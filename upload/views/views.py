@@ -19,6 +19,7 @@ from django.views.decorators.http import require_POST
 from django_downloadview import PathDownloadView
 from jfu.http import upload_receive, UploadResponse, JFUResponse
 
+from annotation.models import AnnotationRun
 from annotation.views import get_build_contigs
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
@@ -28,7 +29,7 @@ from snpdb.models import VCF
 from upload import forms, upload_processing, upload_stats
 from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
     UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, \
-    VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant, TimeFilterMethod
+    VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant, TimeFilterMethod, UploadedVCF
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
     get_uploaded_file_type, get_url_and_data_for_uploaded_file_data, \
     retry_upload_pipeline, get_import_tasks_by_extension
@@ -95,6 +96,12 @@ def uploadedfile_dict(uploaded_file) -> dict:
         try:
             if upload_pipeline.genome_build:
                 data["genome_build"] = str(upload_pipeline.genome_build)
+                if upload_pipeline.status == ProcessingStatus.PROCESSING:
+                    try:
+                        uploaded_vcf = uploaded_file.uploadedvcf
+                        data['remaining_annotation_runs'] = get_remaining_annotation_runs(uploaded_vcf, upload_pipeline.genome_build)
+                    except UploadedVCF.RelatedObjectDoesNotExist:
+                        pass
         except:
             pass  # Genome build is optional
 
@@ -108,6 +115,11 @@ def uploadedfile_dict(uploaded_file) -> dict:
     data['status_image'] = get_icon_for_uploaded_file_status(status)
     data["url"] = url
     return data
+
+
+def get_remaining_annotation_runs(uploaded_vcf, genome_build) -> int:
+    ar_qs = AnnotationRun.get_active_runs(genome_build)
+    return ar_qs.filter(annotation_range_lock__max_variant__lte=uploaded_vcf.max_variant).count()
 
 
 def handle_file_upload(user, django_uploaded_file, path=None) -> UploadedFile:

@@ -84,6 +84,7 @@ from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder, get_tag_styles_and_colors
 from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
+from upload.views.views import get_remaining_annotation_runs
 
 
 @terms_required
@@ -237,6 +238,15 @@ def _get_vcf_length_stats(vcf: VCF) -> dict:
         pass
     return vcf_length_stats
 
+
+def _get_vcf_infos(vcf) -> list[str]:
+    infos = []
+    if vcf.import_status == ImportStatus.IMPORTING:
+        if num_annotation_runs := get_remaining_annotation_runs(vcf.uploadedvcf, vcf.genome_build):
+            infos.append(f"Variants in VCF are being annotated: {num_annotation_runs} annotation runs remaining")
+    return infos
+
+
 def view_vcf(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
@@ -282,6 +292,9 @@ def view_vcf(request, vcf_id):
 
     for warning, _ in vcf.get_warnings():
         messages.add_message(request, messages.WARNING, warning, extra_tags='import-message')
+
+    for info in _get_vcf_infos(vcf):
+        messages.add_message(request, messages.INFO, info, extra_tags='import-message')
 
     has_write_permission = vcf.can_write(request.user)
     if not has_write_permission:
@@ -407,6 +420,9 @@ def view_sample(request, sample_id):
         if valid:
             form.save()
         add_save_message(request, valid, "Sample")
+
+    for info in _get_vcf_infos(sample.vcf):
+        messages.add_message(request, messages.INFO, info, extra_tags='import-message')
 
     sample_locus_count = list(SampleLocusCount.objects.filter(sample=sample).order_by("locus_count"))
     igv_data = get_igv_data(request.user, genome_build=sample.genome_build)

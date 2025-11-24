@@ -977,6 +977,11 @@ class AnnotationRun(TimeStampedModel):
                                           pipeline_type=pipeline_type).first()
         return ar
 
+    @staticmethod
+    def get_active_runs(genome_build):
+        qs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build)
+        return qs.exclude(status__in=AnnotationStatus.get_completed_states())
+
     @property
     def variant_annotation_version(self):
         return self.annotation_range_lock.version
