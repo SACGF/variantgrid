@@ -4,6 +4,7 @@ from django.db.models.aggregates import Count
 from django.template import Library
 
 from ontology.models import OntologyTerm, OntologyService
+from patients.models import Patient
 
 GENES_COLOR = "#99CD83"
 HPO_COLOR = "#FF8C00"
@@ -13,11 +14,13 @@ MATCHES_GRAPH_TEMPLATE = "patients/tags/patient_matches_graph.html"
 register = Library()
 
 
-def match_graph(title, qs, field_label, color, graph_width, graph_height, max_records, click_handler=None, patient_ids=None):
+def match_graph(user, title, qs, field_label, color, graph_width, graph_height, max_records, click_handler=None, patient_ids=None):
     patient_path = "textphenotypematch__text_phenotype__textphenotypesentence__phenotype_description__patienttextphenotype__patient"
     filter_kwargs = {patient_path + "__isnull": False}
+    patients_qs = Patient.filter_for_user(user)
     if patient_ids:
-        filter_kwargs[patient_path + "__in"] = patient_ids
+        patients_qs = patients_qs.filter(pk__in=patient_ids)
+    filter_kwargs[patient_path + "__in"] = patients_qs
 
     qs = qs.filter(**filter_kwargs).annotate(count=Count(patient_path, distinct=True))
     qs = qs.order_by("-count").values_list(field_label, "count")
@@ -40,19 +43,23 @@ def match_graph(title, qs, field_label, color, graph_width, graph_height, max_re
             'click_handler': click_handler}
 
 
-@register.inclusion_tag(MATCHES_GRAPH_TEMPLATE)
-def patient_phenotypes_graph(graph_width=512, graph_height=384, max_records=20, click_handler=None, patient_ids=None):
+@register.inclusion_tag(MATCHES_GRAPH_TEMPLATE, takes_context=True)
+def patient_phenotypes_graph(context, graph_width=512, graph_height=384, max_records=20, click_handler=None, patient_ids=None):
+    user = context['request'].user
     qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HPO)
-    return match_graph("Human Phenotype Ontology", qs, "name", HPO_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
+    return match_graph(user, "Human Phenotype Ontology", qs, "name", HPO_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
 
 
-@register.inclusion_tag(MATCHES_GRAPH_TEMPLATE)
-def patient_omim_graph(graph_width=512, graph_height=384, max_records=20, click_handler=None, patient_ids=None):
+@register.inclusion_tag(MATCHES_GRAPH_TEMPLATE, takes_context=True)
+def patient_omim_graph(context, graph_width=512, graph_height=384, max_records=20, click_handler=None, patient_ids=None):
+    user = context['request'].user
     qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
-    return match_graph("OMIM", qs, "name", OMIM_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
+    return match_graph(user, "OMIM", qs, "name", OMIM_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
 
 
-@register.inclusion_tag(MATCHES_GRAPH_TEMPLATE)
-def patient_genes_graph(graph_width=512, graph_height=384, max_records=20, click_handler=None, patient_ids=None):
+@register.inclusion_tag(MATCHES_GRAPH_TEMPLATE, takes_context=True)
+def patient_genes_graph(context, graph_width=512, graph_height=384, max_records=20, click_handler=None, patient_ids=None):
+    user = context['request'].user
     qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC)
-    return match_graph("Genes", qs, "name", GENES_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
+    return match_graph(user, "Genes", qs, "name", GENES_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
+
