@@ -220,6 +220,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     # discordance
     "discordance_reports": True,
 
+    "classification_candidate_search": False,  # This is for data mining on curation system
     "classification_upload_unmapped": True,
     "condition_matchings": True,
     "condition_match_test": True,
