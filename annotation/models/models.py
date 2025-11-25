@@ -890,6 +890,8 @@ class VCFAnnotationStats(models.Model):
 
 
 class AnnotationRangeLock(models.Model):
+    MIN_SIZE_FOR_SUBDIVISION = 1000  # Do we need this?
+
     version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     min_variant = models.ForeignKey(Variant, related_name='min_variant', on_delete=PROTECT)
     max_variant = models.ForeignKey(Variant, related_name='max_variant', on_delete=PROTECT)
@@ -923,6 +925,11 @@ class AnnotationRangeLock(models.Model):
             if new_max := Variant.objects.filter(q_contig, pk__gte=arl.min_variant_id, pk__lt=arl.max_variant_id).first():
                 arl.max_variant = new_max
                 arl.save()
+
+    def can_subdivide(self) -> bool:
+        """ This is approx (as could be interleaved w/structural etc) """
+        return int(self.max_variant_id) - int(self.min_variant_id) >= self.MIN_SIZE_FOR_SUBDIVISION
+
 
 
 class AnnotationRun(TimeStampedModel):

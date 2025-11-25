@@ -90,9 +90,15 @@ def _handle_variant_annotation_version(variant_annotation_version):
     return range_lock
 
 
-def subdivide_annotation_range_lock(arl: AnnotationRangeLock, minimum_size=1000):
-    # Sometimes we have an annotation run crash or timeout etc, this splits it in half so we can try again
-    # With a smaller run
+def subdivide_annotation_range_lock(arl: AnnotationRangeLock,
+                                    minimum_size=AnnotationRangeLock.MIN_SIZE_FOR_SUBDIVISION) -> AnnotationRangeLock:
+    """ Sometimes we have an annotation run crash or timeout etc, this splits it in half so we can try again
+        With a smaller run
+
+        Range lock passed in becomes bottom half of original range
+        Returns new range lock for top half of original range
+    """
+
     size = int(arl.max_variant_id) - int(arl.min_variant_id)
     if size < minimum_size:
         raise ValueError(f"Cannot subdivide {arl} below minimum size of {minimum_size}")
@@ -124,3 +130,4 @@ def subdivide_annotation_range_lock(arl: AnnotationRangeLock, minimum_size=1000)
 
     logging.info("Shifted old lock down: %s", arl)
     logging.info("New lock created: %s", new_lock)
+    return new_lock

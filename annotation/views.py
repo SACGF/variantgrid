@@ -4,11 +4,10 @@ from collections import defaultdict, Counter
 import cdot
 from django.conf import settings
 from django.contrib import messages
-from django.http.response import HttpResponse, HttpResponseRedirect, Http404, \
+from django.http.response import HttpResponse, Http404, \
     JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
-from django.urls.base import reverse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
@@ -25,7 +24,7 @@ from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
-from annotation.tasks.annotation_scheduler_task import annotation_scheduler
+from annotation.tasks.annotation_scheduler_task import annotation_scheduler, subdivide_annotation_range_lock
 from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
 from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
@@ -408,10 +407,16 @@ def view_annotation_run(request, annotation_run_id):
         pipeline_type=annotation_run.pipeline_type).exclude(pk=annotation_run.pk)
     can_retry_annotation_run = not other_annotation_runs_qs.exists()
     can_retry_annotation_run_upload = can_retry_annotation_run and annotation_run.vcf_annotated_filename
+    can_subdivide_annotation_run = False
+    if arl := annotation_run.annotation_range_lock:
+        can_subdivide_annotation_run = arl.can_subdivide()
 
-    context = {"annotation_run": annotation_run,
-               "can_retry_annotation_run": can_retry_annotation_run,
-               "can_retry_annotation_run_upload": can_retry_annotation_run_upload}
+    context = {
+        "annotation_run": annotation_run,
+        "can_retry_annotation_run": can_retry_annotation_run,
+        "can_retry_annotation_run_upload": can_retry_annotation_run_upload,
+        "can_subdivide_annotation_run": can_subdivide_annotation_run,
+    }
     return render(request, "annotation/view_annotation_run.html", context)
 
 
@@ -426,13 +431,29 @@ def retry_annotation_run(request, annotation_run_id, upload_only=False):
         msg += " (upload only)"
     status = messages.INFO
     messages.add_message(request, status, msg, extra_tags='import-message')
-
-    return HttpResponseRedirect(reverse("view_annotation_run", kwargs={"annotation_run_id": annotation_run.pk}))
+    return redirect(annotation_run)
 
 
 @require_POST
 def retry_annotation_run_upload(request, annotation_run_id):
     return retry_annotation_run(request, annotation_run_id, upload_only=True)
+
+
+@require_POST
+def subdivide_annotation_run(request, annotation_run_id):
+    """ Sometimes runs fail w/out of memory etc (perhaps due to too many transcripts) - be able to subdivide """
+
+    annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
+    new_range_lock = subdivide_annotation_range_lock(annotation_run.annotation_range_lock)
+
+    new_annotation_run = AnnotationRun.objects.create(annotation_range_lock=new_range_lock,
+                                                      pipeline_type=annotation_run.pipeline_type)
+
+    # These runs will get deleted and new ones made during retry
+    annotation_run = annotation_run_retry(annotation_run)
+    _new_annotation_run = annotation_run_retry(new_annotation_run)
+    return redirect(annotation_run)
+
 
 
 @cache_page(WEEK_SECS)
