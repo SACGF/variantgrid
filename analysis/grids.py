@@ -859,7 +859,7 @@ class CandidateColumns(DatatableConfig[LogEntry]):
         return data
 
 
-class AnalysesColumns(DatatableConfig[LogEntry]):
+class AnalysesColumns(DatatableConfig[Analysis]):
     """ For listing Analyses """
     def __init__(self, request):
         super().__init__(request)
@@ -872,12 +872,38 @@ class AnalysesColumns(DatatableConfig[LogEntry]):
             RichColumn(key="name", orderable=True),
             RichColumn(key="user__username", label='User', orderable=True),
             RichColumn(key="analysis_type", label="Type", orderable=True, renderer=self.render_analysis_type),
+            RichColumn(key="created", label='Created', orderable=True, client_renderer='TableFormat.timestamp'),
+            RichColumn(key="modified", label='Modified', orderable=True, client_renderer='TableFormat.timestamp'),
+
         ]
 
     def get_initial_queryset(self) -> QuerySet[Analysis]:
         qs = Analysis.filter_for_user(self.user)
         qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
+
+        params = ['analysis_type', 'my_user', 'date_min', 'date_max']
+        data = {k: self.get_query_param(k) for k in params}
+
+        if filters := self.get_q_list(self.user, data):
+            qs = qs.filter(*filters)
+
         return qs
+
+    @staticmethod
+    def get_q_list(user, params: dict) -> list[Q]:
+        q_list = []
+        if analysis_type := params.get('analysis_type'):
+            q_list.append(Q(analysis_type=analysis_type))
+
+        if params.get('my_user'):
+            q_list.append(Q(user=user))
+
+        if date_min := params.get('date_min'):
+            q_list.append(Q(created__gte=date_min))
+
+        if date_max := params.get('date_max'):
+            q_list.append(Q(modified__lte=date_max))
+        return q_list
 
     @staticmethod
     def render_analysis_type(row: dict[str, Any]):

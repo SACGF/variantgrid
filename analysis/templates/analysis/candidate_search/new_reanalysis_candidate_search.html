@@ -9,8 +9,20 @@
 
 
     function analysesFilter(data, type) {
-
+        data.analysis_type = blankToNull($("#id_analysis_type").val());
+        data.my_user = blankToNull($("input#id_my_user:checked").val());
+        data.date_min = blankToNull($("#id_date_min").val());
+        data.date_max = blankToNull($("#id_date_max").val());
     }
+
+    $(document).ready(() => {
+        let analysisSelects = ["#id_analysis_type", "#id_my_user", "#id_date_min", "#id_date_min"];
+        $(analysisSelects.join(',')).on("change", function() {
+            filterAnalysesGrid();
+        });
+    });
+
+
 </script>
 {% endblock head %}
 {% block new_candidate_search_content %}
@@ -26,7 +38,7 @@
     <div class="container">
         <h3>Search</h3>
         <div>
-            {% crispy reanalysis_candidate_search_form %}
+            {% crispy sample_candidate_search_form %}
         </div>
     </div>
 {% endblock %}

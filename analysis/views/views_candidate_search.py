@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.generic.base import TemplateView, View
 
-from analysis.forms import ReanalysisCandidateSearchForm, AnalysisFilterForm
+from analysis.forms import AnalysisFilterForm, SampleCandidatesSearchForm
 from analysis.models import CandidateSearchRun, Candidate, CandidateStatus, CandidateSearchType
 from classification.views.views import CreateClassificationForVariantView, create_classification_object
 from snpdb.forms import SampleChoiceForm
@@ -22,6 +22,7 @@ def view_candidate_search_run(request, pk) -> HttpResponse:
     # Permission check??
     context = {
         "candidate_search_run": candidate_search_run,
+        "has_write_permission": candidate_search_run.can_write(request.user),
     }
     return render(request, 'analysis/candidate_search/view_candidate_search_run.html', context)
 
@@ -93,12 +94,12 @@ class NewReanalysisCandidateSearchView(AbstractNewCandidateSearchView):
 
         analyses_filter_form = AnalysisFilterForm()
         analyses_filter_form.helper = no_form_helper
-        reanalysis_candidate_search_form = ReanalysisCandidateSearchForm()
-        reanalysis_candidate_search_form.helper = no_form_helper
+        sample_candidate_search_form = SampleCandidatesSearchForm()
+        sample_candidate_search_form.helper = no_form_helper
 
         context = super().get_context_data()
         context["analyses_filter_form"] = analyses_filter_form
-        context["reanalysis_candidate_search_form"] = reanalysis_candidate_search_form
+        context["sample_candidate_search_form"] = sample_candidate_search_form
         return context
 
 

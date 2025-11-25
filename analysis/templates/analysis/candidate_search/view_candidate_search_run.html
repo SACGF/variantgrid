@@ -104,6 +104,7 @@ $(document).ready(function() {
         // is running
         setTimeout(poll_candidate_search_run, update_secs * 1000);
     {% endif %}
+    $("#candidate-search-tabs").tabs();
 });
 
 </script>
@@ -121,21 +122,28 @@ $(document).ready(function() {
         <div class="card-header">
             {{ candidate_search_run }}
         </div>
-        <div class="card-body">
-            {% labelled id='Methods' label='' hint="tiny" %}{{ candidate_search_run.search_version.methods }}{% endlabelled %}
-            {% labelled id='created' label='Created' hint="tiny" %}{{ candidate_search_run.created }}{% endlabelled %}
-            {% labelled id='user' label='User' hint="tiny" %}{{ candidate_search_run.user }}{% endlabelled %}
-            {% labelled id='status' label='Status' hint="tiny" %}
-                <span id="candidate-search-status">{{ candidate_search_run.get_status_display }}</span>
-                <i id="loading-spinner" class="fa fa-spinner"></i>
-            {% endlabelled %}
-            {% if candidate_search_run.error_exception %}
-                {% labelled id='error_exception' label='Error' hint="tiny" %}{{ candidate_search_run.error_exception }}{% endlabelled %}
-            {% endif %}
-            {% labelled admin_only=True id='celery_task' label='Celery Task' hint="tiny" %}{{ candidate_search_run.celery_task }}{% endlabelled %}
-            {% labelled admin_only=True id='config_snapshot' label='Config' hint="tiny" %}{{ candidate_search_run.config_snapshot }}{% endlabelled %}
-            {% labelled admin_only=True id='git_hash' label='Git Hash' hint="tiny" %}{{ candidate_search_run.git_hash }}{% endlabelled %}
-        </div>
+        <div id="candidate-search-tabs">
+            <ul>
+                <li><a href="#details">Details</a></li>
+                {% if has_write_permission %}
+                <li><a href="{% url 'group_permissions' 'analysis.models.CandidateSearchRun' candidate_search_run.pk %}">Sharing / Permissions</a></li>
+                {% endif %}
+            </ul>
+            <div id="details" class="card-body">
+                {% labelled id='Methods' label='' hint="tiny" %}{{ candidate_search_run.search_version.methods }}{% endlabelled %}
+                {% labelled id='created' label='Created' hint="tiny" %}{{ candidate_search_run.created }}{% endlabelled %}
+                {% labelled id='user' label='User' hint="tiny" %}{{ candidate_search_run.user }}{% endlabelled %}
+                {% labelled id='status' label='Status' hint="tiny" %}
+                    <span id="candidate-search-status">{{ candidate_search_run.get_status_display }}</span>
+                    <i id="loading-spinner" class="fa fa-spinner"></i>
+                {% endlabelled %}
+                {% if candidate_search_run.error_exception %}
+                    {% labelled id='error_exception' label='Error' hint="tiny" %}{{ candidate_search_run.error_exception }}{% endlabelled %}
+                {% endif %}
+                {% labelled admin_only=True id='celery_task' label='Celery Task' hint="tiny" %}{{ candidate_search_run.celery_task }}{% endlabelled %}
+                {% labelled admin_only=True id='config_snapshot' label='Config' hint="tiny" %}{{ candidate_search_run.config_snapshot }}{% endlabelled %}
+                {% labelled admin_only=True id='git_hash' label='Git Hash' hint="tiny" %}{{ candidate_search_run.git_hash }}{% endlabelled %}
+            </div>
     </div>
 
     {% if candidate_search_run.status == 'S' %}

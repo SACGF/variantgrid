@@ -134,6 +134,20 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
         CandidateSearchRun.objects.filter(pk=csr.pk).update(celery_task=result.id)
         return csr
 
+    def get_zygosities_from_config(self) -> list[Zygosity]:
+        """ Helper method if you have stored SampleCandidatesSearchForm in config_snapshot"""
+        ZYG_NAMES = {
+            "hom_ref": Zygosity.HOM_REF,
+            "het": Zygosity.HET,
+            "hom_alt": Zygosity.HOM_ALT,
+        }
+
+        zygosities = []
+        for zyg, code in ZYG_NAMES.items():
+            if self.config_snapshot.get(zyg):
+                zygosities.append(code)
+
+        return zygosities
 
 
 class Candidate(TimeStampedModel):

@@ -3,6 +3,7 @@ from collections import defaultdict
 
 from django.utils.timesince import timesince
 
+from analysis.grids import AnalysesColumns
 from analysis.models import Analysis, Candidate, AnalysisNode
 from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -13,12 +14,25 @@ from variantgrid.celery import app
 
 class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
     def get_candidate_records(self, candidate_search_run):
-        # Get out config
+        analysis_filters = AnalysesColumns.get_q_list(candidate_search_run.user, candidate_search_run.config_snapshot)
+        # Search
+        search_max_results = int(candidate_search_run.config_snapshot.get("max_results"))
+        search_max_samples = int(candidate_search_run.config_snapshot.get("max_samples"))
+        zygosities = candidate_search_run.get_zygosities_from_config()
+
 
         records = []
+        sample_records = self._get_sample_candidates(candidate_search_run, analysis_filters, zygosities)
+        for sample, candidates in self.limit_sample_and_results(sample_records, search_max_results, search_max_samples):
+            records.extend(candidates)
+        return records
+
+
+    def _get_sample_candidates(self, candidate_search_run, analysis_filters, zygosities):
+
         for genome_build in GenomeBuild.builds_with_annotation():
             analyses_qs = Analysis.filter_for_user(candidate_search_run.user)
-            analyses_qs = analyses_qs.filter(genome_build=genome_build,
+            analyses_qs = analyses_qs.filter(*analysis_filters, genome_build=genome_build,
                                              visible=True, template_type__isnull=True,
                                              annotation_version__clinvar_version__isnull=False)
 
@@ -69,25 +83,40 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                     # Faster if list??
                     new_patho_variants = new_clinvar_patho_qs.values_list("pk", flat=True)
 
-                    for (sample, analysis) in samples_and_analyses_by_annotation_version[annotation_version]:
+                    for sample, analysis in samples_and_analyses_by_annotation_version[annotation_version]:
                         print(sample, analysis)
-                        sample_qs = sample.get_variant_qs()
-                        for variant in sample_qs.filter(pk__in=new_patho_variants):
+                        sample_qs = sample.get_variant_qs().filter(pk__in=new_patho_variants)
+                        filter_kwargs = {}
+                        #if zygosities:
+                        #    filter_kwargs[f"{sample.zygosity_alias}__in"] = zygosities
+
+                        sample_candidates = []
+                        for variant in sample_qs.filter(**filter_kwargs):
+                            # I benchmarked it and it's ~5x quicker to leave zygosity off the query and do it here
+                            sample_zygosity = getattr(variant, sample.zygosity_alias)
+                            if zygosities and sample_zygosity not in zygosities:
+                                continue
+
                             # TODO: could clinvar for this version be more efficiently done by annotating the QS?
+                            notes = None
                             evidence = {}
                             if clinvar := variant.clinvar_set.filter(version=av_latest.clinvar_version).first():
                                 ts = timesince(analysis_clinvar_date, latest_clinvar_date)
-                                evidence["clinvar"] = f"New ClinVar in version {latest_clinvar_date.date()} ({ts} since analysis): {clinvar.short_summary()}"
-                            records.append(Candidate(
-                                search_run=candidate_search_run,
-                                analysis=analysis,
-                                sample=sample,
-                                variant=variant,
-                                annotation_version=av_latest,
-                                # notes=notes,
-                                evidence=evidence,
-                            ))
+                                notes = f"New ClinVar in version {latest_clinvar_date.date()} ({ts} since analysis): {clinvar.short_summary()}"
 
-        return records
+                            if notes or evidence:
+
+                                candidate = Candidate(
+                                    search_run=candidate_search_run,
+                                    analysis=analysis,
+                                    sample=sample,
+                                    variant=variant,
+                                    annotation_version=av_latest,
+                                    notes=notes,
+                                    evidence=evidence,
+                                    zygosity=sample_zygosity,
+                                )
+                                sample_candidates.append(candidate)
+                        yield sample, sample_candidates
 
 ReAnalysisNewAnnotationTask = app.register_task(ReAnalysisNewAnnotationTask())

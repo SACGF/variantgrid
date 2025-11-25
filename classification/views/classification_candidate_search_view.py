@@ -4,10 +4,10 @@ from django.conf import settings
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404
 
+from analysis.forms import SampleCandidatesSearchForm
 from analysis.models import CandidateSearchRun, CandidateSearchType
 from analysis.views.views_candidate_search import AbstractCandidateSearchView, AbstractNewCandidateSearchView
-from classification.forms import ClassificationAlleleOriginForm, CrossSampleClassificationForm, \
-    ClinicalSignificanceForm, ClassificationEvidenceUpdateForm
+from classification.forms import ClassificationAlleleOriginForm, ClinicalSignificanceForm, ClassificationEvidenceUpdateForm
 from genes.forms import GeneSymbolForm
 from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm
@@ -83,7 +83,7 @@ class NewCrossSampleClassificationCandidateSearchView(AbstractNewClassificationC
         sample_phenotype_form = PhenotypeMultipleSelectForm(prefix="sample")
         sample_phenotype_form.helper.layout = layout
         context["sample_phenotype_form"] = sample_phenotype_form
-        context["sample_classification_form"] = CrossSampleClassificationForm()
+        context["sample_candidate_search_form"] = SampleCandidatesSearchForm()
 
         samples_qs = Sample.filter_for_user(self.request.user)
         context["num_visible_samples"] = samples_qs.count()

@@ -36,14 +36,6 @@ class ClinicalSignificanceForm(forms.Form):
     helper = form_helper_horizontal()
 
 
-class CrossSampleClassificationForm(forms.Form):
-    max_samples = forms.IntegerField(required=False, initial=10, min_value=1)
-    max_results = forms.IntegerField(required=False, initial=20, min_value=1)
-    hom_ref = forms.BooleanField(required=False)
-    het = forms.BooleanField(required=False, initial=True)
-    hom_alt = forms.BooleanField(required=False, initial=True)
-
-
 class ClassificationEvidenceUpdateForm(forms.Form):
     max_results = forms.IntegerField(required=False, initial=10, min_value=1)
     population = forms.BooleanField(required=False, initial=True)

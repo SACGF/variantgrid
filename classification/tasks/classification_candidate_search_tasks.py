@@ -80,19 +80,6 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
             yield c
 
     @staticmethod
-    def limit_sample_and_results(sample_records, max_samples, max_results):
-        num_results = 0
-        for sample, results in itertools.islice(sample_records, max_samples):
-            max_remaining = max_results - num_results
-            if max_remaining <= 0:
-                break
-            limited = results[:max_remaining]
-            yield sample, limited
-            num_results += len(limited)
-            if num_results >= max_results:
-                break
-
-    @staticmethod
     def _get_sample_qs(user, config: dict):
         # Sample filters
         sample_filters = []
@@ -160,16 +147,7 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
         # Search
         search_max_results = int(config.get("max_results"))
         search_max_samples = int(config.get("max_samples"))
-        ZYG_NAMES = {
-            "hom_ref": Zygosity.HOM_REF,
-            "het": Zygosity.HET,
-            "hom_alt": Zygosity.HOM_ALT,
-        }
-
-        zygosities = []
-        for zyg, code in ZYG_NAMES.items():
-            if config.get(zyg):
-                zygosities.append(code)
+        zygosities = candidate_search_run.get_zygosities_from_config()
 
         records = []
         sample_records = self._sample_classification_overlaps(sample_qs, cm_qs, zygosities)
