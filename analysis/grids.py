@@ -765,6 +765,8 @@ class CandidateColumns(DatatableConfig[LogEntry]):
         self.rich_columns = [
             RichColumn('id', visible=False),
             RichColumn(key="status", orderable=True, renderer=self.render_status),
+            RichColumn(name="action", label="Action",
+                       renderer=self.render_action, client_renderer='candidate_action_renderer'),
             RichColumn(key="variant", label="Variant", orderable=True,
                        renderer=self.render_variant_link, client_renderer='TableFormat.linkUrl'),
             RichColumn(key="notes", orderable=True),
@@ -780,9 +782,6 @@ class CandidateColumns(DatatableConfig[LogEntry]):
 
         # Show/hide various columns based on search type (as we only use some)
         optional_columns = [
-            # search type is used as an "Action" (as we don't need to see the type as they are all the same)
-            RichColumn(key="search_run__search_version__search_type", label="Action", orderable=True,
-                       renderer=self.render_search_type, client_renderer='candidate_action_renderer'),
             RichColumn(key="classification",
                        label="Classification",
                        orderable=True,
@@ -806,6 +805,10 @@ class CandidateColumns(DatatableConfig[LogEntry]):
 
     def get_initial_queryset(self) -> QuerySet[Candidate]:
         qs = Candidate.objects.filter(search_run=self.csr)
+
+        if candidate_status := self.get_query_param("candidate_status"):
+            candidates = candidate_status.split(",")
+            qs = qs.filter(status__in=candidates)
         return qs
 
     @staticmethod
@@ -848,12 +851,13 @@ class CandidateColumns(DatatableConfig[LogEntry]):
         }
 
     @staticmethod
-    def render_search_type(row: dict[str, Any]) -> JsonDataType:
-        # search_type = row["search_run__search_version__search_type"]
+    def render_action(row: dict[str, Any]) -> JsonDataType:
         data = {}
-        if row["status"] == CandidateStatus.OPEN:
-            data["url"] = reverse("classify_candidate", args=[row["id"]]),
-            data["text"] = "Classify sample"
+        if row["status"] in (CandidateStatus.OPEN, CandidateStatus.HIGHLIGHTED):
+            # Only do this if there is a sample
+            if row.get("sample_id"):
+                data["url"] = reverse("classify_candidate", args=[row["id"]]),
+                data["text"] = "Classify sample"
 
         return data
 

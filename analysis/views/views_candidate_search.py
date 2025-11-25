@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.generic.base import TemplateView, View
 
-from analysis.forms import AnalysisFilterForm, SampleCandidatesSearchForm
+from analysis.forms import AnalysisFilterForm, SampleCandidatesSearchForm, CandidateStatusForm
 from analysis.models import CandidateSearchRun, Candidate, CandidateStatus, CandidateSearchType
 from classification.views.views import CreateClassificationForVariantView, create_classification_object
 from snpdb.forms import SampleChoiceForm
@@ -23,6 +23,7 @@ def view_candidate_search_run(request, pk) -> HttpResponse:
     context = {
         "candidate_search_run": candidate_search_run,
         "has_write_permission": candidate_search_run.can_write(request.user),
+        "candidate_status_form": CandidateStatusForm(),
     }
     return render(request, 'analysis/candidate_search/view_candidate_search_run.html', context)
 

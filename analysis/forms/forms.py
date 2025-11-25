@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.forms.widgets import TextInput
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate, AnalysisTemplateVersion, \
-    AnalysisNode
+    AnalysisNode, CandidateStatus
 from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample, AnalysisType
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
@@ -393,3 +393,17 @@ class SampleCandidatesSearchForm(forms.Form):
     hom_ref = forms.BooleanField(required=False)
     het = forms.BooleanField(required=False, initial=True)
     hom_alt = forms.BooleanField(required=False, initial=True)
+
+
+class CandidateStatusForm(forms.Form):
+    candidate_status = forms.MultipleChoiceField(
+        choices=CandidateStatus.choices,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["candidate_status"].initial = [CandidateStatus.OPEN, CandidateStatus.HIGHLIGHTED]
+
+

@@ -127,9 +127,7 @@
         }
 
         classificationSelects = classificationSelects.concat(getOntologySelects("classification"))
-        $(classificationSelects.join(',')).on("change", function() {
-            filterClassificationGrid();
-        });
+        $(classificationSelects.join(',')).on("change", filterClassificationGrid);
     });
 </script>
 {% endblock %}

@@ -70,6 +70,7 @@ function candidate_action_renderer(data, type, row) {
     if (url && text) {
         dom.append($("<a>", {href: url, html: text}));
     }
+    // console.log(row);
     return outterDom;
 }
 
@@ -95,8 +96,19 @@ function classification_summary_renderer(data, type, row) {
     return outterDom;
 }
 
-function candidateSearchRunDatatableFilter(data, type) {
 
+function filterCandidateSearchRunGrid() {
+    console.log("filterCandidateSearchRunGrid");
+    $('#candidate-datatable').DataTable().ajax.reload();
+}
+
+
+function candidateSearchRunDatatableFilter(data, type) {
+    console.log("candidateSearchRunDatatableFilter");
+    const checked = $("#id_candidate_status input:checked");
+    const values = checked.map((_, el) => $(el).val()).get();
+    data.candidate_status = values.join(",");
+    console.log(data);
 }
 
 $(document).ready(function() {
@@ -105,6 +117,8 @@ $(document).ready(function() {
         setTimeout(poll_candidate_search_run, update_secs * 1000);
     {% endif %}
     $("#candidate-search-tabs").tabs();
+
+    $("#id_candidate_status input[type=checkbox]").on('change', filterCandidateSearchRunGrid);
 });
 
 </script>
@@ -148,6 +162,8 @@ $(document).ready(function() {
 </div>
 
 {% if candidate_search_run.status == 'S' %}
+{{ candidate_status_form }}
+
 <div class="container-table">
     <table id="candidate-datatable" data-datatable-url="{% url 'candidate_datatable' candidate_search_run.pk %}" class="sticky-header samples-table" data-adjust-columns="false" data-datatable-data="candidateSearchRunDatatableFilter"></table>
 </div>

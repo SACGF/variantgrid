@@ -11,7 +11,8 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from analysis.models import AnalysisVariable, AnalysisTemplate, NodeCount, VariantTag, CandidateSearchRun
+from analysis.models import AnalysisVariable, AnalysisTemplate, NodeCount, VariantTag, CandidateSearchRun, Candidate, \
+    CandidateStatus
 from analysis.models.enums import TagLocation
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, AnalysisNode
@@ -454,4 +455,19 @@ def get_candidate_search_run_json(request, pk):
     candidate_search_run = CandidateSearchRun.get_for_user(request.user, pk=pk)
     serializer = CandidateSearchRunSerializer(candidate_search_run)
     return JsonResponse(serializer.data)
+
+
+@require_POST
+def set_candidate_status(request, candidate_search_run_id):
+    csr = CandidateSearchRun.get_for_user(request.user, pk=candidate_search_run_id, write=True)
+
+    candidate_id = request.POST["candidate_id"]
+    status = request.POST["status"]
+
+    candidate = csr.candidate_set.get(pk=candidate_id)
+    candidate.status = CandidateStatus(status)
+    candidate.reviewer = request.user
+    candidate.save()
+
+
 
