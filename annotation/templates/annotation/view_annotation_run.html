@@ -27,6 +27,12 @@
             <button type='submit' class="btn btn-primary">Retry Annotation (upload only)</button>
           </form>
         {% endif %}
+        {% if can_subdivide_annotation_run %}
+          <form id="subdivide-annotation-upload-form" action={% url 'subdivide_annotation_run' annotation_run.pk %} method="post">
+            {% csrf_token %}
+              <button type='submit' class="btn btn-primary">Subdivide AnnotationRun</button>
+          </form>
+        {% endif %}
     </div>
 
     <div class="card">
