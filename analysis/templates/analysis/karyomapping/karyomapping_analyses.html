@@ -21,10 +21,6 @@
                 <div class="card-header">Create</div>
                 <div class="card-body">
                     {% labelled label="Trio" %}{{ trio_form.trio }} {{ trio_form.media }}{% endlabelled %}
-                    {% comment %}
-                    <label>Trio</label>
-                    <span>{% crispy_field trio_form.trio %} {{ trio_form.media }}</span>
-                    {% endcomment %}
                     <button class="btn btn-primary" id='new-karyomapping-analysis' type='button'><i class="fas fa-plus-circle"></i> Create for Trio</button>
                 </div>
             </div>

@@ -11,7 +11,7 @@
         {% if clinvar %}
             <a class="hover-link external-link" href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">View on ClinVar</a>
             {% if expert_panel_only %}
-                {% comment %}if we're only interested in showing expert panel data{% endcomment %}
+                {# if we're only interested in showing expert panel data #}
                 {% if data.is_expert_panel_or_greater %}
                     <div class="mt-2">
                         <div data-toggle="ajax" href="{% url "view_clinvar_records_detail" clinvar.clinvar_variation_id min_stars %}">
@@ -22,8 +22,7 @@
                     <span class="text-muted">|</span> <span class="no-value">No expert panel available as of ClinVar Export {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}</span>
                 {% endif %}
             {% else %}
-                {% comment %}Showing summary data as well as all records as they're fetchd live from ClinVar{% endcomment %}
-                {% comment %}Do we need to restore more data that was in ClinVar tag before? e.g. drug_response {% endcomment %}
+                {# Showing summary data as well as all records as they're fetched live from ClinVar. Do we need to restore more data that was in ClinVar tag before? e.g. drug_response #}
                 <span class="text-muted">|</span> Summary Data as of {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}
                 {% admin_link clinvar %}
                 <div class="mt-4">

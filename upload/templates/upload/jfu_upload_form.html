@@ -26,9 +26,7 @@
 {% endblock %}
 
 {% block JS_DOWNLOAD_TEMPLATE_PREVIEW %}
-{% comment %}
-No link for the thumbnail
-{% endcomment %}
+{# No link for the thumbnail #}
 
 <td>
     <span class="preview">
@@ -40,9 +38,7 @@ No link for the thumbnail
 {% endblock %}
 
 {% block JS_DOWNLOAD_TEMPLATE_DOWNLOAD %}
-	{% comment %}
-	Don't have data-gallery
-	{% endcomment %}
+	{# Don't have data-gallery  #}
     <td class="upload-name" uploaded_file_id="{{ JQ_OPEN }}=file.uploaded_file_id{{ JQ_CLOSE }}">
         <div title="{{ JQ_OPEN }}=file.file_type{{ JQ_CLOSE }}" class='file_type_icon file-type-{{ JQ_OPEN }}=file.file_type_code{{ JQ_CLOSE }}'></div>
         <div class="uploaded-file-details">
@@ -86,24 +82,17 @@ No link for the thumbnail
 
 
 {% block JS_JQUERY %}
-    {% comment %}
- 	JQuery already included
-    {% endcomment %}
+ 	{# JQuery already included #}
 {% endblock %}
 
 
 
 
 {% block JS_BOOTSTRAP %}
-    {% comment %}
-    bootstrap already loaded
-    {% endcomment %}
+    {# bootstrap already loaded #}
 {% endblock %}
 {% block CSS_BOOTSTRAP %}
-    {% comment %}
-    only support for bootstrap 3
-    Just use our existing bootstrap
-    {% endcomment %}
+    {# only support for bootstrap 3. Just use our existing bootstrap #}
     <style>
         .fade:not(.show) {
             opacity: 1 !important;
@@ -116,11 +105,8 @@ No link for the thumbnail
 
 
 {% block JS_JQUERY_FILEUPLOAD_UI %}
-{% comment %}
- The File Upload user interface plugin.
- dlawrence - Also added jquery UI to get that to work
-{% endcomment %}
-<script src="{% static 'js/jquery.fileupload-ui.js' %}"></script>
-<script src="{% static 'js/jquery.fileupload-jquery-ui.js' %}"></script>
+    {# The File Upload user interface plugin. Also added jquery UI to get that to work  #}
+    <script src="{% static 'js/jquery.fileupload-ui.js' %}"></script>
+    <script src="{% static 'js/jquery.fileupload-jquery-ui.js' %}"></script>
 {% endblock %}
 
