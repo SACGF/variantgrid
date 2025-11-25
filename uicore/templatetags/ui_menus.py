@@ -9,12 +9,20 @@ from variantgrid.perm_path import get_visible_url_names
 register = Library()
 UNSET = '!@#$%^&*()'
 
+def _validate_method(method: str) -> str:
+    method = method.lower()
+    valid_methods = ['get', 'post']
+    if method not in valid_methods:
+        raise ValueError(f"{method=} not in {', '.join(valid_methods)}")
+    return method
+
 
 @register.inclusion_tag("uicore/tags/menu_item.html", takes_context=True)
 def menu_top(context,
              url_name: str,
              app_name: str,
-             title: str = None):
+             title: str = None,
+             method='get'):
     url = None
     for url_name_part in url_name.split('|'):
         if get_visible_url_names().get(url_name_part):
@@ -41,7 +49,8 @@ def menu_top(context,
         'active': is_active,
         'type': 'top',
         'title': title,
-        'id': f'menu-top-{app_names[0]}'
+        'id': f'menu-top-{app_names[0]}',
+        'method': _validate_method(method),
     }
 
 
@@ -58,7 +67,9 @@ def menu_item(
         href: Optional[str] = None,
         admin_only=False,
         external=False,
+        method='get',
         other_urls: Optional[str] = None):
+    """ :parameter method - get generates link, post generates form"""
 
     request = context.request
     if admin_only and not request.user.is_superuser:
@@ -111,7 +122,8 @@ def menu_item(
         'type': 'side',
         'badge_count': badge_count,
         'id': f'submenu-{url_name}',
-        'external': external
+        'external': external,
+        'method': _validate_method(method),
     }
 
 
