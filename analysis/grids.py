@@ -849,12 +849,11 @@ class CandidateColumns(DatatableConfig[LogEntry]):
 
     @staticmethod
     def render_search_type(row: dict[str, Any]) -> JsonDataType:
-        search_type = row["search_run__search_version__search_type"]
+        # search_type = row["search_run__search_version__search_type"]
         data = {}
-        if search_type == CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION.value:
-            if row["status"] == CandidateStatus.OPEN:
-                data["url"] = reverse("classify_candidate", args=[row["id"]]),
-                data["text"] = "Classify sample"
+        if row["status"] == CandidateStatus.OPEN:
+            data["url"] = reverse("classify_candidate", args=[row["id"]]),
+            data["text"] = "Classify sample"
 
         return data
 

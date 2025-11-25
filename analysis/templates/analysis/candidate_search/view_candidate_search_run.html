@@ -111,7 +111,6 @@ $(document).ready(function() {
 {% endblock %}
 {% block content %}
 <div class="container">
-
     {% with back_url=candidate_search_run.search_version.get_type_base_page_url %}
         {% if back_url %}
             <a href="{{ back_url }}">Back to runs</a>
@@ -144,13 +143,14 @@ $(document).ready(function() {
                 {% labelled admin_only=True id='config_snapshot' label='Config' hint="tiny" %}{{ candidate_search_run.config_snapshot }}{% endlabelled %}
                 {% labelled admin_only=True id='git_hash' label='Git Hash' hint="tiny" %}{{ candidate_search_run.git_hash }}{% endlabelled %}
             </div>
-    </div>
-
-    {% if candidate_search_run.status == 'S' %}
-        <div>
-            <table id="candidate-datatable" data-datatable-url="{% url 'candidate_datatable' candidate_search_run.pk %}" class="sticky-header samples-table" data-adjust-columns="false" data-datatable-data="candidateSearchRunDatatableFilter"></table>
         </div>
-    {% endif %}
-
+    </div>
 </div>
+
+{% if candidate_search_run.status == 'S' %}
+<div class="container-table">
+    <table id="candidate-datatable" data-datatable-url="{% url 'candidate_datatable' candidate_search_run.pk %}" class="sticky-header samples-table" data-adjust-columns="false" data-datatable-data="candidateSearchRunDatatableFilter"></table>
+</div>
+{% endif %}
+
 {% endblock %}
