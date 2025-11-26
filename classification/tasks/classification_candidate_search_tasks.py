@@ -40,7 +40,7 @@ class ClassificationCandidateSearchMixin:
         # request.GET.get("classification_id_filter")
         if lab_id := config.get("lab"):
             lab_list = lab_id.split(",")
-            cm_filters.append(Q(lab__pk__in=lab_list))
+            cm_filters.append(Q(classification__lab__pk__in=lab_list))
 
         if ontology_terms := config.get("ontology_term_id"):
             terms = []
