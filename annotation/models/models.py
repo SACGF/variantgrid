@@ -1872,6 +1872,9 @@ class AnnotationVersion(models.Model):
     def get_human_protein_atlas_annotation(self):
         return HumanProteinAtlasAnnotation.objects.filter(version=self.human_protein_atlas_version)
 
+    def __lt__(self, other):
+        return self.pk < other.pk
+
     def __str__(self):
         sub_versions = [f"Variant: {self.variant_annotation_version}",
                         f"Gene: {self.gene_annotation_version}",
