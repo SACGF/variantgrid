@@ -61,7 +61,7 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                     if analyses := sample_analyses[sample]:
                         # highest annotation version, tiebreaker = last analysed
                         analysis = max(analyses, key=lambda a: (a.annotation_version_id, a.modified))
-                        samples_and_analyses_by_annotation_version[analysis.annotation_version].append((sample, analysis))
+                        samples_and_analyses_by_annotation_version[analysis.annotation_version_id].append((sample, analysis))
 
                 for annotation_version in sorted(samples_and_analyses_by_annotation_version):
                     if annotation_version.clinvar_version.pk >= av_latest.clinvar_version.pk:

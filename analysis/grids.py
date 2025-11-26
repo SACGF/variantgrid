@@ -773,8 +773,8 @@ class CandidateColumns(DatatableConfig[LogEntry]):
                        renderer=self.render_variant_link, client_renderer='TableFormat.linkUrl'),
             RichColumn(key="notes", orderable=True),
             RichColumn(key="evidence", label="Evidence", orderable=True, client_renderer='TableFormat.json'),
-            RichColumn(key="reviewer__username", label="Reviewer", orderable=True),
-            RichColumn(key="reviewer_comment", label="Reviewer Comment", orderable=True),
+            # RichColumn(key="reviewer__username", label="Reviewer", orderable=True),
+            # RichColumn(key="reviewer_comment", label="Reviewer Comment", orderable=True),
             RichColumn(
                 key='sample_id',
                 name='sample_id',
