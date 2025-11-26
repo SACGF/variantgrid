@@ -30,7 +30,6 @@ let update_secs = INITIAL_UPDATE_SECS;
 // use exponential backoff
 // upon it being anything different than the page, reload
 function poll_candidate_search_run() {
-    console.log("poll_candidate_search_run");
     $("#candidate-search-status").hide();
     $("#loading-spinner").show();
 
@@ -39,7 +38,6 @@ function poll_candidate_search_run() {
         dataType: 'json',
         success: function(data) {
             $("#loading-spinner").hide();
-            console.log(data);
             let initialStatus = "{{ candidate_search_run.status }}";
             if (data["status"] !== initialStatus) {
                 window.location.reload();
@@ -47,7 +45,6 @@ function poll_candidate_search_run() {
                 if (update_secs < MAX_UPDATE_SECS) {
                     update_secs *= 2;
                 }
-                console.log("Sleeping for " + update_secs + " secs");
                 setTimeout(poll_candidate_search_run, update_secs * 1000);
                 $("#candidate-search-status").show();
             }
@@ -65,7 +62,6 @@ function setCandidateStatus(candidateId, status) {
     let payload = {
         "status": status
     };
-    console.log("ajax start");
     $.ajax({
         type: "POST",
         url: Urls.set_candidate_status(candidateId),
@@ -77,7 +73,6 @@ function setCandidateStatus(candidateId, status) {
             console.log(`set_candidate_status failed: ${errorThrown}`)
         }
     });
-    console.log("ajax done");
 }
 
 
@@ -142,17 +137,14 @@ function classification_summary_renderer(data, type, row) {
 
 
 function filterCandidateSearchRunGrid() {
-    console.log("filterCandidateSearchRunGrid");
     $('#candidate-datatable').DataTable().ajax.reload();
 }
 
 
 function candidateSearchRunDatatableFilter(data, type) {
-    console.log("candidateSearchRunDatatableFilter");
     const checked = $("#id_candidate_status input:checked");
     const values = checked.map((_, el) => $(el).val()).get();
     data.candidate_status = values.join(",");
-    console.log(data);
 }
 
 $(document).ready(function() {
