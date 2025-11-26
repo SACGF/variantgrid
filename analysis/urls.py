@@ -156,7 +156,7 @@ urlpatterns = [
     path('candidate_search/candidate/classify/<int:candidate_id>',
          views_candidate_search.CreateClassificationForCandidateView.as_view(),
          name='classify_candidate'),
-    path('candidate_search/json/<int:set_candidate_status>/set_candidate_status', views_json.set_candidate_status,
+    path('candidate_search/json/<int:candidate_id>/', views_json.set_candidate_status,
          name='set_candidate_status'),
     path('candidate_search/json/<int:pk>', views_json.get_candidate_search_run_json,
          name='get_candidate_search_run_json'),

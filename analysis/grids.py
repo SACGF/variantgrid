@@ -857,7 +857,8 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             # Only do this if there is a sample
             if row.get("sample_id"):
                 data["url"] = reverse("classify_candidate", args=[row["id"]]),
-                data["text"] = "Classify sample"
+                data["text"] = "📑"
+                data["title"] = "Classify sample"
 
         return data
 

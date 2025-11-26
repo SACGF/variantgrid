@@ -61,17 +61,61 @@ function poll_candidate_search_run() {
 
 }
 
+function setCandidateStatus(candidateId, status) {
+    let payload = {
+        "status": status
+    };
+    console.log("ajax start");
+    $.ajax({
+        type: "POST",
+        url: Urls.set_candidate_status(candidateId),
+        data: payload,
+        success: function(data) {
+            filterCandidateSearchRunGrid(); // reload grid
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.log(`set_candidate_status failed: ${errorThrown}`)
+        }
+    });
+    console.log("ajax done");
+}
+
 
 function candidate_action_renderer(data, type, row) {
-    let outterDom = $('<div>').css("display", "inline-block");
-    let dom = $('<div>').appendTo(outterDom);
+    let outerDom = $('<div>').css("display", "inline-block");
+    let dom = $('<div>').appendTo(outerDom);
     let url = data['url'];
     let text = data['text'];
+    let title = data['title'];
+
     if (url && text) {
-        dom.append($("<a>", {href: url, html: text}));
+        dom.append($("<a>", {href: url, html: text, 'title': title}));
     }
-    // console.log(row);
-    return outterDom;
+    let candidateId = row["id"];
+    let status = row["status"];
+    let buttons = {
+        "highlight": $('<i>', {class: "fa-solid fa-highlighter"}),
+        "unhighlight": $('<i>', {class: "fa-solid fa-highlighter", style: "opacity:.3"}),
+        "hide": $('<i>', {class: "fa-regular fa-eye-slash"}),
+        "unhide": $('<i>', {class: "fa-regular fa-eye"}),
+        "resolve": "✅",
+        "re-open": "🔄"
+    }
+    let stateChanges = {
+        "OPEN": {"highlight": "L", "hide": "D", "resolve": "R"},
+        "RESOLVED": {"re-open": "O"},
+        "HIDDEN": {"unhide": "O"},
+        "HIGHLIGHTED": {"unhighlight": "O"},
+    }
+    // <i class="fa-solid fa-highlighter"></i>
+    let nextStates = stateChanges[status]
+    for (const [state, status] of Object.entries(nextStates)) {
+        let button = buttons[state];
+        let link = $("<a>", {href: `javascript:setCandidateStatus(${candidateId}, "${status}")`, title: state});
+        link.append(button);
+        dom.append(link);
+    }
+    return outerDom;
 }
 
 function classification_summary_renderer(data, type, row) {
@@ -82,8 +126,8 @@ function classification_summary_renderer(data, type, row) {
         '4': 'LP',
         '5': 'P',
     }
-    let outterDom = $('<div>').css("display", "inline-block");
-    let dom = $('<div>').appendTo(outterDom);
+    let outerDom = $('<div>').css("display", "inline-block");
+    let dom = $('<div>').appendTo(outerDom);
 
     let hgvs = data["c_hgvs"] || data["g_hgvs"];
     let classificationId = data["classification"];
@@ -93,7 +137,7 @@ function classification_summary_renderer(data, type, row) {
     let csVal = CLIN_SIG[data["clinical_significance"]] || "";
     let csClass = `cs-` + (csVal || '').toLowerCase()
     dom.append($('<span>', {class: `c-pill cs ${csClass}`, html: csVal}));
-    return outterDom;
+    return outerDom;
 }
 
 

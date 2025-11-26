@@ -458,16 +458,13 @@ def get_candidate_search_run_json(request, pk):
 
 
 @require_POST
-def set_candidate_status(request, candidate_search_run_id):
-    csr = CandidateSearchRun.get_for_user(request.user, pk=candidate_search_run_id, write=True)
-
-    candidate_id = request.POST["candidate_id"]
-    status = request.POST["status"]
-
-    candidate = csr.candidate_set.get(pk=candidate_id)
+def set_candidate_status(request, candidate_id):
+    candidate = Candidate.get_permission_check(candidate_id, request.user, write=True)
+    status = request.POST.get("status")
     candidate.status = CandidateStatus(status)
     candidate.reviewer = request.user
     candidate.save()
+    return JsonResponse({"success": True})
 
 
 
