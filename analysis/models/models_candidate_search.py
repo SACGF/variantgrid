@@ -7,6 +7,8 @@ Note on naming:
 * "Finding" in clinical contexts means real observed/reported result
 
 """
+from collections import Counter
+
 from celery.canvas import Signature
 from django.contrib.auth.models import User
 from django.db import models
@@ -99,8 +101,8 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
 
     CANDIDATE_GRID_COLUMNS = {
         CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ["sample__name", "analysis", "annotation_version", "zygosity"],
-        CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ["classification", "sample__name", "zygosity"],
-        CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ["classification", "annotation_version"],
+        CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ["classification", "classification__clinical_significance", "sample__name", "zygosity"],
+        CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ["classification", "classification__clinical_significance", "annotation_version"],
     }
 
     def __str__(self):
@@ -111,6 +113,12 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
 
     def get_absolute_url(self) -> str:
         return reverse("view_candidate_search_run", kwargs={"pk": self.pk})
+
+    def get_candidate_evidence_counts(self) -> Counter:
+        evidence_counts = Counter()
+        for evidence in self.candidate_set.all().values_list("evidence", flat=True):
+            evidence_counts.update(evidence.keys())
+        return evidence_counts
 
     @staticmethod
     def create_and_launch_job(user, search_type, config_snapshot: dict) -> 'CandidateSearchRun':

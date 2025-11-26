@@ -407,3 +407,25 @@ class CandidateStatusForm(forms.Form):
         self.fields["candidate_status"].initial = [CandidateStatus.OPEN, CandidateStatus.HIGHLIGHTED]
 
 
+def get_mult_choice_form(choices, field_name: str, initial=None):
+    """ initial = initially selected, default=all """
+    if initial is None:
+        initial = [c[0] for c in choices]
+
+    fields = {
+        field_name: forms.MultipleChoiceField(
+            choices=choices,
+            widget=forms.CheckboxSelectMultiple,
+            required=False,
+            label=field_name.capitalize(),
+        )
+    }
+
+    FormClass = type("MultiChoiceForm", (forms.Form,), fields)
+
+    class WrappedForm(FormClass):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.fields[field_name].initial = initial
+
+    return WrappedForm

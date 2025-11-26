@@ -1,5 +1,7 @@
+import operator
 import time
 from collections import defaultdict
+from functools import reduce
 from typing import Optional, Any, Callable
 
 import pandas as pd
@@ -782,13 +784,16 @@ class CandidateColumns(DatatableConfig[LogEntry]):
 
         # Show/hide various columns based on search type (as we only use some)
         optional_columns = [
+            RichColumn(key="classification__clinical_significance",
+                       label="Clin Sig",
+                       orderable=True,
+                       client_renderer="classification_clinical_significance_renderer"),
             RichColumn(key="classification",
                        label="Classification",
                        orderable=True,
                        extra_columns=[
                            'classification__evidence__c_hgvs__value',
                            'classification__evidence__g_hgvs__value',
-                           'classification__clinical_significance',
                            'classification__condition_resolution__display_text',
                        ],
                        renderer=self.render_classification_summary,
@@ -810,6 +815,13 @@ class CandidateColumns(DatatableConfig[LogEntry]):
         if candidate_status := self.get_query_param("candidate_status"):
             candidates = candidate_status.split(",")
             qs = qs.filter(status__in=candidates)
+
+        if evidence := self.get_query_param("evidence"):
+            evidence_keys = evidence.split(",")
+            q_list = [Q(**{f"evidence__{ek}__isnull": False}) for ek in evidence_keys]
+            if q_list:
+                q = reduce(operator.or_, q_list)
+                qs = qs.filter(q)
         return qs
 
     @staticmethod
@@ -848,7 +860,6 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             "classification": row["classification"],
             'c_hgvs': row.get('classification__evidence__c_hgvs__value'),
             'g_hgvs': row.get('classification__evidence__g_hgvs__value'),
-            'clinical_significance': row.get('classification__clinical_significance'),
             'classification__condition_resolution__display_text': row.get('classification__condition_resolution__display_text'),
         }
 

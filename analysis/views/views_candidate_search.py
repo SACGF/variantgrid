@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.generic.base import TemplateView, View
 
-from analysis.forms import AnalysisFilterForm, SampleCandidatesSearchForm, CandidateStatusForm
+from analysis.forms import AnalysisFilterForm, SampleCandidatesSearchForm, CandidateStatusForm, get_mult_choice_form
 from analysis.models import CandidateSearchRun, Candidate, CandidateStatus, CandidateSearchType
 from classification.views.views import CreateClassificationForVariantView, create_classification_object
 from snpdb.forms import SampleChoiceForm
@@ -18,12 +18,15 @@ from snpdb.models import GenomeBuild
 
 def view_candidate_search_run(request, pk) -> HttpResponse:
     """ This is the generic results page """
-    candidate_search_run = get_object_or_404(CandidateSearchRun, pk=pk)
-    # Permission check??
+    candidate_search_run = CandidateSearchRun.get_for_user(request.user, pk=pk)
+    evidence_counts = candidate_search_run.get_candidate_evidence_counts()
+    evidence_choices = [(k, f"{k}: {v}") for k, v in evidence_counts.items()]
+
     context = {
         "candidate_search_run": candidate_search_run,
         "has_write_permission": candidate_search_run.can_write(request.user),
         "candidate_status_form": CandidateStatusForm(),
+        "evidence_form": get_mult_choice_form(evidence_choices, "evidence"),
     }
     return render(request, 'analysis/candidate_search/view_candidate_search_run.html', context)
 

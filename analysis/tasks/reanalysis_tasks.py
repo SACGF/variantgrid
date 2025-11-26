@@ -102,10 +102,9 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                             evidence = {}
                             if clinvar := variant.clinvar_set.filter(version=av_latest.clinvar_version).first():
                                 ts = timesince(analysis_clinvar_date, latest_clinvar_date)
-                                notes = f"New ClinVar in version {latest_clinvar_date.date()} ({ts} since analysis): {clinvar.short_summary()}"
+                                evidence["new_clinvar"] = f"New ClinVar in version {latest_clinvar_date.date()} ({ts} since analysis): {clinvar.short_summary()}"
 
                             if notes or evidence:
-
                                 candidate = Candidate(
                                     search_run=candidate_search_run,
                                     analysis=analysis,

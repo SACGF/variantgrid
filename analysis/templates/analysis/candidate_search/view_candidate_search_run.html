@@ -114,6 +114,23 @@ function candidate_action_renderer(data, type, row) {
 }
 
 function classification_summary_renderer(data, type, row) {
+    let outerDom = $('<div>').css("display", "inline-block");
+    let dom = $('<div>').appendTo(outerDom);
+
+    let hgvs = data["c_hgvs"] || data["g_hgvs"];
+    let classificationId = data["classification"];
+    let classificationUrl = Urls.view_classification(classificationId);
+    let classificationLink = $("<a>", {href: classificationUrl, html: hgvs})
+    dom.append(classificationLink);
+
+    let conditionResolution = data['classification__condition_resolution__display_text']
+    if (conditionResolution) {
+        dom.append($('<span>', {html: conditionResolution}));
+    }
+    return outerDom;
+}
+
+function classification_clinical_significance_renderer(data, type, row) {
     const CLIN_SIG = {
         '1': 'B',
         '2': 'LB',
@@ -123,20 +140,9 @@ function classification_summary_renderer(data, type, row) {
     }
     let outerDom = $('<div>').css("display", "inline-block");
     let dom = $('<div>').appendTo(outerDom);
-
-    let hgvs = data["c_hgvs"] || data["g_hgvs"];
-    let classificationId = data["classification"];
-    let classificationUrl = Urls.view_classification(classificationId);
-    let classificationLink = $("<a>", {href: classificationUrl, html: hgvs})
-    dom.append(classificationLink);
-    let csVal = CLIN_SIG[data["clinical_significance"]] || "";
+    let csVal = CLIN_SIG[data] || "";
     let csClass = `cs-` + (csVal || '').toLowerCase()
     dom.append($('<span>', {class: `c-pill cs ${csClass}`, html: csVal}));
-
-    let conditionResolution = data['classification__condition_resolution__display_text']
-    if (conditionResolution) {
-        dom.append($('<span>', {html: conditionResolution}));
-    }
     return outerDom;
 }
 
@@ -146,10 +152,15 @@ function filterCandidateSearchRunGrid() {
 }
 
 
+function getMultiSelectValues(selector) {
+    const values = $("input:checked", selector).map((_, el) => $(el).val()).get();
+    return values.join(",");
+
+}
+
 function candidateSearchRunDatatableFilter(data, type) {
-    const checked = $("#id_candidate_status input:checked");
-    const values = checked.map((_, el) => $(el).val()).get();
-    data.candidate_status = values.join(",");
+    data.candidate_status = getMultiSelectValues($("#id_candidate_status"));
+    data.evidence = getMultiSelectValues($("#id_evidence"));
 }
 
 $(document).ready(function() {
@@ -159,7 +170,7 @@ $(document).ready(function() {
     {% endif %}
     $("#candidate-search-tabs").tabs();
 
-    $("#id_candidate_status input[type=checkbox]").on('change', filterCandidateSearchRunGrid);
+    $("#id_candidate_status input[type=checkbox], #id_evidence input[type=checkbox]").on('change', filterCandidateSearchRunGrid);
 });
 
 </script>
@@ -203,11 +214,12 @@ $(document).ready(function() {
 </div>
 
 {% if candidate_search_run.status == 'S' %}
-{{ candidate_status_form }}
+    {{ candidate_status_form }}
+    {{ evidence_form }}
 
-<div class="container-table">
-    <table id="candidate-datatable" data-datatable-url="{% url 'candidate_datatable' candidate_search_run.pk %}" class="sticky-header samples-table" data-adjust-columns="false" data-datatable-data="candidateSearchRunDatatableFilter"></table>
-</div>
+    <div class="container-table">
+        <table id="candidate-datatable" data-datatable-url="{% url 'candidate_datatable' candidate_search_run.pk %}" class="sticky-header samples-table" data-adjust-columns="false" data-datatable-data="candidateSearchRunDatatableFilter"></table>
+    </div>
 {% endif %}
 
 {% endblock %}

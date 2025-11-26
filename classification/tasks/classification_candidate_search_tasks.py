@@ -1,4 +1,3 @@
-import itertools
 import operator
 from collections import defaultdict
 from functools import reduce
@@ -13,7 +12,6 @@ from classification.enums import AlleleOriginBucket, ClinicalSignificance
 from classification.models import Classification, ClassificationModification, EvidenceKey
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.views.classification_datatables import ClassificationColumns
-from patients.models_enums import Zygosity
 from snpdb.models import Sample, GenomeBuild
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from variantgrid.celery import app
