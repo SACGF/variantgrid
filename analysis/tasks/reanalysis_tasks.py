@@ -60,7 +60,7 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                 for sample in samples_qs:
                     if analyses := sample_analyses[sample]:
                         # highest annotation version, tiebreaker = last analysed
-                        analysis = max(analyses, key=lambda a: (a.annotation_version, a.modified))
+                        analysis = max(analyses, key=lambda a: (a.annotation_version_id, a.modified))
                         samples_and_analyses_by_annotation_version[analysis.annotation_version].append((sample, analysis))
 
                 for annotation_version in sorted(samples_and_analyses_by_annotation_version):

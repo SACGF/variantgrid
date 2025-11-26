@@ -132,6 +132,11 @@ function classification_summary_renderer(data, type, row) {
     let csVal = CLIN_SIG[data["clinical_significance"]] || "";
     let csClass = `cs-` + (csVal || '').toLowerCase()
     dom.append($('<span>', {class: `c-pill cs ${csClass}`, html: csVal}));
+
+    let conditionResolution = data['classification__condition_resolution__display_text']
+    if (conditionResolution) {
+        dom.append($('<span>', {html: conditionResolution}));
+    }
     return outerDom;
 }
 

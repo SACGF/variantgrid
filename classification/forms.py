@@ -47,7 +47,7 @@ class ClassificationEvidenceUpdateForm(forms.Form):
     pop_no_ba1_min_af = forms.FloatField(required=False, initial=0.01)
     pop_no_bs1_min_af = forms.FloatField(required=False, initial=0.001)
     pop_recessive_no_bs2_min_homozygotes = forms.IntegerField(required=False, initial=1)
-    pop_pm2_min_af = forms.FloatField(required=False, initial=1e-4)
+    pop_pm2_max_af = forms.FloatField(required=False, initial=3e-4)
 
     # ClinVar filters
     clinvar_min_conflict_distance = forms.IntegerField(required=False, initial=2)

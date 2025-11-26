@@ -197,7 +197,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
         pop_no_ba1_min_af = none_or_cast(config.get("pop_no_ba1_min_af"), float)
         pop_no_bs1_min_af = none_or_cast(config.get("pop_no_bs1_min_af"), float)
         pop_recessive_no_bs2_min_homozygotes = none_or_cast(config.get("pop_recessive_no_bs2_min_homozygotes"), int)
-        pop_pm2_min_af = none_or_cast(config.get("pop_pm2_min_af"), float)
+        pop_pm2_max_af = none_or_cast(config.get("pop_pm2_max_af"), float)
         clinvar_min_conflict_distance = none_or_cast(config.get("clinvar_min_conflict_distance"), int)
         clinvar_min_stars = none_or_cast(config.get("clinvar_min_stars"), int)
         computational_vus_spliceai_min = none_or_cast(config.get("computational_vus_spliceai_min"), float)
@@ -250,9 +250,9 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                                 if not evidence("acmg:bs1") and popmax_af >= pop_no_bs1_min_af:
                                     candidate_evidence["acmg:bs1 missing"] = f"{popmax_af=} >= {pop_no_bs1_min_af}"
 
-                            if pop_pm2_min_af is not None:
-                                if evidence("acmg:pm2") and popmax_af >= pop_pm2_min_af:
-                                    candidate_evidence["acmg:pm2"] = f"PM2 set with {popmax_af=} >= {pop_pm2_min_af}"
+                            if pop_pm2_max_af is not None:
+                                if evidence("acmg:pm2") and popmax_af >= pop_pm2_max_af:
+                                    candidate_evidence["acmg:pm2"] = f"PM2 set with {popmax_af=} >= {pop_pm2_max_af}"
 
                         if pop_recessive_no_bs2_min_homozygotes is not None:
                             if not evidence("acmg:bs2"):
@@ -266,8 +266,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                     if clinvar_min_conflict_distance is not None:
                         distance = ClinicalSignificance.distance(cm.clinical_significance, cv.highest_pathogenicity)
                         if abs(distance) >= clinvar_min_conflict_distance:
-                            # clinvar = cv
-                            candidate_evidence["clinvar"] = f"clinvar {distance=} >= {clinvar_min_conflict_distance}"
+                            candidate_evidence["clinvar"] = f"ClinVar {cv.short_summary()} {distance=} >= {clinvar_min_conflict_distance}"
 
                 if check_computational and va:
 
@@ -275,13 +274,27 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                         if cm.clinical_significance in (ClinicalSignificance.VUS,
                                                         ClinicalSignificance.LIKELY_PATHOGENIC):
 
-                            splicing_assertion = evidence("splicing_assertion")
-                            already_used = splicing_assertion is not None and splicing_assertion != "no_effect"
-                            if not already_used and self.maybe_splicing_related(cm.published_evidence):
-                                if not evidence("spliceai"):  # Missing
+                            if not evidence("spliceai"):  # Missing
+                                splice_flag_reasons = []
+                                # If pp3 is flagged nothing to do
+                                pp3 = evidence("acmg:pp3")
+                                if pp3 is None:
+                                    splice_flag_reasons.append("PP3 not applied")
+                                    splicing_assertion = evidence("splicing_assertion")
+                                    bp4 = evidence("acmg:bp4")
+                                    if bp4 is not None:
+                                        splice_flag_reasons.append("BP4 applied")
+                                    if splicing_assertion is not None:
+                                        if splicing_assertion == "no_effect":
+                                            splice_flag_reasons.append(f"{splicing_assertion=}")
+                                    else:
+                                        splice_flag_reasons.append("No splicing assertion applied")
+
+                                if splice_flag_reasons and self.maybe_splicing_related(cm.published_evidence):
                                     if highest_spliceai := va.highest_spliceai():
                                         if highest_spliceai >= computational_vus_spliceai_min:
-                                            spliceai_evidence = f"No splicing assertion, {highest_spliceai=} >= {computational_vus_spliceai_min}"
+                                            reason = ", ".join(splice_flag_reasons)
+                                            spliceai_evidence = f"{reason}, {highest_spliceai=} >= {computational_vus_spliceai_min}"
                                             candidate_evidence["splicing"] = spliceai_evidence
 
                 if check_gene_disease:

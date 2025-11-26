@@ -789,6 +789,7 @@ class CandidateColumns(DatatableConfig[LogEntry]):
                            'classification__evidence__c_hgvs__value',
                            'classification__evidence__g_hgvs__value',
                            'classification__clinical_significance',
+                           'classification__condition_resolution__display_text',
                        ],
                        renderer=self.render_classification_summary,
                        client_renderer="classification_summary_renderer"),
@@ -848,6 +849,7 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             'c_hgvs': row.get('classification__evidence__c_hgvs__value'),
             'g_hgvs': row.get('classification__evidence__g_hgvs__value'),
             'clinical_significance': row.get('classification__clinical_significance'),
+            'classification__condition_resolution__display_text': row.get('classification__condition_resolution__display_text'),
         }
 
     @staticmethod
