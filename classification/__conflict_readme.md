@@ -22,4 +22,41 @@ Germline Onc/Path conflict. Yet if there are no Germline classifications it seem
 Probably easier to create the conflict but be able to mark the Conflict as invalid unless there are non cross conflict contributions.
 So would have several DataRows that would also indicate that they're cross conflict
 
-It does mean the results of a cross conflict could appear in 2 or multiple conflicts, but that's probably a good thing
+It does mean the results of a cross conflict could appear in 2 or multiple conflicts, but that's probably a good thing.
+
+
+Issue
+Cross conflicts include contexts that should have condition, e.g.
+Germline Path vs Solid Tumor Onc/Path
+
+There will be multiple Solid Tumor contexts, but they can't pre-emptively exist
+So those Conflicts will only be created at the time they have non cross context data
+
+Alternative is to have no history or triaging available for cross context
+
+So can just have a cross-context value with no history?
+Alternative is to run populate history at time when history is found?
+Or should there be cross context on allele that can just be referenced?
+Though there's multiple cross contexts?
+
+Run cross-context calc after any calculation:
+Find the conflicts that exist for the allele,
+See which ones are suitable for cross conflict
+
+Or...
+When creating a Conflict, look for cross-context....
+Calculate cross Context classifications on the fly?
+
+If we make CrossConflict its own Conflict, blargh, so ugly.
+
+
+
+Fresh start:
+When making a new Conflict, see if cross context classification groupings exist and bundle them in
+
+Issues:
+Marking the Conflict seems weird since we use ConflictHistory.
+How do we store this stuff?
+On the Conflict - in what level of detail?
+cross_conflict_data: DataRow[]
+Seems like best bet.

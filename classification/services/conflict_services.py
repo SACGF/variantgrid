@@ -16,7 +16,7 @@ from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLeve
     SpecialEKeys
 from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict, ConflictKey, ConflictHistory, \
     ConflictLab, ClassificationGrouping, ClassificationModification, ConflictNotification, ConflictNotificationStatus, \
-    ConflictNotificationRun, AlleleGrouping, DiscordanceReportTriageStatus
+    ConflictNotificationRun, AlleleGrouping
 from genes.hgvs import CHGVS
 from library.utils import strip_json, first, sort_and_group_by, RowSpanTable, RowSpanCellValue, LinkType
 from snpdb.models import Allele, Lab
@@ -304,69 +304,10 @@ class ConflictCompareType(IntEnum):
             case ConflictCompareType.BECAME_AGREED: return "Now resolved"
 
 
-# @dataclass
-# class ConflictLabChange:
-#     lab: Lab
-#     old_value: Optional[ConflictDataRow]
-#     new_value: Optional[ConflictDataRow]
-#     curation_date: Optional[ClassificationDate]
-#
-#     @cached_property
-#     def label(self):
-#         new_value_str: Optional[str] = None
-#         old_value_str: Optional[str] = None
-#         if old_value := self.old_value:
-#             old_value_str = old_value.value_label
-#         if new_value := self.new_value:
-#             new_value_str = new_value.value_label
-#
-#         curation_date_str = None
-#         if curation_date := self.curation_date:
-#             curation_date_str = f" _Curated on {curation_date.relevant_date.date_str}_"
-#
-#         if old_value_str == new_value_str:
-#             return f"**{new_value_str}**{curation_date_str}"
-#         elif not old_value_str:
-#             return f"**{new_value_str}** (Newly Uploaded)" + curation_date_str
-#         elif not new_value_str:
-#             return f"{old_value_str} -> Withdrawn"
-#         else:
-#             return f"{old_value_str} -> **{new_value_str}**" + curation_date_str
-
-
-
 @dataclass
 class ConflictCompare:
     previous_state: Optional[ConflictHistory]
     current_state: ConflictHistory
-
-    # def conflict_lab_changes(self):
-    #     old_data_rows = {}
-    #     new_data_rows = ConflictDataRow.to_not_excluded_dict(self.current_state.data_rows())
-    #     if previous_state := self.previous_state:
-    #         old_data_rows = ConflictDataRow.to_not_excluded_dict(previous_state.data_rows())
-    #
-    #     all_labs = list(sorted(old_data_rows.keys() | new_data_rows.keys()))
-    #     allele_origin_grouping = self.current_state.conflict.allele_origin_grouping()
-    #     for lab in all_labs:
-    #         old_value = old_data_rows.get(lab)
-    #         new_value = new_data_rows.get(lab)
-    #         share_level = new_value.share_level if new_value else old_value.share_level
-    #
-    #         curation_date: ClassificationDate
-    #         if allele_origin_grouping:
-    #             if classification_grouping := ClassificationGrouping.objects.filter(
-    #                 allele_origin_grouping=allele_origin_grouping,
-    #                 lab=lab,
-    #                 share_level=share_level,
-    #             ).first():
-    #                 curation_date = classification_grouping.latest_classification_modification.curated_date_check
-    #         yield ConflictLabChange(
-    #             lab=lab,
-    #             old_value=old_data_rows.get(lab),
-    #             new_value=new_data_rows.get(lab),
-    #             curation_date=curation_date
-    #         )
 
     @property
     def conflict(self) -> Conflict:
@@ -442,15 +383,15 @@ class OncPathCalculator(ConflictCalculator):
         return super().should_exclude(row) or row.bucket is None
 
     def calculate_severity(self) -> ConflictSeverity:
-        oncpath_data = self.included_conflict_data
-        if len(oncpath_data) == 0:
+        onco_path_data = self.included_conflict_data
+        if len(onco_path_data) == 0:
             return ConflictSeverity.NO_SUBMISSIONS
-        elif len(oncpath_data) == 1:
+        elif len(onco_path_data) == 1:
             return ConflictSeverity.SINGLE_SUBMISSION
         else:
             buckets: set = set()
             values: set = set()
-            for row in oncpath_data:
+            for row in onco_path_data:
                 if bucket := row.bucket:
                     buckets.add(bucket)
                 values.add(row.classification)
