@@ -283,7 +283,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                                     if bp4 is not None:
                                         splice_flag_reasons.append("BP4 applied")
                                     if splicing_assertion is not None:
-                                        if splicing_assertion == "no_effect":
+                                        if splicing_assertion in ("no_effect", "No effect"):
                                             splice_flag_reasons.append(f"{splicing_assertion=}")
                                     else:
                                         splice_flag_reasons.append("No splicing assertion applied")
