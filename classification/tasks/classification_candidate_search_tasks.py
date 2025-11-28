@@ -264,7 +264,9 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                     if clinvar_min_conflict_distance is not None:
                         distance = ClinicalSignificance.distance(cm.clinical_significance, cv.highest_pathogenicity)
                         if abs(distance) >= clinvar_min_conflict_distance:
-                            candidate_evidence["clinvar"] = f"ClinVar {cv.short_summary()} {distance=} >= {clinvar_min_conflict_distance}"
+                            json_summary = cv.json_summary()
+                            json_summary["distance"] = distance
+                            candidate_evidence["clinvar"] = json_summary
 
                 if check_computational and va:
 

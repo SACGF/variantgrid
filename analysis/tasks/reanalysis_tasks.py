@@ -97,12 +97,13 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                             if zygosities and sample_zygosity not in zygosities:
                                 continue
 
-                            # TODO: could clinvar for this version be more efficiently done by annotating the QS?
-                            notes = None
+                            notes = []
                             evidence = {}
                             if clinvar := variant.clinvar_set.filter(version=av_latest.clinvar_version).first():
                                 ts = timesince(analysis_clinvar_date, latest_clinvar_date)
-                                evidence["new_clinvar"] = f"New ClinVar in version {latest_clinvar_date.date()} ({ts} since analysis): {clinvar.short_summary()}"
+                                json_summary = clinvar.json_summary()
+                                evidence["clinvar"] = json_summary
+                                notes.append(f"New ClinVar, {ts} since analysis")
 
                             if notes or evidence:
                                 candidate = Candidate(
@@ -111,7 +112,7 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                                     sample=sample,
                                     variant=variant,
                                     annotation_version=av_latest,
-                                    notes=notes,
+                                    notes=" ".join(notes),
                                     evidence=evidence,
                                     zygosity=sample_zygosity,
                                 )

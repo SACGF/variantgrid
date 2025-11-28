@@ -294,12 +294,17 @@ class ClinVar(models.Model):
         return sorted(set(ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                        clinvar_allele_id=self.clinvar_allele_id).values_list('citation_id', flat=True)))
 
-    def short_summary(self) -> str:
-        info = {
+    def json_summary(self) -> dict:
+        return {
+            "clinvar_variation_id": self.clinvar_variation_id,
             "ClinSig": self.clinical_significance,
             "stars": self.germline_stars,
             "disease": self.preferred_disease_name,
+            "origin": self.get_origin_display(),
         }
+
+    def short_summary(self) -> str:
+        info = self.json_summary()
         return " ".join(f"{k}:{v}" for k,v in info.items())
 
     def __str__(self):

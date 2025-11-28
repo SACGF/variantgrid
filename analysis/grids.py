@@ -803,10 +803,12 @@ class CandidateColumns(DatatableConfig[LogEntry]):
                        renderer=self.render_analysis_link, client_renderer='TableFormat.linkUrl'),
             RichColumn(key="annotation_version", label="Annotation Version", orderable=True),
             RichColumn(key="zygosity", label="Zygosity", orderable=True, renderer=self.render_zygosity),
+            RichColumn(name="clinvar", label="ClinVar",
+                       renderer=self.render_clinvar, client_renderer='clinvar_renderer'),
         ]
         columns = CandidateSearchRun.CANDIDATE_GRID_COLUMNS[self.csr.search_version.search_type]
         for rc in optional_columns:
-            if rc.key in columns:
+            if rc.name in columns:
                 self.rich_columns.append(rc)
 
     def get_initial_queryset(self) -> QuerySet[Candidate]:
@@ -873,6 +875,13 @@ class CandidateColumns(DatatableConfig[LogEntry]):
                 data["text"] = "📑"
                 data["title"] = "Classify sample"
 
+        return data
+
+    @staticmethod
+    def render_clinvar(row: dict[str, Any]) -> JsonDataType:
+        data = {}
+        if evidence := row.get("evidence"):
+            data = evidence.get("clinvar", {})
         return data
 
 

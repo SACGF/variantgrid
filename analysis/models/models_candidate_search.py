@@ -100,9 +100,9 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
     }
 
     CANDIDATE_GRID_COLUMNS = {
-        CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ["sample__name", "analysis", "annotation_version", "zygosity"],
+        CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ["sample__name", "analysis", "annotation_version", "zygosity", "clinvar"],
         CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ["classification", "classification__clinical_significance", "sample__name", "zygosity"],
-        CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ["classification", "classification__clinical_significance", "annotation_version"],
+        CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ["classification", "classification__clinical_significance", "annotation_version", "clinvar"],
     }
 
     def __str__(self):

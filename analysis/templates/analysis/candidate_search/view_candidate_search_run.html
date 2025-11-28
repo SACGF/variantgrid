@@ -147,6 +147,70 @@ function classification_clinical_significance_renderer(data, type, row) {
 }
 
 
+function clinVarStars(selector, numStars) {
+    let clinVarContainer = $("<span>", {class: "clinvar-stars-container"});
+    for (let i = 0; i < 4; i++) {
+        let classList = ["fa-star"];
+        let styles = ["margin: 0"];
+        if (i < numStars) {
+            classList.push("fa-solid");
+            classList.push("text-success");
+        } else {
+            classList.push("fa-regular");
+            styles.push("opacity: 0.25");
+        }
+        let star = $("<i>", {class: classList.join(" "), style: styles.join(" ")});
+        clinVarContainer.append(star);
+    }
+    return clinVarContainer;
+
+}
+
+
+function clinvar_renderer(data, type, row) {
+    let outerDom = $('<div>').css("display", "inline-block");
+    if (Object.keys(data).length === 0) {
+        outerDom.append("-");
+        return outerDom;
+    }
+
+    let dom = $('<div>').appendTo(outerDom);
+
+    let clinvar_variation_id = data['clinvar_variation_id'];
+    if (clinvar_variation_id) {
+        let clinVarLink = $("<a>", {
+            href: `https://www.ncbi.nlm.nih.gov/clinvar/variation/${clinvar_variation_id}`,
+            class: "external",
+            html: "View on ClinVar"
+        });
+        dom.append(clinVarLink);
+    }
+    let origin = data["origin"];
+    if (origin) {
+        dom.append($("<span>", {html: `Origin: ${origin}`}));
+    }
+
+    let starsClinSigBlock = $("<div>", {class: "d-inline-block mr-2"});
+    let stars = data["stars"] || 0;
+    let cvStars = clinVarStars(starsClinSigBlock, stars);
+    starsClinSigBlock.append(cvStars);
+
+    let clinSig = data["ClinSig"];
+    if (clinSig) {
+        starsClinSigBlock.append($("<span>", {class: "text-muted", html: "|"}));
+        starsClinSigBlock.append($("<b>", {html: clinSig}));
+    }
+    dom.append(starsClinSigBlock);
+    let disease = data["disease"];
+    if (disease) {
+        dom.append($("<span>", {html: disease}));
+    }
+    return outerDom;
+}
+
+
+
+
 function filterCandidateSearchRunGrid() {
     $('#candidate-datatable').DataTable().ajax.reload();
 }
