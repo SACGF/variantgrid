@@ -95,11 +95,20 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
             if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
                 sample_filters.append(q)
 
+        direct_sample_select_filters = []
         if project := config.get("project"):
-            sample_filters.append(Q(vcf__project=project))
+            direct_sample_select_filters.append(Q(vcf__project=project))
 
         if vcf := config.get("vcf"):
-            sample_filters.append(Q(vcf=vcf))
+            direct_sample_select_filters.append(Q(vcf=vcf))
+
+        if samples_str := config.get("sample"):
+            samples = samples_str.split(",")
+            direct_sample_select_filters.append(Q(pk__in=samples))
+
+        if direct_sample_select_filters:
+            q = reduce(operator.or_, direct_sample_select_filters)
+            sample_filters.append(q)
 
         sample_qs = Sample.filter_for_user(user)
         if sample_filters:

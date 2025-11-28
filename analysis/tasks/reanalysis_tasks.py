@@ -27,7 +27,6 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
             records.extend(candidates)
         return records
 
-
     def _get_sample_candidates(self, candidate_search_run, analysis_filters, zygosities):
 
         for genome_build in GenomeBuild.builds_with_annotation():

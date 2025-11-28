@@ -728,11 +728,20 @@ class SampleColumns(DatatableConfig[Sample]):
             if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
                 filters.append(q)
 
+        direct_sample_select_filters = []
         if project := self.get_query_param("project"):
-            filters.append(Q(vcf__project=project))
+            direct_sample_select_filters.append(Q(vcf__project=project))
 
         if vcf := self.get_query_param("vcf"):
-            filters.append(Q(vcf=vcf))
+            direct_sample_select_filters.append(Q(vcf=vcf))
+
+        if sample_str := self.get_query_param("sample"):
+            samples = sample_str.split(",")
+            direct_sample_select_filters.append(Q(pk__in=samples))
+
+        if direct_sample_select_filters:
+            q = reduce(operator.or_, direct_sample_select_filters)
+            filters.append(q)
 
         if filters:
             qs = qs.filter(*filters)

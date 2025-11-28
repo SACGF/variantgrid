@@ -359,6 +359,14 @@ class SampleChoiceForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
                                                         attrs={'data-placeholder': 'Sample...'}))
 
 
+class SampleMultiForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
+    genome_build_fields = ["sample"]
+    sample = forms.ModelMultipleChoiceField(queryset=Sample.objects.all(),
+                                            required=False,
+                                            widget=ModelSelect2Multiple(url='sample_autocomplete',
+                                                                        attrs={'data-placeholder': 'Sample...'}))
+
+
 class VariantsTypeMultipleChoiceForm(forms.Form):
     variants_type = forms.MultipleChoiceField(choices=VariantsType.choices, widget=forms.CheckboxSelectMultiple())
 

@@ -1,3 +1,4 @@
+from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Field
 
 from django.conf import settings
@@ -11,7 +12,8 @@ from classification.forms import ClassificationAlleleOriginForm, ClinicalSignifi
 from genes.forms import GeneSymbolForm
 from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm
-from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm, ProjectChoiceForm, VCFChoiceForm
+from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm, ProjectChoiceForm, VCFChoiceForm, \
+    SampleMultiForm
 from snpdb.models import Lab, Sample
 from snpdb.user_settings_manager import UserSettingsManager
 
@@ -80,18 +82,33 @@ class NewCrossSampleClassificationCandidateSearchView(AbstractNewClassificationC
     def get_context_data(self):
         context = super().get_context_data()
         layout = self._get_layout()
+
+        no_form_helper = FormHelper()
+        no_form_helper.form_tag = False
+        sample_candidate_search_form = SampleCandidatesSearchForm()
+        sample_candidate_search_form.helper = no_form_helper
+        project_choice_form = ProjectChoiceForm()
+        project_choice_form.helper = no_form_helper
+        vcf_choice_form = VCFChoiceForm()
+        vcf_choice_form.helper = no_form_helper
+        sample_multiple_choice_form = SampleMultiForm()
+        sample_multiple_choice_form.helper = no_form_helper
+
         sample_phenotype_form = PhenotypeMultipleSelectForm(prefix="sample")
         sample_phenotype_form.helper.layout = layout
         context["sample_phenotype_form"] = sample_phenotype_form
-        context["sample_candidate_search_form"] = SampleCandidatesSearchForm()
-        context["project_choice_form"] = ProjectChoiceForm()
-        context["vcf_choice_form"] = VCFChoiceForm()
+        context["sample_candidate_search_form"] = sample_candidate_search_form
+        context["project_choice_form"] = project_choice_form
+        context["vcf_choice_form"] = vcf_choice_form
+        context["sample_multiple_choice_form"] = sample_multiple_choice_form
+
         samples_qs = Sample.filter_for_user(self.request.user)
         context["num_visible_samples"] = samples_qs.count()
         num_sample_gene_lists = SampleGeneList.objects.filter(sample__in=samples_qs).count()
         context["num_sample_gene_lists"] = num_sample_gene_lists
         if num_sample_gene_lists:
             sample_gene_form = GeneSymbolForm(prefix="sample")
+            sample_gene_form.helper = no_form_helper
             sample_gene_form.fields['gene_symbol'].label = "Sample Gene List Gene Symbol"
             context["sample_gene_form"] = sample_gene_form
 
