@@ -243,7 +243,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
             for cm in cm_build_qs:
                 classification = cm.classification
                 variant_id = classification.variant_id
-                notes = None
+                notes = []
                 candidate_evidence = {}
                 # clinvar = None
                 va = va_by_variant_id.get(variant_id)
@@ -256,25 +256,35 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                     if cm.clinical_significance in (ClinicalSignificance.VUS, ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC):
                         popmax_af = va.gnomad_popmax_af
                         if popmax_af is not None:
+                            # Want to combine all popmax messages into 1, only show popmax_af once.
+                            popmax_notes = []
+
                             if pop_no_ba1_min_af is not None:
                                 if not evidence("acmg:ba1") and popmax_af >= pop_no_ba1_min_af:
                                     candidate_evidence["acmg:ba1 missing"] = f"{popmax_af=} >= {pop_no_ba1_min_af}"
+                                    popmax_notes.append("acmg:ba1 missing")
 
                             if pop_no_bs1_min_af is not None:
                                 if not evidence("acmg:bs1") and popmax_af >= pop_no_bs1_min_af:
                                     candidate_evidence["acmg:bs1 missing"] = f"{popmax_af=} >= {pop_no_bs1_min_af}"
+                                    popmax_notes.append("acmg:bs1 missing")
 
                             if pop_pm2_max_af is not None:
                                 if evidence("acmg:pm2") and popmax_af >= pop_pm2_max_af:
-                                    candidate_evidence["acmg:pm2"] = f"PM2 set with {popmax_af=} >= {pop_pm2_max_af}"
+                                    candidate_evidence["acmg:pm2 set"] = f"PM2 set with {popmax_af=} >= {pop_pm2_max_af}"
+                                    popmax_notes.append("acmg:pm2 set")
+
+                            if popmax_notes:
+                                # Only need popmax inserted once - at the start
+                                notes.append(f"High {popmax_af=:.6f}: {', '.join(popmax_notes)}")
 
                         if pop_recessive_no_bs2_min_homozygotes is not None:
                             if not evidence("acmg:bs2"):
                                 if evidence("mode_of_inheritance") == "autosomal_recessive":
                                     if gnomad_num_homozygotes := va.gnomad_hom_alt:
                                         if gnomad_num_homozygotes >= pop_recessive_no_bs2_min_homozygotes:
-                                            candidate_evidence["acmg:bs2"] = f"{gnomad_num_homozygotes=} >= {pop_recessive_no_bs2_min_homozygotes}"
-
+                                            candidate_evidence["acmg:bs2 missing"] = f"{gnomad_num_homozygotes=} >= {pop_recessive_no_bs2_min_homozygotes}"
+                                            notes.append(f"acmg:bs2 missing w/gnomAD HOM={gnomad_num_homozygotes}")
 
                 if check_clinvar and cv:
                     if clinvar_min_conflict_distance is not None:
@@ -282,7 +292,8 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                         if abs(distance) >= clinvar_min_conflict_distance:
                             json_summary = cv.json_summary()
                             json_summary["distance"] = distance
-                            candidate_evidence["clinvar"] = json_summary
+                            candidate_evidence["ClinVar diff"] = json_summary
+                            notes.append("ClinVar Diff")
 
                 if check_computational and va:
 
@@ -312,6 +323,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                                             reason = ", ".join(splice_flag_reasons)
                                             spliceai_evidence = f"{reason}, {highest_spliceai=} >= {computational_vus_spliceai_min}"
                                             candidate_evidence["splicing"] = spliceai_evidence
+                                            notes.append(f"SpliceAI={highest_spliceai}")
 
                 if check_gene_disease:
                     # EKey: gene_disease_validity
@@ -328,7 +340,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                         variant=classification.variant,
                         classification=classification,
                         annotation_version=av,
-                        notes=notes,
+                        notes=" ".join(notes),
                         evidence=candidate_evidence,
                         # clinvar=clinvar,
                     ))

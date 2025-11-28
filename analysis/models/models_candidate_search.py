@@ -195,7 +195,9 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
 class Candidate(TimeStampedModel):
     search_run = models.ForeignKey(CandidateSearchRun, on_delete=CASCADE)
     status = models.CharField(choices=CandidateStatus.choices, max_length=1, default=CandidateStatus.OPEN)
+    # Notes are shown to user
     notes = models.TextField(null=True, blank=True)
+    # Evidence goes into more detail, is set with keys, which can be filtered on grid
     evidence = models.JSONField(default=dict)
     reviewer = models.ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
     reviewer_comment = models.TextField(null=True, blank=True)
