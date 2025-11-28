@@ -1,5 +1,3 @@
-from rest_framework.urlpatterns import format_suffix_patterns
-
 from annotation import views, views_rest
 from annotation.grids import VariantAnnotationVersionGrid, AnnotationRunColumns, \
     VariantAnnotationVersionColumns
@@ -18,6 +16,7 @@ urlpatterns = [
     path('annotation_run/view/<int:annotation_run_id>', views.view_annotation_run, name='view_annotation_run'),
     path('annotation_run/retry/<int:annotation_run_id>', views.retry_annotation_run, name='retry_annotation_run'),
     path('annotation_run/retry_upload/<int:annotation_run_id>', views.retry_annotation_run_upload, name='retry_annotation_run_upload'),
+    path('annotation_run/subdivide/<int:annotation_run_id>', views.subdivide_annotation_run, name='subdivide_annotation_run'),
     path('create_manual_variant_entry_from_text/<genome_build_name>/<variants_text>', views.create_manual_variant_entry_from_text, name='create_manual_variant_entry_from_text'),
     path('view_annotation_descriptions', views.view_annotation_descriptions, name='view_annotation_descriptions'),
     path('view_annotation_descriptions/<genome_build_name>', views.view_annotation_descriptions, name='view_annotation_descriptions_genome_build'),
@@ -34,13 +33,9 @@ urlpatterns = [
     path('citation/<str:citation_id>', views.view_citation, name='view_citation'),
     path('citation/<str:citation_id>/detail', views.view_citation_detail, name='view_citation_detail'),
 
-    path('clinvar/<int:clinvar_variation_id>/detail/<int:min_stars>', views.view_clinvar_records_detail, name='view_clinvar_records_detail')
-]
+    path('clinvar/<int:clinvar_variation_id>/detail/<int:min_stars>', views.view_clinvar_records_detail, name='view_clinvar_records_detail'),
 
-rest_urlpatterns = [
     path('api/manual_variant_entry_collection/<int:pk>', views_rest.ManualVariantEntryCollectionView.as_view(),
          name='api_manual_variant_entry_collection'),
     path('api/variant_annotation/<genome_build_name>/<variant_string>', views_rest.VariantAnnotationView.as_view(), name='api_variant_annotation')
 ]
-
-urlpatterns += format_suffix_patterns(rest_urlpatterns)

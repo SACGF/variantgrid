@@ -294,6 +294,14 @@ class ClinVar(models.Model):
         return sorted(set(ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                        clinvar_allele_id=self.clinvar_allele_id).values_list('citation_id', flat=True)))
 
+    def short_summary(self) -> str:
+        info = {
+            "ClinSig": self.clinical_significance,
+            "stars": self.germline_stars,
+            "disease": self.preferred_disease_name,
+        }
+        return " ".join(f"{k}:{v}" for k,v in info.items())
+
     def __str__(self):
         return f"ClinVar: variant: {self.variant}, path: {self.highest_pathogenicity}"
 
@@ -882,6 +890,8 @@ class VCFAnnotationStats(models.Model):
 
 
 class AnnotationRangeLock(models.Model):
+    MIN_SIZE_FOR_SUBDIVISION = 1000  # Do we need this?
+
     version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     min_variant = models.ForeignKey(Variant, related_name='min_variant', on_delete=PROTECT)
     max_variant = models.ForeignKey(Variant, related_name='max_variant', on_delete=PROTECT)
@@ -915,6 +925,11 @@ class AnnotationRangeLock(models.Model):
             if new_max := Variant.objects.filter(q_contig, pk__gte=arl.min_variant_id, pk__lt=arl.max_variant_id).first():
                 arl.max_variant = new_max
                 arl.save()
+
+    def can_subdivide(self) -> bool:
+        """ This is approx (as could be interleaved w/structural etc) """
+        return int(self.max_variant_id) - int(self.min_variant_id) >= self.MIN_SIZE_FOR_SUBDIVISION
+
 
 
 class AnnotationRun(TimeStampedModel):
@@ -968,6 +983,11 @@ class AnnotationRun(TimeStampedModel):
                                           annotation_range_lock__max_variant__gte=variant.pk,
                                           pipeline_type=pipeline_type).first()
         return ar
+
+    @staticmethod
+    def get_active_runs(genome_build):
+        qs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build)
+        return qs.exclude(status__in=AnnotationStatus.get_completed_states())
 
     @property
     def variant_annotation_version(self):
@@ -1475,6 +1495,16 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return any((self.spliceai_pred_ds_ag, self.spliceai_pred_ds_al,
                     self.spliceai_pred_ds_dg, self.spliceai_pred_ds_dl))
 
+    def highest_spliceai(self) -> int|None:
+        values = []
+        for (ds, _) in self.SPLICEAI_DS_DP.values():
+            if v := getattr(self, ds):
+                values.append(v)
+        if values:
+            return max(values)
+        return None
+
+
     @staticmethod
     def get_gnomad_population_field(population):
         return VariantAnnotation.GNOMAD_FIELDS.get(population)
@@ -1841,6 +1871,9 @@ class AnnotationVersion(models.Model):
 
     def get_human_protein_atlas_annotation(self):
         return HumanProteinAtlasAnnotation.objects.filter(version=self.human_protein_atlas_version)
+
+    def __lt__(self, other):
+        return self.pk < other.pk
 
     def __str__(self):
         sub_versions = [f"Variant: {self.variant_annotation_version}",

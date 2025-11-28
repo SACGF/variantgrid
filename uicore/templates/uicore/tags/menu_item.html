@@ -1,7 +1,29 @@
 {% if not invalid %}
-    <a {% if external %}target="_blank"{% endif %} id="{{ id }}" class="nav-link {% if active %}active{% endif %}" href="{{ url }}">
-        {% if admin_only %}<i class="fas fa-key"></i>{% endif %}{% if icon %}<i class="{{ icon }}"></i>{% endif %}{{ title }}{% if external %} <i class="fas fa-external-link-alt"></i>{% endif %}
-    {% if badge_count %}<span class="badge badge-danger">{{ badge_count }}{% endif %}
-    </a>
-    {% if active and type == 'side' %}<div id="current-record-spot"></div>{% endif %}
+  {% if method == 'post' %}
+    <form id="form-{{ id }}" action="{{ url }}" method="post" style="display:none">
+      {% csrf_token %}
+    </form>
+  {% endif %}
+
+  <a
+    {% if external %}target="_blank"{% endif %}
+    id="{{ id }}"
+    class="nav-link {% if active %}active{% endif %} {{ css_class }}"
+    {% if method == 'post' %}
+      href="#"
+      onclick="document.getElementById('form-{{ id }}').submit(); return false;"
+    {% else %}
+      href="{{ url }}"
+    {% endif %}
+  >
+    {% if admin_only %}<i class="fas fa-key"></i>{% endif %}
+    {% if icon %}<i class="{{ icon }}"></i>{% endif %}
+    {{ title }}
+    {% if external %} <i class="fas fa-external-link-alt"></i>{% endif %}
+    {% if badge_count %}<span class="badge badge-danger">{{ badge_count }}</span>{% endif %}
+  </a>
+
+  {% if active and type == 'side' %}
+    <div id="current-record-spot"></div>
+  {% endif %}
 {% endif %}

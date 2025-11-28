@@ -392,6 +392,11 @@ class SettingsFormFeatures:
         return get_visible_url_names().get("analysis")
 
     @cached_property
+    def analysis_horizontal_mode(self) -> bool:
+        implemented_analysis_horizontal_mode = False  # Not yet
+        return self.analysis_enabled and implemented_analysis_horizontal_mode
+
+    @cached_property
     def upload_enabled(self) -> bool:
         return self.analysis_enabled and get_visible_url_names().get("upload")
 
@@ -402,6 +407,21 @@ class SettingsFormFeatures:
     @cached_property
     def discordance_enabled(self) -> bool:
         return settings.DISCORDANCE_ENABLED
+
+    @cached_property
+    def reanalysis_new_annotation_enabled(self) -> bool:
+        implemented_reanalysis_new_annotation = False  # Not yet
+        return implemented_reanalysis_new_annotation and self.analysis_enabled
+
+    @cached_property
+    def cross_sample_classification_enabled(self) -> bool:
+        implemented_cross_sample_classification = False  # Not yet
+        return implemented_cross_sample_classification and get_visible_url_names().get("view_sample")
+
+    @cached_property
+    def classification_evidence_update_enabled(self) -> bool:
+        implemented_classification_evidence_update = False  # Not yet
+        return implemented_classification_evidence_update
 
 
 @timed_cache()
@@ -472,10 +492,14 @@ class SettingsOverrideForm(BaseModelForm):
             "variant_link_in_analysis_opens_new_tab": settings_config.analysis_enabled,
             "tool_tips": settings_config.analysis_enabled,
             "node_debug_tab": settings_config.analysis_enabled,
+            "analysis_horizontal_mode": False,
             "tag_colors": settings_config.analysis_enabled,
             "import_messages": settings_config.upload_enabled,
             "igv_port": settings_config.igv_links_enabled,
             "grid_sample_label_template": settings_config.analysis_enabled,
+            "show_candidates_reanalysis_new_annotation": settings_config.reanalysis_new_annotation_enabled,
+            "show_candidates_cross_sample_classification":  settings_config.cross_sample_classification_enabled,
+            "show_candidates_classification_evidence_update": settings_config.classification_evidence_update_enabled,
         }
 
         for f, visible in field_visibility.items():

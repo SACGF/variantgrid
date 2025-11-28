@@ -3,26 +3,30 @@ from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
+from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import F, QuerySet, Value, Func
 from django.db.models.aggregates import Count, Max
-from django.db.models.fields import CharField
+from django.db.models.fields import CharField, TextField
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
-from annotation.models import ManualVariantEntryCollection
+from annotation.models import ManualVariantEntryCollection, PATIENT_ONTOLOGY_TERM_PATH
+from genes.models import GeneSymbol, SampleGeneList
 from library.django_utils import get_url_from_view_path
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age, JsonDataType
+from ontology.models import OntologyService, OntologyTerm
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
     VariantZygosityCountCollection, TagColorsCollection, LiftoverRun, AlleleConversionTool, AlleleLiftover, \
     ProcessingStatus, Allele
+from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_for_js
@@ -675,4 +679,54 @@ class ManualVariantEntryCollectionColumns(DatatableConfig[ManualVariantEntryColl
         qs = ManualVariantEntryCollection.objects.all()
         if not self.user.is_staff:
             qs = qs.filter(user=self.user)
+        return qs
+
+
+class SampleColumns(DatatableConfig[Sample]):
+    """ This is currently only used on """
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+
+        self.rich_columns = [
+            RichColumn(key="id",
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="name", label="Name", orderable=True),
+            RichColumn(key="vcf__name", label="VCF", orderable=True),
+            RichColumn(key="vcf__date", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key=OntologyService.OMIM, orderable=True),
+            RichColumn(key=OntologyService.HPO, orderable=True),
+            RichColumn(key=OntologyService.MONDO, orderable=True),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[Sample]:
+        qs = Sample.filter_for_user(self.user)
+        sample_patient_ontology_path = f"patient__{PATIENT_ONTOLOGY_TERM_PATH}"
+        ontology_path = f"{sample_patient_ontology_path}__name"
+        annotation_kwargs = {}
+        for ot in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
+            q_ot = Q(**{f"{sample_patient_ontology_path}__ontology_service": ot})
+            annotation_kwargs[ot.label] = StringAgg(ontology_path, '|',
+                                                    filter=q_ot, distinct=True,
+                                                    output_field=TextField())
+        return qs.annotate(**annotation_kwargs)
+
+    def filter_queryset(self, qs: QuerySet[Sample]) -> QuerySet[Sample]:
+        filters = []
+        ontology_filters = []
+        if ontology_terms := self.get_query_param('ontology_term_id'):
+            if q:= get_sample_ontology_q(ontology_terms):
+                ontology_filters.append(q)
+
+        if ontology_filters:
+            q = reduce(operator.or_, ontology_filters)
+            filters.append(q)
+
+        if gene_symbol_str := self.get_query_param("gene_symbol"):
+            if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
+                filters.append(q)
+
+        if filters:
+            qs = qs.filter(*filters)
         return qs

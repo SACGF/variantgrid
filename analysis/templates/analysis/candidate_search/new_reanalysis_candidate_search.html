@@ -1,0 +1,44 @@
+{% extends "analysis/candidate_search/abstract_new_candidate_search_view.html" %}
+{% load crispy_forms_tags %}
+{% block head %}
+{{ block.super }}
+<script>
+    function filterAnalysesGrid() {
+        $('#analyses-datatable').DataTable().ajax.reload();
+    }
+
+
+    function analysesFilter(data, type) {
+        data.analysis_type = blankToNull($("#id_analysis_type").val());
+        data.my_user = blankToNull($("input#id_my_user:checked").val());
+        data.date_min = blankToNull($("#id_date_min").val());
+        data.date_max = blankToNull($("#id_date_max").val());
+    }
+
+    $(document).ready(() => {
+        let analysisSelects = ["#id_analysis_type", "#id_my_user", "#id_date_min", "#id_date_min"];
+        $(analysisSelects.join(',')).on("change", function() {
+            filterAnalysesGrid();
+        });
+    });
+
+
+</script>
+{% endblock head %}
+{% block new_candidate_search_content %}
+    <div class="container">
+        <h3>Analyses</h3>
+        <div>
+            {% crispy analyses_filter_form  %}
+        </div>
+    </div>
+
+    <table id="analyses-datatable" data-datatable-data='analysesFilter' data-datatable-url="{% url 'analyses_datatables' %}" class="sticky-header classification-table"></table>
+
+    <div class="container">
+        <h3>Search</h3>
+        <div>
+            {% crispy sample_candidate_search_form %}
+        </div>
+    </div>
+{% endblock %}

@@ -169,6 +169,9 @@ class SettingsOverride(models.Model):
                                     help_text="Show/hide help popups on mouse hover")
     node_debug_tab = models.BooleanField(null=True, blank=True,
                                          help_text="If true, an extra tab appears in analysis node editor, with details about node settings + SQL query.")
+    analysis_horizontal_mode = models.BooleanField(null=True, blank=True,
+                                                   help_text="Analysis nodes connect left/right, and grid on bottom. Default=False - connect vertically top/bottom, grid in editor")
+
     import_messages = models.BooleanField(null=True, blank=True,
                                           help_text="Get internal notification (message icon top right) when imports are done (eg VCF finished processing and annotating)")
     igv_port = models.IntegerField(null=True, blank=True,
@@ -190,6 +193,10 @@ class SettingsOverride(models.Model):
 
     timezone = models.TextField(null=True, blank=True,
                                 help_text="Time/date used in classification download")
+
+    show_candidates_reanalysis_new_annotation = models.BooleanField(null=True, blank=True, help_text="Show candidates in analysis pages (You can always explicitly go to the candidate pages)")
+    show_candidates_cross_sample_classification = models.BooleanField(null=True, blank=True, help_text="Show candidates on sample / classification pages (You can always explicitly go to the candidate pages)")
+    show_candidates_classification_evidence_update = models.BooleanField(null=True, blank=True, help_text="Show candidates on sample / classification pages (You can always explicitly go to the candidate pages)")
 
 
 class GlobalSettings(SettingsOverride):
@@ -355,13 +362,17 @@ class UserSettings:
     variant_link_in_analysis_opens_new_tab: bool
     tool_tips: bool
     node_debug_tab: bool
+    analysis_horizontal_mode: bool
     import_messages: bool
     igv_port: bool
     default_genome_build: GenomeBuild
     # default_allele_origin: AlleleOriginFilterDefault
     allele_origin_focus: AlleleOriginFilterDefault
     allele_origin_exclude_filter: bool
-    timezone: str
+    # Candidates = automatically detected variants / classifications to review
+    show_candidates_reanalysis_new_annotation: bool
+    show_candidates_cross_sample_classification: bool
+    show_candidates_classification_evidence_update: bool
 
     @staticmethod
     def parse_value(field_name: str, value: Any) -> Any:

@@ -39,6 +39,13 @@ class AnnotationStatus(models.TextChoices):
     ERROR = 'E', "Error"
 
     @classmethod
+    def get_completed_states(cls):
+        return [
+            cls.FINISHED,
+            cls.ERROR,
+        ]
+
+    @classmethod
     def get_summary_state(cls, annotation_status):
         SUMMARY_STATES = {cls.CREATED: "Queued",
                           cls.FINISHED: "Finished",

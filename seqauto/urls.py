@@ -1,6 +1,5 @@
 from django.urls import include
 from rest_framework import routers
-from rest_framework.urlpatterns import format_suffix_patterns
 
 from library.django_utils.jqgrid_view import JQGridView
 from seqauto import views, views_autocomplete, views_rest
@@ -131,9 +130,6 @@ router.register(r'api/v1/qc_exec_summary', QCExecSummaryViewSet, basename='api_q
 
 urlpatterns += [
     path('', include(router.urls), name='seqauto_apis'),
-]
-
-rest_urlpatterns = [
     path('api/view_enrichment_kit_summary/<int:pk>', views_rest.EnrichmentKitSummaryView.as_view(), name='api_view_enrichment_kit_summary'),
     path('api/view_enrichment_kit/<int:pk>', EnrichmentKitViewSet.as_view({'get': 'retrieve'}),
          name='api_view_enrichment_kit'),  # Deprecated, used for backwards compatability
@@ -148,5 +144,3 @@ rest_urlpatterns = [
 
 
 ]
-
-urlpatterns += format_suffix_patterns(rest_urlpatterns)

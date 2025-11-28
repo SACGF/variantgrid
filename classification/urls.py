@@ -1,7 +1,6 @@
 from rest_framework import routers
-from rest_framework.urlpatterns import format_suffix_patterns
 
-from classification.views import clinvar_export_view, search_view_metrics, clinvar_export_multi_view
+from classification.views import clinvar_export_view, search_view_metrics, clinvar_export_multi_view, classification_candidate_search_view
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, \
     classification_accumulation_graph
@@ -148,6 +147,16 @@ urlpatterns = [
     path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),
 
+    # Classification Candidate Searching
+    path('classification_candidate_search', classification_candidate_search_view.ReanalyisCandidateSearchView.as_view(),
+         name='classification_candidate_search'),
+    path('classification_candidate_search/cross_sample/new',
+         classification_candidate_search_view.NewCrossSampleClassificationCandidateSearchView.as_view(),
+         name='new_cross_sample_classification_candidate_search'),
+    path('classification_candidate_search/evidence_update/new',
+         classification_candidate_search_view.NewClassificationEvidenceUpdateCandidateSearchView.as_view(),
+         name='new_classification_evidence_update_candidate_search'),
+
     path('summary_email', summary_email_preview_html, name='summary_email_html'),
     path('summary_email/<str:lab_id>', summary_email_preview_html, name='summary_email_html'),
     path('summary_email_text', summary_email_preview_text, name='summary_email_text'),
@@ -241,5 +250,3 @@ rest_urlpatterns = [
 
     path('api/condition_text_matching/<int:pk>', ConditionTextMatchingAPI.as_view(), name='condition_text_matching_api')
 ]
-
-urlpatterns += format_suffix_patterns(rest_urlpatterns)

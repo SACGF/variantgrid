@@ -1,9 +1,7 @@
 {% if variant_data %}
     {% load static %}
     {% load js_tags %}
-    {% comment %}
-    Define a JS function "hotspot_graph_click_func(text, transcript_accession, protein_position)" to get callbacks from plotly clicks
-    {% endcomment %}
+    {# Define a JS function "hotspot_graph_click_func(text, transcript_accession, protein_position)" to get callbacks from plotly clicks  #}
     <div class="hotspot-graph" id="hotspot-graph-{{ uuid }}"></div>
     <style>
         .gnomad-af-slider {

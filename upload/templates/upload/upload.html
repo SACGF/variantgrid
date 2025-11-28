@@ -271,8 +271,16 @@ img.thumbnail {
 		}
         const genomeBuild = upload_status['genome_build'];
         if (genomeBuild) {
-            fileLink += " <i>(" + genomeBuild + ")</i>";
+            let infoText = genomeBuild;
+            const remainingAnnotationRuns = upload_status['remaining_annotation_runs'];
+            if (remainingAnnotationRuns) {
+                infoText += ". Annotating: " + remainingAnnotationRuns + " annotation runs remaining";
+            }
+            fileLink += " <i>(" + infoText + ")</i>";
         }
+
+
+
 		fileTypeDiv.append(fileLink);
 
         const upload_data = upload_status["upload_data"];

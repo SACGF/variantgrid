@@ -1,14 +1,18 @@
 from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, KaromappingAnalysesGrid, AnalysisTemplatesGrid, \
     AnalysisNodeIssuesGrid, NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid, \
     NodeTissueExpressionGenesGrid, NodeTissueUniProtTissueSpecificityGenesGrid, NodeGeneListGenesColumns, \
-    AnalysisLogEntryColumns
-from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete
+    AnalysisLogEntryColumns, CandidateSearchRunColumns, CandidateColumns, AnalysesColumns
+from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete, views_candidate_search
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
 urlpatterns = [
     path('analyses/list/', views.analysis_list, name='analyses'),
+    path('analyses/datatable',
+         DatabaseTableView.as_view(column_class=AnalysesColumns),
+         name='analyses_datatables'),
+
     path('analysis_templates/', views.analysis_templates, name='analysis_templates'),
     path('<int:analysis_id>/', views.view_analysis, name='analysis'),
     path('<int:analysis_id>/<int:active_node_id>/', views.view_analysis, name='analysis_node'),
@@ -141,8 +145,28 @@ urlpatterns = [
     path('karyomapping/view_karyomapping_analysis/<int:pk>/', views_karyomapping.view_karyomapping_analysis, name='view_karyomapping_analysis'),
     path('karyomapping/view_karyomapping_gene/<int:pk>/', views_karyomapping.view_karyomapping_gene, name='view_karyomapping_gene'),
     path('karyomapping/download_karyomapping_gene_csv/<int:pk>/', views_karyomapping.download_karyomapping_gene_csv, name='download_karyomapping_gene_csv'),
-
     path('karyomapping/analyses/grid/<slug:op>/', JQGridView.as_view(grid=KaromappingAnalysesGrid, delete_row=True), name='karyomapping_analyses_grid'),
+
+    # Candidates / Reanalysis
+    path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),
+    path('candidate_search/reanalysis/new', views_candidate_search.NewReanalysisCandidateSearchView.as_view(), name='new_reanalysis_candidate_search'),
+    path('candidate_search/reanalysis', views_candidate_search.ReanalyisCandidateSearchView.as_view(), name='reanalysis_candidate_search'),
+    path('candidate_search/candidate/classify/<int:candidate_id>/create/',
+         views_candidate_search.create_classification_for_candidate, name='create_classification_for_candidate'),
+    path('candidate_search/candidate/classify/<int:candidate_id>',
+         views_candidate_search.CreateClassificationForCandidateView.as_view(),
+         name='classify_candidate'),
+    path('candidate_search/json/<int:candidate_id>/', views_json.set_candidate_status,
+         name='set_candidate_status'),
+    path('candidate_search/json/<int:pk>', views_json.get_candidate_search_run_json,
+         name='get_candidate_search_run_json'),
+    path('candidate_search/runs/datatable',
+         DatabaseTableView.as_view(column_class=CandidateSearchRunColumns),
+         name='candidate_search_runs_datatable'),
+
+    path('candidate_search/run/<int:candidate_search_run_id>/datatable',
+         DatabaseTableView.as_view(column_class=CandidateColumns),
+         name='candidate_datatable'),
 
     # Autocompletes
     path('autocomplete/Analysis/', views_autocomplete.AnalysisAutocompleteView.as_view(), name='analysis_autocomplete'),

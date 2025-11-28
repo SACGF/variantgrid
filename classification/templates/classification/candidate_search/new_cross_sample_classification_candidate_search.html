@@ -1,0 +1,58 @@
+{% extends "classification/candidate_search/abstract_new_classification_candidate_search_view.html" %}
+{% load crispy_forms_tags %}
+{% block head %}
+    {{ block.super }}
+<script>
+    function filterSampleGrid() {
+        $('#sample-datatable').DataTable().ajax.reload();
+    }
+
+
+    function sampleFilter(data, type) {
+        data.gene_symbol = blankToNull($('#id_sample-gene_symbol').val());
+        data.ontology_term_id = blankToNull(getOntologyTerms("sample").join(","));
+    }
+
+    $(document).ready(() => {
+        let sampleSelects = ["#id_sample-gene_symbol"];
+        sampleSelects = sampleSelects.concat(getOntologySelects("sample"))
+        $(sampleSelects.join(',')).on("change", function() {
+            filterSampleGrid();
+        });
+    });
+
+</script>
+{% endblock %}
+
+{% block filters_above_classification %}
+<div class="container">
+    <h3>Samples</h3>
+    <div class="row filter-row">
+        {% if num_sample_gene_lists %}
+        <div class="col-3">
+            {{  num_sample_gene_lists }} of {{ num_visible_samples }} samples you can see have Sample Gene Lists
+            {% crispy sample_gene_form form_helper.horizontal %}
+        </div>
+        {% endif %}
+        <div class="col-6">
+            {% crispy sample_phenotype_form %}
+        </div>
+    </div>
+    <table id="sample-datatable" data-datatable-data='sampleFilter' data-datatable-url="{% url 'samples_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
+</div>
+{% endblock %}
+
+{% block filters_extra %}
+<div style="width: 160px" class="mx-3">
+    Internal Classifications require sample<br/>
+    <input id="id_internal_requires_sample" type="checkbox" checked="checked" />
+</div>
+{% endblock %}
+
+{% block filters_below_classification %}
+    <div class="container" id="sample_candidate_search_form">
+        <h3>Search</h3>
+        {% crispy sample_candidate_search_form form_helper.horizontal %}
+    </div>
+{% endblock %}
+

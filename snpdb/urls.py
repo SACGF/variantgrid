@@ -1,18 +1,29 @@
 from django.contrib.auth.views import PasswordChangeView, PasswordChangeDoneView
 from django.urls import include
 from django.urls.conf import path as path_standard
-from rest_framework.documentation import include_docs_urls
-from rest_framework.urlpatterns import format_suffix_patterns
+from rest_framework.permissions import AllowAny
+from rest_framework.schemas import get_schema_view
+from rest_framework.renderers import OpenAPIRenderer
+
 
 from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
     CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns, \
     LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, \
-    ManualVariantEntryCollectionColumns
+    ManualVariantEntryCollectionColumns, SampleColumns
 from snpdb.views import views, views_json, views_rest, views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
+
+schema = get_schema_view(
+    title="VariantGrid API",
+    version="4.0.0",
+    public=True,
+    permission_classes=[AllowAny],
+    renderer_classes=[OpenAPIRenderer],  # raw OpenAPI JSON
+)
+
 
 urlpatterns = [
     # public pages
@@ -125,6 +136,9 @@ urlpatterns = [
     path('settings/custom_columns/collection/datatable',
          DatabaseTableView.as_view(column_class=CustomColumnsCollectionColumns),
          name='custom_columns_collections_datatable'),
+    path('samples/datatable/',
+         DatabaseTableView.as_view(column_class=SampleColumns),
+         name='samples_datatable'),
     path('trio/grid/<slug:op>/', JQGridView.as_view(grid=TriosListGrid, delete_row=True), name='trio_grid'),
     path('vcfs/grid/<slug:op>/', JQGridView.as_view(grid=VCFListGrid, delete_row=True), name='vcfs_grid'),
 
@@ -149,16 +163,12 @@ urlpatterns = [
 
     # Debug dev help
     path('ajax_hello_world/<str:data>', views.ajax_hello_world, name='ajax_hello_world'),
-]
 
-rest_urlpatterns = [
     path_standard('api-auth/', include('rest_framework.urls')),
     path('api/sample_variant_zygosity/<int:sample_id>/<int:variant_id>', views_rest.VariantZygosityForSampleView.as_view(), name='variant_zygosity_for_sample'),
     path('api/trio/<pk>', views_rest.TrioView.as_view(), name='api_view_trio'),
     path('api/variant_allele_for_variant/<int:variant_id>/<genome_build_name>',
          views_rest.VariantAlleleForVariantView.as_view(), name='variant_allele_for_variant'),
     path('api/project/create', views_rest.ProjectViewSet.as_view({"post": "create"}), name='api_project_create'),
-    path('docs/', include_docs_urls(title='VariantGrid API', public=True, authentication_classes=[], permission_classes=[]), name='docs'),
+    path("docs/", schema, name="openapi-schema"),
 ]
-
-urlpatterns += format_suffix_patterns(rest_urlpatterns)

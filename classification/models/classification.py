@@ -2393,6 +2393,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
 
 class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models.Model):
+    """ Tracks history of changes to Classification
+        Created in Classification.patch_value() if any changes applied
+
+        It's this record (not raw Classifications) that appear on grids, so that only correctly saved/shared
+        classifications are shown (ie not partially edited ones)
+    """
+
+
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)  # One who did last change, may not be classification.user
     created = DateTimeUTCField(db_index=True, auto_now_add=True)

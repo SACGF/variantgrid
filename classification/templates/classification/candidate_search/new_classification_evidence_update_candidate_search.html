@@ -1,0 +1,21 @@
+{% extends "classification/candidate_search/abstract_new_classification_candidate_search_view.html" %}
+{% load crispy_forms_tags %}
+{% block head %}
+    {{ block.super }}
+<script>
+</script>
+{% endblock %}
+
+{% block filters_above_classification %}
+{% endblock %}
+
+{% block filters_extra %}
+{% endblock %}
+
+{% block filters_below_classification %}
+    <div class="container" id="sample_classification_form">
+        <h3>Search</h3>
+        {% crispy classification_evidence_update_form form_helper.horizontal %}
+    </div>
+{% endblock %}
+

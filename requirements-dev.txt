@@ -46,11 +46,13 @@ git+https://github.com/dridk/PyVCF3#egg=pyvcf3
 gunicorn
 HTSeq
 ijson
+inflection
 ipython
 kombu
 levenshtein
 lxml
 Markdown
+martor
 matplotlib
 more_itertools
 mozilla_django_oidc
@@ -65,6 +67,7 @@ psycopg2
 pypdf
 pysam
 python_dateutil
+pyyaml
 # Have trouble with Celery workers shutting down with newer versions of Redis
 redis==3.5.3
 reportlab

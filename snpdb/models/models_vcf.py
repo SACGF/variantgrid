@@ -300,6 +300,7 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
     vcf_sample_name = models.TextField()  # Original - can't be modified
     name = models.TextField()  # Initially set from vcf_sample_name
     no_dna_control = models.BooleanField(default=False)
+    research_consent = models.BooleanField(null=True, blank=True)
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     # TODO: A sample may have >1 specimens (eg tumor/normal subtraction)
     specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)

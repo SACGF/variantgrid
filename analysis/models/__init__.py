@@ -1,4 +1,5 @@
 from analysis.models.models_analysis import *
+from analysis.models.models_candidate_search import *
 from analysis.models.models_karyomapping import *
 from analysis.models.models_variant_tag import *
 from analysis.models.mutational_signatures import *

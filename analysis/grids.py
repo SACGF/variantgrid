@@ -1,5 +1,7 @@
+import operator
 import time
 from collections import defaultdict
+from functools import reduce
 from typing import Optional, Any, Callable
 
 import pandas as pd
@@ -13,7 +15,8 @@ from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
-from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, GroupOperation
+from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, GroupOperation, \
+    CandidateSearchRun, CandidateSearchType, Candidate, CandidateStatus, AnalysisType
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.views.analysis_permissions import get_node_subclass_or_404
@@ -33,9 +36,9 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns, \
     get_variantgrid_zygosity_annotation_kwargs
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype
+from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
 class VariantGrid(AbstractVariantGrid):
@@ -721,3 +724,207 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
             analysis = Analysis.get_for_user(self.user, pk=analysis_id)
             qs = analysis.log_entry_qs()
         return qs
+
+
+class CandidateSearchRunColumns(DatatableConfig[LogEntry]):
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+        self.rich_columns = [
+            RichColumn('id',
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl', default_sort=SortOrder.DESC),
+            RichColumn(key="search_version__search_type", orderable=True, renderer=self.render_search_type),
+            RichColumn(key="search_version__code_version", orderable=True),
+            RichColumn(key="created", label="Created", orderable=True, client_renderer='TableFormat.timestamp'),
+            RichColumn(key="user__username", label="User", orderable=True),
+            RichColumn(key="status", label="Status", orderable=True, renderer=self.render_status),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[CandidateSearchRun]:
+        qs = CandidateSearchRun.filter_for_user(self.user)
+        if search_types := self.get_query_param("search_types"):
+            qs = qs.filter(search_version__search_type__in=search_types)
+        return qs
+
+    @staticmethod
+    def render_search_type(row: dict[str, Any]):
+        return CandidateSearchType(row["search_version__search_type"]).label
+
+    @staticmethod
+    def render_status(row: dict[str, Any]):
+        return ProcessingStatus(row["status"]).label
+
+
+class CandidateColumns(DatatableConfig[LogEntry]):
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+        csr_id = self.get_query_param("candidate_search_run_id")
+        # Retrieve for Permission check
+        self.csr = CandidateSearchRun.get_for_user(self.user, pk=csr_id)
+
+        self.rich_columns = [
+            RichColumn('id', visible=False),
+            RichColumn(key="status", orderable=True, renderer=self.render_status),
+            RichColumn(name="action", label="Action",
+                       renderer=self.render_action, client_renderer='candidate_action_renderer'),
+            RichColumn(key="variant", label="Variant", orderable=True,
+                       renderer=self.render_variant_link, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="notes", orderable=True),
+            RichColumn(key="evidence", label="Evidence", orderable=True, client_renderer='TableFormat.json'),
+            # RichColumn(key="reviewer__username", label="Reviewer", orderable=True),
+            # RichColumn(key="reviewer_comment", label="Reviewer Comment", orderable=True),
+            RichColumn(
+                key='sample_id',
+                name='sample_id',
+                visible=False,  # Only used to build links
+            ),
+        ]
+
+        # Show/hide various columns based on search type (as we only use some)
+        optional_columns = [
+            RichColumn(key="classification__clinical_significance",
+                       label="Clin Sig",
+                       orderable=True,
+                       client_renderer="classification_clinical_significance_renderer"),
+            RichColumn(key="classification",
+                       label="Classification",
+                       orderable=True,
+                       extra_columns=[
+                           'classification__evidence__c_hgvs__value',
+                           'classification__evidence__g_hgvs__value',
+                           'classification__condition_resolution__display_text',
+                       ],
+                       renderer=self.render_classification_summary,
+                       client_renderer="classification_summary_renderer"),
+            RichColumn(key="sample__name", label="Sample", orderable=True, client_renderer='VCTable.sample'),
+            RichColumn(key="analysis", label="Analysis", orderable=True,
+                       renderer=self.render_analysis_link, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="annotation_version", label="Annotation Version", orderable=True),
+            RichColumn(key="zygosity", label="Zygosity", orderable=True, renderer=self.render_zygosity),
+        ]
+        columns = CandidateSearchRun.CANDIDATE_GRID_COLUMNS[self.csr.search_version.search_type]
+        for rc in optional_columns:
+            if rc.key in columns:
+                self.rich_columns.append(rc)
+
+    def get_initial_queryset(self) -> QuerySet[Candidate]:
+        qs = Candidate.objects.filter(search_run=self.csr)
+
+        if candidate_status := self.get_query_param("candidate_status"):
+            candidates = candidate_status.split(",")
+            qs = qs.filter(status__in=candidates)
+
+        if evidence := self.get_query_param("evidence"):
+            evidence_keys = evidence.split(",")
+            q_list = [Q(**{f"evidence__{ek}__isnull": False}) for ek in evidence_keys]
+            if q_list:
+                q = reduce(operator.or_, q_list)
+                qs = qs.filter(q)
+        return qs
+
+    @staticmethod
+    def render_status(row: dict[str, Any]):
+        return CandidateStatus(row["status"]).label
+
+    @staticmethod
+    def render_variant_link(row: dict[str, Any]):
+        variant = row["variant"]
+        text = variant
+        if g_hgvs := row.get("classification__evidence__g_hgvs__value"):
+            text = g_hgvs
+
+        return {
+            "text": text,
+            "url": reverse('view_variant', kwargs={'variant_id': variant}),
+        }
+
+    @staticmethod
+    def render_analysis_link(row: dict[str, Any]):
+        data = {}
+        if analysis := row.get("analysis"):
+            data = {
+                "text": analysis,
+                "url": reverse('analysis', kwargs={'analysis_id': analysis}),
+            }
+        return data
+
+    @staticmethod
+    def render_zygosity(row: dict[str, Any]):
+        return Zygosity.display(row["zygosity"])
+
+    @staticmethod
+    def render_classification_summary(row: dict[str, Any]) -> JsonDataType:
+        return {
+            "classification": row["classification"],
+            'c_hgvs': row.get('classification__evidence__c_hgvs__value'),
+            'g_hgvs': row.get('classification__evidence__g_hgvs__value'),
+            'classification__condition_resolution__display_text': row.get('classification__condition_resolution__display_text'),
+        }
+
+    @staticmethod
+    def render_action(row: dict[str, Any]) -> JsonDataType:
+        data = {}
+        if row["status"] in (CandidateStatus.OPEN, CandidateStatus.HIGHLIGHTED):
+            # Only do this if there is a sample
+            if row.get("sample_id"):
+                data["url"] = reverse("classify_candidate", args=[row["id"]]),
+                data["text"] = "📑"
+                data["title"] = "Classify sample"
+
+        return data
+
+
+class AnalysesColumns(DatatableConfig[Analysis]):
+    """ For listing Analyses """
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+
+        self.rich_columns = [
+            RichColumn('id',
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="name", orderable=True),
+            RichColumn(key="user__username", label='User', orderable=True),
+            RichColumn(key="analysis_type", label="Type", orderable=True, renderer=self.render_analysis_type),
+            RichColumn(key="created", label='Created', orderable=True, client_renderer='TableFormat.timestamp'),
+            RichColumn(key="modified", label='Modified', orderable=True, client_renderer='TableFormat.timestamp'),
+
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[Analysis]:
+        qs = Analysis.filter_for_user(self.user)
+        qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
+
+        params = ['analysis_type', 'my_user', 'date_min', 'date_max']
+        data = {k: self.get_query_param(k) for k in params}
+
+        if filters := self.get_q_list(self.user, data):
+            qs = qs.filter(*filters)
+
+        return qs
+
+    @staticmethod
+    def get_q_list(user, params: dict) -> list[Q]:
+        q_list = []
+        if analysis_type := params.get('analysis_type'):
+            q_list.append(Q(analysis_type=analysis_type))
+
+        if params.get('my_user'):
+            q_list.append(Q(user=user))
+
+        if date_min := params.get('date_min'):
+            q_list.append(Q(created__gte=date_min))
+
+        if date_max := params.get('date_max'):
+            q_list.append(Q(modified__lte=date_max))
+        return q_list
+
+    @staticmethod
+    def render_analysis_type(row: dict[str, Any]):
+        if analysis_type := row["analysis_type"]:
+            analysis_type = AnalysisType(row["analysis_type"]).label
+        return analysis_type
+

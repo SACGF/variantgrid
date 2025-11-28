@@ -1,0 +1,38 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% block head %}
+<script>
+    function filterCandidateSearchRunGrid() {
+        // TODO: This is for when we want to trigger reload after changing filters
+        $('#candidate-search-run-datatable').DataTable().ajax.reload();
+    }
+
+    function candidateSearchRunFilter(data, type) {
+        console.log("candidateSearchRunFilter");
+        data.search_types = {{ search_types|jsonify }}.join(",");
+        console.log("data");
+        console.log(data);
+    }
+</script>
+{% endblock %}
+{% block content %}
+<div class="container">
+
+    {% load ui_help %}
+
+    {% block top_content %}
+    {% endblock %}
+
+    <div>
+        <table id="candidate-search-run-datatable" data-datatable-data='candidateSearchRunFilter' data-datatable-url="{% url 'candidate_search_runs_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
+    </div>
+
+</div>
+{% endblock %}

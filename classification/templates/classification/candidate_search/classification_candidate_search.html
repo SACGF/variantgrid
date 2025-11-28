@@ -1,0 +1,20 @@
+{% extends "analysis/candidate_search/abstract_candidate_search.html" %}
+{% block title %}Classification Candidate Search{% endblock %}
+{% load ui_menu_bars %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block top_content %}
+    {% load ui_help %}
+    {% page_help page_id='classification/classification_candidate_search_help' title='Classification Candidate Search Help' %}
+
+    <div>
+        <ul>
+            <li>
+                <a href="{% url 'new_cross_sample_classification_candidate_search'  %}">New Cross Sample Classification Candidate Search</a>
+            </li>
+            <li>
+                <a href="{% url 'new_classification_evidence_update_candidate_search'  %}">New Classification Evidence Update Candidate Search</a>
+            </li>
+        </ul>
+
+    </div>
+{% endblock top_content %}

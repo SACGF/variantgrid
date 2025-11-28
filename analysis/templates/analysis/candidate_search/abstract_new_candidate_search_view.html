@@ -1,0 +1,37 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% block submenu %}{% menu_bar_analysis %}{% endblock %}
+{% block title %}VariantGrid: Reanalysis{% endblock title %}
+{% block content %}
+<div class="container">
+    {% block back_top_link %}
+        <div>
+            <a href="{% url 'reanalysis_candidate_search' %}">Back to Reanalysis Candidate Search</a>
+        </div>
+    {% endblock %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div id="new-candidate-search">
+            <h2>{{ heading }}</h2>
+
+            <div>
+                {{ methods }}
+            </div>
+
+            {% page_help page_id='analysis/reanalysis_warning' title='Note on re-analysis of reported data' %}
+
+            {% block new_candidate_search_content %}
+            {% endblock %}
+        </div>
+        <button type="submit" class="btn btn-primary" id='search-samples'><i class="fas fa-search"></i> {{ button_text }}</button>
+    </form>
+</div>
+{% endblock %}

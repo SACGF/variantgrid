@@ -2082,18 +2082,28 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
 	padding: 0 4px 0 4px;
 }
 
+label[for="id_hpo"],
 .hp,
 .hpo {
 	background-color: #FF8C00;
 	border-color: #FF8C00;
 }
 
+
+label[for="id_omim"],
 .omim {
 	background-color: #22529e;
 	border-color: #22529e;
-	color: #ddd;
+    color: #ddd;
 }
 
+/* Keep text in select 2 readable */
+span.select2 .omim  {
+    color: #444 !important;
+}
+
+
+label[for="id_mondo"],
 .mondo {
 	background-color: #cce34c;
 	border-color: #cce34c;
@@ -2703,6 +2713,10 @@ a.clinical-context {
 .novaseq-5000,
 .novaseq-6000 {
 	background-image: url(/static/icons/sequencers/novaseq_icon.png);
+}
+
+.novaseq-x {
+	background-image: url(/static/icons/sequencers/novaseq_x_icon.png);
 }
 
 .miseq {

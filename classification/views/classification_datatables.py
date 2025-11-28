@@ -9,7 +9,7 @@ from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
 from django.http import HttpRequest
 
-from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket
+from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket, ClinicalSignificance
 from classification.models import ClassificationModification, EvidenceKeyMap, \
     ImportedAlleleInfo, DiscordanceReport, ClassificationGroupingEntry
 from classification.models.classification_utils import classification_gene_symbol_filter
@@ -27,6 +27,14 @@ ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 
 
 class ClassificationColumns(DatatableConfig[ClassificationModification]):
+    CLINICAL_SIGNIFICANCE_FILTERS = {
+        "other": ClinicalSignificance.OTHER,
+        "benign": ClinicalSignificance.BENIGN,
+        "likely_benign": ClinicalSignificance.LIKELY_BENIGN,
+        "vus": ClinicalSignificance.VUS,
+        "likely_pathogenic": ClinicalSignificance.LIKELY_PATHOGENIC,
+        "pathogenic": ClinicalSignificance.PATHOGENIC,
+    }
 
     def render_somatic(self, row: Dict[str, Any]) -> JsonDataType:
         if row["classification__allele_origin_bucket"] != "G":
@@ -328,6 +336,17 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         return [e_key.key for e_key in keys.all_keys if '_id' in e_key.key and
                 e_key.evidence_category in (EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
 
+    @staticmethod
+    def get_clinical_significance_q(clinical_significances: dict) -> Q | None:
+        clinical_significance_list = []
+        for cs_label, cs_val in ClassificationColumns.CLINICAL_SIGNIFICANCE_FILTERS.items():
+            if clinical_significances.get(cs_label):
+                clinical_significance_list.append(cs_val)
+        q = None
+        if clinical_significance_list:
+            q = Q(clinical_significance__in=clinical_significance_list)
+        return q
+
     def value_columns(self) -> List[str]:
         all_columns = super().value_columns()
         if self.get_query_param("id_filter"):
@@ -425,8 +444,21 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         if analysis_id := self.get_query_json("analysis_id"):
             filters.append(Q(classification__analysisclassification__analysis_id=analysis_id))
 
-        if term_id := self.get_query_param("ontology_term_id"):
-            filters.append(Q(classification__condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
+        if ontology_terms := self.get_query_param("ontology_term_id"):
+            terms = []
+            for term_id in ontology_terms.split(","):
+                terms.append(Q(classification__condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
+            if terms:
+                q = reduce(operator.or_, terms)
+                filters.append(q)
+
+        cs_filters = {cs: True for cs in ClassificationColumns.CLINICAL_SIGNIFICANCE_FILTERS if self.get_query_param(cs)}
+        if cs_filters:
+            if q := self.get_clinical_significance_q(cs_filters):
+                filters.append(q)
+
+        if self.get_query_param("internal_requires_sample"):
+            filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))
 
         if filters:
             q = reduce(operator.and_, filters)

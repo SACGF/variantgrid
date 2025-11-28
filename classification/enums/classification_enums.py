@@ -459,6 +459,19 @@ class ClinicalSignificance:
         was_vus_change = old_classification and new_classification and old_classification == 'VUS' and new_classification.startswith('VUS')
         return old_classification != new_classification and not was_vus_change
 
+    @staticmethod
+    def distance(old_classification: int|str, new_classification: int|str) -> int | None:
+        """ Returns distance (0-4) between classifications (returns None if any are OTHER) """
+        d = None
+        try:
+            oc_val = int(old_classification)
+            nc_val = int(new_classification)
+            if oc_val and nc_val:
+                return oc_val - nc_val
+        except ValueError:
+            pass
+        return d
+
 
 class CriteriaEvaluation:
     NOT_MET = CRITERIA_NOT_MET

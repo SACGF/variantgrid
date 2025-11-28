@@ -1,0 +1,14 @@
+{% extends "classification/create_classification_for_variant.html" %}
+{% load js_tags %}
+{% load ui_utils %}
+{% load user_tag_color_tags %}
+{% block classification_form_extra_content %}
+    {% render_tag_styles_and_formatter %}
+    {% labelled label="Candidate" %}
+        <div>
+            Candidate identified in {{ candidate.search_run }}
+        </div>
+
+    {% endlabelled %}
+
+{% endblock %}

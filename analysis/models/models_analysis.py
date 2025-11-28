@@ -48,6 +48,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, blank=True, on_delete=SET_NULL)
     show_igv_links = models.BooleanField(default=True)
     analysis_panel_fraction = models.FloatField(default=0.25)
+    analysis_horizontal_mode = models.BooleanField(default=False)
     annotation_version = models.ForeignKey(AnnotationVersion, null=True, on_delete=SET_NULL)
     lock_input_sources = models.BooleanField(default=False)
     visible = models.BooleanField(default=True)

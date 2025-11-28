@@ -89,11 +89,14 @@ class GuardianPermissionsMixin:
     @classmethod
     def get_for_user(cls, user, pk, write=False):
         obj = get_object_or_404(cls, pk=pk)
-        if write:
-            obj.check_can_write(user)
-        else:
-            obj.check_can_view(user)
+        obj.check_permission(user, write)
         return obj
+
+    def check_permission(self, user, write=False):
+        if write:
+            self.check_can_write(user)
+        else:
+            self.check_can_view(user)
 
 
 class GuardianPermissionsAutoInitialSaveMixin(GuardianPermissionsMixin):
