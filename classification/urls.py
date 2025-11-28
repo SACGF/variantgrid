@@ -218,10 +218,7 @@ urlpatterns = [
     path('clinical_significance_change_data', views.clin_sig_change_data, name='clinical_significance_change_data'),
     path('autocomplete/EvidenceKey/', views_autocomplete.EvidenceKeyAutocompleteView.as_view(), name='evidence_key_autocomplete'),
 
-    path('public_info', views.view_public_info, name='classification_public_info')
-]
-
-rest_urlpatterns = [
+    path('public_info', views.view_public_info, name='classification_public_info'),
     path('api/imported_allele_info/datatables/', DatabaseTableView.as_view(column_class=ImportedAlleleInfoColumns), name='imported_allele_info_datatables'),
 
     path('api/classifications/auto_populate', AutopopulateView.as_view(), name='classification_auto_populate_api'),
