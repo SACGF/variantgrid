@@ -79,7 +79,7 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
 
     @staticmethod
     def _get_sample_qs(user, config: dict):
-        # Sample filters
+        # Sample filters - TODO: This is basically a copy of SampleColumns filtering - extract to common code?
         sample_filters = []
         ontology_filters = []
         for ontology_service in ["hpo", "omim", "mondo"]:
@@ -94,6 +94,12 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
         if gene_symbol_str := config.get("sample_gene_symbol"):
             if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
                 sample_filters.append(q)
+
+        if project := config.get("project"):
+            sample_filters.append(Q(vcf__project=project))
+
+        if vcf := config.get("vcf"):
+            sample_filters.append(Q(vcf=vcf))
 
         sample_qs = Sample.filter_for_user(user)
         if sample_filters:
@@ -117,6 +123,7 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
             # Easier when allele is on Classification (like master)
             print(f"{genome_build=}")
             for sample in samples_qs.filter(vcf__genome_build=genome_build):
+                print(f"Searching {sample}")
                 sample_variant_zyg_and_classifications = []
                 filter_kwargs = {}
                 if zygosities:

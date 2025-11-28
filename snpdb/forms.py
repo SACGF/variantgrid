@@ -346,6 +346,7 @@ SampleFilesFormSet = inlineformset_factory(Sample,
 
 class ProjectChoiceForm(forms.Form):
     project = forms.ModelChoiceField(queryset=Project.objects.all(),
+                                     required=False,
                                      widget=ModelSelect2(url='project_autocomplete',
                                                          attrs={'data-placeholder': 'Project...'}))
 
@@ -353,6 +354,7 @@ class ProjectChoiceForm(forms.Form):
 class SampleChoiceForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
     genome_build_fields = ["sample"]
     sample = forms.ModelChoiceField(queryset=Sample.objects.all(),
+                                    required=False,
                                     widget=ModelSelect2(url='sample_autocomplete',
                                                         attrs={'data-placeholder': 'Sample...'}))
 
@@ -365,6 +367,7 @@ class VCFChoiceForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
     genome_build_fields = ["vcf"]
 
     vcf = forms.ModelChoiceField(queryset=VCF.objects.all(),
+                                 required=False,
                                  widget=ModelSelect2(url='vcf_autocomplete',
                                                      attrs={'data-placeholder': 'VCF...'}))
 

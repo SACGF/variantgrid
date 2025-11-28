@@ -695,6 +695,7 @@ class SampleColumns(DatatableConfig[Sample]):
             RichColumn(key="name", label="Name", orderable=True),
             RichColumn(key="vcf__name", label="VCF", orderable=True),
             RichColumn(key="vcf__date", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="vcf__project__name", label="Project", orderable=True),
             RichColumn(key=OntologyService.OMIM, orderable=True),
             RichColumn(key=OntologyService.HPO, orderable=True),
             RichColumn(key=OntologyService.MONDO, orderable=True),
@@ -726,6 +727,12 @@ class SampleColumns(DatatableConfig[Sample]):
         if gene_symbol_str := self.get_query_param("gene_symbol"):
             if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
                 filters.append(q)
+
+        if project := self.get_query_param("project"):
+            filters.append(Q(vcf__project=project))
+
+        if vcf := self.get_query_param("vcf"):
+            filters.append(Q(vcf=vcf))
 
         if filters:
             qs = qs.filter(*filters)

@@ -11,7 +11,7 @@ from classification.forms import ClassificationAlleleOriginForm, ClinicalSignifi
 from genes.forms import GeneSymbolForm
 from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm
-from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm
+from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm, ProjectChoiceForm, VCFChoiceForm
 from snpdb.models import Lab, Sample
 from snpdb.user_settings_manager import UserSettingsManager
 
@@ -84,7 +84,8 @@ class NewCrossSampleClassificationCandidateSearchView(AbstractNewClassificationC
         sample_phenotype_form.helper.layout = layout
         context["sample_phenotype_form"] = sample_phenotype_form
         context["sample_candidate_search_form"] = SampleCandidatesSearchForm()
-
+        context["project_choice_form"] = ProjectChoiceForm()
+        context["vcf_choice_form"] = VCFChoiceForm()
         samples_qs = Sample.filter_for_user(self.request.user)
         context["num_visible_samples"] = samples_qs.count()
         num_sample_gene_lists = SampleGeneList.objects.filter(sample__in=samples_qs).count()

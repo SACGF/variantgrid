@@ -9,12 +9,14 @@
 
 
     function sampleFilter(data, type) {
+        data.project = blankToNull($('#id_project').val());
+        data.vcf = blankToNull($('#id_vcf').val());
         data.gene_symbol = blankToNull($('#id_sample-gene_symbol').val());
         data.ontology_term_id = blankToNull(getOntologyTerms("sample").join(","));
     }
 
     $(document).ready(() => {
-        let sampleSelects = ["#id_sample-gene_symbol"];
+        let sampleSelects = ["#id_sample-gene_symbol", "#id_project", "#id_vcf"];
         sampleSelects = sampleSelects.concat(getOntologySelects("sample"))
         $(sampleSelects.join(',')).on("change", function() {
             filterSampleGrid();
@@ -35,6 +37,8 @@
         </div>
         {% endif %}
         <div class="col-6">
+            {% crispy project_choice_form %}
+            {% crispy vcf_choice_form %}
             {% crispy sample_phenotype_form %}
         </div>
     </div>
