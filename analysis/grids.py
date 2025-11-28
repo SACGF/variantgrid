@@ -824,6 +824,11 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             if q_list:
                 q = reduce(operator.or_, q_list)
                 qs = qs.filter(q)
+
+        # Aggregate filters
+        for col in ["sample", "analysis", "classification"]:
+            if value := self.get_query_param(col):
+                qs = qs.filter(**{col: value})
         return qs
 
     @staticmethod
@@ -917,6 +922,7 @@ class AnalysesColumns(DatatableConfig[Analysis]):
 
     @staticmethod
     def get_q_list(user, params: dict) -> list[Q]:
+        """ This has been split off so that reanalysis tasks can use the same filters """
         q_list = []
         if analysis_type := params.get('analysis_type'):
             q_list.append(Q(analysis_type=analysis_type))

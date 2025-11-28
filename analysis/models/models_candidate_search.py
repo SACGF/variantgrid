@@ -7,7 +7,7 @@ Note on naming:
 * "Finding" in clinical contexts means real observed/reported result
 
 """
-from collections import Counter
+from collections import Counter, defaultdict
 
 from celery.canvas import Signature
 from django.contrib.auth.models import User
@@ -20,6 +20,7 @@ from model_utils.models import TimeStampedModel
 from analysis.models import Analysis
 from annotation.models import ClinVar, AnnotationVersion
 from classification.models import Classification
+from library.django_utils import count_values_qs
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.utils.django_utils import get_cached_project_git_hash
 from patients.models_enums import Zygosity
@@ -105,6 +106,11 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
         CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ["classification", "classification__clinical_significance", "annotation_version", "clinvar"],
     }
 
+    CANDIDATE_AGGREGATES = {
+        CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ["sample", "analysis"],
+        CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ["classification", "sample"],
+    }
+
     def __str__(self):
         return f"{self.search_version}: {self.pk}"
 
@@ -156,6 +162,34 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
                 zygosities.append(code)
 
         return zygosities
+
+    def get_top_aggregate_counts(self):
+        """ These are displayed on the tabs on view_candidate_search page """
+
+        _max_aggregates = 10
+        top_aggregate_counts = defaultdict(list)
+        if self.status == ProcessingStatus.SUCCESS:
+            if aggregate_columns := self.CANDIDATE_AGGREGATES.get(self.search_version.search_type):
+                c_qs = self.candidate_set.filter(status__in=[CandidateStatus.OPEN, CandidateStatus.HIGHLIGHTED])
+                for col in aggregate_columns:
+                    if col_field := getattr(c_qs.query.model, col, None):
+                        obj_qs = col_field.get_queryset()
+
+                        results = list(count_values_qs(c_qs, col).order_by("-count")[:_max_aggregates])
+                        name = f"Top {len(results)} {col}"
+                        for data in results:
+                            pk = data[col]
+                            count = data["count"]
+
+                            obj = obj_qs.get(pk=pk)
+                            top_aggregate_counts[name].append((obj, col, count))
+
+        return dict(top_aggregate_counts)
+
+
+
+
+
 
 
 class Candidate(TimeStampedModel):

@@ -24,7 +24,7 @@
 const INITIAL_UPDATE_SECS = 1;
 const MAX_UPDATE_SECS = 16;
 let update_secs = INITIAL_UPDATE_SECS;
-
+let aggregateFilters = {};
 
 // Upon page loading - if status is loading - then add a spinner next to the status + poll
 // use exponential backoff
@@ -209,8 +209,6 @@ function clinvar_renderer(data, type, row) {
 }
 
 
-
-
 function filterCandidateSearchRunGrid() {
     $('#candidate-datatable').DataTable().ajax.reload();
 }
@@ -222,9 +220,38 @@ function getMultiSelectValues(selector) {
 
 }
 
+function setAggregateFilter(col, pk) {
+    aggregateFilters = {};
+    aggregateFilters[col] = pk;
+
+    $("#candidate-grid-filters").hide();
+    $("#candidate-grid-aggregate-filter-details").html(`Filtering to ${col}=${pk}`);
+    $("#candidate-grid-aggregate-filter").show();
+
+    $('#candidate-datatable').DataTable().ajax.reload();
+}
+
+function showNormalFilters() {
+    $("#candidate-grid-filters").show();
+    $("#candidate-grid-aggregate-filter").hide();
+    $("#candidate-grid-aggregate-filter-details").empty();
+
+    aggregateFilters = {};
+    $('#candidate-datatable').DataTable().ajax.reload();
+}
+
 function candidateSearchRunDatatableFilter(data, type) {
-    data.candidate_status = getMultiSelectValues($("#id_candidate_status"));
-    data.evidence = getMultiSelectValues($("#id_evidence"));
+    let entries = Object.entries(aggregateFilters);
+    if (entries.length) {
+        for (const [key, value] of entries) {
+            data[key] = value;
+        }
+        // we only ever show open/highlighted of these
+        data.candidate_status = "O,L";
+    } else {
+        data.candidate_status = getMultiSelectValues($("#id_candidate_status"));
+        data.evidence = getMultiSelectValues($("#id_evidence"));
+    }
 }
 
 $(document).ready(function() {
@@ -252,34 +279,57 @@ $(document).ready(function() {
             {{ candidate_search_run }}
         </div>
         <div id="candidate-search-tabs">
-            <ul>
-                <li><a href="#details">Details</a></li>
-                {% if has_write_permission %}
-                <li><a href="{% url 'group_permissions' 'analysis.models.CandidateSearchRun' candidate_search_run.pk %}">Sharing / Permissions</a></li>
-                {% endif %}
-            </ul>
-            <div id="details" class="card-body">
-                {% labelled id='Methods' label='' hint="tiny" %}{{ candidate_search_run.search_version.methods }}{% endlabelled %}
-                {% labelled id='created' label='Created' hint="tiny" %}{{ candidate_search_run.created }}{% endlabelled %}
-                {% labelled id='user' label='User' hint="tiny" %}{{ candidate_search_run.user }}{% endlabelled %}
-                {% labelled id='status' label='Status' hint="tiny" %}
-                    <span id="candidate-search-status">{{ candidate_search_run.get_status_display }}</span>
-                    <i id="loading-spinner" class="fa fa-spinner"></i>
-                {% endlabelled %}
-                {% if candidate_search_run.error_exception %}
-                    {% labelled id='error_exception' label='Error' hint="tiny" %}{{ candidate_search_run.error_exception }}{% endlabelled %}
-                {% endif %}
-                {% labelled admin_only=True id='celery_task' label='Celery Task' hint="tiny" %}{{ candidate_search_run.celery_task }}{% endlabelled %}
-                {% labelled admin_only=True id='config_snapshot' label='Config' hint="tiny" %}{{ candidate_search_run.config_snapshot }}{% endlabelled %}
-                {% labelled admin_only=True id='git_hash' label='Git Hash' hint="tiny" %}{{ candidate_search_run.git_hash }}{% endlabelled %}
-            </div>
+            {% with top_aggregate_counts=candidate_search_run.get_top_aggregate_counts %}
+                <ul>
+                    <li><a href="#details">Details</a></li>
+                    {% for count_name in top_aggregate_counts %}
+                        <li><a href="#{{ count_name|slugify }}">{{ count_name }}</a></li>
+                    {% endfor %}
+                    {% if has_write_permission %}
+                    <li><a href="{% url 'group_permissions' 'analysis.models.CandidateSearchRun' candidate_search_run.pk %}">Sharing / Permissions</a></li>
+                    {% endif %}
+                </ul>
+                <div id="details" class="card-body">
+                    {% labelled id='Methods' label='' hint="tiny" %}{{ candidate_search_run.search_version.methods }}{% endlabelled %}
+                    {% labelled id='created' label='Created' hint="tiny" %}{{ candidate_search_run.created }}{% endlabelled %}
+                    {% labelled id='user' label='User' hint="tiny" %}{{ candidate_search_run.user }}{% endlabelled %}
+                    {% labelled id='status' label='Status' hint="tiny" %}
+                        <span id="candidate-search-status">{{ candidate_search_run.get_status_display }}</span>
+                        <i id="loading-spinner" class="fa fa-spinner"></i>
+                    {% endlabelled %}
+                    {% if candidate_search_run.error_exception %}
+                        {% labelled id='error_exception' label='Error' hint="tiny" %}{{ candidate_search_run.error_exception }}{% endlabelled %}
+                    {% endif %}
+                    {% labelled admin_only=True id='celery_task' label='Celery Task' hint="tiny" %}{{ candidate_search_run.celery_task }}{% endlabelled %}
+                    {% labelled admin_only=True id='config_snapshot' label='Config' hint="tiny" %}{{ candidate_search_run.config_snapshot }}{% endlabelled %}
+                    {% labelled admin_only=True id='git_hash' label='Git Hash' hint="tiny" %}{{ candidate_search_run.git_hash }}{% endlabelled %}
+                </div>
+                {% for count_name, aggregate_counts in top_aggregate_counts.items %}
+                    <div id="{{ count_name|slugify }}" class="card-body">
+                        <ul>
+                            {% for obj, column, count in aggregate_counts %}
+                            <li>
+                                {# Filter grid to object #}
+                                <a href="javascript:setAggregateFilter('{{ column }}', '{{ obj.pk }}')">{{ obj }}</a> - {{ count }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endfor %}
+            {% endwith %}
         </div>
     </div>
 </div>
 
 {% if candidate_search_run.status == 'S' %}
-    {{ candidate_status_form }}
-    {{ evidence_form }}
+    <div id="candidate-grid-filters">
+        {{ candidate_status_form }}
+        {{ evidence_form }}
+    </div>
+    <div id="candidate-grid-aggregate-filter">
+        <div id="candidate-grid-aggregate-filter-details"></div>
+        <a href="javascript:showNormalFilters()">Show normal filters</a>
+    </div>
 
     <div class="container-table">
         <table id="candidate-datatable" data-datatable-url="{% url 'candidate_datatable' candidate_search_run.pk %}" class="sticky-header samples-table" data-adjust-columns="false" data-datatable-data="candidateSearchRunDatatableFilter"></table>
