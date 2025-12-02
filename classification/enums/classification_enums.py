@@ -2,17 +2,58 @@ import typing
 from enum import Enum
 from functools import total_ordering
 from typing import Optional, Union
-
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import TextChoices
-
+from django.db.models import TextChoices, IntegerChoices
 from library.guardian_utils import public_group, all_users_group
 from library.utils import ChoicesEnum
 
 CRITERIA_NOT_MET = 'NM'
 CRITERIA_NOT_APPLICABLE = 'NA'
 CRITERIA_NEUTRAL = 'N'
+
+
+class ConflictType(TextChoices):
+    # Rename to ClassificationResultType
+    CLIN_SIG = "S", "ClinSig"
+    ONCPATH = "P", "OncPath"
+
+    def label_for_context(self, allele_origin_bucket: 'AlleleOriginBucket'):
+        if self == ConflictType.ONCPATH:
+            if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+                return "Pathogenicity"
+            elif allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+                return "Oncogenicity"
+            else:
+                return "Onco-Path"
+        else:
+            return "Clin-Sig"
+
+
+class OverlapStatus(IntegerChoices):
+    NO_CONTRIBUTIONS = 0, "No contributions"
+    NO_COUNTING_CONTRIBUTIONS = 10, "No counting contributions" # used if only RiskFactor or Drug Risk
+    SINGLE_SUBMITTER = 20, "Single submitter"
+    EXACT_AGREEMENT = 30, "Exact agreement"
+    TERMINOLOGY_DIFFERENCES = 40, "Terminology differences"  # e.g. P vs O
+    RESOLUTION_DIFFERENCES = 50, "Resolution differences"  # e.g. VUS vs VUS_A
+    MINOR_DIFFERENCES = 60, "Minor differences"  # e.g. VUS_A vs VUS_B, Pathogenic versus Likely Pathogenic
+    TIER_1_VS_TIER_2_DIFFERENCES = 70, "Tier 1 vs Tier 2 Differences"  # special category for tier_1 vs tier_2
+    MAJOR_DIFFERENCES = 80, "Discordance"  # VUS vs Benign
+    MEDICALLY_SIGNIFICANT = 90, "Medically significant discordance"  # VUS vs Pathogenic
+
+
+class TestingContextBucket(TextChoices):
+    NON_CANCER = "N", "Non-Cancer Somatic"
+    HAEMATOLOGY = "H", "Haematology"
+    SOLID_TUMOR = "S", "Solid Tumour"
+    OTHER = "O", "Other"
+    GERMLINE = "G", "Germline"
+    UNKNOWN = "U", "Unknown"
+
+    @property
+    def should_have_subdivide(self) -> bool:
+        return self in {TestingContextBucket.SOLID_TUMOR, TestingContextBucket.HAEMATOLOGY}
 
 
 class AlleleOriginBucket(TextChoices):
@@ -22,7 +63,7 @@ class AlleleOriginBucket(TextChoices):
 
     @staticmethod
     def bucket_for_allele_origin(allele_origin: Optional[str]) -> 'AlleleOriginBucket':
-        # logic is duplicated in JavaSCript in vc_form.js updateTitle()
+        # logic is duplicated in JavaScript in vc_form.js updateTitle()
         if not allele_origin:
             return AlleleOriginBucket(settings.ALLELE_ORIGIN_NOT_PROVIDED_BUCKET)
 
@@ -41,6 +82,12 @@ class AlleleOriginBucket(TextChoices):
 
 
 class SpecialEKeys:
+    """
+    A subset of EvidenceKeys that should be present in any environment.
+    Refer to them by their constant here instead of string when possible - makes it easier to track what code
+    references specific EvidenceKeys
+    """
+
     AUTOPOPULATE = 'autopopulate'
     VARIANT_COORDINATE = 'variant_coordinate'
     G_HGVS = 'g_hgvs'
@@ -49,6 +96,7 @@ class SpecialEKeys:
     CONDITION = 'condition'
     CLINICAL_SIGNIFICANCE = 'clinical_significance'
     SOMATIC_CLINICAL_SIGNIFICANCE = 'somatic:clinical_significance'
+    TESTING_CONTEXT = "testing_context"
     CURATED_BY = 'curated_by'
     CURATION_DATE = 'curation_date'
     CURATION_VERIFIED_DATE = 'curation_verified_date'
@@ -58,7 +106,7 @@ class SpecialEKeys:
 
     # POPULATED
     # Note: Some fields not here are populated - those with variantgrid_column
-    # and the pops - ie "pop_AFR" "pop_NFE" etc.
+    # and the pops - i.e. "pop_AFR" "pop_NFE" etc.
     AGE = "age"
     AGE_UNITS = "age_units"  # deleted now, but declared fo migrations
     ALLELE_DEPTH = 'allele_depth'
@@ -183,7 +231,7 @@ class EvidenceCategory:
     SIGN_OFF = 'SO'
     LITERATURE = 'L'
     # Summary data covers things like literature
-    # Things that are typically cross evidence concerns that have been bundled up
+    # Things that are typically cross-evidence concerns that have been bundled up
     # in one spot
 
     CHOICES = (
@@ -241,9 +289,11 @@ _ShareLevelData = typing.NamedTuple('ShareLevelData', [('index', int), ('label',
 
 @total_ordering
 class ShareLevel(ChoicesEnum):
-    _ignore_ = ['ALL_LEVELS', 'DISCORDANT_LEVEL_KEYS']
-    ALL_LEVELS: list['ShareLevel'] = []
-    DISCORDANT_LEVEL_KEYS: list[str] = []
+    # note the following aren't enums (thus the _ignore_) type is defined here, contents is defined below ShareLevel definition
+    _ignore_ = ['ALL_LEVELS', 'DISCORDANT_LEVEL_KEYS', '_DATA']
+    ALL_LEVELS: list['ShareLevel']
+    DISCORDANT_LEVEL_KEYS: list[str]
+    _DATA: dict['ShareLevel', _ShareLevelData]
 
     # These strings have to be <= 16 characters for choice field
     CURRENT_USER = 'user'
@@ -270,6 +320,19 @@ class ShareLevel(ChoicesEnum):
     @property
     def is_discordant_level(self) -> bool:
         return self.value in ShareLevel.DISCORDANT_LEVEL_KEYS
+
+    def has_access(self, lab: 'Lab', user: User) -> bool:
+        if user.is_superuser:
+            return True
+        match self:
+            case _ if self.is_discordant_level:
+                return True
+            case ShareLevel.INSTITUTION:
+                return user.groups.filter(name=lab.group_institution).exists()
+            case ShareLevel.LAB:
+                return user.groups.filter(name=lab.group).exists()
+            case _:
+                raise ValueError(f"Unhandled share level {self}")
 
     def group(self, lab: 'Lab', user: User = None):
         groups = {
@@ -461,7 +524,8 @@ class CriteriaEvaluation:
     )
 
     # Neutral, Not Met, Not Applicable don't count
-    ALL_STRENGTHS = [BENIGN_STANDALONE, BENIGN_STRONG, BENIGN_SUPPORTING, BENIGN_UNSPECIFIED,
+    # including Benign Moderate as it gets used more
+    ALL_STRENGTHS = [BENIGN_STANDALONE, BENIGN_STRONG, BENIGN_MODERATE, BENIGN_SUPPORTING, BENIGN_UNSPECIFIED,
                      PATHOGENIC_SUPPORTING, PATHOGENIC_MODERATE, PATHOGENIC_STRONG, PATHOGENIC_VERY_STRONG, PATHOGENIC_UNSPECIFIED]
 
     ####
