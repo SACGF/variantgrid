@@ -155,8 +155,8 @@ class AlleleOriginGrouping(TimeStampedModel):
         return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.allele_grouping_id})
 
     def update(self):
-        from classification.services.conflict_services import calculate_and_apply_conflicts_for
-        calculate_and_apply_conflicts_for(self)
+        from classification.services.overlaps_services import OverlapServices
+        OverlapServices().calculate_and_apply_overlaps_for_ao(self)
         self.dirty = False
         self.save()
 

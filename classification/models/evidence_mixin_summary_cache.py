@@ -1,8 +1,12 @@
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import cached_property
 from typing import TypedDict, Optional, Self
+
+from django.db.models import TextChoices
+
 from classification.criteria_strengths import CriteriaStrength
-from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation
+from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation, TestingContextBucket
 from library.utils import strip_json
 
 """
@@ -13,7 +17,6 @@ return {
     "pathogenicity": {
         "classification": self.classification_value,
         "sort": self.classification_sort,
-        "bucket": self.germline_bucket
     },
     "somatic": {
         "clinical_significance": self.somatic_clinical_significance,
@@ -27,14 +30,16 @@ return {
 }
 """
 
+
 class ClassificationSummaryCacheDictPathogenicity(TypedDict):
     classification: Optional[str]
     sort: int
-    bucket: Optional[int]
-    pending: Optional[str]
+    # pending: Optional[str]
 
 
 class ClassificationSummaryCacheDictSomatic(TypedDict):
+    testing_context_bucket: Optional[str]
+    tumor_type_category: Optional[str]  # condition grouping if testing_contest is solid-tumor
     clinical_significance: Optional[str]
     amp_level: Optional[str]
     sort: int
@@ -49,6 +54,7 @@ class ClassificationSummaryCacheDict(TypedDict):
     criteria_labels: list[str]
     pathogenicity: ClassificationSummaryCacheDictPathogenicity
     somatic: ClassificationSummaryCacheDictSomatic
+    allele_origin_bucket: str
 
 
 @dataclass(frozen=True)
@@ -93,45 +99,60 @@ class ClassificationSummaryCalculator:
         from classification.models import CuratedDate
         curated_date = CuratedDate(self.cm).relevant_date
 
-        # strip out None values as that makes sorting work more naturally
-        return strip_json({
+        pathology: ClassificationSummaryCacheDictPathogenicity = {
+            "classification": self.classification_value,
+            "sort": self.classification_sort,
+            # "bucket": self.germline_bucket,
+            # "pending": self.pending_classification_value
+        }
+        somatic: ClassificationSummaryCacheDictSomatic = {
+            "testing_context_bucket": self.testing_context_bucket,
+            "tumor_type_category": self.tumor_type_category,
+            "clinical_significance": self.somatic_clinical_significance,
+            "amp_level": self.somatic_amp_level,
+            "sort": self.somatic_sort
+        }
+        date_json: ClassificationSummaryCachedDictDate = {
+            "value": curated_date.date_str,
+            "type": curated_date.name,
+        }
+
+        full_json: ClassificationSummaryCacheDict = {
             "criteria_labels": self.criteria_labels,
-            "pathogenicity": {
-                "classification": self.classification_value,
-                "sort": self.classification_sort,
-                "bucket": self.germline_bucket,
-                "pending": self.pending_classification_value
-            },
-            "somatic": {
-                "clinical_significance": self.somatic_clinical_significance,
-                "amp_level": self.somatic_amp_level,
-                "sort": self.somatic_sort
-            },
-            "date": {
-                "value": curated_date.date_str,
-                "type": curated_date.name
-            }
-        })
+            "pathogenicity": pathology,
+            "allele_origin_bucket": self.allele_origin_bucket,
+            "somatic": somatic,
+            "date": date_json
+        }
+
+        # strip out None values as that makes sorting work more naturally
+        return strip_json(full_json)
+
+    # @cached_property
+    # def pending_classification_value(self) -> Optional[str]:
+    #     from classification.models import classification_flag_types, ClassificationFlagTypes
+    #     from flags.models import Flag, FlagStatus
+    #     if flag := Flag.objects.filter(
+    #         flag_type=classification_flag_types.classification_pending_changes,
+    #         resolution__status=FlagStatus.OPEN,
+    #         collection_id=self.cm.classification.flag_collection_id
+    #     ).first():
+    #         return flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
+    #     return None
+
+    # @cached_property
+    # def germline_bucket(self) -> Optional[int]:
+    #     from classification.models import EvidenceKeyMap
+    #     return EvidenceKeyMap.clinical_significance_to_bucket().get(self.classification_value)
 
     @cached_property
-    def pending_classification_value(self) -> Optional[str]:
-        from classification.models import classification_flag_types, ClassificationFlagTypes
-        from flags.models import Flag, FlagStatus
-        if flag := Flag.objects.filter(
-            flag_type=classification_flag_types.classification_pending_changes,
-            resolution__status=FlagStatus.OPEN,
-            collection_id=self.cm.classification.flag_collection_id
-        ).first():
-            return flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
-
-    @cached_property
-    def germline_bucket(self) -> Optional[int]:
-        from classification.models import EvidenceKeyMap
-        return EvidenceKeyMap.clinical_significance_to_bucket().get(self.classification_value)
+    def allele_origin_bucket(self) -> AlleleOriginBucket:
+        return self.cm.classification.allele_origin_bucket
 
     @cached_property
     def is_possibly_somatic(self) -> bool:
-        return self.cm.classification.allele_origin_bucket != AlleleOriginBucket.GERMLINE
+        # TODO grab allele origin as it is per the modification
+        return self.allele_origin_bucket != AlleleOriginBucket.GERMLINE
 
     @cached_property
     def somatic_amp_level(self) -> Optional[str]:
@@ -139,6 +160,7 @@ class ClassificationSummaryCalculator:
             for key, level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
                 if self.cm.get(key):
                     return level
+        return None
 
     @cached_property
     def classification_value(self) -> Optional[str]:
@@ -157,6 +179,29 @@ class ClassificationSummaryCalculator:
     def somatic_clinical_significance(self) -> Optional[str]:
         if self.is_possibly_somatic:
             return self.cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+        return None
+
+    @cached_property
+    def testing_context_bucket(self) -> TestingContextBucket:
+        # TODO move this information into the testing context evidence key data
+        if self.is_possibly_somatic:
+            if testing_context_value := self.cm.get(SpecialEKeys.TESTING_CONTEXT):
+                from classification.models import EvidenceKeyMap
+                return EvidenceKeyMap.cached_key(SpecialEKeys.TESTING_CONTEXT).option_dictionary_property("testing_context_bucket").get(testing_context_value) or TestingContextBucket.OTHER
+            else:
+                return TestingContextBucket.UNKNOWN.value
+        else:
+            return TestingContextBucket.GERMLINE.value
+
+    @cached_property
+    def tumor_type_category(self) -> Optional[str]:
+        if self.testing_context_bucket == TestingContextBucket.SOLID_TUMOR:
+            # TODO actually calculate
+            return None
+        elif self.testing_context_bucket == TestingContextBucket.HAEMATOLOGY:
+            # TODO actually calculate
+            return None
+        return None
 
     @cached_property
     def somatic_sort(self) -> Optional[int]:

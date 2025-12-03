@@ -60,8 +60,12 @@ class OverlapServices:
 
     def calculate_overlap(self, overlap: Overlap):
         for contribution in overlap.classificationgroupingoverlapcontribution_set.select_related('classification_grouping').all():
-            # check if there's already a triage
-            contribution.classification_grouping.classificationgroupingvaluetriage_set.get_or_create(classification_grouping=contribution, overlap=overlap)
+            # ensure triage of the required value type is created
+            contribution.classification_grouping.classificationgroupingvaluetriage_set.get_or_create(
+                classification_grouping=contribution,
+                result_value_type=overlap.value_type
+            )
+
         if overlap.value_type == ClassificationResultValue.ONC_PATH:
             OverlapCalculatorOncPath().calculate_and_apply_overlaps_for_ao(overlap)
         elif overlap.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
