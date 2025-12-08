@@ -1,16 +1,6 @@
 from django.apps.config import AppConfig
-from django.core.cache import cache
 from django.db import ProgrammingError
 from django.db.models.signals import post_save
-
-
-def _has_classification_gene_count_type(GeneCountType):
-    cache_key = "has_classification_gene_count_type"
-    exists = cache.get(cache_key)
-    if exists is None:
-        exists = GeneCountType.objects.filter(enabled=True, uses_classifications=True).exists()
-        cache.set(cache_key, exists)
-    return exists
 
 
 class AnnotationConfig(AppConfig):
@@ -26,6 +16,10 @@ class AnnotationConfig(AppConfig):
         from annotation.models import CachedWebResource
         from annotation.signals.manual_signals import clinvar_citations_post_save_handler
         from annotation.signals import citation_preview, citation_search, clinvar_annotation_health_check
+        from annotation.signals.manual_signals import gene_counts_classification_withdraw_handler, \
+            gene_counts_classification_publish_handler
+        from classification.models import Classification, classification_withdraw_signal, \
+            classification_post_publish_signal
         # pylint: enable=import-outside-toplevel,unused-import
 
         # Entrez wants both email and API key
@@ -36,17 +30,7 @@ class AnnotationConfig(AppConfig):
 
         post_save.connect(clinvar_citations_post_save_handler, sender=CachedWebResource)
 
-        try:
-            GeneCountType = self.get_model('GeneCountType')
-            if _has_classification_gene_count_type(GeneCountType):
-                from annotation.signals.manual_signals import gene_counts_classification_withdraw_handler, \
-                    gene_counts_classification_publish_handler
-                from classification.models import Classification, \
-                    classification_withdraw_signal, classification_post_publish_signal
-
-                classification_withdraw_signal.connect(gene_counts_classification_withdraw_handler,
-                                                       sender=Classification)
-                classification_post_publish_signal.connect(gene_counts_classification_publish_handler,
-                                                           sender=Classification)
-        except ProgrammingError:
-            pass  # Need to allow DB migrations adding these fields to run
+        classification_withdraw_signal.connect(gene_counts_classification_withdraw_handler,
+                                               sender=Classification)
+        classification_post_publish_signal.connect(gene_counts_classification_publish_handler,
+                                                   sender=Classification)
