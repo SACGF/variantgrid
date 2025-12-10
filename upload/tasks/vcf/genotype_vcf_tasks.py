@@ -19,6 +19,7 @@ from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_
     create_variant_zygosity_counts
 from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, UploadedVCFPendingAnnotation, \
     UploadPipeline, SimpleVCFImportInfo, SkipUploadStepException, ModifiedImportedVariants
+from upload.signals.signals import vcf_import_success_signal
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_upload_pipeline
 from variantgrid.celery import app
@@ -183,6 +184,7 @@ class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
             backend_vcf_import_success_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
         except:
             pass
+        vcf_import_success_signal.send(sender=os.path.basename(__file__), vcf=vcf)
 
         create_import_success_message(vcf)
 
