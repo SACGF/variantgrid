@@ -279,6 +279,13 @@ class Sample(SortByPKMixin, models.Model):
     def is_somatic(self):
         return self.variants_type in VariantsType.SOMATIC_TYPES
 
+    @property
+    def enrichment_kit(self):
+        try:
+            return self.samplefromsequencingsample.sequencing_sample.enrichment_kit
+        except ObjectDoesNotExist:
+            return None
+
     def can_view(self, user):
         vcf_read_perm = DjangoPermission.perm(self.vcf, DjangoPermission.READ)
         sample_read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
