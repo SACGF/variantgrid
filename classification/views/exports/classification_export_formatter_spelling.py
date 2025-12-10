@@ -13,6 +13,7 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row
+from library.utils.nltk_utils import ensure_nltk_data
 
 RE_HAS_BAD_CHAR = re.compile(r"[\d._]")
 
@@ -75,6 +76,9 @@ class ClassificationExportFormatterSpelling(ClassificationExportFormatter):
         self.spell = SpellChecker()
         self.suspect_count: dict[str, int] = defaultdict(int)
         super().__init__(classification_filter=classification_filter)
+        # needed for nltk.word_tokenize, but done here so we don't check per row
+        ensure_nltk_data('taggers/averaged_perceptron_tagger_eng')
+
 
     def content_type(self) -> str:
         return "text/csv"

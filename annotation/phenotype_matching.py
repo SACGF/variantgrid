@@ -7,13 +7,14 @@ import nltk
 from annotation.models.models_phenotype_match import TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, \
     TextPhenotypeSentence
 from annotation.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
-from library.utils import get_and_log_time_since, invert_dict_of_lists
+from annotation.phenotype_tokenizer import PhenotypeTokenizer
+from library.utils import get_and_log_time_since
 from patients.models import Patient
 
 MAX_COMBO_LENGTH = 14  # Checked HPO words in DB
 
 
-def get_word_combos_and_spans(words_and_spans: list, max_combo_length: Optional[int]) -> list:
+def _get_word_combos_and_spans(words_and_spans: list, max_combo_length: Optional[int]) -> list:
     combos_and_spans = []
     for i in range(len(words_and_spans)):
         combo_length = len(words_and_spans) - i
@@ -26,12 +27,12 @@ def get_word_combos_and_spans(words_and_spans: list, max_combo_length: Optional[
     return combos_and_spans
 
 
-def get_word_combos_and_spans_sorted_by_length(words_and_spans, max_combo_length: Optional[int] = None) -> Iterable:
-    word_combos_and_spans = get_word_combos_and_spans(words_and_spans, max_combo_length)
+def _get_word_combos_and_spans_sorted_by_length(words_and_spans, max_combo_length: Optional[int] = None) -> Iterable:
+    word_combos_and_spans = _get_word_combos_and_spans(words_and_spans, max_combo_length)
     return reversed(sorted(word_combos_and_spans, key=lambda item: sum(len(i[0]) for i in item)))
 
 
-def get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher: PhenotypeMatcher):
+def _get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher: PhenotypeMatcher):
     offset_start = words_and_spans_subset[0][1][0]
     offset_end = words_and_spans_subset[-1][1][1]
 
@@ -46,7 +47,7 @@ def get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_match
     return results
 
 
-def sub_array_index(array, sub_array):
+def _sub_array_index(array, sub_array):
     for i in range(0, len(array) - len(sub_array) + 1):
         if array[i:i + len(sub_array)] == sub_array:
             return i
@@ -56,13 +57,13 @@ def sub_array_index(array, sub_array):
 def parse_words(text_phenotype, input_words_and_spans, phenotype_matcher) -> list:
     results = []
 
-    word_combos_and_spans = get_word_combos_and_spans_sorted_by_length(input_words_and_spans, max_combo_length=MAX_COMBO_LENGTH)
+    word_combos_and_spans = _get_word_combos_and_spans_sorted_by_length(input_words_and_spans, max_combo_length=MAX_COMBO_LENGTH)
     for words_and_spans_subset in word_combos_and_spans:
-        words_results = get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher)
+        words_results = _get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher)
         if words_results:
             results.extend(words_results)
             if words_and_spans_subset != input_words_and_spans:  # More to match
-                i = sub_array_index(input_words_and_spans, words_and_spans_subset)
+                i = _sub_array_index(input_words_and_spans, words_and_spans_subset)
                 before_words = input_words_and_spans[:i]
                 after_words = input_words_and_spans[i + len(words_and_spans_subset):]
 
@@ -79,7 +80,7 @@ def parse_words(text_phenotype, input_words_and_spans, phenotype_matcher) -> lis
     return results
 
 
-def split_adj_noun_and_noun(words, tags, spans):
+def _split_adj_noun_and_noun(words, tags, spans):
     """ This is used to transform e.g. "long fingers and toes" into "long fingers and long toes"
         I looked and this pattern doesn't appear in HPO terms so is ok to split up """
 
@@ -92,12 +93,12 @@ def split_adj_noun_and_noun(words, tags, spans):
     return new_words_and_spans
 
 
-def transform_words(words, tags, spans):
+def _transform_words(words, tags, spans):
     # TODO:
     # X disorder => Abnormality of X
     # X Ca => X Cancer?
 
-    TRANSFORMATIONS = [split_adj_noun_and_noun]
+    TRANSFORMATIONS = [_split_adj_noun_and_noun]
 
     for t in TRANSFORMATIONS:
         new_words_and_spans = t(words, tags, spans)
@@ -107,111 +108,8 @@ def transform_words(words, tags, spans):
     return list(zip(words, spans))
 
 
-def tokens_and_spans(txt, tokens):
-    offset = 0
-
-    tokenized_text_and_spans = []
-    for token in tokens:
-        offset = txt.find(token, offset)
-        tokenized_text_and_spans.append((token, offset, offset + len(token)))
-        offset += len(token)
-
-    return tokenized_text_and_spans
-
-
-def handle_unsplit(unsplit_digits_and_spans, split_words_and_spans):
-    if unsplit_digits_and_spans:
-        unsplit_word = '/'.join([d[0] for d in unsplit_digits_and_spans])
-        my_offset_start = unsplit_digits_and_spans[0][1]
-        my_offset_end = unsplit_digits_and_spans[-1][2]
-        split_words_and_spans.append((unsplit_word, my_offset_start, my_offset_end))
-        unsplit_digits_and_spans[:] = []
-
-
-def initial_replace_characters(text):
-    REPLACE_CHARS = {';': ' '}
-
-    cleaned_text = text
-    for from_char, to_char in REPLACE_CHARS.items():
-        cleaned_text = cleaned_text.replace(from_char, to_char)
-
-    return cleaned_text
-
-
-def word_tokenise_and_spans(txt):
-    """ Split by nltk.sent_tokenize and / (only if alphanumeric not for dates) """
-
-    cleaned_text = initial_replace_characters(txt)
-    tokens = nltk.word_tokenize(cleaned_text)
-    split_words_and_spans = []
-
-    # {TO: FROM} - These have to be the same size! Then switch them out later
-    PRE_SPLIT_REPLACE = {"dv/p": "dv_p"}
-
-    # replace word : list of alternate words to replace
-    REPLACE_ALTERNATES = {
-        "bartter": ["bartters", "bartter's"],
-        "bull's eye": ["bullseye"],
-        "developmental": ["dev", "devt", "dv_p", "devel"],
-        "dysmorphic": ["dysm"],
-        "gaucher": ["gauchers", "gaucher's"],
-        "hemophagocytic": ["haemophagcytic", "haemophogocytic", "haemophagocytic"],
-        "leukemia": ["leuk"],
-        "seizures": ["sz"],
-        "sanfilippo": ["sanfilipo"],
-        "sclerosis": ["schlerosis", "scleosis"],
-        "respiratory": ["rep", "resp"],
-        "syndrome": ["synd", "syndromes"],
-        "undescended": ["undesc"],
-    }
-    replace_words = invert_dict_of_lists(REPLACE_ALTERNATES)
-
-    for word, offset_start, _ in tokens_and_spans(cleaned_text, tokens):
-        new_offset_start = offset_start
-        unsplit_digits_and_spans = []  # Don't split up dates
-
-        word = PRE_SPLIT_REPLACE.get(word, word)
-        for w in word.split('/'):
-            size = len(w)  # calculate on old size re-replace
-
-            replace = replace_words.get(w.lower())
-            if not replace and word.endswith("."):
-                replace = replace_words.get(w[:-1].lower())
-
-            if replace:
-                w = replace
-
-            new_offset_end = new_offset_start + size
-            if w:
-                data = (w, new_offset_start, new_offset_end)
-                if w.isdigit():
-                    unsplit_digits_and_spans.append(data)
-                else:
-                    handle_unsplit(unsplit_digits_and_spans, split_words_and_spans)
-                    split_words_and_spans.append(data)
-            new_offset_start = new_offset_end
-        handle_unsplit(unsplit_digits_and_spans, split_words_and_spans)
-
-    return split_words_and_spans
-
-
-def sentences_and_offsets(txt):
-    """ Split by nltk.sent_tokenize and new line """
-    tokens = nltk.sent_tokenize(txt)
-
-    split_sentences_and_offsets = []
-    for sentence, sentence_offset, _ in tokens_and_spans(txt, tokens):
-        new_offset = sentence_offset
-        for line in sentence.split('\n'):
-            if line:
-                split_sentences_and_offsets.append((line, new_offset))
-            new_offset += len(line) + 1
-
-    return split_sentences_and_offsets
-
-
-def process_text_phenotype(text_phenotype, phenotype_matcher):
-    tokenized_text_and_spans = word_tokenise_and_spans(text_phenotype.text)
+def _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_matcher):
+    tokenized_text_and_spans = phenotype_tokenizer.word_tokenise_and_spans(text_phenotype.text)
 
     tokenized_text = []
     tokenized_spans = []
@@ -237,7 +135,7 @@ def process_text_phenotype(text_phenotype, phenotype_matcher):
                 offset_end = span[1]
                 spans.append((offset_start, offset_end))
 
-    words_and_spans = transform_words(words, tags, spans)
+    words_and_spans = _transform_words(words, tags, spans)
 
     try:
         parse_words(text_phenotype, words_and_spans, phenotype_matcher)
@@ -248,7 +146,7 @@ def process_text_phenotype(text_phenotype, phenotype_matcher):
     text_phenotype.save()
 
 
-def replace_comments_with_spaces(text):
+def _replace_comments_with_spaces(text):
     """ Replace with spaces instead of removing so that characters offsets remain the same """
     COMMENT = '-'
     COMMENT_REPLACE = ' '
@@ -272,9 +170,11 @@ def replace_comments_with_spaces(text):
 
 
 def create_phenotype_description(text, phenotype_matcher=None):
+    """ PhenotypeMatcher takes a while to initialize, so can create once and pass in for
+        faster bulk processing """
     if phenotype_matcher is None:
         phenotype_matcher = PhenotypeMatcher()
-
+    phenotype_tokenizer = PhenotypeTokenizer()
     phenotype_description = PhenotypeDescription.objects.create(original_text=text)
     known_sentences = []
     unknown_sentences = []
@@ -282,8 +182,8 @@ def create_phenotype_description(text, phenotype_matcher=None):
     # Strip carriage returns - some browsers send \r\n in forms, Ajax usually sends \n
     # These need to be the same so save/ajax preview look the same
     text = text.replace('\r', '')
-    text = replace_comments_with_spaces(text)  # Need to keep length the same for offsets
-    for sentence, sentence_offset in sentences_and_offsets(text):
+    text = _replace_comments_with_spaces(text)  # Need to keep length the same for offsets
+    for sentence, sentence_offset in phenotype_tokenizer.sentences_and_offsets(text):
         text_phenotype, tp_created = TextPhenotype.objects.get_or_create(text=sentence)
         tps = TextPhenotypeSentence.objects.create(phenotype_description=phenotype_description,
                                                    text_phenotype=text_phenotype,
@@ -302,7 +202,7 @@ def create_phenotype_description(text, phenotype_matcher=None):
     if unknown_sentences:
         for sentence in unknown_sentences:
             try:
-                process_text_phenotype(sentence.text_phenotype, phenotype_matcher)
+                _process_text_phenotype(sentence.text_phenotype, phenotype_tokenizer, phenotype_matcher)
             except Exception:
                 logging.error("Problem processing phenotype for '%s'", sentence.text_phenotype.text)
                 raise
