@@ -1452,11 +1452,19 @@ def get_samples_by_sequencing_sample(sample_sheet, vcf):
     def clean_sample_name(s):
         return s.upper().replace("-", "_")
 
+    samples = list(vcf.sample_set.all())
+    potential_samples_by_name = {
+        s.name: s for s in samples
+    }
+    # If there is a single sample, use VCF name (work around SpliceGirls samples called "SAMPLE")
+    if len(samples) == 1:
+        potential_samples_by_name[vcf.name] = samples[0]
+
     samples_by_sequencing_sample = {}
-    for sample in vcf.sample_set.all():
+    for sample_name, sample in potential_samples_by_name.items():
         # Do a startswith match rather than hash lookup as it's less strict (diff naming conventions etc)
         for sequencing_sample_name, sequencing_sample in sequencing_samples_by_name.items():
-            cleaned_sample_name = clean_sample_name(sample.name)
+            cleaned_sample_name = clean_sample_name(sample_name)
             cleaned_sequencing_sample_name = clean_sample_name(sequencing_sample_name)
             if cleaned_sample_name.startswith(cleaned_sequencing_sample_name):
                 samples_by_sequencing_sample[sequencing_sample] = sample
