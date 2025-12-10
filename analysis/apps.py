@@ -7,6 +7,8 @@ class AnalysisConfig(AppConfig):
     def ready(self):
         from analysis.models import VariantTag
         from analysis.signals.signal_handlers import variant_tag_create, variant_tag_delete
+        from upload.signals.signals import vcf_import_success_signal
 
         post_save.connect(variant_tag_create, sender=VariantTag)
         post_delete.connect(variant_tag_delete, sender=VariantTag)
+        vcf_import_success_signal.connect()

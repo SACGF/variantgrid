@@ -1,8 +1,12 @@
+import re
+
+from django.conf import settings
 from django.contrib.auth.models import User
 
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplate, AnalysisTemplateRun, \
     AnalysisTemplateRunArgument, SampleAnalysisTemplateRun
 from analysis.models.nodes.node_utils import get_toposorted_nodes, reload_analysis_nodes
+from analysis.related_analyses import get_related_analysis_details_for_samples
 from library.guardian_utils import add_public_group_read_permission
 from snpdb.models import Sample, GenomeBuild
 
@@ -73,3 +77,28 @@ def get_sample_analysis(sample: Sample, analysis_template: AnalysisTemplate) -> 
         add_public_group_read_permission(at_run.analysis)
         SampleAnalysisTemplateRun.objects.create(sample=sample, analysis_template_run=at_run)
         return at_run.analysis
+
+
+def get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):
+    if skip_already_analysed:
+        if get_related_analysis_details_for_samples(user, [sample]):
+            return []
+
+    sample_enrichment_kit_name = None
+    if sample.enrichment_kit:
+        sample_enrichment_kit_name = sample.enrichment_kit.name
+
+    analysis_templates = []
+    for enrichment_kit_name, sample_regex, analysis_template_name in settings.ANALYSIS_AUTO_LAUNCH_SAMPLE_ANALYSIS_TEMPLATE_CONFIG:
+        if sample_enrichment_kit_name == enrichment_kit_name:
+            if sample_regex and not re.match(sample_regex, sample.name):
+                continue
+            analysis_templates.append(AnalysisTemplate.objects.get(name=analysis_template_name))
+    return analysis_templates
+
+def auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):
+    for analysis_template in get_auto_launch_analysis_templates_for_sample(user, sample,
+                                                                           skip_already_analysed=skip_already_analysed):
+        template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, user=user)
+        template_run.populate_arguments({"sample": sample})
+        populate_analysis_from_template_run(template_run)
