@@ -16,6 +16,7 @@
     <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
     <script src="{% static 'js/include_jqgrid.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/phenotype.js' %}"></script>
     <style>
         /* Fix for grid being 100% size for some unknown reason after bootstrap */
         #gbox_genotype-grid .ui-jqgrid-bdiv {
@@ -89,17 +90,6 @@
             return formatFieldString;
         }
 
-        function getTermLinks(term_type, term_list) {
-            let links = '';
-            if (term_list) {
-                const terms = term_list.split('|');
-                for (let i=0 ; i<terms.length ; ++i) {
-                    const term = terms[i];
-                    links += "<span class='grid-term-link " + term_type + "' title='" + term + "' term='" + term + "' term_type='" + term_type + "'>" + term + "</span>";
-                }
-            }
-            return links;
-        }
 
         function plotSampleAlleleFrequencies(visible_rows) {
             let x = [];
@@ -185,10 +175,11 @@
                     return ZYGOSITY_DICT[zygosity] || zygosity;
                 },
                 hpoFormatter : function(phenotype_terms) {
-                    return getTermLinks('hpo', phenotype_terms);
+                    return getOntologyTermLinks('hpo', phenotype_terms);
                 },
                 omimFormatter : function(omim_terms) {
-                    return getTermLinks('omim', omim_terms);
+                    return getOntologyTermLinks('omim', omim_terms);
+                },
                 },
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
             });
