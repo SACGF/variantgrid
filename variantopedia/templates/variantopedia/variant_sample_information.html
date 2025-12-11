@@ -166,6 +166,10 @@
                 'U': 'Unknown Zygosity',
             };
 
+            function getOntologyTermUrl(term_type, term) {
+                return Urls.ontology_term_text(term_type, term);
+            }
+
             jQuery.extend($.fn.fmatter , {
                 viewSampleLink : function(sampleName, options, rowObject) {
                     const url = Urls.view_sample(rowObject["sample"]);
@@ -175,15 +179,17 @@
                     return ZYGOSITY_DICT[zygosity] || zygosity;
                 },
                 hpoFormatter : function(phenotype_terms) {
-                    return getOntologyTermLinks('hpo', phenotype_terms);
+                    return getOntologyTermLinks('hpo', phenotype_terms, getOntologyTermUrl);
                 },
                 omimFormatter : function(omim_terms) {
-                    return getOntologyTermLinks('omim', omim_terms);
-                },
+                    return getOntologyTermLinks('omim', omim_terms, getOntologyTermUrl);
                 },
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
             });
 
+            // This is made in getOntologyTermLinks
+            // have to do this on document then delegate as they won't be there until grid renders column
+            $(document).on('click', '.ontology-terms-container .collapsed-term', expandCollapsedOntologyTerm);
             jQuery("#genotype-grid").jqGrid({
                 datatype: "local",
                 data: visible_rows,

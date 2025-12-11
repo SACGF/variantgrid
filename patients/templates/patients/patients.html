@@ -193,7 +193,7 @@ function patients_grid_complete() {
     let grid = $("#patient-grid");
     grid[0].p.postData["extra_filters"] = getExtraFilters;
 
-    $(".grid-term-link").each(function() {
+    $(".grid-term-link:not(.collapsed-term)").each(function() {
         $(this).click(function() {
             let term_type = $(this).attr("term_type");
             let value = $(this).attr("term");
@@ -217,15 +217,20 @@ $(document).ready(function() {
             return descriptionSymbol;
         },
         hpoFormatter: function (phenotype_terms) {
-            return getTermLinks('HP', phenotype_terms);
+            return getOntologyTermLinks('HP', phenotype_terms);
         },
         omimFormatter: function (omim_terms) {
-            return getTermLinks('OMIM', omim_terms);
+            return getOntologyTermLinks('OMIM', omim_terms);
         },
         geneFormatter: function (genes) {
-            return getTermLinks('gene', genes);
+            return getOntologyTermLinks('gene', genes);
         },
     });
+
+    // This is made in getOntologyTermLinks
+    // have to do this on document then delegate as they won't be there until grid renders column
+    $(document).on('click', '.ontology-terms-container .collapsed-term', expandCollapsedOntologyTerm);
+
 
     function resetForm() {
         $("form#patient-form").each(function () {
