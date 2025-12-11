@@ -2004,10 +2004,11 @@ label[for="id_hpo"],
 
 
 label[for="id_omim"],
+.omim>a,
 .omim {
 	background-color: #22529e;
 	border-color: #22529e;
-    color: #ddd;
+    color: #ddd !important;
 }
 
 /* Keep text in select 2 readable */
@@ -2025,6 +2026,11 @@ label[for="id_mondo"],
 .hgnc {
 	background-color: #99CD83;
 	border-color: #99CD83;
+}
+
+/* We use this as click to expand grouped OntologyTerms */
+.collapsed-term {
+    cursor: pointer;
 }
 
 .dt-status {

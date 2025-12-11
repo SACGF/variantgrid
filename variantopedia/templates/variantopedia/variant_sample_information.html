@@ -236,6 +236,10 @@
                 'U': 'Unknown Zygosity',
             };
 
+            function getOntologyTermUrl(term_type, term) {
+                return Urls.ontology_term_text(term_type, term);
+            }
+
             jQuery.extend($.fn.fmatter , {
                 viewSampleLink : function(sampleName, options, rowObject) {
                     const url = Urls.view_sample(rowObject["sample"]);
@@ -245,16 +249,20 @@
                     return ZYGOSITY_DICT[zygosity] || zygosity;
                 },
                 hpoFormatter : function(phenotype_terms) {
-                    return getOntologyTermLinks('HP', phenotype_terms);
+                    return getOntologyTermLinks('HP', phenotype_terms, getOntologyTermUrl);
                 },
                 omimFormatter : function(omim_terms) {
-                    return getOntologyTermLinks('OMIM', omim_terms);
+                    return getOntologyTermLinks('OMIM', omim_terms, getOntologyTermUrl);
                 },
                 mondoFormatter : function(mondo_terms) {
-                    return getOntologyTermLinks('MONDO', mondo_terms);
+                    return getOntologyTermLinks('MONDO', mondo_terms, getOntologyTermUrl);
                 },
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
             });
+
+            // This is made in getOntologyTermLinks
+            // have to do this on document then delegate as they won't be there until grid renders column
+            $(document).on('click', '.ontology-terms-container .collapsed-term', expandCollapsedOntologyTerm);
 
             let filters = getGenotypeFilters();
             jQuery("#genotype-grid").jqGrid({

@@ -56,32 +56,69 @@ function getOntologyTermObj(term_type, term, url) {
     return termSpan;
 }
 
-function getOntologyTermLinks(term_type, term_list) {
+function getOntologyTermLinks(term_type, term_list, getUrl) {
+    let MIN_PREFIX_LENGTH = 15;
     let NUM_TERMS_TO_ATTEMPT_COLLAPSE = 5;
-    let MIN_COLLAPSES = 200; // to be worth it
+    let MIN_COLLAPSES = 2;
     let links = '';
     if (term_list) {
         const terms = term_list.split('|');
-        const fullTermsContainer = $("<div>", {class: "container full-terms"});
-        for (const term of terms) {
-            let url = Urls.ontology_term_text(term_type, term);
-            fullTermsContainer.append(getOntologyTermObj(term_type, term, url));
-        }
-        let container = fullTermsContainer;
+        const termsContainer = $("<div>", {class: "ontology-terms-container"});
         if (terms.length >= NUM_TERMS_TO_ATTEMPT_COLLAPSE) {
-            let reducedTerms = summariseTerms(terms);
-            if (reducedTerms.length < terms.length - MIN_COLLAPSES) {
-                const collapsedTermsContainer = $("<div>", {class: "container collapsed-terms"});
-                for (const term of reducedTerms) {
-                    collapsedTermsContainer.append(getOntologyTermObj(term_type, term));
+            let groups = groupTerms(terms, MIN_PREFIX_LENGTH);
+            for (const g of groups) {
+                let fullTerms = [];
+                for (const term of g.items) {
+                    let url = null;
+                    if (getUrl) {
+                        url = getUrl(term_type, term);
+                    }
+                    fullTerms.push(getOntologyTermObj(term_type, term, url));
                 }
-                // TODO: We should make the original container hidden or something - then a link to expand
-                container = collapsedTermsContainer;
+
+                if (g.items.length >= MIN_COLLAPSES && g.prefix.length >= MIN_PREFIX_LENGTH) {
+                    const prefix = g.prefix.replace(/[ ,]+$/, '');
+                    let collapsedLabel = `${prefix} [${g.items.length} matches]`;
+                    let collapsedTerm = getOntologyTermObj(term_type, collapsedLabel);
+                    collapsedTerm.addClass('collapsed-term');
+                    collapsedTerm.attr("title", "click to expand full terms");
+
+                    let group = $("<span>", {class: "term-group"});
+                    let fullTermsContainer = $("<span>", {
+                        class: "full-terms",
+                        style: "display:none"
+                    })
+                    fullTermsContainer.append(...fullTerms);
+
+                    group.append(collapsedTerm);
+                    group.append(fullTermsContainer);
+                    termsContainer.append(group);
+                } else {
+                    termsContainer.append(...fullTerms);
+                }
+            }
+        } else {
+            // Just add the terms directly
+            for (const term of terms) {
+                let url = null;
+                if (getUrl) {
+                    url = getUrl(term_type, term);
+                }
+                let termObj = getOntologyTermObj(term_type, term, url);
+                termObj.addClass("grid-term-link");
+                termsContainer.append(termObj);
             }
         }
-        let numElements = container.length;
-        console.log("Term elements: " + numElements);
-        links = container.html();
+        links = termsContainer.prop("outerHTML");
     }
-    return links;
+    return links
+}
+
+
+// This needs to be set in document.ready()
+// '.ontology-terms-container .collapsed-term'
+function expandCollapsedOntologyTerm() {
+    const group = $(this).closest('.term-group');
+    group.find('.collapsed-term').hide();
+    group.find('.full-terms').show();
 }
