@@ -61,7 +61,8 @@ ANNOTATION = {
     # While VEP has issues with this, so has 'vep_config.fasta' see https://github.com/Ensembl/ensembl-vep/issues/1635
 
     BUILD_GRCH37: {
-        "enabled": True,
+        # Only 38 is enabled by default - overwrite "enabled" in your server settings to use following builds
+        "enabled": False,
         "annotation_consortium": "Ensembl",
         "columns_version": 3,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
@@ -103,9 +104,8 @@ ANNOTATION = {
             "uk10k": "annotation_data/GRCh37/UK10K_COHORT.20160215.sites.vcf.gz",
         }
     },
-    # Only 37 is enabled by default - overwrite "enabled" in your server settings to use following builds
     BUILD_GRCH38: {
-        "enabled": False,
+        "enabled": True,
         "annotation_consortium": "Ensembl",
         "columns_version": 3,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
