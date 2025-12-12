@@ -166,10 +166,6 @@
                 'U': 'Unknown Zygosity',
             };
 
-            function getOntologyTermUrl(term_type, term) {
-                return Urls.ontology_term_text(term_type, term);
-            }
-
             jQuery.extend($.fn.fmatter , {
                 viewSampleLink : function(sampleName, options, rowObject) {
                     const url = Urls.view_sample(rowObject["sample"]);
@@ -179,10 +175,10 @@
                     return ZYGOSITY_DICT[zygosity] || zygosity;
                 },
                 hpoFormatter : function(phenotype_terms) {
-                    return getOntologyTermLinks('hpo', phenotype_terms, getOntologyTermUrl);
+                    return getOntologyTermLinks('hpo', phenotype_terms);
                 },
                 omimFormatter : function(omim_terms) {
-                    return getOntologyTermLinks('omim', omim_terms, getOntologyTermUrl);
+                    return getOntologyTermLinks('omim', omim_terms);
                 },
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
             });
