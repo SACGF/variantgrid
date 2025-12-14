@@ -235,3 +235,42 @@ def get_lab_gene_counts(user: User, lab: Lab):
         gene_clinical_significance_counts[gene_symbol][clinical_significance] += 1
 
     return gene_clinical_significance_counts
+
+def get_vus_lab_gene_counts(user: User,
+                            lab: Lab,
+                            max_groups: int = 10,
+                            unique_classifications: bool=False):
+    gene_symbol_field = "published_evidence__gene_symbol__value"
+    lab_field = "classification__lab"
+
+    kwargs = {gene_symbol_field + "__isnull": False, lab_field: lab}
+
+    vc_qs = get_visible_classifications_qs(user).filter(**kwargs)
+    values_qs = vc_qs.values_list(gene_symbol_field, "clinical_significance", "classification__allele_info__allele")
+
+    gene_vus_count = defaultdict(int)
+
+    if unique_classifications:
+        seen_alleles = set()
+
+        for gene_symbol, clin_sig, allele in values_qs:
+            if clin_sig == '3':
+                if allele in seen_alleles:
+                    continue
+                else:
+                    seen_alleles.add(allele)
+                    gene_vus_count[gene_symbol] += 1
+    else:
+        for gene_symbol, clin_sig, allele in values_qs:
+            if clin_sig == '3':
+                gene_vus_count[gene_symbol] += 1
+
+    top_genes = [gc[0] for gc in sorted(gene_vus_count.items(), key=operator.itemgetter(1), reverse=True)][:max_groups]
+
+
+    data = {"x": top_genes,
+            "y": [gene_vus_count[i] for i in top_genes],
+            "name": "VUS",
+            "type": "bar"}
+
+    return data
