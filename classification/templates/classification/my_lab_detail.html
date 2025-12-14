@@ -1,0 +1,37 @@
+{% load classification_tags %}
+{% load english_tags %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+
+{% load js_tags %}
+{% load static %}
+
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+
+<script>
+
+    function plotGeneVusCount(selector, title, width, height) {
+        let gene_vus_json = {{ gene_vus_count | jsonify }};
+        let structure = defaultLayout(title, width, height);
+        structure["barmode"] = 'stack';
+        console.log(selector);
+        console.log(gene_vus_json);
+        console.log(structure);
+        Plotly.newPlot(selector, gene_vus_json, structure)
+    }
+
+    $(document).ready(() => {
+        plotGeneVusCount('vus-per-gene', 'VUS per Genes');
+    });
+</script>
+
+<div class="my-4">
+    <p>Username: {{ user }}</p>
+    <p>Vus per Gene for lab {{ selected_lab }}: {{ gene_vus_count }}</p>
+    <p>{{ gene_vus_count | jsonify }}</p>
+
+    <div class="row">
+        <div id='vus-per-gene'></div>
+    </div>
+</div>

@@ -1,0 +1,31 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load lab_tags %}
+{% load js_tags %}
+{% load static %}
+{% block title %}My Lab{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+        #classify-container label, #gene-form-container label, #user-form-container label, #lab-form-container label {
+            display: none;
+        }
+        #classify-container button {
+            margin-left: 12px;
+        }
+    </style>
+
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        <h3>My Lab Statistics</h3>
+        {% lab_picker data=lab_picker_data %}
+
+        <div data-toggle="ajax" href="{% url 'my_lab_detail' lab_picker_data.selection %}">
+            <div class="loading-message">Loading your lab statistics, this may take a while.</div>
+        </div>
+
+    </div>
+{% endblock %}
