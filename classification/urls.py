@@ -23,6 +23,7 @@ from classification.views.condition_match_test_view import condition_match_test_
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
+from classification.views.classification_my_lab_view import view_my_lab, view_my_lab_detail
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
     discordance_report_review, action_discordance_report_review, discordance_reports_download
@@ -183,6 +184,10 @@ urlpatterns = [
     path('imported_allele_info', view_imported_allele_info, name='view_imported_allele_info'),
     path('imported_allele_info/<int:allele_info_id>', view_imported_allele_info_detail, name='view_imported_allele_info_detail'),
     path('imported_allele_info/download', download_allele_info, name='imported_allele_info_download'),
+
+    path('my_lab', view_my_lab, name='my_lab'),
+    path('my_lab/<str:lab_id>', view_my_lab, name='my_lab_lab'),
+    path('my_lab/detail/<str:lab_id>', view_my_lab_detail, name='my_lab_detail'),
 
     path('classification_graphs', views.classification_graphs, name='classification_graphs'),
     path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
