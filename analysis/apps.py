@@ -12,4 +12,4 @@ class AnalysisConfig(AppConfig):
 
         post_save.connect(variant_tag_create, sender=VariantTag)
         post_delete.connect(variant_tag_delete, sender=VariantTag)
-        vcf_import_success_signal.connect(vcf_import_success, sender=VCF)
+        vcf_import_success_signal.connect(vcf_import_success)
