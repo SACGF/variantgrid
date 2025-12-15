@@ -33,7 +33,9 @@ def variant_tag_delete(sender, instance, **kwargs):
         transaction.on_commit(lambda: celery_task.apply_async())
 
 
-def vcf_import_success(sender, instance, **kwargs):
+def handle_vcf_import_success(*args, **kwargs):
+    vcf = kwargs["vcf"]
+
     user = admin_bot()
-    for sample in instance.sample_set.all():
+    for sample in vcf.sample_set.all():
         auto_launch_analysis_templates_for_sample(user, sample)
