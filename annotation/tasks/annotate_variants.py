@@ -190,6 +190,10 @@ def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename, annota
 
         annotation_version = annotation_range_lock.version.get_any_annotation_version()
         qs = get_unannotated_variants_qs(annotation_version, **kwargs)
+        # Restrict size of variants for VEP as it can take a really long time
+        VEP_MAX_SEQUENCE_SIZE = 1000
+        qs = qs.filter(locus__ref__length__lte=VEP_MAX_SEQUENCE_SIZE, alt__length__lte=VEP_MAX_SEQUENCE_SIZE)
+
         qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
         sorted_values = qs.values("id", "locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq")
         return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=VARIANT_GRID_INFO_DICT)
