@@ -1,6 +1,7 @@
 {# Analysis can be turned off in that case URLs won't resolve so just skip #}
 {% if url_name_visible.analysis %}
     {% load js_tags %}
+    {% load related_analyses_tags %}
 
     <h3>Analyses</h3>
     
@@ -15,6 +16,9 @@
             <thead>
             <tr>
             <th>Analysis
+            {% if show_output_nodes %}
+                <th>Output Nodes
+            {% endif %}
             <th>Type
             <th>Created by
             {% if show_sample_info %}
@@ -25,6 +29,11 @@
         {% for analysis, sample_info in analysis_details %}
             <tr> 
             <td><a href="{% url 'analysis' analysis.pk %}">{{ analysis.pk }} - {{ analysis }}</a>
+            {% if show_output_nodes %}
+                <td>
+                    {% analysis_output_node_downloads analysis %}
+                </td>
+            {% endif %}
             <td>{{ analysis.get_analysis_type_display }}
             <td>{{ analysis.user }}
             {% if show_sample_info %}
