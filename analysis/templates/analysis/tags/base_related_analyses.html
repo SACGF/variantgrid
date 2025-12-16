@@ -59,7 +59,8 @@
                 use_canonical_transcripts: true,
             }
             let querystring = EncodeQueryData(gridParam);
-            let url = Urls.node_grid_export(analysisId) + "?" + querystring;
+            // VG3 node_grid_export doesn't take analysisId
+            let url = Urls.node_grid_export() + "?" + querystring;
             window.location = url
         }
     </script>
