@@ -370,6 +370,7 @@ ANALYSIS_NODE_CACHE_Q = True  # So can turn off in unit tests
 ANALYSIS_NODE_CACHE_DB = False  # Use NodeCache models
 ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
 ANALYSIS_AUTO_LAUNCH_SAMPLE_ANALYSIS_TEMPLATE_CONFIG = []
+ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T
