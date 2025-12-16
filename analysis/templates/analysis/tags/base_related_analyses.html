@@ -3,6 +3,7 @@
     {% load static %}
     {% load js_tags %}
     {% load related_analyses_tags %}
+    {# styles/code for analysis_output_node_downloads - but display here so only done once #}
     <link rel="stylesheet" href="{% static 'css/analysis_nodes.css' %}">
     <style>
     .icon-stack{position:relative;display:inline-block;width:24px;height:24px}
@@ -36,27 +37,21 @@
 
 
     .icon.node-status {
-        left: 14px
+        left: -2px;
+        top: 8px;
+        color: black;
     }
-
-    .icon-top a {
-        display:block;
-        width:14px;
-        height:14px;
-        left: 14px;
-    }
-
     </style>
     <script>
         function downloadNodeCSV(analysisId, nodeId, nodeVersion) {
-            // This is called from
+            // This is called from analysis_output_node_downloads tag
             console.log("Download " + nodeId);
             let gridParam = {
                 node_id: nodeId,
                 version_id: nodeVersion,
                 rows: 0,
                 export_type: 'csv',
-                use_canonical_transcripts: true,
+                use_canonical_transcripts: true, // if available
             }
             let querystring = EncodeQueryData(gridParam);
             // VG3 node_grid_export doesn't take analysisId
