@@ -9,7 +9,7 @@ ConfigArgParse
 crispy-bootstrap4
 cyvcf2>=0.30.14
 deprecation
-Django<5
+Django
 django-amazon-ses
 django-auditlog>=3.0.0
 django_autocomplete_light
@@ -62,14 +62,14 @@ nltk
 numpy
 oauthlib
 pandas
+ped_parser
 pronto>=2.4.7
 psycopg2
 pypdf
 pysam
 python_dateutil
 pyyaml
-# Have trouble with Celery workers shutting down with newer versions of Redis
-redis==3.5.3
+redis
 reportlab
 requests>=2.32.0
 requests_oauthlib
