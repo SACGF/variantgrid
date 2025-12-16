@@ -3,11 +3,12 @@ import uuid
 from collections import defaultdict
 from functools import reduce
 
+from django.conf import settings
 from django.db.models import Q, Model
 from django.template import Library
 
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
-from analysis.models import MutationalSignature, Analysis, AnalysisTemplate
+from analysis.models import MutationalSignature, Analysis, AnalysisTemplate, TagNode
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.related_analyses import get_related_analysis_details_for_samples, \
     get_related_analysis_details_for_cohort, \
@@ -49,6 +50,7 @@ def update_context_with_related_analysis(context, samples, cohorts=None, trios=N
 
     context.update({"analysis_details": analysis_details,
                     "karyomapping_analyses": karyomapping_analyses,
+                    "show_output_nodes": settings.ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES,
                     "show_sample_info": show_sample_info,
                     "variant_tag_genome_build_names": variant_tag_genome_build_names,
                     "analysis_ids_list": analyses_list})
@@ -152,4 +154,22 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
         "analysis_template_links": analysis_template_links,
         "hidden_inputs": hidden_inputs,
         "missing_templates": ", ".join(missing_templates),
+    }
+
+
+@register.inclusion_tag("analysis/tags/analysis_output_node_downloads.html", takes_context=True)
+def analysis_output_node_downloads(context, analysis):
+    or_filters = [
+        Q(output_node=True)
+    ]
+    # Always add tag node
+    # q_tag_node = Q(name=TagNode.ANALYSIS_TAGS_NAME, visible=False)
+    # or_filters.append(q_tag_node)
+    q = reduce(operator.or_, or_filters)
+    qs_output_nodes = analysis.analysisnode_set.all().filter(q).order_by("pk").select_subclasses()
+    # output_node_values = list(qs_output_nodes.values_list("name", "status", "count"))
+
+    return {
+        "analysis": analysis,
+        "output_nodes": qs_output_nodes,
     }

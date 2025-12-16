@@ -652,6 +652,9 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ Automatic node name """
         raise NotImplementedError(f"Node Class: {self.get_class_name()}")
 
+    def get_name_or_identifier(self):
+        return self.get_node_name() or self.get_identifier()
+
     @staticmethod
     def get_help_text() -> str:
         raise NotImplementedError()

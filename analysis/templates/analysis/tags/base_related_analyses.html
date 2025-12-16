@@ -1,6 +1,68 @@
 {# Analysis can be turned off in that case URLs won't resolve so just skip #}
 {% if url_name_visible.analysis %}
+    {% load static %}
     {% load js_tags %}
+    {% load related_analyses_tags %}
+    <link rel="stylesheet" href="{% static 'css/analysis_nodes.css' %}">
+    <style>
+    .icon-stack{position:relative;display:inline-block;width:24px;height:24px}
+    .icon-stack .icon{position:absolute;inset:0;background-repeat:no-repeat;background-position:center;}
+
+    .output-node-icons .icon {
+      background-size: 24px 24px;
+      padding: 0.1em 0 0.1em 3em;
+      height: 24px;
+      width: 24px;
+      top: 0.1em;
+    }
+
+    .output-node-icons .icon-bottom {
+        opacity: 0.9;
+    }
+
+    .output-node-icons .icon-top {
+        background-size: 14px 14px;
+        inset:auto;
+        width:14px; height:14px;
+        bottom:-2px;
+    }
+
+
+    .icon-top .icon {
+        width:14px; height:14px;
+        background-size: 14px 14px;
+        padding: 0.1em 0 0.1em 1.5em;
+    }
+
+
+    .icon.node-status {
+        left: 14px
+    }
+
+    .icon-top a {
+        display:block;
+        width:14px;
+        height:14px;
+        left: 14px;
+    }
+
+    </style>
+    <script>
+        function downloadNodeCSV(analysisId, nodeId, nodeVersion) {
+            // This is called from
+            console.log("Download " + nodeId);
+            let gridParam = {
+                node_id: nodeId,
+                version_id: nodeVersion,
+                rows: 0,
+                export_type: 'csv',
+                use_canonical_transcripts: true,
+            }
+            let querystring = EncodeQueryData(gridParam);
+            let url = Urls.node_grid_export(analysisId) + "?" + querystring;
+            window.location = url
+        }
+    </script>
 
     <h3>Analyses</h3>
     
@@ -15,6 +77,9 @@
             <thead>
             <tr>
             <th>Analysis
+            {% if show_output_nodes %}
+                <th>Output Nodes
+            {% endif %}
             <th>Type
             <th>Created by
             {% if show_sample_info %}
@@ -25,6 +90,11 @@
         {% for analysis, sample_info in analysis_details %}
             <tr> 
             <td><a href="{% url 'analysis' analysis.pk %}">{{ analysis.pk }} - {{ analysis }}</a>
+            {% if show_output_nodes %}
+                <td>
+                    {% analysis_output_node_downloads analysis %}
+                </td>
+            {% endif %}
             <td>{{ analysis.get_analysis_type_display }}
             <td>{{ analysis.user }}
             {% if show_sample_info %}
