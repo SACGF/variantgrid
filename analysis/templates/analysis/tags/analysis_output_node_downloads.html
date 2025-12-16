@@ -1,23 +1,27 @@
 <div class="output-node-icons">
     {% for node in output_nodes %}
-        <span class="icon-stack" title="{{ node.get_name_or_identifier }}">
-          <i class="icon ui-icon icon-bottom {{ node.get_class_name }}"></i>
-          <i class="icon icon-top">
-              {% if node.is_ready %}
-                {% if node.is_valid %}
-                  <a href="#" onclick="downloadNodeCSV({{ node.analysis_id }}, {{ node.pk }}, {{ node.version }}); return false;">
-                    <i class="icon csv-icon"></i>
-                  </a>
-                  <i class="icon icon-label node-status">
-                      {{ node.count }}
+        {% if node.is_ready and node.is_valid %}
+          <a href="#" onclick="downloadNodeCSV({{ node.analysis_id }}, {{ node.pk }}, {{ node.version }}); return false;">
+        {% endif %}
+                <span class="icon-stack" title="{{ node.get_name_or_identifier }}">
+                  <i class="icon ui-icon icon-bottom {{ node.get_class_name }}"></i>
+                  <i class="icon icon-top">
+                      {% if node.is_ready %}
+                        {% if node.is_valid %}
+                            <i class="icon csv-icon"></i>
+                            <i class="icon icon-label node-status">
+                                {{ node.count }}
+                            </i>
+                        {% else %}
+                            <i class="fas fa-exclamation-triangle text-error" style="color: #FF1111;"></i>
+                        {% endif %}
+                      {% else %}
+                            <i class="fa fa-spinner"></i>
+                      {% endif %}
                   </i>
-                {% else %}
-                    <i class="fas fa-exclamation-triangle text-error" style="color: #FF1111;"></i>
-                {% endif %}
-              {% else %}
-                    <i class="fa fa-spinner"></i>
-              {% endif %}
-          </i>
-        </span>
+                </span>
+        {% if node.is_ready and node.is_valid %}
+            </a>
+        {% endif %}
     {% endfor %}
 </div>
