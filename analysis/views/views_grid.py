@@ -221,7 +221,7 @@ def _node_from_request(request) -> AnalysisNode:
 
 
 def _variant_grid_from_request(request, node: AnalysisNode, **kwargs):
-    extra_filters = request.GET["extra_filters"]
+    extra_filters = request.GET.get("extra_filters")
     return grids.VariantGrid(request.user, node, extra_filters, **kwargs)
 
 
