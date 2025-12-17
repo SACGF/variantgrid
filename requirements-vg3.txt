@@ -58,9 +58,9 @@ psycopg2-binary==2.8.5
 PyPDF2==2.11.1
 pysam==0.16.0.1
 python_dateutil==2.8.1
-python_Levenshtein==0.12.0
+python_Levenshtein==0.12.1
 pytz==2019.3
-PyVCF==0.6.8
+PyVCF3
 redis==3.5.3
 reportlab==3.5.34
 requests==2.22.0
@@ -71,3 +71,4 @@ sqlparse==0.2.4
 toposort==1.5
 Unidecode==1.1.1
 django-crispy-forms==1.10.0
+django-threadlocals
