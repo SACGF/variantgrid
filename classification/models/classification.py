@@ -22,6 +22,7 @@ from django.db.models.functions import LPad, Cast, Concat
 from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
 from django.dispatch.dispatcher import receiver
+from django.utils import timezone as django_timezone
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
@@ -51,7 +52,7 @@ from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, \
-    invalidate_cached_property, md5sum_str, get_timer
+    invalidate_cached_property, md5sum_str, get_timer, utc_from_timestamp
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -666,8 +667,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def dashboard_report_classifications_of_interest(since) -> List[ClassificationOutstandingIssues]:
-        min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
-            minutes=2)  # give records 2 minutes to matching properly before reporting
+        min_age = django_timezone.now() - timedelta(minutes=2) # give records 2 minutes to matching properly before reporting
 
         time_range_q = Q(created__gte=since) & Q(created__lte=min_age)
 
@@ -1377,7 +1377,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             cell.wipe(WipeMode.SET_NONE)
 
     def modification_at_timestamp(self, version_timestamp) -> 'ClassificationModification':
-        dt = datetime.utcfromtimestamp(version_timestamp).replace(tzinfo=timezone.utc)
+        dt = utc_from_timestamp(version_timestamp)
         vcm = ClassificationModification.objects.filter(classification=self, created__lte=dt).order_by(
             '-created').first()
         return vcm
@@ -2441,7 +2441,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         """
         Return if we can edit this record instead of creating a new one
         """
-        edit_window = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(minutes=1)
+        edit_window = django_timezone.now() - timedelta(minutes=1)
 
         return \
                 self.source_enum == source \

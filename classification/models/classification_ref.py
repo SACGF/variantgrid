@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from functools import cached_property
 from typing import Optional, Tuple
 
@@ -12,7 +12,7 @@ from classification.enums import SubmissionSource
 from classification.models import ClassificationJsonParams, ClassificationPatchResponse
 from classification.models.classification import Classification, \
     ClassificationProcessError, ClassificationModification
-from library.utils import empty_to_none
+from library.utils import empty_to_none, utc_from_timestamp
 from snpdb.models import Lab
 
 
@@ -110,7 +110,7 @@ class ClassificationRef:
     @cached_property
     def version_datetime(self) -> Optional[datetime]:
         if self.version:
-            return datetime.utcfromtimestamp(self.version).replace(tzinfo=timezone.utc)
+            return utc_from_timestamp(self.version)
         return None
 
     def exists(self) -> bool:

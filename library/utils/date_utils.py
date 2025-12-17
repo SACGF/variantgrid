@@ -1,5 +1,5 @@
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone as tz
 from typing import Optional
 
 from dateutil import tz
@@ -72,3 +72,7 @@ def http_header_date_now():
 
 def parse_http_header_date(date_str: str):
     return datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=tz.UTC)
+
+
+def utc_from_timestamp(ts) -> datetime:
+    return timezone.datetime.fromtimestamp(ts, tz=tz.utc)
