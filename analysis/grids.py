@@ -886,7 +886,7 @@ class CandidateColumns(DatatableConfig[LogEntry]):
     def render_clinvar(row: dict[str, Any]) -> JsonDataType:
         data = {}
         if evidence := row.get("evidence"):
-            data = evidence.get("clinvar", {})
+            data = evidence.get("ClinVar diff", {})
         return data
 
 
