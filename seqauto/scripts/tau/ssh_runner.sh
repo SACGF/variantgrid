@@ -1,7 +1,13 @@
 #!/bin/bash
 
-# 10.20.98.45 = frgeneseq02.had.sa.gov.au
-HOST="variantgrid@10.20.98.45"
+# Create a file in variantgrid ~/.ssh/config
+# Host frgeneseq02
+  #  HostName 10.20.98.45
+  #  User variantgrid
+  #  IdentityFile ~/.ssh/frgeneseq02_ed25519
+  #  IdentitiesOnly yes
+
+HOST="variantgrid@frgeneseq02"
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 script [args...]" >&2
