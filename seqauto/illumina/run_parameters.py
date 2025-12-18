@@ -34,7 +34,9 @@ def get_run_parameters(run_parameters_dir):
         msg = f"Couldn't find {' or '.join(RUN_PARAMETERS_FILES)} in {run_parameters_dir}"
         raise ValueError(msg)
 
-    tree = ET.parse(run_info_file)
+    with open(run_info_file, "rb") as fh:
+        tree = ET.parse(fh)
+
     root = tree.getroot()
     experiment = get_single_element(run_info_file, root, "ExperimentName")
     try:
