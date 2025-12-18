@@ -7,4 +7,6 @@ ALTER USER snpdb CREATEDB;
 
 -- Install extension install on snpdb database
 \connect snpdb;
+-- need this in later versions on postgres - to create partitions
+GRANT CREATE ON SCHEMA public TO snpdb;
 CREATE EXTENSION IF NOT EXISTS citext;
