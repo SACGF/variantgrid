@@ -1,6 +1,7 @@
 #!/bin/bash
 
-HOST="variantgrid@frgeneseq02"
+# 10.20.98.45 = frgeneseq02.had.sa.gov.au
+HOST="variantgrid@10.20.98.45"
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 script [args...]" >&2
