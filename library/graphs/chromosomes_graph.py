@@ -2,6 +2,8 @@
 Based on example code from Ryan Dale - https://www.biostars.org/p/9922/#9969
 """
 
+import matplotlib
+matplotlib.use("Agg") # Has to be before we import other matplotlib stuff so works headless
 from matplotlib.collections import BrokenBarHCollection
 
 from library.genomics import format_chrom

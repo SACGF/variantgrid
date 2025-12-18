@@ -1,6 +1,9 @@
 from collections import defaultdict
 from django.db import connection
 from lazy import lazy
+import matplotlib
+matplotlib.use("Agg") # Has to be before we import other matplotlib stuff so works headless
+
 from matplotlib import cm
 
 from library.database_utils import get_queryset_select_from_where_parts

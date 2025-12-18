@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use("Agg") # Has to be before we import other matplotlib stuff so works headless
+
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import Formatter
 

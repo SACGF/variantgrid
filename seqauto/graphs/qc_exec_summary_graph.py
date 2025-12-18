@@ -1,4 +1,7 @@
 import hashlib
+import matplotlib
+matplotlib.use("Agg") # Has to be before we import other matplotlib stuff so works headless
+
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 

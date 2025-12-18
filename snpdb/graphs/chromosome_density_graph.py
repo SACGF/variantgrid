@@ -1,5 +1,8 @@
 from collections import defaultdict
 from django.db import connection
+import matplotlib
+matplotlib.use("Agg") # Has to be before we import other matplotlib stuff so works headless
+
 from matplotlib import cm
 import abc
 

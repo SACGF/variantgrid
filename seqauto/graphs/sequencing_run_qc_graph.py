@@ -1,5 +1,8 @@
 from django.shortcuts import get_object_or_404
 from lazy import lazy
+import matplotlib
+matplotlib.use("Agg") # Has to be before we import other matplotlib stuff so works headless
+
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 import hashlib
