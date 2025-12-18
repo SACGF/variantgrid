@@ -1,6 +1,7 @@
 from django.template.library import Library
 
 from snpdb.models import Lab
+from variantgrid import settings
 
 register = Library()
 
@@ -9,22 +10,27 @@ register = Library()
 def lab_locations(labs=None, samples_only=False, involved_only=True,
                   center_lat=19.434403, center_long=37.238392, zoom_level=1):
 
-    if labs is None:
-        labs = Lab.objects.all()
-    elif isinstance(labs, list):
-        labs = Lab.objects.filter(pk__in=[lab.pk for lab in labs])
+    context = {}
+    if "leaflet" in settings.INSTALLED_APPS:
+        if labs is None:
+            labs = Lab.objects.all()
+        elif isinstance(labs, list):
+            labs = Lab.objects.filter(pk__in=[lab.pk for lab in labs])
 
-    labs = labs.filter(lat__isnull=False, long__isnull=False)
-    if samples_only:
-        labs = labs.filter(labproject__samplelabproject__sample__isnull=False)
+        labs = labs.filter(lat__isnull=False, long__isnull=False)
+        if samples_only:
+            labs = labs.filter(labproject__samplelabproject__sample__isnull=False)
 
-    if involved_only:
-        labs = labs.filter(labproject__involved=True)
+        if involved_only:
+            labs = labs.filter(labproject__involved=True)
 
-    return {"labs": labs,
+        context = {
+            "labs": labs,
             "center_lat": center_lat,
             "center_long": center_long,
-            "zoom_level": zoom_level}
+            "zoom_level": zoom_level
+        }
+    return context
 
 
 @register.inclusion_tag("snpdb/tags/lab_families.html")
