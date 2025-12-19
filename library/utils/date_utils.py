@@ -1,9 +1,9 @@
 import time
-from datetime import date, datetime, timedelta, timezone as tz
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from dateutil import tz
-from django.utils import timezone
+from django.utils import timezone as django_timezone
 from django.utils.timezone import localtime
 
 
@@ -14,12 +14,12 @@ def time_since(start: datetime) -> timedelta:
 
 def local_date_string() -> str:
     """ Returns e.g. '2022-07-18' """
-    return localtime(timezone.now()).strftime("%Y-%m-%d")
+    return localtime(django_timezone.now()).strftime("%Y-%m-%d")
 
 
 def local_date_str_no_dash() -> str:
     """ Returns e.g. '20220718' """
-    return localtime(timezone.now()).strftime("%Y%m%d")
+    return localtime(django_timezone.now()).strftime("%Y%m%d")
 
 
 def calculate_age(born: datetime, died: Optional[datetime] = None) -> int:
@@ -75,4 +75,4 @@ def parse_http_header_date(date_str: str):
 
 
 def utc_from_timestamp(ts) -> datetime:
-    return timezone.datetime.fromtimestamp(ts, tz=tz.utc)
+    return datetime.fromtimestamp(ts, tz=timezone.utc)
