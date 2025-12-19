@@ -15,7 +15,8 @@ def analysis_tag_created_task(variant_tag_id):
         variant_tag = VariantTag.objects.get(pk=variant_tag_id)
     except VariantTag.DoesNotExist:
         return  # Deleted before this got run, doesn't matter...
-    update_analysis(variant_tag.analysis.pk)
+    if variant_tag.analysis:
+        update_analysis(variant_tag.analysis.pk)
     _liftover_variant_tag(variant_tag)
 
 
@@ -27,7 +28,7 @@ def analysis_tag_deleted_task(analysis_id, _tag_id):
 
 
 def _liftover_variant_tag(variant_tag: VariantTag):
-    genome_build = variant_tag.analysis.genome_build
+    genome_build = variant_tag.genome_build
     populate_clingen_alleles_for_variants(genome_build, [variant_tag.variant])
     variant_allele = VariantAllele.objects.get(variant=variant_tag.variant, genome_build=genome_build)
     allele_source = VariantAlleleSource.objects.create(variant_allele=variant_allele)
