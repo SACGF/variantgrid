@@ -36,6 +36,17 @@ def variant_tag_delete(sender, instance, **kwargs):
 def handle_vcf_import_success(*args, **kwargs):
     vcf = kwargs["vcf"]
 
-    user = admin_bot()
     for sample in vcf.sample_set.all():
-        auto_launch_analysis_templates_for_sample(user, sample)
+        auto_launch_analysis_templates_for_sample(vcf.user, sample)
+
+
+def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
+    # At the moment, VCFs are sent up by API or found via sequencing scan BEFORE QCGeneLists
+    # which become SampleGeneList/ActiveSampleGeneList
+    # So the 1st time we called auto_launch it would have skipped the templates that requires_sample_gene_list
+    # As they would have failed. Now we have them, try again to now run previously skipped
+
+    if created:
+        sample = instance
+        user = sample.vcf.user
+        auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=True)

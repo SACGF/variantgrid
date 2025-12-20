@@ -1269,6 +1269,7 @@ def sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: di
             try:
                 with transaction.atomic():
                     # There can only be 1 - if this works it's active
+                    # This will also trigger an event which is used to auto lauch analyses
                     ActiveSampleGeneList.objects.create(sample=sample, sample_gene_list=instance)
             except IntegrityError:
                 ActiveSampleGeneList.objects.filter(sample=sample).delete()
