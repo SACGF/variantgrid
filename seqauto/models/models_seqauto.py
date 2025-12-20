@@ -1138,7 +1138,7 @@ class QCGeneList(SeqAutoRecord):
 
     def create_and_assign_sample_gene_list(self, sample: Sample, force_active=False):
         logging.info("QCGeneList: %d - create_and_assign_sample_gene_list for %s", self.pk, sample)
-        # On create, 'sample_gene_list_created' sets to active gene list
+        # On create signal, 'sample_gene_list_created' sets to active gene list
         self.sample_gene_list = SampleGeneList.objects.get_or_create(sample=sample,
                                                                      gene_list=self.custom_text_gene_list.gene_list)[0]
         self.save()

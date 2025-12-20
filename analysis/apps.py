@@ -12,10 +12,13 @@ class AnalysisConfig(AppConfig):
         from analysis.signals import analysis_search, analysis_health_check
 
         from analysis.models import VariantTag
-        from analysis.signals.signal_handlers import variant_tag_create, variant_tag_delete, handle_vcf_import_success
+        from analysis.signals.signal_handlers import variant_tag_create, variant_tag_delete, \
+            handle_vcf_import_success, handle_active_sample_gene_list_created
+        from genes.models import ActiveSampleGeneList
         from upload.signals.signals import vcf_import_success_signal
         # pylint: enable=import-outside-toplevel,unused-import
 
         post_save.connect(variant_tag_create, sender=VariantTag)
         post_delete.connect(variant_tag_delete, sender=VariantTag)
         vcf_import_success_signal.connect(handle_vcf_import_success)
+        post_save.connect(handle_active_sample_gene_list_created, sender=ActiveSampleGeneList)

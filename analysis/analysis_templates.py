@@ -1,3 +1,4 @@
+import logging
 import re
 
 from auditlog.context import disable_auditlog
@@ -8,6 +9,7 @@ from analysis.models import Analysis, AnalysisNode, AnalysisTemplate, AnalysisTe
     AnalysisTemplateRunArgument, SampleAnalysisTemplateRun, CohortAnalysisTemplateRun
 from analysis.models.nodes.node_utils import get_toposorted_nodes, reload_analysis_nodes
 from analysis.related_analyses import get_related_analysis_details_for_samples
+from genes.models import ActiveSampleGeneList
 from library.guardian_utils import add_public_group_read_permission
 from snpdb.models import Sample, GenomeBuild, Cohort
 
@@ -116,6 +118,13 @@ def get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_ana
 def auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):
     for analysis_template in get_auto_launch_analysis_templates_for_sample(user, sample,
                                                                            skip_already_analysed=skip_already_analysed):
+        template_version = analysis_template.active
+        if template_version.requires_sample_gene_list:
+            try:
+                sample.activesamplegenelist
+            except ActiveSampleGeneList.DoesNotExist:
+                logging.warning("Skipping auto analysis '%s' for sample: %s. Will try again if QC Gene Lists created", analysis_template, sample)
+                continue
         template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, user=user)
         template_run.populate_arguments({"sample": sample})
         populate_analysis_from_template_run(template_run)
