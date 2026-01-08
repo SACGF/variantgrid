@@ -36,3 +36,33 @@ def view_my_lab_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] =
                    "vus_present": vus_present,
                    "gene_vus_count": gene_vus_count,
                    "gene_tuples": gene_tuples})
+
+
+class GeneClinSigCountDownload(ExportRow):
+
+    def __init__(self, gene_counts: tuple):
+        self.gene_counts: tuple = gene_counts
+
+    @export_column(label="gene")
+    def gene(self):
+        return self.gene_counts[0]
+
+    @export_column(label="vus")
+    def vus(self):
+        return self.gene_counts[1]
+
+    @export_column(label="benign")
+    def ben(self):
+        return self.gene_counts[2]
+
+    @export_column(label="likely_benign")
+    def likely_ben(self):
+        return self.gene_counts[3]
+
+    @export_column(label="likely_pathogenic")
+    def likely_pat(self):
+        return self.gene_counts[4]
+
+    @export_column(label="pathogenic")
+    def pat(self):
+        return self.gene_counts[5]
