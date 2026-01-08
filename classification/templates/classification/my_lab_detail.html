@@ -10,28 +10,71 @@
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 
 <script>
+    var PATHOGENIC_COLORS = ['#cccccc', // VUS
+                            '#7777ff', // Benign
+                            '#aaaaff', // Likely benign
+                            '#ffaaaa', // Likely pathogenic
+                            '#ff7777', // pathogenic
+                            ];
+
+    var PATHOGENIC_LABELS = ['VUS',
+                            'Benign',
+                            'Likely Benign',
+                            'Likely Pathogenic',
+                            'Pathogenic',
+    ];
+
+    var PATHOGENIC_DICT = dictFromLabelsAndValues(PATHOGENIC_LABELS, PATHOGENIC_COLORS);
 
     function plotGeneVusCount(selector, title, width, height) {
+        {% if vus_present %}
         let gene_vus_json = {{ gene_vus_count | jsonify }};
-        let structure = defaultLayout(title, width, height);
-        structure["barmode"] = 'stack';
+        for (var i=0 ; i < gene_vus_json.length ; ++i) {
+                gene_vus_json[i]["marker"] = {color : PATHOGENIC_COLORS[i]}}
+        let layout = {
+            title: "Germline Classifications per Gene",
+            width: 1200,
+            height: 600,
+            barmode: 'stack',
+            updatemenus: [{
+                buttons: [
+                    {
+                        method: 'restyle',
+                        label: 'Show All Classifications',
+                        args: [{visible: true}]
+                    },
+                    {
+                        method: 'restyle',
+                        label: 'Show VUS Counts',
+                        args: [{'visible': 'legendonly'}, [1, 2, 3, 4]]
+                    }
+                ],
+                direction: 'left',
+                showactive: 'true',
+                type: 'buttons',
+                x: 0.6,
+                y: -0.1
+            }]
+        }
         console.log(selector);
         console.log(gene_vus_json);
-        console.log(structure);
-        Plotly.newPlot(selector, gene_vus_json, structure)
+        console.log(layout);
+        Plotly.newPlot(selector, gene_vus_json, layout)
+        {% endif %}
     }
 
     $(document).ready(() => {
-        plotGeneVusCount('vus-per-gene', 'VUS per Genes');
+        plotGeneVusCount("vus-per-gene", "VUS per Genes");
     });
 </script>
 
 <div class="my-4">
-    <p>Username: {{ user }}</p>
-    <p>Vus per Gene for lab {{ selected_lab }}: {{ gene_vus_count }}</p>
+
     <p>{{ gene_vus_count | jsonify }}</p>
 
     <div class="row">
         <div id='vus-per-gene'></div>
     </div>
+
+    <a href="{% url 'my_lab_download' lab_picker_data.selection %}" class="download-link" download>Dowload Plot Data</a>
 </div>
