@@ -58,7 +58,6 @@ def get_classification_counts_allele(qs: QuerySet[ClassificationModification], f
         counts[possible_value] = count
     return counts
 
-
 def get_visible_classifications_qs(user: User, allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> QuerySet[ClassificationModification]:
     # now excludes external labs (don't want to report on Shariant only data within SA Path for example)
 
@@ -236,41 +235,63 @@ def get_lab_gene_counts(user: User, lab: Lab):
 
     return gene_clinical_significance_counts
 
+
 def get_vus_lab_gene_counts(user: User,
-                            lab: Lab,
+                            labs: set[Lab],
                             max_groups: int = 10,
-                            unique_classifications: bool=False):
+                            allele_level: bool=False):
+    """
+    :param user: User used to check visibility of classifications
+    :param labs: set of labs to get classifications counts for generated from LabPickerData
+    :param max_groups: the max size of the returns list
+    :param allele_level: if True should only count one record per allele
+    :return: data for graphing, a list of dicts with x,y,name and type
+    """
     gene_symbol_field = "published_evidence__gene_symbol__value"
-    lab_field = "classification__lab"
+    lab_field = "classification__lab__in"
+    allele_origin_buckets = AlleleOriginBucket.GERMLINE
+    plot_order = ['VUS', 'Benign', 'Likely Benign', 'Likely Pathogenic', 'Pathogenic']
 
-    kwargs = {gene_symbol_field + "__isnull": False, lab_field: lab}
+    kwargs = {gene_symbol_field + "__isnull": False, lab_field: [lab.id for lab in labs]}
 
-    vc_qs = get_visible_classifications_qs(user).filter(**kwargs)
+    vc_qs = get_visible_classifications_qs(user, allele_origin_buckets=allele_origin_buckets).filter(**kwargs)
     values_qs = vc_qs.values_list(gene_symbol_field, "clinical_significance", "classification__allele_info__allele")
 
-    gene_vus_count = defaultdict(int)
+    gene_vus_count = defaultdict(Counter)
 
-    if unique_classifications:
+    if allele_level:
         seen_alleles = set()
 
         for gene_symbol, clin_sig, allele in values_qs:
-            if clin_sig == '3':
-                if allele in seen_alleles:
-                    continue
-                else:
-                    seen_alleles.add(allele)
-                    gene_vus_count[gene_symbol] += 1
+            if allele in seen_alleles:
+                continue
+            else:
+                seen_alleles.add(allele)
+                gene_vus_count[gene_symbol][clin_sig] += 1
     else:
         for gene_symbol, clin_sig, allele in values_qs:
-            if clin_sig == '3':
-                gene_vus_count[gene_symbol] += 1
+            gene_vus_count[gene_symbol][clin_sig] += 1
 
-    top_genes = [gc[0] for gc in sorted(gene_vus_count.items(), key=operator.itemgetter(1), reverse=True)][:max_groups]
+    genes_sorted = [gc for gc in sorted(gene_vus_count.items(),
+                                        key=lambda gene: gene[1]['3'],
+                                        reverse=True)]
 
+    try:
+        inclusion_threshold = genes_sorted[max_groups-1][1]['3']
+        inclusion_index = len(genes_sorted) - [vc["3"] for _, vc in genes_sorted][::-1].index(inclusion_threshold)
+    except IndexError:
+        inclusion_index = len(genes_sorted)
 
-    data = {"x": top_genes,
-            "y": [gene_vus_count[i] for i in top_genes],
-            "name": "VUS",
-            "type": "bar"}
+    top_genes = [gene[0] for gene in genes_sorted][:inclusion_index]
+
+    data = []
+    for cs, clinical_significance_label in ClinicalSignificance.LABELS.items():
+        if cs and cs != '0':
+            data.append({"x": top_genes,
+                         "y": [gene_vus_count[i][cs] for i in top_genes],
+                         "name": clinical_significance_label,
+                         "type": "bar"})
+
+    data = sorted(data, key=lambda x: plot_order.index(x['name']))
 
     return data
