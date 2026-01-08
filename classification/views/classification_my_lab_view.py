@@ -66,3 +66,15 @@ class GeneClinSigCountDownload(ExportRow):
     @export_column(label="pathogenic")
     def pat(self):
         return self.gene_counts[5]
+
+
+def my_lab_download(request: HttpRequest, lab_id: Optional[Union[str, int]]= None) -> HttpResponseBase:
+    lab_picker = LabPickerData.from_request(request, lab_id)
+    labs = lab_picker.lab_selection.selected_labs
+
+    gene_vus_count = get_vus_lab_gene_counts(user=request.user, labs=labs, allele_level=False)
+    all_counts = [g['y'] for g in gene_vus_count]
+    gene_tuples = [ (x, *ys) for x, *ys in zip(gene_vus_count[0]['x'], *all_counts)]
+
+    return GeneClinSigCountDownload.streaming_csv(iter(gene_tuples),
+                                                  filename="trial_gene_vus")
