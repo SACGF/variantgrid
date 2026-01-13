@@ -760,5 +760,7 @@ def debug(obj: Any):
 
 
 @register.filter(name='pretty_label')
-def _pretty_label(code: str):
+def _pretty_label(code: str, modifier:Optional[str]=None) -> str:
+    if modifier == "lower":
+        code = code.lower()
     return pretty_label(code)

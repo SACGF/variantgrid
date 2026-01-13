@@ -16,7 +16,8 @@ from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
-    EvidenceMixin, ClassificationSummaryCacheDictPathogenicity
+    EvidenceMixin, ClassificationSummaryCacheDictPathogenicity, Overlap, ClassificationGroupingEntry, \
+    OverlapContribution, ClassificationSummaryCacheDictSomatic
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -26,6 +27,7 @@ from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
+from classification.views.overlaps_grouped_datatables import OverlapEntryCompare
 from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
@@ -211,8 +213,8 @@ def clinical_significance_values(vcm: ClassificationModification):
     classification = vcm.classification
     always_show_somatic = vcm.classification.allele_origin_bucket != "G"
 
-    pathogenicity = classification.summary_typed.get("pathogenicity")
-    somatic_dict: ClassificationSummaryCacheDictPathogenicity = classification.summary_typed.get("somatic")
+    pathogenicity: ClassificationSummaryCacheDictPathogenicity = classification.summary_typed.get("pathogenicity")
+    somatic_dict: ClassificationSummaryCacheDictSomatic = classification.summary_typed.get("somatic")
 
     germline_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     pending_from = None
@@ -227,7 +229,7 @@ def clinical_significance_values(vcm: ClassificationModification):
         "css_class": "cs cs-" + (value.lower() if value else "none")
     }]
 
-    if always_show_somatic or somatic_dict and somatic_dict.get("classification"):
+    if always_show_somatic or somatic_dict and somatic_dict.get("clinical_significance"):
         somatic_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
         value = somatic_dict.get("clinical_significance")
         label = somatic_key.pretty_value(value, value) or "No Data"
@@ -310,27 +312,55 @@ def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizonta
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
 def classification_quick(context,
                          vc: Union[Classification, ClassificationModification],
-                         show_clinical_grouping=True,
+                         show_share_level=True,
+                         show_id=True,
                          show_lab=True,
+                         show_category=False,
                          show_condition=False,
                          show_criteria=False,
                          show_flags=False,
                          show_imported_c_hgvs=False,
+                         show_values=True,
                          record_count: Optional[int] = None,
-                         mode: Optional[str] = "detailed"):
+                         mode: Optional[str] = "detailed"):  # other options are "split" and "compact"
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
+
+    id_texts = []
+    if show_lab:
+        id_texts.append(str(vcm.classification.lab))
+    if show_id:
+        id_texts.append(str(vcm.cr_lab_id))
+
+    id_text: str
+    if id_texts:
+        id_text = " / ".join(id_texts)
+    else:
+        id_text = "record"
+
+    category_text = None
+    if show_category:
+        if grouping := ClassificationGroupingEntry.grouping_for(vcm.classification):
+            parts = grouping.allele_origin_grouping.labels(include_allele_origin=True)
+            if parts[0] == "Somatic":
+                parts = parts[1:]
+            category_text = " - ".join(p for p in parts if p)
+
     return {
         "vcm": vcm,
-        "show_clinical_grouping": show_clinical_grouping,
         "mode": mode,
+        "show_share_level": show_share_level,
+        "id_text": id_text,
+        "category_text": category_text,
+        "show_id": show_id,
         "show_lab": show_lab,
         "show_condition": show_condition,
         "show_criteria": show_criteria,
         "show_flags": show_flags,
         "show_imported_c_hgvs": show_imported_c_hgvs,
+        "show_values": show_values,
         "record_count": record_count
     }
 
@@ -703,3 +733,31 @@ def user_view_events(user: User, days: int = 1):
 def evidence_key_input(key: str):
     e_key = EvidenceKeyMap.cached_key(key)
     return {"e_key": e_key}
+
+
+@register.inclusion_tag("classification/tags/overlap.html")
+def overlap(overlap: Overlap, admin_link: bool = True, show_value_type: bool = True, versus: Optional[Overlap] = None):
+    return {
+        "overlap": overlap,
+        "admin_link": admin_link,
+        "show_value_type": show_value_type
+    }
+
+
+# FIXME rename to OverlapContribution
+@register.inclusion_tag("classification/tags/overlap_contribution.html")
+def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompare, show_lab: bool = False):
+    compare_overlap_status = None
+    cross_context = False
+
+    if isinstance(overlap_entry, OverlapEntryCompare):
+        cross_context = overlap_entry.is_cross_context
+        compare_overlap_status = overlap_entry.comparison
+        overlap_entry = overlap_entry.entry_2
+
+    return {
+        "overlap_contribution": overlap_entry,
+        "show_lab": show_lab,
+        "compare_overlap_status": compare_overlap_status,
+        "cross_context": cross_context
+    }

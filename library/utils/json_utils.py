@@ -1,9 +1,12 @@
 import json
 from abc import abstractmethod, ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from functools import cached_property
-from typing import Union, Any, Mapping
+from typing import Union, Any, Mapping, Type
+from dataclasses_json import config
+from django.db.models import TextChoices
+from marshmallow import fields
 
 
 # Inclusion of this code snippet will cause "to_json()" to be called on classes by the JSONEncoder, allowing them to become serializable
@@ -202,3 +205,21 @@ def json_default_converter(obj):
     if isinstance(obj, set):
         return list(obj)
     raise TypeError("Type not serializable")
+
+
+def json_enum_encoder_for_text_choices(text_choices_type: Type[TextChoices]) -> field:
+    """
+    Return a field declaration used for dataclasses_json when you want a TextChoices (not quite a StrEnum but very close)
+    :param text_choices_type: The TextChoices
+    :return: a field to be part of the @dataclasses_json
+    """
+    return field(
+        metadata=config(
+            # Serializer: Convert the TextChoices object to its string value (e.g., 'JR')
+            encoder=lambda enum_val: enum_val.value if enum_val else None,
+            # Deserializer: Convert the string value (e.g., 'JR') back to the TextChoices enum member
+            decoder=text_choices_type,
+            # Use marshmallow field for type hinting/validation if needed
+            mm_field=fields.String()
+        )
+    )

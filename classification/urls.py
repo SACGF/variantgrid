@@ -13,6 +13,7 @@ from classification.views.classification_export_view import ClassificationApiExp
 from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
+from classification.views.classification_overlaps_views2 import TriageView, view_overlaps2
 from classification.views.classification_overlaps_vus_view import view_overlaps_vus, view_overlaps_vus_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
@@ -30,6 +31,7 @@ from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.exports.classification_export_formatter_redcap import redcap_data_dictionary
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
+from classification.views.overlaps_grouped_datatables import ClassificationGroupingOverlapsColumns
 from classification.views.views import classification_import_tool, AutopopulateView
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
@@ -52,6 +54,8 @@ urlpatterns = [
     path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
     path('groupings/<int:classification_grouping_id>/records', views.view_classification_grouping_records_detail,
          name='classification_grouping_records_detail'),
+    path('groupings/<int:classification_grouping_id>/triage/<str:value_type>', TriageView.as_view(), name='triage'),
+
     path('allele_groupings', views.allele_groupings, name='allele_groupings'),
     path('allele_groupings/<str:lab_id>', views.allele_groupings, name='allele_groupings_lab'),
     path('allele_grouping/<allele_grouping_id>', views.view_allele_grouping_detail, name='allele_grouping_detail'),
@@ -179,6 +183,11 @@ urlpatterns = [
     path('overlaps', view_overlaps, name='overlaps'),
     path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
     path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
+
+    path('overlaps2', view_overlaps2, name='overlaps2'),
+    path('overlaps2/<str:lab_id>', view_overlaps2, name='overlaps2'),
+    path('overlaps2/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingOverlapsColumns), name='overlaps2_datatables'),
+
     path('vus', view_overlaps_vus, name='vus'),
     path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),
     path('vus_detail/<str:lab_id>', view_overlaps_vus_detail, name='vus_detail'),

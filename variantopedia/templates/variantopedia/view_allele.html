@@ -285,6 +285,10 @@
             data.allele_id = {{ allele.pk }};
         }
     </script>
+    {% for overlap in overlaps %}
+        <div>{% overlap overlap %}</div>
+    {% endfor %}
+    {% comment %}
     {% for allele_origin_grouping_desc in allele_origin_groupings_desc %}
         <div>
             <span class="allele-origin-box horizontal allele-origin-{{ allele_origin_grouping_desc.allele_origin_grouping.allele_origin_bucket }}">
@@ -312,6 +316,7 @@
             {% endif %}
         </div>
     {% endfor %}
+    {% endcomment %}
     {% if show_overall_diff %}
         <div>
             <span class="allele-origin-box horizontal allele-origin-A">

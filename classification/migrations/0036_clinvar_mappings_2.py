@@ -2,11 +2,11 @@
 
 from django.db import migrations
 
-from classification.autopopulate_evidence_keys.clinvar_option_updator import ClinVarOptionUpdator
+from classification.autopopulate_evidence_keys.clinvar_option_updator import EvidenceKeyOptionUpdator
 
 
 def affected_status(apps, _schema_editor):
-    options = ClinVarOptionUpdator(apps, "affected_status")
+    options = EvidenceKeyOptionUpdator(apps, "affected_status")
     options.set_clinvar_option("yes", "yes")
     options.set_clinvar_option("no", "no")
     options.set_clinvar_option("unknown", "unknown")

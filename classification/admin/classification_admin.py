@@ -27,6 +27,7 @@ from classification.models.clinical_context_models import ClinicalContextRecalcT
 from classification.models.clinical_context_utils import update_clinical_contexts
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
+from classification.services.overlaps_services import OverlapServices
 from classification.signals import send_prepared_discordance_notifications
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.cache import timed_cache
@@ -1415,6 +1416,11 @@ class AlleleOriginGroupingAdmin(ModelAdminBasics):
     def refresh_all(self, request):
         AlleleOriginGrouping.objects.update(dirty=True)
         ClassificationGrouping.update_all_dirty()
+
+    @admin_action("Recalculate Overlap")
+    def recalculate_single_context_overlaps(self, request, queryset: QuerySet[AlleleOriginGrouping]):
+        for aog in queryset:
+            OverlapServices().calculate_and_apply_overlaps_for_ao(aog)
 
 
 class AlleleOriginGroupingTabularAdmin(TabularInline):

@@ -1,7 +1,7 @@
 import typing
 from enum import Enum
 from functools import total_ordering
-from typing import Optional, Union
+from typing import Optional, Union, Self
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import TextChoices, IntegerChoices
@@ -36,24 +36,46 @@ class OverlapStatus(IntegerChoices):
     SINGLE_SUBMITTER = 20, "Single submitter"
     EXACT_AGREEMENT = 30, "Exact agreement"
     TERMINOLOGY_DIFFERENCES = 40, "Terminology differences"  # e.g. P vs O
-    RESOLUTION_DIFFERENCES = 50, "Resolution differences"  # e.g. VUS vs VUS_A
+    RESOLUTION_DIFFERENCES = 50, "Resolution differences"  # e.g. VUS vs VUS_B
     MINOR_DIFFERENCES = 60, "Minor differences"  # e.g. VUS_A vs VUS_B, Pathogenic versus Likely Pathogenic
     TIER_1_VS_TIER_2_DIFFERENCES = 70, "Tier 1 vs Tier 2 Differences"  # special category for tier_1 vs tier_2
     MAJOR_DIFFERENCES = 80, "Discordance"  # VUS vs Benign
     MEDICALLY_SIGNIFICANT = 90, "Medically significant discordance"  # VUS vs Pathogenic
+
+    @property
+    def is_dull(self) -> bool:
+        return self <= OverlapStatus.SINGLE_SUBMITTER
+
+    @property
+    def is_attention(self) -> bool:
+        return self >= OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES
 
 
 class TestingContextBucket(TextChoices):
     NON_CANCER = "N", "Non-Cancer Somatic"
     HAEMATOLOGY = "H", "Haematology"
     SOLID_TUMOR = "S", "Solid Tumour"
-    OTHER = "O", "Other"
+    OTHER = "O", "Other" # FIXME Somatic Other
     GERMLINE = "G", "Germline"
     UNKNOWN = "U", "Unknown"
 
     @property
     def should_have_subdivide(self) -> bool:
         return self in {TestingContextBucket.SOLID_TUMOR, TestingContextBucket.HAEMATOLOGY}
+
+    @property
+    def priority_order(self) -> int:
+        match self:
+            case TestingContextBucket.GERMLINE: return 1
+            case TestingContextBucket.NON_CANCER: return 2
+            case TestingContextBucket.HAEMATOLOGY: return 3
+            case TestingContextBucket.SOLID_TUMOR: return 4
+            case TestingContextBucket.OTHER: return 5
+            case TestingContextBucket.UNKNOWN: return 6
+            case _: return 99
+
+    def __lt__(self, other: Self) -> bool:
+        return self.priority_order < other.priority_order
 
 
 class AlleleOriginBucket(TextChoices):
@@ -94,7 +116,8 @@ class SpecialEKeys:
     C_HGVS = 'c_hgvs'
     P_HGVS = 'p_hgvs'
     CONDITION = 'condition'
-    CLINICAL_SIGNIFICANCE = 'clinical_significance'
+    CLINICAL_SIGNIFICANCE = 'clinical_significance'  # deprecated, use ONC_PATH constant
+    ONC_PATH = 'clinical_significance'
     SOMATIC_CLINICAL_SIGNIFICANCE = 'somatic:clinical_significance'
     TESTING_CONTEXT = "testing_context"
     CURATED_BY = 'curated_by'

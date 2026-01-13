@@ -55,6 +55,7 @@ class ClassificationSummaryCacheDict(TypedDict):
     pathogenicity: ClassificationSummaryCacheDictPathogenicity
     somatic: ClassificationSummaryCacheDictSomatic
     allele_origin_bucket: str
+    date: ClassificationSummaryCachedDictDate
 
 
 @dataclass(frozen=True)

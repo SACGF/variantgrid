@@ -1,20 +1,22 @@
 import operator
+from collections import defaultdict
 from functools import cached_property, reduce
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
-from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel
+from classification.enums import AlleleOriginBucket, EvidenceCategory, ShareLevel, TestingContextBucket, \
+    OverlapStatus
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
-    Classification, DiscordanceReport, DiscordanceReportClassification
+    Classification, DiscordanceReport, OverlapContributionStatus, ClassificationResultValue
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologySnake
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import UserSettings, GenomeBuild, Variant
+from snpdb.models import GenomeBuild, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder, CellData
 
 
@@ -24,12 +26,32 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     This is taking over from ClassificationGroup (in memory merging of rows that then have to be all rendered client side)
     ClassificationColumns - the one classification per row
 
-    Filters are done between a combination of get_initial_query (when on the gene symbol page and we want the maximum
+    Filters are done between a combination of get_initial_query (when on the gene symbol page and if we want the maximum
     number of results to be how many groupings for that gene symbol, rather than presenting the user with
     showing 6 out of 30,000 records)
     and then on filter_query_set when it's a filter that the user can do above and beyond what the page initially loads
     e.g. allele origin filter
     """
+
+    # FIXME
+    # def pre_render(self, qs: QuerySet[ClassificationGrouping]):
+    #     # Keep a set of classification_grouping, lab to indicate these having pending changes
+    #     conflict_ids = set()
+    #     conflict_lab_tuples = list()
+    #     for cl in ConflictLab.objects.filter(classification_grouping__in=qs, active=True).values_list(
+    #             "conflict_id",
+    #             "classification_grouping_id",
+    #             "lab_id",
+    #             "status",
+    #             "conflict__conflict_type"
+    #     ):
+    #         conflict_ids.add(cl[0])
+    #         conflict_lab_tuples.append(cl)
+    #
+    #     major_conflicts = set(Conflict.objects.filter(pk__in=conflict_ids, severity__gte=ConflictSeverity.MAJOR).values_list("pk", flat=True))
+    #     self.pending_conflict_labs_onc_path = {(c[1], c[2]): c[3] for c in conflict_lab_tuples if c[0] in major_conflicts and c[4] == ConflictType.ONCPATH}
+    #     self.pending_conflict_labs_clin_sig = {(c[1], c[2]): c[3] for c in conflict_lab_tuples if c[0] in major_conflicts and c[4] == ConflictType.CLIN_SIG}
+
 
     def render_row_header(self, row: CellData) -> JsonDataType:
 
@@ -47,6 +69,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                         if (value := cm.get(id_key)) and id_filter in value.lower():
                             matches[id_key] = value
 
+        testing_context = row.get('allele_origin_grouping__testing_context_bucket')
+        testing_context_bucket_label: str
+        if testing_context == TestingContextBucket.OTHER.value:
+            testing_context_bucket_label = "Other Testing Context"
+        elif testing_context == TestingContextBucket.UNKNOWN.value:
+            testing_context_bucket_label = "Unknown Testing Context"
+        else:
+            testing_context_bucket_label = TestingContextBucket(testing_context).label
+
         return {
             "dirty": row.get("dirty"),
             "id": row.get("id"),
@@ -54,7 +85,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
             "lab_name": row.get('lab__name'),
             "share_level": row.get('share_level'),
-            "allele_origin_bucket": row.get('allele_origin_bucket'),
+            "allele_origin_bucket": row.get('allele_origin_grouping__allele_origin_bucket'),
+            "testing_context_bucket": testing_context,
+            "testing_context_bucket_label": testing_context_bucket_label,
             "matches": matches,
             "search": search
         }
@@ -66,29 +99,33 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     #     }
 
     def render_somatic(self, row: CellData) -> JsonDataType:
-        if row["allele_origin_bucket"] != "G":
-            diff_value = row["somatic_difference"]
+        diff_value = row["somatic_difference"]
+        if row["allele_origin_grouping__allele_origin_bucket"] != "G":
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
                 somatic_dict["diff"] = diff_value
+                # somatic_dict["pending_change"] = row["pending_change_clin_sig"]
+                # if ShareLevel(row["share_level"]).is_discordant_level:
+                #     if discordance_status := self.pending_conflict_labs_clin_sig.get((row["pk"], row["lab_id"])):
+                #         somatic_dict["conflict_status"] = discordance_status
+
                 return somatic_dict
+        return None
 
     def render_pathogenic(self, row: CellData) -> JsonDataType:
         diff_value = row["pathogenic_difference"]
         result_dict = row["latest_classification_modification__classification__summary__pathogenicity"] or {}
         result_dict["diff"] = diff_value
 
-        if dr := self.discordance_report:
-            if drc := DiscordanceReportClassification.objects.filter(report_id=dr.pk,
-                                                                     classification_original__classification=row[
-                                                                         "latest_classification_modification__classification_id"]).first():
-                old_cs = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-                if result_dict and result_dict.get("classification") != old_cs:
-                    result_dict["old"] = old_cs
-                if "pending" not in result_dict:
-                    effective_cs = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-                    if effective_cs != result_dict.get("classification"):
-                        result_dict["new"] = result_dict.get("classification")
-                        result_dict["classification"] = effective_cs
+        if overlaps := self.grouping_value_type_overlaps.get(row["pk"], {}).get(ClassificationResultValue.ONC_PATH):
+            result_dict["overlaps"] = True
+            # TODO only show triage link if an overlap requires it (or a triage already exists maybe?)
+
+        result_dict["classification_grouping_id"] = row.get("pk")
+        result_dict["triage"] = True
+
+        # if ShareLevel(row["share_level"]).is_discordant_level:
+        #     if discordance_status := self.pending_conflict_labs_onc_path.get((row["pk"], row["lab_id"])):
+        #         result_dict["conflict_status"] = discordance_status
 
         return result_dict
 
@@ -145,6 +182,26 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         return response
 
+    def pre_render(self, qs: QuerySet[DC]):
+        super().pre_render(qs)
+        # grouping_value_type_overlaps = defaultdict(lambda: defaultdict(list))
+        # for contribution in ClassificationGroupingOverlapContribution.objects.filter(classification_grouping__in=qs).select_related("overlap")\
+        #         .exclude(contribution_status=OverlapContributionStatus.NOT_SHARED)\
+        #         .filter(overlap__overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES):
+        #     overlap = contribution.overlap
+        #     grouping_value_type_overlaps[contribution.classification_grouping_id][overlap.value_type].append(overlap)
+        # print(grouping_value_type_overlaps)
+        # self.grouping_value_type_overlaps = grouping_value_type_overlaps
+
+
+    #def get_grouped_conflict_data(self):
+        # if allele_id := self.get_query_param('allele_id'):
+        #     o = Overlap()
+        #     o.classificationgroupingoverlapcontribution_set
+        #     Overlap.objects.filter(allele_id=allele_id).prefetch_related()
+
+        grouped_conflict_data = []
+
     def get_initial_queryset(self) -> QuerySet[DC]:
         qs = ClassificationGrouping.filter_for_user(self.user, ClassificationGrouping.objects.all())
 
@@ -154,12 +211,20 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         # run the filters that are perma-applied on certain pages
 
+        # if conflict_id := self.get_query_param('conflict_id'):
+        #     conflict = Conflict.objects.get(pk=conflict_id)
+        #     filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(conflict.allele.id)))
+        #     filters.append(Q(allele_origin_grouping__allele_origin_bucket=conflict.allele_origin_bucket))
+        #     filters.append(Q(allele_origin_grouping__testing_context_bucket=conflict.testing_context_bucket))
+        #     if tumor_type_category := conflict.tumor_type_category:
+        #         filters.append(Q(allele_origin_grouping__tumor_type_category=tumor_type_category))
+
         if allele_id := self.get_query_param('allele_id'):
             filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))
 
-        if ontology_terms := self.get_query_param('ontology_term_id'):
-            if q_ontology := self.get_ontology_q(ontology_terms):
-                filters.append(q_ontology)
+        if condition := self.get_query_param('ontology_term_id'):
+            if c_filter := self.condition_filter(condition):
+                filters.append(c_filter)
 
         if page == "gene_symbol":
             if gene_symbol_str := self.get_query_param("gene_symbol"):
@@ -189,7 +254,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
-                filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+                filters.append(Q(allele_origin_grouping__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+        if testing_context := self.get_query_param("testing_context"):
+            filters.append(Q(allele_origin_grouping__testing_context_bucket=testing_context))
 
         # for view gene symbol
         if protein_position := self.get_query_param("protein_position"):
@@ -212,6 +279,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         if settings.CLASSIFICATION_GRID_SHOW_USERNAME:
             if user_id := self.get_query_param('user'):
                 filters.append(self.classification_filter_to_grouping(Q(user__pk=user_id)))
+
         return qs.filter(*filters)
 
     @cached_property
@@ -220,6 +288,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             dr = DiscordanceReport.objects.get(pk=discordance_report_id)
             dr.check_can_view(self.user)
             return dr
+        return None
 
     @cached_property
     def id_columns(self) -> List[str]:
@@ -255,41 +324,29 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 ).values_list('grouping_id', flat=True)
         )
 
-    @staticmethod
-    def gene_symbol_filter(gene_symbol: str):
+    def gene_symbol_filter(self, gene_symbol: str) -> Optional[Q]:
         if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol).first():
             all_strs = [gene_symbol.symbol] + gene_symbol.alias_meta.alias_symbol_strs
             all_strs = [gs.upper() for gs in all_strs]
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL, all_strs)
+        return None
         # FIXME add support for gene symbol alias
 
-    def scv_filter(self, scv: str):
+    def scv_filter(self, scv: str) -> Optional[Q]:
         if scv.startswith("SCV"):
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CLINVAR_SCV, scv)
+        return None
 
-    @staticmethod
-    def get_ontology_q(ontology_terms: str) -> Q | None:
-        condition_filters = []
-        for condition in ontology_terms.split(","):
-            if c_filter := ClassificationGroupingColumns.condition_filter(condition):
-                condition_filters.append(c_filter)
-        q = None
-        if condition_filters:
-            q = reduce(operator.or_, condition_filters)
-        return q
-
-
-    @staticmethod
-    def condition_filter(text, must_exist: bool = False):
+    def condition_filter(self, text, must_exist: bool = False) -> Optional[Q]:
         try:
             term = OntologyTerm.get_or_stub(text)
             if must_exist and term.is_stub:
-                return False
+                return None
 
             all_terms = {term}
             if mondo_term := OntologyTermRelation.as_mondo(term):
-                # if we have (or can translate) into a mondo term
-                # get all the direct parent and all the direct children terms
+                # if we have (or can translate) into a mondo term.
+                # get all the direct parent terms and all the direct children terms
                 # and then the OMIM equiv of them
                 mondo_terms = {mondo_term}
                 mondo_terms |= OntologySnake.get_children(mondo_term)
@@ -304,6 +361,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                                                              all_strs)
         except ValueError:
             pass
+        return None
 
     def row_columns(self) -> list[str]:
         return ["share_level"]
@@ -319,15 +377,19 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         genome_build_preferred = first(self.genome_build_prefs)
 
+        self.grouping_value_type_overlaps = {}
+        # self.pending_conflict_labs_onc_path: dict[Tuple[int, int], DiscordanceReportTriageStatus] = {}
+        # self.pending_conflict_labs_clin_sig: dict[Tuple[int, int], DiscordanceReportTriageStatus] = {}
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('classification_grouping_detail',
                                                                        expected_height=108)
-
         self.rich_columns = [
             RichColumn(
                 key='lab',
                 # share_level_sort annotated column
                 sort_keys=[
-                    'allele_origin_bucket',
+                    'allele_origin_grouping__allele_origin_bucket',
+                    'allele_origin_grouping__testing_context_bucket',
+                    'allele_origin_grouping__tumor_type_category',
                     'lab__organization__name',
                     'lab__name',
                     'share_level'
@@ -339,18 +401,20 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 client_renderer='VCTable.groupIdentifier',
                 extra_columns=[
                     'id',
+                    'allele_origin_grouping__testing_context_bucket',
+                    'allele_origin_grouping__tumor_type_category',
                     'classification_count',
                     'lab__organization__short_name',
                     'lab__organization__name',
                     'lab__name',
-                    'allele_origin_bucket',
+                    'allele_origin_grouping__allele_origin_bucket',
                     'share_level',
                     'dirty'
                 ]
             ),
             RichColumn(
                 key=ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info"),
-                # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
+                # sort_keys=['variant_sort', 'c_hgvs'], # annotated column
                 sort_keys=[ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info",
                                                                     "genomic_sort")],
                 name='c_hgvs',
@@ -382,9 +446,11 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 renderer=self.render_pathogenic,
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 extra_columns=[
+                    "pk",
                     "latest_classification_modification__classification_id",
                     "latest_classification_modification__classification__summary__pathogenicity",
-                    "pathogenic_difference"
+                    "pathogenic_difference",
+                    'share_level'
                 ]
             ),
             RichColumn(
@@ -393,14 +459,17 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 client_renderer="VCTable.somatic_clinical_significance",
                 sort_keys=[
                     'latest_classification_modification__classification__summary__somatic__sort',
-                    'latest_classification_modification__classification__summary__pathogenicity__sort'
+                    'latest_classification_modification__classification__summary__pathogenicity__sort',
                 ],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 renderer=self.render_somatic,
                 extra_columns=[
+                    "pk",
+                    "lab_id",
                     "latest_classification_modification__classification__summary__somatic",
-                    "allele_origin_bucket",
-                    "somatic_difference"
+                    "allele_origin_grouping__allele_origin_bucket",
+                    "somatic_difference",
+                    'share_level'
                 ]
             ),
             RichColumn(
@@ -431,3 +500,4 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 default_sort=SortOrder.DESC
             )
         ]
+

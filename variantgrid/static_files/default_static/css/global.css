@@ -2594,6 +2594,44 @@ a.clinical-context {
   bottom: -28px;
 }
 
+.overlap-source {
+  font-size: 8pt;
+  text-align: center;
+  border-radius: 2px;
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  background-color: #888888;
+  font-weight: bold;
+  color: #FFF;
+}
+
+.testing-context-box {
+  font-size: 8pt;
+  text-align: center;
+  border-radius: 8px;
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  background-color: #ddbbdd;
+    /*
+    all testing contexts other than Germline are somatic
+
+    NON_CANCER = "N", "Non-Cancer Somatic"
+    HAEMATOLOGY = "H", "Haematology"
+    SOLID_TUMOR = "S", "Solid Tumour"
+    OTHER = "O", "Other" # FIXME Somatic Other
+    GERMLINE = "G", "Germline"
+    UNKNOWN = "U", "Unknown"
+     */
+  color: #FFF;
+  font-weight: bold;
+}
+.testing-context-box.testing-context-G {
+  color: #444;
+  background-color: #aaeeaa;
+}
+
 a .c-hgvs-body .c-hgvs-transcript,
 a .c-hgvs-body .c-hgvs-nomen {
   color: #444488 !important;

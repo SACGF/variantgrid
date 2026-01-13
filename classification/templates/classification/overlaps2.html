@@ -1,0 +1,30 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load js_tags %}
+{% load lab_tags %}
+{% block title %}Overlaps{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+<div class="container">
+    <style>
+        .dt-overlaps {
+            width: 60%;
+        }
+    </style>
+    <script>
+        function groupingFilter(data) {
+            data.lab_selection = {{ lab_picker_data.selection | jsonify }};
+        }
+    </script>
+    {% lab_picker data=lab_picker_data %}
+    <table
+           data-datatable-data='groupingFilter'
+           data-datatable-url="{% url 'overlaps2_datatables' %}"
+           class="sticky-header"
+           data-adjust-columns="false">
+    </table>
+
+
+</div>
+{% endblock %}

@@ -2,40 +2,32 @@ import operator
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Self, Tuple, Iterable, Union
+from typing import Optional, Self, Tuple
 
 import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
-from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet, Subquery, OuterRef, Manager, \
-    PROTECT, Exists, When, Value, Case
+from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet
 from django.urls import reverse
-from django.utils.safestring import SafeString
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
 
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket, OverlapStatus, \
-    ConflictType
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved, ConditionReference, DiscordanceReportTriageStatus, DiscordanceReportNextStep
+    ConditionResolved, ConditionReference
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
-from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
-from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import strip_json
-from review.models import ReviewableModelMixin, Review
 from snpdb.models import Allele, Lab
-import html
-from datetime import datetime, timedelta
-from django.utils import timezone
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
-classification_grouping_onc_path_signal = django.dispatch.Signal()  # args: "instance", expects Classification
-classification_grouping_clin_sig_signal = django.dispatch.Signal()  # args: "instance", expects Classification
+classification_grouping_update_signal = django.dispatch.Signal()  # TODO is there a point for this over ClassificationGrouping
+#classification_grouping_onc_path_signal = django.dispatch.Signal()  # args: "instance", expects Classification
+#classification_grouping_clin_sig_signal = django.dispatch.Signal()  # args: "instance", expects Classification
 
 # TODO this needs to be moved to Classification
 # class ClassificationQualityLevel(TextChoices):
@@ -115,7 +107,7 @@ class AlleleOriginGrouping(TimeStampedModel):
     def __str__(self):
         return f"{self.allele_grouping.allele} {self.get_allele_origin_bucket_display()} Testing Context: {self.get_testing_context_bucket_display()} Sub-Type: {self.tumor_type_category}"
 
-    def labels(self, include_allele_origin=True) -> list[str]:
+    def labels(self, include_allele_origin=True) -> list[Optional[str]]:
         parts = []
         if include_allele_origin:
             parts.append(AlleleOriginBucket(self.allele_origin_bucket).label)
@@ -155,10 +147,12 @@ class AlleleOriginGrouping(TimeStampedModel):
         return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.allele_grouping_id})
 
     def update(self):
-        from classification.services.overlaps_services import OverlapServices
-        OverlapServices().calculate_and_apply_overlaps_for_ao(self)
-        self.dirty = False
-        self.save()
+        # FIXME as overlaps now belong in
+        # from classification.services.overlaps_services import OverlapServices
+        # OverlapServices().calculate_and_apply_overlaps_for_ao(self)
+        # self.dirty = False
+        # self.save()
+        print("FIXME: AlleleOriginGrouping.Update currently doesn't do anything")
 
 
 class ClassificationGroupingPathogenicDifference(IntegerChoices):
@@ -188,6 +182,29 @@ class ClassificationGrouping(TimeStampedModel):
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
     latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        parts = [
+            f"({self.pk})",
+            "Classification-Grouping",
+            f"{self.allele_origin_grouping.allele_grouping.allele:CA}",
+            self.allele_origin_grouping.get_testing_context_bucket_display(),
+            str(self.lab),
+            "Shared" if self.share_level_obj.is_discordant_level else "Not-shared",
+        ]
+        if classification := self.latest_cached_summary.get("pathogenicity").get("classification"):
+            parts.append(f"Class({classification})")
+        if clin_sig := self.latest_cached_summary.get("somatic").get("clin_sig"):
+            parts.append(f"ClinSig({clin_sig})")
+        return " ".join(parts)
+
+    @property
+    def testing_context(self) -> TestingContextBucket:
+        return TestingContextBucket(self.allele_origin_grouping.testing_context_bucket)
+
+    @property
+    def tumor_type(self) -> str:
+        return self.allele_origin_grouping.tumor_type_category
 
     @property
     def allele_origin_bucket(self):
@@ -462,12 +479,14 @@ class ClassificationGrouping(TimeStampedModel):
 
             self.dirty = False
             self.save()
-            if primary_clin_sig_change:
-                classification_grouping_clin_sig_signal.send(sender=ClassificationGrouping, instance=self)
-            if primary_onc_path_change:
-                classification_grouping_onc_path_signal.send(sender=ClassificationGrouping, instance=self)
+            classification_grouping_update_signal.send(sender=ClassificationGrouping, instance=self)
+            # if primary_clin_sig_change:
+            #     classification_grouping_clin_sig_signal.send(sender=ClassificationGrouping, instance=self)
+            # if primary_onc_path_change:
+            #     classification_grouping_onc_path_signal.send(sender=ClassificationGrouping, instance=self)
         else:
             # there are no classifications, time to die
+            # FIXME add soft delete
             self.delete()
 
     def gene_symbols(self):
@@ -553,6 +572,7 @@ class ClassificationGroupingSearchTermBuilder:
 
 class ClassificationGroupingEntry(TimeStampedModel):
     # this is just here so this model can stay completely separate from Classification
+    # should only ever be a single grouping per classification (should classification be made unique??)
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE)
 
@@ -564,6 +584,12 @@ class ClassificationGroupingEntry(TimeStampedModel):
 
     class Meta:
         unique_together = ("grouping", "classification")
+
+    @staticmethod
+    def grouping_for(classification: Classification) -> Optional[ClassificationGrouping]:
+        if entry := ClassificationGroupingEntry.objects.filter(classification=classification).select_related("grouping").first():
+            return entry.grouping
+        return None
 
 
 # @dataclass(frozen=True)

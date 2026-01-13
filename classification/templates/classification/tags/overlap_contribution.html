@@ -1,0 +1,10 @@
+{% load ui_utils %}
+{# Treat "Single Context" as the default overlap type, only show overlap type if it's something different#}
+<span style="{% if cross_context %}opacity:0.6{% endif %}">
+<span class="testing-context-box testing-context-{{ overlap_contribution.testing_context_bucket_obj.value }}">{{ overlap_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span>
+{{ overlap_contribution.pretty_value }}
+{% if show_lab %}<span class="text-muted"> : {% if overlap_contribution.scv %}ClinVar Expert Panel{% else %}{{ overlap_contribution.lab }}{% endif %} </span>{% endif %}
+{% if compare_overlap_status.is_attention %}
+- {{ compare_overlap_status.name| lower | pretty_label }}
+{% endif %}
+</span>

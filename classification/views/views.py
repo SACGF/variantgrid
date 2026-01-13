@@ -34,7 +34,8 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
 from classification.classification_changes import ClassificationChanges
 from classification.classification_stats import get_grouped_classification_counts, \
     get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason, AlleleOriginBucket
+from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason, AlleleOriginBucket, \
+    OverlapStatus
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
@@ -966,12 +967,19 @@ def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
 def view_classification_grouping_detail(request, classification_grouping_id: int):
     grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
     grouping.check_can_view(request.user)
+
+    # TODO should we pass in the contributions rather than the overlaps?
+    overlaps_qs = ClassificationGroupingOverlapContribution.objects.filter(classification_grouping=grouping)\
+        .filter(overlap__valid=True)
+    overlaps = list(sorted(contribution.overlap for contribution in overlaps_qs))
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
-        "classification_grouping": grouping
+        "classification_grouping": grouping,
+        "overlaps": overlaps
     })
 
 
 def view_classification_grouping_records_detail(request, classification_grouping_id: int):
+    # TODO how is this different
     grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_records_detail.html', {

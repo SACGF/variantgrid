@@ -25,7 +25,7 @@ from annotation.models import AnnotationRun, AnnotationVersion, ClassificationMo
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
-    EvidenceKeyMap, ClassificationGroupingEntry
+    EvidenceKeyMap, ClassificationGroupingEntry, Overlap
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -533,49 +533,50 @@ class AlleleOriginGroupingDescription:
                     if dr.is_active:
                         discordance_report = dr
 
-        shared_counts = allele_origin_grouping.classificationgrouping_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
-        unshared_counts = (
-            ClassificationGrouping.filter_for_user(for_user, allele_origin_grouping.classificationgrouping_set.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)).count())
+        # shared_counts = allele_origin_grouping.classificationgrouping_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
+        # unshared_counts = (
+        #     ClassificationGrouping.filter_for_user(for_user, allele_origin_grouping.classificationgrouping_set.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)).count())
+        #
+        # overlap_status: OverlapStatus
+        # if shared_counts == 0:
+        #     overlap_status = OverlapStatus.NO_SHARED_RECORDS
+        # elif shared_counts == 1:
+        #     overlap_status = OverlapStatus.SINGLE_SUBMITTER
+        # elif allele_origin_grouping.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+        #     overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
+        # else:
+        #     # TODO right now it's lookiung at every classification in the grouping
+        #     # In future, only look at the latest
+        #     classification_groups = allele_origin_grouping.classificationgrouping_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('pk', flat=True)
+        #     classification_groups_classes = ClassificationGroupingEntry.objects.filter(grouping__in=classification_groups).values_list('classification_id', flat=True)
+        #     classification_values = set(ClassificationModification.objects.filter(is_last_published=True, classification_id__in=classification_groups_classes).values_list(f'published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value', flat=True).all())
+        #
+        #     # now see if we're agreement, confidence or discordant
+        #     bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
+        #     buckets = {bucket_mapping.get(class_value) for class_value in classification_values}
+        #     if None in buckets:
+        #         buckets.remove(None)
+        #
+        #     if len(buckets) > 1:
+        #         # discordant
+        #         if "P" in classification_values or "LP" in classification_values:
+        #             overlap_status = OverlapStatus.DISCORDANCE_MEDICALLY_SIGNIFICANT
+        #         else:
+        #             overlap_status = OverlapStatus.DISCORDANCE
+        #     else:
+        #         if len(classification_values) > 1:
+        #             overlap_status = OverlapStatus.CONFIDENCE
+        #         else:
+        #             # complete agreement
+        #             overlap_status = OverlapStatus.AGREEMENT
 
-        overlap_status: OverlapStatus
-        if shared_counts == 0:
-            overlap_status = OverlapStatus.NO_SHARED_RECORDS
-        elif shared_counts == 1:
-            overlap_status = OverlapStatus.SINGLE_SUBMITTER
-        elif allele_origin_grouping.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
-            overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
-        else:
-            # TODO right now it's lookiung at every classification in the grouping
-            # In future, only look at the latest
-            classification_groups = allele_origin_grouping.classificationgrouping_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('pk', flat=True)
-            classification_groups_classes = ClassificationGroupingEntry.objects.filter(grouping__in=classification_groups).values_list('classification_id', flat=True)
-            classification_values = set(ClassificationModification.objects.filter(is_last_published=True, classification_id__in=classification_groups_classes).values_list(f'published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value', flat=True).all())
-
-            # now see if we're agreement, confidence or discordant
-            bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
-            buckets = {bucket_mapping.get(class_value) for class_value in classification_values}
-            if None in buckets:
-                buckets.remove(None)
-
-            if len(buckets) > 1:
-                # discordant
-                if "P" in classification_values or "LP" in classification_values:
-                    overlap_status = OverlapStatus.DISCORDANCE_MEDICALLY_SIGNIFICANT
-                else:
-                    overlap_status = OverlapStatus.DISCORDANCE
-            else:
-                if len(classification_values) > 1:
-                    overlap_status = OverlapStatus.CONFIDENCE
-                else:
-                    # complete agreement
-                    overlap_status = OverlapStatus.AGREEMENT
-
+        # TODO grab all this from the
         return AlleleOriginGroupingDescription(
             allele_origin_grouping=allele_origin_grouping,
             discordance_report=discordance_report,
-            overlap_status=overlap_status,
-            shared_counts=shared_counts,
-            unshared_counts=unshared_counts,
+            overlap_status=OverlapStatus.NO_COUNTING_CONTRIBUTIONS,
+            shared_counts=1,
+            unshared_counts=1,
         )
 
 
@@ -596,7 +597,8 @@ def view_allele(request, allele_id: int):
     show_overall_diff = len(aogs) > 1
 
     context = {
-        "allele_origin_groupings_desc": aogs,
+        # "allele_origin_groupings_desc": aogs,
+        "overlaps": list(sorted(Overlap.objects.filter(allele=allele, valid=True).all())),
         "show_overall_diff": show_overall_diff,
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
