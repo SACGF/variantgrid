@@ -3,7 +3,7 @@
 from django.db import migrations, models
 
 
-def _variant_end_message(apps, _schema_editor):
+def _variant_end_message(_apps, _schema_editor):
     print("If this migration fails, you need to have run 'one_off_calc_variant_end' - this existed in the commit before this migration/schema change 6a0b1f112f338fe4aa96fa2775bcb5e9f933c883")
 
 

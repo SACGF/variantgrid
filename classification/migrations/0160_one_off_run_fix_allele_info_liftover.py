@@ -6,7 +6,7 @@ from classification.management.commands.fix_allele_info import Command as FixAll
 from manual.operations.manual_operations import ManualOperation
 
 
-def _test_needs_imported_allele_info_liftover(apps):
+def _test_needs_imported_allele_info_liftover(_apps):
     for _genome_build, iai_qs in FixAlleleInfoCommand.get_imported_allele_info_liftover_builds_and_qs():
         if iai_qs.exists():
             return True

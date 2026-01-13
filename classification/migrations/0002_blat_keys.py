@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def blat_keys(apps, schema_editor):
+def blat_keys(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 
     # don't override existing keys

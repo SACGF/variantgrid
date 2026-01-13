@@ -7,7 +7,7 @@ def _set_allow_custom_strengths(apps, _schema):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     EvidenceKey.objects.filter(value_type="C").update(crit_allows_override_strengths=True)
 
-def _dummy_reverse(apps, schema):
+def _dummy_reverse(_apps, _schema):
     pass
 
 class Migration(migrations.Migration):
