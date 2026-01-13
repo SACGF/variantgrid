@@ -54,10 +54,10 @@ def cautious_attempt_html_to_text(text: str, whitelist: set[str] = None) -> str:
     return bs.get_text()
 
 
-def html_to_text(html: str, preserve_lines: bool = False) -> Optional[str]:
-    if not html:
+def html_to_text(html_str: str, preserve_lines: bool = False) -> Optional[str]:
+    if not html_str:
         return None
-    bs = BeautifulSoup(f'<body>{html}</body>', features="html.parser")
+    bs = BeautifulSoup(f'<body>{html_str}</body>', features="html.parser")
 
     if not preserve_lines:
         return bs.get_text()
