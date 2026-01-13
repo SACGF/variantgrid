@@ -28,6 +28,10 @@ class EventLogHandler(logging.Handler):  # Inherit from logging.Handler
                 severity = LogLevel.INFO
             elif record.levelname == 'ERROR':
                 severity = LogLevel.ERROR
+            elif record.levelname == 'DEBUG':
+                severity = LogLevel.DEBUG
+            else:
+                raise ValueError("Unknown log level: %s" % record.levelname)
 
             name = 'django_exception'
             details_list = []
