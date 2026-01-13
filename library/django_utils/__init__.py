@@ -35,7 +35,7 @@ def get_url_from_view_path(view_path):
     current_site = Site.objects.get_current()
     protocol = 'http'
     # TODO can do better than this for determining https vs http
-    if 'shariant.org.au' in current_site.domain or 'variantgrid.com.au' in current_site.domain:
+    if 'shariant.org.au' in current_site.domain or 'variantgrid.com' in current_site.domain:
         protocol = 'https'
     return f'{protocol}://{current_site.domain}{view_path}'
 
