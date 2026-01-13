@@ -913,9 +913,9 @@ def search_receiver(
                         if result == INVALID_INPUT:
                             matched_pattern = False
                             break
-                        elif result is None:
+                        if result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")
-                        elif isinstance(result, SearchMessageOverall):
+                        if isinstance(result, SearchMessageOverall):
                             overall_messages.add(result)
                         else:
 
