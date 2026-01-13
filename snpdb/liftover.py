@@ -309,7 +309,7 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
                 yield conversion_tool, None, variant_errors_str
                 continue
 
-            if check_liftover_errors:
+            if check_liftover_errors is not None:
                 if error_message := check_liftover_errors(variant_coordinate, source_genome_build):
                     yield conversion_tool, None, error_message
                     continue
