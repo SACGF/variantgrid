@@ -66,7 +66,7 @@ class PhenotypeMatcher:
         'joints',
         'kit',
         'large', 'lateral', 'left', 'likes', 'liver',
-        'march', 'match', 'macro', 'mild', 'milena', 'moderate', 'mother', 'month', 'months', 'mother', 'motor', 'movements',
+        'march', 'match', 'macro', 'mild', 'milena', 'moderate', 'mother', 'month', 'months', 'motor', 'movements',
         'nad', 'name', 'normal',
         'onset', 'other',
         'panel', 'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged',
