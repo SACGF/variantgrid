@@ -712,9 +712,7 @@ class HGVSMatcher:
             # fix gene/transcript swap and lower case separately to get separate warnings.
             uc_gene = gene_symbol.upper()
             if looks_like_transcript(uc_gene):  # Need to upper here
-                old_transcript = transcript_accession
-                transcript_accession = gene_symbol
-                gene_symbol = old_transcript
+                transcript_accession, gene_symbol = gene_symbol, transcript_accession
                 if gene_symbol:
                     fixed_messages.append("Swapped gene/transcript")
                 transcript_ok = looks_like_transcript(transcript_accession)
