@@ -2,7 +2,6 @@ import math
 import re
 from collections import defaultdict
 from copy import deepcopy
-from dataclasses import field
 from enum import Enum
 from functools import cached_property
 from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast

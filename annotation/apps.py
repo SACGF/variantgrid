@@ -1,5 +1,4 @@
 from django.apps.config import AppConfig
-from django.db import ProgrammingError
 from django.db.models.signals import post_save
 
 

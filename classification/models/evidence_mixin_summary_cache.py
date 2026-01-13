@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from typing import TypedDict, Optional, Self
+
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation
 from library.utils import strip_json

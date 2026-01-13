@@ -14,13 +14,12 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from annotation.models import ManualVariantEntryCollection, PATIENT_ONTOLOGY_TERM_PATH
-from genes.models import GeneSymbol, SampleGeneList
 from library.django_utils import get_url_from_view_path
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age, JsonDataType
-from ontology.models import OntologyService, OntologyTerm
+from ontology.models import OntologyService
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \

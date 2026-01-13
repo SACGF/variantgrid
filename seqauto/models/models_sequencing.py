@@ -1,6 +1,3 @@
-import re
-from typing import Optional
-
 from django.db import models
 from django.db.models import CASCADE, PROTECT
 from django.urls import reverse

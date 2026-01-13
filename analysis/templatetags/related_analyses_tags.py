@@ -8,7 +8,7 @@ from django.db.models import Q, Model
 from django.template import Library
 
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
-from analysis.models import MutationalSignature, Analysis, AnalysisTemplate, TagNode
+from analysis.models import MutationalSignature, Analysis, AnalysisTemplate
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.related_analyses import get_related_analysis_details_for_samples, \
     get_related_analysis_details_for_cohort, \

@@ -29,7 +29,6 @@ from review.models import ReviewableModelMixin, Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, GenomeBuild
 
-
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "clinical_context_change_data:ClinicalContextChangeData"
 
 

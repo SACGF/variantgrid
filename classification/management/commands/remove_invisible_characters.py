@@ -1,7 +1,8 @@
 import json
+import re
 
 from django.core.management.base import BaseCommand
-import re
+
 from classification.models import Classification
 from library.guardian_utils import admin_bot
 

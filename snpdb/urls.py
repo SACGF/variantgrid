@@ -2,9 +2,8 @@ from django.contrib.auth.views import PasswordChangeView, PasswordChangeDoneView
 from django.urls import include
 from django.urls.conf import path as path_standard
 from rest_framework.permissions import AllowAny
-from rest_framework.schemas import get_schema_view
 from rest_framework.renderers import OpenAPIRenderer
-
+from rest_framework.schemas import get_schema_view
 
 from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view

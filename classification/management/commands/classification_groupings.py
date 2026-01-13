@@ -1,5 +1,3 @@
-import argparse
-
 from django.core.management import BaseCommand
 
 from classification.models import Classification, ClassificationModification, ClassificationSummaryCalculator

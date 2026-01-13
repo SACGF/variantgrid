@@ -1,6 +1,5 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Field
-
 from django.conf import settings
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404
@@ -8,7 +7,8 @@ from django.shortcuts import render, get_object_or_404
 from analysis.forms import SampleCandidatesSearchForm
 from analysis.models import CandidateSearchRun, CandidateSearchType
 from analysis.views.views_candidate_search import AbstractCandidateSearchView, AbstractNewCandidateSearchView
-from classification.forms import ClassificationAlleleOriginForm, ClinicalSignificanceForm, ClassificationEvidenceUpdateForm
+from classification.forms import ClassificationAlleleOriginForm, ClinicalSignificanceForm, \
+    ClassificationEvidenceUpdateForm
 from genes.forms import GeneSymbolForm
 from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm

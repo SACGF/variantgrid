@@ -33,7 +33,6 @@ from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS, NON_PR_TERMS
 from snpdb.models import Lab
 
-
 condition_set_signal = django.dispatch.Signal()  # args: "classification", "resolved_condition"
 
 

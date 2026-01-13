@@ -3,7 +3,7 @@ import re
 import uuid
 from collections import Counter, namedtuple
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timedelta, date
 from enum import Enum, StrEnum
 from functools import cached_property
 from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
@@ -22,10 +22,11 @@ from django.db.models.functions import LPad, Cast, Concat
 from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
 from django.dispatch.dispatcher import receiver
-from django.utils import timezone as django_timezone
 from django.urls.base import reverse
+from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \

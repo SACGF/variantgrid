@@ -7,6 +7,7 @@ import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
+from django.db import models, transaction
 from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
@@ -14,7 +15,6 @@ from frozendict import frozendict
 from more_itertools import last
 
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
-from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
@@ -23,7 +23,6 @@ from genes.models import GeneSymbol
 from library.utils import strip_json
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
-
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
 

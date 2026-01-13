@@ -1,10 +1,12 @@
 import operator
 from functools import cached_property, reduce
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
+
 from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
+
 from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
@@ -14,7 +16,7 @@ from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologySnake
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import UserSettings, GenomeBuild, Variant
+from snpdb.models import GenomeBuild, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder, CellData
 
 

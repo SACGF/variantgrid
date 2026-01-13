@@ -1,4 +1,3 @@
-import logging
 import os.path
 
 from rest_framework import serializers
