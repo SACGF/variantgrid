@@ -876,7 +876,7 @@ class CandidateColumns(DatatableConfig[LogEntry]):
         if row["status"] in (CandidateStatus.OPEN, CandidateStatus.HIGHLIGHTED):
             # Only do this if there is a sample
             if row.get("sample_id"):
-                data["url"] = reverse("classify_candidate", args=[row["id"]]),
+                data["url"] = reverse("classify_candidate", args=[row["id"]])
                 data["text"] = "📑"
                 data["title"] = "Classify sample"
 
