@@ -936,7 +936,6 @@ class AnnotationRangeLock(models.Model):
         return int(self.max_variant_id) - int(self.min_variant_id) >= self.MIN_SIZE_FOR_SUBDIVISION
 
 
-
 class AnnotationRun(TimeStampedModel):
     status = models.CharField(max_length=1, choices=AnnotationStatus.choices, default=AnnotationStatus.CREATED)
     annotation_range_lock = models.ForeignKey(AnnotationRangeLock, null=True, on_delete=CASCADE)
@@ -1508,7 +1507,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
         if values:
             return max(values)
         return None
-
 
     @staticmethod
     def get_gnomad_population_field(population):

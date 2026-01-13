@@ -386,7 +386,6 @@ class AnalysisFilterForm(forms.Form):
             raise ValidationError('date_min must be <= date_max')
 
 
-
 class SampleCandidatesSearchForm(forms.Form):
     max_samples = forms.IntegerField(required=False, initial=10, min_value=1)
     max_results = forms.IntegerField(required=False, initial=20, min_value=1)

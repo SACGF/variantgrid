@@ -465,6 +465,3 @@ def set_candidate_status(request, candidate_id):
     candidate.reviewer = request.user
     candidate.save()
     return JsonResponse({"success": True})
-
-
-

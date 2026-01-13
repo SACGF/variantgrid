@@ -84,7 +84,6 @@ class CandidateSearchVersion(TimeStampedModel):
         return url
 
 
-
 class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     search_version = models.ForeignKey(CandidateSearchVersion, on_delete=CASCADE)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
@@ -185,11 +184,6 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
                             top_aggregate_counts[name].append((obj, col, count))
 
         return dict(top_aggregate_counts)
-
-
-
-
-
 
 
 class Candidate(TimeStampedModel):

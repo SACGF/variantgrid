@@ -27,12 +27,10 @@ def view_classification_candidate_search(request, pk) -> HttpResponse:
     return render(request, 'classification/candidate_search/classification_candidate_search.html', context)
 
 
-
 class ReanalyisCandidateSearchView(AbstractCandidateSearchView):
     template_name = 'classification/candidate_search/classification_candidate_search.html'
     def _get_search_types(self) -> list[CandidateSearchType]:
         return [CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION, CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE]
-
 
 
 class AbstractNewClassificationCandidateSearchView(AbstractNewCandidateSearchView):
@@ -128,4 +126,3 @@ class NewClassificationEvidenceUpdateCandidateSearchView(AbstractNewClassificati
 
     def _get_candidate_search_type(self) -> CandidateSearchType:
         return CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE
-

@@ -65,7 +65,6 @@ class ClassificationCandidateSearchMixin:
         return cm_qs
 
 
-
 class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearchMixin, AbstractCandidateSearchTask):
     @staticmethod
     def _filter_classifications_by_sample_and_patient(sample: Sample, classifications: Iterable[Classification]) -> Iterable[Classification]:
@@ -349,4 +348,3 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
 
 CrossSampleClassificationCandidateSearchTask = app.register_task(CrossSampleClassificationCandidateSearchTask())
 ClassificationEvidenceUpdateCandidateSearchTask = app.register_task(ClassificationEvidenceUpdateCandidateSearchTask())
-

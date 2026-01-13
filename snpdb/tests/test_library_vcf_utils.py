@@ -121,4 +121,3 @@ class TestVCFUtils(TestCase):
         for v in cyvcf2.Reader(filename):
             _ref, alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(v, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
             self._assert_del_svlen(alt, svlen)
-

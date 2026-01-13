@@ -69,7 +69,6 @@ class QCSerializer(serializers.ModelSerializer):
             qc_path = QC.get_path_from_vcf(vcf_file)
         defaults["path"] = qc_path
 
-
         qc, _ = QC.objects.get_or_create(
             sequencing_run=sequencing_run,
             bam_file=vcf_file.bam_file,

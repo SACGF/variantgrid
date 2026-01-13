@@ -942,4 +942,3 @@ class AnalysesColumns(DatatableConfig[Analysis]):
         if analysis_type := row["analysis_type"]:
             analysis_type = AnalysisType(row["analysis_type"]).label
         return analysis_type
-

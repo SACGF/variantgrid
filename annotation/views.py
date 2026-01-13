@@ -455,7 +455,6 @@ def subdivide_annotation_run(request, annotation_run_id):
     return redirect(annotation_run)
 
 
-
 @cache_page(WEEK_SECS)
 @vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
 def view_annotation_descriptions(request, genome_build_name=None):

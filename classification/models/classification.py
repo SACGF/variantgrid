@@ -667,7 +667,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def dashboard_report_classifications_of_interest(since) -> List[ClassificationOutstandingIssues]:
-        min_age = django_timezone.now() - timedelta(minutes=2) # give records 2 minutes to matching properly before reporting
+        min_age = django_timezone.now() - timedelta(minutes=2)  # give records 2 minutes to matching properly before reporting
 
         time_range_q = Q(created__gte=since) & Q(created__lte=min_age)
 
@@ -2224,7 +2224,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         It's this record (not raw Classifications) that appear on grids, so that only correctly saved/shared
         classifications are shown (ie not partially edited ones)
     """
-
 
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)  # One who did last change, may not be classification.user

@@ -62,4 +62,3 @@ def patient_genes_graph(context, graph_width=512, graph_height=384, max_records=
     user = context['request'].user
     qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC)
     return match_graph(user, "Genes", qs, "name", GENES_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
-

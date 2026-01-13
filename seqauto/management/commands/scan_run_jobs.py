@@ -12,7 +12,6 @@ class Command(BaseCommand):
         parser.add_argument('--reuse-prev-scan-id', type=int, required=False,
                             help="Reused previous scanned files from run ID")
 
-
     def handle(self, *args, **options):
         only_process_file_types = options.get("process_types")
         only_launch_file_types = options.get("launch_types")

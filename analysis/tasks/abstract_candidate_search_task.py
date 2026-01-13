@@ -41,4 +41,3 @@ class AbstractCandidateSearchTask(Task):
             num_results += len(limited)
             if num_results >= max_results:
                 break
-

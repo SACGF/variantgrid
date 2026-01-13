@@ -97,7 +97,7 @@ def get_cohort_analysis(cohort: Cohort, analysis_template: AnalysisTemplate) -> 
     return _get_single_template_run_analysis(CohortAnalysisTemplateRun, analysis_template,
                                              cohort, "cohort")
 
-                                             
+
 def get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):
     if skip_already_analysed:
         if get_related_analysis_details_for_samples(user, [sample]):
@@ -128,4 +128,3 @@ def auto_launch_analysis_templates_for_sample(user, sample, skip_already_analyse
         template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, user=user)
         template_run.populate_arguments({"sample": sample})
         populate_analysis_from_template_run(template_run)
-

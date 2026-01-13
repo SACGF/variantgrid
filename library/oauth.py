@@ -66,7 +66,7 @@ class ServerAuth:
                 password=self.password
             )
 
-    def get(self, url_suffix: str, timeout: int=MINUTE_SECS, **kwargs) -> Response:
+    def get(self, url_suffix: str, timeout: int = MINUTE_SECS, **kwargs) -> Response:
         return requests.get(
             url=self.url(url_suffix),
             auth=self.auth,
@@ -74,7 +74,7 @@ class ServerAuth:
             **kwargs
         )
 
-    def post(self, url_suffix: str, timeout: int=MINUTE_SECS, **kwargs) -> Response:
+    def post(self, url_suffix: str, timeout: int = MINUTE_SECS, **kwargs) -> Response:
         return requests.post(
             url=self.url(url_suffix),
             auth=self.auth,

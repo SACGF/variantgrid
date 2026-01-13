@@ -278,7 +278,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             q = reduce(operator.or_, condition_filters)
         return q
 
-
     @staticmethod
     def condition_filter(text, must_exist: bool = False):
         try:

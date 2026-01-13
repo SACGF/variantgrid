@@ -43,7 +43,6 @@ class SequencerModelSerializer(serializers.ModelSerializer):
         return SequencerModel.objects.get(model=validated_data["model"])
 
 
-
 class SequencerSerializer(serializers.ModelSerializer):
     name = serializers.CharField(validators=[])  # Disable UniqueValidator
     sequencer_model = SequencerModelSerializer()

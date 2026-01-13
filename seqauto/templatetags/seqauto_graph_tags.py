@@ -8,7 +8,7 @@ register = Library()
 
 
 @register.inclusion_tag("seqauto/tags/sample_enrichment_kits_graph.html")
-def sample_enrichment_kits_graph(sample_enrichment_kits_df, title, by_column, max_years: int=None):
+def sample_enrichment_kits_graph(sample_enrichment_kits_df, title, by_column, max_years: int = None):
     enrichment_kits_over_time, enrichment_kit_labels = group_enrichment_kits_df(sample_enrichment_kits_df, by_column,
                                                                                 max_groups=10, max_years=max_years)
 

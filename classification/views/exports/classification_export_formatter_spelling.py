@@ -79,7 +79,6 @@ class ClassificationExportFormatterSpelling(ClassificationExportFormatter):
         # needed for nltk.word_tokenize, but done here so we don't check per row
         ensure_nltk_data('taggers/averaged_perceptron_tagger_eng')
 
-
     def content_type(self) -> str:
         return "text/csv"
 
