@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Q
 
-from library.utils import invert_dict, Constant
+from library.utils import invert_dict, Constant, get_single_element
 
 
 class NucleicAcid(models.TextChoices):
@@ -73,7 +73,7 @@ class Zygosity:
                     escaped_zygosities_set.add(z)
 
             if len(zygosities_set) == 1:
-                (zygosity_char_match,) = escaped_zygosities_set
+                zygosity_char_match = get_single_element(escaped_zygosities_set)
             else:
                 zygosity_char_match = '[%s]' % ''.join(escaped_zygosities_set)
         else:
