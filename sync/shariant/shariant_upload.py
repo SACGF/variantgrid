@@ -203,7 +203,7 @@ class ClassificationUploader:
         if cm := qs.first():  # Should only be 1
             sync_match = True
             if cm_sync_record := ClassificationModificationSyncRecord.objects.filter(run__destination=self.sync_destination,
-                                                                                    classification_modification=cm).latest():
+                                                                                    classification_modification=cm).order_by("modified").last():
                 if sync_success := cm_sync_record.success:
                     # Search is a bit of a hack as we don't have a way to access it directly
                     remote_url = self.shariant.url(f'variantopedia/search?search={classification.lab_record_id}')
