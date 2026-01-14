@@ -365,16 +365,16 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     classification=classification
                 )
 
-	        if attempt_automatch and (new_root or new_gene_level):
-	            ConditionTextMatch.attempt_automatch(ct)
-	            ct_save_required = True
+            if attempt_automatch and (new_root or new_gene_level):
+                ConditionTextMatch.attempt_automatch(ct)
+                ct_save_required = True
 
-	        if update_counts:
-	            update_condition_text_match_counts(ct)
-	            ct_save_required = True
+            if update_counts:
+                update_condition_text_match_counts(ct)
+                ct_save_required = True
 
-	        if ct_save_required:
-	            ct.save()
+            if ct_save_required:
+                ct.save()
                 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
