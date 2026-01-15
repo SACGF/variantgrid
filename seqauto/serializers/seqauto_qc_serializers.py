@@ -114,10 +114,13 @@ class QCGeneListCreateSerializer(serializers.ModelSerializer):
         gene_list_text = ",".join(gene_list_data)
         custom_text_gene_list = QCGeneList.create_gene_list(gene_list_text,
                                                             sequencing_sample=qc.sequencing_sample)
+        defaults = {
+            "data_state": DataState.COMPLETE,
+            "custom_text_gene_list": custom_text_gene_list,
+        }
         instance, _created = QCGeneList.objects.update_or_create(qc=qc,
                                                                  path=path,
-                                                                 custom_text_gene_list=custom_text_gene_list,
-                                                                 defaults={"data_state": DataState.COMPLETE})
+                                                                 defaults=defaults)
 
         # With API - whatever we sent is always the active one
         instance.link_samples_if_exist(force_active=True)
