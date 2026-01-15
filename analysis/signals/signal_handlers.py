@@ -42,7 +42,7 @@ def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):
     # As they would have failed. Now we have them, try again to now run previously skipped
 
     if created:
-        sample = instance
+        sample = instance.sample
         if sample.import_status == ImportStatus.SUCCESS:
             user = sample.vcf.user
             auto_launch_analysis_templates_for_sample(user, sample,
