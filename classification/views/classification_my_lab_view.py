@@ -5,7 +5,7 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from library.utils import ExportRow, export_column
 
-from classification.classification_stats import get_vus_lab_gene_counts
+from classification.classification_stats import get_lab_clinsig_gene_counts
 from snpdb.lab_picker import LabPickerData
 
 def view_my_lab(request: HttpRequest, lab_id=None) -> HttpResponseBase:
@@ -20,22 +20,20 @@ def view_my_lab_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] =
     lab_picker = LabPickerData.from_request(request, lab_id)
     labs = lab_picker.lab_selection.selected_labs
 
-    gene_vus_count = get_vus_lab_gene_counts(user=request.user, labs=labs, allele_level=False)
+
+    gene_vus_count = get_lab_clinsig_gene_counts(user=request.user, labs=labs)
+
 
     vus_present = any(
         len(d.get("x", [])) > 0
         for d in gene_vus_count
     )
 
-    gene_tuples = zip(gene_vus_count[0]['x'], gene_vus_count[0]['y'])
-
     return render(request,
                   "classification/my_lab_detail.html",
-                  {"user": request.user,
-                   "lab_picker_data": lab_picker,
+                  {"lab_picker_data": lab_picker,
                    "vus_present": vus_present,
-                   "gene_vus_count": gene_vus_count,
-                   "gene_tuples": gene_tuples})
+                   "gene_vus_count": gene_vus_count})
 
 
 class GeneClinSigCountDownload(ExportRow):
@@ -43,27 +41,27 @@ class GeneClinSigCountDownload(ExportRow):
     def __init__(self, gene_counts: tuple):
         self.gene_counts: tuple = gene_counts
 
-    @export_column(label="gene")
+    @export_column(label="Gene")
     def gene(self):
         return self.gene_counts[0]
 
-    @export_column(label="vus")
+    @export_column(label="VUS")
     def vus(self):
         return self.gene_counts[1]
 
-    @export_column(label="benign")
+    @export_column(label="Benign")
     def ben(self):
         return self.gene_counts[2]
 
-    @export_column(label="likely_benign")
+    @export_column(label="Likely Benign")
     def likely_ben(self):
         return self.gene_counts[3]
 
-    @export_column(label="likely_pathogenic")
+    @export_column(label="Likely Pathogenic")
     def likely_pat(self):
         return self.gene_counts[4]
 
-    @export_column(label="pathogenic")
+    @export_column(label="Pathogenic")
     def pat(self):
         return self.gene_counts[5]
 
@@ -72,7 +70,7 @@ def my_lab_download(request: HttpRequest, lab_id: Optional[Union[str, int]]= Non
     lab_picker = LabPickerData.from_request(request, lab_id)
     labs = lab_picker.lab_selection.selected_labs
 
-    gene_vus_count = get_vus_lab_gene_counts(user=request.user, labs=labs, allele_level=False)
+    gene_vus_count = get_lab_clinsig_gene_counts(user=request.user, labs=labs, allele_level=False)
     all_counts = [g['y'] for g in gene_vus_count]
     gene_tuples = [ (x, *ys) for x, *ys in zip(gene_vus_count[0]['x'], *all_counts)]
 
