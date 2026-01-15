@@ -259,12 +259,25 @@ def get_lab_clinsig_gene_counts(user: User,
     gene_symbol_field = "published_evidence__gene_symbol__value"
     lab_field = "classification__lab__in"
     allele_origin_buckets = AlleleOriginBucket.GERMLINE
-    plot_order = ['VUS', 'Benign', 'Likely Benign', 'Likely Pathogenic', 'Pathogenic']
+    plot_order = {'Total_VUS': 'Total VUS',
+                  'VUS': 'VUS',
+                  'VUS_C': 'VUS C',
+                  'VUS_B': 'VUS B',
+                  'VUS_A': 'VUS A',
+                  'B': 'Benign',
+                  'LB': 'Likely Benign',
+                  'LP': 'Likely Pathogenic',
+                  'P': 'Pathogenic'}
 
-    kwargs = {gene_symbol_field + "__isnull": False, lab_field: [lab.id for lab in labs]}
+
+    kwargs = {gene_symbol_field + "__isnull": False, lab_field: labs}
+
 
     vc_qs = get_visible_classifications_qs(user, allele_origin_buckets=allele_origin_buckets).filter(**kwargs)
-    values_qs = vc_qs.values_list(gene_symbol_field, "clinical_significance", "classification__allele_info__allele")
+    values_qs = vc_qs.values_list(gene_symbol_field,
+                                  "published_evidence__clinical_significance__value",
+                                  "classification__allele_info__allele")
+
 
     gene_vus_count = defaultdict(Counter)
 
@@ -281,26 +294,39 @@ def get_lab_clinsig_gene_counts(user: User,
         for gene_symbol, clin_sig, allele in values_qs:
             gene_vus_count[gene_symbol][clin_sig] += 1
 
+    for gene in gene_vus_count.keys():
+        gene_vus_count[gene]['Total_VUS'] = sum(value for key,value in gene_vus_count[gene].items() if key.startswith('VUS'))
+
     genes_sorted = [gc for gc in sorted(gene_vus_count.items(),
-                                        key=lambda gene: gene[1]['3'],
+                                        key=lambda gene: gene[1]['Total_VUS'],
                                         reverse=True)]
 
     try:
-        inclusion_threshold = genes_sorted[max_groups-1][1]['3']
-        inclusion_index = len(genes_sorted) - [vc["3"] for _, vc in genes_sorted][::-1].index(inclusion_threshold)
+        inclusion_threshold = genes_sorted[max_groups-1][1]['Total_VUS']
+        inclusion_index = len(genes_sorted) - [vc['Total_VUS'] for _, vc in genes_sorted][::-1].index(inclusion_threshold)
     except IndexError:
         inclusion_index = len(genes_sorted)
 
     top_genes = [gene[0] for gene in genes_sorted][:inclusion_index]
 
     data = []
-    for cs, clinical_significance_label in ClinicalSignificance.LABELS.items():
-        if cs and cs != '0':
+    for cs in plot_order.keys():
+        if cs.startswith('VUS'):
             data.append({"x": top_genes,
                          "y": [gene_vus_count[i][cs] for i in top_genes],
-                         "name": clinical_significance_label,
+                         "name": plot_order[cs],
+                         "type": "bar",
+                         "visible": False})
+        elif cs != 'Total_VUS':
+            data.append({"x": top_genes,
+                         "y": [gene_vus_count[i][cs] for i in top_genes],
+                         "name": plot_order[cs],
+                         "type": "bar",
+                         "visible": 'legendonly'})
+        else:
+            data.append({"x": top_genes,
+                         "y": [gene_vus_count[i][cs] for i in top_genes],
+                         "name": plot_order[cs],
                          "type": "bar"})
-
-    data = sorted(data, key=lambda x: plot_order.index(x['name']))
 
     return data
