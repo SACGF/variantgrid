@@ -368,7 +368,10 @@ class ConditionResolved:
             return ConditionResolved(references=references, join=join, plain_text=plain_text)
         else:
             # old format with resolved terms and plain_text_terms
-            terms = list(sorted(OntologyTerm.get_or_stub_cached(term_dict.get("term_id")) for term_dict in condition_dict.get("resolved_terms")))
+            if resolved_terms := condition_dict.get("resolved_terms"):
+                terms = list(sorted(OntologyTerm.get_or_stub_cached(term_dict.get("term_id")) for term_dict in resolved_terms))
+            else:
+                terms = []
             plain_text_terms = condition_dict.get("plain_text_terms")
 
             return ConditionResolved.from_uncounted_terms(terms=terms, plain_text_terms=plain_text_terms, join=join, plain_text=plain_text)

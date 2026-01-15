@@ -7,21 +7,40 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 <div class="container">
+    <script>
+        function groupingFilter(data) {
+            data.lab_selection = {{ lab_picker_data.selection | jsonify }};
+            data.multi_context = $('#multi-context').is(":checked");
+        }
+        function filterGrid() {
+            $('#overlaps-table').DataTable().ajax.reload();
+        }
+        $(document).ready(() => {
+            $('#multi-context').change(() => {
+                filterGrid();
+            });
+        });
+    </script>
     <style>
+        .thick-border > tbody > tr > td, .thick-border > tbody tr:first-of-type > th {
+            border-top: 3px solid #dee2e6 !important;
+        }
         .dt-overlaps {
             width: 60%;
         }
     </style>
-    <script>
-        function groupingFilter(data) {
-            data.lab_selection = {{ lab_picker_data.selection | jsonify }};
-        }
-    </script>
     {% lab_picker data=lab_picker_data %}
+
+    <label class="form-check-label checkbox-row py-2 ml-4">
+         <input type="checkbox" class="form-check-input" id="multi-context" value="multi">
+         Show cross context overlaps
+    </label>
+
     <table
            data-datatable-data='groupingFilter'
            data-datatable-url="{% url 'overlaps2_datatables' %}"
-           class="sticky-header"
+           class="sticky-header thick-border"
+           id="overlaps-table"
            data-adjust-columns="false">
     </table>
 

@@ -606,11 +606,14 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
 
 
 @register.inclusion_tag("classification/tags/condition.html")
-def condition(condition_obj: Union[OntologyTerm, ConditionResolved],
+def condition(condition_obj: Union[OntologyTerm, ConditionResolved, dict],
               limit: Optional[int] = 100,
               show_link: Optional[bool] = True,
               no_condition_message: bool = False):
-    if isinstance(condition_obj, OntologyTerm):
+    if isinstance(condition_obj, dict):
+        print(condition_obj)
+        condition_obj = ConditionResolved.from_dict(condition_obj)
+    elif isinstance(condition_obj, OntologyTerm):
         condition_obj = ConditionResolved(terms=[condition_obj])
     return {"condition": condition_obj, "limit": limit, "show_link": show_link, "no_condition_message": no_condition_message}
 
@@ -746,7 +749,7 @@ def overlap(overlap: Overlap, admin_link: bool = True, show_value_type: bool = T
 
 # FIXME rename to OverlapContribution
 @register.inclusion_tag("classification/tags/overlap_contribution.html")
-def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompare, show_lab: bool = False):
+def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompare, show_lab: bool = False, show_context: bool = True):
     compare_overlap_status = None
     cross_context = False
 
@@ -758,6 +761,7 @@ def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompar
     return {
         "overlap_contribution": overlap_entry,
         "show_lab": show_lab,
+        "show_context": show_context,
         "compare_overlap_status": compare_overlap_status,
         "cross_context": cross_context
     }

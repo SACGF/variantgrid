@@ -225,7 +225,7 @@ class OverlapCalculatorBase(ABC):
     #     )
 
     @classmethod
-    def calculate_entries(cls, entries: list[OverlapContribution]) -> OverlapStatus:
+    def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapStatus:
         non_comparable_values: int = 0
         contributing: list[OverlapContribution] = []
         for entry in entries:
@@ -328,6 +328,7 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
 
     @classmethod
     def clinvar_to_contribution(cls, allele: Allele) -> Optional[OverlapContribution]:
+        # FIXME not used
         if clinvar_details := ClinVarDetails.instance_from(allele=allele):
             if clinvar_details.is_expert_panel_or_greater and clinvar_details.clinvar.highest_pathogenicity > 0:
                 clinvar_record_collection = ClinVarFetchRequest(
@@ -337,6 +338,8 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
                 if expert_panel := clinvar_record_collection.expert_panel:
                     value = expert_panel.clinical_significance
                     relevant_value = ClassificationResultValue.ONC_PATH and EvidenceKeyMap.clinical_significance_to_bucket().get(value) is not None
+                    effective_date = expert_panel.date_last_evaluated or expert_panel.date_clinvar_updated
+                    print(effective_date)
 
                     return OverlapContribution(
                         source=OverlapEntrySourceTextChoices.CLINVAR,
@@ -346,7 +349,7 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
                         classification_grouping_id=None,
                         value=value,
                         contribution=OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE,
-                        effective_date=(expert_panel.date_clinvar_updated or expert_panel.date_clinvar_created).isoformat()
+                        effective_date=effective_date
                     )
         return None
 
@@ -373,9 +376,9 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
         elif all_classification_values == {"P", "O"} or all_classification_values == {"LP", "LO"}:
             return OverlapStatus.TERMINOLOGY_DIFFERENCES
         elif len(all_bucket_values) == 1:
-            return  OverlapStatus.MINOR_DIFFERENCES
+            return OverlapStatus.MINOR_DIFFERENCES
         elif len(all_bucket_values) > 1:
-            if {"LP", "P", "LO", "O"} in all_bucket_values:
+            if 3 in all_bucket_values:
                 return OverlapStatus.MEDICALLY_SIGNIFICANT
             else:
                 return OverlapStatus.MAJOR_DIFFERENCES

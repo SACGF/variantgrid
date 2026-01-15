@@ -104,6 +104,10 @@ class AlleleOriginGrouping(TimeStampedModel):
     testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, default=TestingContextBucket.UNKNOWN)
     tumor_type_category = models.TextField(null=True, blank=True)
 
+    @property
+    def testing_context_bucket_obj(self):
+        return TestingContextBucket(self.testing_context_bucket)
+
     def __str__(self):
         return f"{self.allele_grouping.allele} {self.get_allele_origin_bucket_display()} Testing Context: {self.get_testing_context_bucket_display()} Sub-Type: {self.tumor_type_category}"
 
@@ -197,6 +201,13 @@ class ClassificationGrouping(TimeStampedModel):
         if clin_sig := self.latest_cached_summary.get("somatic").get("clin_sig"):
             parts.append(f"ClinSig({clin_sig})")
         return " ".join(parts)
+
+    @property
+    def category_text_compact(self) -> str:
+        parts = self.allele_origin_grouping.labels(include_allele_origin=True)
+        if parts[0] == "Somatic":
+            parts = parts[1:]
+        return " - ".join(p for p in parts if p)
 
     @property
     def testing_context(self) -> TestingContextBucket:

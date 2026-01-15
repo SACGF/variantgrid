@@ -22,12 +22,15 @@ class OverlapServices:
         {TestingContextBucket.GERMLINE, TestingContextBucket.HAEMATOLOGY, TestingContextBucket.SOLID_TUMOR}
     ]
 
-
     def calculate_and_apply_overlaps_for_allele(self, allele: Allele):
         print("FIXME: NOT RE-SUPPORTED YET")
 
     @staticmethod
     def update_classification_grouping_overlap_contribution(classification_grouping: ClassificationGrouping):
+        if classification_grouping.testing_context in {TestingContextBucket.OTHER, TestingContextBucket.UNKNOWN}:
+            # no conflicts for other
+            return
+
         value_types: list[ClassificationResultValue] = [ClassificationResultValue.ONC_PATH]
         if classification_grouping.testing_context != TestingContextBucket.GERMLINE:
             value_types.append(ClassificationResultValue.CLINICAL_SIGNIFICANCE)
@@ -115,7 +118,6 @@ class OverlapServices:
                         }
                     )
                     cross_context_overlap.contributions.add(overlap_contribution)
-
 
     @staticmethod
     def recalc_overlap(overlap: Overlap):

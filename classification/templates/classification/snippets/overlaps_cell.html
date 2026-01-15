@@ -1,41 +1,46 @@
 {% load classification_tags %}
 {% load ui_utils %}
-{% comment %}
-{% if value_type == "O" %}
-    {% clinical_significance value evidence_key='clinical_significance' %} <a class="my-1" data-href="{% url 'triage' classification_grouping.pk 'O' %}?edit=true" data-toggle="ajax-modal">Triage</a><br/>
-{% else %}
-    {% clinical_significance value evidence_key='somatic:clinical_significance' %} <a class="my-1" data-href="{% url 'triage' classification_grouping.pk 'S' %}?edit=true" data-toggle="ajax-modal">Triage</a>
-{% endif %}
-{% if value %}
-<hr style="border-top-style:dashed"/>
-{% endif %}
-{% endcomment %}
-{% if onc_path_entries %}
-    {% if classification_grouping.allele_origin_bucket == "G" %}
-        <label>Pathogenicity</label>
-    {% else %}
-        <label>Onco-Path</label>
+{% load js_tags %}
+
+{% for overlap_grouping in overlap_groupings %}
+    {% if overlap_grouping.same_context_overlap_status.is_attention or overlap_grouping.other_context_overlap_status.is_attention %}
+        <label style="color:#666; font-weight:bold" class="mb-1">{{ overlap_grouping.value_type.name | pretty_label:"lower" }}</label>
+        - {{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }} overlap : <span class="{% if overlap_grouping.same_context_overlap_status.is_attention %}text-danger{% endif %}">{{ overlap_grouping.same_context_overlap_status.name| pretty_label:"lower" }}</span>
+
+        {% if overlap_grouping.other_context_overlap_status.is_attention %}
+            , Cross overlap : <span class="text-danger">{{ overlap_grouping.other_context_overlap_status.name| pretty_label:"lower" }}</span>
+        {% endif %}
+
+        <table class="table" style="table-layout: fixed; width:100%">
+            <tbody>
+                <tr style="background-color:#f8f8f8">
+                    {% if multi_context %}
+                        <td><span class="testing-context-box testing-context-{{ overlap_grouping.user_contribution.testing_context_bucket_obj.value }}">{{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
+                    {% endif %}
+                    <td><b>{{  overlap_grouping.user_contribution.pretty_value }}</b> <a class="my-1" data-href="{% url 'triage'  overlap_grouping.user_contribution.classification_grouping.pk overlap_grouping.value_type %}?edit=true" data-toggle="ajax-modal">Triage</a></td>
+                    <td class="no-value">Your Lab</td>
+                    <td>{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}</td>
+                </tr>
+                {% for overlap_comparison in overlap_grouping.comparisons %}
+                    <tr {% if overlap_comparison.is_cross_context %}style="opacity:0.7"{% endif %}>
+                    {% if multi_context %}
+                        <td><span class="testing-context-box testing-context-{{ overlap_comparison.entry_2.testing_context_bucket_obj.value }}">{{ overlap_comparison.entry_2.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
+                    {% endif %}
+                    <td>{{ overlap_comparison.entry_2.pretty_value }}</td>
+
+                    <td>{% if overlap_comparison.entry_2.scv %}ClinVar Expert Panel<br/>{{ overlap_comparison.entry_2.scv }}{% else %}{{ overlap_comparison.entry_2.lab }}{% endif %}</td>
+                    <td>{% timestamp overlap_comparison.entry_2.effective_date time_ago=True %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     {% endif %}
-    <div><span class="testing-context-box testing-context-{{ classification_grouping.testing_context.value }}">{{ classification_grouping.testing_context.name | pretty_label:"lower" }}</span> <b>{{ classification_entry.pretty_value }}</b>
-        <span class="text-muted"> : Your value</span> <a class="my-1" data-href="{% url 'triage' classification_grouping.pk 'O' %}?edit=true" data-toggle="ajax-modal">Triage</a>
-    </div>
-    {% comment %}
-    {% for overlap in onc_path_overlaps %}<div>{% overlap overlap show_value_type=False admin_link=False %}</div>{% endfor %}
-    {% endcomment %}
-    {% for entry in onc_path_entries %}
-        <div>{% overlap_contribution entry show_lab=True %}</div>
-    {% endfor %}
-{% endif %}
-{% if clin_sig_entries %}
-    {% if onc_path_overlaps %}<br/>{% endif %}
-    <label>Clinical Signifiance</label>
-    <div><span class="testing-context-box testing-context-{{ classification_grouping.testing_context.value }}">{{ classification_grouping.testing_context.name | pretty_label:"lower" }}</span> <b>{{ clinical_significance_entry.pretty_value }}</b>
-        <span class="text-muted"> : Your value</span> <a class="my-1" data-href="{% url 'triage' classification_grouping.pk 'O' %}?edit=true" data-toggle="ajax-modal">Triage</a>
-    </div>
-    {% comment %}
-    {% for overlap in clin_sig_overlaps %}<div>{% overlap overlap show_value_type=False admin_link=False %}</div>{% endfor %}
-    {% endcomment %}
-    {% for entry in clin_sig_entries %}
-        <div>{% overlap_contribution entry show_lab=True %}</div>
-    {% endfor %}
-{% endif %}
+{% endfor %}
+
+{% comment %}
+{% if classification_grouping.allele_origin_bucket == "G" %}
+        <label style="color:#666; font-weight:bold" class="mb-1">Pathogenicity</label>
+    {% else %}
+        <label style="color:#666; font-weight:bold" class="mb-1">Onco-Path</label>
+    {% endif %}
+{% endcomment %}

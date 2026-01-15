@@ -28,13 +28,15 @@
                         <span {% if vcm.vc.withdrawn %}style="text-decoration: line-through"{% endif %}>{{ id_text }}</span>
                     </a>
                 </strong>
+                {% if mode == "split" %}<br/>{% endif %}
                 {% if show_condition %}
-                    - <span style="opacity:0.75">{% condition vcm.condition_resolution_obj_fallback limit=50 no_condition_message=True %}</span>
+                    {% if mode != "split" %}- {% endif %}<span style="opacity:0.75">{% condition vcm.condition_resolution_obj_fallback limit=50 no_condition_message=True %}</span>
                 {% endif %}
                 {% if show_criteria and vcm.classification.summary.criteria_labels %}
                     - <span class="text-monospace text-secondary">{% for crit in vcm.classification.summary.criteria_labels %}{% if not forloop.first %},{% endif %}{{ crit }}{% endfor %}</span>
                 {% endif %}
-                : {% timestamp vcm.curated_date_check.value time_ago=True tooltip=vcm.curated_date_check.name %} {% if vcm.curated_date_check.name %}<span class="text-secondary">{{ vcm.curated_date_check.name }}</span>{% endif %}
+                {% if mode == "split" %}<br/>
+                {% else %}: {% endif %}{% if vcm.curated_date_check.name %}<span class="text-secondary">{{ vcm.curated_date_check.name }}</span>{% timestamp vcm.curated_date_check.value time_ago=True tooltip=vcm.curated_date_check.name %}{% endif %}
             </span>
             {% if mode == "split" %}
                 <div>

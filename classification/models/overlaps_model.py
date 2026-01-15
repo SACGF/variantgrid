@@ -130,6 +130,9 @@ class OverlapContribution(TimeStampedModel):
     # TODO do we want to keep date type somewhere?
     effective_date = models.DateField(null=True, blank=True)
 
+    def __str__(self):
+        return f"{self.pk} {self.source} {self.value}"
+
     @property
     def testing_context_bucket_obj(self):
         return TestingContextBucket(self.testing_context_bucket)
