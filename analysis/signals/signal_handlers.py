@@ -1,8 +1,11 @@
+import logging
+
 from django.db import transaction
 
 from analysis.analysis_templates import auto_launch_analysis_templates_for_sample
 from analysis.tasks.variant_tag_tasks import variant_tag_created_task, variant_tag_deleted_in_analysis_task, \
     analysis_tag_nodes_set_dirty
+from snpdb.models import ImportStatus
 
 
 def variant_tag_create(sender, instance, created=False, **kwargs):
@@ -27,7 +30,9 @@ def handle_vcf_import_success(*args, **kwargs):
     vcf = kwargs["vcf"]
 
     for sample in vcf.sample_set.all():
-        auto_launch_analysis_templates_for_sample(vcf.user, sample)
+        auto_launch_analysis_templates_for_sample(vcf.user, sample,
+                                                  analysis_description="Auto Created from vcf_import_success signal",
+                                                  skip_already_analysed=True)
 
 
 def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
@@ -38,5 +43,12 @@ def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):
 
     if created:
         sample = instance
-        user = sample.vcf.user
-        auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=True)
+        if sample.import_status == ImportStatus.SUCCESS:
+            user = sample.vcf.user
+            auto_launch_analysis_templates_for_sample(user, sample,
+                                                      analysis_description="Auto Created from sample_gene_list_created signal",
+                                                      skip_already_analysed=True)
+        else:
+            logging.warning("Skipping auto analysis for sample: %s, import_status=%s",
+                            sample, sample.get_import_status_display())
+

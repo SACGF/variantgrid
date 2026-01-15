@@ -98,7 +98,7 @@ def get_cohort_analysis(cohort: Cohort, analysis_template: AnalysisTemplate) -> 
                                              cohort, "cohort")
 
 
-def get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):
+def _get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):
     if skip_already_analysed:
         if get_related_analysis_details_for_samples(user, [sample]):
             return []
@@ -115,16 +115,20 @@ def get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_ana
             analysis_templates.append(AnalysisTemplate.objects.get(name=analysis_template_name))
     return analysis_templates
 
-def auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):
-    for analysis_template in get_auto_launch_analysis_templates_for_sample(user, sample,
-                                                                           skip_already_analysed=skip_already_analysed):
+def auto_launch_analysis_templates_for_sample(user, sample, analysis_description=None, skip_already_analysed=False):
+    for analysis_template in _get_auto_launch_analysis_templates_for_sample(user, sample,
+                                                                            skip_already_analysed=skip_already_analysed):
         template_version = analysis_template.active
+        template_arguments = {"sample": sample}
         if template_version.requires_sample_gene_list:
             try:
-                sample.activesamplegenelist
+                template_arguments["sample_gene_list"] = sample.activesamplegenelist
             except ActiveSampleGeneList.DoesNotExist:
                 logging.warning("Skipping auto analysis '%s' for sample: %s. Will try again if QC Gene Lists created", analysis_template, sample)
                 continue
         template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, user=user)
-        template_run.populate_arguments({"sample": sample})
+        if analysis_description:
+            template_run.analysis.description = analysis_description
+            template_run.analysis.save()
+        template_run.populate_arguments(template_arguments)
         populate_analysis_from_template_run(template_run)
