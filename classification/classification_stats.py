@@ -1,6 +1,8 @@
 import operator
 from collections import Counter, defaultdict
-from typing import Optional, Any, Iterable
+from typing import Optional, Any, Iterable, TypedDict
+from dataclasses import dataclass
+from dataclasses_json import dataclass_json
 
 import numpy as np
 from django.conf import settings
@@ -235,11 +237,18 @@ def get_lab_gene_counts(user: User, lab: Lab):
 
     return gene_clinical_significance_counts
 
+@dataclass_json
+@dataclass
+class ClinSigCountData:
+    x: list[str]
+    y: list[int]
+    name: str
+    type: str
 
-def get_vus_lab_gene_counts(user: User,
-                            labs: set[Lab],
-                            max_groups: int = 10,
-                            allele_level: bool=False):
+def get_lab_clinsig_gene_counts(user: User,
+                                labs: set[Lab],
+                                max_groups: int = 10,
+                                allele_level: bool=False) -> list[ClinSigCountData]:
     """
     :param user: User used to check visibility of classifications
     :param labs: set of labs to get classifications counts for generated from LabPickerData
