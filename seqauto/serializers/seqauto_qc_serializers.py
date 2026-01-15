@@ -106,15 +106,20 @@ class QCGeneListCreateSerializer(serializers.ModelSerializer):
         fields = ("path", "qc", "gene_list")
 
     def create(self, validated_data):
+        path = validated_data["path"]
         qc_data = validated_data.pop("qc")
         qc = QCSerializer.get_object(qc_data)
         gene_list_data = validated_data.pop("gene_list")
         gene_list_text = ",".join(gene_list_data)
         custom_text_gene_list = QCGeneList.create_gene_list(gene_list_text,
                                                             sequencing_sample=qc.sequencing_sample)
+        defaults = {
+            "data_state": DataState.COMPLETE,
+            "custom_text_gene_list": custom_text_gene_list,
+        }
         instance, _created = QCGeneList.objects.update_or_create(qc=qc,
-                                                                 custom_text_gene_list=custom_text_gene_list,
-                                                                 defaults={"data_state": DataState.COMPLETE})
+                                                                 path=path,
+                                                                 defaults=defaults)
 
         # With API - whatever we sent is always the active one
         instance.link_samples_if_exist(force_active=True)
