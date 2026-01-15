@@ -208,7 +208,7 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         const phenotypeMatches = {{ patient_results | jsonify }};
         if (phenotypeMatches) {
             const descriptionBox = $("#description-highlighted", phenotypeEditorTag);
-            const phenotypeText = `{{ initial_phenotype_text }}`; // can have newlines
+            const phenotypeText = `{{ initial_phenotype_text|escapejs }}`; // can have newlines
             displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches);
             const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
             createTermGrid(gridData);
