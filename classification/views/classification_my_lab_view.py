@@ -32,7 +32,7 @@ def view_my_lab_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] =
 
     vus_present = any(
         len(d.get("x", [])) > 0
-        for d in gene_vus_count
+        for d in gene_clinsig_count
     )
 
     return render(request,
