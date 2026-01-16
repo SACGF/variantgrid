@@ -287,9 +287,11 @@ def get_lab_clinsig_gene_counts(user: User,
         for gene_symbol, clin_sig, allele in values_qs:
             if allele in seen_alleles:
                 continue
-            else:
+            elif clin_sig.startswith('VUS'):
                 seen_alleles.add(allele)
-                gene_vus_count[gene_symbol][clin_sig] += 1
+                gene_vus_count[gene_symbol]['VUS'] += 1
+            else:
+                continue
     else:
         for gene_symbol, clin_sig, allele in values_qs:
             gene_vus_count[gene_symbol][clin_sig] += 1
@@ -310,23 +312,30 @@ def get_lab_clinsig_gene_counts(user: User,
     top_genes = [gene[0] for gene in genes_sorted][:inclusion_index]
 
     data = []
-    for cs in plot_order.keys():
-        if cs.startswith('VUS'):
-            data.append({"x": top_genes,
-                         "y": [gene_vus_count[i][cs] for i in top_genes],
-                         "name": plot_order[cs],
-                         "type": "bar",
-                         "visible": False})
-        elif cs != 'Total_VUS':
-            data.append({"x": top_genes,
-                         "y": [gene_vus_count[i][cs] for i in top_genes],
-                         "name": plot_order[cs],
-                         "type": "bar",
-                         "visible": 'legendonly'})
-        else:
-            data.append({"x": top_genes,
-                         "y": [gene_vus_count[i][cs] for i in top_genes],
-                         "name": plot_order[cs],
-                         "type": "bar"})
+
+    if allele_level:
+        data.append({"x": top_genes,
+                     "y": [gene_vus_count[i]["VUS"] for i in top_genes],
+                     "name": "VUS",
+                     "type": "bar"})
+    else:
+        for cs in plot_order.keys():
+            if cs.startswith('VUS'):
+                data.append({"x": top_genes,
+                             "y": [gene_vus_count[i][cs] for i in top_genes],
+                             "name": plot_order[cs],
+                             "type": "bar",
+                             "visible": False})
+            elif cs != 'Total_VUS':
+                data.append({"x": top_genes,
+                             "y": [gene_vus_count[i][cs] for i in top_genes],
+                             "name": plot_order[cs],
+                             "type": "bar",
+                             "visible": 'legendonly'})
+            else:
+                data.append({"x": top_genes,
+                             "y": [gene_vus_count[i][cs] for i in top_genes],
+                             "name": plot_order[cs],
+                             "type": "bar"})
 
     return data

@@ -63,8 +63,22 @@
         {% endif %}
     }
 
+
+    function plotUniqueVUSCount(selector, title, width, height) {
+        {% if vus_present %}
+            let unique_vus_json = {{ unique_vus_count | jsonify }};
+            unique_vus_json[0]['marker'] = {"color": '#dddddd'}
+            let layout = {
+                title: "Unique VUS per Gene",
+                width: 1200,
+                height: 600}
+            Plotly.newPlot(selector, unique_vus_json, layout)
+        {% endif %}
+    }
+
     $(document).ready(() => {
-        plotGeneVusCount("vus-per-gene", "VUS per Genes");
+        plotGeneClinSigCount("vus-per-gene", "VUS per Genes");
+        plotUniqueVUSCount("unique-vus-per-gene", "Unique VUS per Gene");
     });
 </script>
 
@@ -76,5 +90,12 @@
         <div id='vus-per-gene'></div>
     </div>
 
-    <a href="{% url 'my_lab_download' lab_picker_data.selection %}" class="download-link" download>Dowload Plot Data</a>
+    <a href="{% url 'my_lab_download' lab_picker_data.selection %}" class="download-link" download>Download Classification per Gene Data</a>
+
+    <div class="row">
+        <div id="unique-vus-per-gene"></div>
+    </div>
+
+    <a href="{% url 'my_lab_download' lab_picker_data.selection %}?allele_level=true" class="download-link" download>Download Unique VUS per Gene Data</a>
+
 </div>
