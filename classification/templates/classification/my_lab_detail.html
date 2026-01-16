@@ -10,27 +10,23 @@
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 
 <script>
-    var PATHOGENIC_COLORS = ['#cccccc', // VUS
+
+    var PATHOGENIC_COLORS = ['#dddddd', // VUS Total
+                            '#dddddd', // VUS
+                            '#dddddd', // VUS C
+                            '#dddddd', // VUS B
+                            '#dddddd', // VUS A
                             '#7777ff', // Benign
                             '#aaaaff', // Likely benign
                             '#ffaaaa', // Likely pathogenic
                             '#ff7777', // pathogenic
                             ];
 
-    var PATHOGENIC_LABELS = ['VUS',
-                            'Benign',
-                            'Likely Benign',
-                            'Likely Pathogenic',
-                            'Pathogenic',
-    ];
-
-    var PATHOGENIC_DICT = dictFromLabelsAndValues(PATHOGENIC_LABELS, PATHOGENIC_COLORS);
-
-    function plotGeneVusCount(selector, title, width, height) {
+    function plotGeneClinSigCount(selector, title, width, height) {
         {% if vus_present %}
-        let gene_vus_json = {{ gene_vus_count | jsonify }};
-        for (var i=0 ; i < gene_vus_json.length ; ++i) {
-                gene_vus_json[i]["marker"] = {color : PATHOGENIC_COLORS[i]}}
+        let gene_clinsig_json = {{ gene_vus_count | jsonify }};
+        for (var i=0 ; i < gene_clinsig_json.length ; ++i) {
+                gene_clinsig_json[i]["marker"] = {color : PATHOGENIC_COLORS[i]}}
         let layout = {
             title: "Germline Classifications per Gene",
             width: 1200,
@@ -41,25 +37,33 @@
                     {
                         method: 'restyle',
                         label: 'Show All Classifications',
-                        args: [{visible: true}]
+                        args: [{'visible': [true, true, true, true],
+                                'marker.color': ['#7777ff', '#aaaaff', '#ffaaaa', '#ff7777']},
+                                [5, 6, 7, 8]],
+                        args2: [{'visible': ['legendonly', 'legendonly', 'legendonly', 'legendonly'],
+                                'marker.color': ['#7777ff', '#aaaaff', '#ffaaaa', '#ff7777']},
+                                [5, 6, 7, 8]]
                     },
                     {
                         method: 'restyle',
-                        label: 'Show VUS Counts',
-                        args: [{'visible': 'legendonly'}, [1, 2, 3, 4]]
+                        label: 'Show VUS Sub-Classes',
+                        args: [{'visible': [false, true, true, true, true],
+                                'marker.color': ['#dddddd', '#dddddd', '#e5e5ff', '#dddddd', '#eecccc']},
+                                [0, 1, 2, 3, 4]],
+                        args2: [{'visible': [true, false, false, false, false],
+                                'marker.color': ['#dddddd', '#dddddd', '#e5e5ff', '#dddddd', '#eecccc']},
+                                [0, 1, 2, 3, 4]]
                     }
                 ],
                 direction: 'left',
                 showactive: 'true',
                 type: 'buttons',
+                active: -1,
                 x: 0.6,
                 y: -0.1
             }]
         }
-        console.log(selector);
-        console.log(gene_vus_json);
-        console.log(layout);
-        Plotly.newPlot(selector, gene_vus_json, layout)
+        Plotly.newPlot(selector, gene_clinsig_json, layout)
         {% endif %}
     }
 
