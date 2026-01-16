@@ -21,6 +21,21 @@
 {% block content %}
     <div class="container">
         <h3>My Lab Statistics</h3>
+        {% page_help_embedded title="My Lab Stats" %}
+            This page contains graphs that show the top 10 genes with the most VUS for both total classifications and unique alleles.
+            By default the graphs display the top 10 genes, however, all genes with the same number of VUS as the 10th position gene will also be displayed.
+            Only germline classifications are currently displayed in these graphs.
+            <br/>
+            <br/>
+            The buttons below the total classifications graph allow you display classifications of all clinical significances for a gene and display VUS sub-classifications (VUS A, VUS B, VUS C).
+            <br/>
+            <br/>
+            To exclude specific clinical significance values from the plot, you can click on that value in the legend.
+            <br/>
+            <br/>
+            Plot data can be downloaded in CSV format from the links available below the graphs.
+        {% end_page_help_embedded %}
+
         {% lab_picker data=lab_picker_data %}
 
         <div data-toggle="ajax" href="{% url 'my_lab_detail' lab_picker_data.selection %}">
