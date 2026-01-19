@@ -279,7 +279,7 @@ def get_lab_clinsig_gene_counts(user: User,
                                   "classification__allele_info__allele")
 
 
-    gene_vus_count = defaultdict(Counter)
+    gene_vus_count: defaultdict[str, Counter[str]] = defaultdict(Counter)
 
     if allele_level:
         seen_alleles = set()
