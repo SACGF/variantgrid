@@ -4,30 +4,34 @@
 
 {% for overlap_grouping in overlap_groupings %}
     {% if overlap_grouping.same_context_overlap_status.is_attention or overlap_grouping.other_context_overlap_status.is_attention %}
-        <label style="color:#666; font-weight:bold" class="mb-1">{{ overlap_grouping.value_type.name | pretty_label:"lower" }}</label>
-        - {{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }} overlap : <span class="{% if overlap_grouping.same_context_overlap_status.is_attention %}text-danger{% endif %}">{{ overlap_grouping.same_context_overlap_status.name| pretty_label:"lower" }}</span>
-
-        {% if overlap_grouping.other_context_overlap_status.is_attention %}
-            , Cross overlap : <span class="text-danger">{{ overlap_grouping.other_context_overlap_status.name| pretty_label:"lower" }}</span>
-        {% endif %}
-
-        <table class="table" style="table-layout: fixed; width:100%">
+        <table class="table contribution-table" style="table-layout: fixed; width:100%">
             <tbody>
-                <tr style="background-color:#f8f8f8">
+                <tr class="users-contribution">
+                    <td class="overlap-summary" rowspan={{ overlap_grouping.contribution_count }}>
+                        <label style="color:#666; font-weight:bold" class="mb-1">{{ overlap_grouping.value_type.name | pretty_label:"lower" }}</label>
+                        <br/>{{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}
+                        <br/><span class="{% if overlap_grouping.same_context_overlap_status.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap_grouping.same_context_overlap_status.label | pretty_label:"lower" }}</span>
+
+                        {% if overlap_grouping.other_context_overlap_status.is_attention %}
+                            <br/><br/>Cross Contexts<br/><span class="text-danger">{{ overlap_grouping.other_context_overlap_status.name| pretty_label:"lower" }}</span>
+                        {% endif %}
+                    </td>
+
                     {% if multi_context %}
-                        <td><span class="testing-context-box testing-context-{{ overlap_grouping.user_contribution.testing_context_bucket_obj.value }}">{{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
+                        <td style="text-align:center"><span class="testing-context-box testing-context-{{ overlap_grouping.user_contribution.testing_context_bucket_obj.value }}">{{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
                     {% endif %}
                     <td><b>{{  overlap_grouping.user_contribution.pretty_value }}</b> <a class="my-1" data-href="{% url 'triage'  overlap_grouping.user_contribution.classification_grouping.pk overlap_grouping.value_type %}?edit=true" data-toggle="ajax-modal">Triage</a></td>
-                    <td class="no-value">Your Lab</td>
+                    <td>{% condition overlap_grouping.user_contribution.conditions %}</td>
+                    <td>{{ overlap_grouping.user_contribution.lab }}</td>
                     <td>{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}</td>
                 </tr>
                 {% for overlap_comparison in overlap_grouping.comparisons %}
                     <tr {% if overlap_comparison.is_cross_context %}style="opacity:0.7"{% endif %}>
                     {% if multi_context %}
-                        <td><span class="testing-context-box testing-context-{{ overlap_comparison.entry_2.testing_context_bucket_obj.value }}">{{ overlap_comparison.entry_2.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
+                        <td style="text-align:center"><span class="testing-context-box testing-context-{{ overlap_comparison.entry_2.testing_context_bucket_obj.value }}">{{ overlap_comparison.entry_2.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
                     {% endif %}
                     <td>{{ overlap_comparison.entry_2.pretty_value }}</td>
-
+                    <td>{% condition overlap_comparison.entry_2.conditions %}</td>
                     <td>{% if overlap_comparison.entry_2.scv %}ClinVar Expert Panel<br/>{{ overlap_comparison.entry_2.scv }}{% else %}{{ overlap_comparison.entry_2.lab }}{% endif %}</td>
                     <td>{% timestamp overlap_comparison.entry_2.effective_date time_ago=True %}</td>
                     </tr>

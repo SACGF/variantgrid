@@ -8,8 +8,12 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import TextChoices, JSONField, CASCADE
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
-from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys
-from classification.models import ClassificationGrouping, EvidenceKeyMap
+
+from annotation.models import ClinVarRecord
+from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, AlleleOriginBucket
+from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved
+from library.utils import first
+from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 
 
@@ -143,6 +147,17 @@ class OverlapContribution(TimeStampedModel):
             return classification_grouping.lab
         return None
 
+    @cached_property
+    def conditions(self) -> Optional[ConditionResolved]:
+        # TODO, should this be cached?
+        if classification_grouping := self.classification_grouping:
+            return ConditionResolved.from_dict(classification_grouping.conditions)
+        elif scv := self.scv:
+            if record := ClinVarRecord.objects.filter(record_id=scv).first():
+                if condition_strs := record.conditions:
+                    return ConditionResolved.from_uncounted_terms(terms=[OntologyTerm.get_or_stub(condition_str) for condition_str in condition_strs])
+        return None
+
     @property
     def pretty_value(self) -> str:
         if not self.value:
@@ -193,6 +208,14 @@ class Overlap(TimeStampedModel):
             return list(sorted([TestingContextBucket(t) for t in testing_contexts]))
         else:
             return []
+
+    @property
+    def testing_context(self) -> TestingContextBucket:
+        if len(self.testing_contexts_objs) == 1:
+            return first(self.testing_contexts_objs)
+        else:
+            raise ValueError("Overlap has multiple testing contexts")
+
 
     @property
     def priority_order(self) -> Any:

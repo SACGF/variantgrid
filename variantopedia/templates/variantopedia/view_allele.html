@@ -280,14 +280,6 @@
         </table>
 
     <h4>Classification Records</h4>
-    <script>
-        function classificationGroupingFilterExtra(data) {
-            data.allele_id = {{ allele.pk }};
-        }
-    </script>
-    {% for overlap in overlaps %}
-        <div>{% overlap overlap %}</div>
-    {% endfor %}
     {% comment %}
     {% for allele_origin_grouping_desc in allele_origin_groupings_desc %}
         <div>
@@ -317,6 +309,77 @@
         </div>
     {% endfor %}
     {% endcomment %}
+    <script>
+        let alleleOriginFilter = null;
+        let testingContextFilter = null;
+
+        function makeFilterBox(text) {
+            $('#classificationFilterBox').empty();
+            let box = $('<a>', {class: 'filter-item', text: text, onclick:"clearFilterBox()"});
+            $('#classificationFilterBox').append(box);
+        }
+        function clearFilterBox() {
+            alleleOriginFilter = null;
+            testingContextFilter = null;
+            $('#classificationFilterBox').empty();
+            classificationGroupingRedraw();
+        }
+
+        function filterAlleleOrigin(alleleOrigin, label) {
+            testingContextFilter = null;
+            alleleOriginFilter = alleleOrigin;
+            makeFilterBox(label);
+            classificationGroupingRedraw();
+        }
+        function filterTestingContext(testingContext, label) {
+            testingContextFilter = testingContext;
+            alleleOriginFilter = null;
+            makeFilterBox(label);
+            classificationGroupingRedraw();
+        }
+        function classificationGroupingFilterExtra(data) {
+            data.allele_id = {{ allele.pk }};
+            data.allele_origin = alleleOriginFilter;
+            data.testing_context = testingContextFilter;
+        }
+    </script>
+    <table class="table testing-context-table">
+        <thead>
+            <tr>
+                <th>Allele Origin</th>
+                <th>Testing Context</th>
+                <th>Value Type</th>
+                <th>Values</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for overlap in overlaps %}
+                <tr class="testing-context-{{ overlap.testing_context }}">
+                    <td class="allele-origin-{{ overlap.testing_context.allele_origin }}">{% ifchanged overlap.testing_context.allele_origin.label %}
+                        <a class="filter-link" onclick="filterAlleleOrigin('{{ overlap.testing_context.allele_origin }}', '{{ overlap.testing_context.allele_origin.label }}')">{{ overlap.testing_context.allele_origin.label }}</a>
+                    {% endifchanged %}</td>
+                    <td>{% ifchanged overlap.testing_context.label %}<a class="filter-link" onclick="filterTestingContext('{{ overlap.testing_context }}', '{{ overlap.testing_context.label }}')">{{ overlap.testing_context.label }}</a>{% endifchanged %}</td>
+                    <td>{{ overlap.value_type_label }}</td>
+                    <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}{{ value }}{% endfor %}</td>
+                    <td class="font-weight-bold"><span class="{% if overlap.overlap_status_obj.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.overlap_status_obj.label }}</td>
+                </tr>
+            {% endfor %}
+            {% for overlap in cross_overlaps %}
+                <tr class="testing-context-C">
+                    <td class="allele-origin-C">{% if forloop.first %}Cross Contexts{% endif %}</td>
+                    <td>
+                        {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}{{ testing_context.label }}</span>{% endfor %}
+                    </td>
+                    <td>{{ overlap.value_type_label }}</td>
+                    <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}{{ value }}{% endfor %}</td>
+                    <td class="font-weight-bold"><span class="{% if overlap.overlap_status_obj.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.overlap_status_obj.label }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div id="classificationFilterBox" class="filter-box"></div>
+
     {% if show_overall_diff %}
         <div>
             <span class="allele-origin-box horizontal allele-origin-A">
@@ -324,7 +387,8 @@
             </span>
             <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ allele.id }}&latest=true" title="Show differences between labs latest classifications across all allele origins">Show Diffs</a></div>
     {% endif %}
-    {% classification_groupings %}
+
+    {% classification_groupings show_allele_origin_filter=False %}
 
     <div class="mt-4">
         {% clinvar allele=allele expert_panel_only=True %}

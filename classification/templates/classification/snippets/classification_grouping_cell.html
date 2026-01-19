@@ -7,9 +7,11 @@
 {% load ui_utils %}
 {% load js_tags %}
 <div>
-    <span style="display:inline-block;margin-bottom:8px;padding-left:8px;padding-right:8px;" class="testing-context-box testing-context-{{ grouping.allele_origin_bucket }}">{{ grouping.category_text_compact }}</span>
+    <span style="display:inline-block;margin-bottom:8px;padding-left:8px;padding-right:8px;" class="testing-context-box testing-context-{{ grouping.allele_origin_bucket }}">{{ grouping.category_text_compact }}</span><br/>
     <a href="{{ grouping.allele.get_absolute_url }}">{% c_hgvs grouping.latest_allele_info.imported_c_hgvs_obj %}</a>
 </div>
+
+{% comment %}
 <div class="mb-1"><label> - Your Overlapping Record - </label></div>
 <div>{{ grouping.lab }}</div>
 <div></div>
@@ -18,6 +20,8 @@
     <span class="text-secondary">{% if grouping.latest_classification_modification.curated_date_check.name %}{{ grouping.latest_classification_modification.curated_date_check.name }}{% else %}Curated{% endif %}</span> :
     {% timestamp grouping.latest_classification_modification.curated_date_check.value time_ago=True tooltip=grouping.curated_date_check.name %}
 </div>
+{% endcomment %}
+
 {% comment %}
 <br/>
 <br/>

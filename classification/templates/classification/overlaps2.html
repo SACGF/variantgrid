@@ -24,16 +24,48 @@
     <style>
         .thick-border > tbody > tr > td, .thick-border > tbody tr:first-of-type > th {
             border-top: 3px solid #dee2e6 !important;
+            padding-bottom: 30px;
         }
+
+        .users-contribution, .users-contribution span.no-value {
+            font-weight:bold;
+        }
+
+        .users-contribution a {
+            font-weight: normal;
+        }
+
+        .contribution-table .users-contribution td {
+            border-top-width:0;
+        }
+
+        .contribution-table + .contribution-table .users-contribution td {
+            border-top-width: 1px;
+        }
+
+        .contribution-table + .contribution-table {
+            margin-top: 50px;
+        }
+
+        .contribution-table:not(:last-of-type) tr:last-of-type td {
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        td.overlap-summary {
+            background-color: #f4f4f4;
+            border-top-left-radius: 8px;
+            border-bottom-left-radius: 8px;
+        }
+
         .dt-overlaps {
-            width: 60%;
+            width: 80%;
         }
     </style>
     {% lab_picker data=lab_picker_data %}
 
     <label class="form-check-label checkbox-row py-2 ml-4">
-         <input type="checkbox" class="form-check-input" id="multi-context" value="multi">
-         Show cross context overlaps
+         <input type="checkbox" class="form-check-input" style="position:relative" id="multi-context" value="multi">
+        <span class="ml-1">Show cross context overlaps</span>
     </label>
 
     <table

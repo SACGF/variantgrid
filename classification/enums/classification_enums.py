@@ -77,6 +77,13 @@ class TestingContextBucket(TextChoices):
     def __lt__(self, other: Self) -> bool:
         return self.priority_order < other.priority_order
 
+    @property
+    def allele_origin(self) -> 'AlleleOriginBucket':
+        match self:
+            case TestingContextBucket.UNKNOWN: return AlleleOriginBucket.UNKNOWN
+            case TestingContextBucket.GERMLINE: return AlleleOriginBucket.GERMLINE
+            case _: return AlleleOriginBucket.SOMATIC
+
 
 class AlleleOriginBucket(TextChoices):
     GERMLINE = "G", "Germline"

@@ -119,7 +119,7 @@ class TriageView(AjaxFormView[ClassificationGroupingValueTriage]):
         all_overlaps = Overlap.objects.filter(contributions=contribution, valid=True)
         all_overlaping_groups = set()
         for overlap in all_overlaps:
-            all_overlaping_groups.update(ocg.classification_grouping for ocg in overlap.contributions.all())
+            all_overlaping_groups.update(ocg.classification_grouping for ocg in overlap.contributions.all() if ocg.classification_grouping)
 
         # TODO expert panels
 

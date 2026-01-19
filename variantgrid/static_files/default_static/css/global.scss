@@ -413,6 +413,40 @@ a {
 	background-image: url(/static/icons/view-details-black.png);
 }
 
+.filter-link {
+	color: #4444bb !important;
+	text-decoration: none;
+
+	&:hover {
+		cursor: pointer;
+		text-decoration: underline;
+	}
+	&:after {
+		content:'\f0b0';
+		position: relative;
+		right: -4px;
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+	}
+}
+.filter-item {
+	cursor: pointer;
+	display: inline-block;
+	padding: 4px 8px 4px 8px;
+	border: 1px solid #aaaaee;
+	border-radius: 12px;
+	&:hover {
+		text-decoration: none;
+	}
+	&:after {
+		position: relative;
+		right: -4px;
+		content: '\f057';
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+	}
+}
+
 .hover-link {
 	color: #4444bb !important;
 	text-decoration: none;
@@ -3023,6 +3057,37 @@ a.clinical-context {
 	color: #cc44cc;
 	font-weight: bold;
 }
+.testing-context-G td {
+	background-color: #ddffdd;
+}
+.testing-context-S td {
+
+	background-color: #ffd6ff;
+}
+.testing-context-H td {
+background-color: #ffddff;
+}
+.testing-context-N td {
+	background-color: #ffeeff;
+}
+td.allele-origin-G {
+	background-color: #ddffdd;
+}
+.testing-context-C td {
+	// C for cross context
+	background-color: #eeeeee;
+	opacity: 0.7;
+	color: #444444;
+}
+td.allele-origin-S {
+	background-color: #ffdcff;
+}
+.testing-context-table {
+	tbody tr td {
+		border-top-width: 0;
+	}
+}
+
 
 a .c-hgvs-body {
 

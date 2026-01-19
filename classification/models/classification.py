@@ -304,7 +304,7 @@ class ConditionResolved:
         if join := self.join:
             hash_value += hash(join)
         if references := self.references:
-            hash_value += reduce(operator.add, map(hash, self.references))
+            hash_value += reduce(operator.add, map(hash, references))
         return hash_value
 
     @property
