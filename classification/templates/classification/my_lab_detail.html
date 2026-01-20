@@ -25,10 +25,10 @@
     function plotGeneClinSigCount(selector, title, width, height) {
         {% if vus_present %}
         let gene_clinsig_json = {{ gene_vus_count | jsonify }};
-        for (var i=0 ; i < gene_clinsig_json.length ; ++i) {
+        for (let i=0 ; i < gene_clinsig_json.length ; ++i) {
                 gene_clinsig_json[i]["marker"] = {color : PATHOGENIC_COLORS[i]}}
         let layout = {
-            title: "Germline Classifications per Gene",
+            title: "Germline VUS per Gene",
             width: 1200,
             height: 600,
             barmode: 'stack',
@@ -36,7 +36,7 @@
                 buttons: [
                     {
                         method: 'restyle',
-                        label: 'Show All Classifications',
+                        label: 'Show All Clinical Significance Values',
                         args: [{'visible': [true, true, true, true],
                                 'marker.color': ['#7777ff', '#aaaaff', '#ffaaaa', '#ff7777']},
                                 [5, 6, 7, 8]],
@@ -87,8 +87,6 @@
 </script>
 
 <div class="my-4">
-
-    <p>{{ gene_vus_count | jsonify }}</p>
 
     <div class="row">
         <div id='vus-per-gene'></div>

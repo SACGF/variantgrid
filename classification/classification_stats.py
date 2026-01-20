@@ -244,6 +244,7 @@ class ClinSigCountData:
     y: list[int]
     name: str
     type: str
+    visible: bool | str | None
 
 def get_lab_clinsig_gene_counts(user: User,
                                 labs: set[Lab],
@@ -272,12 +273,10 @@ def get_lab_clinsig_gene_counts(user: User,
 
     kwargs = {gene_symbol_field + "__isnull": False, lab_field: labs}
 
-
     vc_qs = get_visible_classifications_qs(user, allele_origin_buckets=allele_origin_buckets).filter(**kwargs)
     values_qs = vc_qs.values_list(gene_symbol_field,
                                   "published_evidence__clinical_significance__value",
                                   "classification__allele_info__allele")
-
 
     gene_vus_count: defaultdict[str, Counter[str]] = defaultdict(Counter)
 

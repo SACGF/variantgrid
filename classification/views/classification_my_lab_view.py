@@ -20,15 +20,8 @@ def view_my_lab_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] =
     lab_picker = LabPickerData.from_request(request, lab_id)
     labs = lab_picker.lab_selection.selected_labs
 
-
-    # if allele_level := bool(request.GET.get('allele_level')):
-    #     gene_vus_count = get_lab_clinsig_gene_counts(user=request.user, labs=labs, allele_level=allele_level)
-    # else:
-    #     gene_vus_count = get_lab_clinsig_gene_counts(user=request.user, labs=labs)
-
     gene_clinsig_count = get_lab_clinsig_gene_counts(user=request.user, labs=labs)
     unique_vus_count = get_lab_clinsig_gene_counts(user=request.user, labs=labs, allele_level=True)
-
 
     vus_present = any(
         len(d.get("x", [])) > 0
@@ -119,4 +112,4 @@ def my_lab_download(request: HttpRequest, lab_id: Optional[Union[str, int]]= Non
                                                         filename="unique_VUS")
     else:
         return GeneClinSigCountDownload.streaming_csv(iter(gene_tuples),
-                                                  filename="trial_gene_vus")
+                                                      filename="total_classifications")
