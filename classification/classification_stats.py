@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
-from classification.enums import ClinicalSignificance, AlleleOriginBucket
+from classification.enums import ClinicalSignificance, AlleleOriginBucket, SpecialEKeys
 from classification.enums.classification_enums import CriteriaEvaluation
 from classification.models import EvidenceKeyMap
 from classification.models.classification import Classification, ClassificationModification
@@ -261,15 +261,14 @@ def get_lab_clinsig_gene_counts(user: User,
     lab_field = "classification__lab__in"
     allele_origin_buckets = AlleleOriginBucket.GERMLINE
     plot_order = {'Total_VUS': 'Total VUS',
-                  'VUS': 'VUS',
-                  'VUS_C': 'VUS C',
-                  'VUS_B': 'VUS B',
-                  'VUS_A': 'VUS A',
-                  'B': 'Benign',
-                  'LB': 'Likely Benign',
-                  'LP': 'Likely Pathogenic',
-                  'P': 'Pathogenic'}
-
+                  'VUS': EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value("VUS"),
+                  'VUS_C': EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value("VUS_C"),
+                  'VUS_B': EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value("VUS_B"),
+                  'VUS_A': EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value("VUS_A"),
+                  'B': EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value("B"),
+                  'LB': EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value("LB"),
+                  'LP': EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value("LP"),
+                  'P': EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value("P")}
 
     kwargs = {gene_symbol_field + "__isnull": False, lab_field: labs}
 
