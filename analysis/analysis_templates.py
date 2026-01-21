@@ -105,7 +105,7 @@ def auto_launch_analysis_templates_for_sample(user, sample, analysis_description
         template_arguments = {"sample": sample}
         if template_version.requires_sample_gene_list:
             try:
-                template_arguments["sample_gene_list"] = sample.activesamplegenelist
+                template_arguments["sample_gene_list"] = sample.activesamplegenelist.sample_gene_list
             except ActiveSampleGeneList.DoesNotExist:
                 logging.warning("Skipping auto analysis '%s' for sample: %s. Will try again if QC Gene Lists created", analysis_template, sample)
                 continue
