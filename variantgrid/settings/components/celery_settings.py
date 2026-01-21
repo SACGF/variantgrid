@@ -53,6 +53,8 @@ CELERY_SEQAUTO_WORKER_NAMES = ['seqauto_single_worker']
 
 CELERY_ROUTES = {
     # Analysis
+    'analysis.tasks.auto_analysis_tasks.auto_run_analyses_for_sample': ANALYSIS_WORKERS,
+    'analysis.tasks.auto_analysis_tasks.auto_run_analyses_for_vcf': ANALYSIS_WORKERS,
     'analysis.tasks.karyomapping_tasks.create_genome_karyomapping_for_trio': ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.dummy_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.update_node_task": ANALYSIS_WORKERS,
@@ -108,6 +110,7 @@ CELERY_ROUTES = {
 
 CELERY_IMPORTS = (
     'analysis.tasks.analysis_update_tasks',
+    'analysis.tasks.auto_analysis_tasks',
     'analysis.tasks.karyomapping_tasks',
     'analysis.tasks.node_update_tasks',
     'annotation.tasks.annotate_variants',

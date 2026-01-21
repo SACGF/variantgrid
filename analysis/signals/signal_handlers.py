@@ -3,11 +3,10 @@ import logging
 from django.db import transaction
 from django.db.models import Q
 
-from analysis.analysis_templates import auto_launch_analysis_templates_for_sample
 from analysis.models import TagNode, Analysis, Tag
+from analysis.tasks.auto_analysis_tasks import auto_run_analyses_for_vcf, auto_run_analyses_for_sample
 from analysis.tasks.variant_tag_tasks import analysis_tag_created_task, analysis_tag_deleted_task
 from snpdb.models import ImportStatus
-from library.guardian_utils import admin_bot
 
 
 def _analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag):
@@ -39,14 +38,13 @@ def variant_tag_delete(sender, instance, **kwargs):
 def handle_vcf_import_success(*args, **kwargs):
     vcf = kwargs["vcf"]
 
-    for sample in vcf.sample_set.all():
-        auto_launch_analysis_templates_for_sample(vcf.user, sample,
-                                                  analysis_description="Auto Created from vcf_import_success signal",
-                                                  skip_already_analysed=True)
+    # Launch tasks using celery, so that it doesn't take down the VCF import if something fails
+    celery_task = auto_run_analyses_for_vcf.si(vcf.pk, "Auto Created from vcf_import_success signal", skip_already_analysed=True)
+    celery_task.apply_async()
 
 
 def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
-    # At the moment, VCFs are sent up by API or found via sequencing scan BEFORE QCGeneLists
+    # At the moment, VCFs are sent up by API or found via sequencing scan can be imported BEFORE QCGeneLists
     # which become SampleGeneList/ActiveSampleGeneList
     # So the 1st time we called auto_launch it would have skipped the templates that requires_sample_gene_list
     # As they would have failed. Now we have them, try again to now run previously skipped
@@ -54,10 +52,10 @@ def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):
     if created:
         sample = instance.sample
         if sample.import_status == ImportStatus.SUCCESS:
-            user = sample.vcf.user
-            auto_launch_analysis_templates_for_sample(user, sample,
-                                                      analysis_description="Auto Created from sample_gene_list_created signal",
-                                                      skip_already_analysed=True)
+            # Launch tasks using celery, so that it doesn't take down the VCF import if something fails
+            celery_task = auto_run_analyses_for_sample.si(sample.pk, "Auto Created from sample_gene_list_created signal",
+                                                          skip_already_analysed=True)
+            transaction.on_commit(lambda: celery_task.apply_async())
         else:
             logging.warning("Skipping auto analysis for sample: %s, import_status=%s",
                             sample, sample.get_import_status_display())
