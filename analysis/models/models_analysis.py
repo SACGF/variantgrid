@@ -601,9 +601,12 @@ class AnalysisTemplateRun(TimeStampedModel):
 
     def check_populated(self):
         """ Throws exception if all AnalysisVariables not populated w/o error """
-        unpopulated = self._get_unset_or_errored_variables()
-        if unpopulated_fields := list(unpopulated.values_list("field", flat=True)):
-            raise ValueError(f"Missing/Errored analysis variables: {', '.join(unpopulated_fields)}")
+        problems = []
+        for variable_error in self._get_unset_or_errored_variables():
+            problems.append(f"{variable_error.field}: {variable_error.analysistemplaterunargument.error}")
+
+        if problems:
+            raise ValueError(f"Problem with Analysis Variables: {', '.join(problems)}")
 
     def populate_analysis_name(self):
         """ Populate analysis_name_template with params based on AnalysisVariable fields, and the magic values:
