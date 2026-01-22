@@ -4,7 +4,7 @@ from analysis.analysis_templates import auto_launch_analysis_templates_for_sampl
 from snpdb.models import VCF, Sample
 
 
-@celery.task
+@celery.shared_task
 def auto_run_analyses_for_sample(sample_id: int, analysis_description: str, skip_already_analysed: bool):
     sample = Sample.objects.get(pk=sample_id)
     user = sample.vcf.user
@@ -13,7 +13,7 @@ def auto_run_analyses_for_sample(sample_id: int, analysis_description: str, skip
                                               skip_already_analysed=skip_already_analysed)
 
 
-@celery.task
+@celery.shared_task
 def auto_run_analyses_for_vcf(vcf_id: int, analysis_description: str, skip_already_analysed: bool):
     vcf = VCF.objects.get(pk=vcf_id)
 
