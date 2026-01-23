@@ -10,7 +10,8 @@ from classification.enums import AlleleOriginBucket, EvidenceCategory, ShareLeve
     OverlapStatus
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
-    Classification, DiscordanceReport, OverlapContributionStatus, ClassificationResultValue
+    Classification, DiscordanceReport, ClassificationResultValue
+from classification.models.overlaps_enums import OverlapContributionStatus
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType

@@ -54,7 +54,7 @@ urlpatterns = [
     path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
     path('groupings/<int:classification_grouping_id>/records', views.view_classification_grouping_records_detail,
          name='classification_grouping_records_detail'),
-    path('groupings/<int:classification_grouping_id>/triage/<str:value_type>', TriageView.as_view(), name='triage'),
+    path('triage/<int:triage_id>/triage', TriageView.as_view(), name='triage'),
 
     path('allele_groupings', views.allele_groupings, name='allele_groupings'),
     path('allele_groupings/<str:lab_id>', views.allele_groupings, name='allele_groupings_lab'),

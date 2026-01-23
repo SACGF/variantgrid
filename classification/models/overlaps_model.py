@@ -1,73 +1,19 @@
-from dataclasses import dataclass
-from enum import StrEnum
 from functools import reduce, cached_property
-from typing import Any, TypedDict, Optional
+from typing import Any, Optional
 
-from dataclasses_json import dataclass_json
-from django.contrib.postgres.fields import ArrayField
-from django.db.models import TextChoices, JSONField, CASCADE
+from django.contrib.auth.models import User
+from django.db.models import CASCADE, QuerySet
 from django.db import models
+from django.db.models.enums import TextChoices
 from django_extensions.db.models import TimeStampedModel
-
 from annotation.models import ClinVarRecord
-from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, AlleleOriginBucket
-from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved
+from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys
+from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
+from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, TriageStatus, \
+    OverlapEntrySourceTextChoices
 from library.utils import first
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
-
-
-class OverlapType(TextChoices):
-    SINGLE_CONTEXT = "context", "Single Context"
-    CROSS_CONTEXT = "cross", "Cross Context"
-    CLINVAR_EXPERT_PANEL = "clinvar", "ClinVar Expert Panel"
-    # CROSS_GERMLINE_NON_CANCER = "cross_germ_non_cancer", "Cross Germline / Somatic Non-Cancer"
-    # CROSS_GERMLINE_HAEM = "cross_germ_haem", "Cross Germline / Somatic Haem"
-    # CROSS_GERMLINE_SOLID_TUMOR = "cross_germ_solid_tumor", "Cross Germline / Solid Tumour"
-    # CROSS_HAEM_SOLID_TUMOR = "cross_haem_solid_tumor", "Cross Haem / Solid Tumour"
-
-    @property
-    def priority_order(self) -> int:
-        match self:
-            case OverlapType.SINGLE_CONTEXT: return 1
-            case OverlapType.CLINVAR_EXPERT_PANEL: return 2
-            case OverlapType.CROSS_CONTEXT: return 3
-
-    def __lt__(self, other):
-        return self.priority_order < other.priority_order
-
-
-class ClassificationResultValue(TextChoices):
-    # FIXME should be called value type
-    ONC_PATH = "O", "Onco-Path"
-    CLINICAL_SIGNIFICANCE = "S", "Clinical significance"
-
-    @property
-    def priority_order(self) -> int:
-        match self:
-            case ClassificationResultValue.ONC_PATH: return 1
-            case ClassificationResultValue.CLINICAL_SIGNIFICANCE: return 2
-
-
-class OverlapContributionStatus(TextChoices):
-    PENDING_CALCULATION = "P", "Pending Calculation"
-    CONTRIBUTING = "C", "Contributing"
-    NOT_SHARED = "N", "Not-shared"
-    NO_VALUE = "X", "No value"
-    NON_COMPARABLE_VALUE = "Z", "Non-comparable value"  # e.g. Risk Factor
-
-
-class TriageStatus(TextChoices):
-    PENDING = "P", "Pending Triage"
-    REVIEWED_WILL_FIX = "F", "Will Amend"
-    REVIEWED_WILL_DISCUSS = "D", "For Joint Discussion"
-    REVIEWED_SATISFACTORY = "R", "Confident in Classification"
-    COMPLEX = "X", "Low Penetrance/Risk Allele etc"
-
-
-class OverlapEntrySourceTextChoices(TextChoices):
-    CLASSIFICATION = "CLASS", "CLASSIFICATION"
-    CLINVAR = "CLIN", "CLINVAR"
 
 
 # class OverlapEntrySource(StrEnum):
@@ -122,7 +68,7 @@ class OverlapEntrySourceTextChoices(TextChoices):
 
 class OverlapContribution(TimeStampedModel):
     source = models.TextField(choices=OverlapEntrySourceTextChoices.choices)
-    scv = models.TextField(null=True, blank=True) # could SCV change?
+    scv = models.TextField(null=True, blank=True)  # could SCV change?
     allele = models.ForeignKey(Allele, null=True, blank=True, on_delete=CASCADE)
     classification_grouping = models.ForeignKey(ClassificationGrouping, null=True, blank=True, on_delete=CASCADE)
     value_type = models.TextField(choices=ClassificationResultValue.choices)
@@ -133,6 +79,10 @@ class OverlapContribution(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)
     # TODO do we want to keep date type somewhere?
     effective_date = models.DateField(null=True, blank=True)
+
+    @property
+    def overlaps(self) -> QuerySet['Overlap']:
+        return Overlap.objects.filter(pk__in=self.overlapcontributionskew_set.values_list('overlap_id'))
 
     def __str__(self):
         return f"{self.pk} {self.source} {self.value}"
@@ -146,6 +96,16 @@ class OverlapContribution(TimeStampedModel):
         if classification_grouping := self.classification_grouping:
             return classification_grouping.lab
         return None
+
+    @property
+    def triage_status(self) -> TriageStatus:
+        # TODO if we make triaging more complicated than just a date
+        # we might want to
+        if classification_grouping := self.classification_grouping:
+            triage = classification_grouping.triage_for(self.value_type)
+            return triage.triage_status
+        else:
+            return TriageStatus.NON_INTERACTIVE_THIRD_PARTY
 
     @cached_property
     def conditions(self) -> Optional[ConditionResolved]:
@@ -177,20 +137,23 @@ class Overlap(TimeStampedModel):
     overlap_type = models.TextField(choices=OverlapType.choices)
     value_type = models.TextField(max_length=1, choices=ClassificationResultValue.choices)
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE, null=True, blank=True)  # might be blank for gene symbol wide
-    testing_contexts = ArrayField(models.TextField(max_length=1, choices=TestingContextBucket.choices), null=True, blank=True)
+    testing_context = models.TextField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
     overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_CONTRIBUTIONS.value)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
 
     # have to cache the values
-    contributions = models.ManyToManyField(OverlapContribution)
-
+    # contributions = models.ManyToManyField(OverlapContribution)
+    @property
+    def contributions(self) -> QuerySet[OverlapContribution]:
+        return OverlapContribution.objects.filter(pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True))
 
     class Meta:
         indexes = [models.Index(fields=['overlap_type']), models.Index(fields=['value_type']), models.Index(fields=['allele'])]
         # TODO, we could put lab back in for ClinVar type so we can have this unique
         # unique_together = ('overlap_type', 'allele', 'value_type', 'testing_contexts', 'tumor_type_category', 'lab')
 
+    @property
     def overlap_status_obj(self) -> OverlapStatus:
         return OverlapStatus(self.overlap_status)
 
@@ -203,19 +166,32 @@ class Overlap(TimeStampedModel):
         return value_type.label
 
     @property
-    def testing_contexts_objs(self) -> list[TestingContextBucket]:
-        if testing_contexts := self.testing_contexts:
-            return list(sorted([TestingContextBucket(t) for t in testing_contexts]))
-        else:
-            return []
+    def overlap_status_label(self):
+        label = self.overlap_status_obj.label
+        if self.overlap_type == OverlapType.CROSS_CONTEXT:
+            match self.overlap_status_obj:
+                case OverlapStatus.MAJOR_DIFFERENCES: return "Difference"
+                case OverlapStatus.MEDICALLY_SIGNIFICANT: return "Medically significant difference"
+                case _: return self.overlap_status_obj.label
+        return self.overlap_status_obj.label
 
     @property
-    def testing_context(self) -> TestingContextBucket:
-        if len(self.testing_contexts_objs) == 1:
-            return first(self.testing_contexts_objs)
+    def testing_contexts_objs(self) -> list[TestingContextBucket]:
+        if testing_context := self.testing_context:
+            return [TestingContextBucket(testing_context)]
         else:
-            raise ValueError("Overlap has multiple testing contexts")
+            testing_contexts = set()
+            for contribution in self.contributions.filter(contribution=OverlapContributionStatus.CONTRIBUTING).all():
+                testing_contexts.add(TestingContextBucket(contribution.testing_context_bucket))
 
+            return list(sorted(testing_contexts))
+
+    @property
+    def testing_context_obj(self) -> TestingContextBucket:
+        if testing_contexts_objs := self.testing_contexts_objs:
+            if len(testing_contexts_objs):
+                return first(testing_contexts_objs)
+        raise ValueError("Overlap has multiple testing contexts")
 
     @property
     def priority_order(self) -> Any:
@@ -264,13 +240,29 @@ class Overlap(TimeStampedModel):
         #             relevant_values.add(value)
 
         if self.value_type == ClassificationResultValue.ONC_PATH:
-            return list(EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(relevant_values))
+            return list(EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(relevant_values))[::-1]
         elif self.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
             somatic_clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-            return [somatic_clin_sig_e_key.pretty_value(val) for val in somatic_clin_sig_e_key.sort_values(relevant_values)]
+            return [somatic_clin_sig_e_key.pretty_value(val) for val in somatic_clin_sig_e_key.sort_values(relevant_values)][::-1]
         else:
             return []
 
+
+class TriageNextStep(TextChoices):
+    PENDING_CALCULATION = "X", "Pending Calculation"
+    UNANIMOUSLY_COMPLEX = "C", "Unanimously Complex"
+    AWAITING_YOUR_TRIAGE = "T", "Awaiting Your Triage"
+    AWAITING_YOUR_AMEND = "A", "Awaiting Your Amendment"
+    AWAITING_OTHER_LAB = "O", "Awaiting Other Lab"
+    TO_DISCUSS = "D", "To Discuss"
+    NOT_INVOLVED = "N", "Not Involved"
+
+
+# this should be the model that links Contributions to Overlaps to reduce redundancy
+class OverlapContributionSkew(TimeStampedModel):
+    overlap = models.ForeignKey(Overlap, on_delete=CASCADE)
+    contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
+    skew_perspective = models.TextField(max_length=1, choices=TriageNextStep.choices, default=TriageNextStep.PENDING_CALCULATION)
 
 #
 # @dataclass
@@ -332,5 +324,30 @@ class ClassificationGroupingValueTriage(TimeStampedModel):
     new_value = models.TextField(null=True, blank=True)
     triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
 
+    @cached_property
+    def contribution(self) -> OverlapContribution:
+        return OverlapContribution.objects.filter(classification_grouping=self.classification_grouping, value_type=self.result_value_type).get()
+
+    @property
+    def triage_status_obj(self):
+        return TriageStatus(self.triage_status)
+
     class Meta:
         unique_together = ('classification_grouping', 'result_value_type')
+
+
+class ClassificationGroupingValueTriageHistory(TimeStampedModel):
+    triage = models.ForeignKey(ClassificationGroupingValueTriage, on_delete=models.CASCADE)
+    new_value = models.TextField(null=True, blank=True)
+    triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
+    comment = models.TextField(null=True, blank=True)
+    user = models.ForeignKey(User, null=False, blank=False, on_delete=models.PROTECT)
+    state_data = models.JSONField(null=True, blank=True)  # For caching state of the Overlaps at the time
+
+    @property
+    def result_value_type(self):
+        return self.triage.result_value_type
+
+    @property
+    def triage_status_obj(self):
+        return TriageStatus(self.triage_status)

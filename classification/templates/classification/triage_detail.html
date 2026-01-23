@@ -2,110 +2,116 @@
 {% load crispy_forms_tags %}
 {% load user_tags %}
 {% load classification_tags %}
+{% load js_tags %}
 {% if mode == "inline" %}
     INLINE
 {% else %}
-    <form data-toggle="ajax-form" method="POST" action="{% url 'triage' classification_grouping.pk value_type %}?edit=true&mode={{ mode }}">
-    <div class="card-header">Triage</div>
+    <form data-toggle="ajax-form" method="POST" action="{% url 'triage' triage.pk %}?edit=true&mode={{ mode }}">
+    <div class="card-header">
+        {% if value_type == "O" %}Onco-Path{% elif value_type == "S" %}Clinical Significance{% endif %}
+        Triage
+    </div>
     <div class="card-body">
         {% include "uicore/messages/messages.html" %}
-        Triage stuff will go here
-        {% labelled label="Other Submissions" %}
+
+        {% labelled label="Submissions Submissions" %}
+            <table class="table contribution-table" style="table-layout: fixed; width:100%">
+                <tbody>
+                    <tr class="users-contribution">
+                        <td style="text-align:center"><span class="testing-context-box testing-context-{{ overlap_grouping.user_contribution.testing_context_bucket_obj.value }}">{{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
+                        <td><b>{{  overlap_grouping.user_contribution.pretty_value }}</b> {% triage overlap_grouping.user_triage %}</td>
+                        <td>{% condition overlap_grouping.user_contribution.conditions %}</td>
+                        <td>{{ overlap_grouping.user_contribution.lab }}</td>
+                        <td>{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}</td>
+                    </tr>
+                {% for overlap_comparison in overlap_grouping.comparisons %}
+                    <tr {% if overlap_comparison.is_cross_context %}style="opacity:0.7"{% endif %}>
+                        <td style="text-align:center"><span class="testing-context-box testing-context-{{ overlap_comparison.entry_2.testing_context_bucket_obj.value }}">{{ overlap_comparison.entry_2.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
+                        <td>{{ overlap_comparison.entry_2.pretty_value }} {% if overlap_comparison.triage %}{% triage overlap_comparison.triage %}{% endif %}</td>
+                        <td>{% condition overlap_comparison.entry_2.conditions %}</td>
+                        <td>{% if overlap_comparison.entry_2.scv %}ClinVar Expert Panel<br/>{{ overlap_comparison.entry_2.scv }}{% else %}{{ overlap_comparison.entry_2.lab }}{% endif %}</td>
+                        <td>{% timestamp overlap_comparison.entry_2.effective_date time_ago=True %}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% comment %}
             {% for alternative_grouping in alternative_groupings %}
                 <div class="my-1">{% classification_quick alternative_grouping.latest_classification_modification show_category=True show_share_level=False %}</div>
                 {% if not forloop.last %}<hr/>{% endif %}
             {% endfor %}
+            {% endcomment %}
         {% endlabelled %}
-        <hr/>
-        {% labelled label="Your Submission" %}
-            <div class="y-1">{% classification_quick classification_grouping.latest_classification_modification show_category=True show_share_level=False %}</div>
-        {% endlabelled %}
-{#        {% labelled label="New Value" %}#}
-{#            <select class="form-control" name="new-value" id="triage-new-value">#}
-{#                <option value="no-chance">No Change</option>#}
-{#                {% for option in evidence_key.virtual_options %}#}
-{#                    <option value="{{ option.value }}">{{ option.label }}</option>#}
-{#                {% endfor %}#}
-{#            </select>#}
-{#        {% endlabelled %}#}
-        {% if form %}
-        {% crispy form form_helper.horizontal %}
-        {% endif %}
 
-        {% labelled label="Comment" %}
-            <textarea class="form-control" rows="3" id="comment" name="comment"></textarea>
-        {% endlabelled %}
+        <label class="w-100 text-center">History</label>
+        {% for linked_history in overlap_grouping.history %}
+            <div class="row my-4">
+                <div class="col-3 text-right">
+                    <div>{% timestamp linked_history.history.created time_ago=True %}</div>
+                    <div class="mt-1">{% user linked_history.history.user size="tiny" %}</div>
+                </div>
+                <div class="col-9 text-left">
+                    {% ifchanged linked_history.triage.classification_grouping %}
+                    <div>
+                        {% with contribution=linked_history.triage.contribution %}
+                            <div style="display:flex; width: 600px">
+                                <div>
+                                <span class="testing-context-box testing-context-{{ contribution.testing_context_bucket_obj.value }}">{{ contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span>
+                                </div>
+                                <div class="mx-2">
+                                    <b>{{ contribution.pretty_value }}</b>
+                                </div>
+                                <div class="mx-2">
+                                    {% condition contribution.conditions %}
+                                </div>
+                                <div class="mx-2">
+                                    {{ contribution.lab }}
+                                </div>
+                            </div>
+                        {% endwith %}
+                    </div>
+                    {% endifchanged %}
+                    <div>
+                        {% if linked_history.previous_history %}
+                            {% triage linked_history.previous_history show_label=True %} -> {% triage linked_history.history show_label=True %}
+                        {% else %}
+                            {% triage linked_history.history show_label=True %}
+                        {% endif %}
+                    </div>
+                    <div class="mt-1">{{ linked_history.history.comment }}</div>
+                </div>
+            </div>
+            {% if not forloop.last %}<hr/>{% endif %}
+        {% endfor %}
+        <hr/>
+
+        {% if form %}
+            <label class="w-100 text-center">Update</label>
+            {% crispy form form_helper.horizontal %}
+            <script>
+                function triage_status_updated() {
+                    let value = $('input[name="triage_status"]:checked').val();
+                    let willAmend = value == "F";
+                    if (willAmend) {
+                        $('#div_id_new_value').show();
+                    } else {
+                        $('#div_id_new_value').hide();
+                    }
+                }
+                $(document).ready(() => {
+                    triage_status_updated();
+                    $('input[name="triage_status"]').change(() => {
+                        triage_status_updated();
+                    });
+                });
+            </script>
+        {% endif %}
     </div>
+    {% if form %}
     <div class="card-footer">
         <input type="submit" class="btn btn-primary" value="Submit">
     </div>
+    {% endif %}
     </form>
 
-    {% comment %}
-    <div class="card-header">{{ triage.lab }} {% admin_link triage %}</div>
-    {% if form %}
-        <style>
-            .triage-form input[value="P"] + label {
-                color: #888 !important;
-            }
-        </style>
-        <form data-toggle="ajax-form" method="POST" action="{% url 'discordance_report_triage_detail' triage.pk %}?edit=true&mode={{ mode }}">
-            <div class="card-body">
-                {% labelled label="Editing By" %}{% user user size="tiny" %}{% endlabelled %}
-                <div class="triage-form">
-                {% crispy form form_helper.horizontal %}
-                </div>
-            </div>
-            <div class="card-footer">
-                <input type="submit" class="btn btn-primary" />
-            </div>
-        </form>
-    {% else %}
-        {% load ui_utils %}
-        {% load js_tags %}
-        {% load crispy_forms_tags %}
-        <div class="card-body">
-            {% labelled label="Triage Status" %}
-                {% if triage.triage_status == "P" %}<span class="no-value">Pending</span>{% else %}
-                {{ triage.get_triage_status_display }}
-                {% endif %}
-            {% endlabelled %}
-            {% if triage.triage_date %}
-                {% labelled label="Triage Date" %}{{ triage.triage_date | date:'Y-m-d' }}{% endlabelled %}
-            {% endif %}
-            {% if triage.user %}
-                {% labelled label="Last Update By" %}{% user triage.user size="tiny" %}{% endlabelled %}
-            {% endif %}
-            {% if triage.note %}
-                {% labelled label="Note" %}{{ triage.note }}{% endlabelled %}
-            {% endif %}
-            <div class="container">{% include "uicore/messages/messages.html" %}</div>
-            {% if saved %}
-                Warning this is duplicated in discordance_report.html
-                <div data-replace="#discordance-report-discussion">
-                    {% if next_step == "D" %}
-                        <div class="card">
-                            <div class="card-header">Discussion</div>
-                            <div class="card-body">
-                                <div class="no-value">This Discordance Report has not yet been discussed.</div>
-                            </div>
-                            <div class="card-footer">
-                                <a class="mt-2 btn btn-primary" href="{% url 'discordance_report_review' report.pk %}">Start Discordance Discussion</a>
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="no-value">This discordance isn't marked as ready for discussion - see triages. <a class="hover-link" href="{% url 'discordance_report_review' report.pk %}">Click here to discuss anyway.</a></div>
-                    {% endif %}
-                </div>
-            {% endif %}
-        </div>
-        {% if not read_only %}
-            {% if_user_can_edit triage %}
-                <div class="card-footer">
-                    <a class="btn btn-primary" data-toggle="embed-content" href="{% url 'discordance_report_triage_detail' triage.pk %}?edit=true">Edit</a>
-                </div>
-            {% end_if_user_can_edit %}
-        {% endif %}
-    {% endif %}
-    {% endcomment %}
 {% endif %}

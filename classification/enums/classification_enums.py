@@ -38,7 +38,7 @@ class OverlapStatus(IntegerChoices):
     TERMINOLOGY_DIFFERENCES = 40, "Terminology differences"  # e.g. P vs O
     RESOLUTION_DIFFERENCES = 50, "Resolution differences"  # e.g. VUS vs VUS_B
     MINOR_DIFFERENCES = 60, "Minor differences"  # e.g. VUS_A vs VUS_B, Pathogenic versus Likely Pathogenic
-    TIER_1_VS_TIER_2_DIFFERENCES = 70, "Tier 1 vs Tier 2 Differences"  # special category for tier_1 vs tier_2
+    TIER_1_VS_TIER_2_DIFFERENCES = 70, "Tier 1 vs Tier 2 differences"  # special category for tier_1 vs tier_2
     MAJOR_DIFFERENCES = 80, "Discordance"  # VUS vs Benign
     MEDICALLY_SIGNIFICANT = 90, "Medically significant discordance"  # VUS vs Pathogenic
 

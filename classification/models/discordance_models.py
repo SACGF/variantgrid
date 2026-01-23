@@ -12,6 +12,7 @@ from django.db.models import TextChoices
 from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 
 from classification.enums.classification_enums import SpecialEKeys

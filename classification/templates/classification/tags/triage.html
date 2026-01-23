@@ -1,0 +1,2 @@
+{{ triage.triage_status_obj.icon }}{% if show_label %} <i>{{ triage.triage_status_obj.label }}</i>{% endif %}{% if new_value %} <i>(<span style="color:#888">{{ new_value }}</span>)</i>{% endif %}
+{% if show_link %} <a href="{% url 'triage' triage.pk %}?edit=true" data-toggle="ajax-modal">Triage</a>{% endif %}

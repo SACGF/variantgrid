@@ -18,6 +18,7 @@ from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, T
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved, ConditionReference
+from classification.models.overlaps_enums import ClassificationResultValue
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
 from genes.models import GeneSymbol
@@ -186,6 +187,14 @@ class ClassificationGrouping(TimeStampedModel):
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
     latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
+
+    def triage_for(self, value_type: ClassificationResultValue) -> 'ClassificationGroupingValueTriage':
+        from classification.models import ClassificationGroupingValueTriage
+        triage, _ = ClassificationGroupingValueTriage.objects.get_or_create(
+            classification_grouping=self,
+            result_value_type=value_type
+        )
+        return triage
 
     def __str__(self):
         parts = [

@@ -5,8 +5,9 @@ from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.models import ClinVarRecord
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.enums import TestingContextBucket, OverlapStatus
-from classification.models import ClassificationResultValue, OverlapType, Overlap, ClassificationSummaryCacheDict, \
-    OverlapContributionStatus, EvidenceKeyMap, OverlapContribution, OverlapEntrySourceTextChoices
+from classification.models import ClassificationResultValue, Overlap, ClassificationSummaryCacheDict, \
+    EvidenceKeyMap, OverlapContribution
+from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices
 from library.utils import first
 from snpdb.models import Allele
 

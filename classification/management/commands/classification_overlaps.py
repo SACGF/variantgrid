@@ -4,7 +4,8 @@ from annotation.models import ClinVarRecordCollection
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import TestingContextBucket
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
-    EvidenceKeyMap, OverlapEntrySourceTextChoices, OverlapContributionStatus
+    EvidenceKeyMap
+from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices
 from classification.services.overlaps_services import OverlapServices
 
 
@@ -49,5 +50,5 @@ class Command(BaseCommand):
                     effective_date=effective_date
                 )
                 OverlapServices.link_overlap_contribution(contribution)
-                for overlap in contribution.overlap_set.all():
-                    OverlapServices.recalc_overlap(overlap)
+                for skew in contribution.overlapcontributionskew_set.select_related('overlap').all():
+                    OverlapServices.recalc_overlap(skew.overlap)

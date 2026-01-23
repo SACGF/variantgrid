@@ -17,7 +17,8 @@ from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
     EvidenceMixin, ClassificationSummaryCacheDictPathogenicity, Overlap, ClassificationGroupingEntry, \
-    OverlapContribution, ClassificationSummaryCacheDictSomatic
+    OverlapContribution, ClassificationSummaryCacheDictSomatic, ClassificationGroupingValueTriage, \
+    ClassificationGrouping, ClassificationGroupingValueTriageHistory, ClassificationResultValue, TriageStatus
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -27,7 +28,7 @@ from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
-from classification.views.overlaps_grouped_datatables import OverlapEntryCompare
+from classification.services.overlaps_services import OverlapEntryCompare
 from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
@@ -311,7 +312,7 @@ def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizonta
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
 def classification_quick(context,
-                         vc: Union[Classification, ClassificationModification],
+                         vc: Union[Classification, ClassificationModification, ClassificationGrouping],
                          show_share_level=True,
                          show_id=True,
                          show_lab=True,
@@ -326,6 +327,9 @@ def classification_quick(context,
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
+        vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
+    elif isinstance(vc, ClassificationGrouping):
+        vc = vc.latest_classification_modification.classification
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
 
     id_texts = []
@@ -765,3 +769,27 @@ def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompar
         "compare_overlap_status": compare_overlap_status,
         "cross_context": cross_context
     }
+
+
+@register.inclusion_tag("classification/tags/triage.html", takes_context=True)
+def triage(context,
+           triage: Union[ClassificationGroupingValueTriage | ClassificationGroupingValueTriageHistory],
+           show_label: bool = False,
+           show_link: bool = False
+           ):
+    new_value = None
+    if show_link and isinstance(triage, ClassificationGroupingValueTriageHistory):
+        raise ValueError("can't show_link on Triage History")
+
+    if triage.triage_status_obj == TriageStatus.REVIEWED_WILL_FIX:
+        new_value = triage.new_value
+        value_type = triage.result_value_type
+
+        if new_value == 'undecided':  # fixme standardise terminology
+            new_value = "To Be Determined"
+        elif value_type == ClassificationResultValue.ONC_PATH:
+            new_value = EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).pretty_value(new_value)
+        elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+            new_value = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(new_value)
+
+    return {"triage": triage, "new_value": new_value, "show_label": show_label, "show_link": show_link}

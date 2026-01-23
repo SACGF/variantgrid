@@ -115,19 +115,28 @@ function enhanceAndMonitor() {
         }},
 
         {test: 'form[data-toggle="ajax-form"]', func: (node) => {
+            console.log("FOUND AJAX FORM");
             let $node = $(node);
+            // if ($node.attr('ajaxed')) {
+            //     return;
+            // }
+            // $node.attr('ajaxed', 'true');
             let wrapper = $node.closest(".modal-content, .embed-wrapper");
-            $node.submit(function() { // catch the form's submit event
+            $node.on('submit', function(event) { // catch the form's submit event
+                console.log("Submitting");
+                event.preventDefault(event);
                 let $this = $(this);
                 $.ajax({ // create an AJAX call...
                     data: $this.serialize(), // get the form data
                     type: $this.attr('method'), // GET or POST
                     url: $this.attr('action'), // the file to call
                     success: function(response) { // on success..
+                        console.log("Success");
                         wrapper.html(response); // update the DIV
                         if (wrapper.hasClass("modal-content")) {
                             cardToModal(wrapper);
                         }
+                        return false;
                     }
                 });
                 return false;
