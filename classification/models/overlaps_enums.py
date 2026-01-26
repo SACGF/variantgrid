@@ -46,7 +46,7 @@ class TriageStatus(TextChoices):
     PENDING = "P", "Pending Triage"
     REVIEWED_WILL_FIX = "F", "Will Amend"
     REVIEWED_WILL_DISCUSS = "D", "For Joint Discussion"
-    REVIEWED_SATISFACTORY = "R", "Confident in Classification"
+    REVIEWED_SATISFACTORY = "R", "Confident in Value"
     COMPLEX = "X", "Low Penetrance/Risk Allele etc"
     NON_INTERACTIVE_THIRD_PARTY = "Z", "Non-Interactive Party"
 

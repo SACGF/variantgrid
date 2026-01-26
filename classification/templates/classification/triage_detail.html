@@ -72,10 +72,12 @@
                     </div>
                     {% endifchanged %}
                     <div>
-                        {% if linked_history.previous_history %}
-                            {% triage linked_history.previous_history show_label=True %} -> {% triage linked_history.history show_label=True %}
-                        {% else %}
-                            {% triage linked_history.history show_label=True %}
+                        {% if linked_history.status_changed %}
+                            {% if linked_history.previous_history %}
+                                {% triage linked_history.previous_history show_label=True %} -> {% triage linked_history.history show_label=True %}
+                            {% else %}
+                                {% triage linked_history.history show_label=True %}
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div class="mt-1">{{ linked_history.history.comment }}</div>

@@ -117,10 +117,10 @@ function enhanceAndMonitor() {
         {test: 'form[data-toggle="ajax-form"]', func: (node) => {
             console.log("FOUND AJAX FORM");
             let $node = $(node);
-            // if ($node.attr('ajaxed')) {
-            //     return;
-            // }
-            // $node.attr('ajaxed', 'true');
+            if ($node.attr('ajaxed')) {
+                return;
+            }
+            $node.attr('ajaxed', 'true');
             let wrapper = $node.closest(".modal-content, .embed-wrapper");
             $node.on('submit', function(event) { // catch the form's submit event
                 console.log("Submitting");

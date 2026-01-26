@@ -24,11 +24,11 @@
                         <td style="text-align:center"><span class="testing-context-box testing-context-{{ overlap_grouping.user_contribution.testing_context_bucket_obj.value }}">{{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
                     {% endif %}
                     <td><b>{{  overlap_grouping.user_contribution.pretty_value }}</b>
-                        {% triage overlap_grouping.user_triage show_link=True %}
+                        <div class="mt-1"><span style="font-weight:normal">{% triage overlap_grouping.user_triage show_link=True show_label=True %}</span></div>
                     </td>
                     <td>{% condition overlap_grouping.user_contribution.conditions %}</td>
                     <td>{{ overlap_grouping.user_contribution.lab }}</td>
-                    <td>{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}</td>
+                    <td class="date-column">{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}</td>
                 </tr>
 
                 {% for overlap_comparison in overlap_grouping.comparisons %}
@@ -36,10 +36,10 @@
                     {% if multi_context %}
                         <td style="text-align:center"><span class="testing-context-box testing-context-{{ overlap_comparison.entry_2.testing_context_bucket_obj.value }}">{{ overlap_comparison.entry_2.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
                     {% endif %}
-                    <td>{{ overlap_comparison.entry_2.pretty_value }} {% if overlap_comparison.triage %}{% triage overlap_comparison.triage %}{% endif %}</td>
+                        <td><b>{{ overlap_comparison.entry_2.pretty_value }}</b>{% if overlap_comparison.triage %}<div class="mt-1">{% triage overlap_comparison.triage show_label=True %}</div>{% endif %}</td>
                     <td>{% condition overlap_comparison.entry_2.conditions %}</td>
                     <td>{% if overlap_comparison.entry_2.scv %}ClinVar Expert Panel<br/>{{ overlap_comparison.entry_2.scv }}{% else %}{{ overlap_comparison.entry_2.lab }}{% endif %}</td>
-                    <td>{% timestamp overlap_comparison.entry_2.effective_date time_ago=True %}</td>
+                    <td class="date-column">{% timestamp overlap_comparison.entry_2.effective_date time_ago=True %}</td>
                     </tr>
                 {% endfor %}
             </tbody>

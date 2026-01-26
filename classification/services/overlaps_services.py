@@ -219,6 +219,12 @@ class OverlapServices:
         history: ClassificationGroupingValueTriageHistory
 
         @property
+        def status_changed(self) -> bool:
+            if not self.previous_history:
+                return True
+            return self.history.triage_status_obj != self.previous_history.triage_status_obj or self.history.new_value != self.previous_history.new_value
+
+        @property
         def triage(self) -> ClassificationGroupingValueTriage:
             return self.history.triage
 
