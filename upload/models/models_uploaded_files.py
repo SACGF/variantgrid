@@ -114,15 +114,6 @@ class UploadedLiftover(models.Model):
         return self.liftover
 
 
-@receiver(pre_delete, sender=UploadedGeneCoverage)
-def uploaded_gene_coverage_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    # UploadedGeneCoverage cascade deletes QCGeneCoverage which comes from the API
-    # In VG3 we need to set this null
-    # See https://github.com/SACGF/variantgrid_sapath/issues/395
-    from seqauto.models import QCGeneCoverage
-    QCGeneCoverage.objects.filter(gene_coverage_collection=instance).update(gene_coverage_collection=None)
-
-
 @receiver(post_delete, sender=UploadedGeneCoverage)
 def uploaded_gene_coverage_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     # This can be called via a CASCADE delete from GeneCoverageCollection
