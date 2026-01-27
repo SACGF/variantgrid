@@ -1554,8 +1554,11 @@ def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # 
     # they are made via SeqAuto, reload should link this again
     try:
         from seqauto.models import QCGeneCoverage
-        QCGeneCoverage.objects.filter(gene_coverage_collection=instance).update(gene_coverage_collection=None)
-    except:
+        logging.info("GeneCoverageCollection - setting related QCGeneCoverage to None so API data not deleted")
+        ret = QCGeneCoverage.objects.filter(gene_coverage_collection=instance).update(gene_coverage_collection=None)
+        logging.info("update returned %s", ret)
+    except Exception as e:
+        logging.error(e)
         pass
 
     try:
