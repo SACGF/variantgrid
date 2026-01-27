@@ -1438,6 +1438,17 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
 
         return gene_coverage
 
+    def delete(self, *args, **kwargs):
+        try:
+            # We don't want to delete any linked QCGeneCoverage files (made via API or seqauto)
+            # reload should link a new GeneCoverageCollection
+            logging.info("GeneCoverageCollection.delete() - setting related QCGeneCoverage to None so API data not deleted")
+            from seqauto.models import QCGeneCoverage
+            QCGeneCoverage.objects.filter(gene_coverage_collection=self).update(gene_coverage_collection=None)
+        except Exception as e:
+            logging.error(e)
+        super().delete(*args, **kwargs)
+
     def load_from_file(self, enrichment_kit, **kwargs):
         logging.debug("GeneCoverageCollection.load_for_qc()")
         try:
@@ -1550,17 +1561,7 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
 
 @receiver(pre_delete, sender=GeneCoverageCollection)
 def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    # We don't want to delete any linked QCGeneCoverage files
-    # they are made via SeqAuto, reload should link this again
-    try:
-        from seqauto.models import QCGeneCoverage
-        logging.info("GeneCoverageCollection - setting related QCGeneCoverage to None so API data not deleted")
-        ret = QCGeneCoverage.objects.filter(gene_coverage_collection=instance).update(gene_coverage_collection=None)
-        logging.info("update returned %s", ret)
-    except Exception as e:
-        logging.error(e)
-        pass
-
+    logging.error("gene_coverage_collection_pre_delete_handler - deleting related objects")
     try:
         instance.delete_related_objects()
     except:

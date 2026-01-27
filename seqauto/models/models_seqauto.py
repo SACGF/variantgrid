@@ -11,7 +11,7 @@ from django.core.cache import cache
 from django.db import models
 from django.db.models import Value, When, Case, IntegerField, Max
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
-from django.db.models.signals import post_delete, pre_delete
+from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils.timezone import make_aware
@@ -1282,13 +1282,12 @@ class QCGeneCoverage(SeqAutoRecord):
         self.save()
 
 
-@receiver(pre_delete, sender=QCGeneCoverage)
-def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+@receiver(post_delete, sender=QCGeneCoverage)
+def qc_gene_coverage_collection_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
-        if gcc := instance.gene_coverage_collection:
-            instance.gene_coverage_collection = None  # To stop recursive deleting
-            instance.save()
-            gcc.delete()
+        if gcc_id := instance.gene_coverage_collection_id:
+            logging.info("QCGeneCoverage is deleting GCC")
+            GeneCoverageCollection.objects.filter(pk=gcc_id).delete()
     except:
         # Might fail due to GoldGeneCoverageCollection protecting it
         pass
