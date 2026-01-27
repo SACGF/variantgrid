@@ -1,3 +1,4 @@
+import logging
 import os
 
 from django.conf import settings
@@ -86,6 +87,15 @@ class UploadedGeneCoverage(models.Model):
     gene_coverage_collection = models.OneToOneField(GeneCoverageCollection, null=True, on_delete=CASCADE)
     sample = models.OneToOneField(Sample, null=True, on_delete=CASCADE)
 
+    def delete(self, *args, **kwargs):
+        logging.info("UploadedGeneCoverage.delete()")
+        if gcc := self.gene_coverage_collection:
+            logging.info("Delegating delete to gene_coverage_collection - will cascade delete")
+            ret = gcc.delete()  # Will also cascade delete this
+        else:
+            ret = super().delete(*args, **kwargs)
+        return ret
+
     def get_data(self):
         return self.gene_coverage_collection
 
@@ -112,14 +122,6 @@ class UploadedLiftover(models.Model):
 
     def get_data(self):
         return self.liftover
-
-
-@receiver(post_delete, sender=UploadedGeneCoverage)
-def uploaded_gene_coverage_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    # This can be called via a CASCADE delete from GeneCoverageCollection
-    # in which case that object will already be deleted (so check id w/o ORM)
-    if gc_id := instance.gene_coverage_collection_id:
-        GeneCoverageCollection.objects.filter(pk=gc_id).delete()
 
 
 class UploadedClinVarVersion(models.Model):
