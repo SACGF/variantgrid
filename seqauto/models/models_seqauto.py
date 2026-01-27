@@ -1267,7 +1267,8 @@ class ExecSummaryReferenceRange(models.Model):
 
 class QCGeneCoverage(SeqAutoRecord):
     qc = models.OneToOneField(QC, on_delete=CASCADE)
-    gene_coverage_collection = models.OneToOneField(GeneCoverageCollection, null=True, on_delete=CASCADE)
+    # gene_coverage_collection is populated in load_from_file, set_null as needs to be deleted/reset when reloaded
+    gene_coverage_collection = models.OneToOneField(GeneCoverageCollection, null=True, on_delete=SET_NULL)
 
     @staticmethod
     def get_path_from_qc(qc):
