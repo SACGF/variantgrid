@@ -17,8 +17,8 @@ from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
     EvidenceMixin, ClassificationSummaryCacheDictPathogenicity, Overlap, ClassificationGroupingEntry, \
-    OverlapContribution, ClassificationSummaryCacheDictSomatic, ClassificationGroupingValueTriage, \
-    ClassificationGrouping, ClassificationGroupingValueTriageHistory, ClassificationResultValue, TriageStatus
+    OverlapContribution, ClassificationSummaryCacheDictSomatic, \
+    ClassificationGrouping, ClassificationResultValue, TriageStatus
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -220,7 +220,7 @@ def clinical_significance_values(vcm: ClassificationModification):
     germline_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     pending_from = None
     value = pathogenicity.get("classification")
-    if pending_classification_value := pathogenicity.get("pending"):
+    if pending_classification_value := pathogenicity.get("pending"):  # FIXME pending values will be in OverlapContribution now not "pending"
         pending_from = germline_key.pretty_value(value, value) or "No Data"
         value = pending_classification_value
     value_list = [{
@@ -773,13 +773,13 @@ def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompar
 
 @register.inclusion_tag("classification/tags/triage.html", takes_context=True)
 def triage(context,
-           triage: Union[ClassificationGroupingValueTriage | ClassificationGroupingValueTriageHistory],
+           triage: OverlapContribution,
            show_label: bool = False,
            show_link: bool = False
            ):
     new_value = None
-    if show_link and isinstance(triage, ClassificationGroupingValueTriageHistory):
-        raise ValueError("can't show_link on Triage History")
+    # if show_link and isinstance(triage, ClassificationGroupingValueTriageHistory):
+    #     raise ValueError("can't show_link on Triage History")
 
     if triage.triage_status_obj == TriageStatus.REVIEWED_WILL_FIX:
         new_value = triage.new_value

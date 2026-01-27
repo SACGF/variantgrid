@@ -8,9 +8,8 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 
 from classification.enums import SpecialEKeys
-from classification.models import \
-    ClassificationGroupingValueTriage, ClassificationResultValue, ClassificationGrouping, \
-    EvidenceKey, EvidenceKeyMap, OverlapContribution, TriageStatus, ClassificationGroupingValueTriageHistory
+from classification.models import ClassificationResultValue, ClassificationGrouping, \
+    EvidenceKey, EvidenceKeyMap, TriageStatus, OverlapContribution
 from classification.services.overlaps_services import OverlapGrouping, OverlapServices
 from library.log_utils import log_saved_form
 from snpdb.lab_picker import LabPickerData
@@ -20,7 +19,7 @@ from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 class ClassificationGroupingValueTriageForm(forms.ModelForm):
 
     class Meta:
-        model = ClassificationGroupingValueTriage
+        model = OverlapContribution
         fields = ("triage_status", "new_value")
 
     # triage_date = forms.DateField(
@@ -82,10 +81,10 @@ def view_overlaps2(request: HttpRequest, lab_id=None) -> HttpResponseBase:
     return render(request, "classification/overlaps2.html", {"lab_picker_data": lab_picker})
 
 
-class TriageView(AjaxFormView[ClassificationGroupingValueTriage]):
+class TriageView(AjaxFormView[OverlapContribution]):
 
     @classmethod
-    def lazy_render(cls, obj: ClassificationGroupingValueTriage, context: Optional[dict] = None) -> LazyRender:
+    def lazy_render(cls, obj: OverlapContribution, context: Optional[dict] = None) -> LazyRender:
         def dynamic_context_gen(request):
             # FIX ME what is dynamic context vs static c
             return {}
@@ -114,9 +113,9 @@ class TriageView(AjaxFormView[ClassificationGroupingValueTriage]):
 
     def handle(self, request, triage_id: int):
         # FIXME security checks
-        triage = ClassificationGroupingValueTriage.objects.get(pk=triage_id)
+        triage = OverlapContribution.objects.get(pk=triage_id)
         classification_grouping = triage.classification_grouping
-        value_type = triage.result_value_type
+        value_type = triage.value_type
 
         context = {}
         saved = False
@@ -182,20 +181,21 @@ class TriageView(AjaxFormView[ClassificationGroupingValueTriage]):
                     form.cleaned_data["new_value"] = None
 
                 # don't save "New Value" unless mode is set to Reviewed Will Fix
-                triage: ClassificationGroupingValueTriage = form.save(commit=False)
+                triage: OverlapContribution = form.save(commit=False)
                 if triage.triage_status != TriageStatus.REVIEWED_WILL_FIX:
                     triage.new_value = None
                 triage.save()
 
                 log_saved_form(form)
 
-                ClassificationGroupingValueTriageHistory(
-                    triage=triage,
-                    new_value=triage.new_value,
-                    triage_status=triage.triage_status,
-                    comment=form.cleaned_data["comment"],
-                    user=request.user
-                ).save()
+                # FIXME have history
+                # ClassificationGroupingValueTriageHistory(
+                #     triage=triage,
+                #     new_value=triage.new_value,
+                #     triage_status=triage.triage_status,
+                #     comment=form.cleaned_data["comment"],
+                #     user=request.user
+                # ).save()
 
                 for overlap_contribution in triage.classification_grouping.overlapcontribution_set.filter(value_type=value_type):
                     for overlap in overlap_contribution.overlaps:

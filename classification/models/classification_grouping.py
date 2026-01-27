@@ -188,13 +188,9 @@ class ClassificationGrouping(TimeStampedModel):
     latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
 
-    def triage_for(self, value_type: ClassificationResultValue) -> 'ClassificationGroupingValueTriage':
-        from classification.models import ClassificationGroupingValueTriage
-        triage, _ = ClassificationGroupingValueTriage.objects.get_or_create(
-            classification_grouping=self,
-            result_value_type=value_type
-        )
-        return triage
+    def contribution_for(self, value_type: ClassificationResultValue) -> 'OverlapContribution':
+        from classification.models import OverlapContribution
+        return OverlapContribution.objects.filter(classification_grouping=self, value_type=value_type).first()
 
     def __str__(self):
         parts = [

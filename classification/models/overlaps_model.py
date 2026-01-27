@@ -1,7 +1,5 @@
 from functools import reduce, cached_property
 from typing import Any, Optional
-
-from django.contrib.auth.models import User
 from django.db.models import CASCADE, QuerySet
 from django.db import models
 from django.db.models.enums import TextChoices
@@ -10,7 +8,7 @@ from annotation.models import ClinVarRecord
 from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, TriageStatus, \
-    OverlapEntrySourceTextChoices
+    OverlapEntrySourceTextChoices, EffectiveDateType
 from library.utils import first
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
@@ -74,11 +72,22 @@ class OverlapContribution(TimeStampedModel):
     value_type = models.TextField(choices=ClassificationResultValue.choices)
     value = models.TextField(null=True, blank=True)
     # annoying thing about contribution is it takes a little bit of context knowledge to work out
-    contribution = models.TextField(choices=OverlapContributionStatus.choices)
+    contribution = models.TextField(choices=OverlapContributionStatus.choices)  # TODO rename to contribution_status
     testing_context_bucket = models.TextField(choices=TestingContextBucket.choices)
     tumor_type_category = models.TextField(null=True, blank=True)
     # TODO do we want to keep date type somewhere?
     effective_date = models.DateField(null=True, blank=True)
+    effective_date_type = models.TextField(choices=EffectiveDateType.choices, default=EffectiveDateType.UNKNOWN)
+
+    new_value = models.TextField(null=True, blank=True)  # TODO rename to amended value
+    triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
+
+    class Meta:
+        unique_together = ('classification_grouping', 'value_type')
+
+    @property
+    def triage_status_obj(self) -> TriageStatus:
+        return TriageStatus(self.triage_status)
 
     @property
     def overlaps(self) -> QuerySet['Overlap']:
@@ -96,16 +105,6 @@ class OverlapContribution(TimeStampedModel):
         if classification_grouping := self.classification_grouping:
             return classification_grouping.lab
         return None
-
-    @property
-    def triage_status(self) -> TriageStatus:
-        # TODO if we make triaging more complicated than just a date
-        # we might want to
-        if classification_grouping := self.classification_grouping:
-            triage = classification_grouping.triage_for(self.value_type)
-            return triage.triage_status
-        else:
-            return TriageStatus.NON_INTERACTIVE_THIRD_PARTY
 
     @cached_property
     def conditions(self) -> Optional[ConditionResolved]:
@@ -318,36 +317,36 @@ class OverlapContributionSkew(TimeStampedModel):
 #         unique_together = ('classification_grouping', 'overlap')
 #
 
-class ClassificationGroupingValueTriage(TimeStampedModel):
-    classification_grouping = models.ForeignKey(ClassificationGrouping, on_delete=models.CASCADE)
-    result_value_type = models.TextField(max_length=1, choices=ClassificationResultValue.choices)
-    new_value = models.TextField(null=True, blank=True)
-    triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
-
-    @cached_property
-    def contribution(self) -> OverlapContribution:
-        return OverlapContribution.objects.filter(classification_grouping=self.classification_grouping, value_type=self.result_value_type).get()
-
-    @property
-    def triage_status_obj(self):
-        return TriageStatus(self.triage_status)
-
-    class Meta:
-        unique_together = ('classification_grouping', 'result_value_type')
-
-
-class ClassificationGroupingValueTriageHistory(TimeStampedModel):
-    triage = models.ForeignKey(ClassificationGroupingValueTriage, on_delete=models.CASCADE)
-    new_value = models.TextField(null=True, blank=True)
-    triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
-    comment = models.TextField(null=True, blank=True)
-    user = models.ForeignKey(User, null=False, blank=False, on_delete=models.PROTECT)
-    state_data = models.JSONField(null=True, blank=True)  # For caching state of the Overlaps at the time
-
-    @property
-    def result_value_type(self):
-        return self.triage.result_value_type
-
-    @property
-    def triage_status_obj(self):
-        return TriageStatus(self.triage_status)
+# class ClassificationGroupingValueTriage(TimeStampedModel):
+#     classification_grouping = models.ForeignKey(ClassificationGrouping, on_delete=models.CASCADE)
+#     result_value_type = models.TextField(max_length=1, choices=ClassificationResultValue.choices)
+#     new_value = models.TextField(null=True, blank=True)
+#     triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
+#
+#     @cached_property
+#     def contribution(self) -> OverlapContribution:
+#         return OverlapContribution.objects.filter(classification_grouping=self.classification_grouping, value_type=self.result_value_type).get()
+#
+#     @property
+#     def triage_status_obj(self):
+#         return TriageStatus(self.triage_status)
+#
+#     class Meta:
+#         unique_together = ('classification_grouping', 'result_value_type')
+#
+#
+# class ClassificationGroupingValueTriageHistory(TimeStampedModel):
+#     triage = models.ForeignKey(ClassificationGroupingValueTriage, on_delete=models.CASCADE)
+#     new_value = models.TextField(null=True, blank=True)
+#     triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
+#     comment = models.TextField(null=True, blank=True)
+#     user = models.ForeignKey(User, null=False, blank=False, on_delete=models.PROTECT)
+#     state_data = models.JSONField(null=True, blank=True)  # For caching state of the Overlaps at the time
+#
+#     @property
+#     def result_value_type(self):
+#         return self.triage.result_value_type
+#
+#     @property
+#     def triage_status_obj(self):
+#         return TriageStatus(self.triage_status)

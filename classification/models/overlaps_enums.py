@@ -2,6 +2,14 @@ from django.db.models import TextChoices
 from django.utils.safestring import mark_safe
 
 
+class EffectiveDateType(TextChoices):
+    CREATED = "created", "Created"
+    CURATED = "curated", "Curated"
+    SAMPLE_DATE = "sample", "Sample"
+    VERIFIED = "verified", "Verified"
+    UNKNOWN = "unknown", "Unknown"
+
+
 class OverlapType(TextChoices):
     SINGLE_CONTEXT = "context", "Single Context"
     CROSS_CONTEXT = "cross", "Cross Context"
@@ -63,6 +71,8 @@ class TriageStatus(TextChoices):
                 return mark_safe('<i class="fa-solid fa-clipboard-check" title="Confident in Classification" style="opacity:0.6"></i>')
             case TriageStatus.COMPLEX:
                 return mark_safe('<i class="fa-solid fa-clipboard-question" title="Complex Reasons for Discordance" style="opacity:0.6"></i>')
+            case TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
+                return mark_safe('<i class="fa-solid fa-face-meh-blank" title="3rd Party" style="opacity:0.6"></i>')
             case _:
                 return "?"
 

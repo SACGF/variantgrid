@@ -1,11 +1,10 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Iterator, Iterable
+from typing import Optional, Iterable
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
-    OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, ClassificationGroupingValueTriage, \
-    ClassificationGroupingValueTriageHistory, OverlapContributionSkew, TriageStatus, TriageNextStep
+    OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, TriageStatus, TriageNextStep
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig
 
@@ -49,6 +48,7 @@ class OverlapServices:
                     "value": value,
                     "contribution": contribution,
                     "effective_date": classification_grouping.latest_classification_modification.curated_date
+                    # TODO date type
                 }
             )
             if created:
@@ -213,29 +213,31 @@ class OverlapServices:
         :return:
         """
 
-    @dataclass
-    class LinkedTriageHistory:
-        previous_history: Optional[ClassificationGroupingValueTriageHistory]
-        history: ClassificationGroupingValueTriageHistory
-
-        @property
-        def status_changed(self) -> bool:
-            if not self.previous_history:
-                return True
-            return self.history.triage_status_obj != self.previous_history.triage_status_obj or self.history.new_value != self.previous_history.new_value
-
-        @property
-        def triage(self) -> ClassificationGroupingValueTriage:
-            return self.history.triage
-
-    @staticmethod
-    def get_linked_history_for(triages: list[ClassificationGroupingValueTriageHistory]) -> Iterator[LinkedTriageHistory]:
-        qs = ClassificationGroupingValueTriageHistory.objects.filter(triage__in=triages).order_by('created')
-        triage_last_history: dict[int, ClassificationGroupingValueTriageHistory] = {}
-        for triage_history in qs.iterator():
-            previous = triage_last_history.get(triage_history.triage_id)
-            yield OverlapServices.LinkedTriageHistory(previous_history=previous, history=triage_history)
-            triage_last_history[triage_history.triage_id] = triage_history
+    # FIXME - restore history
+    #
+    # @dataclass
+    # class LinkedTriageHistory:
+    #     previous_history: Optional[ClassificationGroupingValueTriageHistory]
+    #     history: ClassificationGroupingValueTriageHistory
+    #
+    #     @property
+    #     def status_changed(self) -> bool:
+    #         if not self.previous_history:
+    #             return True
+    #         return self.history.triage_status_obj != self.previous_history.triage_status_obj or self.history.new_value != self.previous_history.new_value
+    #
+    #     @property
+    #     def triage(self) -> ClassificationGroupingValueTriage:
+    #         return self.history.triage
+    #
+    # @staticmethod
+    # def get_linked_history_for(triages: list[ClassificationGroupingValueTriageHistory]) -> Iterator[LinkedTriageHistory]:
+    #     qs = ClassificationGroupingValueTriageHistory.objects.filter(triage__in=triages).order_by('created')
+    #     triage_last_history: dict[int, ClassificationGroupingValueTriageHistory] = {}
+    #     for triage_history in qs.iterator():
+    #         previous = triage_last_history.get(triage_history.triage_id)
+    #         yield OverlapServices.LinkedTriageHistory(previous_history=previous, history=triage_history)
+    #         triage_last_history[triage_history.triage_id] = triage_history
 
 
 @dataclass
@@ -269,10 +271,8 @@ class OverlapEntryCompare:
         return self.sort_value < other.sort_value
 
     @property
-    def triage(self) -> Optional[ClassificationGroupingValueTriage]:
-        if classification_grouping := self.entry_2.classification_grouping:
-            return classification_grouping.triage_for(value_type=self.value_type)
-        return None
+    def triage(self) -> OverlapContribution:
+        return self.entry_2
 
 
 @dataclass(frozen=True)
@@ -298,17 +298,19 @@ class OverlapGrouping:
         return TriageNextStep.PENDING_CALCULATION
 
     @property
-    def history(self) -> Iterable[ClassificationGroupingValueTriageHistory]:
-        all_triages = set()
-        for contribution in self.contributions:
-            if classification_grouping := contribution.classification_grouping:
-                triage = classification_grouping.triage_for(self.value_type)
-                all_triages.add(triage)
-        if classification_grouping := self.user_contribution.classification_grouping:
-            triage = classification_grouping.triage_for(self.value_type)
-            all_triages.add(triage)
-
-        return OverlapServices.get_linked_history_for(all_triages)
+    def history(self) -> Iterable:
+        return []
+        # FIXME
+        # all_triages = set()
+        # for contribution in self.contributions:
+        #     if classification_grouping := contribution.classification_grouping:
+        #         triage = classification_grouping.triage_for(self.value_type)
+        #         all_triages.add(triage)
+        # if classification_grouping := self.user_contribution.classification_grouping:
+        #     triage = classification_grouping.triage_for(self.value_type)
+        #     all_triages.add(triage)
+        #
+        # return OverlapServices.get_linked_history_for(all_triages)
 
     @staticmethod
     def overlap_grouping_for(classification_grouping: ClassificationGrouping, value_type: ClassificationResultValue, include_cross_context: bool) -> 'OverlapGrouping':
@@ -347,8 +349,8 @@ class OverlapGrouping:
         )
 
     @property
-    def user_triage(self) -> ClassificationGroupingValueTriage:
-        return self.user_contribution.classification_grouping.triage_for(self.value_type)
+    def user_triage(self) -> 'OverlapContribution':
+        return self.user_contribution
 
     @property
     def contribution_count(self):

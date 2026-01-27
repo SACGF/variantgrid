@@ -2862,6 +2862,7 @@ class ClassificationConsensus:
         return patch
 
 
+# FIXME use CuratedDateType
 class ClassificationDateType(StrEnum):
     CURATION = ""  # default
     VERIFIED = "Verified"

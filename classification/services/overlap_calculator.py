@@ -1,62 +1,61 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Optional, Iterable
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.models import ClinVarRecord
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.enums import TestingContextBucket, OverlapStatus
-from classification.models import ClassificationResultValue, Overlap, ClassificationSummaryCacheDict, \
-    EvidenceKeyMap, OverlapContribution
-from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices
+from classification.models import ClassificationResultValue, ClassificationSummaryCacheDict, \
+    EvidenceKeyMap, OverlapContribution, TriageStatus
+from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices
 from library.utils import first
 from snpdb.models import Allele
 
-
-@dataclass(frozen=True)
-class TestingContextKey:
-    testing_context_bucket: TestingContextBucket
-    tumor_type_category: Optional[str]
-
-
-@dataclass(frozen=True)
-class OverlapIdentifier:
-    """
-    Within an allele, what kind of overlap are we looking at?
-    The identifier should link to one and only one Overlap
-    """
-    testing_contexts: str  # concat ordered string
-    overlap_type: OverlapType = OverlapType.SINGLE_CONTEXT
-    value_type: ClassificationResultValue = ClassificationResultValue.ONC_PATH
-    tumor_type_category: Optional[str] = None
-    # lab: Optional[Lab] = None
-
-    @property
-    def testing_context_array(self):
-        return [TestingContextBucket(tc) for tc in "|".split(self.testing_contexts)]
-
-    @staticmethod
-    def contexts_to_str(contexts: Iterable[TestingContextBucket]) -> str:
-        return "|".join(sorted(contexts))
-
-    @staticmethod
-    def from_overlap(overlap: Overlap) -> "OverlapIdentifier":
-        return OverlapIdentifier(
-            overlap_type=overlap.overlap_type,
-            value_type=overlap.value_type,
-            testing_contexts=OverlapIdentifier.contexts_to_str(overlap.testing_contexts),
-            tumor_type_category=overlap.tumor_type_category,
-            # lab=overlap.lab
-        )
-
-    def to_new_overlap(self, allele: Allele) -> Overlap:
-        return Overlap(
-            overlap_type=self.overlap_type,
-            value_type=self.value_type,
-            allele=allele,
-            testing_contexts=self.testing_context_array,
-            # lab=self.lab,
-            overlap_status=None  # needs to be provided a value before it can be saved
-        )
+#
+# @dataclass(frozen=True)
+# class TestingContextKey:
+#     testing_context_bucket: TestingContextBucket
+#     tumor_type_category: Optional[str]
+#
+#
+# @dataclass(frozen=True)
+# class OverlapIdentifier:
+#     """
+#     Within an allele, what kind of overlap are we looking at?
+#     The identifier should link to one and only one Overlap
+#     """
+#     testing_contexts: str  # concat ordered string
+#     overlap_type: OverlapType = OverlapType.SINGLE_CONTEXT
+#     value_type: ClassificationResultValue = ClassificationResultValue.ONC_PATH
+#     tumor_type_category: Optional[str] = None
+#     # lab: Optional[Lab] = None
+#
+#     @property
+#     def testing_context_array(self):
+#         return [TestingContextBucket(tc) for tc in "|".split(self.testing_contexts)]
+#
+#     @staticmethod
+#     def contexts_to_str(contexts: Iterable[TestingContextBucket]) -> str:
+#         return "|".join(sorted(contexts))
+#
+#     @staticmethod
+#     def from_overlap(overlap: Overlap) -> "OverlapIdentifier":
+#         return OverlapIdentifier(
+#             overlap_type=overlap.overlap_type,
+#             value_type=overlap.value_type,
+#             testing_contexts=OverlapIdentifier.contexts_to_str(overlap.testing_contexts),
+#             tumor_type_category=overlap.tumor_type_category,
+#             # lab=overlap.lab
+#         )
+#
+#     def to_new_overlap(self, allele: Allele) -> Overlap:
+#         return Overlap(
+#             overlap_type=self.overlap_type,
+#             value_type=self.value_type,
+#             allele=allele,
+#             testing_contexts=self.testing_context_array,
+#             # lab=self.lab,
+#             overlap_status=None  # needs to be provided a value before it can be saved
+#         )
 
 #
 # class OverlapEntryStore:
@@ -350,7 +349,9 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
                         classification_grouping_id=None,
                         value=value,
                         contribution=OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE,
-                        effective_date=effective_date
+                        effective_date=effective_date,
+                        # effective_date_type= # FIXME
+                        triage_status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY
                     )
         return None
 
