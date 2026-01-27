@@ -2319,14 +2319,6 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
 
 @receiver(pre_delete, sender=GeneCoverageCollection)
 def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    # We don't want to delete any linked QCGeneCoverage files
-    # they are made via SeqAuto, reload should link this again
-    try:
-        from seqauto.models import QCGeneCoverage
-        QCGeneCoverage.objects.filter(gene_coverage_collection=instance).update(gene_coverage_collection=None)
-    except:
-        pass
-
     try:
         instance.delete_related_objects()
     except:
