@@ -123,7 +123,7 @@ class AutoLaunchAnalysisTemplateMatch:
 
     @property
     def match(self) -> bool:
-        return self.enrichment_kit_match and self.sample_regex_match
+        return self.enrichment_kit_match and self.sample_regex_match and self.analysis_template
 
 
 def get_auto_launch_analysis_template_matches(sample_enrichment_kit_name, sample_name) -> List[AutoLaunchAnalysisTemplateMatch]:
