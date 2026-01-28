@@ -15,6 +15,7 @@ from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
+from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, Sample, VariantGridColumn, Trio, UserSettings
 
@@ -343,3 +344,11 @@ class VCFLocusFilterForm(forms.Form):
 
         for filter_id, initial in sorted(vcf_filters.items(), key=lambda s: s[0].lower()):
             self.fields[filter_id] = forms.BooleanField(required=False, initial=initial)
+
+
+class AnalysisTemplateAutoLaunchForm(forms.Form):
+    enrichment_kit = forms.ModelChoiceField(queryset=EnrichmentKit.objects.all(),
+                                            required=False, blank=True,
+                                            widget=ModelSelect2(url='enrichment_kit_autocomplete',
+                                                                attrs={'data-placeholder': 'Enrichment Kit...'}))
+    example_sample_name = forms.CharField(required=False)

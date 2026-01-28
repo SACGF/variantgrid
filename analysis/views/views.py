@@ -25,10 +25,10 @@ from htmlmin.decorators import not_minified_response
 from lazy import lazy
 
 from analysis import forms
-from analysis.analysis_templates import populate_analysis_from_template_run
+from analysis.analysis_templates import populate_analysis_from_template_run, get_auto_launch_analysis_template_matches
 from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
 from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, InputSamplesForm, \
-    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm
+    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm, AnalysisTemplateAutoLaunchForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
@@ -53,6 +53,7 @@ from library.django_utils import add_save_message, get_field_counts, set_form_re
 from library.guardian_utils import is_superuser
 from library.utils import full_class_name, defaultdict_to_dict
 from pedigree.models import Pedigree
+from seqauto.models import EnrichmentKit
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
     Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Variant, GenomeBuild
@@ -84,6 +85,29 @@ def analysis_templates(request):
     context = {"create_analysis_template_form": form,
                "analysis_template_choice_form": AnalysisTemplateTypeChoiceForm()}
     return render(request, 'analysis/analysis_templates.html', context)
+
+
+def analysis_templates_auto_launch(request):
+    """ Shows how the auto launch will work to users """
+
+    template_auto_launch_form = AnalysisTemplateAutoLaunchForm(request.POST or None)
+
+    sample_enrichment_kit_name = None
+    sample_name = ""
+    if request.method == "POST":
+        if sample_enrichment_kit_id := request.POST.get("enrichment_kit"):
+            if enrichment_kit := EnrichmentKit.objects.filter(pk=sample_enrichment_kit_id).first():
+                sample_enrichment_kit_name = enrichment_kit.name
+        sample_name = request.POST["example_sample_name"]
+
+    auto_launch_analysis_template_matches = get_auto_launch_analysis_template_matches(sample_enrichment_kit_name, sample_name)
+    context = {
+        "auto_launch_analysis_template_matches": auto_launch_analysis_template_matches,
+        "template_auto_launch_form": template_auto_launch_form,
+        "sample_enrichment_kit_name": sample_enrichment_kit_name,
+        "sample_name": sample_name,
+    }
+    return render(request, 'analysis/analysis_templates_auto_launch.html', context)
 
 
 def get_analysis_settings(user, analysis):

@@ -305,3 +305,10 @@ class TagUtils:
         if val is not None:
             return bool(val)
         return None
+
+        
+@register.filter(name='bool_emojify')
+def bool_emojify(val: bool):
+    if val:
+        return "✅"
+    return  "❌"

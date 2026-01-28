@@ -46,7 +46,9 @@
     <form>
         {% labelled label="Open Analysis Template" %}{{ analysis_template_choice_form.analysis }} {{ analysis_template_choice_form.media }}{% endlabelled %}
     </form>
-
+</div>
+<div>
+    <a class='hover-link' id="show-form-link" title="See which templates will auto-run on which samples" href="{% url 'analysis_templates_auto_launch' %}">Analysis templates Auto Launch</a>
 </div>
 <div class="container-table">
     {% user_data_grid_filter 'analysis_templates' 'Analysis Templates' %}
