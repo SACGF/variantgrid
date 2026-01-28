@@ -14,6 +14,8 @@ urlpatterns = [
          name='analyses_datatables'),
 
     path('analysis_templates/', views.analysis_templates, name='analysis_templates'),
+    path('analysis_templates/auto_launch/', views.analysis_templates_auto_launch,
+         name='analysis_templates_auto_launch'),
     path('<int:analysis_id>/', views.view_analysis, name='analysis'),
     path('<int:analysis_id>/<int:active_node_id>/', views.view_analysis, name='analysis_node'),
     path('clone_analysis/<int:analysis_id>/', views_json.clone_analysis, name='clone_analysis'),

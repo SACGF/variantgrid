@@ -1,5 +1,7 @@
 import logging
 import re
+from dataclasses import dataclass
+from typing import Optional, List
 
 from auditlog.context import disable_auditlog
 from django.conf import settings
@@ -107,13 +109,38 @@ def _get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_an
     if sample.enrichment_kit:
         sample_enrichment_kit_name = sample.enrichment_kit.name
 
-    analysis_templates = []
+    matches = get_auto_launch_analysis_template_matches(sample_enrichment_kit_name, sample.name)
+    return [m.analysis_template for m in matches if m.match]
+
+@dataclass
+class AutoLaunchAnalysisTemplateMatch:
+    enrichment_kit_name: Optional[str]
+    enrichment_kit_match: bool
+    sample_regex: Optional[str]
+    sample_regex_match: bool
+    analysis_template_name: str
+    analysis_template: Optional[AnalysisTemplate]
+
+    @property
+    def match(self) -> bool:
+        return self.enrichment_kit_match and self.sample_regex_match
+
+
+def get_auto_launch_analysis_template_matches(sample_enrichment_kit_name, sample_name) -> List[AutoLaunchAnalysisTemplateMatch]:
+    matches = []
     for enrichment_kit_name, sample_regex, analysis_template_name in settings.ANALYSIS_AUTO_LAUNCH_SAMPLE_ANALYSIS_TEMPLATE_CONFIG:
-        if sample_enrichment_kit_name == enrichment_kit_name:
-            if sample_regex and not re.match(sample_regex, sample.name):
-                continue
-            analysis_templates.append(AnalysisTemplate.objects.get(name=analysis_template_name))
-    return analysis_templates
+        analysis_template = AnalysisTemplate.objects.filter(name=analysis_template_name).first()
+        sample_regex_match = True  # blank means anything
+        if sample_regex:
+            sample_regex_match = bool(re.match(sample_regex, sample_name))
+        match = AutoLaunchAnalysisTemplateMatch(enrichment_kit_name=enrichment_kit_name,
+                                                enrichment_kit_match=sample_enrichment_kit_name == enrichment_kit_name,
+                                                sample_regex=sample_regex,
+                                                sample_regex_match=sample_regex_match,
+                                                analysis_template_name=analysis_template_name,
+                                                analysis_template=analysis_template)
+        matches.append(match)
+    return matches
 
 def auto_launch_analysis_templates_for_sample(user, sample, analysis_description=None, skip_already_analysed=False):
     for analysis_template in _get_auto_launch_analysis_templates_for_sample(user, sample,

@@ -745,6 +745,12 @@ def _embed(context, embed: LazyRender, **kwargs):
 def emojify(text: str):
     return emoji_to_unicode(text)
 
+@register.filter(name='bool_emojify')
+def bool_emojify(val: bool):
+    if val:
+        return "✅"
+    return  "❌"
+
 
 @register.filter(name='debug')
 def debug(obj: Any):

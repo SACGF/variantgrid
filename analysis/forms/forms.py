@@ -19,6 +19,7 @@ from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
+from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, VariantGridColumn, Trio, UserSettings
 from uicore.utils.form_helpers import form_helper_horizontal
@@ -428,3 +429,14 @@ def get_mult_choice_form(choices, field_name: str, initial=None):
             self.fields[field_name].initial = initial
 
     return WrappedForm
+
+
+
+class AnalysisTemplateAutoLaunchForm(forms.Form):
+    enrichment_kit = forms.ModelChoiceField(queryset=EnrichmentKit.objects.all(),
+                                            required=False, blank=True,
+                                            widget=ModelSelect2(url='enrichment_kit_autocomplete',
+                                                                attrs={'data-placeholder': 'Enrichment Kit...'}))
+    example_sample_name = forms.CharField(required=False)
+
+

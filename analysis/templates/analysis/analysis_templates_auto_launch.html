@@ -1,0 +1,80 @@
+{% extends menu_analysis_base %}
+{% load static %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load crispy_forms_field %}
+{% load crispy_forms_tags %}
+{% block title %}VariantGrid: Analysis templates{% endblock title %}
+{% block submenu_page_content %}
+<script>
+$(document).ready(function() {
+    console.log("doc ready");
+    {% if request.method == 'POST' %}
+        console.log("is post");
+        $(".match").show();
+    {% else %}
+        console.log("NOT A  post");
+        $(".match").hide();
+    {% endif %}
+});
+</script>
+
+    <p>
+        Template auto-launching is currently handled by settings configuration.
+
+        Please speak to your systems administrator to change them.
+    </p>
+
+    {% if auto_launch_analysis_template_matches %}
+        <form method="POST">
+            {% csrf_token %}
+            <div class="horizontal-fields">
+                {{ template_auto_launch_form }}
+                {{ template_auto_launch_form.media }}
+                <button class="btn btn-primary" type="submit">Check sample / template matches</button>
+            </div>
+        </form>
+
+        <div class="match">
+            <b>Showing matches for:</b>
+            {% labelled label="Kit Name" %}{{ sample_enrichment_kit_name }}{% endlabelled %}
+            {% labelled label="Sample Name" %}{{ sample_name }}{% endlabelled %}
+        </div>
+
+
+        <div id="settings-config" class="mt-2">
+            <table class="table">
+                <tr>
+                    <th>Enrichment Kit</th>
+                    <th class="match">Match</th>
+                    <th>Regex</th>
+                    <th class="match">Match</th>
+                    <th>Template Name</th>
+                    <th>Template</th>
+                </tr>
+                {% for match in auto_launch_analysis_template_matches %}
+                    <tr>
+                        <td>{{ match.enrichment_kit_name }}</td>
+                        <td class="match">{{ match.enrichment_kit_match | bool_emojify }}</td>
+                        <td>{{ match.sample_regex }}</td>
+                        <td class="match">{{ match.sample_regex_match | bool_emojify }}</td>
+                        <td>{{ match.analysis_template_name }}</td>
+                        <td>
+                            {% if match.analysis_template %}
+                                <a href="{{ match.analysis_template.analysis.get_absolute_url }}">
+                                    {{ match.analysis_template }}
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+
+            </table>
+        </div>
+
+    {% else %}
+        There is no currently configured auto launching
+    {% endif %}
+
+{% endblock submenu_page_content %}
+
