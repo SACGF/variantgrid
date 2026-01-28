@@ -51,6 +51,7 @@ $(document).ready(function() {
                     <th class="match">Match</th>
                     <th>Template Name</th>
                     <th>Template</th>
+                    <th class="match">Launch</th>
                 </tr>
                 {% for match in auto_launch_analysis_template_matches %}
                     <tr>
@@ -66,6 +67,7 @@ $(document).ready(function() {
                                 </a>
                             {% endif %}
                         </td>
+                        <td class="match">{{ match.match | bool_emojify }}</td>
                     </tr>
                 {% endfor %}
 
