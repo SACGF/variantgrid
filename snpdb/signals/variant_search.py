@@ -592,8 +592,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 msg = f"{contig_accession=} is from builds {build_names} which are not enabled/annotated."
                 yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
         else:
-            known_builds = GenomeBuild.get_known_builds_comma_separated_string()
-            msg = f"{contig_accession=} not in known_builds: {known_builds}"
+            enabled_builds = GenomeBuild.get_enabled_builds_comma_separated_string()
+            msg = f"{contig_accession=} not in enabled builds: {enabled_builds}"
             yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
 
     except (ValueError, NotImplementedError) as hgvs_error:

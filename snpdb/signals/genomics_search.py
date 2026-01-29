@@ -44,6 +44,6 @@ def contig_search(search_input: SearchInputInstance):
             msg = f"contig={other_contig.refseq_accession} is from builds {build_names} which are not enabled/annotated."
             yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
         elif re.match(r"^NC_\d+.\d$", search_input.search_string):
-            known_builds = GenomeBuild.get_known_builds_comma_separated_string()
-            msg = f"contig={search_input.search_string} not in known_builds: {known_builds}"
+            enabled_builds = GenomeBuild.get_enabled_builds_comma_separated_string()
+            msg = f"contig={search_input.search_string} not in enabled builds: {enabled_builds}"
             yield SearchMessageOverall(msg, severity=LogLevel.WARNING)

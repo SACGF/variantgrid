@@ -292,8 +292,8 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
         return annotation_version.variant_annotation_version.assembly
 
     @staticmethod
-    def get_known_builds_comma_separated_string() -> str:
-        return ", ".join(GenomeBuild.objects.all().order_by("name").values_list("name", flat=True))
+    def get_enabled_builds_comma_separated_string() -> str:
+        return ", ".join(GenomeBuild.builds_with_annotation().values_list("name", flat=True))
 
     def __str__(self):
         return self.name
