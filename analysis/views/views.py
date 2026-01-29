@@ -31,7 +31,7 @@ from analysis.analysis_templates import populate_analysis_from_template_run, get
 from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
 from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, \
     AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm, AnalysisTemplateForm, \
-    AnalysisTemplateAutoLaunchForm
+    AnalysisTemplateAutoLaunchForm, AutoLaunchFormSet
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
@@ -102,7 +102,7 @@ def analysis_templates_auto_launch(request):
                 sample_enrichment_kit_name = enrichment_kit.name
         sample_name = request.POST["example_sample_name"]
 
-    auto_launch_analysis_template_matches = get_auto_launch_analysis_template_matches(sample_enrichment_kit_name, sample_name)
+    auto_launch_analysis_template_matches = get_auto_launch_analysis_template_matches(request.user, sample_enrichment_kit_name, sample_name)
     context = {
         "auto_launch_analysis_template_matches": auto_launch_analysis_template_matches,
         "template_auto_launch_form": template_auto_launch_form,
@@ -284,6 +284,7 @@ def analysis_template_settings(request, pk):
     has_write_permission = analysis_template.can_write(request.user)
 
     at_form = _get_form(request, AnalysisTemplateForm, 'at-pre', instance=analysis_template)
+    formset = AutoLaunchFormSet(request.POST or None, instance=analysis_template)
     atv_form = None
     if atv := analysis_template.active:
         atv_form = _get_form(request, AnalysisTemplateVersionForm, 'atv-pre', instance=atv)
@@ -291,6 +292,7 @@ def analysis_template_settings(request, pk):
     if not has_write_permission:
         set_form_read_only(at_form)
         set_form_read_only(atv_form)
+        set_form_read_only(formset)
         messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
 
     if request.method == 'POST':
@@ -298,9 +300,10 @@ def analysis_template_settings(request, pk):
             raise PermissionDenied(f"Don't have permission to modify {analysis_template}")
 
         if at_form and at_form.is_bound:
-            valid = at_form.is_valid()
+            valid = at_form.is_valid() and formset.is_valid()
             if valid:
                 at_form.save()
+                formset.save()
             add_save_message(request, valid, "Analysis Template")
 
         if atv_form and atv_form.is_bound:
@@ -313,6 +316,7 @@ def analysis_template_settings(request, pk):
         "analysis_template": analysis_template,
         "analysis_template_versions": analysis_template.analysistemplateversion_set.order_by("-pk"),
         "at_form": at_form,
+        "at_formset": formset,
         "atv_form": atv_form,
         "has_write_permission": has_write_permission,
     }

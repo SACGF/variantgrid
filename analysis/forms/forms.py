@@ -1,5 +1,6 @@
 import itertools
 import operator
+import re
 from collections import defaultdict
 
 from crispy_forms.bootstrap import FieldWithButtons, StrictButton
@@ -7,10 +8,11 @@ from crispy_forms.layout import Layout, Field
 from dal import forward
 from django import forms
 from django.core.exceptions import ValidationError
+from django.forms import inlineformset_factory
 from django.forms.widgets import TextInput
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate, AnalysisTemplateVersion, \
-    AnalysisNode, CandidateStatus
+    AnalysisNode, CandidateStatus, AutoLaunchAnalysisTemplate
 from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample, AnalysisType
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
@@ -111,7 +113,39 @@ class AnalysisTemplateForm(forms.ModelForm):
     class Meta:
         fields = ('name', 'description')
         model = AnalysisTemplate
-        widgets = {'name': TextInput()}
+        widgets = {'name': TextInput(),
+                   'description': TextInput()}
+
+
+class AutoLaunchAnalysisTemplateForm(forms.ModelForm):
+    class Meta:
+        model = AutoLaunchAnalysisTemplate
+        fields = ("enrichment_kit", "sample_regex")
+        widgets = {
+            "enrichment_kit": ModelSelect2(url='enrichment_kit_autocomplete',
+                                           attrs={'data-placeholder': 'Enrichment Kit...'}),
+            "sample_regex": forms.TextInput(attrs={
+                "size": 20,
+                "class": "form-control form-control-sm",
+            })
+        }
+
+    def clean_sample_regex(self):
+        if value := self.cleaned_data.get("sample_regex"):
+            try:
+                re.compile(value)
+            except re.error as e:
+                raise forms.ValidationError(f"RegEx error: {e}")
+        return value
+
+
+AutoLaunchFormSet = inlineformset_factory(
+    AnalysisTemplate,
+    AutoLaunchAnalysisTemplate,
+    form=AutoLaunchAnalysisTemplateForm,
+    extra=1,
+    can_delete=True
+)
 
 
 class CreateAnalysisTemplateForm(forms.ModelForm):

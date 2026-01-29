@@ -23,6 +23,7 @@ from genes.models import CanonicalTranscriptCollection
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
 from library.preview_request import PreviewModelMixin
+from seqauto.models import EnrichmentKit
 from snpdb.models import CustomColumnsCollection, CustomColumn, \
     UserSettings, AbstractNodeCountSettings, Sample, Cohort
 from snpdb.models.models_enums import BuiltInFilters
@@ -522,6 +523,15 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if self.deleted:
             s += " (deleted)"
         return s
+
+
+class AutoLaunchAnalysisTemplate(TimeStampedModel):
+    template = models.ForeignKey(AnalysisTemplate, on_delete=CASCADE)
+    enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, blank=True, on_delete=CASCADE)
+    sample_regex = models.TextField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('template', 'enrichment_kit', 'sample_regex')
 
 
 class AnalysisTemplateVersion(TimeStampedModel):

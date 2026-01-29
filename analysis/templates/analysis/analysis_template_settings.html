@@ -1,10 +1,20 @@
 {% extends menu_analysis_base %}
+{% load crispy_forms_tags %}
 {% load static %}
 {% load tz %}
+{% load ui_utils %}
 {% load ui_help %}
 {% block title %}Analysis Template: {{ analysis_template  }}{% endblock title %}
 
 {% block submenu_page_content %}
+<style>
+.has-error input,
+.has-error select,
+.has-error textarea {
+  border-color: #dc3545;
+  background-color: #fff5f5;
+}
+</style>
 
     <h3>Template Settings: {{ analysis_template  }}</h3>
 
@@ -16,10 +26,45 @@
 
     <p>
 
-        <form id="active-template-version-form" method="post" action="{{ request.path }}" novalidate>
+        <form id="active-template-version-form" method="post">
             {% csrf_token %}
 
-            {{  at_form.as_p }}
+            {{ at_form|crispy }}
+
+            <h3>Auto Launch Config</h3>
+
+            {{ at_formset.management_form }}
+            {{ at_formset.non_form_errors }}
+
+            {% for f in at_formset %}
+                <div class="row align-items-center mb-1">
+
+                {{ f.id }}
+
+                <div class="col-md-4">
+                    {{ f.enrichment_kit.errors }}
+                    {% labelled label="EnrichmentKit" %}
+                        {{ f.enrichment_kit }}
+                    {% endlabelled %}
+                </div>
+
+                <div class="col-md-6 {%if f.sample_regex.errors %}has-error{% endif %}">
+                    {{ f.sample_regex.errors }}
+                    {% labelled label="Sample RegEx" %}
+                        {{ f.sample_regex }}
+                    {% endlabelled %}
+                </div>
+
+                <div class="col-md-2 text-center">
+                    {% labelled label="Delete" %}
+                        {{ f.DELETE }}
+                    {% endlabelled %}
+                </div>
+
+                </div>
+            {% endfor %}
+
+            {{  at_formset.media }}
 
             {% if has_write_permission %}
             <button type="submit" name="{{at_form.prefix}}" class="btn btn-primary">save</button>

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplate, AnalysisTemplateRun, \
-    AnalysisTemplateRunArgument, SampleAnalysisTemplateRun, CohortAnalysisTemplateRun
+    AnalysisTemplateRunArgument, SampleAnalysisTemplateRun, CohortAnalysisTemplateRun, AutoLaunchAnalysisTemplate
 from analysis.models.nodes.node_utils import get_toposorted_nodes, reload_analysis_nodes
 from analysis.related_analyses import get_related_analysis_details_for_samples
 from genes.models import ActiveSampleGeneList
@@ -109,7 +109,7 @@ def _get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_an
     if sample.enrichment_kit:
         sample_enrichment_kit_name = sample.enrichment_kit.name
 
-    matches = get_auto_launch_analysis_template_matches(sample_enrichment_kit_name, sample.name)
+    matches = get_auto_launch_analysis_template_matches(user, sample_enrichment_kit_name, sample.name)
     return [m.analysis_template for m in matches if m.match]
 
 @dataclass
@@ -118,27 +118,29 @@ class AutoLaunchAnalysisTemplateMatch:
     enrichment_kit_match: bool
     sample_regex: Optional[str]
     sample_regex_match: bool
-    analysis_template_name: str
-    analysis_template: Optional[AnalysisTemplate]
+    analysis_template: AnalysisTemplate
 
     @property
     def match(self) -> bool:
-        return self.enrichment_kit_match and self.sample_regex_match and self.analysis_template
+        return self.enrichment_kit_match and self.sample_regex_match
 
 
-def get_auto_launch_analysis_template_matches(sample_enrichment_kit_name, sample_name) -> List[AutoLaunchAnalysisTemplateMatch]:
+def get_auto_launch_analysis_template_matches(user, sample_enrichment_kit_name, sample_name) -> List[AutoLaunchAnalysisTemplateMatch]:
     matches = []
-    for enrichment_kit_name, sample_regex, analysis_template_name in settings.ANALYSIS_AUTO_LAUNCH_SAMPLE_ANALYSIS_TEMPLATE_CONFIG:
-        analysis_template = AnalysisTemplate.objects.filter(name=analysis_template_name).first()
+    templates_qs = AnalysisTemplate.filter_for_user(user)
+    for auto_launch in AutoLaunchAnalysisTemplate.objects.filter(template__in=templates_qs):
+        enrichment_kit_name = None
+        if enrichment_kit := auto_launch.enrichment_kit:
+            enrichment_kit_name = enrichment_kit.name
+
         sample_regex_match = True  # blank means anything
-        if sample_regex:
-            sample_regex_match = bool(re.match(sample_regex, sample_name))
+        if auto_launch.sample_regex:
+            sample_regex_match = bool(re.match(auto_launch.sample_regex, sample_name))
         match = AutoLaunchAnalysisTemplateMatch(enrichment_kit_name=enrichment_kit_name,
                                                 enrichment_kit_match=sample_enrichment_kit_name == enrichment_kit_name,
-                                                sample_regex=sample_regex,
+                                                sample_regex=auto_launch.sample_regex,
                                                 sample_regex_match=sample_regex_match,
-                                                analysis_template_name=analysis_template_name,
-                                                analysis_template=analysis_template)
+                                                analysis_template=auto_launch.template)
         matches.append(match)
     return matches
 
