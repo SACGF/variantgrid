@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
@@ -8,6 +8,7 @@ from snpdb.search import search_data
 from variantopedia.models import SearchTypes
 
 
+@override_settings(PREFER_ALLELE_LINKS=False)
 class TestSearch(TestCase):
 
     @classmethod
@@ -63,6 +64,7 @@ class TestSearch(TestCase):
         ]
         for variant_str in VARIANTS:
             search_results = search_data(self.user, variant_str, False)
+            # Returns variant if settings.PREFER_ALLELE_LINKS=False
             self._verify_all_of_type(search_results, SearchTypes.VARIANT)
 
     def test_search_dbsnp(self):
