@@ -50,6 +50,11 @@ class OverlapContributionStatus(TextChoices):
     NON_COMPARABLE_VALUE = "Z", "Non-comparable value"  # e.g. Risk Factor
 
 
+class OverlapContributionChangeSource(TextChoices):
+    UPLOAD = "U", "Upload"
+    TRIAGE = "T", "Triage"
+
+
 class TriageStatus(TextChoices):
     PENDING = "P", "Pending Triage"
     REVIEWED_WILL_FIX = "F", "Will Amend"

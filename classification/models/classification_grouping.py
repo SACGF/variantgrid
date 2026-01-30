@@ -258,24 +258,6 @@ class ClassificationGrouping(TimeStampedModel):
         self.allele_origin_grouping.dirty = True
         self.allele_origin_grouping.save(update_fields=["dirty"])
 
-    # def sub_groupings(self) -> list[ClassificationSubGrouping]:
-    #     return ClassificationSubGrouping.from_modifications(self.classification_modifications)
-
-    # # for discordances
-    # classification_bucket
-    #
-    # # search details
-    # gene_symbols
-    # conditions
-    # curated
-    #
-    # # cached details
-    # summary_curated
-    # summary_classification
-    # summary_somatic_clinical_significance
-    # summary_c_hgvses
-    # summary_criteria
-
     def __lt__(self, other):
         def _sort_value(obj: ClassificationGrouping):
             return obj.share_level_obj, obj.lab
@@ -366,20 +348,11 @@ class ClassificationGrouping(TimeStampedModel):
     def allele(self) -> Allele:
         return self.allele_origin_grouping.allele_grouping.allele
 
-    # def to_json(self):
-    #     scs = self.latest_classification_modification.somatic_clinical_significance_value
-    #     return {
-    #         "lab": str(self.lab),
-    #         "classification": self.latest_classification_modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
-    #         "somatic_clinical_significance": scs.as_json() if scs else None,
-    #         "curated_date": str(self.latest_curation_date)  # fixme, need a quick way for yyyy-mm-dd
-    #     }
-
     @transaction.atomic
     def update(self):
 
         # FIXME there's a bunch of overlap calculation here that doesn't need to happen
-        # as that is now managed by Conflicts
+        # as that is now managed by Overlaps
 
         self.allele_origin_grouping.dirty = True
         self.allele_origin_grouping.save(update_fields=["dirty"])

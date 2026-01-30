@@ -1,6 +1,8 @@
 from functools import reduce, cached_property
 from typing import Any, Optional
-from django.db.models import CASCADE, QuerySet
+
+from django.contrib.auth.models import User
+from django.db.models import CASCADE, QuerySet, PROTECT
 from django.db import models
 from django.db.models.enums import TextChoices
 from django_extensions.db.models import TimeStampedModel
@@ -8,7 +10,7 @@ from annotation.models import ClinVarRecord
 from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, TriageStatus, \
-    OverlapEntrySourceTextChoices, EffectiveDateType
+    OverlapEntrySourceTextChoices, EffectiveDateType, OverlapContributionChangeSource
 from library.utils import first
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
@@ -26,7 +28,7 @@ from snpdb.models import Allele, Lab
 # @dataclass
 # class OverlapEntry:
 #     """
-#     Cached status of a contribution to the overlap.
+#     Cached status of a contribution_status to the overlap.
 #     Could be a reference to a classification or clinvar record
 #     Useful to cache as the overall status is cached - so it's good to cache the working out
 #     """
@@ -35,8 +37,8 @@ from snpdb.models import Allele, Lab
 #     lab_id: Optional[int]
 #     classification_grouping_id: Optional[int]
 #     value: Optional[str]
-#     # annoying thing about contribution is it takes a little bit of context knowledge to work out
-#     contribution: OverlapContributionStatus = None #json_enum_encoder_for_text_choices(OverlapContributionStatus),
+#     # annoying thing about contribution_status is it takes a little bit of context knowledge to work out
+#     contribution_status: OverlapContributionStatus = None #json_enum_encoder_for_text_choices(OverlapContributionStatus),
 #     testing_context_bucket: TestingContextBucket = None #json_enum_encoder_for_text_choices(TestingContextBucket),
 #     tumor_type_category: Optional[str] = None
 #     # TODO do we want to keep date type somewhere?
@@ -45,7 +47,7 @@ from snpdb.models import Allele, Lab
 #     @property
 #     def _sort_obj(self):
 #         # TODO do we need a sort order as part of value
-#         return {self.source, self.testing_context_bucket, self.contribution, self.value, self.lab_id or 0}
+#         return {self.source, self.testing_context_bucket, self.contribution_status, self.value, self.lab_id or 0}
 #
 #     def __lt__(self, other):
 #         return self._sort_obj < other._sort_obj
@@ -71,8 +73,8 @@ class OverlapContribution(TimeStampedModel):
     classification_grouping = models.ForeignKey(ClassificationGrouping, null=True, blank=True, on_delete=CASCADE)
     value_type = models.TextField(choices=ClassificationResultValue.choices)
     value = models.TextField(null=True, blank=True)
-    # annoying thing about contribution is it takes a little bit of context knowledge to work out
-    contribution = models.TextField(choices=OverlapContributionStatus.choices)  # TODO rename to contribution_status
+    # annoying thing about contribution_status is it takes a little bit of context knowledge to work out
+    contribution_status = models.TextField(choices=OverlapContributionStatus.choices)  # TODO rename to contribution_status
     testing_context_bucket = models.TextField(choices=TestingContextBucket.choices)
     tumor_type_category = models.TextField(null=True, blank=True)
     # TODO do we want to keep date type somewhere?
@@ -129,6 +131,44 @@ class OverlapContribution(TimeStampedModel):
             raise ValueError(f"Unsupported ValueType {self.value_type}")
 
 
+class OverlapContributionLog(TimeStampedModel):
+    overlap_contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
+    change_source = models.TextField(choices=OverlapContributionChangeSource.choices)
+    value = models.TextField(null=True, blank=True)
+    new_value = models.TextField(null=True, blank=True)  # TODO rename to amended value
+    triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, null=True, blank=True)
+    comment = models.TextField(null=True, blank=True)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=PROTECT)  # only used for triages
+
+    @property
+    def pretty_value(self) -> str:
+        # FIXME remove duplication
+        if not self.value:
+            return "no-value"
+        if self.overlap_contribution.value_type == ClassificationResultValue.ONC_PATH:
+            return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).pretty_value(self.value)
+        elif self.overlap_contribution.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+            return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.value)
+        else:
+            raise ValueError(f"Unsupported ValueType {self.overlap_contribution.value_type}")
+
+    @staticmethod
+    def from_current_overlap_state(
+            overlap_contribution: OverlapContribution,
+            change_source: OverlapContributionChangeSource,
+            comment: Optional[str] = None,
+            user: Optional[User] = None):
+        return OverlapContributionLog(
+            overlap_contribution=overlap_contribution,
+            change_source=change_source,
+            value=overlap_contribution.value,
+            new_value=overlap_contribution.new_value,
+            triage_status=overlap_contribution.triage_status,
+            comment=comment,
+            user=user
+        )
+
+
 class Overlap(TimeStampedModel):
     """
     Overlap is made by composition as making a separate model for each overlap type added a lot of overhead for just isolating a few fields
@@ -180,7 +220,7 @@ class Overlap(TimeStampedModel):
             return [TestingContextBucket(testing_context)]
         else:
             testing_contexts = set()
-            for contribution in self.contributions.filter(contribution=OverlapContributionStatus.CONTRIBUTING).all():
+            for contribution in self.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING).all():
                 testing_contexts.add(TestingContextBucket(contribution.testing_context_bucket))
 
             return list(sorted(testing_contexts))
@@ -226,7 +266,7 @@ class Overlap(TimeStampedModel):
     def relevant_values(self) -> list[str]:
         relevant_values = set()
         for entry in self.contributions.all():
-            if entry.contribution == OverlapContributionStatus.CONTRIBUTING:
+            if entry.contribution_status == OverlapContributionStatus.CONTRIBUTING:
                 relevant_values.add(entry.value)
         # for cg in self.classificationgroupingoverlapcontribution_set.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
         #     # FIXME check triages
@@ -262,91 +302,3 @@ class OverlapContributionSkew(TimeStampedModel):
     overlap = models.ForeignKey(Overlap, on_delete=CASCADE)
     contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
     skew_perspective = models.TextField(max_length=1, choices=TriageNextStep.choices, default=TriageNextStep.PENDING_CALCULATION)
-
-#
-# @dataclass
-# class OverlapSkew:
-#     classification_grouping_id: int
-#     overlap: Overlap
-#     other_testing_contexts: list[TestingContextBucket]
-#     other_context_entries: list[OverlapEntry]
-#
-#     @property
-#     def overlap_entries(self) -> list[OverlapEntry]:
-#         return self.other_context_entries
-#
-#     @staticmethod
-#     def skew_versus(overlap: Overlap, classification_grouping_id: int) -> 'OverlapSkew':
-#         matching_entry: Optional[OverlapEntry] = None
-#         other_entries: list[OverlapEntry] = []
-#         for entry in overlap.overlap_entries:
-#             if entry.classification_grouping_id == classification_grouping_id:
-#                 matching_entry = entry
-#             else:
-#                 other_entries.append(entry)
-#
-#         if not matching_entry:
-#             raise ValueError(f"{classification_grouping_id} is not part of this entry")
-#
-#         match overlap.overlap_type:
-#             case OverlapType.SINGLE_CONTEXT | OverlapType.CLINVAR_EXPERT_PANEL:
-#                 return OverlapSkew(
-#                     classification_grouping_id,
-#                     overlap,
-#                     other_testing_contexts=[],
-#                     other_context_entries=other_entries)
-#             case OverlapType.CROSS_CONTEXT:
-#                 other_contexts = set(overlap.testing_contexts_objs)
-#                 other_contexts.remove(matching_entry.testing_context_bucket)
-#                 return OverlapSkew(
-#                     classification_grouping_id,
-#                     overlap,
-#                     other_testing_contexts=list(other_contexts)[0],
-#                     other_context_entries=[entry for entry in overlap.overlap_entries if entry.testing_context_bucket in other_contexts]
-#                 )
-#             case _:
-#                 raise ValueError(f"Unexpected overlap type {overlap.overlap_type}")
-
-
-# class ClassificationGroupingOverlapContribution(TimeStampedModel):
-#     classification_grouping = models.ForeignKey(ClassificationGrouping, on_delete=models.CASCADE)
-#     overlap = models.ForeignKey(Overlap, on_delete=models.CASCADE)
-#     contribution_status = models.TextField(max_length=1, choices=OverlapContributionStatus.choices, default=OverlapContributionStatus.PENDING_CALCULATION)
-#
-#     class Meta:
-#         unique_together = ('classification_grouping', 'overlap')
-#
-
-# class ClassificationGroupingValueTriage(TimeStampedModel):
-#     classification_grouping = models.ForeignKey(ClassificationGrouping, on_delete=models.CASCADE)
-#     result_value_type = models.TextField(max_length=1, choices=ClassificationResultValue.choices)
-#     new_value = models.TextField(null=True, blank=True)
-#     triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
-#
-#     @cached_property
-#     def contribution(self) -> OverlapContribution:
-#         return OverlapContribution.objects.filter(classification_grouping=self.classification_grouping, value_type=self.result_value_type).get()
-#
-#     @property
-#     def triage_status_obj(self):
-#         return TriageStatus(self.triage_status)
-#
-#     class Meta:
-#         unique_together = ('classification_grouping', 'result_value_type')
-#
-#
-# class ClassificationGroupingValueTriageHistory(TimeStampedModel):
-#     triage = models.ForeignKey(ClassificationGroupingValueTriage, on_delete=models.CASCADE)
-#     new_value = models.TextField(null=True, blank=True)
-#     triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
-#     comment = models.TextField(null=True, blank=True)
-#     user = models.ForeignKey(User, null=False, blank=False, on_delete=models.PROTECT)
-#     state_data = models.JSONField(null=True, blank=True)  # For caching state of the Overlaps at the time
-#
-#     @property
-#     def result_value_type(self):
-#         return self.triage.result_value_type
-#
-#     @property
-#     def triage_status_obj(self):
-#         return TriageStatus(self.triage_status)

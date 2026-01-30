@@ -16,10 +16,12 @@
 {% labelled label="Overlaps" %}
     {% for overlap in overlaps %}<div class="my-1">{% overlap overlap %}</div>{% endfor %}
 {% endlabelled %}
+{% comment %}
 {% labelled label="Triages" %}
     <a class="my-1" data-href="{% url 'triage' classification_grouping.pk 'O' %}?edit=true" data-toggle="ajax-modal">Onco-Path Triage</a><br/>
     <a class="my-1" data-href="{% url 'triage' classification_grouping.pk 'S' %}?edit=true" data-toggle="ajax-modal">Clinical Significance Triage</a>
 {% endlabelled %}
+{% endcomment %}
 {% with "grouping_records_"|append:classification_grouping.pk as expand_id %}
     {% labelled label="Records" row_id=expand_id %}
         {% if classification_grouping.classification_count > 10 %}

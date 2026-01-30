@@ -40,7 +40,8 @@ from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
     ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping, AlleleOriginGrouping, \
-    ImportedAlleleInfo, ImportedAlleleInfoStatus, ClassificationImportRun, Overlap
+    ImportedAlleleInfo, ImportedAlleleInfoStatus, ClassificationImportRun, Overlap, OverlapContributionSkew, \
+    OverlapContribution
 from classification.models.classification import ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
@@ -971,8 +972,12 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
     # TODO should we pass in the contributions rather than the overlaps?
     # overlaps_qs = ClassificationGroupingOverlapContribution.objects.filter(classification_grouping=grouping).filter(overlap__valid=True)
     # overlaps = list(sorted(contribution.overlap for contribution in overlaps_qs))
-    overlaps = Overlap.objects.filter(valid=True, overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER, contributions__classification_grouping=grouping)
-    # TODO sort to have single context first
+    contributions = OverlapContribution.objects.filter(classification_grouping=grouping)
+    skews = OverlapContributionSkew.objects.filter(contribution__in=contributions)
+    overlaps = Overlap.objects.filter(valid=True, overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER, pk__in=skews.values_list('overlap'))
+
+    # overlaps = Overlap.objects.filter(valid=True, overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER, contributions__classification_grouping=grouping)
+     # TODO sort to have single context first
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
         "classification_grouping": grouping,
         "overlaps": overlaps

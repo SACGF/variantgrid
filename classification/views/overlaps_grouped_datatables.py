@@ -26,7 +26,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             OverlapContribution.objects.filter(
                     classification_grouping=OuterRef('pk'),
                     value_type=ClassificationResultValue.ONC_PATH,
-                    contribution=OverlapContributionStatus.CONTRIBUTING
+                    contribution_status=OverlapContributionStatus.CONTRIBUTING
             ).values_list('pk')))
 
         qs = qs.annotate(onc_path_discordance_single_status=Subquery(
@@ -49,7 +49,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             OverlapContribution.objects.filter(
                     classification_grouping=OuterRef('pk'),
                     value_type=ClassificationResultValue.CLINICAL_SIGNIFICANCE,
-                    contribution=OverlapContributionStatus.CONTRIBUTING
+                    contribution_status=OverlapContributionStatus.CONTRIBUTING
             ).values_list('pk')))
 
         qs = qs.annotate(clin_sig_discordance_single_status=Subquery(
@@ -90,7 +90,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
         onc_path_values = set()
         onc_path_multi_values = set()
         for overlap in onc_path_overlaps:
-            for contribution in overlap.contributions.filter(contribution=OverlapContributionStatus.CONTRIBUTING).all():
+            for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING).all():
                 if contribution.testing_context_bucket != cell.obj.testing_context:
                     onc_path_multi_values.add(contribution.value)
                 else:
@@ -101,7 +101,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
 
         clin_sig_values = set()
         for overlap in clin_sig_overlaps:
-            for contribution in overlap.contributions.filter(contribution=OverlapContributionStatus.CONTRIBUTING).all():
+            for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING).all():
                 clin_sig_values.add(contribution.value)
 
         e_clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)

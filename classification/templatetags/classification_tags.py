@@ -783,7 +783,7 @@ def triage(context,
 
     if triage.triage_status_obj == TriageStatus.REVIEWED_WILL_FIX:
         new_value = triage.new_value
-        value_type = triage.result_value_type
+        value_type = triage.value_type
 
         if new_value == 'undecided':  # fixme standardise terminology
             new_value = "To Be Determined"

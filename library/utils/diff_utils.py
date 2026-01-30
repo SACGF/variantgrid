@@ -3,7 +3,7 @@ import itertools
 import re
 from dataclasses import dataclass, field
 from html import escape
-from typing import Optional, Any, Pattern
+from typing import Optional, Any, Pattern, TypeVar, Generic
 
 from django.utils.safestring import SafeString
 
@@ -265,3 +265,29 @@ class MultiDiff:
                     diff_output.append('d', part[diff_index:])
 
             return outputs
+
+
+# below is just for making diffs between regular ob jects
+@dataclass
+class DiffedValue:
+    old_value: Any
+    new_value: Any
+
+    @property
+    def is_change(self):
+        return self.old_value != self.new_value
+
+
+T = TypeVar("T")
+
+class DiffedValues(Generic[T]):
+
+    def __init__(self, old_object: Optional[T], new_object: T):
+        self.old_object = old_object
+        self.new_object = new_object
+
+    def __getitem__(self, item):
+        return DiffedValue(
+            old_value=vars(self.old_object)[item] if self.old_object else None,
+            new_value=vars(self.new_object)[item],
+        )

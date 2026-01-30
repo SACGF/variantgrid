@@ -47,40 +47,57 @@
         {% for linked_history in overlap_grouping.history %}
             <div class="row my-4">
                 <div class="col-3 text-right">
-                    <div>{% timestamp linked_history.history.created time_ago=True %}</div>
-                    <div class="mt-1">{% user linked_history.history.user size="tiny" %}</div>
+                    <div>{% timestamp linked_history.new_object.created time_ago=True %}</div>
+                    <div class="mt-1">
+                        {% if linked_history.new_object.user %}
+                        {% user linked_history.new_object.user size="tiny" %}
+                        {% endif %}
+                    </div>
+                    {% if linked_history.new_object.overlap_contribution.lab %}
+                         <div class="mt-2">
+                            {{ linked_history.new_object.overlap_contribution.lab  }}
+                        </div>
+                    <div class="mt-2">
+                        <span class="testing-context-box testing-context-{{ linked_history.new_object.overlap_contribution.testing_context_bucket_obj.value }}">{{ linked_history.new_object.overlap_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="col-9 text-left">
-                    {% ifchanged linked_history.triage.classification_grouping %}
+                    {% ifchanged linked_history.new_object.overlap_contribution %}
                     <div>
-                        {% with contribution=linked_history.triage.contribution %}
+                        {% with contribution_log=linked_history.new_object %}
                             <div style="display:flex; width: 600px">
                                 <div>
-                                <span class="testing-context-box testing-context-{{ contribution.testing_context_bucket_obj.value }}">{{ contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span>
+                                    <b>{{ contribution_log.pretty_value }}</b>
                                 </div>
-                                <div class="mx-2">
-                                    <b>{{ contribution.pretty_value }}</b>
-                                </div>
-                                <div class="mx-2">
-                                    {% condition contribution.conditions %}
-                                </div>
-                                <div class="mx-2">
-                                    {{ contribution.lab }}
+                                <div class="ml-2">
+                                    {% condition contribution_log.conditions %}
                                 </div>
                             </div>
                         {% endwith %}
                     </div>
                     {% endifchanged %}
                     <div>
-                        {% if linked_history.status_changed %}
-                            {% if linked_history.previous_history %}
-                                {% triage linked_history.previous_history show_label=True %} -> {% triage linked_history.history show_label=True %}
-                            {% else %}
-                                {% triage linked_history.history show_label=True %}
+{#                        {% if not linked_history.old_object %}#}
+{#                            <div>New Submission: {{ linked_history.new_object.pretty_value }}</div>#}
+{#                        {% endif %}#}
+                        {% if linked_history.old_object %}
+                            {% if linked_history.value.is_change %}
+                                <div>{{ linked_history.old_object.pretty_value }} -> {{ linked_history.new_object.pretty_value }}</div>
+                            {% endif %}
+                            {% if linked_history.conditions.is_change %}
+                                <div>{% condition linked_history.old_object.conditions %} -> {% condition linked_history.new_object.conditions %}}</div>
+                            {% endif %}
+                            {% if linked_history.triage_status.is_change %}
+                                <div>{{ linked_history.old_object.get_triage_status_display }} -> {{ linked_history.new_object.get_triage_status_display }}</div>
                             {% endif %}
                         {% endif %}
                     </div>
-                    <div class="mt-1">{{ linked_history.history.comment }}</div>
+                    {% if linked_history.new_object.comment %}
+                        <div class="mt-1">{{ linked_history.new_object.comment }}</div>
+                    {% elif not linked_history.old_object %}
+                        <div class="mt-1"><i>Initial Upload</i></div>
+                    {% endif %}
                 </div>
             </div>
             {% if not forloop.last %}<hr/>{% endif %}

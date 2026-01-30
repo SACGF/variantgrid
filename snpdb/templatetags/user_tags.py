@@ -44,6 +44,9 @@ def user(context, u: User,
          show_avatar=False, show_email=False, show_last_login=False, show_group=False, show_user_page_link=False,
          role='user', size='normal'):
 
+    if not isinstance(u, User):
+        raise ValueError(f"'{u}' is not a User object")
+
     @dataclass(frozen=True)
     class UserDetails:
         context: Any

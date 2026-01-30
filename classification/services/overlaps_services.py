@@ -1,12 +1,14 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Iterable
+from typing import Optional, Iterable, Iterator
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
-    OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, TriageStatus, TriageNextStep
+    OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, TriageStatus, \
+    TriageNextStep, OverlapContributionLog, OverlapContributionChangeSource
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig
+from library.utils import DiffedValues
 
 
 class OverlapServices:
@@ -37,6 +39,9 @@ class OverlapServices:
             else:
                 contribution = OverlapContributionStatus.CONTRIBUTING
 
+            # FIXME
+            effective_date = classification_grouping.latest_classification_modification.curated_date
+
             overlap_contribution, created = OverlapContribution.objects.update_or_create(
                 source=OverlapEntrySourceTextChoices.CLASSIFICATION,
                 allele=classification_grouping.allele,
@@ -46,15 +51,23 @@ class OverlapServices:
                 value_type=value_type,
                 defaults={
                     "value": value,
-                    "contribution": contribution,
+                    "contribution_status": contribution,
                     "effective_date": classification_grouping.latest_classification_modification.curated_date
                     # TODO date type
                 }
             )
             if created:
+                OverlapContributionLog.from_current_overlap_state(overlap_contribution, OverlapContributionChangeSource.UPLOAD).save()
                 OverlapServices.link_overlap_contribution(overlap_contribution)
                 # make sure this is added to or creates the relevant overlaps
                 overlap_contribution.refresh_from_db()
+            else:
+                last_log = OverlapContributionLog.objects.filter(overlap_contribution=overlap_contribution).order_by('-created').first()
+                if value != last_log.value:
+                    OverlapContributionLog.from_current_overlap_state(
+                        overlap_contribution,
+                        OverlapContributionChangeSource.UPLOAD
+                    ).save()
 
             # now update status of any created overlaps or existing linked overlaps
             for skew in overlap_contribution.overlapcontributionskew_set.select_related('overlap').all():
@@ -192,52 +205,14 @@ class OverlapServices:
             overlap.valid = valid
         overlap.save()
 
-        """
-        class OverlapContribution(TimeStampedModel):
-        source = models.TextField(choices=OverlapEntrySourceTextChoices.choices)
-        scv = models.TextField(null=True, blank=True) # could SCV change?
-        # lab_id = models.ForeignKey(Lab, on_delete=CASCADE)
-        classification_grouping = models.ForeignKey(ClassificationGrouping, null=True, blank=True, on_delete=CASCADE)
-        value_type = models.TextField(choices=ClassificationResultValue.choices)
-        value = models.TextField(null=True, blank=True)
-        # annoying thing about contribution is it takes a little bit of context knowledge to work out
-        contribution = models.TextField(choices=OverlapContributionStatus.choices)
-        testing_context_bucket = models.TextField(choices=TestingContextBucket.choices)
-        tumor_type_category = models.TextField(null=True, blank=True)
-        # TODO do we want to keep date type somewhere?
-        effective_date = models.DateField(null=True, blank=True)
-
-        :param sender:n  
-        :param instance:
-        :param kwargs:
-        :return:
-        """
-
-    # FIXME - restore history
-    #
-    # @dataclass
-    # class LinkedTriageHistory:
-    #     previous_history: Optional[ClassificationGroupingValueTriageHistory]
-    #     history: ClassificationGroupingValueTriageHistory
-    #
-    #     @property
-    #     def status_changed(self) -> bool:
-    #         if not self.previous_history:
-    #             return True
-    #         return self.history.triage_status_obj != self.previous_history.triage_status_obj or self.history.new_value != self.previous_history.new_value
-    #
-    #     @property
-    #     def triage(self) -> ClassificationGroupingValueTriage:
-    #         return self.history.triage
-    #
-    # @staticmethod
-    # def get_linked_history_for(triages: list[ClassificationGroupingValueTriageHistory]) -> Iterator[LinkedTriageHistory]:
-    #     qs = ClassificationGroupingValueTriageHistory.objects.filter(triage__in=triages).order_by('created')
-    #     triage_last_history: dict[int, ClassificationGroupingValueTriageHistory] = {}
-    #     for triage_history in qs.iterator():
-    #         previous = triage_last_history.get(triage_history.triage_id)
-    #         yield OverlapServices.LinkedTriageHistory(previous_history=previous, history=triage_history)
-    #         triage_last_history[triage_history.triage_id] = triage_history
+    @staticmethod
+    def get_linked_history_for(triages: list[OverlapContribution]) -> Iterator[DiffedValues[OverlapContributionLog]]:
+        qs = OverlapContributionLog.objects.filter(overlap_contribution__in=triages).order_by('created')
+        triage_last_history: dict[int, OverlapContributionLog] = {}
+        for triage_history in qs.iterator():
+            previous = triage_last_history.get(triage_history.overlap_contribution_id)
+            yield DiffedValues(previous, triage_history)
+            triage_last_history[triage_history.overlap_contribution_id] = triage_history
 
 
 @dataclass
@@ -298,19 +273,9 @@ class OverlapGrouping:
         return TriageNextStep.PENDING_CALCULATION
 
     @property
-    def history(self) -> Iterable:
-        return []
-        # FIXME
-        # all_triages = set()
-        # for contribution in self.contributions:
-        #     if classification_grouping := contribution.classification_grouping:
-        #         triage = classification_grouping.triage_for(self.value_type)
-        #         all_triages.add(triage)
-        # if classification_grouping := self.user_contribution.classification_grouping:
-        #     triage = classification_grouping.triage_for(self.value_type)
-        #     all_triages.add(triage)
-        #
-        # return OverlapServices.get_linked_history_for(all_triages)
+    def history(self) -> Iterator[DiffedValues[OverlapContributionLog]]:
+        all_triages = self.contributions | set([self.user_contribution])
+        return OverlapServices.get_linked_history_for(all_triages)
 
     @staticmethod
     def overlap_grouping_for(classification_grouping: ClassificationGrouping, value_type: ClassificationResultValue, include_cross_context: bool) -> 'OverlapGrouping':
@@ -324,7 +289,7 @@ class OverlapGrouping:
             return None
 
         contributions = set()
-        contributions |= set(single_context_overlap.contributions.filter(contribution=OverlapContributionStatus.CONTRIBUTING))
+        contributions |= set(single_context_overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING))
 
         user_contribution = None
         for contribution in contributions:
@@ -336,7 +301,7 @@ class OverlapGrouping:
         if include_cross_context:
             cross_context_overlap = overlaps.filter(overlap_type=OverlapType.CROSS_CONTEXT).first()
             if cross_context_overlap:
-                contributions |= set(cross_context_overlap.contributions.filter(contribution=OverlapContributionStatus.CONTRIBUTING))
+                contributions |= set(cross_context_overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING))
 
         contributions.remove(user_contribution)
 

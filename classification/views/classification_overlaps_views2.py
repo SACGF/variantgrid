@@ -8,25 +8,16 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 
 from classification.enums import SpecialEKeys
-from classification.models import ClassificationResultValue, ClassificationGrouping, \
-    EvidenceKey, EvidenceKeyMap, TriageStatus, OverlapContribution
+from classification.models import ClassificationResultValue, \
+    EvidenceKey, EvidenceKeyMap, TriageStatus, OverlapContribution, OverlapContributionLog, \
+    OverlapContributionChangeSource
 from classification.services.overlaps_services import OverlapGrouping, OverlapServices
-from library.log_utils import log_saved_form
 from snpdb.lab_picker import LabPickerData
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
-class ClassificationGroupingValueTriageForm(forms.ModelForm):
+class ClassificationGroupingValueTriageForm(forms.Form):
 
-    class Meta:
-        model = OverlapContribution
-        fields = ("triage_status", "new_value")
-
-    # triage_date = forms.DateField(
-    #     label="Triage Date",
-    #     widget=forms.TextInput(attrs={"class": "date-picker form-control"}),
-    #     required=True,
-    # )
     triage_status = forms.ChoiceField(
         label="Triage Status",
         widget=forms.RadioSelect(),
@@ -119,29 +110,15 @@ class TriageView(AjaxFormView[OverlapContribution]):
 
         context = {}
         saved = False
-
-        # contribution = OverlapContribution.objects.filter(classification_grouping=classification_grouping, value_type=value_type).get()
-
         overlap_grouping = OverlapGrouping.overlap_grouping_for(classification_grouping, value_type, True)
-
-        # all_overlaps = Overlap.objects.filter(contributions=contribution, valid=True)
-        # all_overlaping_groups: set[ClassificationGrouping] = set()
-        # for overlap in all_overlaps:
-        #     all_overlaping_groups.update(ocg.classification_grouping for ocg in overlap.contributions.all() if ocg.classification_grouping)
-
-        # TODO expert panels
 
         context["overlap_grouping"] = overlap_grouping
         same_context = []
         other_contexts = []
-        # for grouping in all_overlaping_groups:
-        #     if grouping.pk != classification_grouping_id:
-        #         alternative_groupings.append(grouping)
+
         # TODO can we sort these values on how similar the context is?
-        # context["alternative_groupings"] = alternative_groupings
         context["classification_grouping"] = classification_grouping
         context["value_type"] = value_type
-        # TODO expert panels
 
         value_e_key: EvidenceKey
         if value_type == ClassificationResultValue.ONC_PATH:
@@ -154,48 +131,45 @@ class TriageView(AjaxFormView[OverlapContribution]):
         if request.GET.get("edit") == "true":
             if value_type == ClassificationResultValue.ONC_PATH:
                 form = ClassificationGroupingValueTriageOncPathForm(
-                    data=request.POST or None,
-                    instance=triage
+                    # data=request.POST or None,
+                    data=request.POST if request.method == "POST" else None,
+                    initial={
+                        "triage_status": triage.triage_status,
+                        "new_value": triage.new_value
+                    }
                 )
             else:
                 form = ClassificationGroupingValueTriageClinSigForm(
-                    data=request.POST or None,
-                    instance=triage
+                    # data=request.POST or None,
+                    data=request.POST if request.method == "POST" else None,
+                    initial={
+                        "triage_status": triage.triage_status,
+                        "new_value": triage.new_value
+                    }
                 )
             context["form"] = form
 
-            # if not triage.can_write(request.user):
-            #     raise PermissionError("User does not have permission to edit this triage")
-
-
-
-            # form = DiscordanceReportTriageForm(
-            #     data=request.POST or None,
-            #     instance=triage,
-            #     initial={"triage_date": datetime.now().date()},
-            #     prefix=f"drt{discordance_report_triage_id}"
-            # )
             if form.is_valid() and request.method == "POST":
                 # triage.user = request.user
                 if form.cleaned_data != TriageStatus.REVIEWED_WILL_FIX:
                     form.cleaned_data["new_value"] = None
 
-                # don't save "New Value" unless mode is set to Reviewed Will Fix
-                triage: OverlapContribution = form.save(commit=False)
-                if triage.triage_status != TriageStatus.REVIEWED_WILL_FIX:
+                triage.triage_status = form.cleaned_data["triage_status"]
+                if triage.triage_status == TriageStatus.REVIEWED_WILL_FIX:
+                    triage.new_value = form.cleaned_data["new_value"]
+                else:
                     triage.new_value = None
+                comment = form.cleaned_data["comment"]
+                user = request.user
+
+                # TODO put in transaction
                 triage.save()
-
-                log_saved_form(form)
-
-                # FIXME have history
-                # ClassificationGroupingValueTriageHistory(
-                #     triage=triage,
-                #     new_value=triage.new_value,
-                #     triage_status=triage.triage_status,
-                #     comment=form.cleaned_data["comment"],
-                #     user=request.user
-                # ).save()
+                OverlapContributionLog.from_current_overlap_state(
+                    overlap_contribution=triage,
+                    change_source=OverlapContributionChangeSource.TRIAGE,
+                    comment=comment,
+                    user=user
+                ).save()
 
                 for overlap_contribution in triage.classification_grouping.overlapcontribution_set.filter(value_type=value_type):
                     for overlap in overlap_contribution.overlaps:
@@ -205,7 +179,5 @@ class TriageView(AjaxFormView[OverlapContribution]):
                 context["saved"] = True
 
                 return redirect(reverse('triage', kwargs={"triage_id": triage.pk}))
-            # else:
-            #     context["form"] = form
 
         return TriageView.lazy_render(triage, context).render(request, saved=saved)
