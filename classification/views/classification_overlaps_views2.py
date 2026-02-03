@@ -1,5 +1,7 @@
 from tokenize import Special
 from typing import Optional
+
+from auditlog.context import set_extra_data
 from django.contrib import messages
 from django import forms
 from django.http import HttpRequest, HttpResponseBase
@@ -151,9 +153,6 @@ class TriageView(AjaxFormView[OverlapContribution]):
 
             if form.is_valid() and request.method == "POST":
                 # triage.user = request.user
-                if form.cleaned_data != TriageStatus.REVIEWED_WILL_FIX:
-                    form.cleaned_data["new_value"] = None
-
                 triage.triage_status = form.cleaned_data["triage_status"]
                 if triage.triage_status == TriageStatus.REVIEWED_WILL_FIX:
                     triage.new_value = form.cleaned_data["new_value"]
@@ -162,8 +161,9 @@ class TriageView(AjaxFormView[OverlapContribution]):
                 comment = form.cleaned_data["comment"]
                 user = request.user
 
-                # TODO put in transaction
+                triage.set_change_comment(comment)
                 triage.save()
+
                 OverlapContributionLog.from_current_overlap_state(
                     overlap_contribution=triage,
                     change_source=OverlapContributionChangeSource.TRIAGE,

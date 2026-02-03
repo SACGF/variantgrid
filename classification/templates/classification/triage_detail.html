@@ -26,7 +26,7 @@
                     </tr>
                 {% for overlap_comparison in overlap_grouping.comparisons %}
                     <tr {% if overlap_comparison.is_cross_context %}style="opacity:0.7"{% endif %}>
-                        <td style="text-align:center"><span class="testing-context-box testing-context-{{ overlap_comparison.entry_2.testing_context_bucket_obj.value }}">{{ overlap_comparison.entry_2.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
+                        <td style="text-align:center">{% testing_context overlap_comparison.entry_2 %}</td>
                         <td>{{ overlap_comparison.entry_2.pretty_value }} {% if overlap_comparison.triage %}{% triage overlap_comparison.triage %}{% endif %}</td>
                         <td>{% condition overlap_comparison.entry_2.conditions %}</td>
                         <td>{% if overlap_comparison.entry_2.scv %}ClinVar Expert Panel<br/>{{ overlap_comparison.entry_2.scv }}{% else %}{{ overlap_comparison.entry_2.lab }}{% endif %}</td>
@@ -44,6 +44,33 @@
         {% endlabelled %}
 
         <label class="w-100 text-center">History</label>
+        {% for change in overlap_grouping.change_log %}
+            {% ifchanged change.overlap_contribution %}
+                <hr/>
+            {% endifchanged %}
+            <div class="row my-4">
+                <div class="col-3 text-right">
+                    {% ifchanged change.overlap_contribution %}
+                        <div>{% testing_context change.overlap_contribution %} {{ change.overlap_contribution.lab }}</div>
+                    {% endifchanged %}
+                    <div>{% timestamp change.timestamp time_ago=True %}</div>
+                    {% if change.user %}
+                        <div></div>
+                    {% endif %}
+                </div>
+                <div class="col-9">
+                    {% for field_change in change.changes %}
+                        <div>{{ field_change.old_value }} -> {{ field_change.new_value }}</div>
+                    {% endfor %}
+                    {% if change.comment and change.user %}
+                        <div class="comment">{{ change.comment }}{% user change.user size="tiny" %}</div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+
+
+        {% comment %}
         {% for linked_history in overlap_grouping.history %}
             <div class="row my-4">
                 <div class="col-3 text-right">
@@ -57,10 +84,13 @@
                          <div class="mt-2">
                             {{ linked_history.new_object.overlap_contribution.lab  }}
                         </div>
+                     {% else %}
+                        <div class="mt-2">{{ linked_history.new_object.overlap_contribution.scv }}</div>
+                    {% endif %}
                     <div class="mt-2">
                         <span class="testing-context-box testing-context-{{ linked_history.new_object.overlap_contribution.testing_context_bucket_obj.value }}">{{ linked_history.new_object.overlap_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span>
                     </div>
-                    {% endif %}
+
                 </div>
                 <div class="col-9 text-left">
                     {% ifchanged linked_history.new_object.overlap_contribution %}
@@ -103,6 +133,7 @@
             {% if not forloop.last %}<hr/>{% endif %}
         {% endfor %}
         <hr/>
+        {% endcomment %}
 
         {% if form %}
             <label class="w-100 text-center">Update</label>

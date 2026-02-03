@@ -32,15 +32,15 @@ class ConflictType(TextChoices):
 
 class OverlapStatus(IntegerChoices):
     NO_CONTRIBUTIONS = 0, "No contributions"
-    NO_COUNTING_CONTRIBUTIONS = 10, "No counting contributions" # used if only RiskFactor or Drug Risk
+    NO_COUNTING_CONTRIBUTIONS = 10, "No counting contributions" # used if only Risk Factor or Drug Risk
     SINGLE_SUBMITTER = 20, "Single submitter"
     EXACT_AGREEMENT = 30, "Exact agreement"
     TERMINOLOGY_DIFFERENCES = 40, "Terminology differences"  # e.g. P vs O
     RESOLUTION_DIFFERENCES = 50, "Resolution differences"  # e.g. VUS vs VUS_B
     MINOR_DIFFERENCES = 60, "Minor differences"  # e.g. VUS_A vs VUS_B, Pathogenic versus Likely Pathogenic
-    TIER_1_VS_TIER_2_DIFFERENCES = 70, "Tier 1 vs Tier 2 differences"  # special category for tier_1 vs tier_2
-    MAJOR_DIFFERENCES = 80, "Discordance"  # VUS vs Benign
-    MEDICALLY_SIGNIFICANT = 90, "Medically significant discordance"  # VUS vs Pathogenic
+    TIER_1_VS_TIER_2_DIFFERENCES = 70, "Tier 1 vs Tier 2 differences"  # User group disagrees on importance of Tier 1 vs Tier 2 - can work out how to treat this later
+    MAJOR_DIFFERENCES = 80, "Discordance"  # VUS vs Benign TODO work out if this is in tier 1 vs tier 3
+    MEDICALLY_SIGNIFICANT = 90, "Medically significant discordance"  # VUS or lower vs Pathogenic as will require re-reporting
 
     @property
     def is_dull(self) -> bool:

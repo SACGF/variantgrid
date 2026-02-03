@@ -13,7 +13,7 @@ cyvcf2==0.30.28
 deprecation==2.1.0
 Django==4.2.15
 django-amazon-ses==4.0.1
-django-auditlog==3.0.0
+django-auditlog==3.4.1
 django_autocomplete_light==3.9.1
 django-avatar==8.0.0
 django_cache_memoize==0.1.10

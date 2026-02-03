@@ -3290,3 +3290,17 @@ a .c-hgvs-body {
 		background: black;
 	}
 }
+
+.comment {
+	padding: 8px;
+	border: 1px solid #ccc;
+	border-radius: 0 8px 8px 8px;
+	color: #888;
+
+	&:before {
+		content: '\f27a';
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+		padding-right: 8px;
+	}
+}

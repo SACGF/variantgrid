@@ -771,6 +771,14 @@ def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompar
     }
 
 
+@register.inclusion_tag("classification/tags/testing_context.html")
+def testing_context(obj: OverlapContribution):
+    return {
+        "testing_context": obj.testing_context_bucket_obj,
+        "tumor_type": obj.tumor_type_category
+    }
+
+
 @register.inclusion_tag("classification/tags/triage.html", takes_context=True)
 def triage(context,
            triage: OverlapContribution,

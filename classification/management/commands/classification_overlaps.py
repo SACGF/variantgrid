@@ -45,7 +45,7 @@ class Command(BaseCommand):
                     classification_grouping=None,
                     value_type=ClassificationResultValue.ONC_PATH,
                     value=value,
-                    contribution=contribution_enum,
+                    contribution_status=contribution_enum,
                     testing_context_bucket=TestingContextBucket.GERMLINE,
                     tumor_type_category=None,
                     effective_date=effective_date,

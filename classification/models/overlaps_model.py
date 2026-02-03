@@ -1,6 +1,8 @@
 from functools import reduce, cached_property
 from typing import Any, Optional
 
+from auditlog.models import AuditlogHistoryField
+from auditlog.registry import auditlog
 from django.contrib.auth.models import User
 from django.db.models import CASCADE, QuerySet, PROTECT
 from django.db import models
@@ -67,6 +69,8 @@ from snpdb.models import Allele, Lab
 
 
 class OverlapContribution(TimeStampedModel):
+    history = AuditlogHistoryField()
+
     source = models.TextField(choices=OverlapEntrySourceTextChoices.choices)
     scv = models.TextField(null=True, blank=True)  # could SCV change?
     allele = models.ForeignKey(Allele, null=True, blank=True, on_delete=CASCADE)
@@ -83,6 +87,16 @@ class OverlapContribution(TimeStampedModel):
 
     new_value = models.TextField(null=True, blank=True)  # TODO rename to amended value
     triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._change_comment = None
+
+    def set_change_comment(self, change_comment: str):
+        self._change_comment = change_comment
+
+    def get_additional_data(self) -> dict:
+        return {"comment": self._change_comment}
 
     class Meta:
         unique_together = ('classification_grouping', 'value_type')
@@ -121,24 +135,36 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def pretty_value(self) -> str:
-        if not self.value:
+        return OverlapContribution.pretty_value_for(self.value, self.value_type)
+
+    @staticmethod
+    def pretty_value_for(value: Optional[str], value_type: ClassificationResultValue):
+        if not value:
             return "no-value"
-        if self.value_type == ClassificationResultValue.ONC_PATH:
-            return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).pretty_value(self.value)
-        elif self.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
-            return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.value)
+        if value_type == ClassificationResultValue.ONC_PATH:
+            return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).pretty_value(value)
+        elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+            return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(value)
         else:
-            raise ValueError(f"Unsupported ValueType {self.value_type}")
+            raise ValueError(f"Unsupported ValueType {value_type}")
+
+
+auditlog.register(OverlapContribution)
 
 
 class OverlapContributionLog(TimeStampedModel):
     overlap_contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
     change_source = models.TextField(choices=OverlapContributionChangeSource.choices)
-    value = models.TextField(null=True, blank=True)
     new_value = models.TextField(null=True, blank=True)  # TODO rename to amended value
     triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, null=True, blank=True)
     comment = models.TextField(null=True, blank=True)
     user = models.ForeignKey(User, null=True, blank=True, on_delete=PROTECT)  # only used for triages
+
+    # values changed by upload
+    value = models.TextField(null=True, blank=True)
+    effective_date = models.DateField(null=True, blank=True)
+    effective_date_type = models.TextField(choices=EffectiveDateType.choices, default=EffectiveDateType.UNKNOWN)
+    contribution_status = models.TextField(choices=OverlapContributionStatus.choices)
 
     @property
     def pretty_value(self) -> str:
@@ -161,11 +187,14 @@ class OverlapContributionLog(TimeStampedModel):
         return OverlapContributionLog(
             overlap_contribution=overlap_contribution,
             change_source=change_source,
-            value=overlap_contribution.value,
             new_value=overlap_contribution.new_value,
             triage_status=overlap_contribution.triage_status,
             comment=comment,
-            user=user
+            user=user,
+            value=overlap_contribution.value,
+            effective_date=overlap_contribution.effective_date,
+            effective_date_type=overlap_contribution.effective_date_type,
+            contribution_status=overlap_contribution.contribution_status
         )
 
 

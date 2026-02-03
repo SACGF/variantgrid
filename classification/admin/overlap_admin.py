@@ -24,6 +24,7 @@ from snpdb.models import AlleleOrigin, Allele
 
 @admin.register(OverlapContribution)
 class OverlapContributionAdmin(ModelAdminBasics):
+    show_auditlog_history_link = True
     list_display = ['source', 'allele', 'classification_grouping', 'value_type', 'value', 'testing_context_bucket', 'effective_date']
     list_filter = ('source', 'value_type', 'testing_context_bucket')
 

@@ -1,14 +1,20 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from functools import cached_property
 from typing import Optional, Iterable, Iterator
+
+from auditlog.context import set_actor
+from auditlog.models import LogEntry
+from django.contrib.auth.models import User
+from django.db.models import QuerySet
+
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, TriageStatus, \
     TriageNextStep, OverlapContributionLog, OverlapContributionChangeSource
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig
-from library.utils import DiffedValues
 
 
 class OverlapServices:
@@ -52,7 +58,7 @@ class OverlapServices:
                 defaults={
                     "value": value,
                     "contribution_status": contribution,
-                    "effective_date": classification_grouping.latest_classification_modification.curated_date
+                    "effective_date": effective_date
                     # TODO date type
                 }
             )
@@ -63,7 +69,7 @@ class OverlapServices:
                 overlap_contribution.refresh_from_db()
             else:
                 last_log = OverlapContributionLog.objects.filter(overlap_contribution=overlap_contribution).order_by('-created').first()
-                if value != last_log.value:
+                if value != last_log.value or contribution != last_log.contribution_status or effective_date != last_log.effective_date:
                     OverlapContributionLog.from_current_overlap_state(
                         overlap_contribution,
                         OverlapContributionChangeSource.UPLOAD
@@ -205,15 +211,6 @@ class OverlapServices:
             overlap.valid = valid
         overlap.save()
 
-    @staticmethod
-    def get_linked_history_for(triages: list[OverlapContribution]) -> Iterator[DiffedValues[OverlapContributionLog]]:
-        qs = OverlapContributionLog.objects.filter(overlap_contribution__in=triages).order_by('created')
-        triage_last_history: dict[int, OverlapContributionLog] = {}
-        for triage_history in qs.iterator():
-            previous = triage_last_history.get(triage_history.overlap_contribution_id)
-            yield DiffedValues(previous, triage_history)
-            triage_last_history[triage_history.overlap_contribution_id] = triage_history
-
 
 @dataclass
 class OverlapEntryCompare:
@@ -250,6 +247,28 @@ class OverlapEntryCompare:
         return self.entry_2
 
 
+@dataclass
+class FieldChange:
+    field: str
+    old_value: str
+    new_value: str
+
+    def __lt__(self, other):
+        return self.field < other.field
+
+
+@dataclass
+class ChangeRow:
+    overlap_contribution: OverlapContribution
+    user: Optional[User]
+    changes: list[FieldChange]
+    comment: Optional[str]
+    timestamp: datetime
+
+    def __lt__(self, other):
+        return self.timestamp < other.timestamp
+
+
 @dataclass(frozen=True)
 class OverlapGrouping:
     single_context_overlap: Optional[Overlap]
@@ -272,10 +291,75 @@ class OverlapGrouping:
                 return TriageNextStep(skew.skew_perspective)
         return TriageNextStep.PENDING_CALCULATION
 
-    @property
-    def history(self) -> Iterator[DiffedValues[OverlapContributionLog]]:
+    @cached_property
+    def change_log(self) -> list[ChangeRow]:
         all_triages = self.contributions | set([self.user_contribution])
-        return OverlapServices.get_linked_history_for(all_triages)
+        change_rows: list[ChangeRow] = []
+
+        def none_str_to_none(changes: list[str]) -> list[Optional[str]]:
+            if changes:
+                return [None if value == "None" else value for value in changes]
+            return None
+
+        for triage in all_triages:
+            triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage)
+            for entry in triage_log:
+                field_changes = []
+
+                new_value_change = none_str_to_none(entry.changes_dict.get("new_value"))
+                triage_status_change = none_str_to_none(entry.changes_dict.get("triage_status"))
+                if new_value_change or triage_status_change:
+
+                    old_triage_status = TriageStatus.REVIEWED_WILL_FIX
+                    new_triage_status = TriageStatus.REVIEWED_WILL_FIX
+                    if triage_status_change:
+                        old_triage_status = TriageStatus(triage_status_change[0])
+                        new_triage_status = TriageStatus(triage_status_change[1])
+
+                    old_new_value = new_value_change[0] if new_value_change else None
+                    new_new_value = new_value_change[1] if new_value_change else None
+
+                    old_triage_str = old_triage_status.label
+                    if old_new_value:
+                        old_new_value = OverlapContribution.pretty_value_for(old_new_value, triage.value_type)
+                        old_triage_str += f" ({old_new_value})"
+
+                    new_triage_str = new_triage_status.label
+                    if new_new_value:
+                        new_new_value = OverlapContribution.pretty_value_for(new_new_value, triage.value_type)
+                        new_triage_str += f" ({new_new_value})"
+
+                    field_change = FieldChange("triage_status", old_triage_str, new_triage_str)
+                    field_changes.append(field_change)
+
+                for key, value_list in entry.changes_display_dict.items():
+                    if key in {"new value", "triage status"}:
+                        continue
+                    else:
+                        print(key)
+
+                    field_change = FieldChange(key, value_list[0], value_list[1])
+                    field_changes.append(field_change)
+
+                user: Optional[User] = entry.actor
+
+                change_row = ChangeRow(
+                    overlap_contribution=triage,
+                    user=user,
+                    changes=list(sorted(field_changes)),
+                    comment=entry.additional_data.get("comment") if entry.additional_data else None,
+                    timestamp=entry.timestamp
+                )
+                change_rows.append(change_row)
+        return list(sorted(change_rows))
+        # all_changes = LogEntry.objects.get_for_objects(all_triages)
+        # for triage in all_triages:
+        #     print(triage.history.latest().changes_dict)
+        #
+        # print(f"All changes for {all_triages}")
+        # for entry in all_changes:
+        #     print(entry)
+        # print("End changes")
 
     @staticmethod
     def overlap_grouping_for(classification_grouping: ClassificationGrouping, value_type: ClassificationResultValue, include_cross_context: bool) -> 'OverlapGrouping':
