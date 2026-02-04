@@ -673,12 +673,11 @@ class HGVSMatcher:
                 if gene_symbol:
                     cleaned_text += f"({gene_symbol})"
                 cleaned_text += c_nomen
-            else:
+                cleaned_hgvs = cleaned_text
+            elif gene_symbol:
                 # transcript-less we don't put brackets around the gene symbol
-                cleaned_text = f"{gene_symbol}{c_nomen}"
-
-            cleaned_hgvs = cleaned_text
-
+                cleaned_hgvs = f"{gene_symbol}{c_nomen}"
+            # otherwise we don't have a transcript or a gene symbol, very little to clean
 
         def fix_ref_alt(m):
             return m.group('ref').upper() + '>' + m.group('alt').upper()
