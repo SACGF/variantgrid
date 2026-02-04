@@ -1381,6 +1381,13 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             raise e
         api_response = data.read()
         with StringIO(api_response) as f:
+            if api_response.startswith("Error:"):
+                error_message = api_response[6:]
+                if len(error_message) > 2 and error_message[2] == " ":
+                    # error messages seem to have been iterated so that every 2nd characer is a space, fix this
+                    error_message = "".join(char for i, char in enumerate(error_message) if i % 2 == 1)
+                raise ValueError("ClinGen API response: " + error_message)
+
             records = list(SeqIO.parse(f, "genbank"))
             record = get_single_element(records)
             kwargs = TranscriptVersionSequenceInfo._get_kwargs_from_genbank_record(record)
