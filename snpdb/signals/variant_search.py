@@ -679,6 +679,38 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         # yield SearchMessageOverall(str(hgvs_error))
         if hgvs_error:  # May have been cleared if matched gene symbol HGVS
             raise hgvs_error
+    except HGVSNomenclatureException as hgvs_ex:
+        raw_message = str(hgvs_ex)
+        if "char" not in raw_message and not "EOF" in raw_message:
+            # this is likely not a technical message, send it directly to the user
+            yield SearchMessageOverall(raw_message)
+            return
+
+        report_parts = []
+        if match := HGVSMatcher.HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT.match(hgvs_string):
+            # if transcript := match.group("transcript_value"):
+            #     if transcript_version := match.group("transcript_version"):
+            #         report_parts.append(["Transcript", f"{transcript}.{transcript_version}"])
+            #
+            # if gene_symbol := match.group("gene_symbol"):
+            #     report_parts.append(["Gene Symbol", gene_symbol])
+            #
+            # report_parts.append(["HGVS Allele", f"{match.group('letter')}.{match.group('nomen')}"])
+            #
+            # flattened_parts = []
+            # for part in report_parts:
+            #     label, value = part
+            #     entry = ""
+            #     if label:
+            #         entry = f"{label}: "
+            #     entry += f"\"{value}\""
+            #     flattened_parts.append(entry)
+            # flattened_parts_str = ", ".join(flattened_parts)
+            yield SearchMessageOverall(f"Invalid HGVS cDNA allele : \"{match.group('letter')}.{match.group('nomen')}\"")  # {hgvs_ex}
+
+        else:
+            yield SearchMessageOverall(f"Invalid HGVS cDNA allele \"{hgvs_string}\"")  # {hgvs_ex}
+
 
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:
