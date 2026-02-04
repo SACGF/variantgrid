@@ -135,6 +135,14 @@ class HGVSMatcher:
         r"^(?P<transcript_prefix>:NR|NM|NC|ENST|LRG|XR)(?P<transcript_value>[0-9_]*)(\.(?P<transcript_version>[0-9]+))?([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
         re.IGNORECASE
     )
+    HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT = re.compile(
+        r"^((?P<transcript_prefix>:NR|NM|NC|ENST|LRG|XR)(?P<transcript_value>[0-9_]*)(\.(?P<transcript_version>[0-9]+))?)?([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
+        re.IGNORECASE
+    )
+    # HGVS_CLEAN_PATTERN_NO_TRANSCRIPT = re.compile(
+    #     r"^([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
+    #     re.IGNORECASE
+    # )
     # Only try to fix things with the sloppy pattern if the clean pattern doesn't match
     # Replace is now done with lambda instead of regex so we can lowercase c,g,n,p
     HGVS_TRANSCRIPT_NO_CDOT = re.compile(r"^(NM_|ENST)\d+.*:\d+")
@@ -652,14 +660,26 @@ class HGVSMatcher:
         cleaned_hgvs = self.TRANSCRIPT_NO_UNDERSCORE.sub(self.TRANSCRIPT_UNDERSCORE_REPLACE, cleaned_hgvs)
         # r"\g<1>:\g<2>.\g<3>"
 
-        if match := self.HGVS_CLEAN_PATTERN.match(cleaned_hgvs):
-            cleaned_text = match.group("transcript_prefix").upper() + match.group("transcript_value")
-            if transcript_version := match.group("transcript_version"):
-                cleaned_text += "." + transcript_version
-            if gene_symbol := match.group("gene_symbol"):
-                cleaned_text += "(" + gene_symbol + ")"
-            cleaned_text += ":" + match.group("letter").lower() + "." + match.group("nomen")
+        if match := self.HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT.match(cleaned_hgvs):
+            c_nomen = ":" + match.group("letter").lower() + "." + match.group("nomen")
+            gene_symbol = match.group("gene_symbol")
+
+            if transcript_prefix := match.group("transcript_prefix"):
+                transcript_value = match.group("transcript_value")
+                cleaned_text = f"{transcript_prefix.upper()}{transcript_value}"
+                if transcript_version := match.group("transcript_version"):
+                    cleaned_text += "." + transcript_version
+
+                # has transcript
+                if gene_symbol:
+                    cleaned_text += f"({gene_symbol})"
+                cleaned_text += c_nomen
+            else:
+                # transcript-less we don't put brackets around the gene symbol
+                cleaned_text = f"{gene_symbol}{c_nomen}"
+
             cleaned_hgvs = cleaned_text
+
 
         def fix_ref_alt(m):
             return m.group('ref').upper() + '>' + m.group('alt').upper()
