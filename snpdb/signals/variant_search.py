@@ -20,6 +20,7 @@ from genes.models import MissingTranscript, MANE, TranscriptVersion, BadTranscri
 from genes.models_enums import AnnotationConsortium
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
+from library.log_utils import report_exc_info
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
@@ -527,7 +528,11 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
             if search_input.user.is_superuser:
                 error_message = str(e)
             else:
+                report_exc_info()
                 error_message = "Error resolving HGVS"
+                # need to work out which errors are user friendly and which need to be converted to just "Error resolving HGVS"
+                # though much work has been done to improve the error messages in general
+                # error_message = str(e)
 
         if error_message:
             results = [SearchResult.error_result(error_message, genome_build)]
