@@ -22,7 +22,7 @@ It also applies data level validation
 """
 
 # ClinVar doesn't accept ENST for example
-CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
+CLINVAR_ACCEPTED_TRANSCRIPTS = {"NC_", "NM_", "NR_"}
 
 
 class ClinVarCitation(TypedDict, total=False):
