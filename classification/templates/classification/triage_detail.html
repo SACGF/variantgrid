@@ -19,7 +19,7 @@
                 <tbody>
                     <tr class="users-contribution">
                         <td style="text-align:center"><span class="testing-context-box testing-context-{{ overlap_grouping.user_contribution.testing_context_bucket_obj.value }}">{{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
-                        <td><b>{{  overlap_grouping.user_contribution.pretty_value }}</b> {% triage overlap_grouping.user_triage %}</td>
+                        <td class="cs-{{ overlap_grouping.user_contribution.value }}"><b>{{  overlap_grouping.user_contribution.pretty_value }}</b> {% triage overlap_grouping.user_triage %}</td>
                         <td>{% condition overlap_grouping.user_contribution.conditions %}</td>
                         <td>{{ overlap_grouping.user_contribution.lab }}</td>
                         <td>{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}</td>
@@ -27,7 +27,7 @@
                 {% for overlap_comparison in overlap_grouping.comparisons %}
                     <tr {% if overlap_comparison.is_cross_context %}style="opacity:0.7"{% endif %}>
                         <td style="text-align:center">{% testing_context overlap_comparison.entry_2 %}</td>
-                        <td>{{ overlap_comparison.entry_2.pretty_value }} {% if overlap_comparison.triage %}{% triage overlap_comparison.triage %}{% endif %}</td>
+                        <td class="cs-{{ overlap_comparison.entry_2.value }}">{{ overlap_comparison.entry_2.pretty_value }} {% if overlap_comparison.triage %}{% triage overlap_comparison.triage %}{% endif %}</td>
                         <td>{% condition overlap_comparison.entry_2.conditions %}</td>
                         <td>{% if overlap_comparison.entry_2.scv %}ClinVar Expert Panel<br/>{{ overlap_comparison.entry_2.scv }}{% else %}{{ overlap_comparison.entry_2.lab }}{% endif %}</td>
                         <td>{% timestamp overlap_comparison.entry_2.effective_date time_ago=True %}</td>

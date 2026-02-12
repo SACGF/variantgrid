@@ -2505,7 +2505,7 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
         return dom;
     } else {
         // FIXME can still have different values with no-value
-        return $('<div>', {class: 'c-pill scs-none no-value', html: 'No Data'});
+        return $('<div>', {class: 'c-pill cs-none no-value', html: 'No Data'});
     }
 }
 

@@ -2771,50 +2771,66 @@ a .c-hgvs-body .c-hgvs-nomen {
   width: 130px;
   text-align: center;
   border: 1px solid rgba(255, 255, 255, 0.4);
-  color: #555;
   font-weight: 600;
 }
-.c-pill.scs-none, .c-pill.cs-none {
+
+.cs-none {
   border: none !important;
   background-color: #eeeeee;
 }
-.c-pill.scs-tier_1 {
+
+.cs-tier_1 {
   background-color: #ffcccc;
 }
-.c-pill.scs-tier_1_or_2 {
+
+.cs-tier_1_or_2 {
   background-color: #ffd5d5;
 }
-.c-pill.scs-tier_2 {
+
+.cs-tier_2 {
   background-color: #ffdddd;
 }
-.c-pill.scs-tier_3 {
+
+.cs-tier_3 {
   background-color: #dddddd;
 }
-.c-pill.scs-tier_4 {
+
+.cs-tier_4 {
   background-color: #ccccff;
 }
-.c-pill.cs-b {
+
+.cs-b {
   background-color: #ccccff;
 }
-.c-pill.cs-lb {
+
+.cs-lb {
   background-color: #ddddff;
 }
-.c-pill.cs-r, .c-pill cs-dr {
+
+.cs-r, cs-dr {
   background-color: #eeeeee;
 }
-.c-pill.cs-vus, .c-pill.cs-vus_a, .c-pill.cs-vus_b, .c-pill.cs-vus_c {
+
+.cs-vus,
+.cs-vus_a,
+.cs-vus_b,
+.cs-vus_c {
   background-color: #dddddd;
 }
-.c-pill.cs-lp, .c-pill.cs-lo {
+
+.cs-lp, .cs-lo {
   background-color: #ffdddd;
 }
-.c-pill.cs-p, .c-pill.cs-o {
+
+.cs-p, .cs-o {
   background-color: #ffcccc;
 }
-.c-pill.cs-pending {
+
+.cs-pending {
   background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
 }
-.c-pill.cs-withdrawn {
+
+.cs-withdrawn {
   opacity: 0.5;
 }
 

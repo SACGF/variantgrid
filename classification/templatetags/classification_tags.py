@@ -240,7 +240,7 @@ def clinical_significance_values(vcm: ClassificationModification):
         somatic = {
             "title": somatic_key.pretty_label,
             "label": label,
-            "css_class": f"scs scs-{value.lower() if value else 'none'}"
+            "css_class": f"scs cs-{value.lower() if value else 'none'}"
         }
         value_list.append(somatic)
 
