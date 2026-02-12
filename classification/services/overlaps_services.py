@@ -137,9 +137,12 @@ class OverlapServices:
     @staticmethod
     def update_skews(overlap: Overlap):
         status_buckets: defaultdict[TriageStatus, list[OverlapContributionSkew]] = defaultdict(list)
+        all_interactive_skews: list[OverlapContributionSkew] = []
         for skew in overlap.overlapcontributionskew_set.all():
             # move skews into - user has done something, user is waiting on something
             status_buckets[skew.contribution.triage_status].append(skew)
+            if skew.contribution.triage_status_obj != TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
+                all_interactive_skews.append(skew)
 
         print(status_buckets)
         pending = status_buckets[TriageStatus.PENDING]
@@ -149,7 +152,7 @@ class OverlapServices:
         reviewed_complex = status_buckets[TriageStatus.COMPLEX]
         non_interactive = status_buckets[TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
 
-        for entry in pending + reviewed_will_discuss + reviewed_confident + reviewed_complex:
+        for entry in all_interactive_skews:
             entry.skew_perspective = TriageNextStep.PENDING_CALCULATION
 
         had_pending_or_changing = False
@@ -188,12 +191,12 @@ class OverlapServices:
                     complex.skew_perspective = TriageNextStep.UNANIMOUSLY_COMPLEX
 
         # the above should have updated every skew perspective, check below
-        for entry in pending + reviewed_will_change + reviewed_will_discuss + reviewed_confident + reviewed_complex:
+        for entry in all_interactive_skews:
             if entry.skew_perspective == TriageNextStep.PENDING_CALCULATION:
                 raise ValueError("Failed to assign each skew a status")
 
         OverlapContributionSkew.objects.bulk_update(
-            objs=pending + reviewed_will_discuss + reviewed_confident + reviewed_complex,
+            objs=all_interactive_skews,
             fields=['skew_perspective']
         )
 

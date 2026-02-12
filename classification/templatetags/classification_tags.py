@@ -783,7 +783,8 @@ def testing_context(obj: OverlapContribution):
 def triage(context,
            triage: OverlapContribution,
            show_label: bool = False,
-           show_link: bool = False
+           show_link: bool = False,
+           show_icon: bool = False
            ):
     new_value = None
     # if show_link and isinstance(triage, ClassificationGroupingValueTriageHistory):
@@ -800,4 +801,4 @@ def triage(context,
         elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
             new_value = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(new_value)
 
-    return {"triage": triage, "new_value": new_value, "show_label": show_label, "show_link": show_link}
+    return {"triage": triage, "new_value": new_value, "show_label": show_label, "show_link": show_link, "show_icon": show_icon}

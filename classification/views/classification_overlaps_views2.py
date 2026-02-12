@@ -115,8 +115,6 @@ class TriageView(AjaxFormView[OverlapContribution]):
         overlap_grouping = OverlapGrouping.overlap_grouping_for(classification_grouping, value_type, True)
 
         context["overlap_grouping"] = overlap_grouping
-        same_context = []
-        other_contexts = []
 
         # TODO can we sort these values on how similar the context is?
         context["classification_grouping"] = classification_grouping

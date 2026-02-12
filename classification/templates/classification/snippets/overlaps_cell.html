@@ -14,7 +14,12 @@
 
                         <br/><span class="{% if overlap_grouping.single_context_overlap.overlap_status.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap_grouping.single_context_overlap.overlap_status_label }}</span>
                         {% if overlap_grouping.single_context_overlap.overlap_status_obj.is_attention %}
-                            <br/><span>{{ overlap_grouping.user_next_step_single_context.label }}</span>
+                            <br/>
+                            {% if overlap_grouping.user_next_step_single_context.user_should_action %}
+                            <span>{{ overlap_grouping.user_next_step_single_context.icon }}{{ overlap_grouping.user_next_step_single_context.label }}</span>
+                            {% else %}
+                            <span class="no-value">{{ overlap_grouping.user_next_step_single_context.label }}</span>
+                            {% endif %}
                         {% else %}
                             <br/><span class="no-value">No action required</span>
                         {% endif %}

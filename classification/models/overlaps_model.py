@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.db.models import CASCADE, QuerySet, PROTECT
 from django.db import models
 from django.db.models.enums import TextChoices
+from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 from annotation.models import ClinVarRecord
 from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys
@@ -324,6 +325,25 @@ class TriageNextStep(TextChoices):
     AWAITING_OTHER_LAB = "O", "Awaiting Other Lab"
     TO_DISCUSS = "D", "To Discuss"
     NOT_INVOLVED = "N", "Not Involved"
+
+    @property
+    def user_should_action(self) -> bool:
+        match self:
+            case TriageNextStep.AWAITING_YOUR_TRIAGE: return True
+            case TriageNextStep.AWAITING_YOUR_AMEND: return True
+            case TriageNextStep.TO_DISCUSS: return True
+            case _: return False
+    
+    @property
+    def icon(self):
+        match self:
+            case TriageNextStep.AWAITING_YOUR_TRIAGE:
+                return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
+            case TriageNextStep.AWAITING_YOUR_AMEND:
+                return mark_safe('<i class="fa-solid fa-square-pen mr-1" style="opacity:0.6"></i>')
+            case TriageNextStep.TO_DISCUSS:
+                return mark_safe('<i class="fa-solid fa-comments mr-1" style="opacity:0.6"></i>')
+            case _: return ""
 
 
 # this should be the model that links Contributions to Overlaps to reduce redundancy

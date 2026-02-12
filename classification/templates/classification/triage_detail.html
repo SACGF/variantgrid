@@ -9,9 +9,15 @@
     <form data-toggle="ajax-form" method="POST" action="{% url 'triage' triage.pk %}?edit=true&mode={{ mode }}">
     <div class="card-header">
         {% if value_type == "O" %}Onco-Path{% elif value_type == "S" %}Clinical Significance{% endif %}
-        Triage
+        Triage {% admin_link triage %}
     </div>
     <div class="card-body">
+        {% if user.is_superuser %}
+            <div class="admin-only my-4">
+                {% if overlap_grouping.single_context_overlap %}<div>{{ overlap_grouping.single_context_overlap }}{% admin_link overlap_grouping.single_context_overlap %}</div>{% endif %}
+                {% if overlap_grouping.cross_context_overlap %}<div>{{ overlap_grouping.cross_context_overlap }}{% admin_link overlap_grouping.cross_context_overlap %}</div>{% endif %}
+            </div>
+        {% endif %}
         {% include "uicore/messages/messages.html" %}
 
         {% labelled label="Submissions Submissions" %}
