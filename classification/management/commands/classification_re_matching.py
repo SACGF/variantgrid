@@ -49,6 +49,8 @@ class Command(BaseCommand):
 
     def rematch_file(self, file_name: str, commit: bool = False):
         df = pd.read_csv(file_name, sep=",", low_memory=False)
+
+        batch: list[int] = []
         for idx, row in df.iterrows():
             genome_build_patch_ver: GenomeBuildPatchVersion
             genome_build_str = row[Command.GENOME_BUILD_COL]
@@ -97,11 +99,16 @@ class Command(BaseCommand):
                     Classification.objects.filter(allele=allele).update(allele=None)
                     allele.delete()
 
-                    reattempt_variant_matching(admin_bot(), ImportedAlleleInfo.objects.filter(pk=imported_allele_info.pk), True)
-                else:
-                    reattempt_variant_matching(admin_bot(), ImportedAlleleInfo.objects.filter(pk=imported_allele_info.pk), True)
-                sleep(10)
-                print("Rematched")
+                batch.append(imported_allele_info.pk)
+                if len(batch) > 50:
+                    print("Rematching Batch")
+                    reattempt_variant_matching(admin_bot(), ImportedAlleleInfo.objects.filter(pk__in=batch), True)
+                    batch.clear()
+                    sleep(50)
+
+        if batch:
+            print("Rematching Batch")
+            reattempt_variant_matching(admin_bot(), ImportedAlleleInfo.objects.filter(pk__in=batch), True)
 
         print("Completed")
 
