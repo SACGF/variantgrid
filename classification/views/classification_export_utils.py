@@ -96,7 +96,9 @@ class UsedKeyTracker:
                  user: User,
                  ekeys: EvidenceKeyMap,
                  key_value_formatter: KeyValueFormatter,
-                 pretty: bool = False,
+                 pretty: Optional[bool] = None,
+                 pretty_headers: bool = False,
+                 pretty_values: bool = False,
                  cell_formatter: Optional[Callable[[Any], Any]] = None,
                  include_explains_and_notes: bool = False,
                  ignore_evidence_keys: Optional[set[str]] = None,
@@ -105,7 +107,13 @@ class UsedKeyTracker:
         self.ekeys = ekeys
         self.key_value_formatter = key_value_formatter
         self.calc_dict: dict[str, UsedKey] = {}
-        self.pretty = pretty
+        # self.pretty = pretty
+        if pretty is not None:
+            self.pretty_headers = pretty
+            self.pretty_values = pretty
+        else:
+            self.pretty_headers = pretty_headers
+            self.pretty_values = pretty_values
         self.cell_formatter = cell_formatter
         self.include_explains_and_notes = include_explains_and_notes
         self.ignore_evidence_keys = ignore_evidence_keys
@@ -181,11 +189,11 @@ class UsedKeyTracker:
         cols: list[str] = []
         for used_key in self.ordered_keys:
             if used_key.has_value:
-                cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty))
+                cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty_headers))
             if used_key.has_note:
-                cols.append(self.key_value_formatter.header_for(used_key.ekey, is_note=True, pretty=self.pretty))
+                cols.append(self.key_value_formatter.header_for(used_key.ekey, is_note=True, pretty=self.pretty_headers))
             if used_key.has_explain:
-                cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty) + '.explain')
+                cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty_headers) + '.explain')
         return cols
 
     def row(self, classification_modification: ClassificationModification, formatter: Callable[[Any], Any]) -> list[Optional[str]]:
@@ -206,7 +214,7 @@ class UsedKeyTracker:
                         if points is not None:
                             value = str(points)
 
-                    cols.append(self.key_value_formatter.value_for(used_key.ekey, value, pretty=self.pretty, cell_formatter=self.cell_formatter))
+                    cols.append(self.key_value_formatter.value_for(used_key.ekey, value, pretty=self.pretty_values, cell_formatter=self.cell_formatter))
 
             # an earlier check determines if we even think about adding has_note or has_explain
             if used_key.has_note:
