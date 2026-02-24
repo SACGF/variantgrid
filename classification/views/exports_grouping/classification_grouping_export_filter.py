@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Set, Union, Optional, Iterator, Any
+from typing import Set, Union, Optional, Iterator
 
 import itertools
 from django.contrib.auth.models import User
@@ -10,7 +10,8 @@ from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from more_itertools.more import peekable
 from classification.enums import ShareLevel
-from classification.models import ClassificationGrouping, ConflictLab, ImportedAlleleInfo
+from classification.models import ClassificationGrouping, ImportedAlleleInfo, OverlapContributionSkew, \
+    OverlapContribution
 from library.utils import local_date_string
 from snpdb.models import Organization, Lab, GenomeBuild, Variant, Allele
 import re
@@ -81,7 +82,7 @@ class ClassificationGroupingExportFilter:
             # update based on either ConflictLab updating, or the latest classification of a grouping updating
             # and the grouping itself updating (make sure we don't do any null updates)
 
-            via_updated_conflicts = ConflictLab.objects.filter(modified__gte=since).values_list("classification_grouping", flat=True)
+            via_updated_conflicts = OverlapContribution.objects.filter(modified__gte=since).values_list("classification_grouping", flat=True)
             groupings = groupings.filter(Q(latest_classification_modification__modified__gte=since) | Q(pk__in=via_updated_conflicts))
 
         # order by allele ordering
