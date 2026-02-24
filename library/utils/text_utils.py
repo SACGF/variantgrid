@@ -107,7 +107,7 @@ class VCFDialect(csv.Dialect):
     quoting = csv.QUOTE_NONE
 
 
-def delimited_row(data: list, delimiter: str = ',', dialect=None) -> str:
+def delimited_row(data: list, delimiter: str = ',', dialect=None, include_new_line=True) -> str:
     kwargs = {}
     if dialect is not None:
         kwargs["dialect"] = dialect
@@ -116,7 +116,10 @@ def delimited_row(data: list, delimiter: str = ',', dialect=None) -> str:
     out = io.StringIO(newline='')
     writer = csv.writer(out, delimiter=delimiter, **kwargs)
     writer.writerow(data)
-    return out.getvalue()
+    text = out.getvalue()
+    if not include_new_line:
+        text = text.rstrip()
+    return text
 
 
 def clean_string(input_string: str) -> str:

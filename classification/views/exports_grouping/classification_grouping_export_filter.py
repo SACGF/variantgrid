@@ -12,6 +12,7 @@ from more_itertools.more import peekable
 from classification.enums import ShareLevel
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, \
     OverlapContribution
+from classification.models import EvidenceKeyMap
 from library.utils import local_date_string
 from snpdb.models import Organization, Lab, GenomeBuild, Variant, Allele
 import re
@@ -151,6 +152,10 @@ class ClassificationGroupingExportFormat(ABC):
     def genome_build(self) -> 'GenomeBuild':
         # implement if format properties state that genome build is important
         raise NotImplementedError()
+
+    @cached_property
+    def e_keys(self) -> 'EvidenceKeyMap':
+        return EvidenceKeyMap.cached()
 
     def queryset(self, genome_build: Optional[GenomeBuild] = None) -> QuerySet[ClassificationGrouping]:
         return self.classification_grouping_filter.queryset(genome_build=genome_build)
