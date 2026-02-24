@@ -29,6 +29,8 @@ from classification.views.discordance_report_views import discordance_report_vie
     discordance_report_review, action_discordance_report_review, discordance_reports_download
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.exports.classification_export_formatter_redcap import redcap_data_dictionary
+from classification.views.exports_grouping.classification_grouping_export_view import \
+    view_classification_grouping_export
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
 from classification.views.overlaps_grouped_datatables import ClassificationGroupingOverlapsColumns
@@ -51,9 +53,12 @@ urlpatterns = [
     path('classifications', views.classifications, name='classifications'),
 
     path('groupings', views.classification_groupings, name='classification_groupings'),
+    path('groupings/export_config', view_classification_grouping_export, name='classification_grouping_export_config'),
     path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
     path('groupings/<int:classification_grouping_id>/records', views.view_classification_grouping_records_detail,
          name='classification_grouping_records_detail'),
+
+
     path('triage/<int:triage_id>/triage', TriageView.as_view(), name='triage'),
 
     path('allele_groupings', views.allele_groupings, name='allele_groupings'),
