@@ -69,7 +69,6 @@ class PhenotypeNode(AnalysisNode):
                 modified = True
 
         if modified:
-            print("Modified so set appearance dirty")
             self.appearance_dirty = True
 
     def modifies_parents(self):

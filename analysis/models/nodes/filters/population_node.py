@@ -190,7 +190,6 @@ class PopulationNode(AnalysisNode):
             q = reduce(operator.or_, or_q)
             node_arg_q_dict[None] = {str(q): q}
 
-        print(f"{node_arg_q_dict=}")
         return node_arg_q_dict
 
     @staticmethod
