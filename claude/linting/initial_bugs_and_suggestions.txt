@@ -1,0 +1,360 @@
+================================================================================
+VARIANTGRID — INITIAL BUG REPORT & ARCHITECTURAL SUGGESTIONS
+================================================================================
+All bugs below were verified by reading the actual source files.
+Agent findings that could not be confirmed have been excluded.
+
+================================================================================
+SECTION 1: CONFIRMED BUGS
+================================================================================
+
+--------------------------------------------------------------------------------
+BUG 1 — AttributeError: wrong attribute name in as_json()
+FILE:    classification/models/evidence_mixin.py
+LINE:    72
+IMPACT:  HIGH — runtime AttributeError any time as_json() is called on a
+         SomaticClinicalSignificanceValue that has an amp_level
+--------------------------------------------------------------------------------
+
+SomaticClinicalSignificanceValue is a frozen dataclass with fields:
+  tier_level: str
+  amp_level: Optional[str]
+
+But as_json() references self.level which does not exist:
+
+    def as_json(self):
+        return {
+            "somatic_clinical_significance": self.tier_level,
+            "amp_level": self.level          # <-- BUG: should be self.amp_level
+        }
+
+Fix: change self.level → self.amp_level
+
+
+--------------------------------------------------------------------------------
+BUG 2 — Operator precedence error in __lt__ (somatic value sort is broken)
+FILE:    classification/models/evidence_mixin.py
+LINE:    67
+IMPACT:  HIGH — somatic classification values sort incorrectly
+--------------------------------------------------------------------------------
+
+    def __lt__(self, other):
+        return self.sort_value or 0 < other.sort_value or 0
+
+Python operator precedence makes this parse as:
+    return (self.sort_value) or (0 < other.sort_value) or (0)
+
+Which is a boolean/truthy evaluation, NOT a numeric comparison. The intended
+logic is clearly:
+    return (self.sort_value or 0) < (other.sort_value or 0)
+
+Fix: add parentheses around each "or 0" clause.
+
+
+--------------------------------------------------------------------------------
+BUG 3 — Typo in type annotation (copy/paste)
+FILE:    classification/models/evidence_mixin.py
+LINE:    54
+IMPACT:  LOW — only affects type checkers / IDEs, not runtime
+--------------------------------------------------------------------------------
+
+    @property
+    def without_amp_level(self) -> 'SopmaticClinicalSignificanceValue':
+                                     ^^^^^^^^^^
+    Typo: "Sopmatic" instead of "Somatic". Should be:
+        -> 'SomaticClinicalSignificanceValue'
+
+
+--------------------------------------------------------------------------------
+BUG 4 — Typo in ORM lookup path causes FieldError at runtime
+FILE:    classification/views/classification_grouping_datatables.py
+LINE:    203
+IMPACT:  HIGH — any user filtering by protein position gets a Django FieldError
+         (500 error or unhandled exception)
+--------------------------------------------------------------------------------
+
+    filters.append(Q(allele_origin_grouping__allele_grouing__allele__variantallele__variant__in=variant_qs))
+                                              ^^^^^^^^^^^^
+    Typo: "allele_grouing" instead of "allele_grouping".
+
+The actual FK field on AlleleOriginGrouping is `allele_grouping`
+(confirmed in classification/models/classification_grouping.py line 97).
+
+Fix: rename allele_grouing → allele_grouping in the Q() lookup.
+
+
+--------------------------------------------------------------------------------
+BUG 5 — is_pending always returns True (type mismatch comparison)
+FILE:    classification/views/discordance_report_views.py
+LINE:    102
+IMPACT:  HIGH — pending-change indicator is always True, breaking the
+         discordance report UI's pending change display
+--------------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class _LabClinSig:
+    lab_clin_sig_key: _LabClinSigKey   # a frozen dataclass
+    count: int
+    pending_clin_sig: Optional[str] = None  # a string or None
+
+    @property
+    def is_pending(self) -> bool:
+        return self.lab_clin_sig_key != self.pending_clin_sig   # BUG
+
+A _LabClinSigKey object will never equal an Optional[str], so this property
+always returns True regardless of whether there is actually a pending change.
+
+Likely intended comparison (checking if a pending change to a *different*
+classification exists):
+    return self.pending_clin_sig is not None and self.pending_clin_sig != self.clin_sig
+
+
+--------------------------------------------------------------------------------
+BUG 6 — "leave it as it was" comment but code overwrites the value
+FILE:    classification/views/discordance_report_views.py
+LINES:   267–269
+IMPACT:  MEDIUM — when multiple pending clin-sig directions exist, the
+         suggested_pending_cs ends up as key.clin_sig (current value) instead
+         of remaining as the first-detected pending target
+--------------------------------------------------------------------------------
+
+    for pending_cs, pending_count in pendings.items():
+        total_count += pending_count
+        if suggested_pending_cs:
+            # can't handle pending in multiple directions, just leave it as it was
+            suggested_pending_cs = key.clin_sig    # <-- BUG: overwrites, not "leaves"
+        else:
+            suggested_pending_cs = pending_cs
+
+The comment says "leave it as it was" but the code replaces suggested_pending_cs
+with key.clin_sig (the *current* clin sig, not the already-set pending target).
+Should be `pass` (do nothing) to actually leave the variable unchanged.
+
+
+--------------------------------------------------------------------------------
+BUG 7 — Wrong settings attribute name in error message path
+FILE:    classification/tasks/classification_import_map_and_insert_task.py
+LINES:   50–52
+IMPACT:  MEDIUM — when an invalid file_type_override is supplied, the
+         AttributeError on the wrong settings name masks the original
+         validation error
+--------------------------------------------------------------------------------
+
+    if file_type_override not in settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS:
+        valid_parsers = ",".join(settings.OMNI_IMPORTER_PARSERS)   # <-- BUG
+        raise ValueError(f'{file_type_override=} must be one of {valid_parsers}')
+
+Line 50 correctly uses settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS.
+Line 51 uses settings.OMNI_IMPORTER_PARSERS (different name, likely does not
+exist), causing an AttributeError instead of the intended ValueError.
+
+Fix: change settings.OMNI_IMPORTER_PARSERS → settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS
+
+
+--------------------------------------------------------------------------------
+BUG 8 — Nullable FK accessed without None check in preview property
+FILE:    classification/models/clinvar_export_models.py
+LINE:    233
+IMPACT:  MEDIUM — AttributeError when ClinVarExport.preview is called on a
+         record where classification_based_on is None
+--------------------------------------------------------------------------------
+
+    classification_based_on = models.ForeignKey(
+        ClassificationModification, null=True, blank=True, on_delete=models.CASCADE
+    )   # field is nullable
+
+    @property
+    def preview(self) -> PreviewData:
+        extra = [
+            PreviewKeyValue(key="Lab:", value=self.classification_based_on.lab.name),  # BUG
+        ]
+
+classification_based_on can be None (null=True), but the property dereferences
+it unconditionally. Compare with line 139 elsewhere in the same file which
+correctly guards with: if self.classification_based_on_id is None.
+
+Fix: guard with a None check, e.g.:
+    lab_name = self.classification_based_on.lab.name if self.classification_based_on_id else "Unknown"
+
+
+--------------------------------------------------------------------------------
+BUG 9 — Pretty label compared against raw key value (comparison always fails)
+FILE:    classification/signals/classification_hooks_significant_change.py
+LINE:    122
+IMPACT:  MEDIUM — the close message always incorrectly appends
+         ", expected <pending_label>" even when the new classification
+         matches the pending change expectation
+--------------------------------------------------------------------------------
+
+    pending_change_label = EvidenceKeyMap.cached_key(...).pretty_value(pending_change_value)
+    if classification_change.new_label != pending_change_value:
+        close_message += f", expected {pending_change_label}"
+
+classification_change.new_label is a human-readable string (e.g. "Pathogenic").
+pending_change_value is a raw EvidenceKey key value (e.g. "P").
+These will never be equal, so the "expected X" clause is always appended.
+
+The comparison should be one of:
+  - classification_change.new_value != pending_change_value  (both raw values)
+  - classification_change.new_label != pending_change_label  (both pretty labels)
+
+
+================================================================================
+SECTION 2: ARCHITECTURAL SUGGESTIONS (high benefit / low cost)
+================================================================================
+
+These are suggestions for improvements where the payoff is large relative to
+the implementation effort. They are listed roughly in order of benefit/cost ratio.
+
+--------------------------------------------------------------------------------
+SUGGESTION 1 — Eliminate the parallel clinical significance value systems
+BENEFIT: HIGH  |  COST: LOW-MEDIUM
+--------------------------------------------------------------------------------
+
+There are currently two separate representations of clinical significance:
+
+  a) ClinicalSignificance class (classification_enums.py):
+       BENIGN = '1', LIKELY_BENIGN = '2', VUS = '3', LP = '4', P = '5'
+
+  b) EvidenceKey option keys used in the evidence JSON blob:
+       'B', 'LB', 'VUS', 'LP', 'P'  (plus 'VUS_A', 'VUS_B', etc.)
+
+These two systems coexist and are used in different code paths, leading to
+subtle confusion (e.g. one of the agent-reported false positives mistook
+the 'VUS' string check in is_significant_change() for a bug because it
+looked like it should be ClinicalSignificance.VUS == '3').
+
+The ClinicalSignificance class (system a) appears to be a legacy/DB-level
+concept while system b is the live representation. Clearly marking which
+contexts each applies in, or consolidating them, would reduce cognitive load
+and the risk of real bugs at the boundary.
+
+Minimum viable improvement: add a docstring to ClinicalSignificance explaining
+when to use it vs EvidenceKey values, and add a conversion helper.
+
+
+--------------------------------------------------------------------------------
+SUGGESTION 2 — Add a FIXME_REDUNDANT cleanup pass on evidence_mixin.py
+BENEFIT: MEDIUM  |  COST: LOW
+--------------------------------------------------------------------------------
+
+The file already contains this comment on line 94:
+    # FIXME redundant now, remove
+on the _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES dict.
+
+The file also has Bug 1 (self.level), Bug 2 (operator precedence), and Bug 3
+(typo) — suggesting it hasn't had a careful review in a while. A focused
+cleanup pass would fix the confirmed bugs and remove confirmed dead code.
+
+
+--------------------------------------------------------------------------------
+SUGGESTION 3 — Protect EvidenceKeyMap cache invalidation in multi-worker deploys
+BENEFIT: HIGH  |  COST: LOW
+--------------------------------------------------------------------------------
+
+EvidenceKeyMap uses @cached_property / class-level caching. In production,
+multiple Gunicorn workers each hold their own in-process cache. If an admin
+updates EvidenceKey records, the change propagates on next request to some
+workers but not others until they restart.
+
+Options (cheapest first):
+  a) Add a management command to touch a cache-bust key in Redis, and document
+     that EvidenceKey changes require a worker restart or cache clear.
+  b) Move the cache to Redis (django.core.cache) keyed on a version counter
+     stored in the DB, so all workers see the same version.
+
+
+--------------------------------------------------------------------------------
+SUGGESTION 4 — Move view-layer helper dataclasses out of discordance_report_views.py
+BENEFIT: MEDIUM  |  COST: LOW
+--------------------------------------------------------------------------------
+
+discordance_report_views.py contains substantial non-view logic:
+  - _LabClinSigKey, _LabClinSig (dataclasses for lab/clin-sig grouping)
+  - DiscordanceReportTemplateData (200+ line class that aggregates report data)
+
+This makes the view file hard to navigate and the logic hard to test in
+isolation. Moving DiscordanceReportTemplateData to
+classification/models/discordance_models_utils.py (which already exists)
+and the helper dataclasses to a classification/views/discordance_helpers.py
+would improve separation and testability.
+
+
+--------------------------------------------------------------------------------
+SUGGESTION 5 — Make classification import task chain explicit with Celery chords
+BENEFIT: MEDIUM  |  COST: MEDIUM
+--------------------------------------------------------------------------------
+
+The import pipeline is spread across three separate Celery tasks:
+  1. ClassificationImportMapInsertTask   (map file → VG JSON, then insert)
+  2. process_classification_import_task  (process one ClassificationImport)
+  3. ClassificationImportProcessVariantsTask  (link variants, trigger liftover)
+
+The dependencies between them are implicit (each task creates DB state the
+next reads). Expressing this as a Celery chain/chord would:
+  - Make the dependency graph explicit in code
+  - Enable automatic retry/error propagation across the whole pipeline
+  - Make it easier to observe progress of a full import run
+
+
+--------------------------------------------------------------------------------
+SUGGESTION 6 — Move discordance recalculation to a Celery task
+BENEFIT: MEDIUM  |  COST: LOW-MEDIUM
+--------------------------------------------------------------------------------
+
+ClinicalContext.recalculate() is called synchronously on every classification
+publication (via signal). For labs with hundreds of classifications for the
+same allele, this blocks the request/response cycle. Moving this to an async
+Celery task (with a short delay to batch rapid publications) would improve
+response times for bulk imports and the import API.
+
+The ClinicalContextRecalcTrigger model already exists and seems designed to
+support deferred recalculation — it may be partially implemented.
+
+
+--------------------------------------------------------------------------------
+SUGGESTION 7 — Consolidate the two allele_origin filtering paths in grouping datatables
+BENEFIT: LOW-MEDIUM  |  COST: LOW
+--------------------------------------------------------------------------------
+
+In classification_grouping_datatables.py, there are two separate code paths
+for filtering groupings by variant:
+  - gene_symbol filter (line ~205+): traverses allele_grouping correctly
+  - protein_position filter (line 203): traverses allele_grouing (typo, Bug 4)
+
+Once Bug 4 is fixed, both paths use the same relation chain. Consider
+extracting the shared allele→variant→annotation join into a helper method
+to avoid future divergence.
+
+
+--------------------------------------------------------------------------------
+SUGGESTION 8 — Typed evidence blob accessors
+BENEFIT: MEDIUM  |  COST: MEDIUM
+--------------------------------------------------------------------------------
+
+The evidence JSONField stores all classification data as an untyped dict.
+Accessing values (get/set via EvidenceMixin) works but provides no IDE
+autocompletion or type safety for individual keys.
+
+A low-effort improvement: create TypedDict definitions for the most-used
+special keys (e.g. ClinSigBlob, CHGVSBlob) and use them in the hot paths
+(classification_hooks_significant_change, classification_grouping, etc.).
+This does not require schema migration and can be done incrementally.
+
+
+--------------------------------------------------------------------------------
+SUGGESTION 9 — Rename confusing loop variables in string_to_labs / string_to_orgs
+BENEFIT: LOW  |  COST: VERY LOW
+--------------------------------------------------------------------------------
+
+In classification_export_view.py lines 208–219, the list comprehension loop
+variable is named lab_str, shadowing the function parameter of the same name:
+
+    def string_to_labs(lab_str: str) -> list[Lab]:
+        parts = [l.strip() for l in lab_str.split(',')]
+        labs = [Lab.objects.filter(group_name=lab_str).first() for lab_str in parts]
+
+Python 3 comprehension scoping means the filter correctly uses the loop
+variable (not the parameter), so this is NOT a functional bug. But the
+naming is actively misleading to readers. Renaming the loop variable to
+`part` in both functions would make the intent clear.
