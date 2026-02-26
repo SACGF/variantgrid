@@ -999,7 +999,6 @@ class AlleleLiftover(models.Model):
     error = models.JSONField(null=True)  # Only set on error - uses ERROR_JSON_MESSAGE_KEY key in dict
 
     def set_info(self, info: dict):
-        print(f"Setting AlleleLiftover({self.pk}): {info=}")
         data = self.data or {}
         data[self._get_data_key()] = info
         self.data = data
