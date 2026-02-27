@@ -15,11 +15,21 @@ PANEL_APP_PREFIX = "panel-app"
 PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"
 PANEL_APP_GET_PANEL_API_BASE_PATH = "/api/v1/panels/"
 PANEL_APP_SEARCH_BY_GENES_BASE_PATH = "/api/v1/genes/"
+# Panel App is blocking bots as of 27/2/2026 @see https://github.com/SACGF/variantgrid/issues/1457
+PANEL_APP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:148.0) Gecko/20100101 Firefox/148.0"
+}
+
+
+def get_request(url):
+    if PANEL_APP_HEADERS:
+        headers = PANEL_APP_HEADERS
+    return requests.get(url, timeout=MINUTE_SECS, headers=headers)
 
 
 def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol) -> Optional[Dict]:
     url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + str(gene_symbol)
-    r = requests.get(url)
+    r = get_request(url)
     results = None
     if r.ok:
         data = r.json()
@@ -30,7 +40,7 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
 
 def _get_panel_app_panel_url_and_json(panel_app_panel):
     url = panel_app_panel.server.url + PANEL_APP_GET_PANEL_API_BASE_PATH + str(panel_app_panel.panel_id)
-    r = requests.get(url)
+    r = get_request(panel_app_panel.url)
     json_data: Dict = r.json()
     # Panel App isn't very REST-ful - returns 200 for missing data but we'll return 404
     if detail := json_data.get("detail"):
@@ -105,7 +115,7 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
     url = server.url + PANEL_APP_LIST_PANELS_PATH
     while url:
         logging.debug("Calling %s", url)
-        r = requests.get(url)
+        r = get_request(url)
         data = r.json()
         url = data["next"]
 
