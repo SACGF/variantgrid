@@ -241,7 +241,7 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
                                                     defaults={"open": True})
         except Exception as e:
             SeqAutoMessage.objects.update_or_create(record=self, severity=LogLevel.ERROR,
-                                                    sample_sheet_qc_exception=sample_sheet_qc_exception,
+                                                    code=sample_sheet_qc_exception,
                                                     message=f"QC not loaded: {e}",
                                                     defaults={"open": True})
 
@@ -789,10 +789,10 @@ class UnalignedReads(models.Model):
         return UnalignedReads.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
 
     def __str__(self):
-        if self.fastq_r1.data_state == self.fastq_r2.data_state:
-            data_state = self.fastq_r1.get_data_state_display()
-        else:
+        if self.fastq_r2 and self.fastq_r1.data_state != self.fastq_r2.data_state:
             data_state = f"R1: {self.fastq_r1.get_data_state_display()}, R2: {self.fastq_r2.get_data_state_display()}"
+        else:
+            data_state = self.fastq_r1.get_data_state_display()
         return f"UnalignedReads from sample {self.sequencing_sample} ({data_state})"
 
 
@@ -961,7 +961,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
     @cached_property
     def vcf(self) -> Optional[VCF]:
         try:
-            VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)
+            return VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)
         except VCF.DoesNotExist:
             return None
 
@@ -1322,7 +1322,7 @@ class GoldReference(models.Model):
         import_status = self.get_import_status_display()
         name = f"{self.enrichment_kit} ({import_status})"
         if self.error_exception:
-            name += " error: {self.error_exception}"
+            name += f" error: {self.error_exception}"
         return name
 
 
