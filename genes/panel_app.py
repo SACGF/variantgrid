@@ -21,6 +21,7 @@ PANEL_APP_HEADERS = {
 
 
 def get_request(url):
+    headers = None
     if PANEL_APP_HEADERS:
         headers = PANEL_APP_HEADERS
     return requests.get(url, timeout=MINUTE_SECS, headers=headers)
