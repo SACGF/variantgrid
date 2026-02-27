@@ -82,10 +82,10 @@ class ClinVarVersion(SubVersionPartition):
         if m := re.match(CLINVAR_PATTERN_37_38, base_name):
             date_time = m.group(1)
             return datetime.strptime(date_time, "%Y%m%d")
-        CLINVAR_PATTERN_T2T = r"^Homo_sapiens-GCA_009914755.4-(20\d{2})_(10)-clinvar.vcf.gz"
+        CLINVAR_PATTERN_T2T = r"^Homo_sapiens-GCA_009914755.4-(20\d{2})_(\d+)-clinvar.vcf.gz"
         if m := re.match(CLINVAR_PATTERN_T2T, base_name):
             year = m.group(1)
-            month = m.group(0)
+            month = m.group(2)
             return datetime(int(year), int(month), 1)  # Just go with 1st of month
 
         patterns = ", ".join([CLINVAR_PATTERN_37_38, CLINVAR_PATTERN_T2T])
@@ -831,7 +831,7 @@ class VariantAnnotationVersion(SubVersionPartition):
                     release = m.group(1)
                     gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz"
                 else:
-                    (release, gff_filename) = self.refseq.split(" - ")
+                    (release, gff_filename) = self.refseq.split(" - ", maxsplit=1)
                     if not gff_filename.endswith(".gz"):
                         gff_filename += ".gz"
                     # This is good for VEP v108 (will need to keep on top of this)
