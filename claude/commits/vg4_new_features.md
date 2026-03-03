@@ -37,7 +37,8 @@ A brand-new SA Path workflow to **find variants in your samples that may need re
 
 ## 3. Structural Variant (SV/CNV) Support — Major Improvements
 
-VG3 had basic SV support. VG4 has significantly improved handling of large variants.
+VG3 used explicit ref/alt bases. VG4 has significantly improved handling of large variants via
+handling <DEL>, <DUP> and <INV> with arbitrary lengths
 
 **What this means for medical scientists:**
 - SVs are now correctly **annotated** — gene impact, population frequency (gnomAD SV), ClinVar SV overlap
@@ -53,15 +54,15 @@ VG3 had basic SV support. VG4 has significantly improved handling of large varia
 
 VG4 includes substantially newer annotation databases:
 
-| Database | VG3 | VG4 |
-|----------|-----|-----|
-| gnomAD (GRCh38) | v2.1 | **v4** (many new fields, hemi counts, PopMax AC) |
-| gnomAD (GRCh37) | v2.1 | v2.1 + extra fields |
-| dbNSFP | 4.2 | **4.5** |
+| Database | VG3           | VG4 |
+|----------|---------------|-----|
+| gnomAD (GRCh38) | v3            | **v4** (many new fields, hemi counts, PopMax AC) |
+| gnomAD (GRCh37) | v2.1          | v2.1 + extra fields |
+| dbNSFP | 4.2           | **4.5** |
 | AlphaMissense | Not available | **Included** (AI-predicted pathogenicity) |
 | MAVE scores | Not available | **Included** (saturation genome editing data) |
-| VEP | 105 | **110** |
-| ClinVar | VCF only | **XML** (richer data, more variants) |
+| VEP | 105           | **110** |
+| ClinVar | VCF only      | **XML** (richer data, more variants) |
 
 **What this means for medical scientists:**
 - More accurate population frequency data for rare variant filtering (gnomAD v4)
@@ -121,8 +122,7 @@ Improvements to the variant filtering analysis:
 - **Analysis grid now shows patient name** alongside sample name (previously only sample ID)
 - **Cohort node per-sample filtering** — select individual samples to include/exclude with correct counts
 - **gnomAD filtering allele frequency (FAF)** available as a filter option in Population Node
-- **Auto-launch analysis templates** — you can now configure templates to auto-launch when a new sample arrives, and preview which samples would match the configuration
-- **Analysis output node CSV download** — download a CSV directly from an output node in the analysis
+- **Auto-launch analysis templates** — you can now configure templates to auto-launch when a new sample arrives, and preview which samples would match the configuration. This was added to VG3 but is hardcoded just for Molecular Oncology.
 - **VCF upload notification** — you are now told when uploaded VCFs are being annotated, rather than showing an empty grid
 
 ---
@@ -133,48 +133,15 @@ Variant search is substantially more informative and helpful:
 
 - **Gene-symbol HGVS search** — search using `BRCA1:c.185del` format directly
 - **HGNC ID search** — search by HGNC integer identifier
-- **dbSNP lookup via API** — searches rs numbers via live API lookup
+- **dbSNP lookup via API** — searches rs numbers via live API lookup as it was very slow searching large local DB
 - **Much better error messages** — instead of generic failures, you now get specific messages explaining why a search didn't resolve (normalization differences, unsupported genome build coordinates, etc.)
 - **HGVS normalisation warnings** — if your searched HGVS was normalised to a different form, a warning is shown
 - **Cohort/pedigree search** — you can now find cohorts and pedigrees by name in the search bar
-- **MT (mitochondrial) HGVS** handled consistently across builds
 
 ---
 
-## 10. SeqAuto / Sequencing Automation
+## 10. Other
 
-For labs using the sequencing automation pipeline:
-
-- **NovaSeq X** supported as a sequencer type
-- **Single-sample VCF** support via the SeqAuto API (previously required multi-sample VCF)
-- **Auto-run onco analyses** — analyses can be automatically triggered when an oncology VCF is received via the API
-- **Custom VCF INFO/FORMAT fields** — VCF custom annotation fields can now be stored and used in analysis
-- **Annotated VCF/CSV download** — generate annotated output files from an analysis node for offline download
-
----
-
-## Summary: What's New vs VG3 at a Glance
-
-| Feature | VG3 (SA Path) | VG4 (master) |
-|---------|--------------|-------------|
-| Somatic classification (Horak/AMP) | ❌ | ✅ |
-| ClinVar Reanalysis / Candidate Search | ❌ | ✅ |
-| gnomAD v4 | ❌ | ✅ |
-| AlphaMissense | ❌ | ✅ |
-| MAVE scores | ❌ | ✅ |
-| MANE transcript tagging | ❌ | ✅ |
-| T2T genome build | ❌ | ✅ |
-| ClinVar XML import | ❌ | ✅ |
-| SV annotation (gnomAD SV, ClinVar overlap) | Basic | ✅ Improved |
-| MOI analysis node | ❌ | ✅ |
-| Conservation analysis node | ❌ | ✅ |
-| Classification dashboard | ❌ | ✅ |
-| Condition text → ontology auto-matching | Partial | ✅ Improved |
-| Discordance triage workflow | Basic | ✅ Improved |
-| Gene-symbol HGVS search | ❌ | ✅ |
-| Analysis shows patient name | ❌ | ✅ |
-| Analysis auto-launch from template | ❌ | ✅ |
-| Output node CSV download | ❌ | ✅ |
-| NovaSeq X support | ❌ | ✅ |
-| Custom VCF INFO/FORMAT fields | ❌ | ✅ |
-| Django version | 3.2 | 6.0 |
+- **MT chrM mito variants** — Various fixes related to MT variants
+- **Custom VCF INFO/FORMAT fields** — VCF custom annotation fields can now be stored and used in analysis. These are read/stored but not displayed yet.
+- **Annotated VCF/CSV download** — generate annotated output files from an analysis node for offline download on sample/VCF page
