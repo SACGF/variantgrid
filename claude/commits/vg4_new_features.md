@@ -3,38 +3,6 @@
 This document summarises what is new in VG4 compared to the VG3 SA Path instance.
 It focuses on features that directly affect how medical scientists classify, review, and analyse variants.
 
----
-
-## Somatic Classification (Horak / AMP Framework)
-
-VG4 has full support for classifying somatic/oncology variants using the **Horak (AMP/VICC) framework** alongside the existing germline ACMG system.
-
-**What this means for medical scientists:**
-- Classifications now have an **Allele Origin** (Germline / Somatic / Unknown) — this is mandatory
-- Somatic variants use **Oncogenic / Likely Oncogenic / VUS / Likely Benign / Benign** classification
-- AMP Levels (Tier I–IV) are displayed throughout the system — in classification lists, search results, and the variant page
-- The classification form adapts based on allele origin: somatic fields appear for somatic records, germline fields for germline
-- Assertion method can now be both ACMG and Horak simultaneously (for labs classifying both)
-- ClinVar oncogenic data is imported and shown alongside germline data
-- Classification lists clearly separate germline and somatic columns
-
----
-
-## Candidate Search / ClinVar Reanalysis Tool
-
-A brand-new SA Path workflow to **find variants in your samples that may need reclassification** based on updated ClinVar evidence or new publications.
-
-**What this means for medical scientists:**
-- Search across your sample variants filtered by gene/phenotype/zygosity
-- The tool highlights variants where ClinVar has changed since your last classification
-- Shows your existing classifications alongside current ClinVar data for comparison
-- You can **classify directly from the search results** without needing to go back to the full analysis
-- Filter by individual sample, VCF project, or phenotype/ontology term
-- Shows how long ago the variant was last classified
-- Medical scientists can change workflow state directly from the reanalysis pages (not just admins)
-
----
-
 ## Structural Variants (SV/CNV) Support — Major Improvements
 
 VG3 used explicit ref/alt bases. VG4 has significantly improved handling of large variants via
@@ -45,7 +13,6 @@ handling `<DEL>`, `<DUP>` and `<INV>` with arbitrary lengths.
 - Large deletions, duplications, and inversions import and display properly
 - Quick links to external databases (Varsome, gnomAD) work for SVs
 - Variants from Manta, Dragen, and other SV callers import more reliably
-- ClinVar matching for SVs uses **overlap percentage** rather than exact coordinates (more clinically meaningful)
 - gnomAD SV population frequency shown on variant detail page
 
 ---
@@ -83,7 +50,6 @@ VG4 includes substantially newer annotation databases:
 | AlphaMissense | Not available | **Included** (AI-predicted pathogenicity) |
 | MAVE scores | Not available | **Included** (saturation genome editing data) |
 | VEP | 105 | **110** (also updated Mastermind and COSMIC) |
-| ClinVar | VCF only | **XML** (richer data, more variants) |
 
 **New annotation columns:**
 - **New dbNSFP gene columns** — GDI, GDI-Phred, P(HI), GHIS, P(rec), HIPred score, Gene indispensability score, Expression (egenetics), Expression (GNF/Atlas), BioCarta Pathway, ConsensusPathDB Pathway, KEGG IDs, KEGG Pathway, GWAS traits, GO process, GO cellular, GO molecular function, BioGRID interactions, ConsensusPathDB interactions, gnomAD prob LOF intolerant/HOM/tolerant, Essential Gene (CRISPR/CRISPR2/Gene Trap)
@@ -100,15 +66,15 @@ VG4 includes substantially newer annotation databases:
 - **New rankscore columns** — AlphaMissense, BayesDel (NoAF), CADD (raw), ClinPred, REVEL, MetaLR, VEST4
   - These are scaled 0→1 based on all non-synonymous SNVs. There is 1 score per variant (not per transcript).
   - Previously we used levels (e.g. DAMAGING, BENIGN), but those used genome-wide thresholds which vary considerably per gene.
-- **Old columns removed** — FATHMM, Mutation Assessor, Mutation Taster, Polyphen2, CADD Phred, REVEL Score
 - New pathogenicity prediction scores now **autopopulate classifications**
 
 ---
 
-## Classification Workflow
+## Classification
 
 Several improvements to the day-to-day classification experience:
 
+- **Grouping** of similar classifications (to handle some labs that have dozens of classifications for a variant)
 - **Classification Dashboard** — a new summary page showing condition text match status, lab activity, and outstanding issues (replaces the old flat "issues" list)
 - **Condition text matching** uses MONDO, OMIM, and HPO to auto-suggest ontology terms when you type a condition
 - **GenCC gene-disease validity** integrated — helps assess pathogenicity evidence for gene-disease relationships
@@ -119,8 +85,36 @@ Several improvements to the day-to-day classification experience:
 - **Invisible character detection** — classifications with invisible Unicode characters are flagged and cleaned
 - **Withdrawn classification handling** improved throughout
 
+
+## Somatic Classification (Horak / AMP Framework)
+
+VG4 has full support for classifying somatic/oncology variants using the **Horak (AMP/VICC) framework** alongside the existing germline ACMG system.
+
+**What this means for medical scientists:**
+- Classifications now have an **Allele Origin** (Germline / Somatic / Unknown) — this is mandatory
+- Somatic variants use **Oncogenic / Likely Oncogenic / VUS / Likely Benign / Benign** classification
+- AMP Levels (Tier I–IV) are displayed throughout the system — in classification lists, search results, and the variant page
+- The classification form adapts based on allele origin: somatic fields appear for somatic records, germline fields for germline
+- Assertion method can now be both ACMG and Horak simultaneously (for labs classifying both)
+- ClinVar oncogenic data is imported and shown alongside germline data
+- Classification lists clearly separate germline and somatic columns
+
 ---
 
+## Candidate Search / ClinVar Reanalysis Tool
+
+A brand-new SA Path workflow to **find variants in your samples that may need reclassification** based on updated ClinVar evidence or new publications.
+
+**What this means for medical scientists:**
+- Search across your sample variants filtered by gene/phenotype/zygosity
+- The tool highlights variants where ClinVar has changed since your last classification
+- Shows your existing classifications alongside current ClinVar data for comparison
+- You can **classify directly from the search results** without needing to go back to the full analysis
+- Filter by individual sample, VCF project, or phenotype/ontology term
+- Shows how long ago the variant was last classified
+- Medical scientists can change workflow state directly from the reanalysis pages (not just admins)
+
+---
 ## Data
 
 - **Download annotated CSV/VCF** — generate annotated output files from an analysis node for offline download on the sample/VCF page
@@ -185,11 +179,12 @@ VG4 supports the new **T2T-CHM13v2** reference genome as a third genome build al
 - **MANE transcripts** — transcripts are now tagged as **MANE Select** (single preferred transcript per gene) or **MANE Plus Clinical**; the MANE Select transcript is highlighted and chosen as the default on variant detail pages and in classification
 - **Show all locus variants** — other variants at the same locus are now shown regardless of genotype call; also links to alleles that were once on the same row in VCF files
 - **Quick gene info summary** — shows a summary of gene/disease links on the variant page (click to expand for full details)
-- **Tag counts in grid** — shows tag counts rather than listing all tags (which could get extremely long)
+- **Tag counts** — shows unique tag counts rather than listing all tags (which could get extremely long for popular variants). Able to click + expand if you want
 - **Annotation on intergenic variants** — users can now see limited annotation on intergenic variants
 - **Tooltips** — added tooltips to show help about columns on gene/variant pages
 - **Nearby variants** — now shows tags and classification summary counts, and works across genome builds
 - **Structural Variant page** — page appears differently for SVs (unavailable annotations hidden, notes field added)
+- **ClinVar** - load more detailed, up to date info from ClinVar website
 
 ---
 
