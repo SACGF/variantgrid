@@ -1,19 +1,8 @@
-import logging
 from dataclasses import field, dataclass
 from datetime import datetime, timedelta
 from functools import reduce
 
 from threadlocals.threadlocals import get_request_variable, set_request_variable
-
-from library.utils import time_since
-
-
-def get_and_log_time_since(start: datetime, name='') -> timedelta:
-    ts = time_since(start)
-    if name:
-        name += ': '
-    logging.info("%sTotal time taken: %.2f seconds", name, ts)
-    return ts
 
 
 @dataclass

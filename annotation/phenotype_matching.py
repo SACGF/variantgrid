@@ -8,7 +8,6 @@ from annotation.models.models_phenotype_match import TextPhenotypeMatch, Phenoty
     TextPhenotypeSentence
 from annotation.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
 from annotation.phenotype_tokenizer import PhenotypeTokenizer
-from library.utils import get_and_log_time_since
 from patients.models import Patient
 
 MAX_COMBO_LENGTH = 14  # Checked HPO words in DB
@@ -217,9 +216,9 @@ def bulk_patient_phenotype_matching(patients=None):
 
     start = time.time()
     phenotype_matcher = PhenotypeMatcher()
-    get_and_log_time_since(start, "load references")
+    loaded = time.time()
+    logging.info("load references: %.2d secs", loaded - start)
 
-    start = time.time()
     patients = list(patients)
     num_patients = len(patients)
     num_parsed_phenotypes = 0
@@ -231,9 +230,11 @@ def bulk_patient_phenotype_matching(patients=None):
                 perc_complete = 100.0 * i / num_patients
                 logging.info("%d patients %0.2f%% complete", i, perc_complete)
 
-        ts = get_and_log_time_since(start, "bulk_patient_phenotype_matching")
+        bulk_start = time.time()
+        match_time = bulk_start - loaded
+        logging.info("bulk_patient_phenotype_matching: %.2d", match_time)
         if num_parsed_phenotypes:
-            time_per_patient = ts / num_parsed_phenotypes
+            time_per_patient = match_time / num_parsed_phenotypes
             pps = 1.0 / time_per_patient
             logging.info("%d parsed patient phenotypes - %.2f parsed per second/%.2f seconds per patient",
                          num_parsed_phenotypes, pps, time_per_patient)

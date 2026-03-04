@@ -1,4 +1,3 @@
-import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -8,8 +7,7 @@ from django.utils.timezone import localtime
 
 
 def time_since(start: datetime) -> timedelta:
-    end = time.time()
-    return end - start
+    return datetime.now() - start
 
 
 def local_date_string() -> str:
