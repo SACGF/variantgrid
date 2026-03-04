@@ -200,7 +200,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             variant_qs = Variant.objects.filter(varianttranscriptannotation__transcript_version=transcript_version,
                                                 varianttranscriptannotation__protein_position__icontains=protein_position)
             # Join through allele so it works across genome builds
-            filters.append(Q(allele_origin_grouping__allele_grouing__allele__variantallele__variant__in=variant_qs))
+            filters.append(Q(allele_origin_grouping__allele_grouping__allele__variantallele__variant__in=variant_qs))
 
         if page != "gene_symbol":
             if gene_symbol_str := self.get_query_param("gene_symbol"):

@@ -119,7 +119,7 @@ def clinical_significance_change_check(
                     )
 
                     pending_change_label = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(pending_change_value)
-                    if classification_change.new_label != pending_change_value:
+                    if classification_change.new_value != pending_change_value:
                         close_message += f", expected {pending_change_label}"
 
                     # is_agreed_change = newly_published != pending_change_value

@@ -229,8 +229,9 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
 
     @property
     def preview(self) -> PreviewData:
+        lab_name = self.classification_based_on.lab.name if self.classification_based_on_id else "Unknown"
         extra = [
-            PreviewKeyValue(key="Lab:", value=self.classification_based_on.lab.name),
+            PreviewKeyValue(key="Lab:", value=lab_name),
         ]
         return PreviewData.for_object(obj=self, summary_extra=extra,
                                       icon=self.preview_icon(),

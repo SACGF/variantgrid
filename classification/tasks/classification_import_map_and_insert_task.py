@@ -48,7 +48,7 @@ class ClassificationImportMapInsertTask(Task):
     @staticmethod
     def validate_file_type_override(file_type_override: str) -> str:
         if file_type_override not in settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS:
-            valid_parsers = ",".join(settings.OMNI_IMPORTER_PARSERS)
+            valid_parsers = ",".join(settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS)
             raise ValueError(f'{file_type_override=} must be one of {valid_parsers}')
         return file_type_override
 
