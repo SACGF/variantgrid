@@ -234,8 +234,7 @@
             const ZYGOSITY_DICT = {'O': 'HOM_ALT', 'E': 'HET', 'R': 'REF', 'U': 'Unknown Zygosity'};
 
             let rows = [cols.map(c => '"' + (c.label || c.name) + '"').join(',')];
-            grid.jqGrid('getDataIDs').forEach(function(id) {
-                const rowData = grid.jqGrid('getLocalRow', id);
+            grid.jqGrid('getGridParam', 'data').forEach(function(rowData) {
                 const values = cols.map(function(c) {
                     let val = rowData[c.name];
                     if (val === null || val === undefined) val = '';
