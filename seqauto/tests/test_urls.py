@@ -36,8 +36,14 @@ class Test(URLTestCase):
         GRID_LIST_URLS = [
             ("experiments_datatable", {}, 200),
             ("enrichment_kit_datatable", {}, 200),
+            ("library_datatable", {}, 200),
+            ("sequencer_datatable", {}, 200),
+            ("assay_datatable", {}, 200),
+            ("aligner_datatable", {}, 200),
+            ("variant_caller_datatable", {}, 200),
+            ("variant_calling_pipeline_datatable", {}, 200),
         ]
-        self._test_urls(GRID_LIST_URLS, self.user_non_owner)
+        self._test_datatable_urls(GRID_LIST_URLS, self.user_non_owner)
 
     def testAutocompleteUrls(self):
         # panel_app_forward = json.dumps({"server_id": self.panel_app_panel.server_id})

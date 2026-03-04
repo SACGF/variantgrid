@@ -10,8 +10,8 @@ from seqauto.grids.seqauto_grids import SeqAutoRunsGrid, EnrichmentKitGeneCovera
 from seqauto.grids.sequencing_data_grids import SequencingRunListGrid, \
     UnalignedReadsListGrid, BamFileListGrid, VCFFileListGrid, QCFileListGrid, \
     EnrichmentKitColumns, ExperimentColumns
-from seqauto.grids.sequencing_software_versions_grids import LibraryGrid, SequencerGrid, \
-    AssayGrid, AlignerGrid, VariantCallerGrid, VariantCallingPipelineGrid
+from seqauto.grids.sequencing_software_versions_grids import LibraryColumns, SequencerColumns, \
+    AssayColumns, AlignerColumns, VariantCallerColumns, VariantCallingPipelineColumns
 from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCallerUpdate, \
     AlignerUpdate, VariantCallingPipelineUpdate
 from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
@@ -89,12 +89,12 @@ urlpatterns = [
     path('flagstats/grid/<slug:op>/', JQGridView.as_view(grid=FlagstatsGrid, csv_download=True), name='flagstats_grid'),
     path('qc_exec_summary/grid/<slug:op>/', JQGridView.as_view(grid=QCExecSummaryGrid, csv_download=True), name='qc_exec_summary_grid'),
     # Software/settings
-    path('sequencing_software_versions/library/grid/<slug:op>/', JQGridView.as_view(grid=LibraryGrid), name='library_grid'),
-    path('sequencing_software_versions/sequencer/grid/<slug:op>/', JQGridView.as_view(grid=SequencerGrid), name='sequencer_grid'),
-    path('sequencing_software_versions/assay/grid/<slug:op>/', JQGridView.as_view(grid=AssayGrid), name='assay_grid'),
-    path('sequencing_software_versions/aligner/grid/<slug:op>/', JQGridView.as_view(grid=AlignerGrid), name='aligner_grid'),
-    path('sequencing_software_versions/variant_caller/grid/<slug:op>/', JQGridView.as_view(grid=VariantCallerGrid), name='variant_caller_grid'),
-    path('sequencing_software_versions/variant_calling_pipeline/grid/<slug:op>/', JQGridView.as_view(grid=VariantCallingPipelineGrid), name='variant_calling_pipeline_grid'),
+    path('sequencing_software_versions/library/datatables/', DatabaseTableView.as_view(column_class=LibraryColumns), name='library_datatable'),
+    path('sequencing_software_versions/sequencer/datatables/', DatabaseTableView.as_view(column_class=SequencerColumns), name='sequencer_datatable'),
+    path('sequencing_software_versions/assay/datatables/', DatabaseTableView.as_view(column_class=AssayColumns), name='assay_datatable'),
+    path('sequencing_software_versions/aligner/datatables/', DatabaseTableView.as_view(column_class=AlignerColumns), name='aligner_datatable'),
+    path('sequencing_software_versions/variant_caller/datatables/', DatabaseTableView.as_view(column_class=VariantCallerColumns), name='variant_caller_datatable'),
+    path('sequencing_software_versions/variant_calling_pipeline/datatables/', DatabaseTableView.as_view(column_class=VariantCallingPipelineColumns), name='variant_calling_pipeline_datatable'),
 
     path('sequencing_software_versions', views.sequencing_software_versions, name='sequencing_software_versions'),
     path('view_sequencer/<pk>', SequencerUpdate.as_view(), name='view_sequencer'),
