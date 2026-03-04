@@ -2,13 +2,12 @@ from collections import defaultdict
 from functools import cached_property
 
 import numpy as np
-from django.db import connection
+from django.db.models import Count, ExpressionWrapper, F, IntegerField
 from matplotlib import cm
 
 from library.genomics import get_genomic_size_description
 from library.graphs.chromosomes_graph import plot_chromosomes
 from library.utils import sha256sum_str
-from library.utils.database_utils import get_queryset_select_from_where_parts
 from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models import Sample, Variant
 
@@ -40,21 +39,16 @@ class HomozygosityPercentGraph(CacheableGraph):
 
     def get_chromosome_zygosity_density_bins(self, bin_size):
         qs = self.get_queryset()
-
-        # We want to NOT group by variant_id, so that they get added together, hence we have to do SQL ourselves.
-        qs = qs.values_list("locus__contig__name", self.sample.zygosity_alias)  # Join to right columns
-        # print(str(qs.query))
-        select_part, from_part, where_part = get_queryset_select_from_where_parts(qs)
-        select_part += f', (snpdb_locus.position / {BIN_SIZE}) AS "bin_number", COUNT("snpdb_variant"."id") AS "bin_count"'
-        group_by = f'GROUP BY "snpdb_contig"."name", {self.sample.zygosity_alias}, bin_number'
-        sql = '\n'.join([select_part, from_part, where_part, group_by])
-
-        cursor = connection.cursor()
-        cursor.execute(sql)
+        zygosity_alias = self.sample.zygosity_alias
+        results = (
+            qs.annotate(bin_number=ExpressionWrapper(F('locus__position') / bin_size, output_field=IntegerField()))
+            .values('locus__contig__name', zygosity_alias, 'bin_number')
+            .annotate(bin_count=Count('id'))
+            .values_list('locus__contig__name', zygosity_alias, 'bin_number', 'bin_count')
+        )
         chrom_bins = defaultdict(list)
-        for chrom, zygosity, bin_number, bin_count in cursor.fetchall():
+        for chrom, zygosity, bin_number, bin_count in results:
             chrom_bins[chrom].append((bin_number, bin_count, zygosity))
-
         return chrom_bins
 
     def plot(self, ax):
@@ -101,7 +95,6 @@ class HomozygosityPercentGraph(CacheableGraph):
 
             homozygosity_percent = np.empty(num_bins)
             for i in range(num_bins):
-                num_bins += 1
                 het = het_array[i]
                 hom = hom_array[i]
 
