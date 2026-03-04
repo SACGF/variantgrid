@@ -27,7 +27,7 @@ from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     ProcessingStatus, Allele
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from uicore.templatetags.js_tags import jsonify_for_js
 
 
@@ -263,77 +263,94 @@ class CohortSampleListGrid(JqGridUserRowConfig):
         self.queryset = queryset.values(*self.get_field_names())
 
 
-class CohortListGrid(JqGridUserRowConfig):
-    model = Cohort
-    caption = 'Cohorts'
-    fields = ["id", "name", "import_status", "user__username", "modified", "sample_count"]
-    colmodel_overrides = {
-        'id': {"hidden": True},
-        "name": {'formatter': 'linkFormatter',
-                 'formatter_kwargs': {"icon_css_class": "cohort-icon",
-                                      "url_name": "view_cohort",
-                                      "url_object_column": "id"}},
-        "sample_count": {"label": "Sample Count"},
-    }
+class CohortListColumns(DatatableConfig[Cohort]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='id', visible=False),
+            RichColumn(key='name', label='Name', orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='import_status', label='Status', orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+            RichColumn(key='user__username', label='Uploaded by', orderable=True),
+            RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn(key='sample_count', label='Sample Count', orderable=True),
+            RichColumn(key='id', name='delete', label='', orderable=False,
+                       renderer=self.render_delete,
+                       client_renderer='TableFormat.deleteRow'),
+        ]
 
-    def __init__(self, user):
-        super().__init__(user)
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        queryset = self.model.filter_for_user(user, success_status_only=False)
+    def render_delete(self, cell: CellData) -> str:
+        return reverse('cohort_delete', kwargs={'pk': cell.value})
+
+    def get_initial_queryset(self) -> QuerySet[Cohort]:
+        return Cohort.filter_for_user(self.user, success_status_only=False).filter(vcf__isnull=True)
+
+    def filter_queryset(self, qs: QuerySet[Cohort]) -> QuerySet[Cohort]:
+        user_grid_config = UserGridConfig.get(self.user, 'Cohorts')
         if not user_grid_config.show_group_data:
-            queryset = queryset.filter(user=user)
-        queryset = queryset.filter(vcf__isnull=True)  # Don't show auto-cohorts
-
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': "modified",
-                                  'sortorder': "desc"})
+            qs = qs.filter(user=self.user)
+        return qs
 
 
-class TriosListGrid(JqGridUserRowConfig):
-    model = Trio
-    caption = 'Trios'
-    fields = ["id", "name", "user__username", "modified", "mother__sample__name", "mother_affected",
-              "father__sample__name", "father_affected", "proband__sample__name"]
-    colmodel_overrides = {
-        'id': {'formatter': 'linkFormatter',
-               'formatter_kwargs': {"icon_css_class": "trio-icon",
-                                    "display_column": "name",
-                                    "url_name": "view_trio"}},
-        "name": {"hidden": True},
-        "mother__sample__name": {"label": "Mother"},
-        "father__sample__name": {"label": "Father"},
-        "proband__sample__name": {"label": "Proband"}
-    }
+class TriosListColumns(DatatableConfig[Trio]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='id', visible=False),
+            RichColumn(key='name', label='Name', orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='user__username', label='Uploaded by', orderable=True),
+            RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn(key='mother__sample__name', label='Mother', orderable=True),
+            RichColumn(key='mother_affected', label='Mother Affected', orderable=True),
+            RichColumn(key='father__sample__name', label='Father', orderable=True),
+            RichColumn(key='father_affected', label='Father Affected', orderable=True),
+            RichColumn(key='proband__sample__name', label='Proband', orderable=True),
+            RichColumn(key='id', name='delete', label='', orderable=False,
+                       renderer=self.render_delete,
+                       client_renderer='TableFormat.deleteRow'),
+        ]
 
-    def __init__(self, user):
-        super().__init__(user)
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        queryset = self.model.filter_for_user(user)
+    def render_delete(self, cell: CellData) -> str:
+        return reverse('trio_delete', kwargs={'pk': cell.value})
+
+    def get_initial_queryset(self) -> QuerySet[Trio]:
+        return Trio.filter_for_user(self.user)
+
+    def filter_queryset(self, qs: QuerySet[Trio]) -> QuerySet[Trio]:
+        user_grid_config = UserGridConfig.get(self.user, 'Trios')
         if not user_grid_config.show_group_data:
-            queryset = queryset.filter(user=user)
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': "pk",
-                                  'sortorder': "desc"})
+            qs = qs.filter(user=self.user)
+        return qs
 
 
-class GenomicIntervalsListGrid(JqGridUserRowConfig):
-    model = GenomicIntervalsCollection
-    caption = 'Genomic Intervals'
-    fields = ["id", "name", "import_status", "genome_build__name", "user__username"]
-    colmodel_overrides = {
-        'id': {"hidden": True},
-        "name": {'formatter': 'linkFormatter',
-                 'formatter_kwargs': {"icon_css_class": "bed-icon",
-                                      "url_name": "view_genomic_intervals",
-                                      "url_object_column": "id"}},
-        "genome_build__name": {"label": "Genome Build"},
-        'user__username': {'label': 'Uploaded by'}
-    }
+class GenomicIntervalsListColumns(DatatableConfig[GenomicIntervalsCollection]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='id', visible=False),
+            RichColumn(key='name', label='Name', orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='import_status', label='Status', orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+            RichColumn(key='genome_build__name', label='Genome Build', orderable=True),
+            RichColumn(key='user__username', label='Uploaded by', orderable=True),
+            RichColumn(key='id', name='delete', label='', orderable=False,
+                       renderer=self.render_delete,
+                       client_renderer='TableFormat.deleteRow'),
+        ]
 
-    def __init__(self, user):
-        super().__init__(user)
-        queryset = get_objects_for_user(user, 'snpdb.view_genomicintervalscollection', accept_global_perms=False)
-        self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
+    def render_delete(self, cell: CellData) -> str:
+        return reverse('genomic_intervals_delete', kwargs={'pk': cell.value})
+
+    def get_initial_queryset(self) -> QuerySet[GenomicIntervalsCollection]:
+        return get_objects_for_user(self.user, 'snpdb.view_genomicintervalscollection', accept_global_perms=False)
 
 
 class CustomColumnsCollectionColumns(DatatableConfig[CustomColumnsCollection]):

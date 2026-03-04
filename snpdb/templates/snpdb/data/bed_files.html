@@ -1,4 +1,3 @@
 <div>
-	{% load jqgrid_tags %}
-	{% jqgrid 'genomic_intervals_grid' 'bed-files' search=False delete=True %}
+    <table id="bed-files-grid" data-datatable-url="{% url 'genomic_intervals_datatable' %}" class="sticky-header"></table>
 </div>

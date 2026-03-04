@@ -92,14 +92,14 @@ class Test(URLTestCase):
         cls.PRIVATE_GRID_LIST_URLS = [
             ("vcfs_grid", {}, cls.vcf),
             ("samples_grid", {}, cls.sample),
-            ("cohort_grid", {}, cls.cohort2),
-            ("trio_grid", {}, cls.trio),
-            ("genomic_intervals_grid", {}, cls.genomic_intervals_collection),
         ]
 
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
             ("tag_color_collections_datatable", {}, cls.test_tag),
-            ("custom_columns_collections_datatable", {}, cls.custom_columns_collection)
+            ("custom_columns_collections_datatable", {}, cls.custom_columns_collection),
+            ("cohort_datatable", {}, cls.cohort2),
+            ("trio_datatable", {}, cls.trio),
+            ("genomic_intervals_datatable", {}, cls.genomic_intervals_collection),
         ]
 
     def testUrls(self):

@@ -557,6 +557,30 @@ def cached_generated_file_delete(request):
     return HttpResponse()
 
 
+@require_POST
+def cohort_delete(request, pk):
+    cohort = get_object_or_404(Cohort, pk=pk)
+    cohort.check_can_write(request.user)
+    cohort.delete()
+    return HttpResponse()
+
+
+@require_POST
+def trio_delete(request, pk):
+    trio = get_object_or_404(Trio, pk=pk)
+    trio.check_can_write(request.user)
+    trio.delete()
+    return HttpResponse()
+
+
+@require_POST
+def genomic_intervals_delete(request, pk):
+    gic = get_object_or_404(GenomicIntervalsCollection, pk=pk)
+    gic.check_can_write(request.user)
+    gic.delete()
+    return HttpResponse()
+
+
 def vcfs(request):
     context = {
         "form": VCFChoiceForm(),
@@ -1105,7 +1129,8 @@ def cohorts(request):
         else:
             add_save_message(request, valid, "Cohort", created=True)
 
-    context = {"form": form}
+    show_group_data = UserGridConfig.get(request.user, 'Cohorts').show_group_data
+    context = {"form": form, "show_group_data": show_group_data}
     return render(request, 'snpdb/patients/cohorts.html', context)
 
 
@@ -1245,7 +1270,8 @@ def cohort_gene_counts_matrix(request, cohort_id, gene_count_type_id, gene_list_
 
 
 def trios(request):
-    context = {}
+    show_group_data = UserGridConfig.get(request.user, 'Trios').show_group_data
+    context = {"show_group_data": show_group_data}
     return render(request, 'snpdb/patients/trios.html', context)
 
 

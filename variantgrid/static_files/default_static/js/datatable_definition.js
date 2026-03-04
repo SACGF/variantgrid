@@ -648,6 +648,37 @@ TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
     }
 };
 
+TableFormat.deleteRow = function(data, type, row) {
+    if (!data) {
+        return '';
+    }
+    return $('<button>', {
+        type: 'button',
+        class: 'btn btn-sm btn-danger dt-delete-row',
+        'data-url': data,
+        html: $('<i>', {class: 'fas fa-trash'})
+    }).prop('outerHTML');
+};
+
+$(document).on('click', '.dt-delete-row', function() {
+    if (!confirm('Are you sure you want to delete this?')) {
+        return;
+    }
+    let btn = $(this);
+    let url = btn.data('url');
+    $.ajax({
+        type: 'POST',
+        url: url,
+        headers: {'X-CSRFToken': Cookies.get('csrftoken')},
+        success: function() {
+            btn.closest('table').DataTable().ajax.reload(null, false);
+        },
+        error: function(xhr) {
+            alert('Error: ' + (xhr.responseText || 'Failed to delete'));
+        }
+    });
+});
+
 TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
     let fieldset = $('<div>', {class:'mt-3'});
     for (let col of columns) {

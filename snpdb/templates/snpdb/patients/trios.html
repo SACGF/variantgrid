@@ -10,7 +10,23 @@
         <div id="trio-grid-filter-container"></div>
 	</div>
 
-	{% load jqgrid_tags %}
-    {% user_data_grid_filter 'trio' 'Trios' %}
-	{% jqgrid 'trio_grid' 'trio' search=True gbox_id='trio-grid-filter-container' delete=True %}
+    <div class="mb-2">
+        <label><input type="checkbox" id="trio-group-data" {% if show_group_data %}checked{% endif %}> Show Group Data</label>
+    </div>
+    <table id="trio-grid" data-datatable-url="{% url 'trio_datatable' %}" class="sticky-header"></table>
+    <script>
+    $(document).ready(function() {
+        $("#trio-group-data").change(function() {
+            $.ajax({
+                type: "POST",
+                data: {grid_name: "Trios", filter_level: "groups", checked: $(this).is(":checked")},
+                url: "{% url 'set_user_data_grid_config' %}",
+                headers: {"X-CSRFToken": Cookies.get("csrftoken")},
+                success: function() {
+                    $("#trio-grid").DataTable().ajax.reload(null, false);
+                }
+            });
+        });
+    });
+    </script>
 {% endblock %}
