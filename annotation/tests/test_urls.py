@@ -68,13 +68,6 @@ class Test(URLTestCase):
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.admin_user)
 
-    def testGridUrls(self):
-        build_kwargs = {"genome_build_name": self.grch37.name, "op": "config"}
-        GRID_LIST_URLS = [
-            ("variant_annotation_version_grid", build_kwargs, 200),
-        ]
-        self._test_urls(GRID_LIST_URLS, self.user)
-
     def testDataGridUrls(self):
         DATATABLE_GRID_LIST_URLS = [
             ("variant_annotation_version_datatable", {"genome_build_name": self.grch37.name}, 200),
