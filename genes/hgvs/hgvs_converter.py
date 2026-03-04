@@ -14,6 +14,7 @@ class HGVSConverterType(Enum):
     COMBO = 3
     CLINGEN_ALLELE_REGISTRY = 4  # This is not a full implementation just enough for HGVS tester tool
 
+    @property
     def is_internal_type(self) -> bool:
         return self in (HGVSConverterType.PYHGVS, HGVSConverterType.BIOCOMMONS_HGVS)
 

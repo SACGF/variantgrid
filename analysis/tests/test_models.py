@@ -37,13 +37,13 @@ class AnalysisModelTestCase(TestCase):
     def test_locking(self):
         analysis = Analysis(genome_build=self.grch37)
         analysis.set_defaults_and_save(self.owner_user)
-        analysis.is_locked()
+        analysis.is_locked
 
         AnalysisLock.objects.create(analysis=analysis, locked=True, user=self.owner_user, date=timezone.now())
         # Bump version to expire cache
         analysis.version += 1
         analysis.save()
-        self.assertTrue(analysis.is_locked())
+        self.assertTrue(analysis.is_locked)
 
         # Nobody should be able to write if locked
         self.assertFalse(analysis.can_write(self.owner_user))

@@ -45,9 +45,11 @@ class CandidateSearchType(models.TextChoices):
             raise ValueError(f"Method not defined for {self}")
         return methods
 
+    @property
     def is_analysis_type(self):
         return self in (CandidateSearchType.REANALYSIS_NEW_ANNOTATION, )
 
+    @property
     def is_classification_type(self):
         return self in (CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION, CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE)
 
@@ -77,9 +79,9 @@ class CandidateSearchVersion(TimeStampedModel):
     def get_type_base_page_url(self) -> str | None:
         url = None
         search_type = CandidateSearchType(self.search_type)
-        if search_type.is_analysis_type():
+        if search_type.is_analysis_type:
             url = reverse("reanalysis_candidate_search")
-        elif search_type.is_classification_type():
+        elif search_type.is_classification_type:
             url = reverse("classification_candidate_search")
         return url
 
@@ -113,6 +115,7 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
     def __str__(self):
         return f"{self.search_version}: {self.pk}"
 
+    @property
     def is_running(self) -> bool:
         return self.status in ProcessingStatus.RUNNING_STATES
 

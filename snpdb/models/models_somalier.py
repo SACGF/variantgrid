@@ -155,6 +155,7 @@ class SomalierRelate(AbstractSomalierModel):
     def get_samples(self) -> Iterable[Sample]:
         return []
 
+    @property
     def is_joint_called_vcf(self) -> bool:
         samples_qs = self.get_samples()
         num_vcfs = samples_qs.order_by("vcf").distinct("vcf").count()

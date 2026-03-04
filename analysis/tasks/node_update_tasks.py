@@ -46,7 +46,7 @@ def update_node_task(node_id, version):
                 node.set_node_task_and_status(update_node_task.request.id, NodeStatus.LOADING)
                 node.load()
                 # Check if we need to clear shadow color
-                if node.shadow_color == NodeColors.ERROR and node.is_valid():
+                if node.shadow_color == NodeColors.ERROR and node.is_valid:
                     node.update(shadow_color=None)
                 return  # load already modified status, no need to save again below
             except NodeOutOfDateException:
@@ -114,7 +114,7 @@ def node_cache_task(node_id, version):
     if variant_collection.status != ProcessingStatus.CREATED:
         return
 
-    if not (node.is_valid() and node.modifies_parents()):
+    if not (node.is_valid and node.modifies_parents()):
         logging.debug("Not doing anything for node %s", node.pk)
         variant_collection.status = ProcessingStatus.SKIPPED
         variant_collection.save()

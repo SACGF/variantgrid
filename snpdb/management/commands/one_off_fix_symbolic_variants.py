@@ -45,7 +45,7 @@ class Command(BaseCommand):
                 except Exception as e:
                     print(f"Could not test {v.pk} g.hgvs: {e}")
 
-                if not vc.is_symbolic():
+                if not vc.is_symbolic:
                     not_symbolic.append(v)
                     continue
 

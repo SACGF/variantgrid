@@ -220,7 +220,7 @@ def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, va
                                                  variant_string=variant_string):
         yield SearchResult(cmv, messages=search_messages)
 
-    if variant_coordinate.is_symbolic():
+    if variant_coordinate.is_symbolic:
         original_alt_desc = _sv_alt_description(variant_coordinate)
     else:
         original_alt_desc = Sequence.abbreviate(variant_coordinate.alt)
@@ -274,7 +274,7 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
             continue
 
         search_messages = []
-        if not variant_coordinate.is_symbolic():
+        if not variant_coordinate.is_symbolic:
             # Only check refs if explicit, non-symbolic refs
             calculated_ref = variant_coordinate.calculated_reference(genome_build)
             logging.info("calc ref: %s, provided ref: %s", calculated_ref, variant_coordinate.ref)

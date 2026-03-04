@@ -61,7 +61,7 @@ class CohortMixin:
     @property
     def count_column_prefix(self):
         cohort = self._get_cohort()
-        if cohort and cohort.is_sub_cohort():
+        if cohort and cohort.is_sub_cohort:
             column_prefix = f"sub_cohort_{cohort.pk}_"
         else:
             cgc = self.cohort_genotype_collection
@@ -85,7 +85,7 @@ class CohortMixin:
     def ref_count_annotation_arg(self):
         """ key in annotation_kwargs """
         cohort = self._get_cohort()
-        if cohort and cohort.is_sub_cohort():
+        if cohort and cohort.is_sub_cohort:
             return self.ref_count_column
         return self.cohort_genotype_collection.cohortgenotype_alias
 
@@ -93,7 +93,7 @@ class CohortMixin:
     def het_count_annotation_arg(self):
         """ key in annotation_kwargs """
         cohort = self._get_cohort()
-        if cohort and cohort.is_sub_cohort():
+        if cohort and cohort.is_sub_cohort:
             return self.het_count_column
         return self.cohort_genotype_collection.cohortgenotype_alias
 
@@ -101,7 +101,7 @@ class CohortMixin:
     def hom_count_annotation_arg(self):
         """ key in annotation_kwargs """
         cohort = self._get_cohort()
-        if cohort and cohort.is_sub_cohort():
+        if cohort and cohort.is_sub_cohort:
             return self.hom_count_column
         return self.cohort_genotype_collection.cohortgenotype_alias
 
@@ -135,7 +135,7 @@ class CohortMixin:
         if cohort:
             cgc = self.cohort_genotype_collection
             q_and = []
-            if cohort.is_sub_cohort():
+            if cohort.is_sub_cohort:
                 missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
                 sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
                 q_sub = cgc.get_zygosity_q(sample_zygosities_dict, exclude=True)

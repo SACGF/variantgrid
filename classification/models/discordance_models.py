@@ -348,7 +348,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                         return latest_report.reopen_continued_discordance(cause=f'Change after previous report marked as continued discordance - {clinical_context_change_data.cause_text}')
                     return None
 
-            if clinical_context.is_discordant():
+            if clinical_context.is_discordant:
                 report = DiscordanceReport(clinical_context=clinical_context, cause_text=clinical_context_change_data.cause_text)
                 report.update(clinical_context_change_data=clinical_context_change_data)
                 return report

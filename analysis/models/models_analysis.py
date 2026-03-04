@@ -89,6 +89,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     def last_lock(self):
         return self.analysislock_set.order_by("pk").last()
 
+    @property
     def is_locked(self):
         is_snapshot = AnalysisTemplateVersion.objects.filter(analysis_snapshot=self).exists()
         return is_snapshot or (self.last_lock and self.last_lock.locked)
@@ -117,7 +118,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
         """ Disable modification when locked """
         if super().can_write(user_or_group):
-            return not self.is_locked()
+            return not self.is_locked
         return False
 
     def get_absolute_url(self):
@@ -174,6 +175,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                 warnings.append(str(e))
         return warnings
 
+    @property
     def is_valid(self):
         return not self.get_errors()
 
@@ -289,7 +291,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         warnings = []
         if self.lock_input_sources:
             warnings.append("INPUT LOCKED - cannot create new input source nodes.")
-        if not self.can_write(user) and not self.is_locked():  # Locked has own icon, no need for warning
+        if not self.can_write(user) and not self.is_locked:  # Locked has own icon, no need for warning
             warnings.append("This analysis is READ-ONLY - you do not have write permission to modify anything")
         return warnings
 
@@ -606,6 +608,7 @@ class AnalysisTemplateRun(TimeStampedModel):
         av_qs = AnalysisVariable.objects.filter(node__analysis=self.analysis)
         return av_qs.exclude(analysistemplaterunargument__error__isnull=True)
 
+    @property
     def is_populated(self) -> bool:
         return not self._get_unset_or_errored_variables().exists()
 

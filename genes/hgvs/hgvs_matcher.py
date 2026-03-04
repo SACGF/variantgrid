@@ -201,7 +201,7 @@ class HGVSMatcher:
             raise
         except ClinGenAlleleServerException as cga_se:
             # If it's unknown reference we can just retry with another version, other errors are fatal
-            if cga_se.is_unknown_reference():
+            if cga_se.is_unknown_reference:
                 transcript_accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
                 self._set_clingen_allele_registry_missing_transcript(transcript_accession)
             else:
@@ -406,7 +406,7 @@ class HGVSMatcher:
                 hgvs_variant.transcript = tv.accession
                 # Ensure that ref is always present so we can give warning about provided reference
                 hgvs_string_for_version = hgvs_variant.format(max_ref_length=sys.maxsize)
-                if potential_converter_type.is_internal_type():
+                if potential_converter_type.is_internal_type:
                     method = self.hgvs_converter.description(describe_fallback=False)
                     variant_coordinate, matches_reference, originally_normalized = self.hgvs_converter.hgvs_to_variant_coordinate_reference_match_and_normalized(hgvs_string_for_version, tv)
                 elif potential_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
@@ -417,7 +417,7 @@ class HGVSMatcher:
                             variant_coordinate, matches_reference, originally_normalized = self._clingen_get_variant_coordinate_matches_reference_and_normalized(hgvs_string_for_version)
                         except ClinGenAlleleServerException as cga_se:
                             # If it's unknown reference we can just retry with another version, other errors are fatal
-                            if cga_se.is_unknown_reference():
+                            if cga_se.is_unknown_reference:
                                 self._set_clingen_allele_registry_missing_transcript(tv.accession)
                             else:
                                 msg = f"{error_message} : {cga_se}"
@@ -515,7 +515,7 @@ class HGVSMatcher:
             for transcript_version, potential_converter_type in self.filter_best_transcripts_and_converter_type_by_accession(transcript_accession):
                 hgvs_method = f"{potential_converter_type}: {transcript_version}"
                 hgvs_methods[hgvs_method] = None
-                if potential_converter_type.is_internal_type():
+                if potential_converter_type.is_internal_type:
                     # Sanity Check - make sure contig is the same
                     vc_contig = self.genome_build.chrom_contig_mappings[variant_coordinate.chrom]
                     if vc_contig != transcript_version.contig:
@@ -538,7 +538,7 @@ class HGVSMatcher:
                                     hgvs_method = potential_converter_type
                         except ClinGenAlleleServerException as cga_se:
                             # If it's unknown reference we can just retry with another version, other errors are fatal
-                            if cga_se.is_unknown_reference():
+                            if cga_se.is_unknown_reference:
                                 self._set_clingen_allele_registry_missing_transcript(transcript_version.accession)
                             else:
                                 logging.error(error_message, cga_se)

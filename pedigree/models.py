@@ -44,6 +44,7 @@ class PedFileFamily(models.Model):
         records = list(self.pedfilerecord_set.all())
         return validate(records)
 
+    @property
     def is_valid(self):
         return not self.errors
 

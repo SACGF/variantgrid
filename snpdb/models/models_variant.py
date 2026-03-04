@@ -252,7 +252,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                 * <INS> symbolic structural variant alleles: POS + length of REF allele − 1.
                 * <DEL>, <DUP>, <INV>, and <CNV> symbolic structural variant alleles:, POS + SVLEN
         """
-        if self.is_symbolic():
+        if self.is_symbolic:
             # We don't support <INV> so don't need to worry about it
             return self.position + abs(self.svlen)
         return self.position + len(self.ref) - 1
@@ -325,6 +325,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             raise ValueError("Must pass 'svlen' when using symbolic alt")
         return VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt)
 
+    @property
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
 
@@ -336,7 +337,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def as_external_explicit(self, genome_build) -> 'VariantCoordinate':
         """ explicit ref/alt """
-        if self.is_symbolic():
+        if self.is_symbolic:
             if self.svlen is None:
                 raise ValueError(f"{self} has 'svlen' = None")
 
@@ -366,7 +367,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     @property
     def max_sequence_length(self) -> int:
-        if self.is_symbolic():
+        if self.is_symbolic:
             return abs(self.svlen)
         else:
             return max(len(self.ref), len(self.alt))
@@ -376,7 +377,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         """ Internal format - alt can be <DEL> or <DUP>
             Uses our internal reference representation
         """
-        if self.is_symbolic():
+        if self.is_symbolic:
             return self
 
         ref = self.ref
@@ -421,7 +422,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         vc_symbolic = self.as_internal_symbolic(genome_build)
         if vc_symbolic.svlen and abs(vc_symbolic.svlen) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
             vc = vc_symbolic
-        elif self.is_symbolic():
+        elif self.is_symbolic:
             vc = self.as_external_explicit(genome_build)
         else:
             vc = self
@@ -480,6 +481,7 @@ class Sequence(models.Model):
     def allele_is_symbolic(seq: Union[str, 'Sequence']) -> bool:
         return seq.startswith("<") and seq.endswith(">")
 
+    @property
     def is_standard_sequence(self) -> bool:
         """ only contains G/A/T/C/N """
         return not re.match(r"[^GATCN]", self.seq)
@@ -659,7 +661,7 @@ class Variant(PreviewModelMixin, models.Model):
     def is_standard_variant(self) -> bool:
         """ Variant alt sequence is standard [GATCN] (ie not special or reference) """
         # locus.ref should always be standard...
-        return self.alt.is_standard_sequence()
+        return self.alt.is_standard_sequence
 
     @property
     def is_indel(self) -> bool:
@@ -715,6 +717,7 @@ class Variant(PreviewModelMixin, models.Model):
     def as_tuple(self) -> tuple[str, int, str, str, int]:
         return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen
 
+    @property
     def is_abbreviated(self):
         return str(self) != self.full_string
 

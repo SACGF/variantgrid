@@ -116,7 +116,7 @@ def _somalier_relate(somalier_relate: SomalierRelate) -> Path:
     processing_dir = get_import_processing_dir(somalier_relate.pk, "somalier_relate")
 
     command = [somalier_bin, "relate"]
-    if not somalier_relate.is_joint_called_vcf():
+    if not somalier_relate.is_joint_called_vcf:
         # Somalier --unknown    set unknown genotypes to hom-ref.
         # it is often preferable to use this with VCF samples that were not jointly called
         command += ["--unknown"]

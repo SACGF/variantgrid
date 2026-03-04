@@ -93,7 +93,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
         if self.cohort:
             # We need to join to our cohort genotype before annotate, or the counts etc will be for the whole table
-            if self.cohort.is_sub_cohort():
+            if self.cohort.is_sub_cohort:
                 cgc = self.cohort.cohort_genotype_collection
                 sample_substrings = []
                 for sample in self.cohort.get_samples():

@@ -348,6 +348,7 @@ class SubmissionSource(str, Enum):
     API = 'api'
     VARIANT_GRID = 'variantgrid'
 
+    @property
     def is_valid_user_source(self) -> bool:
         return self in (SubmissionSource.FORM, SubmissionSource.CONSENSUS, SubmissionSource.API)
 

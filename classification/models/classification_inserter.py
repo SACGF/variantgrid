@@ -40,7 +40,7 @@ class BulkClassificationInserter:
     @staticmethod
     def verify_source(data) -> SubmissionSource:
         source = SubmissionSource(data.pop('source', SubmissionSource.API))
-        if not source.is_valid_user_source():
+        if not source.is_valid_user_source:
             raise ValueError(
                 'Illegal value for source, should be "' + SubmissionSource.API.value + '" or "' + SubmissionSource.FORM.value + '"')
         return source

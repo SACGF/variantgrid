@@ -48,6 +48,7 @@ class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException)
         self.response_json = response_json
         self.description = json_str
 
+    @property
     def is_unknown_reference(self):
         """ e.g. error is they don't have that particular transcript - could retry """
         if self.status_code == 500:

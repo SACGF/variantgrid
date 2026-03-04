@@ -166,12 +166,13 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     def get_sample_ids(self):
         return self.get_samples_qs().values_list("pk", flat=True)
 
+    @property
     def is_sub_cohort(self):
         return self.parent_cohort is not None
 
     def get_base_cohort(self):
         """ Underlying cohort (ie deals with sub cohorts) """
-        if self.is_sub_cohort():
+        if self.is_sub_cohort:
             # recursion in case we ever decide to allow sub-sub cohorts
             cohort = self.parent_cohort.get_base_cohort()
         else:

@@ -13,7 +13,7 @@ from snpdb.models import GenomeBuild, VariantCoordinate
 def bcftools_pre_liftover_error_check(variant_coordinate: VariantCoordinate, source_genome_build) -> Optional[str]:
     """ Return non-null (string reason) if you want to skip bcftools liftover """
     # BCFTools requires ref match
-    if variant_coordinate.is_symbolic():
+    if variant_coordinate.is_symbolic:
         if not settings.LIFTOVER_BCFTOOLS_SYMBOLIC:
             return f"Liftover of symbolic variants disabled via {settings.LIFTOVER_BCFTOOLS_SYMBOLIC=}"
     else:

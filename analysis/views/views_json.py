@@ -150,7 +150,7 @@ def nodes_copy(request, analysis_id):
                 edge = clone_node.get_connection_data(new_parent)
                 edges.append(edge)
 
-            if not clone_node.is_valid():
+            if not clone_node.is_valid:
                 clone_node.count = None
 
             clone_node.save()

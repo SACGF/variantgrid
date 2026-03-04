@@ -116,7 +116,7 @@ class VennNode(AnalysisNode):
             in node_utils.get_analysis_update_task before children are loaded  """
 
         task_args_set = set()
-        if self.is_valid():
+        if self.is_valid:
             try:
                 a, b = self.ordered_parents
                 for intersection_type in self.get_vennodecache_intersection_types():

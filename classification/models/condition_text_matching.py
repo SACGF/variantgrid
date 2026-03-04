@@ -571,7 +571,7 @@ class ConditionMatchingSuggestion:
                     return False
 
             if gene_symbol:
-                if self.is_all_leafs():
+                if self.is_all_leafs:
                     # if we're at a gene level, and we have a relationship and we're leafs
                     term = terms[0]
                     if OntologySnake.has_gene_relationship(term, gene_symbol):
@@ -630,6 +630,7 @@ class ConditionMatchingSuggestion:
                     self.add_message(
                         ConditionMatchingMessage(severity="error", text=f"{term.id} : \"{term.warning_text}\""))
 
+    @property
     def is_all_leafs(self):
         if terms := self.terms:
             for term in terms:
