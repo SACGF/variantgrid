@@ -738,10 +738,12 @@ def variant_sample_information(request, variant_id, genome_build_name):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     vsi = VariantSampleInformation(request.user, variant, genome_build)
     other_loci_variants_by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(variant)
+    g_hgvs = VariantAnnotation.get_hgvs_g(variant)
 
     context = {
         "variant": variant,
         "vsi": vsi,
+        "g_hgvs": g_hgvs,
         "other_loci_variants_by_multiallelic": other_loci_variants_by_multiallelic,
         "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build=genome_build).exists(),
     }

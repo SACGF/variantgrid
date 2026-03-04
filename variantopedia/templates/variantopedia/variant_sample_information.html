@@ -227,6 +227,35 @@
         }
 
 
+        function exportGenotypeGridCSV() {
+            const grid = $("#genotype-grid");
+            const colModel = grid.jqGrid('getGridParam', 'colModel');
+            const cols = colModel.filter(c => !c.hidden);
+            const ZYGOSITY_DICT = {'O': 'HOM_ALT', 'E': 'HET', 'R': 'REF', 'U': 'Unknown Zygosity'};
+
+            let rows = [cols.map(c => '"' + (c.label || c.name) + '"').join(',')];
+            grid.jqGrid('getDataIDs').forEach(function(id) {
+                const rowData = grid.jqGrid('getLocalRow', id);
+                const values = cols.map(function(c) {
+                    let val = rowData[c.name];
+                    if (val === null || val === undefined) val = '';
+                    if (c.name === 'zygosity') val = ZYGOSITY_DICT[val] || val;
+                    return '"' + String(val).replace(/"/g, '""') + '"';
+                });
+                rows.push(values.join(','));
+            });
+
+            const gHgvs = "{{ g_hgvs|default:variant }}";
+            const slug = gHgvs.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+            const blob = new Blob([rows.join('\n')], {type: 'text/csv'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'variant_genotypes_' + slug + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         $(document).ready(function() {
             const visible_rows = {{ vsi.visible_rows | jsonify }};
             const ZYGOSITY_DICT = {
@@ -289,6 +318,15 @@
                 },
                 rowNum: 20,
                 pager: 'genotype-grid-pager',
+            });
+
+            jQuery("#genotype-grid").jqGrid('navGrid', '#genotype-grid-pager', {add:false, edit:false, del:false, search:false, refresh:false});
+            jQuery("#genotype-grid").jqGrid('navButtonAdd', '#genotype-grid-pager', {
+                caption: "CSV",
+                buttonicon: "ui-icon-arrowthickstop-1-s",
+                onClickButton: exportGenotypeGridCSV,
+                title: "Download as CSV",
+                cursor: "pointer"
             });
 
             $(".genotype-filter").change(filterGenotypes);
