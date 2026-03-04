@@ -133,9 +133,6 @@ def cgf_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unuse
     if instance.filename:
         if os.path.exists(instance.filename):
             os.unlink(instance.filename)
-        dirname = os.path.dirname(instance.filename)
-        if os.path.isdir(dirname):
-            os.rmdir(dirname)
 
 class Company(models.Model):
     name = models.TextField(primary_key=True)
