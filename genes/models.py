@@ -587,7 +587,7 @@ class GeneVersion(models.Model):
         return {
             "chrom": contigs.pop().name,
             "start": min(all_transcripts_data["start"]),
-            "end": min(all_transcripts_data["end"]),
+            "end": max(all_transcripts_data["end"]),
             "strand": strand_set.pop(),
         }
 
@@ -1844,7 +1844,7 @@ class GeneList(TimeStampedModel):
         # Match original name and symbol so we can delete non-matched
         name_or_symbol_match = Q(original_name__in=gene_symbol_deletions) | Q(gene_symbol__in=gene_symbol_deletions)
         qs = self.genelistgenesymbol_set.filter(name_or_symbol_match)
-        num_deleted = qs.delete()
+        num_deleted, _ = qs.delete()
 
         if num_added or num_deleted:
             self.set_modified_to_now()
