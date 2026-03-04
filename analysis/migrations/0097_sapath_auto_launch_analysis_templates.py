@@ -23,23 +23,19 @@ def _sapath_create_auto_launch_analysis_templates(apps, _schema_editor):
     for enrichment_kit_name, sample_regex, template_name in SAPATH_AUTO_LAUNCH_CONFIG:
         enrichment_kit = EnrichmentKit.objects.filter(name=enrichment_kit_name).first()
         if enrichment_kit is None:
-            print(f"Skipping: EnrichmentKit '{enrichment_kit_name}' not found")
+            # print(f"Skipping: EnrichmentKit '{enrichment_kit_name}' not found")
             continue
 
         template = AnalysisTemplate.objects.filter(name=template_name).first()
         if template is None:
-            print(f"Skipping: AnalysisTemplate '{template_name}' not found")
+            # print(f"Skipping: AnalysisTemplate '{template_name}' not found")
             continue
 
-        obj, created = AutoLaunchAnalysisTemplate.objects.get_or_create(
+        AutoLaunchAnalysisTemplate.objects.get_or_create(
             enrichment_kit=enrichment_kit,
             template=template,
             sample_regex=sample_regex,
         )
-        if created:
-            print(f"Created AutoLaunchAnalysisTemplate: {enrichment_kit_name} / {template_name}")
-        else:
-            print(f"Already exists: AutoLaunchAnalysisTemplate: {enrichment_kit_name} / {template_name}")
 
 
 class Migration(migrations.Migration):
