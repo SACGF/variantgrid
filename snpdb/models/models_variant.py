@@ -484,6 +484,7 @@ class Sequence(models.Model):
         """ only contains G/A/T/C/N """
         return not re.match(r"[^GATCN]", self.seq)
 
+    @property
     def is_symbolic(self) -> bool:
         return self.allele_is_symbolic(self.seq)
 
@@ -674,11 +675,11 @@ class Variant(PreviewModelMixin, models.Model):
     def is_deletion(self) -> bool:
         if self.alt.is_symbolic:
             return self.alt.seq == VCFSymbolicAllele.DEL
-        return self.alt.seq != Variant.REFERENCE_ALT and len(self.locus.ref) > len(self.alt.seq)
+        return self.alt.seq != Variant.REFERENCE_ALT and len(self.locus.ref.seq) > len(self.alt.seq)
 
     @property
     def is_symbolic(self) -> bool:
-        return self.locus.ref.is_symbolic() or self.alt.is_symbolic()
+        return self.locus.ref.is_symbolic or self.alt.is_symbolic
 
     @property
     def can_make_g_hgvs(self) -> bool:
@@ -696,7 +697,7 @@ class Variant(PreviewModelMixin, models.Model):
             if self.alt.seq == VCFSymbolicAllele.DUP:
                 allele_size *= 2
         else:
-            allele_size = len(self.locus.ref) + len(self.alt)
+            allele_size = len(self.locus.ref.seq) + len(self.alt.seq)
         return allele_size
 
     @property
@@ -709,7 +710,7 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_c_hgvs(self) -> bool:
-        return self.can_have_annotation and self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH
+        return self.can_have_annotation and (self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH)
 
     def as_tuple(self) -> tuple[str, int, str, str, int]:
         return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen

@@ -14,6 +14,8 @@ class VariantTestCase(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.variant = slowly_create_test_variant("3", 128198980, 'A', 'T', cls.grch37)
         cls.ref_variant = slowly_create_test_variant("3", 128198980, 'A', 'A', cls.grch37)
+        cls.deletion_variant = slowly_create_test_variant("3", 128198990, 'GAG', 'G', cls.grch37)
+        cls.insertion_variant = slowly_create_test_variant("3", 128198995, 'G', 'GAG', cls.grch37)
 
         # Need this for HGVSMatcher in VariantCoordinate - that may be removed in future
         get_fake_annotation_version(cls.grch37)
@@ -116,6 +118,28 @@ class VariantTestCase(TestCase):
         vc_from_symbolic = vc_symbolic.as_internal_canonical_form(self.grch37)
         vc_from_explicit = vc_explicit.as_internal_canonical_form(self.grch37)
         self.assertEqual(vc_from_symbolic, vc_from_explicit)
+
+    def test_is_deletion(self):
+        """ Issue #1449 BUG 1 - len(self.locus.ref) was missing .seq, causing TypeError """
+        self.assertTrue(self.deletion_variant.is_deletion)
+        self.assertFalse(self.insertion_variant.is_deletion)
+        self.assertFalse(self.variant.is_deletion)
+
+    def test_is_insertion(self):
+        self.assertTrue(self.insertion_variant.is_insertion)
+        self.assertFalse(self.deletion_variant.is_insertion)
+        self.assertFalse(self.variant.is_insertion)
+
+    def test_clingen_allele_size(self):
+        """ Issue #1449 BUG 2 - len(self.locus.ref) + len(self.alt) were missing .seq, causing TypeError """
+        self.assertEqual(self.deletion_variant._clingen_allele_size, len('GAG') + len('G'))
+        self.assertEqual(self.insertion_variant._clingen_allele_size, len('G') + len('GAG'))
+        self.assertEqual(self.variant._clingen_allele_size, len('A') + len('T'))
+
+    def test_can_have_c_hgvs(self):
+        """ Issue #1449 BUG 3 - operator precedence caused TypeError for reference variants (svlen=None, can_have_annotation=False) """
+        self.assertTrue(self.variant.can_have_c_hgvs)
+        self.assertFalse(self.ref_variant.can_have_c_hgvs)
 
     def test_symbolic_from_string(self):
         variant_string_lower = "1:10000-50000 <del>"  # Written with lower case

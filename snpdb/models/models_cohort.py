@@ -455,7 +455,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         already_set = self.cohortgenotype_alias in kwargs.get("existing_annotation_kwargs", set())
         if not (already_set and kwargs.get("override") is False):
             collections = [self.pk]
-            if kwargs.get("common_variants", True):
+            if kwargs.get("common_variants", True) and self.common_collection_id is not None:
                 collections.append(self.common_collection_id)
             cgc_condition = Q(cohortgenotype__collection__in=collections)
             annotation_kwargs[self.cohortgenotype_alias] = FilteredRelation('cohortgenotype', condition=cgc_condition)
