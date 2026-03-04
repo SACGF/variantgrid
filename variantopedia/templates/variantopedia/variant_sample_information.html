@@ -175,7 +175,7 @@
                 rows.push(values.join(','));
             });
 
-            const gHgvs = "{{ variant }}";
+            const gHgvs = "{{ variant|slice:":50" }}";
             const slug = gHgvs.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
             const blob = new Blob([rows.join('\n')], {type: 'text/csv'});
             const url = URL.createObjectURL(blob);
