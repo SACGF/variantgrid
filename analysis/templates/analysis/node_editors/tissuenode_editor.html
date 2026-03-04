@@ -1,5 +1,4 @@
 {% extends "analysis/node_editors/grid_editor_gene_tab.html" %}
-{% load jqgrid_tags %}
 
 {% block docreadyjs %}
     var tissueNodeForm = $('form#tissue-node');
@@ -13,14 +12,18 @@
 	{% if annotation_version.human_protein_atlas_version and node.tissue_sample %}
 		<b>Human Protein Atlas Tissue:</b> {{ node.tissue_sample.name }} (Abundance >= {{ node.min_abundance }})
 
-		{% jqgrid 'node_tissue_expression_genes_grid' 'node-tissue-expression-genes' search=False download_grid_json_as_csv=True analysis_id=node.analysis_id node_id=node.pk version=node.version %}
+		<table id="node-tissue-expression-genes-datatable"
+		       data-datatable-url="{% url 'node_tissue_expression_genes_datatable' node.analysis_id node.pk node.version %}"
+		       class="sticky-header"></table>
 	{% else %}
 		No tissue sample selected.
 	{% endif %}
 {% elif node.text_tissue %}
 	<b>UniProt Tissue Specificity:</b> {{ node.text_tissue }}
 
-	{% jqgrid 'node_tissue_uniprot_genes_grid' 'node-tissue-uniprot-genes' search=False download_grid_json_as_csv=True analysis_id=node.analysis_id node_id=node.pk version=node.version %}
+	<table id="node-tissue-uniprot-genes-datatable"
+	       data-datatable-url="{% url 'node_tissue_uniprot_genes_datatable' node.analysis_id node.pk node.version %}"
+	       class="sticky-header"></table>
 
 {% endif %}
 

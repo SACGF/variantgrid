@@ -3,7 +3,6 @@
 {% load ui_menu_bars %}
 {% load ui_utils %}
 {% load js_tags %}
-{% load jqgrid_tags %}
 {% block title %}Analysis Issues{% endblock title %}
 {% block submenu %}{% menu_bar_analysis %}{% endblock %}
 {% block head %}
@@ -67,16 +66,6 @@
             }
 
             showSummaryGraph("analysis-node-summary-graph", nodesStatusSummary);
-
-            jQuery.extend($.fn.fmatter , {
-                analysisNodeLink : function(cellvalue, options, rowObject) {
-                    let analysisId = rowObject.analysis__id;
-                    let nodeId = rowObject.id;
-                    // Hack as Urls can use dictionary as kwargs (set in JqGrid colmodel override)
-                    rowObject.hack_kwargs = {analysis_id: analysisId, active_node_id: nodeId};
-                    return linkFormatter(cellvalue, options, rowObject);
-                }
-            });
         });
     </script>
 {% endblock head %}
@@ -90,7 +79,7 @@
                 {% labelled label=field %}{{ count }}{% endlabelled %}
             {% endfor %}
         </div>
-        {% jqgrid 'analysis_node_issues_grid' search=False %}
+        <table id="analysis-node-issues-datatable" data-datatable-url="{% url 'analysis_node_issues_datatable' %}" class="sticky-header"></table>
     </div>
 
 {% endblock content %}

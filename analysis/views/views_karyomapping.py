@@ -2,10 +2,12 @@ import csv
 from collections import defaultdict, OrderedDict
 
 from django.core.exceptions import PermissionDenied
+from django.http import HttpResponse
 from django.http.response import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls.base import reverse
 from django.views.decorators.cache import cache_page
+from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 
 from analysis.forms import KaryomappingGeneForm, UserTrioForm
@@ -28,8 +30,18 @@ def get_karyomapping_analysis_permission_check(request, pk):
 
 
 def karyomapping_analyses(request):
-    context = {"trio_form": UserTrioForm()}
+    from snpdb.models import UserGridConfig
+    show_group_data = UserGridConfig.get(request.user, 'Karomapping Analyses').show_group_data
+    context = {"trio_form": UserTrioForm(), "show_group_data": show_group_data}
     return render(request, 'analysis/karyomapping/karyomapping_analyses.html', context)
+
+
+@require_POST
+def karyomapping_analysis_delete(request, pk):
+    ka = get_object_or_404(KaryomappingAnalysis, pk=pk)
+    ka.check_can_write(request.user)
+    ka.delete()
+    return HttpResponse()
 
 
 def create_and_view_karyomapping_analysis_for_trio(trio, user):

@@ -1,7 +1,8 @@
-from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, KaromappingAnalysesGrid, AnalysisTemplatesGrid, \
-    AnalysisNodeIssuesGrid, NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid, \
-    NodeTissueExpressionGenesGrid, NodeTissueUniProtTissueSpecificityGenesGrid, NodeGeneListGenesColumns, \
-    AnalysisLogEntryColumns, CandidateSearchRunColumns, CandidateColumns, AnalysesColumns
+from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, AnalysisTemplatesGrid, \
+    NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid, \
+    NodeGeneListGenesColumns, AnalysisLogEntryColumns, CandidateSearchRunColumns, CandidateColumns, AnalysesColumns, \
+    AnalysisNodeIssuesColumns, KaryomappingAnalysesColumns, NodeTissueExpressionGenesColumns, \
+    NodeTissueUniProtGenesColumns
 from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete, views_candidate_search
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
@@ -115,8 +116,8 @@ urlpatterns = [
     path('analyses/grid/<slug:op>/', JQGridView.as_view(grid=AnalysesGrid, delete_row=True), name='analyses_grid'),
 
     path('analysis_templates/grid/<slug:op>/', JQGridView.as_view(grid=AnalysisTemplatesGrid, delete_row=True), name='analysis_templates_grid'),
-    path('analysis_issues/grid/<slug:op>/',
-         JQGridView.as_view(grid=AnalysisNodeIssuesGrid), name='analysis_node_issues_grid'),
+    path('analysis_issues/datatables/',
+         DatabaseTableView.as_view(column_class=AnalysisNodeIssuesColumns), name='analysis_node_issues_datatable'),
 
     path('<int:analysis_id>/node/ontology/genes/grid/<int:node_id>/<int:version>/<slug:op>/',
          JQGridView.as_view(grid=NodeOntologyGenesGrid), name='node_ontology_genes_grid'),
@@ -124,10 +125,10 @@ urlpatterns = [
          JQGridView.as_view(grid=NodeGeneDiseaseClassificationGenesGrid),
          name='node_gene_disease_classification_genes_grid'),
 
-    path('<int:analysis_id>/node/tissue/genes/grid/<int:node_id>/<int:version>/<slug:op>/',
-         JQGridView.as_view(grid=NodeTissueExpressionGenesGrid), name='node_tissue_expression_genes_grid'),
-    path('<int:analysis_id>/node/tissue_uniprot/genes/grid/<int:node_id>/<int:version>/<slug:op>/',
-         JQGridView.as_view(grid=NodeTissueUniProtTissueSpecificityGenesGrid), name='node_tissue_uniprot_genes_grid'),
+    path('<int:analysis_id>/node/tissue/genes/datatables/<int:node_id>/<int:version>/',
+         DatabaseTableView.as_view(column_class=NodeTissueExpressionGenesColumns), name='node_tissue_expression_genes_datatable'),
+    path('<int:analysis_id>/node/tissue_uniprot/genes/datatables/<int:node_id>/<int:version>/',
+         DatabaseTableView.as_view(column_class=NodeTissueUniProtGenesColumns), name='node_tissue_uniprot_genes_datatable'),
 
     path('<int:analysis_id>/node/<int:node_id>/<int:version>/gene_list_genes/<int:gene_list_id>',
          DatabaseTableView.as_view(column_class=NodeGeneListGenesColumns),
@@ -147,7 +148,8 @@ urlpatterns = [
     path('karyomapping/view_karyomapping_analysis/<int:pk>/', views_karyomapping.view_karyomapping_analysis, name='view_karyomapping_analysis'),
     path('karyomapping/view_karyomapping_gene/<int:pk>/', views_karyomapping.view_karyomapping_gene, name='view_karyomapping_gene'),
     path('karyomapping/download_karyomapping_gene_csv/<int:pk>/', views_karyomapping.download_karyomapping_gene_csv, name='download_karyomapping_gene_csv'),
-    path('karyomapping/analyses/grid/<slug:op>/', JQGridView.as_view(grid=KaromappingAnalysesGrid, delete_row=True), name='karyomapping_analyses_grid'),
+    path('karyomapping/analyses/datatables/', DatabaseTableView.as_view(column_class=KaryomappingAnalysesColumns), name='karyomapping_analyses_datatable'),
+    path('karyomapping/analysis/delete/<int:pk>', views_karyomapping.karyomapping_analysis_delete, name='karyomapping_analysis_delete'),
 
     # Candidates / Reanalysis
     path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),

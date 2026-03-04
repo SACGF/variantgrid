@@ -10,6 +10,18 @@
             var url = Urls.create_karyomapping_analysis_for_trio(trioId);
             window.location = url;
         });
+
+        $("#karyomapping-group-data").change(function() {
+            $.ajax({
+                type: "POST",
+                data: {grid_name: "Karomapping Analyses", filter_level: "groups", checked: $(this).is(":checked")},
+                url: "{% url 'set_user_data_grid_config' %}",
+                headers: {"X-CSRFToken": Cookies.get("csrftoken")},
+                success: function() {
+                    $("#karyomapping-analyses-datatable").DataTable().ajax.reload(null, false);
+                }
+            });
+        });
     });
 </script>
 {% endblock head %}
@@ -28,8 +40,9 @@
     </div>
 
     <div class="mt-4">
-        {% load jqgrid_tags %}
-        {% user_data_grid_filter 'karyomapping_analyses' 'KaryomappingAnalyses' %}
-        {% jqgrid 'karyomapping_analyses_grid' 'karyomapping_analyses' search=False delete=True %}
+        <div class="mb-2">
+            <label><input type="checkbox" id="karyomapping-group-data" {% if show_group_data %}checked{% endif %}> Show Group Data</label>
+        </div>
+        <table id="karyomapping-analyses-datatable" data-datatable-url="{% url 'karyomapping_analyses_datatable' %}" class="sticky-header"></table>
     </div>
 {% endblock submenu_page_content %}
