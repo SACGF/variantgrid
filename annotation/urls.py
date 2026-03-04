@@ -1,7 +1,6 @@
 from annotation import views, views_rest
-from annotation.grids import VariantAnnotationVersionGrid, AnnotationRunColumns, \
+from annotation.grids import AnnotationRunColumns, \
     VariantAnnotationVersionColumns
-from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
@@ -25,7 +24,6 @@ urlpatterns = [
     path('load_cached_web_resource/<pk>', views.load_cached_web_resource, name='load_cached_web_resource'),
 
     path('annotation_version/datatable/<path:genome_build_name>/', DatabaseTableView.as_view(column_class=VariantAnnotationVersionColumns), name='variant_annotation_version_datatable'),
-    path('annotation_version/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=VariantAnnotationVersionGrid), name='variant_annotation_version_grid'),
 
     path('annotation_run/datatables', DatabaseTableView.as_view(column_class=AnnotationRunColumns), name='annotation_run_datatable'),
 

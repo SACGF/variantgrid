@@ -88,30 +88,6 @@ class AnnotationRunColumns(DatatableConfig):
         return qs
 
 
-class VariantAnnotationVersionGrid(JqGridUserRowConfig):
-    model = VariantAnnotationVersion
-    caption = 'VariantAnnotationVersion'
-    fields = [
-        'id', "vep", "annotation_consortium", 'created', 'last_checked_date', 'gene_annotation_release__version',
-        "ensembl", "ensembl_funcgen", "ensembl_variation", "ensembl_io",
-        "thousand_genomes", "cosmic", "hgmd", "assembly", "dbsnp",
-        "gencode", "genebuild", "gnomad", "refseq", "regbuild", "sift", "dbnsfp", "distance"
-    ]
-    colmodel_overrides = {
-        'gene_annotation_release__version': {"label": "Gene Annotation Release"},
-    }
-
-    def __init__(self, user, genome_build_name):
-        super().__init__(user)
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        queryset = self.model.objects.filter(genome_build=genome_build)
-        self.queryset = queryset.values(*self.get_field_names())
-
-        self.extra_config.update({'sortname': "created",
-                                  'sortorder': "desc",
-                                  'shrinkToFit': False})
-
-
 class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion]):
 
     def __init__(self, request):
