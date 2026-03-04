@@ -51,7 +51,7 @@
             <h3>Existing Tags</h3>
 
             <p>
-                Tags colored below using tag colors
+                Tags coloured below using tag colours
                 {% if user_settings_tag_colors %}
                     <a href="{{ user_settings_tag_colors.get_absolute_url }}">{{ user_settings_tag_colors }}</a>
                 {% endif %}
@@ -63,9 +63,9 @@
             {% endfor %}
         </div>
 
-        <h3>Tag color schemes</h3>
+        <h3>Tag colour schemes</h3>
 
-        <p>Change colors schemes below</p>
+        <p>Change colour schemes below</p>
 
         <table id="tag-color-collections-datatable" data-datatable-url="{% url 'tag_color_collections_datatable' %}" class="sticky-header responsive"></table>
 

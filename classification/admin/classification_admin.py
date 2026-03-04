@@ -1156,11 +1156,11 @@ class ImportedAlleleValidationFilter(admin.SimpleListFilter):
     VALIDATION_TO_PATH = {
         "Missing 37": "builds__missing_37",
         "Missing 38": "builds__missing_38",
-        "Transcript ID Change (normal)": "normalize__transcript_id_change",
+        "Transcript ID Change (normalised)": "normalize__transcript_id_change",
         "Transcript ID Change (liftover)": "liftover__transcript_id_change",
-        "Transcript Ver Change (normal)": "normalize__transcript_version_change",
+        "Transcript Ver Change (normalised)": "normalize__transcript_version_change",
         "Transcript Ver Change (liftover)": "liftover__transcript_version_change",
-        "Gene Symbol Change (normal)": "normalize__gene_symbol_change",
+        "Gene Symbol Change (normalised)": "normalize__gene_symbol_change",
         "Gene Symbol Change (liftover)": "liftover__gene_symbol_change",
         "General Issue (no resolve, unsup transcript)": "general"
     }

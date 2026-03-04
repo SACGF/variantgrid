@@ -249,7 +249,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
     for rvi, is_reference in resolved_variant_info_is_reference:
         if is_reference:
-            origin = "Normalized"
+            origin = "Normalised"
         else:
             origin = "Liftover"
         if rvi:

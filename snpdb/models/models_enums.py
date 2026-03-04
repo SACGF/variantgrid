@@ -109,7 +109,7 @@ class VariantsType(models.TextChoices):
     UNKNOWN = 'U', 'Unknown'
     GERMLINE = 'G', 'Germline'
     MIXED = 'M', "Mixed (Single Sample)"
-    SOMATIC_ONLY = 'S', "Somatic only (Tumor minus normal)"
+    SOMATIC_ONLY = 'S', "Somatic only (Tumour minus normal)"
 
     SOMATIC_TYPES = Constant([e[0] for e in (MIXED, SOMATIC_ONLY)])
 
@@ -138,9 +138,9 @@ class AssemblyMoleculeType(models.TextChoices):
 
 class AlleleOrigin(models.TextChoices):
     IMPORTED_TO_DATABASE = 'D', 'Imported as this build'
-    IMPORTED_NORMALIZED = 'N', 'Imported (normalized)'
+    IMPORTED_NORMALIZED = 'N', 'Imported (normalised)'
     LIFTOVER = 'L', 'Liftover'
-    LIFTOVER_NORMALIZED = 'M', 'Liftover (normalized)'  # This probably shouldn't happen!
+    LIFTOVER_NORMALIZED = 'M', 'Liftover (normalised)'  # This probably shouldn't happen!
 
     @staticmethod
     def variant_origin(variant, allele, genome_build):

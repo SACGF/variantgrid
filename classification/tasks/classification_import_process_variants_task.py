@@ -88,7 +88,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
                 miv = ModifiedImportedVariant.get_upload_pipeline_unnormalized_variant(upload_step.upload_pipeline,
                                                                                        variant_coordinate)
                 variant = miv.variant
-                validation_message = f"{miv.old_variant} was normalized to {miv.variant}"
+                validation_message = f"{miv.old_variant} was normalised to {miv.variant}"
             except ModifiedImportedVariant.DoesNotExist:
                 variant_str = " ".join(map(str, variant_coordinate))
                 variant = None

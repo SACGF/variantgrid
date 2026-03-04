@@ -51,5 +51,5 @@ class UploadStepOrigin(models.TextChoices):
 
 
 class ModifiedImportedVariantOperation(models.TextChoices):
-    NORMALIZATION = 'N', "Normalization"
+    NORMALIZATION = 'N', "Normalisation"
     RMDUP = 'R', "Removed Duplicate"
