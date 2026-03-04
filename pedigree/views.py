@@ -3,9 +3,11 @@ from django.conf import settings
 from django.forms.forms import Form
 from django.forms.formsets import formset_factory
 from django.forms.models import ModelChoiceField
+from django.http import HttpResponse
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls.base import reverse
+from django.views.decorators.http import require_POST
 
 from library.utils import full_class_name
 from pedigree import forms
@@ -15,7 +17,7 @@ from pedigree.models import PedFile, Pedigree, PedFileFamily, PedFileRecord, \
     CohortSamplePedFileRecord, create_automatch_pedigree
 from snpdb.forms import UserCohortForm
 from snpdb.graphs import graphcache
-from snpdb.models import Cohort
+from snpdb.models import Cohort, UserGridConfig
 
 
 def view_ped_file(request, ped_file_id):
@@ -46,9 +48,26 @@ def ped_files(request):
 
 def pedigrees(request):
     form = forms.UserCohortandPedFileFamilyForm(user=request.user)
-    context = {'form': form}
+    show_group_data = UserGridConfig.get(request.user, 'Pedigrees').show_group_data
+    context = {'form': form, 'show_group_data': show_group_data}
 
     return render(request, 'pedigree/pedigrees.html', context)
+
+
+@require_POST
+def ped_file_delete(request, pk):
+    ped_file = get_object_or_404(PedFile, pk=pk)
+    ped_file.check_can_write(request.user)
+    ped_file.delete()
+    return HttpResponse()
+
+
+@require_POST
+def pedigree_delete(request, pk):
+    pedigree = get_object_or_404(Pedigree, pk=pk)
+    pedigree.check_can_write(request.user)
+    pedigree.delete()
+    return HttpResponse()
 
 
 def view_pedigree(request, pedigree_id):

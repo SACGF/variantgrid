@@ -1,44 +1,59 @@
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
+from django.db.models import QuerySet
+from django.http import HttpRequest
+from django.urls import reverse
+
 from pedigree.models import PedFile, Pedigree
-from snpdb.models import UserGridConfig
+from snpdb.models import UserGridConfig, ImportStatus
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
 
 
-class PedFilesGrid(JqGridUserRowConfig):
-    model = PedFile
-    caption = '.ped Files'
-    fields = ["id", "name", "user__username", 'import_status']
-    colmodel_overrides = {
-        'id': {"hidden": True},
-        "name": {'formatter': 'linkFormatter',
-                 'formatter_kwargs': {"icon_css_class": "pedigree-icon",
-                                      "url_name": "view_ped_file",
-                                      "url_object_column": "id"}},
-        'user__username': {'label': 'Uploaded by'},
-    }
+class PedFilesColumns(DatatableConfig[PedFile]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='id', visible=False),
+            RichColumn(key='name', label='Name', orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='user__username', label='Uploaded by', orderable=True),
+            RichColumn(key='import_status', label='Status', orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+            RichColumn(key='id', name='delete', label='', orderable=False,
+                       renderer=self.render_delete,
+                       client_renderer='TableFormat.deleteRow'),
+        ]
 
-    def __init__(self, user):
-        super().__init__(user)
-        queryset = self.model.filter_for_user(user)
-        self.queryset = queryset.values(*self.get_field_names())
+    def render_delete(self, cell: CellData) -> str:
+        return reverse('ped_file_delete', kwargs={'pk': cell.value})
+
+    def get_initial_queryset(self) -> QuerySet[PedFile]:
+        return PedFile.filter_for_user(self.user)
 
 
-class PedigreeGrid(JqGridUserRowConfig):
-    model = Pedigree
-    caption = 'Pedigrees'
-    fields = ["id", "name", "user__username", "modified"]
-    colmodel_overrides = {
-        'id': {"hidden": True},
-        "name": {'formatter': 'linkFormatter',
-                 'formatter_kwargs': {"icon_css_class": "pedigree-icon",
-                                      "url_name": "view_pedigree",
-                                      "url_object_column": "id"}},
-        'user__username': {'label': 'Created By'},
-    }
+class PedigreeColumns(DatatableConfig[Pedigree]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='id', visible=False),
+            RichColumn(key='name', label='Name', orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='user__username', label='Created By', orderable=True),
+            RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn(key='id', name='delete', label='', orderable=False,
+                       renderer=self.render_delete,
+                       client_renderer='TableFormat.deleteRow'),
+        ]
 
-    def __init__(self, user):
-        super().__init__(user)
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        queryset = self.model.filter_for_user(user)
+    def render_delete(self, cell: CellData) -> str:
+        return reverse('pedigree_delete', kwargs={'pk': cell.value})
+
+    def get_initial_queryset(self) -> QuerySet[Pedigree]:
+        return Pedigree.filter_for_user(self.user)
+
+    def filter_queryset(self, qs: QuerySet[Pedigree]) -> QuerySet[Pedigree]:
+        user_grid_config = UserGridConfig.get(self.user, 'Pedigrees')
         if not user_grid_config.show_group_data:
-            queryset = queryset.filter(user=user)
-        self.queryset = queryset.values(*self.get_field_names())
+            qs = qs.filter(user=self.user)
+        return qs
