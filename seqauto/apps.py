@@ -9,5 +9,5 @@ class SeqautoConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
-        from seqauto.signals import experiment_search, sequencing_run_search
+        from seqauto.signals import experiment_search, sequencing_run_search, enrichment_kit_search
         # pylint: enable=import-outside-toplevel,unused-import
