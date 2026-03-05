@@ -1878,6 +1878,10 @@ class AnnotationVersion(models.Model):
     def __lt__(self, other):
         return self.pk < other.pk
 
+    @property
+    def short_description(self) -> str:
+        return f"{self.pk} ({self.annotation_date.date()})"
+
     def __str__(self):
         sub_versions = [f"Variant: {self.variant_annotation_version}",
                         f"Gene: {self.gene_annotation_version}",
@@ -1885,7 +1889,7 @@ class AnnotationVersion(models.Model):
                         f"HPA: {self.human_protein_atlas_version}",
                         f"Ontology: {self.ontology_version}"]
         sub_versions_str = ", ".join(sub_versions)
-        return f"{self.pk} ({self.annotation_date.date()}). {sub_versions_str}"
+        return f"{self.short_description}. {sub_versions_str}"
 
 
 class CachedWebResource(TimeStampedModel):
