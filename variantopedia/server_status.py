@@ -50,7 +50,7 @@ def get_dashboard_notices(user: User, days_ago: int) -> dict:
 
     return {
         "notice_header": notice_header,
-        'recent_lines_with_previews': checks,
+        'recent_lines_with_previews': recent_lines_with_previews,
         'overall_lines': overall_lines,
         'days_ago': days_ago
     }

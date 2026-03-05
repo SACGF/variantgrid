@@ -114,7 +114,7 @@ def server_status(request):
             nb.add_markdown("This is a Slack Test :ladybug:")
             nb.send()
             messages.add_message(request, level=messages.INFO, message="Slack should have been sent a test message.")
-        if action == 'Health Check':
+        elif action == 'Health Check':
             notify_server_status_now()
             messages.add_message(request, level=messages.INFO, message="Slack should have been sent the health check.")
         elif action == 'Test Rollbar':
