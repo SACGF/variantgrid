@@ -1,0 +1,10 @@
+{% load ui_utils %}
+{% if hgnc %}
+    {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
+    {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}
+        <a href="{{ hgnc.get_absolute_url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }})
+        <a href="{{ hgnc.url }}">HGNC site</a>
+    {% endlabelled %}
+{% else %}
+    {% labelled label="HGNC" %}<span class="no-value">Not an HGNC gene</span>{% endlabelled %}
+{% endif %}
