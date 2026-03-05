@@ -1,9 +1,29 @@
 div.graph-loading {
-	background: url(/static/icons/loading.gif) no-repeat center center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 2em;
+}
+
+div.graph-loading::before {
+	font-family: "Font Awesome 5 Free";
+	content: "\f110";
+	font-weight: 900;
+	animation: fa-spin 2s linear infinite;
 }
 
 div.graph-failure {
-	background: url(/static/icons/dead.png) no-repeat center center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 2em;
+}
+
+div.graph-failure::before {
+	font-family: "Font Awesome 5 Free";
+	content: "\f071";
+	font-weight: 900;
+	color: #dc3545;
 }
 
 div.generated-graph {

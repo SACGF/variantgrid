@@ -641,15 +641,25 @@ ul.messages {
   width: 80%;
 }
 ul.messages li {
-  background-image: url(/static/icons/tick.png);
-  background-repeat: no-repeat;
-  background-position: 16px 16px;
   padding: 16px;
   padding-left: 48px;
+  position: relative;
+}
+ul.messages li::before {
+  font-family: "Font Awesome 5 Free";
+  content: "\f00c";
+  font-weight: 900;
+  color: #28a745;
+  position: absolute;
+  left: 16px;
+  top: 16px;
 }
 
-li.error {
-  background-image: url(/static/icons/cross.png) !important;
+li.error::before {
+  font-family: "Font Awesome 5 Free";
+  content: "\f00d" !important;
+  font-weight: 900 !important;
+  color: #dc3545 !important;
 }
 
 .info {
@@ -2320,10 +2330,6 @@ a.clinical-context {
 
 .hidden-eye-icon {
   background-image: url(/static/icons/hidden_eye.png);
-}
-
-.bad-run-icon {
-  background-image: url(/static/icons/cross.png);
 }
 
 .gene-icon {

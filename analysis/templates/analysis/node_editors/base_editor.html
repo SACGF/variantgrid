@@ -192,8 +192,7 @@
 	</script>
 	<style>
 	#locked-warning-icon {
-		width: 18px;
-		height: 18px;
+		font-size: 18px;
 	}
 
 	{% block style %}
@@ -230,7 +229,7 @@
 
 					{% if node.analysis.lock_input_sources and not node.has_input %}
 						<div>
-						<img id='locked-warning-icon' src="{% static 'icons/warning.png' %}" />
+						<i id='locked-warning-icon' class="fas fa-exclamation-triangle text-warning"></i>
 						<b>Analysis locked</b> - you cannot change samples.</div>
 					{% endif %}
 

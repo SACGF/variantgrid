@@ -38,16 +38,15 @@ UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
                          UploadedFileTypes.GENE_LIST: "uploaded_gene_list"}
 
 
-def get_icon_for_uploaded_file_status(status):
-    THUMBNAILS = {ProcessingStatus.CREATED: 'queued.png',
-                  ProcessingStatus.PROCESSING: 'loading.gif',
-                  ProcessingStatus.ERROR: 'cross.png',
-                  ProcessingStatus.SUCCESS: 'tick.png',
-                  ProcessingStatus.TERMINATED_EARLY: 'warning.png'}
-    icon = THUMBNAILS.get(status)
-    if icon:
-        return os.path.join(settings.STATIC_URL, 'icons', icon)
-    return None
+def get_status_icon(status):
+    ICONS = {
+        ProcessingStatus.CREATED: {'icon': 'fa-clock', 'title': 'Queued'},
+        ProcessingStatus.PROCESSING: {'icon': 'fa-spinner fa-spin', 'title': 'Processing'},
+        ProcessingStatus.ERROR: {'icon': 'fa-times-circle', 'css': 'text-danger', 'title': 'Error'},
+        ProcessingStatus.SUCCESS: {'icon': 'fa-check-circle', 'css': 'text-success', 'title': 'Success'},
+        ProcessingStatus.TERMINATED_EARLY: {'icon': 'fa-exclamation-triangle', 'css': 'text-warning', 'title': 'Terminated early'},
+    }
+    return ICONS.get(status, {})
 
 def _get_basic_uploaded_file_context(uploaded_file) -> dict:
     data_url, upload_data = get_url_and_data_for_uploaded_file_data(uploaded_file)
@@ -112,7 +111,7 @@ def uploadedfile_dict(uploaded_file) -> dict:
         url = reverse('view_uploaded_file', kwargs={'uploaded_file_id': uploaded_file.pk})
 
     data['processing_status'] = status
-    data['status_image'] = get_icon_for_uploaded_file_status(status)
+    data['status_icon'] = get_status_icon(status)
     data["url"] = url
     return data
 
