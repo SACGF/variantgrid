@@ -404,6 +404,10 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
             return last.version
         return 0
 
+    @property
+    def latest_version_obj(self):
+        return self.analysistemplateversion_set.order_by("-pk").first()
+
     @classmethod
     def filter_for_user(cls, user, queryset=None, **kwargs):
         """ Hides deleted objects """

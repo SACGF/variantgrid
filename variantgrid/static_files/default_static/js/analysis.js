@@ -420,7 +420,9 @@ function setupAnalysisTemplateTopBar(analysisTemplateId) {
                 let messageTime = 1000;
 
                 if (data.version) {
-                    $("#latest-template-version").html(data.version);
+                    let savedDate = data.created ? new Date(data.created).toLocaleString() : "";
+                    let versionText = "v." + data.version + (savedDate ? " saved " + savedDate : "");
+                    $("#latest-template-version").html(versionText);
                 }
                 if (data.error) {
                     message = data.error;

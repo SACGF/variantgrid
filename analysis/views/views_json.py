@@ -436,7 +436,7 @@ def analysis_template_save(request, pk):
 
     try:
         atv = analysis_template.new_version()
-        return JsonResponse({"version": atv.version})
+        return JsonResponse({"version": atv.version, "created": atv.created.isoformat()})
     except ValueError:
         return JsonResponse({
             "error": f"Could not create new analysis template version for '{analysis_template}'"
