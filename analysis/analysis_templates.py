@@ -63,7 +63,6 @@ def populate_analysis_from_template_run(template_run):
             nodes_to_hide = {n.pk for n in nodes_with_expected_errors} | descendants_node_ids_to_hide
             AnalysisNode.objects.filter(pk__in=nodes_to_hide).update(visible=False)
 
-        print("Everything fine - recalculating everything!")
         reload_analysis_nodes(template_run.analysis.pk)
 
 
