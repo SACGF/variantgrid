@@ -737,7 +737,8 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @property
     def resolved_builds(self) -> list[ResolvedVariantInfo]:
-        return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related('genome_build'))
+        return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related(
+            'genome_build', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt'))
 
     def calculate_variant_coordinate(self) -> CalculatedVariantCoordinate:
         vc: Optional[VariantCoordinate] = None

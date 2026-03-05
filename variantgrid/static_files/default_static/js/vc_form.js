@@ -1025,11 +1025,21 @@ const VCForm = (function() {
         },
 
         variantCoordinate() {
+            // Prefer to use the ekey
             let vc_value = this.value(SpecialEKeys.VARIANT_COORDINATE);
             if (vc_value) {
                 return vc_value;
             }
-            return this.record.allele.variant_coordinate;
+            // Try the resolved per-build coordinate (populated from ResolvedVariantInfo.variant.coordinate)
+            let genome_build = this.value(SpecialEKeys.GENOME_BUILD);
+            if (genome_build) {
+                let build_vc = this.record.allele?.genome_builds?.[genome_build]?.[SpecialEKeys.VARIANT_COORDINATE];
+                if (build_vc) {
+                    return build_vc;
+                }
+            }
+            // Final fallback: imported coordinate from allele_info (may be null for importer bot records)
+            return this.record.allele?.resolved?.variant_coordinate;
         },
 
         cHGVS() {
