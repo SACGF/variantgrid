@@ -196,8 +196,13 @@ def ensure_mutally_exclusive_fields_not_set(obj, field_a, field_b):
 
 
 def set_form_read_only(form):
-    for field in form.fields.values():
-        field.disabled = True
+    if form is None:
+        return
+    # We need to loop over forms if passed a formset
+    forms = form.forms if hasattr(form, 'forms') else [form]
+    for f in forms:
+        for field in f.fields.values():
+            field.disabled = True
 
 
 def thread_safe_unique_together_get_or_create(klass, **kwargs):
