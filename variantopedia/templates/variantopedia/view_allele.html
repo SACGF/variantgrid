@@ -23,7 +23,7 @@
                             let links = vcLinks.generateLinks({{ vc.quick_link_data | jsonify }});
                             let anchors = links.filter(link => !link.isMissing()).map(link => link.asAnchor("bootstrap"));
                             let content = $("<ul>", {class:"list-group", html:anchors});
-                            $('#quick-links-{{ vc.variant.pk }}').html(content);
+                            $('#quick-links-{{ vc.genome_build.pk }}').html(content);
                         }
                     {% endif %}
                 {% endwith %}
@@ -242,7 +242,7 @@
                                 {% if vc.quick_link_data %}
                                     {% modal label="Quick Links" size="md" %}
                                         <div class="modal-body">
-                                            <div class="quick-links" id="quick-links-{{ vc.variant.pk }}">Loading ...</div>
+                                            <div class="quick-links" id="quick-links-{{ vc.genome_build.pk }}">Loading ...</div>
                                         </div>
                                     {% endmodal %}
                                 {% else %}
