@@ -1,8 +1,10 @@
 import logging
 
+import celery
 from django.db import transaction
 
-from analysis.tasks.auto_analysis_tasks import auto_run_analyses_for_vcf, auto_run_analyses_for_sample
+from analysis.tasks.auto_analysis_tasks import auto_run_analyses_for_vcf, auto_run_analyses_for_sample, \
+    reload_auto_analyses_for_vcf
 from analysis.tasks.variant_tag_tasks import variant_tag_created_task, variant_tag_deleted_in_analysis_task, \
     analysis_tag_nodes_set_dirty
 from snpdb.models import ImportStatus
@@ -30,8 +32,12 @@ def handle_vcf_import_success(*args, **kwargs):
     vcf = kwargs["vcf"]
 
     # Launch tasks using celery, so that it doesn't take down the VCF import if something fails
-    celery_task = auto_run_analyses_for_vcf.si(vcf.pk, "Auto Created from vcf_import_success signal", skip_already_analysed=True)
-    celery_task.apply_async()
+    # Chain: create new auto-analyses for samples that don't have one, then reload nodes in any
+    # existing auto-analyses (handles re-imports where node counts may be stale)
+    celery.chain(
+        auto_run_analyses_for_vcf.si(vcf.pk, "Auto Created from vcf_import_success signal", skip_already_analysed=True),
+        reload_auto_analyses_for_vcf.si(vcf.pk),
+    ).apply_async()
 
 
 def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
