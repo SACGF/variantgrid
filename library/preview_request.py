@@ -311,7 +311,7 @@ class PreviewData:
     def __hash__(self):
         genome_builds = tuple(sorted(self.genome_builds)) if self.genome_builds else ()
         annotation_consortia = tuple(sorted(self.annotation_consortia)) if self.annotation_consortia else ()
-        summary_extra = tuple(self.summary_extra) if self.summary_extra else ()
+        summary_extra = tuple((pkv.key, pkv.value_str) for pkv in self.summary_extra) if self.summary_extra else ()
 
         fields = (
             self.category,
