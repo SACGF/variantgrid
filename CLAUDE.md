@@ -86,6 +86,9 @@ There are per-app research documents generated in claude/research
 ### Object-level permissions
 All major models use Django Guardian for object-level permissions. The mixin `GuardianPermissionsMixin` (in `library/django_utils/guardian_permissions_mixin.py`) provides `can_view()`, `can_write()`, `filter_for_user()`. Standard groups are `all_users` and `public`. Use `assign_permission_to_user_and_groups()` from `library/guardian_utils.py`.
 
+### Frontend
+The project uses **Bootstrap 4**. Use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`) for collapse, modal, and other Bootstrap JS components.
+
 ### Grid/table views
 Two systems coexist:
 - **jQGrid** (legacy): `JqGridUserRowConfig` base class in `library/jqgrid/`. Still used in many places.
