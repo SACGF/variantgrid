@@ -608,6 +608,6 @@ class FollowLeadScientist(models.Model):
 
 def get_lead_scientist_users_for_user(user):
     users_list = [user]
-    ls_to_follow = FollowLeadScientist.objects.filter(user=user).values_list("follow")
+    ls_to_follow = FollowLeadScientist.objects.filter(user=user).values_list("follow", flat=True)
     users_list.extend(ls_to_follow)
     return users_list

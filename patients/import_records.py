@@ -191,7 +191,7 @@ def set_fields_if_blank(obj, field_values):
     changed = False
     for k, v in field_values.items():
         existing_value = getattr(obj, k)
-        if existing_value:
+        if not existing_value:
             changed = True
             setattr(obj, k, v)
 
