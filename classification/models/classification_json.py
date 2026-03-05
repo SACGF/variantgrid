@@ -44,7 +44,8 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
         for variant_info in allele_info.resolved_builds:
             genome_builds[variant_info.genome_build.name] = {
                 'variant_id': variant_info.variant_id,
-                SpecialEKeys.C_HGVS: variant_info.c_hgvs
+                SpecialEKeys.C_HGVS: variant_info.c_hgvs,
+                SpecialEKeys.VARIANT_COORDINATE: str(variant_info.variant.coordinate),
             }
 
         if genome_builds:
