@@ -76,8 +76,7 @@ def _create_vcf_field(klass: type[AbstractVCFField], vcf, header_data: dict):
     records = []
     for identifier, field_data in header_data.items():
         raw_data_type = field_data['Type']
-        data_type = type_lookup.get(raw_data_type)
-        if raw_data_type is None:
+        if (data_type := type_lookup.get(raw_data_type)) is None:
             raise ValueError(f"Unknown VCFInfoTypes: {raw_data_type} (valid={','.join(type_lookup)}")
 
         record = klass(vcf=vcf,

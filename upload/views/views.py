@@ -7,7 +7,7 @@ from functools import cached_property, reduce
 
 from django.conf import settings
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import Q
 from django.http.response import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, get_object_or_404
@@ -100,7 +100,7 @@ def uploadedfile_dict(uploaded_file) -> dict:
                     try:
                         uploaded_vcf = uploaded_file.uploadedvcf
                         data['remaining_annotation_runs'] = get_remaining_annotation_runs(uploaded_vcf, upload_pipeline.genome_build)
-                    except UploadedVCF.RelatedObjectDoesNotExist:
+                    except ObjectDoesNotExist:
                         pass
         except:
             pass  # Genome build is optional
