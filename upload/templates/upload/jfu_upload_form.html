@@ -31,7 +31,7 @@
 <td>
     <span class="status-icon">
         {{ JQ_OPEN }} if (file.status_icon && file.status_icon.icon) { {{ JQ_CLOSE }}
-            <i class="fas {%= file.status_icon.icon %} {%= file.status_icon.css || '' %}" title="{%= file.status_icon.title %}"></i>
+            <i class="fas {{ JQ_OPEN }}=file.status_icon.icon{{ JQ_CLOSE }} {{ JQ_OPEN }}=file.status_icon.css || ''{{ JQ_CLOSE }}" title="{{ JQ_OPEN }}=file.status_icon.title{{ JQ_CLOSE }}"></i>
         {{ JQ_OPEN }} } {{ JQ_CLOSE }}
     </span>
 </td>
