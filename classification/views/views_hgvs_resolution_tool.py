@@ -34,6 +34,7 @@ class MatcherOutput:
     message: Optional[str] = None
     used_converter_type: Optional[HGVSConverterType] = None
     method: Optional[str] = None
+    cdot_version_changed: Optional[str] = None
 
     @property
     def explicit_variant_coordinate(self):
@@ -96,6 +97,10 @@ def hgvs_resolution_tool(request: HttpRequest):
                 output.hgvs = resolved_variant.c_hgvs
                 if tv := resolved_variant.transcript_version:
                     output.transcript_version = tv.as_parts
+                    current_cdot = tv.data.get('cdot', '')
+                    stored_cdot = resolved_variant.c_hgvs_converter_data_version
+                    if stored_cdot and current_cdot and stored_cdot != current_cdot:
+                        output.cdot_version_changed = f"cdot data version changed: {stored_cdot} → {current_cdot}"
                 if v := resolved_variant.variant:
                     output.variant_coordinate = v.coordinate
             output.message = iai.message

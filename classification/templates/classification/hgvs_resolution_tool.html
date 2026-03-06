@@ -51,6 +51,9 @@
                                 {% if output.imported_allele_info %}
                                     <div>{% imported_allele_info output.imported_allele_info %}</div>
                                 {% endif %}
+                                {% if output.cdot_version_changed %}
+                                    <div class="text-warning"><i class="fa-solid fa-triangle-exclamation"></i> {{ output.cdot_version_changed }}</div>
+                                {% endif %}
                             </th>
                         {% if show_method_column %}
                             <td>{{ output.used_converter_type|dash_if_empty }}</td>

@@ -40,6 +40,29 @@ class FakeTranscriptVersion:
         return f"{self.transcript_id}.{self.version}"
 
 
+@dataclass
+class HGVSConverterResult(FormerTuple):
+    """Return type of variant_coordinate_to_hgvs_used_converter_type_and_method.
+    Extends FormerTuple so existing destructuring (hgvs_variant, converter_type, method = result) still works.
+    """
+    hgvs_variant: HGVSVariant
+    used_converter_type: HGVSConverterType
+    method: str
+    transcript_version: Optional['TranscriptVersion'] = None
+    """ The TranscriptVersion used for the conversion (if any; None for g.HGVS, LRG via ClinGen, or FakeTranscriptVersion) """
+
+    @property
+    def as_tuple(self) -> tuple:
+        return self.hgvs_variant, self.used_converter_type, self.method
+
+    @property
+    def hgvs_converter_data_version(self) -> str:
+        """ The cdot data version from the transcript used, or '' if not available """
+        if isinstance(self.transcript_version, TranscriptVersion):
+            return self.transcript_version.data.get('cdot', '')
+        return ''
+
+
 @dataclass(frozen=True)
 class VariantCoordinateAndDetails(FormerTuple):
     variant_coordinate: VariantCoordinate
@@ -471,25 +494,27 @@ class HGVSMatcher:
         accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
         return TranscriptVersion.get_transcript_id_and_version(accession)
 
-    def _lrg_variant_coordinate_to_hgvs(self, variant_coordinate: VariantCoordinate, lrg_identifier: str = None) -> tuple[HGVSVariant, HGVSConverterType, str]:
+    def _lrg_variant_coordinate_to_hgvs(self, variant_coordinate: VariantCoordinate, lrg_identifier: str = None) -> HGVSConverterResult:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
             if transcript_version.hgvs_ok:
-                hgvs_variant, hgvs_converter_type, hgvs_method = self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant_coordinate, transcript_version.accession)
-                if hgvs_variant.transcript != transcript_version.accession:
+                result = self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant_coordinate, transcript_version.accession)
+                if result.hgvs_variant.transcript != transcript_version.accession:
                     msg = f"Error creating HGVS for {variant_coordinate}, LRG '{lrg_identifier}' asked for HGVS " \
-                          f"'{transcript_version.accession}' but got '{hgvs_variant.transcript}'"
+                          f"'{transcript_version.accession}' but got '{result.hgvs_variant.transcript}'"
                     raise ValueError(msg)
                 # Replace with our LRG
-                hgvs_variant.transcript = lrg_identifier
-                hgvs_variant.gene = str(transcript_version.gene_symbol)
-                return hgvs_variant, hgvs_converter_type, hgvs_method
+                result.hgvs_variant.transcript = lrg_identifier
+                result.hgvs_variant.gene = str(transcript_version.gene_symbol)
+                return result
 
         problems = ["No transcript via LRGRefSeqGene"]
 
         # Use ClinGen - will raise exception if it can't get it
         if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self, require_allele_id=False):
             if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, lrg_identifier):
-                return hgvs_variant, HGVSConverterType.CLINGEN_ALLELE_REGISTRY, self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
+                return HGVSConverterResult(hgvs_variant=hgvs_variant,
+                                           used_converter_type=HGVSConverterType.CLINGEN_ALLELE_REGISTRY,
+                                           method=self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY)
             else:
                 problems.append(f"{ca} didn't contain HGVS for '{lrg_identifier}'")
 
@@ -497,9 +522,9 @@ class HGVSMatcher:
         raise HGVSImplementationException(f"Could not convert {variant_coordinate} to HGVS using '{lrg_identifier}': {problem_str}")
 
     def variant_coordinate_to_hgvs_used_converter_type_and_method(self, variant_coordinate: VariantCoordinate,
-                                                                  transcript_accession: str = None) -> tuple[HGVSVariant, HGVSConverterType, str]:
+                                                                  transcript_accession: str = None) -> HGVSConverterResult:
         """
-            returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not
+            returns HGVSConverterResult - hgvs is c.HGVS if transcript provided, g.HGVS if not
 
             This handles using different methods (eg local/ClinGen allele registry)
             We always generate the HGVS with full-length reference bases etc, as we adjust that in HGVSExtra.format()
@@ -508,6 +533,7 @@ class HGVSMatcher:
         hgvs_variant = None
         hgvs_converter_type = None
         hgvs_method = None
+        used_transcript_version = None
         if transcript_accession:
             if transcript_is_lrg(transcript_accession):
                 return self._lrg_variant_coordinate_to_hgvs(variant_coordinate, transcript_accession)
@@ -551,6 +577,7 @@ class HGVSMatcher:
 
                 if hgvs_variant:
                     hgvs_converter_type = potential_converter_type
+                    used_transcript_version = transcript_version if isinstance(transcript_version, TranscriptVersion) else None
                     break
 
             if hgvs_methods:
@@ -572,9 +599,10 @@ class HGVSMatcher:
             hgvs_converter_type = self.hgvs_converter.get_hgvs_converter_type()
             hgvs_method = self.hgvs_converter.description(describe_fallback=False)
 
-        return hgvs_variant, hgvs_converter_type, hgvs_method
+        return HGVSConverterResult(hgvs_variant=hgvs_variant, used_converter_type=hgvs_converter_type,
+                                   method=hgvs_method, transcript_version=used_transcript_version)
 
-    def variant_to_hgvs_variant_used_converter_type_and_method(self, variant: Variant, transcript_name=None) -> Tuple[HGVSVariant, HGVSConverterType, str]:
+    def variant_to_hgvs_variant_used_converter_type_and_method(self, variant: Variant, transcript_name=None) -> HGVSConverterResult:
         return self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant.coordinate, transcript_name)
 
     def variant_to_hgvs_variant(self, variant: Variant, transcript_name=None) -> HGVSVariant:
