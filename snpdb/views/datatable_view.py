@@ -360,24 +360,26 @@ class DatatableConfig(Generic[DC]):
         """
         pass
 
+    @cached_property
+    def _model(self) -> Type[DC]:
+        return self.get_initial_queryset().model
+
     def view_primary_key(self, row: CellData) -> JsonDataType:
         """ Relies on being 'id' and object defining get_absolute_url  """
-        qs = self.get_initial_queryset()
-        primary_key_name = qs.model._meta.pk.name
+        primary_key_name = self._model._meta.pk.name
         pk = row.get(primary_key_name)
         if not pk:
             raise ValueError(f"Need to include primary key ('{primary_key_name}') in columns")
         text = row.value
-        obj = qs.model(pk=pk)
+        obj = self._model(pk=pk)
         return {
             "text": text,
             "url": obj.get_absolute_url(),
         }
 
     def render_delete(self, cell: CellData) -> str:
-        model = self.get_initial_queryset().model
         return reverse('group_permissions_object_delete',
-                       kwargs={'class_name': full_class_name(model), 'primary_key': cell.value})
+                       kwargs={'class_name': full_class_name(self._model), 'primary_key': cell.value})
 
 
 class DatabaseTableView(Generic[DC], JSONResponseView):
