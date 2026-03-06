@@ -128,8 +128,8 @@ def hgvs_resolution_tool(request: HttpRequest):
                 if vcd := matcher.get_variant_coordinate_and_details(hgvs_str):
                     variant_coordinate = vcd.variant_coordinate
                     output.variant_coordinate = variant_coordinate
-                    output.used_converter_type = vcd.used_converter_type.name
-                    output.method = vcd.method
+                    output.used_converter_type = vcd.converter_info.used_converter_type.name
+                    output.method = vcd.converter_info.method
 
                 if vcd.transcript_accession:
                     output.transcript_version = TranscriptVersion.transcript_parts(vcd.transcript_accession)
