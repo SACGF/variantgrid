@@ -202,10 +202,10 @@ class ResolvedVariantInfo(TimeStampedModel):
         version = hgvs_matcher.hgvs_converter.get_version()
         transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
         # Prefer data version from the transcript directly used; fall back to the c_hgvs_obj lookup
-        data_version = (result.hgvs_converter_data_version
+        data_version = (result.converter_info.hgvs_converter_data_version
                         or (transcript_version.data.get('cdot', '') if transcript_version else ''))
         c_hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
-                                                          used_converter_type=result.used_converter_type)
+                                                          used_converter_type=result.converter_info.used_converter_type)
         return CHGVSResolution(
                 c_hgvs=c_hgvs,
                 c_hgvs_compatible=result.hgvs_variant.format(use_compat=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
@@ -419,13 +419,6 @@ class CalculatedVariantCoordinate:
     @property
     def is_valid(self) -> bool:
         return self.variant_coordinate is not None
-
-
-def _get_latest_cdot_data_version(genome_build: GenomeBuild) -> str:
-    """ Fallback: get the cdot data version from the most recently imported TranscriptVersion for the genome build """
-    return TranscriptVersion.objects.filter(
-        genome_build=genome_build
-    ).exclude(data__cdot=None).order_by('-pk').values_list('data__cdot', flat=True).first() or ''
 
 
 class ImportedAlleleInfo(TimeStampedModel):
@@ -770,24 +763,21 @@ class ImportedAlleleInfo(TimeStampedModel):
         hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         version = hgvs_matcher.hgvs_converter.get_version()
         used_converter_type = hgvs_converter_type
-        # Default data version: latest cdot data in DB for this build (used if resolution fails or no transcript found)
-        data_version = _get_latest_cdot_data_version(genome_build)
+        data_version = ''
 
         try:
             vc_extra = hgvs_matcher.get_variant_coordinate_and_details(use_hgvs)
-            message = f"HGVS matched by \"{vc_extra.method}\""
-            used_converter_type = vc_extra.used_converter_type
-            if used_converter_type.is_internal_type:
-                if vc_extra.transcript_accession:
-                    tv = TranscriptVersion.get_transcript_version(genome_build, vc_extra.transcript_accession)
-                    if isinstance(tv, TranscriptVersion):
-                        data_version = tv.data.get('cdot', data_version)
-            else:
-                # ClinGen Allele Registry: use today's date as data version
-                data_version = now().date().isoformat()
+            message = f"HGVS matched by \"{vc_extra.converter_info.method}\""
+            used_converter_type = vc_extra.converter_info.used_converter_type
+            data_version = vc_extra.converter_info.hgvs_converter_data_version
             vc = vc_extra.variant_coordinate
         except Exception as ex:
             message = str(ex)
+
+        # Fallback: if we couldn't determine a data version (failed resolution, g.HGVS, LRG without local TV),
+        # use the most recently imported cdot version for this build
+        if not data_version:
+            data_version = hgvs_matcher.get_latest_cdot_data_version()
 
         hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
                                                           used_converter_type=used_converter_type)
