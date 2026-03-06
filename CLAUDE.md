@@ -107,6 +107,8 @@ Several apps have `__<app>_readme.md` files documenting architecture (e.g., `snp
 
 When writing any comment on a GitHub issue or pull request, always preface it with 🤖 Written by Claude.
 
+Do NOT close GitHub issues. Issues must go through a testing lifecycle before being closed by the user.
+
 ## Testing
 
 Tests extend `django.test.TestCase`. URL tests use `URLTestCase` from `library/django_utils/unittest_utils.py`, which:
