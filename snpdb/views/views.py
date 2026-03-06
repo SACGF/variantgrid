@@ -557,29 +557,6 @@ def cached_generated_file_delete(request):
     return HttpResponse()
 
 
-@require_POST
-def cohort_delete(request, pk):
-    cohort = get_object_or_404(Cohort, pk=pk)
-    cohort.check_can_write(request.user)
-    cohort.delete()
-    return HttpResponse()
-
-
-@require_POST
-def trio_delete(request, pk):
-    trio = get_object_or_404(Trio, pk=pk)
-    trio.check_can_write(request.user)
-    trio.delete()
-    return HttpResponse()
-
-
-@require_POST
-def genomic_intervals_delete(request, pk):
-    gic = get_object_or_404(GenomicIntervalsCollection, pk=pk)
-    gic.check_can_write(request.user)
-    gic.delete()
-    return HttpResponse()
-
 
 def vcfs(request):
     context = {

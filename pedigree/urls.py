@@ -12,9 +12,7 @@ urlpatterns = [
     path('pedigree_chart/<int:ped_file_id>', views.pedigree_chart, name='pedigree_chart'),
 
     path('ped_files/datatables/', DatabaseTableView.as_view(column_class=PedFilesColumns), name='ped_files_datatables'),
-    path('ped_file/delete/<int:pk>', views.ped_file_delete, name='ped_file_delete'),
     path('pedigree/datatables/', DatabaseTableView.as_view(column_class=PedigreeColumns), name='pedigree_datatables'),
-    path('pedigree/delete/<int:pk>', views.pedigree_delete, name='pedigree_delete'),
     path('create_pedigree_from_cohort_and_ped_file_family/<int:cohort_id>/<int:ped_file_family_id>', views.create_pedigree_from_cohort_and_ped_file_family, name='create_pedigree_from_cohort_and_ped_file_family'),
 
     path('autocomplete/Pedigree/', views_autocomplete.PedigreeAutocompleteView.as_view(), name='pedigree_autocomplete'),

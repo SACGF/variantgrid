@@ -14,8 +14,10 @@ from django.db.models import QuerySet, Q, F, OrderBy
 from django.http import HttpRequest, QueryDict
 from kombu.utils import json
 
+from django.urls import reverse
+
 from library.log_utils import report_exc_info
-from library.utils import pretty_label, JsonDataType, JsonObjType
+from library.utils import pretty_label, JsonDataType, JsonObjType, full_class_name
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
@@ -371,6 +373,11 @@ class DatatableConfig(Generic[DC]):
             "text": text,
             "url": obj.get_absolute_url(),
         }
+
+    def render_delete(self, cell: CellData) -> str:
+        model = self.get_initial_queryset().model
+        return reverse('group_permissions_object_delete',
+                       kwargs={'class_name': full_class_name(model), 'primary_key': cell.value})
 
 
 class DatabaseTableView(Generic[DC], JSONResponseView):

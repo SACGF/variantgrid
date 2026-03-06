@@ -554,9 +554,6 @@ class KaryomappingAnalysesColumns(DatatableConfig[KaryomappingAnalysis]):
                        client_renderer='TableFormat.deleteRow'),
         ]
 
-    def render_delete(self, cell: CellData) -> str:
-        return reverse('karyomapping_analysis_delete', kwargs={'pk': cell.value})
-
     def get_initial_queryset(self) -> QuerySet[KaryomappingAnalysis]:
         return KaryomappingAnalysis.filter_for_user(self.user)
 

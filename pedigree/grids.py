@@ -1,10 +1,9 @@
 from django.db.models import QuerySet
 from django.http import HttpRequest
-from django.urls import reverse
 
 from pedigree.models import PedFile, Pedigree
 from snpdb.models import UserGridConfig, ImportStatus
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
 class PedFilesColumns(DatatableConfig[PedFile]):
@@ -22,9 +21,6 @@ class PedFilesColumns(DatatableConfig[PedFile]):
                        renderer=self.render_delete,
                        client_renderer='TableFormat.deleteRow'),
         ]
-
-    def render_delete(self, cell: CellData) -> str:
-        return reverse('ped_file_delete', kwargs={'pk': cell.value})
 
     def get_initial_queryset(self) -> QuerySet[PedFile]:
         return PedFile.filter_for_user(self.user)
@@ -45,9 +41,6 @@ class PedigreeColumns(DatatableConfig[Pedigree]):
                        renderer=self.render_delete,
                        client_renderer='TableFormat.deleteRow'),
         ]
-
-    def render_delete(self, cell: CellData) -> str:
-        return reverse('pedigree_delete', kwargs={'pk': cell.value})
 
     def get_initial_queryset(self) -> QuerySet[Pedigree]:
         return Pedigree.filter_for_user(self.user)

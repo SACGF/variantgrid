@@ -7,8 +7,6 @@ from django.http import HttpResponse
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls.base import reverse
-from django.views.decorators.http import require_POST
-
 from library.utils import full_class_name
 from pedigree import forms
 from pedigree.forms import BaseCohortSamplesForPedFileRecordsFormSet
@@ -53,21 +51,6 @@ def pedigrees(request):
 
     return render(request, 'pedigree/pedigrees.html', context)
 
-
-@require_POST
-def ped_file_delete(request, pk):
-    ped_file = get_object_or_404(PedFile, pk=pk)
-    ped_file.check_can_write(request.user)
-    ped_file.delete()
-    return HttpResponse()
-
-
-@require_POST
-def pedigree_delete(request, pk):
-    pedigree = get_object_or_404(Pedigree, pk=pk)
-    pedigree.check_can_write(request.user)
-    pedigree.delete()
-    return HttpResponse()
 
 
 def view_pedigree(request, pedigree_id):

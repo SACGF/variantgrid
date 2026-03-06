@@ -27,7 +27,7 @@ from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     ProcessingStatus, Allele
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_for_js
 
 
@@ -282,9 +282,6 @@ class CohortListColumns(DatatableConfig[Cohort]):
                        client_renderer='TableFormat.deleteRow'),
         ]
 
-    def render_delete(self, cell: CellData) -> str:
-        return reverse('cohort_delete', kwargs={'pk': cell.value})
-
     def get_initial_queryset(self) -> QuerySet[Cohort]:
         return Cohort.filter_for_user(self.user, success_status_only=False).filter(vcf__isnull=True)
 
@@ -316,9 +313,6 @@ class TriosListColumns(DatatableConfig[Trio]):
                        client_renderer='TableFormat.deleteRow'),
         ]
 
-    def render_delete(self, cell: CellData) -> str:
-        return reverse('trio_delete', kwargs={'pk': cell.value})
-
     def get_initial_queryset(self) -> QuerySet[Trio]:
         return Trio.filter_for_user(self.user)
 
@@ -345,9 +339,6 @@ class GenomicIntervalsListColumns(DatatableConfig[GenomicIntervalsCollection]):
                        renderer=self.render_delete,
                        client_renderer='TableFormat.deleteRow'),
         ]
-
-    def render_delete(self, cell: CellData) -> str:
-        return reverse('genomic_intervals_delete', kwargs={'pk': cell.value})
 
     def get_initial_queryset(self) -> QuerySet[GenomicIntervalsCollection]:
         return get_objects_for_user(self.user, 'snpdb.view_genomicintervalscollection', accept_global_perms=False)

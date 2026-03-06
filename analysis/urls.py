@@ -149,7 +149,6 @@ urlpatterns = [
     path('karyomapping/view_karyomapping_gene/<int:pk>/', views_karyomapping.view_karyomapping_gene, name='view_karyomapping_gene'),
     path('karyomapping/download_karyomapping_gene_csv/<int:pk>/', views_karyomapping.download_karyomapping_gene_csv, name='download_karyomapping_gene_csv'),
     path('karyomapping/analyses/datatables/', DatabaseTableView.as_view(column_class=KaryomappingAnalysesColumns), name='karyomapping_analyses_datatable'),
-    path('karyomapping/analysis/delete/<int:pk>', views_karyomapping.karyomapping_analysis_delete, name='karyomapping_analysis_delete'),
 
     # Candidates / Reanalysis
     path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),

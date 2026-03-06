@@ -119,11 +119,9 @@ urlpatterns = [
 
     # Grids
     path('cohort/datatable/', DatabaseTableView.as_view(column_class=CohortListColumns), name='cohort_datatable'),
-    path('cohort/delete/<int:pk>', views.cohort_delete, name='cohort_delete'),
     path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),
     path('sample/grid/<slug:op>/', JQGridView.as_view(grid=SamplesListGrid, delete_row=True), name='samples_grid'),
     path('genomic_intervals/datatable/', DatabaseTableView.as_view(column_class=GenomicIntervalsListColumns), name='genomic_intervals_datatable'),
-    path('genomic_intervals/delete/<int:pk>', views.genomic_intervals_delete, name='genomic_intervals_delete'),
     path('liftover/liftover_runs/datatable', DatabaseTableView.as_view(column_class=LiftoverRunColumns),
          name='liftover_runs_datatable'),
     path('liftover/allele_liftover/datatable', DatabaseTableView.as_view(column_class=LiftoverRunAlleleLiftoverColumns),
@@ -141,7 +139,6 @@ urlpatterns = [
          DatabaseTableView.as_view(column_class=SampleColumns),
          name='samples_datatable'),
     path('trio/datatable/', DatabaseTableView.as_view(column_class=TriosListColumns), name='trio_datatable'),
-    path('trio/delete/<int:pk>', views.trio_delete, name='trio_delete'),
     path('vcfs/grid/<slug:op>/', JQGridView.as_view(grid=VCFListGrid, delete_row=True), name='vcfs_grid'),
 
     # Autocompletes
