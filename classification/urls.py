@@ -13,7 +13,7 @@ from classification.views.classification_export_view import ClassificationApiExp
 from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
-from classification.views.classification_overlaps_views2 import TriageView, view_overlaps2
+from classification.views.classification_overlaps_views2 import TriageView, view_overlaps2, view_overlaps3
 from classification.views.classification_overlaps_vus_view import view_overlaps_vus, view_overlaps_vus_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
@@ -34,6 +34,7 @@ from classification.views.exports_grouping.classification_grouping_export_view i
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
 from classification.views.overlaps_grouped_datatables import ClassificationGroupingOverlapsColumns
+from classification.views.overlaps_grouped_datatables_3 import ClassificationGroupingOverlapsColumns3
 from classification.views.views import classification_import_tool, AutopopulateView
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
@@ -193,6 +194,11 @@ urlpatterns = [
     path('overlaps2', view_overlaps2, name='overlaps2'),
     path('overlaps2/<str:lab_id>', view_overlaps2, name='overlaps2'),
     path('overlaps2/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingOverlapsColumns), name='overlaps2_datatables'),
+
+    path('overlaps3', view_overlaps3, name='overlaps2'),
+    path('overlaps3/<str:lab_id>', view_overlaps3, name='overlaps2'),
+    path('overlaps3/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingOverlapsColumns3),
+         name='overlaps3_datatables'),
 
     path('vus', view_overlaps_vus, name='vus'),
     path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),

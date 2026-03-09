@@ -182,7 +182,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             RichColumn(
                 name="classification",
                 label="c.HGVS",
-                sort_keys=["imported_"],
+                sort_keys=["latest_allele_info__grch38__genomic_sort"],
                 renderer=self.render_classification_grouping
             ),
 

@@ -99,6 +99,10 @@ class OverlapContribution(TimeStampedModel):
     def get_additional_data(self) -> dict:
         return {"comment": self._change_comment}
 
+    @property
+    def effective_value(self):
+        return self.new_value or self.value
+
     class Meta:
         unique_together = ('classification_grouping', 'value_type')
 
@@ -114,7 +118,7 @@ class OverlapContribution(TimeStampedModel):
         return f"{self.pk} {self.source} {self.value}"
 
     @property
-    def testing_context_bucket_obj(self):
+    def testing_context_bucket_obj(self) -> TestingContextBucket:
         return TestingContextBucket(self.testing_context_bucket)
 
     @property

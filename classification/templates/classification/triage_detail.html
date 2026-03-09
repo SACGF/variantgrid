@@ -20,7 +20,7 @@
         {% endif %}
         {% include "uicore/messages/messages.html" %}
 
-        {% labelled label="Submissions Submissions" %}
+        {% labelled label="Relevant Submissions" %}
             <table class="table contribution-table" style="table-layout: fixed; width:100%">
                 <tbody>
                     <tr class="users-contribution">
@@ -28,7 +28,7 @@
                         <td class="cs-{{ overlap_grouping.user_contribution.value }}"><b>{{  overlap_grouping.user_contribution.pretty_value }}</b> {% triage overlap_grouping.user_triage %}</td>
                         <td>{% condition overlap_grouping.user_contribution.conditions %}</td>
                         <td>{{ overlap_grouping.user_contribution.lab }}</td>
-                        <td>{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}</td>
+                        <td>{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}<i class="fa-regular fa-hand-point-left" title="Your record"></i></td>
                     </tr>
                 {% for overlap_comparison in overlap_grouping.comparisons %}
                     <tr {% if overlap_comparison.is_cross_context %}style="opacity:0.7"{% endif %}>
@@ -58,6 +58,9 @@
                 <div class="col-3 text-right">
                     {% ifchanged change.overlap_contribution %}
                         <div>{% testing_context change.overlap_contribution %} {{ change.overlap_contribution.lab }}</div>
+                        {% ifchanged change.user %}
+                        <div>{% user change.user size="tiny" %}</div>
+                        {% endifchanged %}
                     {% endifchanged %}
                     <div>{% timestamp change.timestamp time_ago=True %}</div>
                     {% if change.user %}
@@ -69,7 +72,7 @@
                         <div>{{ field_change.old_value }} -> {{ field_change.new_value }}</div>
                     {% endfor %}
                     {% if change.comment and change.user %}
-                        <div class="comment">{{ change.comment }}{% user change.user size="tiny" %}</div>
+                        <div class="comment">{{ change.comment }}</div>
                     {% endif %}
                 </div>
             </div>
