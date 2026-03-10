@@ -48,6 +48,7 @@ class Command(BaseCommand):
         sleep(50)
 
     def rematch_file(self, file_name: str, commit: bool = False):
+        print(f"Committing changes = {commit}")
         df = pd.read_csv(file_name, sep=",", low_memory=False)
 
         batch: list[int] = []
