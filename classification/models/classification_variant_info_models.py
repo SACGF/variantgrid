@@ -208,7 +208,7 @@ class ResolvedVariantInfo(TimeStampedModel):
                                                           used_converter_type=result.converter_info.used_converter_type)
         return CHGVSResolution(
                 c_hgvs=c_hgvs,
-                c_hgvs_compatible=result.hgvs_variant.format(use_compat=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
+                c_hgvs_compatible=result.hgvs_variant.format(use_delins_for_inv=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
                 c_hgvs_converter_version=c_hgvs_converter_version,
                 c_hgvs_converter_data_version=data_version,
                 transcript_version=transcript_version,

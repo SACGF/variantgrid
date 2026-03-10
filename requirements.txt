@@ -211,6 +211,8 @@ gunicorn==23.0.0
     # via -r requirements.in
 hgvs @ git+https://github.com/biocommons/hgvs@9b32a3077acdb407327c05562fe342d182332c8d#egg=hgvs
     # via -r requirements.in
+hgvs_shim==0.2.0
+    # via -r requirements.in
 html5lib==1.1
     # via django-htmlmin
 htseq==2.0.9
