@@ -563,7 +563,11 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     try:
         vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
-        variant_coordinate, used_transcript_accession, kind, _used_converter_type, method, matches_reference, originally_normalized = vc_details
+        variant_coordinate = vc_details.variant_coordinate
+        used_transcript_accession = vc_details.transcript_accession
+        kind = vc_details.kind
+        matches_reference = vc_details.matches_reference
+        originally_normalized = vc_details.originally_normalized
         logging.info("get_variant_coordinate_and_details - variant_coordinate=%s", variant_coordinate)
         if not matches_reference:
             # reporting on the "provided" reference is slightly problematic as it's not always provided directly, it could be indirectly
