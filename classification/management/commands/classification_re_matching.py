@@ -1,6 +1,8 @@
 from enum import StrEnum
 from time import sleep
 from django.core.management import BaseCommand
+from django.db.models import Q
+
 from classification.classification_import import reattempt_variant_matching
 from classification.models import Classification, ImportedAlleleInfo, DiscordanceReport, ClinVarExport, \
     ResolvedVariantInfo
@@ -76,7 +78,7 @@ class Command(BaseCommand):
             rematch_level = RematchLevel(row[Command.REMATCH_LEVEL])
             # imported_c_hgvs = TextField(null=True, blank=True)
             imported_allele_info = ImportedAlleleInfo.objects.filter(
-                imported_c_hgvs=c_hgvs,
+                Q(imported_c_hgvs=c_hgvs) | Q(imported_g_hgvs=c_hgvs),
                 imported_genome_build_patch_version=genome_build_patch_ver
             ).first()
 
