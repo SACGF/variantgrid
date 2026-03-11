@@ -33,7 +33,7 @@ class RematchRequest:
     def from_row(row):
         genome_build_str = row[GENOME_BUILD_COL]
         c_hgvs = row[C_HGVS_COL]
-        rematch_level = RematchLevel(row[Command.REMATCH_LEVEL])
+        rematch_level = RematchLevel(row[REMATCH_LEVEL])
 
         return RematchRequest(genome_build_str=genome_build_str, c_hgvs=c_hgvs, rematch_level=rematch_level)
 
@@ -52,9 +52,9 @@ class RematchRequest:
                 genome_build=self.genome_build_str,
                 patch_version__isnull=True
             ).first()
-        if not genome_patch_version:
+        if not genome_build_patch_ver:
             raise ValueError(f"Could not find Genome Patch Version {self.genome_build_str}")
-        return genome_patch_version
+        return genome_build_patch_ver
 
     @cached_property
     def imported_allele_info(self) -> ImportedAlleleInfo:
@@ -68,7 +68,7 @@ class RematchRequest:
 
     def validate(self):
         # make sure imported allele info can be found
-        self.imported_allele_info
+        _ = self.imported_allele_info
 
         # if hard rematch (where we're deleting an allele)
         if self.rematch_level == RematchLevel.HARD:
@@ -102,7 +102,6 @@ class Command(BaseCommand):
             self.link_all_unlinked()
         if file := options["file"]:
             self.rematch_file(file, commit=options["file_commit"])
-
 
     def rematch_file(self, file_name: str, commit: bool = False):
         print(f"Committing changes = {commit}")
@@ -142,9 +141,7 @@ class Command(BaseCommand):
 
         print("Completed")
 
-
-### IF LINKED UNLINKED
-
+# IF LINKED UNLINKED
 
     def rematch_classifications(self, _bulk: list[Classification]):
         allele_infos = []
