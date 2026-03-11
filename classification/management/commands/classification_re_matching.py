@@ -87,10 +87,10 @@ class Command(BaseCommand):
 
             if rematch_level == RematchLevel.HARD:
                 if allele := imported_allele_info.allele:
-                    if DiscordanceReport.objects.filter(clinical_context__allele=allele).exists():
-                        raise ValueError(f"Can't rematch {imported_allele_info} hard as existing allele has Discordance Reports")
-                    if ClinVarExport.objects.filter(clinvar_allele__allele=allele).exists():
-                        raise ValueError(f"Can't rematch {imported_allele_info} hard as existing allele has ClinVar Export")
+                    if example_dr := DiscordanceReport.objects.filter(clinical_context__allele=allele).first():
+                        raise ValueError(f"Can't rematch {imported_allele_info} hard as existing allele has Discordance Reports {example_dr.pk}")
+                    if example_cv := ClinVarExport.objects.filter(clinvar_allele__allele=allele).first():
+                        raise ValueError(f"Can't rematch {imported_allele_info} hard as existing allele has ClinVar Export {example_cv.pk}")
                     print(f"{genome_build_patch_ver}\t{c_hgvs}\tFound - Safe for hard rematch")
             else:
                 print(f"{genome_build_patch_ver}\t{c_hgvs}\tFound")
