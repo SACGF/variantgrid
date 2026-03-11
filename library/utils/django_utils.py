@@ -1,3 +1,4 @@
+import inspect
 from typing import Optional, TypeVar
 
 from cache_memoize import cache_memoize
@@ -49,3 +50,28 @@ def get_model_content_type_dict(model):
 @cache_memoize(30)
 def get_cached_project_git_hash() -> str:
     return Git(settings.BASE_DIR).hash
+
+
+def view_to_string(view) -> str:
+    """ This isn't fast so don't use this for anything other than displaying info in
+        error pathways or something """
+    v=inspect.unwrap(view)
+
+    vc=getattr(v,'view_class',None)
+    if vc is not None:
+        m=vc.__module__
+        n=vc.__name__
+        return f'{m}.{n}'
+
+    if inspect.ismethod(v):
+        c=v.__self__.__class__
+        return f'{c.__module__}.{c.__name__}.{v.__name__}'
+
+    if inspect.isfunction(v):
+        return f'{v.__module__}.{v.__qualname__}'
+
+    if hasattr(v,'__class__') and hasattr(v,'__call__'):
+        c=v.__class__
+        return f'{c.__module__}.{c.__name__}'
+
+    return repr(v)
