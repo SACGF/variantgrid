@@ -25,7 +25,8 @@ class APIFileUploadView(APIView):
             response_data = {}
             existing_uploaded_file: Optional[UploadedFile] = None
             if path and not force:
-                existing_uploaded_file = self._get_existing_uploaded_file(path, django_uploaded_file)
+                existing_uploaded_file = self._get_existing_uploaded_file(request.user,
+                                                                          path, django_uploaded_file)
 
             if existing_uploaded_file:
                 response_data["message"] = "Existing path/hash uploaded file found"
@@ -42,10 +43,11 @@ class APIFileUploadView(APIView):
             return JsonResponse({"error": "Upload failed"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     @staticmethod
-    def _get_existing_uploaded_file(path, django_uploaded_file) -> Optional[UploadedFile]:
+    def _get_existing_uploaded_file(user, path, django_uploaded_file) -> Optional[UploadedFile]:
         if existing_ufs := list(UploadedFile.objects.filter(path=path).order_by("pk")):
             new_hash = file_or_filename_md5sum(django_uploaded_file)
             for existing_uf in existing_ufs:
+                existing_uf.check_can_view(user)
                 # Only look at uploaded files that have been successfully processed
                 upload_data = get_upload_data_for_uploaded_file(existing_uf)
                 if upload_data is not None:
