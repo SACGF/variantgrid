@@ -1,4 +1,6 @@
+from dataclasses import dataclass
 from enum import StrEnum
+from functools import cached_property
 from time import sleep
 from django.core.management import BaseCommand
 from django.db.models import Q
@@ -14,6 +16,75 @@ from snpdb.models import GenomeBuildPatchVersion
 class RematchLevel(StrEnum):
     SOFT = "SOFT"
     HARD = "HARD"
+
+
+GENOME_BUILD_COL = "Imported Genome Build"
+C_HGVS_COL = "c.HGVS (Imported)"
+REMATCH_LEVEL = "Rematch"
+
+
+@dataclass
+class RematchRequest:
+    genome_build_str: str
+    c_hgvs: str
+    rematch_level: RematchLevel
+
+    @staticmethod
+    def from_row(row):
+        genome_build_str = row[GENOME_BUILD_COL]
+        c_hgvs = row[C_HGVS_COL]
+        rematch_level = RematchLevel(row[Command.REMATCH_LEVEL])
+
+        return RematchRequest(genome_build_str=genome_build_str, c_hgvs=c_hgvs, rematch_level=rematch_level)
+
+    @cached_property
+    def genome_build_patch_ver(self) -> GenomeBuildPatchVersion:
+        genome_build_patch_ver: GenomeBuildPatchVersion
+        if "." in self.genome_build_str:
+            genome_build_main, genome_patch_version = self.genome_build_str.split(".")
+            genome_patch_version = genome_patch_version[1:]  # drop the leading p
+            genome_build_patch_ver = GenomeBuildPatchVersion.objects.filter(
+                genome_build__name=genome_build_main,
+                patch_version=genome_patch_version
+            ).first()
+        else:
+            genome_build_patch_ver = GenomeBuildPatchVersion.objects.filter(
+                genome_build=self.genome_build_str,
+                patch_version__isnull=True
+            ).first()
+        if not genome_patch_version:
+            raise ValueError(f"Could not find Genome Patch Version {self.genome_build_str}")
+        return genome_patch_version
+
+    @cached_property
+    def imported_allele_info(self) -> ImportedAlleleInfo:
+        iai = ImportedAlleleInfo.objects.filter(
+            Q(imported_c_hgvs=self.c_hgvs) | Q(imported_g_hgvs=self.c_hgvs),
+            imported_genome_build_patch_version=self.genome_build_patch_ver
+        ).first()
+        if not iai:
+            raise ValueError(f"Could not find Imported Allele Info for {self.genome_build_str} {self.c_hgvs}")
+        return iai
+
+    def validate(self):
+        # make sure imported allele info can be found
+        self.imported_allele_info
+
+        # if hard rematch (where we're deleting an allele)
+        if self.rematch_level == RematchLevel.HARD:
+            if allele := self.imported_allele_info.allele:
+                dr = DiscordanceReport.objects.filter(clinical_context__allele=allele).first()
+                ces = list(ClinVarExport.objects.filter(clinvar_allele__allele=allele).all())
+                if dr or ces:
+                    ces_ids = " ,".join(ce.pk for ce in ces)
+                    raise ValueError(f"Can't rematch {self.imported_allele_info} HARD - Discordance Report {dr}, ClinVarExports - {ces_ids}")
+
+    def prep_if_hard(self):
+        if self.rematch_level == RematchLevel.HARD:
+            ResolvedVariantInfo.objects.filter(allele_info=self.imported_allele_info).delete()
+            if allele := self.imported_allele_info.allele:
+                Classification.objects.filter(allele=allele).update(allele=None)
+                allele.delete()
 
 
 class Command(BaseCommand):
@@ -32,9 +103,48 @@ class Command(BaseCommand):
         if file := options["file"]:
             self.rematch_file(file, commit=options["file_commit"])
 
-    GENOME_BUILD_COL = "Imported Genome Build"
-    C_HGVS_COL = "c.HGVS (Imported)"
-    REMATCH_LEVEL = "Rematch"
+
+    def rematch_file(self, file_name: str, commit: bool = False):
+        print(f"Committing changes = {commit}")
+        df = pd.read_csv(file_name, sep=",", low_memory=False)
+
+        passed_validation = True
+        rematch_requests: list[RematchRequest] = []
+        for idx, row in df.iterrows():
+            rematch_request = RematchRequest.from_row(row)
+            try:
+                rematch_request.validate()
+            except Exception as ex:
+                print(ex)
+                passed_validation = False
+            rematch_requests.append(rematch_request)
+
+        if not passed_validation:
+            print("1 or more records failed validation, exiting")
+            return
+
+        if commit:
+            for rematch_request in rematch_requests:
+                rematch_request.prep_if_hard()
+
+            batch: list[int] = []
+            for rematch_request in rematch_requests:
+                batch.append(rematch_request.imported_allele_info.pk)
+                if len(batch) > 50:
+                    print("Rematching Batch")
+                    reattempt_variant_matching(admin_bot(), ImportedAlleleInfo.objects.filter(pk__in=batch), True)
+                    batch.clear()
+                    sleep(50)
+
+            if batch:
+                print("Rematching Batch")
+                reattempt_variant_matching(admin_bot(), ImportedAlleleInfo.objects.filter(pk__in=batch), True)
+
+        print("Completed")
+
+
+### IF LINKED UNLINKED
+
 
     def rematch_classifications(self, _bulk: list[Classification]):
         allele_infos = []
@@ -48,72 +158,6 @@ class Command(BaseCommand):
         allele_info_qs = ImportedAlleleInfo.objects.filter(pk__in={ai.pk for ai in allele_infos})
         reattempt_variant_matching(admin_bot(), allele_info_qs, False)
         sleep(50)
-
-    def rematch_file(self, file_name: str, commit: bool = False):
-        print(f"Committing changes = {commit}")
-        df = pd.read_csv(file_name, sep=",", low_memory=False)
-
-        batch: list[int] = []
-        for idx, row in df.iterrows():
-            genome_build_patch_ver: GenomeBuildPatchVersion
-            genome_build_str = row[Command.GENOME_BUILD_COL]
-            c_hgvs = row[Command.C_HGVS_COL]
-
-            if "." in genome_build_str:
-                genome_build_main, genome_patch_version = genome_build_str.split(".")
-                genome_patch_version = genome_patch_version[1:]  # drop the leading p
-                genome_build_patch_ver = GenomeBuildPatchVersion.objects.filter(
-                    genome_build__name=genome_build_main,
-                    patch_version=genome_patch_version
-                ).first()
-            else:
-                genome_build_patch_ver = GenomeBuildPatchVersion.objects.filter(
-                    genome_build=genome_build_str,
-                    patch_version__isnull=True
-                ).first()
-
-            if not genome_build_patch_ver:
-                raise ValueError(f"Could not find Genome Patch Version {genome_build_str}")
-
-            rematch_level = RematchLevel(row[Command.REMATCH_LEVEL])
-            # imported_c_hgvs = TextField(null=True, blank=True)
-            imported_allele_info = ImportedAlleleInfo.objects.filter(
-                Q(imported_c_hgvs=c_hgvs) | Q(imported_g_hgvs=c_hgvs),
-                imported_genome_build_patch_version=genome_build_patch_ver
-            ).first()
-
-            if not imported_allele_info:
-                raise ValueError(f"Could not find Imported Allele Info {genome_build_str} {c_hgvs}")
-
-            if rematch_level == RematchLevel.HARD:
-                if allele := imported_allele_info.allele:
-                    if example_dr := DiscordanceReport.objects.filter(clinical_context__allele=allele).first():
-                        raise ValueError(f"Can't rematch {imported_allele_info} hard as existing allele has Discordance Reports {example_dr.pk}")
-                    if example_cv := ClinVarExport.objects.filter(clinvar_allele__allele=allele).first():
-                        raise ValueError(f"Can't rematch {imported_allele_info} hard as existing allele has ClinVar Export {example_cv.pk}")
-                    print(f"{genome_build_patch_ver}\t{c_hgvs}\tFound - Safe for hard rematch")
-            else:
-                print(f"{genome_build_patch_ver}\t{c_hgvs}\tFound")
-
-            if commit:
-                if rematch_level == RematchLevel.HARD:
-                    allele = imported_allele_info.allele
-                    ResolvedVariantInfo.objects.filter(allele_info=imported_allele_info).delete()
-                    Classification.objects.filter(allele=allele).update(allele=None)
-                    allele.delete()
-
-                batch.append(imported_allele_info.pk)
-                if len(batch) > 50:
-                    print("Rematching Batch")
-                    reattempt_variant_matching(admin_bot(), ImportedAlleleInfo.objects.filter(pk__in=batch), True)
-                    batch.clear()
-                    sleep(50)
-
-        if batch:
-            print("Rematching Batch")
-            reattempt_variant_matching(admin_bot(), ImportedAlleleInfo.objects.filter(pk__in=batch), True)
-
-        print("Completed")
 
     def link_all_unlinked(self):
         rematch_count = 0
