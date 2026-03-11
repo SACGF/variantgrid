@@ -433,7 +433,7 @@ ROLLBAR = {
     'access_token': rollbar_access_token,
     'client_access_token': rollbar_client_access_token,
     'environment': socket.gethostname().lower().split('.')[0].replace('-', ''),
-    'enabled': bool(rollbar_access_token and rollbar_client_access_token),  # set to false in environments to disable rollbar
+    'enabled': bool(rollbar_access_token and rollbar_client_access_token) and not UNIT_TEST,  # set to false in environments to disable rollbar
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,
