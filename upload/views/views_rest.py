@@ -1,6 +1,8 @@
+import os
 from http import HTTPStatus
 from typing import Optional
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -50,8 +52,12 @@ class APIFileUploadView(APIView):
                 existing_uf.check_can_view(user)
                 # Only look at uploaded files that have been successfully processed
                 upload_data = get_upload_data_for_uploaded_file(existing_uf)
-                if upload_data is not None:
-                    existing_hash = file_or_filename_md5sum(existing_uf.uploaded_file.path)
+                if upload_data is not None and existing_uf.uploaded_file:
+                    upload_dir = os.path.realpath(settings.UPLOAD_DIR)
+                    file_path = os.path.realpath(existing_uf.uploaded_file.path)
+                    if not file_path.startswith(upload_dir + os.sep):
+                        raise ValueError(f"Uploaded file path '{file_path}' is not within UPLOAD_DIR")
+                    existing_hash = file_or_filename_md5sum(file_path)
                     if new_hash == existing_hash:
                         return existing_uf
         return None
