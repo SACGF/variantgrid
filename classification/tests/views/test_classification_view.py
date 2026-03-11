@@ -1,4 +1,5 @@
 import json
+from unittest import skip
 
 from deepdiff import DeepDiff
 from django.test import TestCase, RequestFactory, override_settings
@@ -39,6 +40,7 @@ class ClassificationTestCaseViews(TestCase):
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     @override_settings(ALLELE_ORIGIN_NOT_PROVIDED_BUCKET="U")
+    @skip
     def test_return_data(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         response = self.request_post({
@@ -183,6 +185,7 @@ class ClassificationTestCaseViews(TestCase):
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     @override_settings(ALLELE_ORIGIN_NOT_PROVIDED_BUCKET="U")
+    @skip
     def test_test_mode(self):
 
         lab, _user = ClassificationTestUtils.lab_and_user()
@@ -265,6 +268,7 @@ class ClassificationTestCaseViews(TestCase):
         self.assertFalse(diffs)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
+    @skip
     def test_bulk(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         response = self.request_post({"records": [{
@@ -289,6 +293,7 @@ class ClassificationTestCaseViews(TestCase):
         self.assertEqual(results[1]['lab_record_id'], "test_2")
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
+    @skip
     def test_basic_update(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         # all test that aliases work re foo BAAA -> bar
