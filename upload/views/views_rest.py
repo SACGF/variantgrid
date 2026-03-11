@@ -6,6 +6,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
 
+from library.log_utils import report_exc_info
 from library.utils import file_or_filename_md5sum
 from upload.models import UploadedFile
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
@@ -36,8 +37,9 @@ class APIFileUploadView(APIView):
 
             response_data["uploaded_file_id"] = uploaded_file.pk
             return JsonResponse(response_data)
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        except Exception:
+            report_exc_info(request=request)
+            return JsonResponse({"error": "Upload failed"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     @staticmethod
     def _get_existing_uploaded_file(path, django_uploaded_file) -> Optional[UploadedFile]:
