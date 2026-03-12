@@ -68,8 +68,13 @@ class Command(BaseCommand):
                         continue
                 else:
                     if info := columns[VCFColumns.INFO]:
-                        # Which alternate allele became the reference during liftover (-1 for new reference)
-                        # See - SACGF/variantgrid_private#3763
+                        # BCFTools liftover can emit records with `SWAP=1` in INFO. This happens when the variant
+                        # being lifted over is the reference allele in the destination build. BCFTools swaps REF/ALT
+                        # and inverts sample genotypes so multi-sample VCFs remain internally consistent.
+                        #
+                        # VariantGrid lifts over **variants, not genotypes**, so the swap is semantically incorrect
+                        # for our use case. When `SWAP=1`, the sample allele is actually reference in the destination
+                        # build. See SACGF/variantgrid_private#3763
                         if "SWAP=1" in info:
                             if "," not in alt:
                                 # This should never be a multi-alt but just to be sure
