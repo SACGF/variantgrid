@@ -1,5 +1,6 @@
 import abc
 import logging
+import os
 from abc import abstractmethod
 
 import celery
@@ -53,6 +54,46 @@ class PreprocessAndAnnotateVCFTask(ImportVCFStepTask):
         # Reload from DB - vcf_extract_unknown_and_split_file set items_processed in a different process
         upload_step = UploadStep.objects.get(pk=upload_step.pk)
         return upload_step.items_processed
+
+
+class LiftoverPreprocessVCFTask(ImportVCFStepTask):
+    """PreprocessVCFTask variant used exclusively by LiftoverImportFactory.
+
+    When settings.BCFTOOLS_LIFTOVER_ALLOW_SWAP=False (the default), records with SWAP flags
+    in their INFO are excluded from the VCF stream before SeparateUnknownVariantsTask can
+    insert them as novel variants, and their AlleleLiftover records are marked ERROR.
+
+    When BCFTOOLS_LIFTOVER_ALLOW_SWAP=True the legacy swap behaviour is preserved.
+    See SACGF/variantgrid_private#3763."""
+
+    def process_items(self, upload_step):
+        disable_swap = not settings.LIFTOVER_BCFTOOLS_ALLOW_SWAP
+        swap_skipped_file = preprocess_vcf(upload_step, disable_swap=disable_swap)
+
+        if disable_swap and swap_skipped_file and os.path.exists(swap_skipped_file):
+            self._fail_swapped_allele_liftovers(upload_step, swap_skipped_file)
+
+        upload_step = UploadStep.objects.get(pk=upload_step.pk)
+        return upload_step.items_processed
+
+    @staticmethod
+    def _fail_swapped_allele_liftovers(upload_step, swap_skipped_file):
+        allele_ids = []
+        with open(swap_skipped_file) as f:
+            for line in f:
+                parts = line.strip().split('\t')
+                if parts and parts[0]:
+                    allele_ids.append(int(parts[0]))
+        if not allele_ids:
+            return
+        liftover = upload_step.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        records = []
+        for al in AlleleLiftover.objects.filter(liftover=liftover, allele__in=allele_ids):
+            al.status = ProcessingStatus.ERROR
+            al.error = {"message": "BCFTools liftover SWAP=1: variant is reference allele in destination build"}
+            records.append(al)
+        if records:
+            AlleleLiftover.objects.bulk_update(records, fields=["status", "error"])
 
 
 class CheckStartAnnotationTask(ImportVCFStepTask):
@@ -203,6 +244,7 @@ def process_vcf_file_task(vcf_filename, name, user_id, import_source):
 
 PreprocessVCFTask = app.register_task(PreprocessVCFTask())
 PreprocessAndAnnotateVCFTask = app.register_task(PreprocessAndAnnotateVCFTask())
+LiftoverPreprocessVCFTask = app.register_task(LiftoverPreprocessVCFTask())
 CheckStartAnnotationTask = app.register_task(CheckStartAnnotationTask())
 ScheduleMultiFileOutputTasksTask = app.register_task(ScheduleMultiFileOutputTasksTask())
 UploadPipelineFinishedTask = app.register_task(UploadPipelineFinishedTask())

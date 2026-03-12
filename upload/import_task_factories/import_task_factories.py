@@ -23,7 +23,8 @@ from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, ProcessG
     ImportCreateVCFModelForGenotypeVCFTask, SomalierVCFTask
 from upload.tasks.vcf.import_vcf_tasks import ProcessVCFSetMaxVariantTask, \
     ImportCreateUploadedVCFTask, ProcessVCFLinkAllelesSetMaxVariantTask, LiftoverCompleteTask, LiftoverCreateVCFTask, \
-    PreprocessAndAnnotateVCFTask, ProcessVCFClinGenAlleleTask, ProcessVCFLinkManualVariantEntrySetMaxVariantTask
+    PreprocessAndAnnotateVCFTask, ProcessVCFClinGenAlleleTask, ProcessVCFLinkManualVariantEntrySetMaxVariantTask, \
+    LiftoverPreprocessVCFTask
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -229,6 +230,9 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
                                                               output_filename=output_filename)
             pre_vcf_task = LiftoverCreateVCFTask.si(unknown_variants_step.pk, 0)
         return pre_vcf_task
+
+    def _get_preprocess_class(self) -> Type:
+        return LiftoverPreprocessVCFTask
 
     def get_create_data_from_vcf_header_task_class(self):
         return ImportCreateUploadedVCFTask

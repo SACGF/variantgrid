@@ -257,6 +257,13 @@ LIFTOVER_BCFTOOLS_ENABLED = True
 LIFTOVER_BCFTOOLS_SYMBOLIC = False
 LIFTOVER_BCFTOOLS_MAX_LENGTH = 1000
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
+# When False (default), BCFTools liftover SWAP=1 variants are rejected and the AlleleLiftover
+# is marked ERROR rather than inserting the swapped variant. VariantGrid lifts variants (not
+# genotypes), so a SWAP=1 record means the sample allele is already reference in the destination
+# build — storing it as a novel variant would be wrong.
+# Set True only to restore the legacy behavior (swap REF/ALT and insert). See SACGF/variantgrid_private#3763
+LIFTOVER_BCFTOOLS_ALLOW_SWAP = False
+
 BCFTOOLS_COMMAND = "bcftools"  # if not absolute, needs to be in path
 
 PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
