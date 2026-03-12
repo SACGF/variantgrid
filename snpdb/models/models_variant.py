@@ -699,10 +699,20 @@ class Variant(PreviewModelMixin, models.Model):
             allele_size = len(self.locus.ref) + len(self.alt)
         return allele_size
 
+    def clingen_allele_skip_reason(self) -> Optional[str]:
+        """Return why ClinGen should be skipped for this variant, or None if it can be used."""
+        from snpdb.models.models_clingen_allele import ClinGenAllele
+
+        if not self.can_make_g_hgvs:
+            return f"Symbolic variant {self.alt} cannot form g.HGVS (only DEL/DUP/INV supported)"
+        size = self._clingen_allele_size
+        if size > ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE:
+            return f"Variant too large for ClinGen ({size:,} bp > {ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE:,} bp limit)"
+        return None
+
     @property
     def can_have_clingen_allele(self) -> bool:
-        from snpdb.models.models_clingen_allele import ClinGenAllele
-        return self._clingen_allele_size <= ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE and self.can_make_g_hgvs
+        return self.clingen_allele_skip_reason() is None
 
     @property
     def can_have_annotation(self) -> bool:

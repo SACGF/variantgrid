@@ -248,7 +248,14 @@ def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBui
             except ValueError:  # Various contig errors all subclass from this
                 clingen_failure_message = f"{allele.clingen_allele} did not contain g.HGVS for {dest_genome_build}"
         else:
-            clingen_failure_message = "No ClinGenAllele for variant"
+            # allele.clingen_allele is None — ClinGen was skipped, not tried-and-failed
+            # (a real failure would be stored via AlleleLiftover, caught by has_existing_failure above)
+            skip_reason = None
+            if va := allele.variantallele_set.select_related(
+                "variant__locus__ref", "variant__alt"
+            ).first():
+                skip_reason = va.variant.clingen_allele_skip_reason()
+            clingen_failure_message = skip_reason or "ClinGen skipped: no ClinGen allele registered for this variant"
 
         # Store the fact that we couldn't use ClinGen
         if clingen_failure_message:

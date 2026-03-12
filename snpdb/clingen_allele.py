@@ -457,9 +457,8 @@ def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
-    if not variant.can_have_clingen_allele:
-        msg = f"No ClinGenAllele possible for variant: {variant}"
-        raise ClinGenAlleleAPIException(msg)
+    if skip_reason := variant.clingen_allele_skip_reason():
+        raise ClinGenAlleleAPIException(f"No ClinGenAllele possible for variant {variant}: {skip_reason}")
 
     va = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     if va.allele.clingen_allele is None:
