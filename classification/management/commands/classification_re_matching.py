@@ -76,7 +76,7 @@ class RematchRequest:
                 dr = DiscordanceReport.objects.filter(clinical_context__allele=allele).first()
                 ces = list(ClinVarExport.objects.filter(clinvar_allele__allele=allele).all())
                 if dr or ces:
-                    ces_ids = " ,".join(ce.pk for ce in ces)
+                    ces_ids = " ,".join(str(ce.pk) for ce in ces)
                     raise ValueError(f"Can't rematch {self.imported_allele_info} HARD - Discordance Report {dr}, ClinVarExports - {ces_ids}")
 
     def prep_if_hard(self):
