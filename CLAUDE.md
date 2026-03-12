@@ -81,6 +81,13 @@ There are per-app research documents generated in claude/research
 - **`variantopedia/`** — Variant detail pages ("Variantopedia" wiki-style pages).
 - **`vcauth/`** / **`oidc_auth/`** — Authentication/OIDC.
 
+## Security
+
+### Authentication
+The project uses `global_login_required.GlobalLoginRequiredMiddleware`, which enforces login on **all** views globally. Individual views do **not** need `@login_required` decorators — their absence is intentional, not a security gap. Do not flag missing `@login_required` as a security issue during audits.
+
+DRF is configured with `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`, so all REST API endpoints require authentication by default. Individual API views do not need explicit `permission_classes` — their absence is intentional, not a security gap.
+
 ## Key Patterns
 
 ### Object-level permissions
