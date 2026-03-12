@@ -59,14 +59,14 @@ def _write_cleaned_header(genome_build, upload_pipeline, vcf_filename) -> str:
     tag = ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG
     HEADERS = [
         f'##INFO=<ID={tag},Number=1,Type=String,Description="Original variant. Format: CHR|POS|REF|ALT|USED_ALT_IDX">',
-        f'##INFO=<ID={INFO_LIFTOVER_SWAPPED_REF_ALT},Number=0,Type=Flag,Description="Whether we have switched REF/ALT due to SWAP=1">'
+        f'##INFO=<ID={INFO_LIFTOVER_SWAPPED_REF_ALT},Number=0,Type=Flag,Description="Whether we have switched REF/ALT due to SWAP">'
     ]
     write_cleaned_vcf_header(genome_build, vcf_filename, cleaned_vcf_header_filename,
                              new_info_lines=HEADERS, standard_contigs_only=True)
     return cleaned_vcf_header_filename
 
 
-def preprocess_vcf(upload_step, annotate_gnomad_af=False):
+def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
@@ -96,6 +96,9 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
     skipped_filters_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_filters.tsv")
     skipped_alts_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_alts.tsv")
     converted_alts_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.converted_alts.tsv")
+    swap_skipped_file = None
+    if disable_swap:
+        swap_skipped_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.swap_skipped.tsv")
 
     cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_filename)
 
@@ -127,13 +130,14 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
     pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"]
 
     # We have performed multi-allelic splitting above, so that we can now filter out bad alts (but leave rest of record)
-    pipe_commands[VCF_CLEAN_ALTS_SUB_STEP] = manage_command + [
-         "vcf_clean_alts",
-         "--skipped-records-stats-file",
-         skipped_alts_stats_file,
-        "--converted-records-stats-file",
-        converted_alts_stats_file,
+    clean_alts_cmd = manage_command + [
+        "vcf_clean_alts",
+        "--skipped-records-stats-file", skipped_alts_stats_file,
+        "--converted-records-stats-file", converted_alts_stats_file,
     ]
+    if disable_swap:
+        clean_alts_cmd += ["--disable-swap", "--swap-skipped-file", swap_skipped_file]
+    pipe_commands[VCF_CLEAN_ALTS_SUB_STEP] = clean_alts_cmd
 
     norm_substep_names = [UploadStep.NORMALIZE_SUB_STEP]
 
@@ -261,6 +265,8 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
         # We don't know how big the last split file is, so leave items_to_process as null so no check
         UploadStepMultiFileOutput.objects.create(upload_step=upload_step,
                                                  output_filename=output_filename)
+
+    return swap_skipped_file
 
 
 def _store_vcf_stats(filename, upload_step, description, operation='Skipped'):

@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from library.genomics.vcf_enums import VCFColumns, INFO_LIFTOVER_SWAPPED_REF_ALT
+from library.genomics.vcf_utils import parse_vcf_info_column
 
 
 class Command(BaseCommand):
@@ -22,11 +23,19 @@ class Command(BaseCommand):
         parser.add_argument('--vcf', help='VCF file, default: - (stdin)', default="-")
         parser.add_argument('--skipped-records-stats-file', help='File name')
         parser.add_argument('--converted-records-stats-file', help='File name')
+        parser.add_argument('--disable-swap', action='store_true', default=False,
+                            help='When set, records with SWAP in INFO are excluded from output and their allele IDs '
+                                 'written to --swap-skipped-file. Default (False) preserves legacy '
+                                 'behaviour: REF/ALT are swapped in-place and the record passes through. '
+                                 'See settings.BCFTOOLS_LIFTOVER_ALLOW_SWAP and #3763.')
+        parser.add_argument('--swap-skipped-file', help='TSV file to record allele IDs of excluded SWAP=1 records')
 
     def handle(self, *args, **options):
         vcf_filename = options["vcf"]
         skipped_records_stats_file = options.get("skipped_records_stats_file")
         converted_records_stats_file = options.get("converted_records_stats_file")
+        disable_swap = options["disable_swap"]
+        swap_skipped_file = options.get("swap_skipped_file")
 
         if vcf_filename == '-':
             f = sys.stdin
@@ -35,6 +44,7 @@ class Command(BaseCommand):
 
         skipped_records = Counter()
         converted_records = Counter()
+        swap_skipped_records = Counter()
 
         alt_standard_bases_pattern = re.compile(r"[GATC,.]")  # Can "." for reference
         skipped_alt_first_examples = None
@@ -68,15 +78,25 @@ class Command(BaseCommand):
                         continue
                 else:
                     if info := columns[VCFColumns.INFO]:
-                        # BCFTools liftover can emit records with `SWAP=1` in INFO. This happens when the variant
+                        # BCFTools liftover can emit records with SWAP = 1 or -1 in INFO. This happens when the variant
                         # being lifted over is the reference allele in the destination build. BCFTools swaps REF/ALT
                         # and inverts sample genotypes so multi-sample VCFs remain internally consistent.
                         #
                         # VariantGrid lifts over **variants, not genotypes**, so the swap is semantically incorrect
                         # for our use case. When `SWAP=1`, the sample allele is actually reference in the destination
                         # build. See SACGF/variantgrid_private#3763
-                        if "SWAP=1" in info:
-                            if "," not in alt:
+                        #
+                        # When --disable-swap is set (settings.BCFTOOLS_LIFTOVER_ALLOW_SWAP=False), these records
+                        # are excluded from the output stream and their allele IDs written to --swap-skipped-file
+                        # so the caller can mark the corresponding AlleleLiftover records as ERROR.
+                        # When --disable-swap is not set, the legacy swap behavior is preserved.
+                        info_dict = parse_vcf_info_column(info)
+                        if "SWAP" in info_dict:
+                            if disable_swap:
+                                allele_id = columns[VCFColumns.ID]
+                                swap_skipped_records[allele_id] += 1
+                                continue
+                            elif "," not in alt:
                                 # This should never be a multi-alt but just to be sure
                                 ref = columns[VCFColumns.REF]
                                 columns[VCFColumns.REF] = alt
@@ -92,6 +112,7 @@ class Command(BaseCommand):
 
         self._write_vcf_stats(skipped_records, skipped_records_stats_file)
         self._write_vcf_stats(converted_records, converted_records_stats_file)
+        self._write_vcf_stats(swap_skipped_records, swap_skipped_file)
 
     @staticmethod
     def _write_vcf_stats(counts, filename):
