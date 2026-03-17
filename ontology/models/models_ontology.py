@@ -279,6 +279,7 @@ class OntologyIdNormalized:
     def num_part(self) -> int:
         return int(self.postfix)
 
+    @property
     def num_part_safe(self) -> int:
         try:
             return self.num_part
