@@ -8,6 +8,7 @@ from classification.enums import SubmissionSource
 from classification.models import EvidenceKey
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.guardian_utils import admin_bot
+from library.log_utils import log_traceback
 from library.pandas_utils import df_nan_to_none
 from library.utils import batch_iterator
 from snpdb.models import Lab
@@ -66,9 +67,15 @@ class Command(BaseCommand):
                     count = count + 1
                     if count >= max_records:
                         break
+            except Exception as e:
+                log_traceback()
+                raise
             finally:
                 logging.info("Finish")
                 inserter.finish()
+
+            if count >= max_records:
+                break
 
     @staticmethod
     def get_static_keys(static_ekeys_csv) -> dict[str, str]:
@@ -114,6 +121,7 @@ class Command(BaseCommand):
                 "upsert": data, # Whatever is left are popping
              }
 
-            logging.info(record)
+            # logging.info(record)
+
 
             yield record
