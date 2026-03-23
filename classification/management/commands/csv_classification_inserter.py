@@ -5,20 +5,19 @@ import pandas as pd
 from django.core.management import BaseCommand
 
 from classification.enums import SubmissionSource
-from classification.models import EvidenceKeyMap, EvidenceKey
+from classification.models import EvidenceKey
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.guardian_utils import admin_bot
 from library.pandas_utils import df_nan_to_none
 from library.utils import batch_iterator
+from snpdb.models import Lab
 
 
 class Command(BaseCommand):
     """
         Create classifications from ekey CSV files, @see https://github.com/SACGF/variantgrid/issues/1481
 
-        TODO:
-            * "internal_use" Ekey to document metadata in VG3, but what to use in master? source_data
-
+        TODO: (maybe optional and do from args)
             * set classification.sample (will be used in auto populate)
             * Auto populate - classification_auto_populate_fields
     """
@@ -26,20 +25,25 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--max-records', type=int, default=1,  # TODO: Remove after testing ok
                             help="Limit number of records created")
+        parser.add_argument('--lab', required=True, type=str,
+                            help="Lab name")
         parser.add_argument('--variants-ekeys-csv', required=True,
                             help="Each row represents a new Classification, columns = Ekeys")
         parser.add_argument('--static-ekeys-csv', required=True,
                             help="These are applied to every classification")
 
+
     def handle(self, *args, **options):
         max_records = options["max_records"]
+        lab_name = options["lab"]
         variants_ekeys_csv = options["variants_ekeys_csv"]
         static_ekeys_csv = options["static_ekeys_csv"]
         static_dict = self.get_static_keys(static_ekeys_csv)
 
         user = admin_bot()  # Or make it --user param?
+        lab = Lab.objects.get(name=lab_name)
 
-        records = self.iter_records(static_dict, variants_ekeys_csv)
+        records = self.iter_records(lab, static_dict, variants_ekeys_csv)
 
         count = 0
         first_batch = False
@@ -53,8 +57,10 @@ class Command(BaseCommand):
                 first_batch = False
 
                 for record in batch:
+
                     inserter.insert(
                         record,
+                        # record_id=record.pop("record_id"),
                         submission_source=SubmissionSource.API,
                     )
                     count = count + 1
@@ -80,16 +86,22 @@ class Command(BaseCommand):
             return ekey.key
         raise ValueError("No Ekey found")
 
-    def iter_records(self, static_dict: dict[str,str], variants_ekeys_csv: str):
-        internal_notes_ekey = self.get_internal_notes_ekey_name()
-        known_keys = EvidenceKeyMap.instance()
+    def iter_records(self, lab: Lab, static_dict: dict[str,str], variants_ekeys_csv: str):
+        # Are we going to do any validation? Code around the place uses:
+        # known_keys = EvidenceKeyMap.instance()
+        # known_keys.get(key).is_dummy
+        # valid_evidence_keys = set(k.key for k in EvidenceKeyMap.cached().all_keys)
 
+        internal_notes_ekey = self.get_internal_notes_ekey_name()
         df = pd.read_csv(variants_ekeys_csv)
         df = df_nan_to_none(df)
 
         for _, row in df.iterrows():
-            data = row.to_dict()
+            data = static_dict.copy()
+            data.update(row.to_dict())
+
             lab_record_id = data.pop("lab_record_id")
+            id_str = f"{lab.group_name}/{lab_record_id}" # Format is lab_id/]record_id[.version
             internal_use = data.pop("internal_use")
             internal_use_note = data.pop("internal_use_note")
             data[internal_notes_ekey] = {
@@ -98,13 +110,10 @@ class Command(BaseCommand):
             }
 
             record = {
-                 "id": lab_record_id,
-                 "upsert": data, # Whatever is left are popping
+                "id": id_str,
+                "upsert": data, # Whatever is left are popping
              }
 
+            logging.info(record)
+
             yield record
-
-
-            # Are we going to do any validation? Code around the place uses:
-            # known_keys.get(key).is_dummy
-            # valid_evidence_keys = set(k.key for k in EvidenceKeyMap.cached().all_keys)
