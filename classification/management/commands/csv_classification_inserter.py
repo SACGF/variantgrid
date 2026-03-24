@@ -89,12 +89,12 @@ class Command(BaseCommand):
                 break
 
     @staticmethod
-    def get_static_keys(static_ekeys_csv) -> dict[str, str]:
+    def get_static_keys(static_ekeys_csv):
         df = pd.read_csv(static_ekeys_csv)
         row = df.loc[0]
         return row.to_dict()
 
-    def get_internal_notes_ekey_name(self) -> str:
+    def get_internal_notes_ekey_name(self):
         # The ekey to store internal data differs between VG3 and master
         POTENTIAL_EKEYS = [
             "internal_use", # VG3 SA Path
@@ -104,7 +104,7 @@ class Command(BaseCommand):
             return ekey.key
         raise ValueError("No Ekey found")
 
-    def iter_records(self, lab: Lab, static_dict: dict[str,str], variants_ekeys_csv: str):
+    def iter_records(self, lab: Lab, static_dict, variants_ekeys_csv: str):
         # Are we going to do any validation? Code around the place uses:
         # known_keys = EvidenceKeyMap.instance()
         # known_keys.get(key).is_dummy
