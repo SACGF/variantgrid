@@ -32,6 +32,9 @@ class Command(BaseCommand):
                             help="Each row represents a new Classification, columns = Ekeys")
         parser.add_argument('--static-ekeys-csv', required=True,
                             help="These are applied to every classification")
+        parser.add_argument('--sleep', type=int, default=0, required=False,
+                            help="Sleep seconds between batches")
+
 
 
     def handle(self, *args, **options):
@@ -39,6 +42,7 @@ class Command(BaseCommand):
         lab_name = options["lab"]
         variants_ekeys_csv = options["variants_ekeys_csv"]
         static_ekeys_csv = options["static_ekeys_csv"]
+        sleep = options["sleep"]
         static_dict = self.get_static_keys(static_ekeys_csv)
 
         user = admin_bot()  # Or make it --user param?
@@ -53,8 +57,9 @@ class Command(BaseCommand):
             try:
                 # give the process 10 seconds to breath between batches of 50 classifications
                 # in case we're downloading giant chunks of data
-                if not first_batch:
-                    time.sleep(10)
+                if sleep and not first_batch:
+                    logging.info("Sleeping %d secs" % sleep)
+                    time.sleep(sleep)
                 first_batch = False
 
                 for record in batch:
