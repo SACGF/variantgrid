@@ -6,7 +6,13 @@ from django.core.management import BaseCommand
 
 from classification.enums import SubmissionSource
 from classification.models import EvidenceKey
-from classification.models.classification_inserter import BulkClassificationInserter
+try:
+    # Master code
+    from classification.models.classification_inserter import BulkClassificationInserter
+except ImportError:
+    # VG3 SA Path Prod old code
+    from classification.views.classification_view import BulkInserter as BulkClassificationInserter
+
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from library.pandas_utils import df_nan_to_none
