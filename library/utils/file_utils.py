@@ -63,7 +63,7 @@ def file_or_filename_md5sum(file_or_filename: Union[IO, str]) -> str:
         f = open(file_or_filename, "rb")
 
     for chunk in iter(lambda: f.read(8192), b''):
-         m.update(chunk)
+        m.update(chunk)
     return m.hexdigest()
 
 
