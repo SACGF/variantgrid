@@ -78,7 +78,7 @@ def get_variant_lookup_and_scatter_data(karyomapping_bins):
     for karyotype_code, variant_data in karyomapping_bins.items():
         x = []
         text = []
-        for variant_id, chrom, position, ref, alt, svlen in variant_data:
+        for variant_id, _contig_id, chrom, position, ref, alt, svlen in variant_data:
             variant_string = Variant.format_tuple(chrom, position, ref, alt, svlen)
             variant_id_lookup[variant_string] = variant_id
             x.append(position)
@@ -136,7 +136,7 @@ def download_karyomapping_gene_csv(request, pk):
         writer.writeheader()
         yield pseudo_buffer.value
         for variant_data, genotype_tuple in variant_and_genotypes:
-            _, chrom, position, ref, alt, svlen = variant_data
+            _, _contig_id, chrom, position, ref, alt, svlen = variant_data
             proband_gt, father_gt, mother_gt = genotype_tuple
             try:
                 karotype_bin = karotype_bin_lookup[proband_gt][father_gt][mother_gt]
