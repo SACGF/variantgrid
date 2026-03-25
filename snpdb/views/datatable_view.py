@@ -377,7 +377,10 @@ class DatatableConfig(Generic[DC]):
             "url": obj.get_absolute_url(),
         }
 
-    def render_delete(self, cell: CellData) -> str:
+    def render_delete(self, cell: CellData) -> Optional[str]:
+        obj = self._model(pk=cell.value)
+        if not obj.can_write(self.user):
+            return None
         return reverse('group_permissions_object_delete',
                        kwargs={'class_name': full_class_name(self._model), 'primary_key': cell.value})
 
