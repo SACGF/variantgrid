@@ -114,6 +114,8 @@ Several apps have `__<app>_readme.md` files documenting architecture (e.g., `snp
 
 Do NOT add "Co-Authored-By: Claude" or any similar co-author trailer to commit messages.
 
+Reference GitHub issues in commit messages (e.g., `#1400`) but do NOT use keywords that auto-close issues (e.g., "fix", "close", "resolve"). Issues must go through a testing pipeline before being closed manually.
+
 ## GitHub Comments
 
 When writing any comment on a GitHub issue or pull request, always preface it with 🤖 Written by Claude.
