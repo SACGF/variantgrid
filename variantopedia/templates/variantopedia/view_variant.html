@@ -24,7 +24,7 @@
 
 {% block content %}
     {% if in_multiple_genome_builds %}
-        {% genome_build_url_arg genome_build 'view_variant_genome_build' variant_id=variant.pk %}
+        {% genome_build_url_arg genome_build 'view_variant_genome_build' variant_id=variant.pk limit_builds=variant.genome_builds %}
     {% endif %}
 
 	{% include "variantopedia/variant_details.html" %}
