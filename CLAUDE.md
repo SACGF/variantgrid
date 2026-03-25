@@ -110,6 +110,10 @@ Models implement `PreviewModelMixin` to support hover-card previews. Apps connec
 ### Model readmes
 Several apps have `__<app>_readme.md` files documenting architecture (e.g., `snpdb/__snpdb_readme.md`, `classification/__classification_readme.md`).
 
+## Git Commits
+
+Do NOT add "Co-Authored-By: Claude" or any similar co-author trailer to commit messages.
+
 ## GitHub Comments
 
 When writing any comment on a GitHub issue or pull request, always preface it with 🤖 Written by Claude.

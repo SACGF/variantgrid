@@ -17,7 +17,7 @@ def _escape_sql_param(param):
     if param is None:
         param = 'NULL'
     elif isinstance(param, list):
-        param = pg_sql_array(map(str, param))
+        param = pg_sql_array(_escape_sql_param(v) for v in param)
     elif isinstance(param, str):
         return f"'{param}'"
     return str(param)
