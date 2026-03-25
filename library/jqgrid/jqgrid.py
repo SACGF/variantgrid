@@ -271,7 +271,11 @@ class JqGrid:
     def _sort_items(self, items, sidx, sord):
         """ Moved code into here to make it easier to overwrite sidx in subclasses (as request.GET is immutable) """
         order_by_list = []
-        if sidx is not None:
+        if sidx is not None and sidx:
+            # Validate sidx looks like a valid Django field path (alphanumeric/underscores)
+            if not all(part.isidentifier() for part in sidx.split('__')):
+                sidx = None
+        if sidx is not None and sidx:
             order_by = F(sidx)
             # dlawrence - sort nulls first/last via
             # https://docs.djangoproject.com/en/3.1/ref/models/expressions/#using-f-to-sort-null-values

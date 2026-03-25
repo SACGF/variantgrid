@@ -3,7 +3,7 @@ from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
-from django.db.models import TextField, Value, QuerySet, Q
+from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -151,6 +151,7 @@ class VariantTagsGrid(JqGridUserRowConfig):
         super().__init__(user)
 
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build_name = genome_build.name
         queryset = VariantTag.get_for_build(genome_build)
 
         if extra_filters:
@@ -178,11 +179,18 @@ class VariantTagsGrid(JqGridUserRowConfig):
         queryset = queryset.filter(allele__variantallele__genome_build=genome_build)
         queryset = Variant.annotate_variant_string(queryset,
                                                    path_to_variant="allele__variantallele__variant__")
-        queryset = queryset.annotate(view_genome_build=Value(genome_build.name, output_field=TextField()))
-        field_names = self.get_field_names() + ["variant_string", "view_genome_build"]
+        field_names = self.get_field_names() + ["variant_string"]
         self.queryset = queryset.values(*field_names)
         self.extra_config.update({'sortname': 'variant_string',
                                   'sortorder': 'asc'})
+
+    def iter_format_items(self, items):
+        """ Inject constant genome build value into iterator results """
+        items = super().iter_format_items(items)
+        genome_build_name = self.genome_build_name
+        for row in items:
+            row['view_genome_build'] = genome_build_name
+            yield row
 
     def get_colmodels(self, remove_server_side_only=False):
         before_colmodels = [

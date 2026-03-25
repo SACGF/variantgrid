@@ -356,9 +356,9 @@ class AnalysesGrid(JqGridUserRowConfig):
 
         self.genome_builds = list(GenomeBuild.builds_with_annotation())
         if len(self.genome_builds) == 1:  # No need to show
-            genome_build_colmodel = self._overrides.get('genome_build', {})
+            genome_build_colmodel = self._overrides.get('genome_build__name', {})
             genome_build_colmodel['hidden'] = True
-            self._overrides['genome_build'] = genome_build_colmodel
+            self._overrides['genome_build__name'] = genome_build_colmodel
         user_grid_config = UserGridConfig.get(user, self.caption)
         qs = Analysis.filter_for_user(user)
         if not user_grid_config.show_group_data:
