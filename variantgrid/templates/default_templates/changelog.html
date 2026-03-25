@@ -108,6 +108,7 @@
                     <li>dbSNP lookup is faster</li>
                     <li>Improved HGVS resolution (support for gaps, LRG, non-coding transcripts)</li>
                     <li>Manual variant entry - improved user experience creating novel variants via search</li>
+                    <li>#Search for EnrichmentKit</li>
                 </ul>
 
                 <h4>Tagging</h4>
@@ -144,6 +145,87 @@
 
 
     {% else %}
+       <div class="card mt-4">
+            <div class="card-header">25 March 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#1418 - Fix issue where analysis nodes error with VCFs without genotype samples</li>
+                    <li>#1424 - Analysis template version - improved UX messages</li>
+                    <li>#1429 - Fix node view crash when multiple patients match</li>
+                    <li>#1439 - Fix division by zero in sample grid export</li>
+                    <li>#1471 - Fix error on auto-launch analysis template settings page</li>
+                    <li>#1482 - Fix SQL error in variant tags grid ordering</li>
+                    <li>Convert jqGrid to DataTables - analysis grids</li>
+                </ul>
+
+                <h4>Annotation</h4>
+                <ul>
+                    <li>#1444 - Reduce oversized SV annotation logs</li>
+                    <li>#1450 - Fix bugs in annotation models</li>
+                    <li>Convert jqGrid to DataTables - annotation version grid</li>
+                </ul>
+
+                <h4>Data / Grids</h4>
+                <ul>
+                    <li>#2215 - Add date suffix to grid download filenames and node version to analysis exports</li>
+                    <li>SACGF/variantgrid_sapath#403 - Sample genotype grid CSV download</li>
+                    <li>#1377 - Performance optimization for DataTable primary key lookups</li>
+                    <li>#1474 - Consolidate DataTables delete endpoints</li>
+                    <li>Convert jqGrid to DataTables across multiple apps (snpdb, pedigrees, seqauto)</li>
+                </ul>
+
+                <h4>Genes / HGVS</h4>
+                <ul>
+                    <li>#1312 - Gene Symbol page - fix display for non-HGNC genes</li>
+                    <li>#1476 - Reject oversized tokens in gene list parser</li>
+                    <li>#1477 - Refactor HGVS converter code to use hgvs_shim library</li>
+                </ul>
+
+                <h4>Liftover</h4>
+                <ul>
+                    <li>#1103 - Create liftover failure event when ClinGen Allele Registry isn't available</li>
+                    <li>bcftools liftover - handle SWAP variants correctly</li>
+                </ul>
+
+                <h4>Search</h4>
+                <ul>
+                    <li>#1401 - Search for EnrichmentKit</li>
+                    <li>#996 - Symbolic alt quick links (gnomAD, Varsome etc) work correctly</li>
+                </ul>
+
+                <h4>Variant Details</h4>
+                <ul>
+                    <li>#1407 - Only show genome build switcher buttons for builds a variant exists in</li>
+                    <li>#1423 - Hide annotation version by default (click to expand)</li>
+                    <li>#1441 - Fix quick links for mitochondrial variants on allele page</li>
+                    <li>#1484 - Fix karyomapping chromosome/contig handling</li>
+                    <li>#1417 - Fix error when manually selecting genome build</li>
+                </ul>
+
+                <h4>VCF Upload</h4>
+                <ul>
+                    <li>#1473 - Manual variant entry import handles partial failures gracefully</li>
+                    <li>#3813 - Enable pipefail in VCF import to detect intermediate command failures</li>
+                    <li>#1400 - Fix race condition in cohort/file export</li>
+                </ul>
+
+                <h4>T2T Genome Build</h4>
+                <ul>
+                    <li>#1464 - Fix chromosome density and homozygosity graphs for T2T genome build</li>
+                    <li>#1465 - Rewrite homozygosity graph to use ORM</li>
+                </ul>
+
+                <h4>UI</h4>
+                <ul>
+                    <li>#1206 - Fix broken loading spinners</li>
+                    <li>#1469 - Django messages show correct icons for errors/warnings</li>
+                    <li>#1436 - GRCh37 IGV correctly maps to hg19</li>
+                </ul>
+            </div>
+        </div>
+
+
        <div class="card mt-4">
             <div class="card-header">13 Feb 2026</div>
             <div class="card-body">
