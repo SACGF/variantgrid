@@ -51,7 +51,7 @@ def update_cgf_progress_iterator(iterator, cgf_id, total_records, update_size):
             progress = i / total_records if total_records else 0
             cgf_qs.update(progress=progress)
         yield record
-    cgf_qs.update(progress=1, task_status='SUCCESS')
+    cgf_qs.update(progress=1)
 
 
 def _write_node_to_cached_generated_file(cgf, analysis, node, name, export_type):

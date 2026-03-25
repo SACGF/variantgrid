@@ -36,7 +36,11 @@ def cached_generated_file_check(request, cgf_id):
     if cgf.exception:
         data["exception"] = str(cgf.exception)
     elif cgf.task_status == "SUCCESS":
-        data["url"] = cgf.get_media_url()
+        if cgf.filename:
+            data["url"] = cgf.get_media_url()
+        else:
+            # File generation still in progress - task_status was set before filename was saved
+            data["status"] = "PENDING"
 
     return JsonResponse(data)
 
