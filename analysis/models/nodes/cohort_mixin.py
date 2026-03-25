@@ -313,10 +313,15 @@ class AncestorSampleMixin(SampleMixin):
         return errors
 
     def _get_ancestor_samples(self) -> set[Sample]:
+        """ Get all samples from ancestor nodes, including those from VCFs without genotypes.
+            Uses cohort samples directly rather than visibility-filtered get_samples(),
+            so that variant-only VCFs (has_genotype=False) are still recognized as valid ancestors. """
         parent_sample_set = set()
         parents, _errors = self.get_parent_subclasses_and_errors()
         for parent in parents:  # Use parent samples not own as own inserts self.sample
-            parent_sample_set.update(parent.get_samples())
+            cohorts, _ = parent.get_cohorts_and_sample_visibility(sort=False)
+            for c in cohorts:
+                parent_sample_set.update(c.get_samples())
         return parent_sample_set
 
     def handle_ancestor_input_samples_changed(self):
