@@ -837,12 +837,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         Optional[ImportedAlleleInfo], bool]:
         created = False
         if not self.allele_info or force_allele_info_update_check:
-            try:
-                genome_build_patch_version = self.get_genome_build_patch_version()
-            except Exception:
-                raise
-                # no allele info if we can't derive a genome build
-                # return None, False
+            genome_build_patch_version = self.get_genome_build_patch_version()
 
             fields = {"imported_genome_build_patch_version": genome_build_patch_version}
             if c_hgvs := self.imported_c_hgvs:
