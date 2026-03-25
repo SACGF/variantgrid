@@ -416,8 +416,7 @@ class JqGrid:
                     if return_json_fields_as_tuple:
                         return fk_name, field_name
                     return field
-                foreign_model_options = field.related_model._meta
-            return JqGrid.lookup_foreign_key_field(foreign_model_options, field_name,
+                return JqGrid.lookup_foreign_key_field(field.related_model._meta, field_name,
                                                    return_json_fields_as_tuple=return_json_fields_as_tuple)
         return options.get_field(field_name)
 

@@ -140,7 +140,7 @@ def match_sample(user, sample_id, sample_name, validation_messages):
 
         if sample_id:
             kwargs = {"id": sample_id}
-        elif sample_name:
+        else:
             kwargs = {"name": sample_name}
 
         try:
