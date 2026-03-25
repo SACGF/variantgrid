@@ -3,10 +3,10 @@ from django.conf import settings
 from django.forms.forms import Form
 from django.forms.formsets import formset_factory
 from django.forms.models import ModelChoiceField
-from django.http import HttpResponse
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls.base import reverse
+
 from library.utils import full_class_name
 from pedigree import forms
 from pedigree.forms import BaseCohortSamplesForPedFileRecordsFormSet

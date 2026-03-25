@@ -12,9 +12,8 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import QuerySet, Q, F, OrderBy
 from django.http import HttpRequest, QueryDict
-from kombu.utils import json
-
 from django.urls import reverse
+from kombu.utils import json
 
 from library.log_utils import report_exc_info
 from library.utils import pretty_label, JsonDataType, JsonObjType, full_class_name

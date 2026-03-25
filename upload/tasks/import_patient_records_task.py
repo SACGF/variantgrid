@@ -1,5 +1,3 @@
-import logging
-
 from patients.import_records import import_patient_records
 from patients.models import PatientRecords, PatientImport
 from upload.models import UploadedPatientRecords

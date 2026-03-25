@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Optional, List
 
 from auditlog.context import disable_auditlog
-from django.conf import settings
 from django.contrib.auth.models import User
 
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplate, AnalysisTemplateRun, \

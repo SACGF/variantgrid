@@ -29,7 +29,7 @@ from snpdb.models import VCF
 from upload import forms, upload_processing, upload_stats
 from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
     UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, \
-    VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant, TimeFilterMethod, UploadedVCF
+    VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant, TimeFilterMethod
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
     get_uploaded_file_type, get_url_and_data_for_uploaded_file_data, \
     retry_upload_pipeline, get_import_tasks_by_extension

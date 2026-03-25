@@ -2,7 +2,6 @@ import csv
 from collections import defaultdict, OrderedDict
 
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse
 from django.http.response import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls.base import reverse

@@ -1,12 +1,11 @@
 import sys
-from typing import Optional
 
 import pyhgvs
+from hgvs_shim import PyHGVSConverter as _PyHGVSConverter
+from hgvs_shim.hgvs_converter_pyhgvs import PyHGVSVariant
 from pyhgvs import get_genomic_sequence, HGVSName
 from pyhgvs.utils import make_transcript
 
-from hgvs_shim import PyHGVSConverter as _PyHGVSConverter, TranscriptInfo
-from hgvs_shim.hgvs_converter_pyhgvs import PyHGVSVariant
 from genes.hgvs import HGVSException
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HGVSConverterType
 from genes.transcripts_utils import transcript_is_lrg

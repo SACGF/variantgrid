@@ -5,7 +5,6 @@ from functools import cached_property
 from typing import Optional
 
 from Bio.Data.IUPACData import protein_letters_1to3_extended
-from hgvs_shim import HGVSException, HGVSNomenclatureException, HGVSImplementationException, HGVSVariant
 
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, LRGRefSeqGene
 from snpdb.models.models_genome import GenomeBuild

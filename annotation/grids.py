@@ -6,7 +6,6 @@ from django.db.models import QuerySet, ExpressionWrapper, F, fields
 
 from annotation.models import VariantAnnotationVersion, AnnotationRun, AnnotationStatus, VariantAnnotationPipelineType
 from genes.models_enums import AnnotationConsortium
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 

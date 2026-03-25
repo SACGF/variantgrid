@@ -2,7 +2,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from typing import Optional, Union, Tuple
+from typing import Optional, Union
 
 from django.conf import settings
 from django.core.cache import cache

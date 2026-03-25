@@ -1,11 +1,13 @@
 from enum import StrEnum
 from time import sleep
+
+import pandas as pd
 from django.core.management import BaseCommand
+
 from classification.classification_import import reattempt_variant_matching
 from classification.models import Classification, ImportedAlleleInfo, DiscordanceReport, ClinVarExport, \
     ResolvedVariantInfo
 from library.guardian_utils import admin_bot
-import pandas as pd
 from snpdb.models import GenomeBuildPatchVersion
 
 
