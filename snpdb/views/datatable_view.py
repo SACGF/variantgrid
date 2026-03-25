@@ -16,7 +16,7 @@ from django.urls import reverse
 from kombu.utils import json
 
 from library.log_utils import report_exc_info
-from library.utils import pretty_label, JsonDataType, JsonObjType, full_class_name
+from library.utils import pretty_label, nice_class_name, JsonDataType, JsonObjType, full_class_name
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
@@ -215,6 +215,7 @@ class DatatableConfig(Generic[DC]):
     """
     search_box_enabled = False
     download_csv_button_enabled = False
+    csv_name: Optional[str] = None  # filename for CSV download (date suffix added automatically)
     rich_columns: list[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
     scroll_x = False
@@ -512,10 +513,18 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
     def json_definition(self) -> JsonObjType:
         config = self.config
 
+        csv_name = config.csv_name
+        if not csv_name:
+            try:
+                csv_name = nice_class_name(config.get_initial_queryset().model)
+            except Exception:
+                csv_name = "export"
+
         data: JsonObjType = {
             "responsive": any(col.detail for col in config.enabled_columns),
             "searchBoxEnabled": config.search_box_enabled,
             "downloadCsvButtonEnabled": config.download_csv_button_enabled,
+            "csvName": csv_name,
             "expandClientRenderer": config.expand_client_renderer,
             "scrollX": config.scroll_x,
         }

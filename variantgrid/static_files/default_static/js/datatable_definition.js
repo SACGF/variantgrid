@@ -146,11 +146,14 @@ let DataTableDefinition = (function() {
             }
 
             if (defn.downloadCsvButtonEnabled) {
+                let csvName = defn.csvName || 'export';
+                let dateStr = new Date().toISOString().slice(0, 10);
                 dtParams.buttons = [
                     {
                         extend: 'csvHtml5',
                         action: newExportAction,
                         text: "Download as CSV",
+                        filename: csvName + '_' + dateStr,
                     }
                 ]
             }

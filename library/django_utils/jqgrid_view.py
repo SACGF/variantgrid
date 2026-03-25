@@ -9,6 +9,7 @@ from django.utils.text import slugify
 from django.views.generic.base import View
 
 from library.utils import nice_class_name, StashFile
+from library.utils.date_utils import local_date_string
 
 
 class JQGridViewOp:
@@ -121,6 +122,8 @@ def grid_export_request(request, grid, basename):
     items = grid.get_items(request)[2]
     colmodels = grid.get_colmodels()
     csv_iterator = grid_export_csv(colmodels, items)
+    date_str = local_date_string()
+    basename = f"{basename}_{date_str}"
     basename = basename[:MAX_FILE_NAME_LENGTH]
     response = StreamingHttpResponse(csv_iterator, content_type="text/csv")
     response['Content-Disposition'] = f'attachment; filename="{slugify(basename)}.csv"'

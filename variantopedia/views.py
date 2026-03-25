@@ -14,7 +14,6 @@ from django.db import connection
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.timesince import timesince
 from django.utils.timezone import localtime
 from django.views.decorators.http import require_POST
@@ -381,7 +380,7 @@ def view_variant(request, variant_id, genome_build_name=None):
     if genome_build_name:
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         if genome_build not in variant.genome_builds:
-            raise ValueError(f"Variant {variant} not in '{genome_build}'")
+            return redirect(reverse('view_variant', kwargs={'variant_id': variant_id}))
     else:
         if in_multiple_genome_builds:
             user_settings = UserSettings.get_for_user(request.user)
@@ -798,10 +797,7 @@ def nearby_variants(request, variant_id, annotation_version_id):
 
 
 def _get_grid_name(request, name) -> str:
-    name_parts = [
-        name,
-        timezone.now().strftime('%Y-%m-%d'),
-    ]
+    name_parts = [name]
     if extra_filters := request.GET.get("extra_filters"):
         extra_filters = json.loads(extra_filters)
         if tag_id := extra_filters.get("tag"):
