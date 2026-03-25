@@ -714,7 +714,7 @@ def if_user_can_edit(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
     nodelist = parser.parse(('end_if_user_can_edit',))
     parser.delete_first_token()
-    if not len(args) == 1:
+    if len(args) != 1:
         raise ValueError("if_user_can_edit requires 1 argument of object to check")
 
     return IfCanEditTag(nodelist,

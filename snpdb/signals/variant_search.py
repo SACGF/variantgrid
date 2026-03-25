@@ -690,7 +690,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             raise hgvs_error
     except HGVSNomenclatureException as hgvs_ex:
         raw_message = str(hgvs_ex)
-        if "char" not in raw_message and not "EOF" in raw_message:
+        if "char" not in raw_message and "EOF" not in raw_message:
             # this is likely not a technical message, send it directly to the user
             yield SearchMessageOverall(raw_message)
             return
