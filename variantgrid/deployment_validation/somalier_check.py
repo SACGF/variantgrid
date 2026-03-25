@@ -13,7 +13,7 @@ def verify_somalier_config() -> Optional[str]:
     try:
         somalier_output = check_output([somalier_bin], stderr=subprocess.STDOUT)
         somalier = somalier_output.decode().split("\n", 1)[0]
-    except:
+    except Exception:
         log_traceback()
 
     return somalier

@@ -617,7 +617,7 @@ class Lab(models.Model, PreviewModelMixin):
             if days == 0:
                 days = 1
             cpd = self.total_classifications / days
-        except:
+        except Exception:
             cpd = 0
         return cpd
 
@@ -796,7 +796,7 @@ class SiteMessage(models.Model):
             try:
                 site_message_dict = json.loads(site_message_str)
                 reload = False
-            except:
+            except Exception:
                 pass
 
         if reload:

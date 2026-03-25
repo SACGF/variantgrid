@@ -109,7 +109,7 @@ class CriteriaStrength:
         index = 0
         try:
             index = CriteriaEvaluation.ALL_STRENGTHS.index(self.strength)
-        except:
+        except Exception:
             pass
         if self.custom_strength:
             index = 9999

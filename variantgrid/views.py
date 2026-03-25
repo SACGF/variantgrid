@@ -226,7 +226,7 @@ class ContactFormView(FormView):
                 self.send_message(form)
                 messages.success(request, "Your details have been sent")
                 context["sent"] = True
-            except:
+            except Exception:
                 report_exc_info(request=request)
                 # TODO, maybe grab an email from settings at this point?
                 messages.error(request, "There was an error with the contact form. Please try again later")

@@ -451,7 +451,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             if self._cache_node_q:
                 try:
                     cache.set(cache_key, arg_q_dict)
-                except:
+                except Exception:
                     log_traceback()
         return arg_q_dict
 

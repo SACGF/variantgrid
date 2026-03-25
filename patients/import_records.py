@@ -80,7 +80,7 @@ def parse_date(row, column, validation_messages):
         if date_string.upper() != UNKNOWN_STRING:
             try:
                 d = parser.parse(date_string)
-            except:
+            except Exception:
                 message = f"{column}: Could not parse date '{date_string}'"
                 validation_messages.append(message)
 

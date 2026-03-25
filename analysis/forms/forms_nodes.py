@@ -500,7 +500,7 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
                 genomic_interval.end = self.cleaned_data["end"]
                 genomic_interval.save()
                 node.genomic_interval = genomic_interval
-            except:
+            except Exception:
                 pass
 
         if "hgvs_string" in self.changed_data:

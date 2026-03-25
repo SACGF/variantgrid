@@ -27,7 +27,7 @@ def cyvcf2_header_types(cyvcf2_reader) -> defaultdict:
 def cyvcf2_header_get(cyvcf2_reader, key, default=None):
     try:
         header_dict = cyvcf2_reader.get_header_type(key)
-    except:
+    except Exception:
         header_dict = {}
     return header_dict.get(key, default)
 

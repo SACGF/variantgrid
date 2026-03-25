@@ -248,7 +248,7 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
     def get_current_sample_sheet(self):
         try:
             return self.sequencingruncurrentsamplesheet.sample_sheet
-        except:
+        except Exception:
             logging.info("Can't find current sample sheet for %s", self.path)
             raise
 
@@ -347,7 +347,7 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
             combo = current_sample_sheet.samplesheetcombinedvcffile_set.get()
             if combo.needs_to_be_linked():
                 return True
-        except:
+        except Exception:
             pass
 
         old_sample_sheets = self.get_old_sample_sheets()
@@ -500,9 +500,9 @@ class SequencingSample(models.Model):
             try:
                 bam_file = unaligned_reads.bamfile_set.get()
                 return bam_file
-            except:
+            except Exception:
                 logging.error("Wasn't exactly 1 bam_file for unaligned_reads %s", unaligned_reads)
-        except:
+        except Exception:
             logging.error("Wasn't exactly 1 unaligned reads for sequencing sample %s", self)
         return None
 
@@ -565,7 +565,7 @@ class VCFFromSequencingRun(models.Model):
             return self.variant_caller
         try:
             return self.vcf.uploadedvcf.backendvcf.variant_caller
-        except:
+        except Exception:
             pass
         return None
 
@@ -908,7 +908,7 @@ class VCFFile(SeqAutoRecord):
     def upload_pipeline(self):
         try:
             up = self.backendvcf.uploaded_vcf.upload_pipeline
-        except:
+        except Exception:
             up = None
         return up
 
@@ -954,7 +954,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
     def upload_pipeline(self):
         try:
             up = self.backendvcf.uploaded_vcf.upload_pipeline
-        except:
+        except Exception:
             up = None
         return up
 
@@ -977,7 +977,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
 
                 uploaded_vcf = UploadedVCF.objects.get(uploaded_file__path=self.path)
                 create_backend_vcf_links(uploaded_vcf)
-            except:
+            except Exception:
                 log_traceback()
 
             # Re-linking SequencingRun / backend VCF will be done manually in view_sequencing_run
@@ -994,7 +994,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
                 _ = self.backendvcf.vcf.vcffromsequencingrun
             except VCFFromSequencingRun.DoesNotExist:
                 return True
-        except:
+        except Exception:
             pass
         return False
 
@@ -1306,7 +1306,7 @@ def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # 
             instance.gene_coverage_collection = None  # To stop recursive deleting
             instance.save()
             gcc.delete()
-    except:
+    except Exception:
         # Might fail due to GoldGeneCoverageCollection protecting it
         pass
 
@@ -1340,7 +1340,7 @@ class GoldGeneCoverageCollection(models.Model):
     def sequencing_sample(self):
         try:
             ss = self.gene_coverage_collection.qcgenecoverage.qc.bam_file.unaligned_reads.sequencing_sample
-        except:
+        except Exception:
             ss = None
         return ss
 
@@ -1423,7 +1423,7 @@ class JobScript(SeqAutoRecord):
                 try:
                     record.load_from_file(self.seqauto_run)
                     data_state = DataState.COMPLETE
-                except:
+                except Exception:
                     error_exception = get_traceback()
                     data_state = DataState.ERROR
             else:
@@ -1443,7 +1443,7 @@ class JobScript(SeqAutoRecord):
 def post_delete_job_script(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
         os.remove(instance.path)
-    except:
+    except Exception:
         pass
 
 

@@ -55,7 +55,7 @@ class EventLogHandler(logging.Handler):  # Inherit from logging.Handler
             #                       level = severity.lower(),
             #                       request = record.request,
             #                       extra_data = {'name': name, 'app_name': app_name})
-        except:
+        except Exception:
             pass
 
         return

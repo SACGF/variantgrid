@@ -677,7 +677,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
             genes_canonical_transcripts = get_genes_canonical_transcripts(variant, annotation_version)
 
-        except:  # May not have been annotated?
+        except Exception:  # May not have been annotated?
             log_traceback()
 
     modified_normalised_variants = variant.modifiedimportedvariant_set.filter(old_variant__isnull=False)

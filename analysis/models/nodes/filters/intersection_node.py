@@ -109,7 +109,7 @@ class IntersectionNode(AnalysisNode):
                 if len(enrichment_kits) == 1:
                     enrichment_kit = enrichment_kits[0]
                     pbi = VCFBedIntersection.get_for_vcf_and_enrichment_kit(vcf, enrichment_kit)
-            except:
+            except Exception:
                 pass
 
         return pbi, enrichment_kit

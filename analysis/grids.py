@@ -246,7 +246,7 @@ class VariantGrid(AbstractVariantGrid):
                 if sample_formatter:
                     try:
                         sample_formatted_str = sample_formatter(sample)
-                    except:
+                    except Exception:
                         pass
                 if sample_formatted_str is None or len(sample_formatted_str) == 0:
                     sample_formatted_str = str(sample.name)

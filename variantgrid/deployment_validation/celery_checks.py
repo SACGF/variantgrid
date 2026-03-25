@@ -16,7 +16,7 @@ def _check_celery_tasks(setting_name, task_names, is_task_class=False) -> dict:
                     bad_task_routes[class_or_module_path] = "Not a celery task"
             else:
                 importlib.import_module(class_or_module_path)
-        except:
+        except Exception:
             bad_task_routes[class_or_module_path] = "Not found"
 
     if bad_task_routes:

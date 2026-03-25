@@ -61,7 +61,7 @@ def check_vep() -> dict:
                         "valid": True,
                         "warning": warning,
                     }
-        except:
+        except Exception:
             pass
 
         logging.disable(previous_level)

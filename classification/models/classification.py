@@ -390,7 +390,7 @@ class ConditionResolved:
             try:
                 from classification.models import MultiCondition
                 return MultiCondition(join).label
-            except:
+            except Exception:
                 pass
         return None
 
@@ -1018,7 +1018,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if making_new_id:
                     record.lab_record_id = 'vc' + str(record.id)
                     record.save()
-            except:
+            except Exception:
                 pass
                 # in case of collision, leave the uuid
 
@@ -1236,7 +1236,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     self.sample = Sample.objects.get(pk=int(value))
                     # self.requires_auto_population = True
                     return None  # clear out the value
-                except:
+                except Exception:
                     cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
                                         message="Couldn't resolve Sample " + str(value) + ")")
 
@@ -1318,7 +1318,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     value = float(value)
                     cell.value = value
                     valid = 0 <= value <= 1
-                except:
+                except Exception:
                     pass
                 if not valid:
                     cell.add_validation(code=ValidationCode.INVALID_UNIT, severity='warning',
@@ -1330,7 +1330,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     value = float(value)
                     cell.value = value
                     valid = True
-                except:
+                except Exception:
                     pass
                 if not valid:
                     cell.add_validation(code=ValidationCode.INVALID_FLOAT, severity='warning',
@@ -1342,7 +1342,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     value = int(value)
                     cell.value = value
                     valid = True
-                except:
+                except Exception:
                     pass
                 if not valid:
                     cell.add_validation(code=ValidationCode.INVALID_INTEGER, severity='warning',
@@ -1864,7 +1864,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                             valid_copy = validation.copy()
                             valid_copy['key'] = key
                             messages.append(valid_copy)
-                        except:
+                        except Exception:
                             pass
         # make order of messages predictable
         messages.sort(key=lambda m: m.get('key') + ':' + m.get('code'))

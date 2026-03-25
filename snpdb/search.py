@@ -958,7 +958,7 @@ def search_receiver(
             if settings.PREFER_ALLELE_LINKS and response.search_type.preview_category() == "Variant":
                 try:
                     response = _convert_variant_search_response_to_allele_search_response(response)
-                except:
+                except Exception:
                     report_exc_info()
                     response.messages_overall.append(SearchMessageOverall("Unexpected error when attempting to convert Variant results into Allele results"))
 

@@ -255,7 +255,7 @@ class FlagHelper:
                 try:
                     created = FlagComment.objects.filter(flag=flag, resolution__status=FlagStatus.OPEN).order_by('-created').\
                         values_list('created', flat=True).first()
-                except:
+                except Exception:
                     pass
 
             resolution = self.flag_resolutions[flag.resolution_id]

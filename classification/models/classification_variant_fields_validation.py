@@ -212,7 +212,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
                 except NoTranscript:
                     # this should find its way into Validation Matching flag
                     pass
-                except:
+                except Exception:
                     # this should be handled by ImportedAlleleInfo
                     pass
                 # except ValueError as ve:

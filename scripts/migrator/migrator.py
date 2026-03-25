@@ -265,7 +265,7 @@ class Migrator:
                     command += 1
 
             self.migrations = migrations
-        except:
+        except Exception:
             print("Unable to retrieve outstanding commands")
             traceback.print_exc()
 

@@ -559,7 +559,7 @@ class GeneVersion(models.Model):
         """ 1-based for humans """
         try:
             return f"{self.chrom}:{self.start + 1}-{self.end} ({self.strand})"
-        except:
+        except Exception:
             return ""
 
     @cached_property
@@ -1218,7 +1218,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                     if self.chrom != other_cleaned_chrom:
                         differences["contig"] = (f"{my_chrom} (contig name: {self.chrom})",
                                                  f"{other_chrom} (contig name: {other_cleaned_chrom})")
-                except:
+                except Exception:
                     # Can't convert - just show differences
                     differences["contig"] = (my_chrom, other_chrom)
 
@@ -2209,7 +2209,7 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
                 logging.error("Wasn't exactly 1 qc for bam_file %s", bam_file)
         except ObjectDoesNotExist:
             pass
-        except:
+        except Exception:
             log_traceback()
 
         return gene_coverage
@@ -2328,7 +2328,7 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
 def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
         instance.delete_related_objects()
-    except:
+    except Exception:
         pass
 
 

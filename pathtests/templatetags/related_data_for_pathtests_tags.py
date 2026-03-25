@@ -21,6 +21,6 @@ def related_data_for_pathology_test_order(context, pathology_test_order):
     context["samples"] = samples
     try:
         context["sapath_link"] = pathology_test_order.sapathologyrequestgenelistpathologytestorderlink
-    except:  # May not have SA Path app installed
+    except Exception:  # May not have SA Path app installed
         pass
     return context

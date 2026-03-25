@@ -123,7 +123,7 @@ class CreateGeneListView(APIView):
             gene_matcher = GeneSymbolMatcher()
             gene_matcher.create_gene_list_gene_symbols(gene_list, gene_symbols, modification_info)
             import_status = ImportStatus.SUCCESS
-        except:
+        except Exception:
             gene_list.error_message = get_traceback()
             import_status = ImportStatus.ERROR
 

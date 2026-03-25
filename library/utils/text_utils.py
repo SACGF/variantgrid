@@ -53,7 +53,7 @@ def limit_str(text: str, limit: int) -> str:
 def pretty_collection(collection: Collection[Any], to_string: Optional[Callable] = None) -> str:
     try:
         collection = sorted(collection)
-    except:
+    except Exception:
         pass
     if to_string:
         collection = (to_string(item) for item in collection)

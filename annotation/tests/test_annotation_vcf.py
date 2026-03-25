@@ -249,7 +249,7 @@ class TestVEP(TestCase):
         for line in LINES:
             try:
                 vep_parse_version_line(line)
-            except:
+            except Exception:
                 self.fail(f"vep_parse_version_line died on line: {line}")
 
     def test_aloft_pick_single(self):

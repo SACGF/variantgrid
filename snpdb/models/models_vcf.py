@@ -370,12 +370,12 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         """ for reloading in place """
         try:
             self.samplestats.delete()
-        except:
+        except Exception:
             pass
 
         try:
             self.samplestatspassingfilter.delete()
-        except:
+        except Exception:
             pass
 
         related_objects = [
@@ -484,7 +484,7 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
     def sequencing_run(self):
         try:
             return self.samplefromsequencingsample.sequencing_run
-        except:
+        except Exception:
             return None
 
     @staticmethod
@@ -767,7 +767,7 @@ class VCFBedIntersection(models.Model):
             pbi = VCFBedIntersection.objects.get(**kwargs)
         except VCFBedIntersection.DoesNotExist:
             pass
-        except:
+        except Exception:
             log_traceback()
         return pbi
 

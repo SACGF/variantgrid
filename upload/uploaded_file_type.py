@@ -65,7 +65,7 @@ def get_url_and_data_for_uploaded_file_data(uploaded_file):
         try:
             data = upload_data.get_data()
             url = data.get_absolute_url()
-        except:
+        except Exception:
             pass
     return url, upload_data
 

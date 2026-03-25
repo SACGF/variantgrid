@@ -37,7 +37,7 @@ class UploadedClassificationsUnmappedValidationRow(ExportRow):
     def line_number(self) -> Optional[int]:
         try:
             return int(self._row.get('row'))
-        except:
+        except Exception:
             return None
 
     @export_column("severity")

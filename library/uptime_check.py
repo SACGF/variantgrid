@@ -58,7 +58,7 @@ def retrieve_uptime_response():
         # note that it's quite likely if the database is down, something well before this will cause an exception
         # but feels dishonest to say the database is okay without checking anything
         User.objects.first()
-    except:
+    except Exception:
         status = UptimeCheckStatus.CRITICAL_FAILURE
     all_uptimes.append(UptimeCheckResponse(
         name="Database",

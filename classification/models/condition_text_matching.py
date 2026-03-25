@@ -975,7 +975,7 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
                 matches.append(cms)
         if search_match := merge_matches(matches):
             return search_match
-    except:
+    except Exception:
         report_exc_info()
 
     if local_omim := find_local_term(match_text, OntologyService.OMIM):

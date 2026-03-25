@@ -283,7 +283,7 @@ class OntologyIdNormalized:
     def num_part_safe(self) -> int:
         try:
             return self.num_part
-        except:
+        except Exception:
             return 0
 
     @staticmethod
@@ -507,7 +507,7 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
                 return existing
             try:
                 index_num_part_value = normal_id.num_part
-            except:
+            except Exception:
                 index_num_part_value = normal_id.num_part_safe  # Ontologies like MedGen can have alpha characters in the "index", providing an index of 0 until we update the model
             return OntologyTerm(
                 id=normal_id.full_id,

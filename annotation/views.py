@@ -121,7 +121,7 @@ def annotation_build_detail(request, genome_build_name):
                 other_gene_annotation[annotation_consortium_display] = _get_gene_and_transcript_stats(genome_build,
                                                                                                       other_ac)
             annotation_details["other_consortia"] = other_gene_annotation
-        except:
+        except Exception:
             pass
 
         gene_annotation_release = None
@@ -309,7 +309,7 @@ def version_diffs(request):
             version_to = last_2[0]
             version_diff = version_diff_klass.objects.get(version_from=version_from, version_to=version_to)
             data["diff"] = version_diff
-        except:
+        except Exception:
             pass
 
         for k, v in zip(['version', 'previous'], last_2):

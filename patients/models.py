@@ -486,7 +486,7 @@ class Clinician(models.Model):
     def cleaned_get_or_create(clinician_string):
         try:
             clinician = Clinician.match(clinician_string)
-        except:
+        except Exception:
             kwargs = {}
             name = nameparser.HumanName(clinician_string)
             if name.title:

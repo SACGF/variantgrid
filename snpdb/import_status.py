@@ -18,5 +18,5 @@ def set_vcf_and_samples_import_status(vcf, import_status):
         cohort.save()
         assign_permission_to_user_and_groups(vcf.user, cohort)
         logging.info("Set cohort %s to %s", cohort, import_status)
-    except:
+    except Exception:
         pass

@@ -373,14 +373,14 @@ class EvidenceKey(TimeStampedModel):
     def namespace(self) -> Optional[str]:
         try:
             return self.key[0:self.key.index(':')]
-        except:
+        except Exception:
             return None
 
     @property
     def without_namespace(self) -> str:
         try:
             return self.key[self.key.index(':')+1:]
-        except:
+        except Exception:
             return self.key
 
     @property
@@ -693,7 +693,7 @@ class VCDataCell:
         if val:
             try:
                 return SubmissionSource(val)
-            except:
+            except Exception:
                 return SubmissionSource.FORM
         else:
             return None

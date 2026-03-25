@@ -46,7 +46,7 @@ class Sequencer(models.Model):
                 try:
                     sequencer_model = SequencerModel.objects.get(model=model_name,
                                                                  manufacturer=illumina)
-                except:
+                except Exception:
                     if 'HiSeq' in model_name:
                         data_naming_convention = DataGeneration.HISEQ
                     else:

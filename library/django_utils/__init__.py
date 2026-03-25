@@ -103,7 +103,7 @@ def get_model_fields_and_formatted_values_tuples_list(model):
         try:
             get_display_func = getattr(model, f"get_{name}_display")
             field = get_display_func()
-        except:
+        except Exception:
             raw_field = getattr(model, name)
             if raw_field is not None:
 #                logging.info("%s: %s", name, type(raw_field))

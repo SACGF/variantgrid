@@ -526,7 +526,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
 def cohort_genotype_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
         instance.delete_related_objects()
-    except:
+    except Exception:
         pass
 
 @receiver(post_delete, sender=CohortGenotypeCollection)

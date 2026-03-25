@@ -654,7 +654,7 @@ class HGVSMatcher:
             hgvs_variant = self.variant_to_hgvs_variant(variant, transcript)
             if hgvs_variant:
                 return CHGVS(hgvs_variant.format(), transcript)
-        except:
+        except Exception:
             if throw_on_issue:
                 raise
             report_exc_info()

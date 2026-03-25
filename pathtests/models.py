@@ -34,7 +34,7 @@ class PathologyTest(TimeStampedModel):
         active_test_version = None
         try:
             active_test_version = self.activepathologytestversion.pathology_test_version
-        except:
+        except Exception:
             pass
         return active_test_version
 
@@ -214,7 +214,7 @@ def get_cases_qs():
     try:
         test_patient = Patient.objects.get(**TEST_PATIENT_KWARGS)
         cases_qs = cases_qs.exclude(patient=test_patient)
-    except:
+    except Exception:
         pass
     return cases_qs
 
@@ -270,5 +270,5 @@ def get_external_order_system_last_checked():
     try:
         from sapath.models.sapath_helix import HelixNGSOrdersImport
         return HelixNGSOrdersImport.get_last_checked()
-    except:  # App not registered?
+    except Exception:  # App not registered?
         return None
