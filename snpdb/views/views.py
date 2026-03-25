@@ -293,8 +293,9 @@ def view_vcf(request, vcf_id):
     for warning, _ in vcf.get_warnings():
         messages.add_message(request, messages.WARNING, warning, extra_tags='import-message')
 
-    for info in _get_vcf_infos(vcf):
-        messages.add_message(request, messages.INFO, info, extra_tags='import-message')
+    if not reload_vcf:
+        for info in _get_vcf_infos(vcf):
+            messages.add_message(request, messages.INFO, info, extra_tags='import-message')
 
     has_write_permission = vcf.can_write(request.user)
     if not has_write_permission:
