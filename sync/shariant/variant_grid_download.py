@@ -48,7 +48,7 @@ class VariantGridDownloadSyncer(SyncRunner):
             skipped_keys = []
             sanitized = {}
             for key, blob in data.items():
-                if key == 'owner' or key == 'source_id':
+                if key in ('owner', 'source_id'):
                     pass
                 elif known_keys.get(key).is_dummy:
                     skipped_keys.append(key)
