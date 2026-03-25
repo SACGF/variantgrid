@@ -9,12 +9,12 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.urls import reverse
+from hgvs_shim import HGVSException, HGVSImplementationException, HGVSNomenclatureException
 
 from annotation.cosmic import CosmicAPI
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher, HGVSException, VariantResolvingError, HGVSImplementationException, \
-    HGVSNomenclatureException, HgvsOriginallyNormalized
+from genes.hgvs import HGVSMatcher, VariantResolvingError, HgvsOriginallyNormalized
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.models import MissingTranscript, MANE, TranscriptVersion, BadTranscript
 from genes.models_enums import AnnotationConsortium
@@ -532,7 +532,8 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
                 # error_message = "Error resolving HGVS"
                 error_message = str(e)
                 # work has been done to improve the error messages
-                # planning a future change where the technical errors identify themselves rather than the user friendly errors identifying themselves
+                # planning a future change where the technical errors identify themselves rather than the
+                # user-friendly errors identifying themselves
 
         if error_message:
             results = [SearchResult.error_result(error_message, genome_build)]
