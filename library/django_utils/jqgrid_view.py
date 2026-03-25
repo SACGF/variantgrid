@@ -73,7 +73,7 @@ class JQGridView(View):
             return JsonResponse(grid_config)
 
         if op == JQGridViewOp.HANDLER:
-            return HttpResponse(grid_obj.get_json(request), content_type="application/json")
+            return HttpResponse(grid_obj.get_json(request), content_type="application/json")  # pylint: disable=http-response-with-content-type-json
 
         if op == JQGridViewOp.DOWNLOAD:
             if not self.csv_download:

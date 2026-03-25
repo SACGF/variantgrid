@@ -1,11 +1,10 @@
-import json
 import re
 from datetime import timedelta
 
 from django.contrib import messages, admin
 from django.db.models import QuerySet, TextField, Q
 from django.db.models.functions import Length, Cast
-from django.http import HttpResponse, HttpRequest
+from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, \
@@ -202,9 +201,8 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
         batch: ClinVarExportBatch = queryset.first()
 
         batch_json = batch.to_json()
-        batch_json_str = json.dumps(batch_json)
 
-        response = HttpResponse(batch_json_str, content_type='application/json')
+        response = JsonResponse(batch_json)
         response['Content-Disposition'] = f'attachment; filename=clinvar_export_preview_{batch.pk}.json'
         return response
 
