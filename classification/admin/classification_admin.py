@@ -296,7 +296,7 @@ class ClassificationAdmin(ModelAdminBasics):
             refseq_transcript_id = vc.get(SpecialEKeys.REFSEQ_TRANSCRIPT_ID)
             ensembl_transcript_id = vc.get(SpecialEKeys.ENSEMBL_TRANSCRIPT_ID)
             if not vc.variant:
-                self.message_user(request, "(%i) No variant for classification" % vc.id)
+                self.message_user(request, f"({vc.id}) No variant for classification")
             else:
                 genome_build = vc.get_genome_build()
                 annotation_version = AnnotationVersion.latest(genome_build)
@@ -329,9 +329,9 @@ class ClassificationAdmin(ModelAdminBasics):
                     publish = True
 
                 if publish:
-                    self.message_user(request, "(%i) Patched = %s" % (vc.id, json.dumps(actual_patch)))
+                    self.message_user(request, f"({vc.id}) Patched = {json.dumps(actual_patch)}")
                 else:
-                    self.message_user(request, "(%i) No changes with = %s" % (vc.id, json.dumps(patch)))
+                    self.message_user(request, f"({vc.id}) No changes with = {json.dumps(patch)}")
 
     @admin_action("Fixes: Condition Text Sync")
     def condition_text_sync(self, request, queryset: QuerySet[Classification]):
@@ -543,7 +543,7 @@ class ClinicalContextAdmin(ModelAdminBasics):
         for dc in queryset:
             dc.recalc_and_save(cause='Admin recalculation',
                                cause_code=ClinicalContextRecalcTrigger.ADMIN)  # cause of None should change to Unknown, which is accurate if this was required
-        self.message_user(request, 'Recalculated %i statuses' % queryset.count())
+        self.message_user(request, f'Recalculated {queryset.count()} statuses')
 
 
 class EvidenceKeySectionFilter(admin.SimpleListFilter):

@@ -4,7 +4,7 @@ def rgb_hex_to_tuples(rgb: str) -> bytes:
 
 
 def rgb_to_hex(red: int, green: int, blue: int) -> str:
-    return "#%02x%02x%02x" % (red, green, blue)
+    return f"#{red:02x}{green:02x}{blue:02x}"
 
 
 def rgb_invert(rgb: str) -> str:

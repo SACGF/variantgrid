@@ -225,7 +225,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
     if len(variant_map) > 1:
         # generate message like:
         # c HGVS resolves to 4:53454A>T but g HGVS resolves to 4:4:53454A>C
-        resolutions = ['%s resolves to (%s)' % (' and '.join([key_map.get(key).pretty_label for key in keys]), variant_str) for variant_str, keys in variant_map.items()]
+        resolutions = [f'{" and ".join([key_map.get(key).pretty_label for key in keys])} resolves to ({variant_str})' for variant_str, keys in variant_map.items()]
         message = ' but '.join(resolutions)
 
         vm.add_message(SpecialEKeys.VARIANT_COORDINATE, code=ValidationCode.INCONSISTENT_VARIANT, severity='warning', message=message)

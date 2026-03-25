@@ -201,9 +201,9 @@ class EvidenceKey(TimeStampedModel):
         suffix_str = ''
         if suffix:
             if is_note:
-                suffix_str = '_n%s' % str(suffix)
+                suffix_str = f'_n{suffix}'
             else:
-                suffix_str = '_%s' % str(suffix)
+                suffix_str = f'_{suffix}'
 
         lower_key = self.key.lower().replace(' ', '_')
         if re.match('^[0-9].*', lower_key):

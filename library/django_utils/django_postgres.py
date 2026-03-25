@@ -10,7 +10,7 @@ class PostgresRealField(models.Field):
 
 
 def pg_sql_array(values):
-    return 'array[%s]' % ','.join(values)
+    return f'array[{",".join(values)}]'
 
 
 def _escape_sql_param(param):

@@ -75,7 +75,7 @@ class Zygosity:
             if len(zygosities_set) == 1:
                 zygosity_char_match = get_single_element(escaped_zygosities_set)
             else:
-                zygosity_char_match = '[%s]' % ''.join(escaped_zygosities_set)
+                zygosity_char_match = f'[{"".join(escaped_zygosities_set)}]'
         else:
             zygosity_char_match = '.'  # All
         return zygosity_char_match

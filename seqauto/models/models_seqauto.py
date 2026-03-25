@@ -84,10 +84,10 @@ class SeqAutoRun(TimeStampedModel):
         return status
 
     def get_scan_resources_dir(self):
-        return os.path.join(settings.SEQAUTO_SCAN_RESOURCES_DIR, "seqauto_run_%00d" % self.pk)
+        return os.path.join(settings.SEQAUTO_SCAN_RESOURCES_DIR, f"seqauto_run_{self.pk}")
 
     def get_job_scripts_dir(self):
-        return os.path.join(settings.SEQAUTO_JOB_SCRIPTS_DIR, "seqauto_run_%00d" % self.pk)
+        return os.path.join(settings.SEQAUTO_JOB_SCRIPTS_DIR, f"seqauto_run_{self.pk}")
 
     def remove_scan_resources_dir(self):
         scan_resources_dir = self.get_scan_resources_dir()
@@ -865,7 +865,7 @@ class Flagstats(SeqAutoRecord):
 
     @staticmethod
     def get_path_from_bam_file(bam_file):
-        return meta_data_file(bam_file.path, "flagstats/%%s%s" % Flagstats.FLAGSTATS_EXTENSION)
+        return meta_data_file(bam_file.path, f"flagstats/%s{Flagstats.FLAGSTATS_EXTENSION}")
 
     def __str__(self):
         return f"Flagstats ({self.get_data_state_display()}) for {self.bam_file}"

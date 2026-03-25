@@ -30,7 +30,7 @@ from snpdb.models.models_genome import GenomeBuild
 def get_igv_data(user, genome_build: GenomeBuild = None):
     user_settings = UserSettings.get_for_user(user)
     replace_dict = UserDataPrefix.get_replace_dict(user)
-    igv_data = {'base_url': "http://localhost:%d" % user_settings.igv_port,
+    igv_data = {'base_url': f"http://localhost:{user_settings.igv_port}",
                 'replace_dict': replace_dict}
     if genome_build:
         igv_data['genome'] = genome_build.igv_genome

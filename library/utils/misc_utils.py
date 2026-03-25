@@ -100,7 +100,7 @@ class Constant:
         return self.value
 
     def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, self.value)
+        return f'{self.__class__.__name__}({self.value!r})'
 
 
 class WrappablePartial(functools.partial):
@@ -116,11 +116,7 @@ class WrappablePartial(functools.partial):
 
     @property
     def __name__(self):
-        return "functools.partial({}, *{}, **{})".format(
-            self.func.__name__,
-            self.args,
-            self.keywords
-        )
+        return f"functools.partial({self.func.__name__}, *{self.args}, **{self.keywords})"
 
     @property
     def __doc__(self):

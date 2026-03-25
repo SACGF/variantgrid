@@ -33,13 +33,13 @@ def calculate_age(born: datetime, died: Optional[datetime] = None) -> int:
 
 
 def get_month_and_year(run_date) -> tuple[int, int]:
-    run_date_str = "%d" % int(run_date)
+    run_date_str = f"{int(run_date):d}"
     parts = [run_date_str[i:i + 2] for i in range(0, len(run_date_str), 2)]
     return int(parts[1]), int(parts[0])
 
 
 def year_month_string(y, m) -> str:
-    return "%02d%02d" % (y, m)
+    return f"{y:02d}{m:02d}"
 
 
 def date_to_month_year_string(d) -> str:
@@ -47,7 +47,7 @@ def date_to_month_year_string(d) -> str:
 
 
 def month_year_string(y, m) -> str:
-    return "%02d/%02d" % (m, int(str(y)[2:]))
+    return f"{m:02d}/{int(str(y)[2:]):02d}"
 
 
 def diff_month(d1, d2) -> int:

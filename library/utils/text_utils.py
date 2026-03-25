@@ -92,7 +92,7 @@ def format_significant_digits(a_number, sig_digits=3) -> str:
     if a_number == 0:
         return "0"
     rounded_number = round(a_number, sig_digits - int(math.floor(math.log10(abs(a_number)))) - 1)
-    rounded_number_str = "{:.12f}".format(rounded_number)
+    rounded_number_str = f"{rounded_number:.12f}"
     if match := trailing_zeros_strip.match(rounded_number_str):
         rounded_number_str = match.group(1)
         if rounded_number_str[-1] == '.':

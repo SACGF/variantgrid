@@ -58,7 +58,7 @@ class FilterNode(AnalysisNode):
         rules_summary = []
         for rule in self.get_rules():
             rule["op"] = format_operation(rule["op"])
-            rules_summary.append("%(field)s %(op)s %(data)s" % rule)
+            rules_summary.append(f"{rule['field']} {rule['op']} {rule['data']}")
 
         joiner = f" {self.group_operation} "
         return joiner.join(rules_summary)

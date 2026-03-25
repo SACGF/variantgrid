@@ -110,7 +110,7 @@ class ManualSubMigration(SubMigration):
             print("y: record success")
             print("n: record failure")
             print("x: back")
-            selection = input("\033[95m{}\033[00m".format("Please enter a selection: "))
+            selection = input("\033[95mPlease enter a selection: \033[00m")
             selection = selection.strip().lower()
             if selection == "y":
                 return MigrationResult.success()
@@ -312,7 +312,7 @@ class Migrator:
 
         selected_migration: Optional[SubMigration] = None
         while selected_migration is None:
-            selection = input("\033[95m{}\033[00m".format(f"Please enter a selection ({','.join(keys)}): "))
+            selection = input(f"\033[95mPlease enter a selection ({','.join(keys)}): \033[00m")
             selection = selection.strip()
 
             if selection == "a":

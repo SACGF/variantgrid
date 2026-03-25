@@ -783,8 +783,7 @@ class VCFBedIntersection(models.Model):
         if self.variant_collection:
             num_records = self.variant_collection.variantcollectionrecord_set.count()
 
-        params = (self.name, self.get_status_display(), self.vcf, self.genomic_intervals, self.variant_collection, num_records)
-        name = "%s (%s) proj: %s, genomic_intervals: %s variant_collection: %s (%d records)" % params
+        name = f"{self.name} ({self.get_status_display()}) proj: {self.vcf}, genomic_intervals: {self.genomic_intervals} variant_collection: {self.variant_collection} ({num_records} records)"
         if self.error_exception:
             name += self.error_exception
 
