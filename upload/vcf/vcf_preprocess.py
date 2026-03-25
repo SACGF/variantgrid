@@ -146,7 +146,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
     pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
                                          "--lines", str(split_file_rows),
-                                         f"--filter='sh -c \"{{ cat {cleaned_vcf_header_filename}; cat; }} | bgzip -c > {split_vcf_dir}/$FILE\"'"]
+                                         f"--filter='bash -c \"set -eo pipefail; {{ cat {cleaned_vcf_header_filename}; cat; }} | bgzip -c > {split_vcf_dir}/$FILE\"'"]
 
     for sub_step_name in norm_substep_names:
         sub_step_commands = pipe_commands[sub_step_name]
@@ -158,9 +158,13 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
     # this is not recommended, less portable and if commands have errors
     if settings.VCF_IMPORT_PREPROCESS_POPEN_SHELL:
         logging.info("single_commands: %s" % " | ".join([' '.join(x) for x in pipe_commands.values()]))
+        # Use pipefail so that a non-zero exit from any stage in the pipe is reported,
+        # not just the last command (see #3813 - bcftools errors were silently swallowed)
+        shell_command = f"set -o pipefail; {piped_command}"
         p = Popen(
-            piped_command,
+            shell_command,
             shell=True,
+            executable="/bin/bash",  # pipefail requires bash, not sh
             stdout=PIPE,
             stderr=PIPE,
         )
