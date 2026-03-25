@@ -273,6 +273,18 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         else:
             return f"{self.chrom}:{self.position} {self.ref}>{self.alt}"
 
+    def format_short(self, max_seq_length: int = 20) -> str:
+        """ Format with truncated ref/alt sequences, suitable for logging """
+        if Sequence.allele_is_symbolic(self.alt):
+            return self.format()
+
+        def _truncate(seq: str) -> str:
+            if len(seq) <= max_seq_length:
+                return seq
+            return f"{seq[:max_seq_length]}...({len(seq)}bp)"
+
+        return f"{self.chrom}:{self.position} {_truncate(self.ref)}>{_truncate(self.alt)}"
+
     @staticmethod
     def from_variant_match(match, genome_build: Optional[GenomeBuild] = None):
         chrom = match.group(1)

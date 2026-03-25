@@ -546,7 +546,7 @@ class BulkVEPVCFAnnotationInserter:
                 # TODO: Protein?? hgvs_p
             except Exception as e:
                 logging.debug("Error calculating c.HGVS for '%s'/'%s': %s",
-                              variant_coordinate, transcript_accession, e)
+                              variant_coordinate.format_short(), transcript_accession, e)
                 hgvs_c = None  # For c.HGVS - it's ok to be blank
                 self._generated_hgvs_c["error"] += 1
 
@@ -564,7 +564,7 @@ class BulkVEPVCFAnnotationInserter:
             try:
                 hgvs_g = self.hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate)
             except Exception as e:
-                logging.error("Error calculating g.HGVS for '%s': %s", variant_coordinate, e)
+                logging.warning("Error calculating g.HGVS for '%s': %s", variant_coordinate.format_short(), e)
                 hgvs_g = VariantAnnotation.SV_HGVS_ERROR_MESSAGE
 
         transcript_data['hgvs_g'] = hgvs_g
