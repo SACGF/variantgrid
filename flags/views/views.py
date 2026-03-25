@@ -146,8 +146,7 @@ class FlagHelper:
         comments = FlagComment.objects.filter(flag__collection__in=self.flag_collections, created__gt=since).order_by('-created').select_related('flag', 'flag__collection')
         comments = [comment for comment in comments if self.is_viewable_flag(comment.flag)]
         for comment in comments:
-            if comment.created > since:
-                since = comment.created
+            since = max(since, comment.created)
 
             if self.is_viewable_flag(comment.flag):
                 self.include_comment(comment, detailed=True)
