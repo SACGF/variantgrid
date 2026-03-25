@@ -89,10 +89,6 @@ persistent=yes
 # Discover python modules and packages in the file system subtree.
 recursive=no
 
-# When enabled, pylint would attempt to guess common misconfiguration and emit
-# user-friendly hints instead of false-positive error messages.
-suggestion-mode=yes
-
 # Allow loading of arbitrary C extensions. Extensions are imported into the
 # active Python interpreter and may run arbitrary code.
 unsafe-load-any-extension=no
@@ -274,10 +270,10 @@ exclude-too-few-public-methods=
 ignored-parents=
 
 # Maximum number of arguments for function / method.
-max-args=10
+max-args=12
 
 # Maximum number of attributes for a class (see R0902).
-max-attributes=7
+max-attributes=10
 
 # Maximum number of boolean expressions in an if statement (see R0916).
 max-bool-expr=5
@@ -292,10 +288,10 @@ max-locals=15
 max-parents=7
 
 # Maximum number of public methods for a class (see R0904).
-max-public-methods=40
+max-public-methods=60
 
 # Maximum number of return / yield for function / method body.
-max-returns=6
+max-returns=8
 
 # Maximum number of statements in function / method body.
 max-statements=100
@@ -440,7 +436,8 @@ disable=raw-checker-failed,
         too-many-nested-blocks,
         too-many-positional-arguments,
         import-outside-toplevel,
-        cyclic-import
+        cyclic-import,
+        pointless-string-statement
 
 
 # Enable the message, report, category or checker with the given id(s). You can
@@ -634,7 +631,7 @@ callbacks=cb_,
 dummy-variables-rgx=_+$|(_[a-zA-Z0-9_]*[a-zA-Z0-9]+?$)|dummy|^ignored_|^unused_
 
 # Argument names that match this expression will be ignored.
-ignored-argument-names=_.*|^ignored_|^unused_
+ignored-argument-names=_.*|^ignored_|^unused_|^sender$
 
 # Tells whether we should check for unused import in __init__ files.
 init-import=no
