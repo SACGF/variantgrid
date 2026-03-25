@@ -1002,7 +1002,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         if version is not None:
             try:
                 transcript_version = transcript_versions_qs.get(version=version)
-            except TranscriptVersion.DoesNotExist:
+            except TranscriptVersion.DoesNotExist as exc:
                 possible_versions = set(transcript_versions_qs.values_list('version', flat=True))
                 possible_versions = [int(p) for p in possible_versions if p is not None]
                 possible_versions.sort()
@@ -1016,7 +1016,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                         transcript_version = transcript_versions_qs.filter(version=use_version).last()
                     else:
                         version_list = ', '.join((str(v) for v in possible_versions))
-                        raise MissingTranscript(f"No Transcript for '{transcript_name}' (build: {genome_build}) - but there are entries for versions {version_list}")
+                        raise MissingTranscript(f"No Transcript for '{transcript_name}' (build: {genome_build}) - but there are entries for versions {version_list}") from exc
         else:
             transcript_version = transcript_versions_qs.last()
 
@@ -1855,12 +1855,12 @@ class GeneList(TimeStampedModel):
     def get_for_user(user, gene_list_id, success_only=True):
         try:
             return GeneList.filter_for_user(user, success_only).get(pk=gene_list_id)
-        except GeneList.DoesNotExist:
+        except GeneList.DoesNotExist as exc:
             # Need to distinguish between does not exist and no permission
             get_object_or_404(GeneList, pk=gene_list_id)  # potentially throws GeneList.DoesNotExist
             # If we're here, object exists but we have a permission error
             msg = f"You don't have permission to access gene_list {gene_list_id}"
-            raise PermissionDenied(msg)
+            raise PermissionDenied(msg) from exc
 
     @staticmethod
     def filter_for_user(user, success_only=True):

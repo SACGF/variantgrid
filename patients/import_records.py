@@ -425,8 +425,8 @@ def pandas_read_encoded_csv(*args, **kwargs):
         kwargs["encoding"] = 'cp1252'
         try:
             df = pd.read_csv(*args, **kwargs)
-        except:
-            raise ude
+        except Exception as exc:
+            raise ude from exc
 
     return df
 

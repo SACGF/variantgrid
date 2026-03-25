@@ -490,7 +490,7 @@ class SettingsOverrideForm(BaseModelForm):
             try:
                 Sample._validate_sample_formatter_func(data)
             except (ValueError, KeyError) as e:
-                raise ValidationError(e)
+                raise ValidationError(e) from e
         return data
 
     def _hide_unused_fields(self):

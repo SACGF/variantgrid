@@ -428,8 +428,8 @@ class ClinVarKeyExcludePattern(TimeStampedModel):
     def clean(self):
         try:
             re.compile(self.pattern)
-        except:
-            raise ValidationError({'pattern': ValidationError(f'{self.pattern} is not a valid regular expression')})
+        except Exception as exc:
+            raise ValidationError({'pattern': ValidationError(f'{self.pattern} is not a valid regular expression')}) from exc
 
         from classification.models import EvidenceKeyMap
         if EvidenceKeyMap.cached_key(self.evidence_key).is_dummy:

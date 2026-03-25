@@ -120,8 +120,8 @@ class BioCommonsHGVSConverter(_BioCommonsHGVSConverterBase):
                 (chrom, position, ref, alt, _typ) = self.babelfish.hgvs_to_vcf(var_g)
                 if alt == '.':
                     alt = ref
-            except HGVSDataNotAvailableError:
-                raise Contig.ContigNotInBuildError()
+            except HGVSDataNotAvailableError as exc:
+                raise Contig.ContigNotInBuildError() from exc
         except HGVSError as hgvs_error:
             klass = self._get_exception_class(hgvs_error)
             raise klass(hgvs_error) from hgvs_error
@@ -202,7 +202,7 @@ class BioCommonsHGVSConverter(_BioCommonsHGVSConverterBase):
             exception_str = str(hgvs_e)
             if "Variant is outside CDS bounds" in exception_str:
                 if normalization_error:
-                    raise normalization_error
+                    raise normalization_error from hgvs_e
                 var_x = var_x_normalized
                 ok = True
             else:

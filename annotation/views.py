@@ -329,8 +329,8 @@ def version_diffs(request):
 def view_version_diff(request, version_diff_id):
     try:
         diff = VersionDiff.objects.get_subclass(pk=version_diff_id)
-    except VersionDiff.DoesNotExist:
-        raise Http404(f"No VersionDiff pk={version_diff_id}")
+    except VersionDiff.DoesNotExist as exc:
+        raise Http404(f"No VersionDiff pk={version_diff_id}") from exc
 
     context = {"diff": diff}
     context.update(diff.get_diff_results())

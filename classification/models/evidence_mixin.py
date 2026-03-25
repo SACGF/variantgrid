@@ -164,13 +164,13 @@ class EvidenceMixin:
         build_name: str
         try:
             build_name = self[SpecialEKeys.GENOME_BUILD]
-        except KeyError:
-            raise ValueError("Classification does not have a value for genome build")
+        except KeyError as exc:
+            raise ValueError("Classification does not have a value for genome build") from exc
 
         try:
             return GenomeBuild.get_name_or_alias(build_name)
-        except GenomeBuild.DoesNotExist:
-            raise ValueError(f"Unsupported GenomeBuild {build_name}")
+        except GenomeBuild.DoesNotExist as exc:
+            raise ValueError(f"Unsupported GenomeBuild {build_name}") from exc
 
     def get_genome_build_opt(self) -> Optional[GenomeBuild]:
         try:

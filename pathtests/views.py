@@ -35,9 +35,9 @@ def user_is_clinician(user):
 def clinician_login(request):
     try:
         request.user.clinician
-    except Clinician.DoesNotExist:
+    except Clinician.DoesNotExist as exc:
         msg = "Only clinicians can view this page!"
-        raise PermissionDenied(msg)
+        raise PermissionDenied(msg) from exc
     return redirect('pathology_test_requests')
 
 

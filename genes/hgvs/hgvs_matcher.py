@@ -337,8 +337,8 @@ class HGVSMatcher:
         version: int
         try:
             transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-        except ValueError:
-            raise HGVSNomenclatureException(f"Error parsing transcript version from \"{transcript_accession}\"")
+        except ValueError as exc:
+            raise HGVSNomenclatureException(f"Error parsing transcript version from \"{transcript_accession}\"") from exc
 
         tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build, transcript_id=transcript_id)
         tv_by_version = {tv.version: tv for tv in tv_qs}

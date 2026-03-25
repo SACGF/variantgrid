@@ -369,8 +369,8 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if template_name := getattr(settings, setting_name, None):
             try:
                 return AnalysisTemplate.objects.get(name=template_name)
-            except AnalysisTemplate.DoesNotExist:
-                raise ValueError(f"Analysis Template '{template_name}' does not exist!")
+            except AnalysisTemplate.DoesNotExist as exc:
+                raise ValueError(f"Analysis Template '{template_name}' does not exist!") from exc
         else:
             raise ValueError(f"settings.{setting_name} not set. Talk to your administrator")
 

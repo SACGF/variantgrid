@@ -231,7 +231,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
         except Exception as e:
             choices = ",".join(consortia_dict)
             msg = f"Annotation settings 'vep_config.annotation_consortium' must be present and one of {choices}: {e}"
-            raise ValueError(msg)
+            raise ValueError(msg) from e
 
     @property
     def reference_fasta(self):

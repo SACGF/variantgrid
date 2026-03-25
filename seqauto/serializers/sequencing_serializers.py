@@ -189,8 +189,8 @@ class SampleSheetLookupSerializer(serializers.Serializer):
                 sequencing_run__name=sequencing_run,
                 hash=hash,
             )
-        except SampleSheet.DoesNotExist:
-            raise serializers.ValidationError("SampleSheet not found.")
+        except SampleSheet.DoesNotExist as exc:
+            raise serializers.ValidationError("SampleSheet not found.") from exc
 
 
 class SequencingSampleLookupSerializer(serializers.Serializer):

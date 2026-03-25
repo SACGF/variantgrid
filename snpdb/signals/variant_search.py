@@ -614,7 +614,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 mane_and_aliases = MANE.get_mane_and_aliases_list_from_symbol(gene_symbol_str)
                 if not mane_and_aliases:
                     raise ValueError(
-                        msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts")
+                        msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts") from hgvs_error
 
                 gene_aliases_to_mane_symbols = set()
                 genes_with_non_mane_transcripts = set()
