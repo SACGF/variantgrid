@@ -56,4 +56,3 @@ def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):
         else:
             logging.warning("Skipping auto analysis for sample: %s, import_status=%s",
                             sample, sample.get_import_status_display())
-

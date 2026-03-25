@@ -720,7 +720,6 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         else:
             yield SearchMessageOverall(f"Invalid HGVS cDNA allele \"{hgvs_string}\"")  # {hgvs_ex}
 
-
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:
             reported = False

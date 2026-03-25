@@ -35,7 +35,6 @@ def karyomapping_analyses(request):
     return render(request, 'analysis/karyomapping/karyomapping_analyses.html', context)
 
 
-
 def create_and_view_karyomapping_analysis_for_trio(trio, user):
     karyomapping = KaryomappingAnalysis.objects.create(user=user,
                                                        name=trio.name,

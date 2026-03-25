@@ -35,8 +35,6 @@ class Command(BaseCommand):
         parser.add_argument('--sleep', type=int, default=0, required=False,
                             help="Sleep seconds between batches")
 
-
-
     def handle(self, *args, **options):
         max_records = options["max_records"]
         lab_name = options["lab"]
@@ -91,7 +89,7 @@ class Command(BaseCommand):
     def get_internal_notes_ekey_name(self) -> str:
         # The ekey to store internal data differs between VG3 and master
         POTENTIAL_EKEYS = [
-            "internal_use", # VG3 SA Path
+            "internal_use",  # VG3 SA Path
             "review_comment",  # Master
         ]
         if ekey := EvidenceKey.objects.filter(pk__in=POTENTIAL_EKEYS).first():
@@ -113,7 +111,7 @@ class Command(BaseCommand):
             data.update(row.to_dict())
 
             lab_record_id = data.pop("lab_record_id")
-            id_str = f"{lab.group_name}/{lab_record_id}" # Format is lab_id/]record_id[.version
+            id_str = f"{lab.group_name}/{lab_record_id}"  # Format is lab_id/]record_id[.version
             internal_use = data.pop("internal_use")
             internal_use_note = data.pop("internal_use_note")
             data[internal_notes_ekey] = {
@@ -123,10 +121,9 @@ class Command(BaseCommand):
 
             record = {
                 "id": id_str,
-                "upsert": data, # Whatever is left are popping
+                "upsert": data,  # Whatever is left are popping
              }
 
             # logging.info(record)
-
 
             yield record

@@ -557,7 +557,6 @@ def cached_generated_file_delete(request):
     return HttpResponse()
 
 
-
 def vcfs(request):
     context = {
         "form": VCFChoiceForm(),

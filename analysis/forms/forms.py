@@ -465,12 +465,9 @@ def get_mult_choice_form(choices, field_name: str, initial=None):
     return WrappedForm
 
 
-
 class AnalysisTemplateAutoLaunchForm(forms.Form):
     enrichment_kit = forms.ModelChoiceField(queryset=EnrichmentKit.objects.all(),
                                             required=False, blank=True,
                                             widget=ModelSelect2(url='enrichment_kit_autocomplete',
                                                                 attrs={'data-placeholder': 'Enrichment Kit...'}))
     example_sample_name = forms.CharField(required=False)
-
-

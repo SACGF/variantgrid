@@ -676,7 +676,6 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
         if result.preview.category == Variant.preview_category():
             result.preview.category = Allele.preview_category()
 
-
         result.messages = [r.with_genome_build(genome_build) for genome_build in result.genome_builds for r in result.messages]
 
         if obj := result.preview.obj:

@@ -749,7 +749,7 @@ def emojify(text: str):
 def bool_emojify(val: bool):
     if val:
         return "✅"
-    return  "❌"
+    return "❌"
 
 
 @register.filter(name='debug')

@@ -463,7 +463,6 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
         return df.sort_values("Counts", ascending=False)
 
 
-
 class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
     colmodel_overrides = {
         "ID": {"width": 200},
@@ -506,7 +505,6 @@ class NodeGeneDiseaseClassificationGenesGrid(DataFrameJqGrid):
 
         df = pd.DataFrame.from_dict(gene_data, orient='index')
         return df.sort_index()
-
 
 
 class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):

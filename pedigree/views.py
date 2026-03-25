@@ -52,7 +52,6 @@ def pedigrees(request):
     return render(request, 'pedigree/pedigrees.html', context)
 
 
-
 def view_pedigree(request, pedigree_id):
     pedigree = Pedigree.get_for_user(request.user, pedigree_id)
 
