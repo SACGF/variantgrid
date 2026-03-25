@@ -8,6 +8,8 @@ from genes.hgvs import HGVSMatcher
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants, get_clingen_alleles_from_external_code
 from snpdb.models import Variant, VariantCoordinate
 from snpdb.models.models_enums import ImportStatus, ClinGenAlleleExternalRecordType
+from upload.models import SimpleVCFImportInfo
+from upload.models.models_enums import VCFImportInfoSeverity
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 
@@ -44,8 +46,22 @@ class ManualVariantsPostInsertTask(ImportVCFStepTask):
         mvec = upload_step.uploaded_file.uploadedmanualvariantentrycollection.collection
         logging.info("ManualVariantsPostInsertTask: mvec_id = %s", mvec)
 
-        if failed_mvec_count := mvec.manualvariantentry_set.filter(createdmanualvariant__isnull=True).count():
-            raise ValueError(f"{mvec}: failed to match {failed_mvec_count} to variants")
+        failed_entries = mvec.manualvariantentry_set.filter(createdmanualvariant__isnull=True)
+        if failed_mvec_count := failed_entries.count():
+            failed_details = []
+            for mve in failed_entries:
+                detail = f"Line {mve.line_number}: '{mve.entry_text}'"
+                if mve.error_message:
+                    detail += f" ({mve.error_message})"
+                failed_details.append(detail)
+            details_str = "; ".join(failed_details)
+            message = f"Failed to match {failed_mvec_count} manual variant entries to variants. {details_str}"
+            logging.warning("%s: %s", mvec, message)
+            SimpleVCFImportInfo.objects.create(
+                severity=VCFImportInfoSeverity.WARNING,
+                upload_step=upload_step,
+                message_string=message,
+            )
 
         mvec.import_status = ImportStatus.SUCCESS
         mvec.save()
