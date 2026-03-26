@@ -1,3 +1,4 @@
+import logging
 import operator
 import time
 from collections import defaultdict
@@ -313,7 +314,7 @@ class ExportVariantGrid(VariantGrid):
         start = time.time()
         yield from items
         end = time.time()
-        print(f"Download took {end-start} seconds")
+        logging.debug("Download took %s seconds", end - start)
 
     @staticmethod
     def _iter_by_contigs(genome_build, items):

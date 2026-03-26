@@ -222,7 +222,6 @@ class PhenotypeNodeSerializer(AnalysisNodeSerializer):
         node = super().create(validated_data)
 
         for ontology_data in phenotypenodeontologyterm_set:
-            print(f"ontology_data: {ontology_data}")
             PhenotypeNodeOntologyTerm.objects.create(phenotype_node=node, **ontology_data)
 
         return node

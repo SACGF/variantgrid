@@ -82,7 +82,7 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                     new_patho_variants = new_clinvar_patho_qs.values_list("pk", flat=True)
 
                     for sample, analysis in samples_and_analyses_by_annotation_version[annotation_version]:
-                        print(sample, analysis)
+                        logging.info("Processing sample %s, analysis %s", sample, analysis)
                         sample_qs = sample.get_variant_qs().filter(pk__in=new_patho_variants)
                         filter_kwargs = {}
                         #if zygosities:

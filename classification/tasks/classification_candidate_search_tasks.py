@@ -1,3 +1,4 @@
+import logging
 import operator
 from collections import defaultdict
 from functools import reduce
@@ -129,9 +130,9 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
             #                                     variantallele__genome_build=genome_build)
 
             # Easier when allele is on Classification (like master)
-            print(f"{genome_build=}")
+            logging.info("genome_build: %s", genome_build)
             for sample in samples_qs.filter(vcf__genome_build=genome_build):
-                print(f"Searching {sample}")
+                logging.info("Searching %s", sample)
                 sample_variant_zyg_and_classifications = []
                 filter_kwargs = {}
                 if zygosities:

@@ -256,7 +256,7 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
             # End of per-sample stuff
 
     copy_start = time.time()
-    print(f"calc time: {copy_start - start}")
+    logging.info("calc time: %s", copy_start - start)
 
     stats_per_sample, stats_passing_filters_per_sample = _create_stats_per_sample(vcf, annotation_version)
     counter_and_models = [

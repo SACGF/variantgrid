@@ -243,7 +243,6 @@ def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disab
 
 @celery.shared_task
 def venn_cache_count(vennode_cache_id):
-    print(f"venn_cache_count: {vennode_cache_id}")
     try:
         vennode_cache = VennNodeCache.objects.get(pk=vennode_cache_id)
     except VennNodeCache.DoesNotExist:

@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
@@ -406,7 +407,7 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
             for lab_clin_sig in data.lab_clin_sigs:
                 key = f"{lab_clin_sig.lab.pk}-{lab_clin_sig.clin_sig}"
                 if updated_clin_sig := request.POST.get(key):
-                    print(f"Lab {lab_clin_sig.lab} changing from {lab_clin_sig.clin_sig} to {updated_clin_sig}")
+                    logging.info("Lab %s changing from %s to %s", lab_clin_sig.lab, lab_clin_sig.clin_sig, updated_clin_sig)
                     modifications = data.classifications_for_lab_clin_sig(lab_clin_sig)
                     classifications = [mod.classification for mod in modifications]
                     if lab_clin_sig.clin_sig != updated_clin_sig:

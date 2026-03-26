@@ -1,4 +1,5 @@
 import json
+import logging
 import pathlib
 import shlex
 import subprocess
@@ -123,7 +124,7 @@ class ClassificationImportMapInsertTask(Task):
                 file_type_override = self.validate_file_type_override(file_type_override_raw)
                 args += ["--file_type", shlex.quote(file_type_override)]
 
-            print(" ".join(args))
+            logging.info("Running: %s", " ".join(args))
 
             # could make it returned the mapped file to stdout
             # but it's handy having the mapped file present

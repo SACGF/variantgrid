@@ -118,7 +118,6 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                                                            sha256_hash="not_a_real_hash",
                                                                                            hpa_version=0.42)[0]
 
-    print(f"Ontology version {ontology_version.pk}")
     av, _ = AnnotationVersion.objects.get_or_create(genome_build=genome_build,
                                                     variant_annotation_version=variant_annotation_version,
                                                     gene_annotation_version=gene_annotation_version,

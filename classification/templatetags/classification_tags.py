@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from datetime import timedelta
 from html import escape
@@ -173,7 +174,7 @@ def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = N
         raise ValueError('ekey filter must have a key')
     e_key = EvidenceKeyMap.cached_key(key)
     if e_key.is_dummy:
-        print(f"Warning, dummy evidence key {key}")
+        logging.warning("Dummy evidence key %s", key)
     pretty_val = e_key.pretty_value(val, dash_for_none=True)
     if val is None or val == '':
         if value_if_none is not None:

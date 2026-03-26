@@ -154,7 +154,7 @@ class BulkClinVarInserter:
         self.bulk_insert()
 
     def bulk_insert(self):
-        print("BulkClinVarInserter bulk_insert")
+        logging.info("BulkClinVarInserter bulk_insert")
         clinvar_list: list[ClinVar] = []
         self.variant_pk_lookup.batch_check()
         for variant_hash, variant_pk in self.variant_pk_lookup.variant_pk_by_hash.items():

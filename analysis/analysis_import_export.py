@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Optional
 
 from django.contrib.auth.models import User
@@ -63,7 +64,7 @@ def analysis_import(user: User, genome_build: GenomeBuild, filename,
         model_name = serializer_subclass.Meta.model._meta.label
         node_serializers[model_name] = serializer_subclass
 
-    print(f"Creating analysis: {analysis.pk}")
+    logging.info("Creating analysis: %s", analysis.pk)
     old_new_map = {}
 
     for node_record in analysis_json["nodes"]:
@@ -86,14 +87,12 @@ def analysis_import(user: User, genome_build: GenomeBuild, filename,
             try:
                 node = s.save()
             except:
-                print(f"Failed to save node: {old_pk}")
-                print(data)
+                logging.error("Failed to save node: %s, data: %s", old_pk, data)
                 raise
 
             old_new_map[old_pk] = node.pk
         else:
-            print("Invalid:")
-            print(s.errors)
+            logging.error("Invalid node serializer: %s", s.errors)
 
     for edge_record in analysis_json["edges"]:
         edge_fields = edge_record["fields"]
@@ -106,7 +105,7 @@ def analysis_import(user: User, genome_build: GenomeBuild, filename,
         if parent_id and child_id:
             AnalysisEdge.objects.create(parent_id=parent_id, child_id=child_id)
         else:
-            print(f"SKIPPED EDGE Parent: {old_parent_id} to Child: {old_child_id}")
+            logging.warning("SKIPPED EDGE Parent: %s to Child: %s", old_parent_id, old_child_id)
 
     reload_analysis_nodes(analysis.pk)
     return analysis

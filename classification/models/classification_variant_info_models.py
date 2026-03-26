@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Any, TypedDict, Literal
@@ -869,7 +870,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         if self.dirty_message != new_dirty_message:
             self.dirty_message = new_dirty_message
-            print(f"Found {new_dirty_message}")
+            logging.info("Found %s", new_dirty_message)
             self.save()
 
     def update_status(self):
