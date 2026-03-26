@@ -73,3 +73,11 @@ class TestVCFProcessors(TestCase):
     def test_genotype_processor(self):
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "sample1_hg19.vcf")
         self._test_genotype_processor(vcf_filename, BulkGenotypeVCFProcessor)
+
+    def test_genotype_processor_undeclared_filter(self):
+        """VCF with a FILTER value not declared in the header should not crash the processor.
+        The processor must auto-create a VCFFilter record for the undeclared code.
+        """
+        vcf_filename = os.path.join(self.TEST_DATA_DIR, "undeclared_filter.vcf")
+        self._test_genotype_processor(vcf_filename, BulkGenotypeVCFProcessor)
+
