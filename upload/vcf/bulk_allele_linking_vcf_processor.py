@@ -58,7 +58,6 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
             variant_id = int(variant_id)
             allele_id = int(allele_id)
 
-            print(f"{variant_id=} - {allele_id=}")
             al = self.allele_liftovers_by_allele_id[allele_id]
             updated_allele_liftovers.append(al)
 

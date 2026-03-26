@@ -75,7 +75,7 @@ def _write_somalier_vcf(cfg: SomalierConfig, processing_dir, vcf_extract: Somali
 
     tabix_command = ["tabix", exported_vcf_filename]
     return_code, stdout, stderr = execute_cmd(tabix_command)
-    print(f"return_code: {return_code}, stdout: {stdout}, stderr: {stderr}")
+    logging.info("return_code: %s, stdout: %s, stderr: %s", return_code, stdout, stderr)
     return exported_vcf_filename
 
 

@@ -114,7 +114,7 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
     exception_message = message
     if target:
         exception_message += f": {target}"
-    print(exception_message)
+    logging.info(exception_message)
     extra_data["exception_message"] = exception_message
 
     if not request:

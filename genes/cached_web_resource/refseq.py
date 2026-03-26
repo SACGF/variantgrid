@@ -127,7 +127,7 @@ def store_refseq_sequence_info_from_web(cached_web_resource: CachedWebResource):
 
     sha256_hash = sha256sum_str(SEQUENCE_INFO_URL)
     if existing_import := TranscriptVersionSequenceInfoFastaFileImport.objects.filter(sha256_hash=sha256_hash).first():
-        print(f"Deleting existing TranscriptVersionSequenceInfos for fasta import {sha256_hash}")
+        logging.info("Deleting existing TranscriptVersionSequenceInfos for fasta import %s", sha256_hash)
         existing_import.delete()
 
     fasta_import = TranscriptVersionSequenceInfoFastaFileImport.objects.create(sha256_hash=sha256_hash,
@@ -152,8 +152,7 @@ def store_refseq_sequence_info_from_web(cached_web_resource: CachedWebResource):
         records.append(tvi)
 
     if unknown_transcripts:
-        print(f"Inserting {len(unknown_transcripts)} unknown_transcripts")
-        print(unknown_transcript_prefixes)
+        logging.info("Inserting %d unknown_transcripts (%s)", len(unknown_transcripts), unknown_transcript_prefixes)
         Transcript.objects.bulk_create(unknown_transcripts, batch_size=2000)
 
     if num_records := len(records):
@@ -164,7 +163,7 @@ def store_refseq_sequence_info_from_web(cached_web_resource: CachedWebResource):
 
 
 def store_gene2pubmed_from_web(cached_web_resource: CachedWebResource):
-    print("store_gene2pubmed_from_web - starting")
+    logging.info("store_gene2pubmed_from_web - starting")
     homo_sapiens_tax_id = "9606"
     expected_cols = ["#tax_id", "GeneID", "PubMed_ID"]
     url = "https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene2pubmed.gz"

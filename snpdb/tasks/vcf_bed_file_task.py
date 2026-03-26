@@ -36,7 +36,7 @@ def create_backend_vcf_bed_intersections(backend_vcf):
         vcf = backend_vcf.vcf
         vcf.cohort.cohort_genotype_collection  # Error and skip if missing
         enrichment_kits = backend_vcf.sample_sheet.get_sample_enrichment_kits()
-        print(f"enrichment_kits = {enrichment_kits}")
+        logging.info("enrichment_kits = %s", enrichment_kits)
 
         for enrichment_kit in enrichment_kits:
             if enrichment_kit.genomic_intervals:

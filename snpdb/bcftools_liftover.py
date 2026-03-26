@@ -86,13 +86,11 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,
     cmd_str = " | ".join((liftover_cmd_str, sort_cmd_str))
     logging.info(cmd_str)
     return_code, std_out, std_err = execute_cmd([cmd_str], env=env, shell=True)
-    print(f"return_code: {return_code}")
+    logging.info("return_code: %s", return_code)
     if std_out:
-        print("stdout:")
-        print(std_out)
+        logging.info("stdout: %s", std_out)
     if std_err:
-        print("stderr:")
-        print(std_err)
+        logging.info("stderr: %s", std_err)
 
     if return_code:
         raise CalledProcessError(return_code, cmd_str, output=std_out, stderr=std_err)

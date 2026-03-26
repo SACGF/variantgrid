@@ -175,7 +175,7 @@ class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
 
         uploaded_vcf = upload_step.get_uploaded_vcf()
         vcf = uploaded_vcf.vcf
-        print(f"ImportVCFSuccessTask for VCF = {vcf}")
+        logging.info("ImportVCFSuccessTask for VCF = %s", vcf)
 
         set_vcf_and_samples_import_status(vcf, ImportStatus.SUCCESS)
 

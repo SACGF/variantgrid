@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from django.db.models import QuerySet
@@ -53,7 +54,7 @@ class EventColumns(DatatableConfig[Event]):
             elif filter_param == 'searches':
                 qs = qs.filter(name='search')
             else:
-                print(f'Unexpected filter {filter_param}')
+                logging.warning("Unexpected filter %s", filter_param)
 
         exclude_admin = self.get_query_json('exclude_admin')
         if exclude_admin:

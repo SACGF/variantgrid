@@ -28,7 +28,7 @@ def get_import_task_factory_from_extension(user, filename, file_extension):
             tasks.append((int(processing_ability), possible))
 
     if tasks:
-        print(f"tasks: {tasks}")
+        logging.debug("tasks: %s", tasks)
         tasks = sorted(tasks, key=itemgetter(0), reverse=True)
         last_pa = None
         for pa, _ in tasks:

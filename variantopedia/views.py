@@ -1,4 +1,5 @@
 import json
+import logging
 import operator
 import re
 from collections import defaultdict
@@ -132,7 +133,7 @@ def server_status(request):
                 terminated = cursor.fetchone()[0]
                 messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
         else:
-            print(f"Unrecognised action {action}")
+            logging.warning("Unrecognised action %s", action)
 
         # return redirect(reverse('server_status'))
 
@@ -175,7 +176,7 @@ def server_status(request):
             active_jobs = []
             if worker_active := active.get(worker):
                 num_active = len(worker_active)
-                print(f"{worker=} active: {worker_active}")
+                logging.debug("worker %s active: %s", worker, worker_active)
                 name_time_stamps = defaultdict(list)
                 for worker_data in worker_active:
                     name = worker_data.get("name")

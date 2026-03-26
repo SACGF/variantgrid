@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from functools import cached_property
 
@@ -108,7 +109,7 @@ class HomozygosityPercentGraph(CacheableGraph):
 
             chrom_homo_percent[chrom] = homozygosity_percent
 
-        print(f"HomozygosityPercentGraph: {num_bins} bins")
+        logging.debug("HomozygosityPercentGraph: %d bins", num_bins)
 
         cmap = cm.get_cmap(self.cmap)
         for chrom, (xranges, yranges) in chrom_ranges.items():

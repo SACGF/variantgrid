@@ -98,7 +98,7 @@ def insert_sequences(unique_sequences):
             seq = m.group(1)  # Strip off end bit
         pfam_sequences.append(PfamSequence(seq_id=seq))
     if pfam_sequences:
-        print(f"Creating {len(pfam_sequences)} PFam sequences")
+        logging.info("Creating %d PFam sequences", len(pfam_sequences))
         PfamSequence.objects.bulk_create(pfam_sequences, batch_size=BULK_INSERT_SIZE, ignore_conflicts=True)
 
 
@@ -123,10 +123,10 @@ def insert_mappings(mapping_df, annotation_consortium):
         mappings.append(PfamSequenceIdentifier(**kwargs))
 
     if mappings:
-        print(f"Inserting {len(mappings)} {ac_label} transcripts")
+        logging.info("Inserting %d %s transcripts", len(mappings), ac_label)
         PfamSequenceIdentifier.objects.bulk_create(mappings, batch_size=BULK_INSERT_SIZE)
     if num_missing_transcripts:
-        print(f"Missing {num_missing_transcripts} {ac_label} transcripts")
+        logging.warning("Missing %d %s transcripts", num_missing_transcripts, ac_label)
 
 
 def insert_domains(pfam_tsv) -> int:
@@ -161,6 +161,6 @@ def insert_domains(pfam_tsv) -> int:
         PfamDomains.objects.bulk_create(pfam_domains, batch_size=BULK_INSERT_SIZE)
 
     if num_missing_pfam:
-        print(f"Missing {num_missing_pfam} Pfam entries")
+        logging.warning("Missing %d Pfam entries", num_missing_pfam)
 
     return len(pfam_domains)

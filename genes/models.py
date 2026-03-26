@@ -481,8 +481,7 @@ class Gene(PreviewModelMixin, models.Model):
         qs = Gene.objects.filter(identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
         ret = qs.delete()
         if ret:
-            print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
-            print(ret)
+            logging.info("Deleted orphaned %s records: %s", Gene.FAKE_GENE_ID_PREFIX, ret)
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """
@@ -1474,7 +1473,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                 )
                 tvi_by_id.update(TranscriptVersionSequenceInfo._insert_from_genbank_handle(fetch_handle))
             except RuntimeError as e:
-                print(f"Entrez failed w/params: {id_param}")
+                logging.warning("Entrez failed w/params: %s", id_param)
                 if fail_on_error:
                     raise e
 
@@ -2093,10 +2092,10 @@ class PanelAppPanelLocalCache(TimeStampedModel):
             "url": self.panel_app_panel.url,
         }
         if gene_list := GeneList.objects.filter(**gene_list_kwargs).order_by("pk").first():
-            print(f"Reused existing gene list: {gene_list.pk}")
+            logging.info("Reused existing gene list: %s", gene_list.pk)
         else:
             gene_list = GeneList.objects.create(**gene_list_kwargs)
-            print(f"Created gene list: {gene_list.pk}")
+            logging.info("Created gene list: %s", gene_list.pk)
             gene_names_list = []
             for pap_lc_gs in self.panelapppanellocalcachegenesymbol_set.all():
                 confidence_level = int(pap_lc_gs.data["confidence_level"])
@@ -2104,7 +2103,7 @@ class PanelAppPanelLocalCache(TimeStampedModel):
                     gene_symbol = pap_lc_gs.data["gene_data"]["gene_symbol"]
                     gene_names_list.append(gene_symbol)
 
-            print(f"Creating symbols: {gene_names_list}")
+            logging.info("Creating symbols: %s", gene_names_list)
             gene_matcher = GeneSymbolMatcher()
             gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list)
             gene_list.import_status = ImportStatus.SUCCESS
@@ -2113,7 +2112,7 @@ class PanelAppPanelLocalCache(TimeStampedModel):
             # PanelApp gene list should be public
             add_public_group_read_permission(gene_list)
 
-        print(f"Returning gene list: {gene_list.pk}")
+        logging.info("Returning gene list: %s", gene_list.pk)
         return gene_list
 
     def __str__(self):

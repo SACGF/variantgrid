@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from io import StringIO
 
@@ -46,7 +47,7 @@ def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
 
-    print("About to load gencc")
+    logging.info("About to load gencc")
     gencc_df: DataFrame = df_nan_to_none(read_csv(file_or_filename, sep=","))
 
     # only want strong and definitive relationships

@@ -1,4 +1,5 @@
 import json
+import logging
 import urllib
 from typing import Optional
 
@@ -40,7 +41,7 @@ class Keycloak:
 
     def ping(self):
         full_url = self.connector.url(f'/auth/admin/realms/{self.realm}/clients')
-        print(full_url)
+        logging.debug("Keycloak ping URL: %s", full_url)
         response = requests.get(
             auth=self.connector.auth,
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/clients'),
@@ -97,7 +98,7 @@ class Keycloak:
                     parent = existing_id
                 else:
                     if not parent:
-                        print(group_dict)
+                        logging.error("No parent group found for %s (%s), group_dict: %s", missing_group, combined, group_dict)
                         raise ValueError(f'No parent group found for {missing_group} ({combined})')
                     response = requests.post(
                         auth=self.connector.auth,
@@ -172,7 +173,7 @@ class Keycloak:
                 timeout=MINUTE_SECS,
             )
             response.raise_for_status()
-            print(response.text)
+            logging.info("Keycloak add user to group response: %s", response.text)
 
         if user.welcome_email:
             user.welcome_email.send()

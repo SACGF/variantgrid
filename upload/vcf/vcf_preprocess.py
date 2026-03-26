@@ -197,7 +197,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
             pipes[sub_step_name] = p
             stderr_filenames[sub_step_name] = stderr_filename
 
-        print("pipe_commands: %s" % " | ".join([' '.join(x) for x in pipe_commands.values()]))
+        logging.info("pipe_commands: %s", " | ".join([' '.join(x) for x in pipe_commands.values()]))
 
         for sub_step_name, p_cmd in reversed(pipe_commands.items()):
             p = pipes[sub_step_name]

@@ -40,7 +40,6 @@ from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGe
 class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException):
     """ Could not contact server, or response != 200 """
     def __init__(self, url, method, status_code, response_json):
-        print(f"{response_json=}")
         json_str = ", ".join([f"{k}: {v}" for k, v in response_json.items()])
         msg = f"Error contacting ClinGen Allele Registry. {url=}, {method=}, {status_code=}. JSON: {json_str}"
         super().__init__(msg)

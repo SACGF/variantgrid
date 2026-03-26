@@ -108,6 +108,6 @@ def get_job_data(seqauto_run, file_type, qs):
     logging.info("Generated scripts for %d records", len(job_data))
     if job_data:
         data = next(iter(job_data.values()))
-        print(f"A job was written to {data['path']}")
+        logging.info("A job was written to %s", data['path'])
 
     return job_data

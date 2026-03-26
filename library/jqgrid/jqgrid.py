@@ -296,7 +296,7 @@ class JqGrid:
         try:
             items = items.order_by(*order_by_list)
         except FieldError as fe:
-            print(fe)
+            logging.warning(fe)
         return items
 
     def get_paginate_by(self, request):

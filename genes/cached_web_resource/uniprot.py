@@ -42,7 +42,7 @@ def store_uniprot(cached_web_resource: CachedWebResource, file_object):
             str_data = {k: JOIN_STRING.join(v) for k, v in data.items()}
             uniprot_records.append(UniProt(accession=accession, cached_web_resource=cached_web_resource, **str_data))
         else:
-            print(f"{accession} had no data we care about!")
+            logging.warning("%s had no data we care about!", accession)
 
     logging.info("Creating DB records")
     UniProt.objects.bulk_create(uniprot_records, batch_size=2000)
@@ -62,7 +62,7 @@ def extract_uniprot_sprot(f) -> dict:
         # only use Primary (citable) accession number
         accession = record.accessions[0]
         if accession in uniprot:
-            print(f"Adding to existing accession: {accession}")
+            logging.warning("Adding to existing accession: %s", accession)
 
         for c in record.comments:
             if c.startswith(FUNCTION_KEY):

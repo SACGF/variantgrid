@@ -1,3 +1,4 @@
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -44,7 +45,7 @@ class TabBuilder:
 
     def __del__(self):
         if not self.rendered:
-            print("Generated TabBuilder but didn't render it with ui_render_tabs")
+            logging.warning("Generated TabBuilder but didn't render it with ui_render_tabs")
 
     @property
     def tabs_required(self) -> bool:
