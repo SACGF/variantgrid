@@ -489,7 +489,7 @@ def get_snp_matrix_counts(user: User, node_id, version_id):
     for ref, alt, count in count_qs:
         if alt == Variant.REFERENCE_ALT:
             alt = ref
-        counts_df[ref][alt] = count
+        counts_df.loc[alt, ref] = count
     return counts_df
 
 
