@@ -315,7 +315,7 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         has_basecall_data = False
         if os.path.exists(basecalls_dir):
             for f in os.listdir(basecalls_dir):
-                if os.path.isdir(f) and f.startswith("L00"):
+                if os.path.isdir(os.path.join(basecalls_dir, f)) and f.startswith("L00"):
                     has_basecall_data = True
         return has_basecall_data
 
