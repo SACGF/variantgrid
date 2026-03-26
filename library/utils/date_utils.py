@@ -32,8 +32,11 @@ def calculate_age(born: datetime, died: Optional[datetime] = None) -> int:
     return age
 
 
-def get_month_and_year(run_date) -> tuple[int, int]:
+def parse_yymm(run_date) -> tuple[int, int]:
+    """ Parse a 4-digit YYMM value (e.g. 2201 for January 2022) into (month, year). """
     run_date_str = f"{int(run_date):d}"
+    if len(run_date_str) != 4:
+        raise ValueError(f"Expected 4-digit YYMM, got {run_date_str!r}")
     parts = [run_date_str[i:i + 2] for i in range(0, len(run_date_str), 2)]
     return int(parts[1]), int(parts[0])
 

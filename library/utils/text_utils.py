@@ -39,7 +39,10 @@ def split_dict_multi_values(data: dict[str, str], sep: str) -> list[dict[str, st
     num_records = len(any_value.split(sep))
     dict_list = [{} for _ in range(num_records)]
     for k, v in data.items():
-        for i, v_part in enumerate(v.split(sep)):
+        parts = v.split(sep)
+        if len(parts) != num_records:
+            raise ValueError(f"Key {k!r} split into {len(parts)} parts, expected {num_records}")
+        for i, v_part in enumerate(parts):
             dict_list[i][k] = v_part
     return dict_list
 

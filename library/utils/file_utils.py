@@ -45,7 +45,7 @@ def file_to_array(filename, comment: Optional[str] = None, max_lines: Optional[i
     array = []
     f_or_f = open_file_or_filename(filename)
     for i, line in enumerate(f_or_f):
-        if max_lines is not None and i > max_lines:
+        if max_lines is not None and i >= max_lines:
             break
 
         if comment and line.startswith(comment):
