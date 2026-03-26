@@ -19,31 +19,12 @@ Tests 7-8 (PopulationNodeGroupOperationQ) document the intentionally-inverted AN
 they PASS before and after (no bug, just a correctness invariant).
 """
 
-from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, AllVariantsNode
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.filters.population_node import PopulationNode
-from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.models import GenomeBuild
-
-
-# ---------------------------------------------------------------------------
-# Shared setup mixin — creates the minimum DB state needed by all test classes
-# ---------------------------------------------------------------------------
-
-class _AnalysisSetupMixin:
-    """Provides cls.analysis and cls.grch37 via setUpTestData."""
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        user = User.objects.get_or_create(username=f"node_filter_bug_{cls.__name__}")[0]
-        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        get_fake_annotation_version(cls.grch37)
-        cls.analysis = Analysis(genome_build=cls.grch37)
-        cls.analysis.set_defaults_and_save(user)
+from analysis.tests.utils import AnalysisSetupMixin
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +32,7 @@ class _AnalysisSetupMixin:
 # ---------------------------------------------------------------------------
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
-class TestZygosityCountZeroBug(_AnalysisSetupMixin, TestCase):
+class TestZygosityCountZeroBug(AnalysisSetupMixin, TestCase):
     """
     AbstractZygosityCountNode.get_zygosity_count_arg_q_dict():
 
@@ -115,7 +96,7 @@ class TestZygosityCountZeroBug(_AnalysisSetupMixin, TestCase):
 # ---------------------------------------------------------------------------
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
-class TestPopulationNodeModifiesParents(_AnalysisSetupMixin, TestCase):
+class TestPopulationNodeModifiesParents(AnalysisSetupMixin, TestCase):
     """
     PopulationNode.modifies_parents() (population_node.py:60-61):
 
@@ -175,7 +156,7 @@ class TestPopulationNodeModifiesParents(_AnalysisSetupMixin, TestCase):
 # ---------------------------------------------------------------------------
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
-class TestPopulationNodeGroupOperationQ(_AnalysisSetupMixin, TestCase):
+class TestPopulationNodeGroupOperationQ(AnalysisSetupMixin, TestCase):
     """
     PopulationNode uses *inverted* operators for ANY/ALL (see comment in source):
 
