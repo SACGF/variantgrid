@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from django.conf import settings
 
-from library.utils.date_utils import get_month_and_year, get_months_since, month_range
+from library.utils.date_utils import parse_yymm, get_months_since, month_range
 from seqauto.models import SequencingSample, SequencingRun
 
 
@@ -32,11 +32,11 @@ def get_sample_enrichment_kits_df():
             year_series[i] = int(run_date[:2])
             year_month_series[i] = int(run_date[:4])
 
-        start_month, start_year = get_month_and_year(year_month_series.min())
+        start_month, start_year = parse_yymm(year_month_series.min())
 
         month_offset = pd.Series(index=df.index, dtype='i')
         for i, year_month in year_month_series.items():
-            month, year = get_month_and_year(year_month)
+            month, year = parse_yymm(year_month)
             month_offset[i] = get_months_since(start_month, start_year, month, year)
 
         df.loc[:, "year"] = year_series
@@ -50,7 +50,7 @@ def year_formatter_start_to_end(start, end, _year_month_start):
 
 
 def year_month_formatter_start_to_end(start, end, year_month_start):
-    start_month, start_year = get_month_and_year(year_month_start)
+    start_month, start_year = parse_yymm(year_month_start)
     return month_range(start_month, start_year, start, end)
 
 
