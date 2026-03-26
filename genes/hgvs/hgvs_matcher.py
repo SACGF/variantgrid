@@ -501,7 +501,7 @@ class HGVSMatcher:
             if transcript_version.hgvs_ok:
                 result = self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant_coordinate, transcript_version.accession)
                 if result.hgvs_variant.transcript != transcript_version.accession:
-                    msg = f"Error creating HGVS for {variant_coordinate}, LRG '{lrg_identifier}' asked for HGVS " \
+                    msg = f"Error creating HGVS for {variant_coordinate.format_short()}, LRG '{lrg_identifier}' asked for HGVS " \
                           f"'{transcript_version.accession}' but got '{result.hgvs_variant.transcript}'"
                     raise ValueError(msg)
                 # Replace with our LRG
@@ -523,7 +523,7 @@ class HGVSMatcher:
                 problems.append(f"{ca} didn't contain HGVS for '{lrg_identifier}'")
 
         problem_str = ", ".join(problems)
-        raise HGVSImplementationException(f"Could not convert {variant_coordinate} to HGVS using '{lrg_identifier}': {problem_str}")
+        raise HGVSImplementationException(f"Could not convert {variant_coordinate.format_short()} to HGVS using '{lrg_identifier}': {problem_str}")
 
     def variant_coordinate_to_hgvs_used_converter_type_and_method(self, variant_coordinate: VariantCoordinate,
                                                                   transcript_accession: str = None) -> HGVSConverterResult:
@@ -557,7 +557,7 @@ class HGVSMatcher:
                     hgvs_variant = self.hgvs_converter.variant_coordinate_to_c_hgvs(variant_coordinate, transcript_version)
                 elif potential_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(transcript_version.accession):
-                        error_message = f"Could not convert '{variant_coordinate}' ({transcript_version}) using {potential_converter_type}: %s"
+                        error_message = f"Could not convert '{variant_coordinate.format_short()}' ({transcript_version}) using {potential_converter_type}: %s"
                         # TODO: We could also use VEP then add reference bases on our HGVSs
                         try:
                             if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self, require_allele_id=False):
@@ -595,7 +595,7 @@ class HGVSMatcher:
                             method += ": " + errors
                         method_and_errors.append(method)
                     attempts = ", ".join(method_and_errors)
-                    raise HGVSImplementationException(f"Could not convert {variant_coordinate} to HGVS - tried: {attempts}")
+                    raise HGVSImplementationException(f"Could not convert {variant_coordinate.format_short()} to HGVS - tried: {attempts}")
             else:
                 # No methods tried, mustn't have had any transcripts
                 TranscriptVersion.raise_bad_or_missing_transcript(transcript_accession)

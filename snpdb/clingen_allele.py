@@ -435,7 +435,7 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
         require_allele_id - set to False if you don't need ClinGen Allele ID (only using for HGVS)
     """
 
-    rep = f"{variant_coordinate=}"
+    rep = variant_coordinate.format_short()
     _clingen_check_variant_coordinate_length(rep, genome_build, variant_coordinate)
     try:
         # Use variant if we have it in the system so we can lookup cache, or store result
