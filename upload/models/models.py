@@ -686,6 +686,8 @@ class ModifiedImportedVariant(models.Model):
         alt_list = alts.split(",")
         if len(cols) > 4:
             alt_index = int(cols[4]) - 1  # 1-based
+            if alt_index < 0:
+                raise ValueError(f"BCFTOOLS_OLD_VARIANT alt index must be >= 1 (got {cols[4]!r}): {old_variant!r}")
             alt = alt_list[alt_index]
         else:
             if len(alt_list) != 1:
