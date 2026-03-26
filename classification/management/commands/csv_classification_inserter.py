@@ -112,12 +112,19 @@ class Command(BaseCommand):
 
             lab_record_id = data.pop("lab_record_id")
             id_str = f"{lab.group_name}/{lab_record_id}"  # Format is lab_id/]record_id[.version
+            # Handle notes
             internal_use = data.pop("internal_use")
             internal_use_note = data.pop("internal_use_note")
             data[internal_notes_ekey] = {
                 "value": internal_use,
                 "note": internal_use_note,
             }
+            somatic_tumor_cellularity_ekey = "somatic:tumor_cellularity"
+            data[somatic_tumor_cellularity_ekey] = {
+                "value": data.pop(somatic_tumor_cellularity_ekey),
+                "note": data.pop(f"{somatic_tumor_cellularity_ekey}_note"),
+            }
+
 
             record = {
                 "id": id_str,
