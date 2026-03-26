@@ -8,6 +8,8 @@
 # Maternal ID      ID of the mother                             [A-Za-z0-9_]+                          0
 # Sex              Sex of the individual                        1=male, 2=female, other, male, female  other
 # Phenotype        Phenotype                                    [A-Za-z0-9_]+                          -9
+import math
+
 from patients.models_enums import Sex
 
 PED_COLUMNS = ['family', 'sample', 'father', 'mother', 'sex', 'affection']
@@ -30,12 +32,13 @@ AFFECTION_VALUES = {'X': None,
 def get_parent_id(parent_id):
     if parent_id in UNKNOWN_PARENT_VALUES:
         return None
+    if isinstance(parent_id, float) and math.isnan(parent_id):
+        return None
     return parent_id
 
 
 def get_sex(sex):
-    sex = str(sex)
-    return SEX_LOOKUP.get(sex, None)
+    return SEX_LOOKUP.get(str(sex).upper(), None)
 
 
 def get_affection(affection):

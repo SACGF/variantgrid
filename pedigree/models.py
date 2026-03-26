@@ -72,11 +72,11 @@ class PedFileRecord(models.Model):
 
     @property
     def affected(self):
-        if self.affection:
-            description = "affected"
-        else:
-            description = "unaffected"
-        return description
+        if self.affection is True:
+            return "affected"
+        if self.affection is False:
+            return "unaffected"
+        return "unknown"
 
     def __str__(self):
         description = f"{self.sample} ({self.get_sex_display()}/{self.affected})"
