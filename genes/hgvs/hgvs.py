@@ -80,9 +80,9 @@ class PHGVS:
                     p_dot = p_dot[1:-1]
                     is_confirmed = False
                 if match := _P_DOT_PARTS.match(p_dot):
-                    aa_from = protein_letters_1to3_extended.get(match[1], match[1])
+                    aa_from = protein_letters_1to3_extended.get(match[1].upper(), match[1].capitalize())
                     codon = match[2]
-                    aa_to = protein_letters_1to3_extended.get(match[3], match[3])
+                    aa_to = protein_letters_1to3_extended.get(match[3].upper(), match[3].capitalize())
                     extra = match[4]
                     fallback = None  # able to parse everything, no fallback required
 
@@ -175,6 +175,8 @@ class CHGVS:
 
         if c_dot_1 == c_dot_2:
             return True
+        if c_dot_1 is None or c_dot_2 is None:
+            return False
         if (c1_m := CHGVS.C_DOT_PARTS.match(c_dot_1)) and (c2_m := CHGVS.C_DOT_PARTS.match(c_dot_2)):
             if c1_m.group('pos') != c2_m.group('pos'):
                 return False
@@ -370,7 +372,7 @@ class CHGVS:
         o_tran = other.transcript_parts
         if my_tran.identifier != o_tran.identifier:
             cdiff = cdiff | CHGVSDiff.DIFF_TRANSCRIPT_ID
-        elif my_tran.version is not None and o_tran.version is not None and my_tran.version != o_tran.version:
+        elif my_tran.version != o_tran.version:
             cdiff = cdiff | CHGVSDiff.DIFF_TRANSCRIPT_VER
 
         if self.gene and other.gene:

@@ -1119,7 +1119,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         # 'tag' was in the transcript in versions 0.2.12 - 0.2.13
         # It is inside genome build data after 0.2.14
         if tag_list_str := self.genome_build_data.get("tag") or self.data.get("tag"):
-            tag_list = sorted(tag for tag in tag_list_str.split(",") if tag not in REMOVE_TAGS)
+            tag_list = sorted(tag.strip() for tag in tag_list_str.split(",") if tag.strip() not in REMOVE_TAGS)
         return tag_list
 
     @cached_property
