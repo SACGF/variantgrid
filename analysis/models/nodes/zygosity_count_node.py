@@ -35,7 +35,7 @@ class AbstractZygosityCountNode(Model):
             q_and = []
             if min_count is not None:
                 q_and.append(Q(**{column + "__gte": min_count}))
-            if max_count:
+            if max_count is not None:
                 q_and.append(Q(**{column + "__lte": max_count}))
             if q_and:
                 q = reduce(operator.and_, q_and)
@@ -53,12 +53,12 @@ class AbstractZygosityCountNode(Model):
         ]
         name = []
         for column, min_count, max_count in COUNT_COLUMNS:
-            if min_count and max_count:
+            if min_count is not None and max_count is not None:
                 name.append(f"{min_count} <= {column} <= {max_count}")
             else:
-                if min_count:
+                if min_count is not None:
                     name.append(f"{column} >= {min_count}")
-                if max_count:
+                if max_count is not None:
                     name.append(f"{column} <= {max_count}")
         return ", ".join(name)
 
