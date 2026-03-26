@@ -516,7 +516,7 @@ class BulkVEPVCFAnnotationInserter:
     def _merge_cosmic_ids(transcript_data: TranscriptData, custom_vcf_cosmic_id: str):
         """ VEP ships w/COSMIC so we always try and pull it out of the existing variation field
             We also support a custom vcf of COSMIC (for cosmic_count) - this is often more recent """
-        cosmic_ids = set(custom_vcf_cosmic_id.split(VEP_SEPARATOR))
+        cosmic_ids = {c for c in custom_vcf_cosmic_id.split(VEP_SEPARATOR) if c}
         if existing_cosmic_id := transcript_data.get("cosmic_id"):
             cosmic_ids.update(existing_cosmic_id.split(VEP_SEPARATOR))
         transcript_data["cosmic_id"] = VEP_SEPARATOR.join(sorted(cosmic_ids))

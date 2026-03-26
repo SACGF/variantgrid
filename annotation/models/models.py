@@ -1147,6 +1147,7 @@ class AbstractVariantAnnotation(models.Model):
         """ p.Ala2351Thr -> p.A2351T """
 
         aa_3_to_1 = invert_dict(protein_letters_1to3)
+        aa_3_to_1["Ter"] = "*"  # BioPython omits stop codon; HGVS uses Ter → *
         aa_3_regex_or = "|".join(aa_3_to_1)
 
         protein_aa1 = protein_string
