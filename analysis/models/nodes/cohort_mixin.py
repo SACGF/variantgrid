@@ -142,7 +142,6 @@ class CohortMixin:
                 q_and.append(q_sub)
             q_and.extend(self._get_q_and_list())
             if q_and:
-                print(q_and)
                 q = reduce(operator.and_, q_and)
                 arg_q_dict[cgc.cohortgenotype_alias] = {str(q): q}
         else:
