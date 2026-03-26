@@ -62,8 +62,8 @@ class PatientForm(forms.ModelForm):
 
             changed = []
             for f in self.changed_data:
-                old_val = self.old_patient_data.get(f)
-                if old_val:  # Only care about fields on the patient model
+                if f in self.old_patient_data:  # Only care about fields on the patient model
+                    old_val = self.old_patient_data[f]
                     new_val = getattr(patient, f)
                     changed.append(f"{f}: '{old_val}' to '{new_val}'")
 

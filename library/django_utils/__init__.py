@@ -192,7 +192,7 @@ def ensure_timezone_aware(datetime_date):
 def ensure_mutally_exclusive_fields_not_set(obj, field_a, field_b):
     a_val = getattr(obj, field_a)
     b_val = getattr(obj, field_b)
-    if a_val and b_val:
+    if a_val is not None and b_val is not None:
         msg = f"{obj} ({obj.pk}): You cannot set both fields '{field_a}' ('{a_val}') and '{field_b}' ('{b_val}') at the same time."
         raise ValueError(msg)
 

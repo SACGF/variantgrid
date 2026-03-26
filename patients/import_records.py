@@ -101,6 +101,7 @@ def parse_boolean(row, column, validation_messages, nullable=True):
         else:
             message = f"{column}: couldn't interpret boolean from '{value}'"
             validation_messages.append(message)
+            value = None
     else:
         if not nullable:
             message = f"{column}: Non-nullable boolean field was None"
@@ -263,7 +264,7 @@ def process_record(patient_records, record_id, row):
                 patient._deceased = patient_deceased
                 patient.save()
                 description = "Updated patient as deceased = True"
-        elif not patient_deceased:
+        elif patient_deceased is False:
             patient.date_of_death = None
             patient._deceased = patient_deceased
             patient.save(check_patient_text_phenotype=False)
@@ -365,7 +366,7 @@ def process_record(patient_records, record_id, row):
             specimen.received_date = specimen_received_date
             specimen.mutation_type = specimen_mutation_type
             specimen.nucleic_acid_source = specimen_nucleic_acid_source
-            specimen.age_at_collection = specimen_age_at_collection
+            specimen._age_at_collection_date = specimen_age_at_collection
 
             specimen.save()
     else:

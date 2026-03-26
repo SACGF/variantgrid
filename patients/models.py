@@ -191,6 +191,8 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         if self.date_of_death:
             dod = self.date_of_death.strftime(settings.DATE_FORMAT)
             return f"dead (D.O.D. {dod})"
+        if self._deceased:
+            return "dead"
         return "alive"
 
     @property
@@ -303,7 +305,7 @@ class Specimen(models.Model):
 
     @property
     def age_at_collection_date(self):
-        if self._age_at_collection_date:
+        if self._age_at_collection_date is not None:
             age = self._age_at_collection_date
         else:
             age = None
@@ -486,7 +488,7 @@ class Clinician(models.Model):
     def cleaned_get_or_create(clinician_string):
         try:
             clinician = Clinician.match(clinician_string)
-        except Exception:
+        except Clinician.DoesNotExist:
             kwargs = {}
             name = nameparser.HumanName(clinician_string)
             if name.title:
