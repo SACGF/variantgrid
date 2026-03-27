@@ -640,6 +640,7 @@ def node_cancel_load(request, analysis_id, node_id):
 
 
 def node_graph(request, analysis_id, node_id, graph_type_id, cmap):
+    """ This is used in node_data_graph """
     get_node_subclass_or_404(request.user, node_id)  # Permission check
     node_graph_type = NodeGraphType.objects.get(pk=graph_type_id)
     cached_graph = graphcache.async_graph(node_graph_type.graph_class, cmap, node_id)
@@ -647,6 +648,7 @@ def node_graph(request, analysis_id, node_id, graph_type_id, cmap):
 
 
 def column_summary_boxplot(request, analysis_id, node_id, label, variant_column):
+    """ This is used in node_column_summary """
     get_node_subclass_or_404(request.user, node_id)  # Permission check
     graph_class_name = full_class_name(ColumnBoxplotGraph)
     cached_graph = graphcache.async_graph(graph_class_name, node_id, label, variant_column)

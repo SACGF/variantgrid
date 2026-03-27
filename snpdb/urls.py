@@ -160,9 +160,6 @@ urlpatterns = [
     # For Uptime Robot
     path('uptime_check', views.view_uptime, name='uptime_check'),
 
-    # Debug dev help
-    path('ajax_hello_world/<str:data>', views.ajax_hello_world, name='ajax_hello_world'),
-
     path_standard('api-auth/', include('rest_framework.urls')),
     path('api/sample_variant_zygosity/<int:sample_id>/<int:variant_id>', views_rest.VariantZygosityForSampleView.as_view(), name='variant_zygosity_for_sample'),
     path('api/trio/<pk>', views_rest.TrioView.as_view(), name='api_view_trio'),
