@@ -56,7 +56,7 @@ class RematchRequest:
             raise ValueError(f"Could not find Genome Patch Version {self.genome_build_str}")
         return genome_build_patch_ver
 
-    @cached_property
+    @property
     def imported_allele_info(self) -> ImportedAlleleInfo:
         iai = ImportedAlleleInfo.objects.filter(
             Q(imported_c_hgvs=self.c_hgvs) | Q(imported_g_hgvs=self.c_hgvs),
@@ -66,9 +66,11 @@ class RematchRequest:
             raise ValueError(f"Could not find Imported Allele Info for {self.genome_build_str} {self.c_hgvs}")
         return iai
 
-    def validate(self):
+    def validate(self, nuke: bool = False):
         # make sure imported allele info can be found
         _ = self.imported_allele_info
+        if nuke:
+            return
 
         # if hard rematch (where we're deleting an allele)
         if self.rematch_level == RematchLevel.HARD:
@@ -79,8 +81,13 @@ class RematchRequest:
                     ces_ids = " ,".join(str(ce.pk) for ce in ces)
                     raise ValueError(f"Can't rematch {self.imported_allele_info} HARD - Discordance Report {dr}, ClinVarExports - {ces_ids}")
 
-    def prep_if_hard(self):
+    def prep_if_hard(self, nuke: bool = False):
         if self.rematch_level == RematchLevel.HARD:
+            if nuke:
+                if allele := self.imported_allele_info.allele:
+                    DiscordanceReport.objects.filter(clinical_context__allele=allele).delete()
+                    ClinVarExport.objects.filter(clinvar_allele__allele=allele).delete()
+
             ResolvedVariantInfo.objects.filter(allele_info=self.imported_allele_info).delete()
             if allele := self.imported_allele_info.allele:
                 Classification.objects.filter(allele=allele).update(allele=None)
@@ -96,14 +103,15 @@ class Command(BaseCommand):
                             help="A csv file with columns identifying which Allele Infos to rematch")
         parser.add_argument('--file_commit', action='store_true',
                             help="provide if you")
+        parser.add_argument("--nuke", action='store_true', help="Will delete ClinVarExports and DiscordanceReports that are linked")
 
     def handle(self, *args, **options):
         if options["link_unlinked"]:
             self.link_all_unlinked()
         if file := options["file"]:
-            self.rematch_file(file, commit=options["file_commit"])
+            self.rematch_file(file, commit=options["file_commit"], nuke=options["nuke"])
 
-    def rematch_file(self, file_name: str, commit: bool = False):
+    def rematch_file(self, file_name: str, commit: bool = False, nuke: bool = False):
         print(f"Committing changes = {commit}")
         df = pd.read_csv(file_name, sep=",", low_memory=False)
 
@@ -112,7 +120,7 @@ class Command(BaseCommand):
         for idx, row in df.iterrows():
             rematch_request = RematchRequest.from_row(row)
             try:
-                rematch_request.validate()
+                rematch_request.validate(nuke=nuke)
             except Exception as ex:
                 print(ex)
                 passed_validation = False
@@ -122,9 +130,11 @@ class Command(BaseCommand):
             print("1 or more records failed validation, exiting")
             return
 
+        print("Validation complete")
+
         if commit:
             for rematch_request in rematch_requests:
-                rematch_request.prep_if_hard()
+                rematch_request.prep_if_hard(nuke=nuke)
 
             batch: list[int] = []
             for rematch_request in rematch_requests:
