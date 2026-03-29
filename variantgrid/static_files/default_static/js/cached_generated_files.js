@@ -33,7 +33,7 @@ function poll_graph_status(graph_selector, poll_url, delete_url) {
 
             graph_selector.removeClass('graph-loading').addClass("graph-failure").click(function(){
 				$(this).removeClass("graph-failure");
-				const retryHTML = "<p>Maybe you can <a href='javascript:retry_generate_graph(" + data.cgf_id + ")'>try again?</a></p>";
+				const retryHTML = "<p>Maybe you can <a href='javascript:retry_generate_graph(\"" + data.cgf_id + "\")'>try again?</a></p>";
 				$(this).html("<p>Graph generation failed with error message:</p><b>" + data.exception + "</b>");
 				$(this).append(retryHTML);
             });
