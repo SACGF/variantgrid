@@ -1,3 +1,4 @@
+from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.test import TestCase
 
@@ -16,6 +17,8 @@ class VariantTestCase(TestCase):
         cls.ref_variant = slowly_create_test_variant("3", 128198980, 'A', 'A', cls.grch37)
         cls.deletion_variant = slowly_create_test_variant("3", 128198990, 'GAG', 'G', cls.grch37)
         cls.insertion_variant = slowly_create_test_variant("3", 128198995, 'G', 'GAG', cls.grch37)
+
+        cls.contig_1 = cls.grch37.contigs.get(name="1")
 
         # Need this for HGVSMatcher in VariantCoordinate - that may be removed in future
         get_fake_annotation_version(cls.grch37)
@@ -110,6 +113,29 @@ class VariantTestCase(TestCase):
         vc = vc.as_internal_canonical_form(self.grch37)
         self.assertIsNone(vc.svlen)
 
+    def test_inv_at_exactly_symbolic_alt_size_stays_explicit(self):
+        # INV intentionally uses strictly > (not >=) so an inversion of exactly
+        # VARIANT_SYMBOLIC_ALT_SIZE stays as an explicit sequence.  Changing
+        # the threshold would require re-checking/converting existing INV records.
+        # "AC" repeats have reverse complement "GT" repeats — non-palindromic.
+        size = settings.VARIANT_SYMBOLIC_ALT_SIZE
+        ref = ("AC" * (size // 2 + 1))[:size]
+        vc = VariantCoordinate(chrom="1", position=1_000_000, ref=ref, alt=reverse_complement(ref))
+        vc_s = vc.as_internal_symbolic(self.grch37)
+        self.assertNotEqual(vc_s.alt, VCFSymbolicAllele.INV,
+            "INV threshold was deliberately left as strictly > (not >=). If you changed it to >=, "
+            "existing production databases may contain explicit INV sequences of exactly "
+            f"VARIANT_SYMBOLIC_ALT_SIZE={size} bp that will no longer round-trip correctly. "
+            "You must write a migration to convert those records to <INV> symbolic form before "
+            "changing this threshold.")
+
+    def test_inv_above_symbolic_alt_size_becomes_symbolic(self):
+        size = settings.VARIANT_SYMBOLIC_ALT_SIZE + 1
+        ref = ("AC" * (size // 2 + 1))[:size]
+        vc = VariantCoordinate(chrom="1", position=1_000_000, ref=ref, alt=reverse_complement(ref))
+        vc_s = vc.as_internal_symbolic(self.grch37)
+        self.assertEqual(vc_s.alt, VCFSymbolicAllele.INV)
+
     def test_as_internal_canonical_form(self):
         # test for issue #1214 - however we get there, it should end up the same
         vc_symbolic = VariantCoordinate(chrom='1', position=1000000, ref='T', alt='<DUP>', svlen=999)
@@ -146,3 +172,47 @@ class VariantTestCase(TestCase):
         vc_lower = VariantCoordinate.from_string(variant_string_lower, self.grch37)
         vc_upper = VariantCoordinate.from_string(variant_string_lower.upper(), self.grch37)
         self.assertEqual(vc_lower, vc_upper, msg="symbolic from string case insensitive")
+
+    # Variant.validate() — position boundary checks
+
+    def test_validate_last_base_of_contig_is_valid(self):
+        # Regression: validate() used `position < contig.length` (strict), rejecting the last base.
+        last_base = self.contig_1.length
+        errors = Variant.validate(self.grch37, "1", last_base)
+        self.assertEqual(errors, [],
+            f"Position {last_base} is valid but validate() returned: {errors}")
+
+    def test_validate_position_beyond_contig_is_invalid(self):
+        errors = Variant.validate(self.grch37, "1", self.contig_1.length + 1)
+        self.assertGreater(len(errors), 0)
+
+    # Variant Q-object classifiers vs instance properties
+
+    def _in_qs(self, q, variant):
+        return Variant.objects.filter(q, pk=variant.pk).exists()
+
+    def test_snp_q_matches_snp(self):
+        self.assertTrue(self._in_qs(Variant.get_snp_q(), self.variant))
+
+    def test_snp_q_does_not_match_reference(self):
+        self.assertFalse(self._in_qs(Variant.get_snp_q(), self.ref_variant))
+
+    def test_is_deletion_property_agrees_with_q(self):
+        for v in (self.deletion_variant, self.variant, self.insertion_variant, self.ref_variant):
+            self.assertEqual(v.is_deletion, self._in_qs(Variant.get_deletion_q(), v),
+                f"{v}: is_deletion disagrees with get_deletion_q()")
+
+    def test_is_insertion_property_agrees_with_q(self):
+        for v in (self.insertion_variant, self.variant, self.deletion_variant, self.ref_variant):
+            self.assertEqual(v.is_insertion, self._in_qs(Variant.get_insertion_q(), v),
+                f"{v}: is_insertion disagrees with get_insertion_q()")
+
+    def test_is_reference_property_agrees_with_q(self):
+        for v in (self.ref_variant, self.variant, self.deletion_variant, self.insertion_variant):
+            self.assertEqual(v.is_reference, self._in_qs(Variant.get_reference_q(), v),
+                f"{v}: is_reference disagrees with get_reference_q()")
+
+    def test_indel_q_matches_deletion_and_insertion_not_snp(self):
+        self.assertTrue(self._in_qs(Variant.get_indel_q(), self.deletion_variant))
+        self.assertTrue(self._in_qs(Variant.get_indel_q(), self.insertion_variant))
+        self.assertFalse(self._in_qs(Variant.get_indel_q(), self.variant))

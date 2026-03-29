@@ -604,7 +604,7 @@ class Variant(PreviewModelMixin, models.Model):
         try:
             contig = genome_build.chrom_contig_mappings[chrom]
             position = int(position)
-            if not (0 < position < contig.length):
+            if not (0 < position <= contig.length):
                 errors.append(f'position "{position}" is outside contig "{contig}" length={contig.length}')
         except KeyError:
             errors.append(f"Chromsome/contig '{chrom}' not a valid in genome build {genome_build}")
