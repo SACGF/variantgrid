@@ -125,6 +125,7 @@ let VCLinks = (function() {
             links.push(this.makeLink('Clin Trials (Gene)', 'https://clinicaltrials.gov', '/search?term=@@', SpecialEKeys.GENE_SYMBOL, 'ClinicalTrials.gov'));
             links.push(this.makeLink('Clinvar Variant', 'https://www.ncbi.nlm.nih.gov', '/clinvar/variation/@@', SpecialEKeys.CLINVAR_VARIANTION_ID));
             links.push(this.makeLink('Cosmic (Gene)', 'https://cancer.sanger.ac.uk/cosmic', '/gene/analysis?ln=@@', SpecialEKeys.GENE_SYMBOL));
+            links.push(this.makeLink('AlphaFold (Gene)', 'https://alphafold.ebi.ac.uk', '/search/text/@@', SpecialEKeys.GENE_SYMBOL, 'AlphaFold Protein Structure Database'));
             links.push(this.makeLink('GHR (Gene)', 'https://ghr.nlm.nih.gov', '/gene/@@', SpecialEKeys.GENE_SYMBOL, 'Genetics Home Reference'));
             // commenting out genomizer due to build confusion
             //links.push(this.generateGenomizer());
