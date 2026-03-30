@@ -8,7 +8,7 @@
     function classificationGroupingRedraw() {
         $('#vc-datatable').DataTable().ajax.reload();
     }
-    let debounceClassificationGroupingRedraw = debounce(classificationGroupingRedraw);
+    var debounceClassificationGroupingRedraw = debounce(classificationGroupingRedraw);
 
     $(document).ready(() => {
         $('.filter').on("change", function() {
