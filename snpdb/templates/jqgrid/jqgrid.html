@@ -91,6 +91,18 @@ If we want to use jqgrid cdn, works for half
 			    const pagerId = '#{{ pager_id }}';
 			    data["pager"] = pagerId;
 
+			    const existingLoadComplete = data.loadComplete;
+			    data.loadComplete = function(responseData) {
+			        if (responseData.approximate_records) {
+			            $(pagerId).find('.ui-paging-info').each(function () {
+			                $(this).text($(this).text().replace(/\d[\d,]*\s*$/, responseData.approximate_records));
+			            });
+			        }
+			        if (existingLoadComplete) {
+			            existingLoadComplete.call(this, responseData);
+			        }
+			    };
+
 			{% if grid_complete %}
 				let grid_complete = {{ grid_complete | safe }};
 				data["gridComplete"] = grid_complete;

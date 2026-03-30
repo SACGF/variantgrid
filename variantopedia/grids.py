@@ -1,8 +1,11 @@
 import operator
+import re
 from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
+from django.core.paginator import Paginator, InvalidPage
+from django.db import connection
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -19,6 +22,16 @@ from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, T
 from snpdb.models.models_user_settings import UserSettings, UserGridConfig
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from variantopedia.interesting_nearby import get_nearby_qs
+
+
+def _format_approx_count(n: int) -> str:
+    """Format a large approximate count as '~100M', '~1.2B', etc."""
+    for threshold, suffix in ((1_000_000_000, 'B'), (1_000_000, 'M'), (1_000, 'K')):
+        if n >= threshold:
+            rounded = n / threshold
+            fmt = f"{rounded:.0f}" if rounded >= 10 else f"{rounded:.1f}"
+            return f"~{fmt}{suffix}"
+    return f"~{n}"
 
 
 class VariantWikiColumns(DatatableConfig[VariantWiki]):
@@ -72,7 +85,7 @@ class AllVariantsGrid(AbstractVariantGrid):
         update_dict_of_dict_values(self._overrides, override)
         self.vzcc = VariantZygosityCountCollection.get_global_germline_counts()
         self.extra_filters = kwargs.pop("extra_filters", {})
-        self.extra_config.update({'sortname': self.vzcc.non_ref_call_alias,
+        self.extra_config.update({'sortname': 'id',
                                   'sortorder': "desc",
                                   'shrinkToFit': False})
 
@@ -94,6 +107,43 @@ class AllVariantsGrid(AbstractVariantGrid):
             filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gt": 0}))
 
         return reduce(operator.and_, filter_list)
+
+    def _get_approx_count(self, qs) -> int:
+        sql, params = qs.query.sql_with_params()
+        with connection.cursor() as cursor:
+            cursor.execute(f"EXPLAIN {sql}", params)
+            first_line = cursor.fetchone()[0]
+        match = re.search(r'rows=(\d+)', first_line)
+        if not match:
+            raise ValueError(f"Could not parse row estimate from EXPLAIN output: {first_line!r}")
+        return int(match.group(1))
+
+    def paginate_items(self, request, items):
+        paginate_by = self.get_paginate_by(request)
+        if not paginate_by:
+            return None, None, items
+
+        try:
+            estimate = self._get_approx_count(items)
+        except Exception:
+            return super().paginate_items(request, items)
+
+        paginator = Paginator(items, paginate_by, allow_empty_first_page=self.allow_empty)
+        # Pre-set the cached_property to avoid COUNT(*) on a huge table
+        paginator.__dict__['count'] = estimate
+
+        page_num = request.GET.get('page', 1)
+        try:
+            page_number = int(page_num)
+            page = paginator.page(page_number)
+        except (ValueError, InvalidPage):
+            page = paginator.page(1)
+        return paginator, page, page.object_list
+
+    def get_data(self, request) -> dict:
+        data = super().get_data(request)
+        data['approximate_records'] = _format_approx_count(data['records'])
+        return data
 
 
 class NearbyVariantsGrid(AbstractVariantGrid):
