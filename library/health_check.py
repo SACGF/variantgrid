@@ -6,6 +6,7 @@ from typing import Union, Optional, Type
 
 import django.dispatch
 from django.db.models import Model, Q
+from django.utils.html import format_html
 from django.utils.timezone import localtime
 
 from library.log_utils import NotificationBuilder
@@ -84,14 +85,15 @@ class HealthCheckRecentActivity(HealthCheckStat):
         return result
 
     def as_html(self):
-        amount_str = self.amount
         if self.amount:
-            amount_str = f"<span class='health-value'>{amount_str}</span>"
-        result = f"{amount_str} {self.name}"
+            amount_html = format_html("<span class='health-value'>{}</span>", self.amount)
+        else:
+            amount_html = format_html("{}", self.amount)
+        result = format_html("{} {}", amount_html, self.name)
         if self.sub_type:
-            result = f"{result} {self.sub_type}"
+            result = format_html("{} {}", result, self.sub_type)
         if self.extra:
-            result = f"{result} {self.extra}"
+            result = format_html("{} {}", result, self.extra)
         return result
 
     @classmethod
@@ -200,12 +202,13 @@ class HealthCheckTotalAmount(HealthCheckStat):
         return result
 
     def as_html(self):
-        amount_str = self.amount
         if self.amount:
-            amount_str = f"<span class='health-value'>{amount_str:,}</span>"
-        result = f"{amount_str} {self.name}"
+            amount_html = format_html("<span class='health-value'>{:,}</span>", self.amount)
+        else:
+            amount_html = format_html("{}", self.amount)
+        result = format_html("{} {}", amount_html, self.name)
         if self.extra:
-            result = f"{result} - {self.extra}"
+            result = format_html("{} - {}", result, self.extra)
         return result
 
     @classmethod
@@ -226,7 +229,7 @@ class HealthCheckCapacity(HealthCheckStat):
         return f"{emoji} {self.name} ({self.used} used, {self.available} available)"
 
     def as_html(self):
-        return f"{self.name} ({self.used} used, {self.available} available)"
+        return format_html("{} ({} used, {} available)", self.name, self.used, self.available)
 
     @classmethod
     def sort_order(cls):
@@ -269,8 +272,8 @@ class HealthCheckAge(HealthCheckStat):
 
     def as_html(self):
         if not self.last_performed_tz:
-            return f"<span class='health-value'>Never Run</span> {self.name}"
-        return f"<span class='health-value'><b>{self.age_in_days}</b> days old</span> {self.name}"
+            return format_html("<span class='health-value'>Never Run</span> {}", self.name)
+        return format_html("<span class='health-value'><b>{}</b> days old</span> {}", self.age_in_days, self.name)
 
     _MULTIPLIER_TO_FACE = {
         0: ":simple_smile:",
