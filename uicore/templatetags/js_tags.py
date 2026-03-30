@@ -20,6 +20,15 @@ from uicore.json.validated_json import ValidatedJson
 register = template.Library()
 
 
+@register.simple_tag
+def dal_media():
+    """ Render DAL (Django Autocomplete Light) CSS and JS once globally.
+        Loaded in base.html rather than via form.media to prevent duplicate scripts
+        when multiple autocomplete forms appear on the same page. """
+    from dal_select2.widgets import ModelSelect2
+    return mark_safe(str(ModelSelect2(url='').media))
+
+
 def jsonify_for_js(json_me, pretty=False) -> Union[str, Any]:
     if isinstance(json_me, str):
         json_me = json_me.replace('"', '\"')
