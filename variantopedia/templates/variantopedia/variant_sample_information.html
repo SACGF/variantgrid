@@ -250,7 +250,8 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'variant_genotypes_' + slug + '.csv';
+            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            a.download = 'variant_genotypes_' + slug + '_' + dateStr + '.csv';
             a.click();
             URL.revokeObjectURL(url);
         }
