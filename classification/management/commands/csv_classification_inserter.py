@@ -73,7 +73,7 @@ class Command(BaseCommand):
                     inserter.insert(
                         record,
                         # record_id=record.pop("record_id"),
-                        submission_source=SubmissionSource.API,
+                        # submission_source=SubmissionSource.API,
                     )
                     count = count + 1
                     if count >= max_records:
@@ -120,7 +120,7 @@ class Command(BaseCommand):
 
             lab_record_id = data.pop("lab_record_id")
             id_str = f"{lab.group_name}/{lab_record_id}" # Format is lab_id/]record_id[.version
-            # Handle notes
+            # Handle notes - need to pop out some ekeys and insert as dicts w/notes
             internal_use = data.pop("internal_use")
             internal_use_note = data.pop("internal_use_note")
             data[internal_notes_ekey] = {
@@ -132,7 +132,6 @@ class Command(BaseCommand):
                 "value": data.pop(somatic_tumor_cellularity_ekey),
                 "note": data.pop(f"{somatic_tumor_cellularity_ekey}_note"),
             }
-
 
             record = {
                 "id": id_str,
