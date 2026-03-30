@@ -248,7 +248,7 @@ class ShareLevel(ChoicesEnum):
     # These strings have to be <= 16 characters for choice field
     CURRENT_USER = 'user'
     LAB = 'lab'
-    INSTITUTION = 'institution'
+    INSTITUTION = 'organisation'
     ALL_USERS = 'logged_in_users'
     PUBLIC = 'public'
 
@@ -298,6 +298,13 @@ class ShareLevel(ChoicesEnum):
     def icon(self) -> str:
         return f'icons/share_level/{self.value}.png'
 
+    @classmethod
+    def _missing_(cls, value):
+        # Backwards compatibility: old DB rows used 'institution' before the rename to 'organisation'
+        if value == 'institution':
+            return cls.INSTITUTION
+        return None
+
     def __str__(self):
         return self.value
 
@@ -318,6 +325,10 @@ class ShareLevel(ChoicesEnum):
             index = source
         elif str(source).isnumeric():
             index = int(source)
+
+        # Backwards compatibility: old DB rows and old API clients used 'institution'
+        if str(source) == 'institution':
+            return ShareLevel.INSTITUTION
 
         for sl in ShareLevel.ALL_LEVELS:
             if sl.value == str(source) or sl.index == index:
