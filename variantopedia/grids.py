@@ -352,5 +352,6 @@ class VariantTagDetailColumns(DatatableConfig[VariantTag]):
         # Not going to use anything build specific so don't care about build
         genome_build = variant.any_genome_build
         qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+        qs = VariantTag.filter_for_user(self.user, queryset=qs)
         qs = qs.filter(tag=tag)
         return qs
