@@ -158,6 +158,10 @@ ul.customicons .ui-icon {
     background-image: url(/static/images/node_icons/trio.png);
 }
 
+.ui-icon.QuadNode {
+    background-image: url(/static/images/node_icons/quad.png);
+}
+
 .ui-icon.FilterNode { 
     background-image: url(/static/images/node_icons/filter.png);
 }

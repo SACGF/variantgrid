@@ -8,12 +8,14 @@
 // Sex convention matches samplenode.js: sex === 'F' → circle, anything else → rect.
 // Father/mother sex is definitional (always rect/circle respectively).
 // Proband is always rendered filled (they are the affected individual under study).
+//
+// The SVG occupies the bottom 80% of the node; the top 20% is left for the text label.
 
-const PEDIGREE_SHAPE_SIZE    = 14;
+const PEDIGREE_SHAPE_SIZE     = 10;
 const PEDIGREE_AFFECTED_FILL  = "#222";
 const PEDIGREE_UNAFFECTED_FILL = "#fff";
-const PEDIGREE_STROKE       = "#333";
-const PEDIGREE_STROKE_WIDTH  = 1.5;
+const PEDIGREE_STROKE         = "#333";
+const PEDIGREE_STROKE_WIDTH   = 1.5;
 
 function pedigreeRect(svg, cx, cy, size, filled) {
     const half = size / 2;
@@ -48,16 +50,19 @@ function pedigreeLine(svg, x1, y1, x2, y2) {
 
 // ── TrioNode ──────────────────────────────────────────────────────────────────
 //
+// Node: 64×50px.  SVG covers the bottom 80% (40px); shapes fit within 64×40.
+//
 //   ■ ———————— ●       father (rect) left, mother (circle) right
 //        |
 //        ■/●           proband (sex-aware), always filled
 
-const TRIO_W = 64, TRIO_H = 50;
+const TRIO_W = 64, TRIO_H = 40;  // SVG canvas = 80% of node height
 
 function createTrioNode() {
     const div = $('<div/>').addClass("window default-node-container");
 
-    const svgEl = $('<div class="trio-pedigree-svg"/>').css({position: 'absolute', top: 0, left: 0});
+    // top: 20% leaves room for the text label
+    const svgEl = $('<div class="trio-pedigree-svg"/>').css({position: 'absolute', top: '20%', left: 0});
     div.append(svgEl);
 
     const nodeOverlay = $('<div/>').addClass("node-overlay").css({
@@ -72,8 +77,8 @@ function createTrioNode() {
         const svg = d3.select($('.trio-pedigree-svg', this)[0])
             .append("svg:svg").attr("width", TRIO_W).attr("height", TRIO_H);
 
-        const fatherX = 16, motherX = 48, parentsY = 16;
-        const probandX = 32, probandY = 40;
+        const fatherX = 16, motherX = 48, parentsY = 9;
+        const probandX = 32, probandY = 33;
         const midX = (fatherX + motherX) / 2;
 
         pedigreeLine(svg, fatherX, parentsY, motherX, parentsY);
@@ -90,17 +95,19 @@ function createTrioNode() {
 
 // ── QuadNode ──────────────────────────────────────────────────────────────────
 //
+// Node: 80×55px.  SVG covers the bottom 80% (44px); shapes fit within 80×44.
+//
 //   ■ ————————————— ●   father (rect) left, mother (circle) right
 //            |
 //      ■/● ——|—— ■/●   sibling (left, sex-aware, affected flag),
 //                       proband (right, sex-aware, always filled)
 
-const QUAD_W = 80, QUAD_H = 55;
+const QUAD_W = 80, QUAD_H = 44;  // SVG canvas = 80% of node height
 
 function createQuadNode() {
     const div = $('<div/>').addClass("window default-node-container");
 
-    const svgEl = $('<div class="quad-pedigree-svg"/>').css({position: 'absolute', top: 0, left: 0});
+    const svgEl = $('<div class="quad-pedigree-svg"/>').css({position: 'absolute', top: '20%', left: 0});
     div.append(svgEl);
 
     const nodeOverlay = $('<div/>').addClass("node-overlay").css({
@@ -115,8 +122,8 @@ function createQuadNode() {
         const svg = d3.select($('.quad-pedigree-svg', this)[0])
             .append("svg:svg").attr("width", QUAD_W).attr("height", QUAD_H);
 
-        const fatherX = 16, motherX = 64, parentsY = 14;
-        const siblingX = 24, probandX = 56, childrenY = 42;
+        const fatherX = 12, motherX = 68, parentsY = 9;
+        const siblingX = 20, probandX = 60, childrenY = 37;
         const dropX = (fatherX + motherX) / 2;
         const barY = (parentsY + childrenY) / 2;
 
