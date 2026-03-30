@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from analysis.models.nodes.analysis_node import Analysis
 from analysis.models.nodes.sources import SampleNode, CohortNode, TrioNode, PedigreeNode
+from analysis.models.nodes.sources.quad_node import QuadNode
 
 
 def sort_analyses_by_date_and_merge_details(all_analysis_details) -> list[tuple[Analysis, str]]:
@@ -43,6 +44,15 @@ def get_related_analysis_details_for_trio(user, trios) -> list[tuple[Analysis, s
                                              trio__in=trios).select_related("analysis", "trio"):
         all_analysis_details[trio_node.analysis].add(str(trio_node.trio))
 
+    return sort_analyses_by_date_and_merge_details(all_analysis_details)
+
+
+def get_related_analysis_details_for_quad(user, quads) -> list[tuple[Analysis, str]]:
+    all_analysis_details = defaultdict(set)
+    analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
+    for quad_node in QuadNode.objects.filter(analysis__in=analyses_ids,
+                                             quad__in=quads).select_related("analysis", "quad"):
+        all_analysis_details[quad_node.analysis].add(str(quad_node.quad))
     return sort_analyses_by_date_and_merge_details(all_analysis_details)
 
 

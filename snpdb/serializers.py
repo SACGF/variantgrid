@@ -3,7 +3,7 @@ from typing import Any
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from snpdb.models import Variant, Locus, Trio
+from snpdb.models import Variant, Locus, Trio, Quad
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_genome import GenomeBuild, Contig
 from snpdb.models.models_variant import Allele, VariantAllele
@@ -121,6 +121,29 @@ class TrioSerializer(serializers.ModelSerializer):
 
     def get_proband(self, obj):
         return obj.proband.name
+
+
+class QuadSerializer(serializers.ModelSerializer):
+    mother = serializers.SerializerMethodField()
+    father = serializers.SerializerMethodField()
+    proband = serializers.SerializerMethodField()
+    sibling = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Quad
+        fields = '__all__'
+
+    def get_mother(self, obj):
+        return obj.mother.name
+
+    def get_father(self, obj):
+        return obj.father.name
+
+    def get_proband(self, obj):
+        return obj.proband.name
+
+    def get_sibling(self, obj):
+        return obj.sibling.name
 
 
 class ProjectSerializer(serializers.ModelSerializer):

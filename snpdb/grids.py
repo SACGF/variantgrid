@@ -22,7 +22,7 @@ from library.utils import calculate_age, JsonDataType
 from ontology.models import OntologyService
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
-    GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
+    GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, Quad, UserGridConfig, GenomeBuild, ClinGenAllele, \
     VariantZygosityCountCollection, TagColorsCollection, LiftoverRun, AlleleConversionTool, AlleleLiftover, \
     ProcessingStatus, Allele
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
@@ -318,6 +318,39 @@ class TriosListColumns(DatatableConfig[Trio]):
 
     def filter_queryset(self, qs: QuerySet[Trio]) -> QuerySet[Trio]:
         user_grid_config = UserGridConfig.get(self.user, 'Trios')
+        if not user_grid_config.show_group_data:
+            qs = qs.filter(user=self.user)
+        return qs
+
+
+class QuadsListColumns(DatatableConfig[Quad]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='id', visible=False),
+            RichColumn(key='name', label='Name', orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='user__username', label='User', orderable=True),
+            RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn(key='mother__sample__name', label='Mother', orderable=True),
+            RichColumn(key='mother_affected', label='Mother Affected', orderable=True),
+            RichColumn(key='father__sample__name', label='Father', orderable=True),
+            RichColumn(key='father_affected', label='Father Affected', orderable=True),
+            RichColumn(key='proband__sample__name', label='Proband', orderable=True),
+            RichColumn(key='sibling__sample__name', label='Sibling', orderable=True),
+            RichColumn(key='sibling_affected', label='Sibling Affected', orderable=True),
+            RichColumn(key='id', name='delete', label='', orderable=False,
+                       renderer=self.render_delete,
+                       client_renderer='TableFormat.deleteRow'),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[Quad]:
+        return Quad.filter_for_user(self.user)
+
+    def filter_queryset(self, qs: QuerySet[Quad]) -> QuerySet[Quad]:
+        user_grid_config = UserGridConfig.get(self.user, 'Quads')
         if not user_grid_config.show_group_data:
             qs = qs.filter(user=self.user)
         return qs

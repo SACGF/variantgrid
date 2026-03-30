@@ -3,8 +3,8 @@ from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
 from pedigree.models import Pedigree, PedFileFamily, PedFile
-from snpdb.models import CohortGenotypeCollection, Trio, CohortSample, ImportStatus, Sample, VCF, GenomeBuild, Cohort, \
-    VCFFilter
+from snpdb.models import CohortGenotypeCollection, Trio, Quad, CohortSample, ImportStatus, Sample, VCF, GenomeBuild, \
+    Cohort, VCFFilter
 
 
 def create_fake_cohort(user: User, genome_build: GenomeBuild) -> Cohort:
@@ -53,6 +53,52 @@ def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
                                proband=proband_cs)
 
     return trio
+
+
+def create_fake_quad(user: User, genome_build: GenomeBuild, sibling_affected: bool = False) -> Quad:
+    """4-sample Cohort (proband, mother, father, sibling) + a Quad."""
+    vcf = VCF.objects.create(
+        name="test_quad_vcf", genotype_samples=1, genome_build=genome_build,
+        import_status=ImportStatus.SUCCESS, user=user, date=timezone.now()
+    )
+    proband_sample = Sample.objects.create(name="proband", vcf=vcf, import_status=ImportStatus.SUCCESS)
+    mother_sample = Sample.objects.create(name="mother", vcf=vcf)
+    father_sample = Sample.objects.create(name="father", vcf=vcf)
+    sibling_sample = Sample.objects.create(name="sibling", vcf=vcf)
+
+    assign_permission_to_user_and_groups(user, vcf)
+    assign_permission_to_user_and_groups(user, proband_sample)
+
+    cohort = Cohort.objects.create(
+        name="test_quad_cohort", user=user, vcf=vcf,
+        genome_build=genome_build, import_status=ImportStatus.SUCCESS
+    )
+    for i, sample in enumerate([proband_sample, mother_sample, father_sample, sibling_sample]):
+        CohortSample.objects.create(
+            cohort=cohort, sample=sample,
+            cohort_genotype_packed_field_index=i, sort_order=i
+        )
+    assign_permission_to_user_and_groups(user, cohort)
+
+    CohortGenotypeCollection.objects.create(
+        cohort=cohort, cohort_version=cohort.version,
+        num_samples=cohort.cohortsample_set.count()
+    )
+
+    proband_cs = cohort.cohortsample_set.get(sample__name='proband')
+    mother_cs = cohort.cohortsample_set.get(sample__name='mother')
+    father_cs = cohort.cohortsample_set.get(sample__name='father')
+    sibling_cs = cohort.cohortsample_set.get(sample__name='sibling')
+
+    return Quad.objects.create(
+        name="test_quad",
+        user=user,
+        cohort=cohort,
+        mother=mother_cs, mother_affected=False,
+        father=father_cs, father_affected=False,
+        proband=proband_cs,
+        sibling=sibling_cs, sibling_affected=sibling_affected,
+    )
 
 
 def create_fake_pedigree(user: User, genome_build: GenomeBuild) -> Pedigree:

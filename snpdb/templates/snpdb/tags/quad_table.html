@@ -1,0 +1,62 @@
+<table>
+    <tr><th>Quad ID:</th>
+        <td><a href="{% url 'view_quad' quad.pk %}">{{ quad.pk }}</a></td>
+    </tr>
+    <tr><th>Name:</th>
+        <td>{{ quad.name }}</td>
+    </tr>
+    <tr><th>Genome Build:</th>
+        <td>{{ quad.genome_build }}</td>
+    </tr>
+    <tr><th>Cohort:</th>
+        <td><a href="{% url 'view_cohort' quad.cohort.pk %}">{{ quad.cohort }}</a></td>
+    </tr>
+    <tr><th>Mother:</th>
+        <td>
+            <div class="display-flex flex-row">
+                <div class="icon24 sample-icon"></div>
+                <a href="{% url 'view_sample' quad.mother.sample.pk %}">{{ quad.mother_details }}</a>
+                {% if quad.mother.sample.patient %}
+                    <div class="icon24 patient-icon"></div>
+                    <a href="{% url 'view_patient' quad.mother.sample.patient_id %}">{{ quad.mother.sample.patient }}</a>
+                {% endif %}
+            </div>
+        </td>
+    </tr>
+    <tr><th>Father:</th>
+        <td>
+            <div class="display-flex flex-row">
+                <div class="icon24 sample-icon"></div>
+                <a href="{% url 'view_sample' quad.father.sample.pk %}">{{ quad.father_details }}</a>
+                {% if quad.father.sample.patient %}
+                    <div class="icon24 patient-icon"></div>
+                    <a href="{% url 'view_patient' quad.father.sample.patient_id %}">{{ quad.father.sample.patient }}</a>
+                {% endif %}
+            </div>
+        </td>
+    </tr>
+    <tr><th>Proband:</th>
+        <td>
+            <div class="display-flex flex-row">
+                <div class="icon24 sample-icon"></div>
+                <a href="{% url 'view_sample' quad.proband.sample.pk %}">{{ quad.proband }}</a>
+                {% if quad.proband.sample.patient %}
+                    <div class="icon24 patient-icon"></div>
+                    <a href="{% url 'view_patient' quad.proband.sample.patient_id %}">{{ quad.proband.sample.patient }}</a>
+                {% endif %}
+            </div>
+        </td>
+    </tr>
+    <tr><th>Sibling:</th>
+        <td>
+            <div class="display-flex flex-row">
+                <div class="icon24 sample-icon"></div>
+                <a href="{% url 'view_sample' quad.sibling.sample.pk %}">{{ quad.sibling_details }}</a>
+                {% if quad.sibling.sample.patient %}
+                    <div class="icon24 patient-icon"></div>
+                    <a href="{% url 'view_patient' quad.sibling.sample.patient_id %}">{{ quad.sibling.sample.patient }}</a>
+                {% endif %}
+            </div>
+        </td>
+    </tr>
+</table>

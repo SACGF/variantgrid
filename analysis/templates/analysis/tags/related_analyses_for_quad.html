@@ -1,0 +1,9 @@
+{% extends "analysis/tags/base_related_analyses.html" %}
+{% block create_analyses %}
+{% if quad.cohort.import_status == "S" %}
+
+    {% load related_analyses_tags %}
+    {% analysis_templates_tag quad.genome_build quad=quad %}
+
+{% endif %}
+{% endblock create_analyses %}

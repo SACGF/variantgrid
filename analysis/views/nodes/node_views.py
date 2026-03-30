@@ -6,7 +6,7 @@ from django.http.response import HttpResponse
 from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeForm, \
     ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
-    PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
+    PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, QuadNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
     VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm, \
     MOINodeForm, ConservationNodeForm
 from analysis.models import TagNode, OntologyTerm, MOINode
@@ -29,6 +29,7 @@ from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.classifications_node import ClassificationsNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
+from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
 from analysis.views.views_json import get_sample_patient_gene_disease_data
@@ -306,6 +307,16 @@ class TissueNodeView(NodeView):
 class TrioNodeView(NodeView):
     model = TrioNode
     form_class = TrioNodeForm
+
+    def get_form_kwargs(self):
+        form_kwargs = super().get_form_kwargs()
+        form_kwargs["genome_build"] = self.object.analysis.genome_build
+        return form_kwargs
+
+
+class QuadNodeView(NodeView):
+    model = QuadNode
+    form_class = QuadNodeForm
 
     def get_form_kwargs(self):
         form_kwargs = super().get_form_kwargs()

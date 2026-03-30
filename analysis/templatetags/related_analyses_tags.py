@@ -12,14 +12,15 @@ from analysis.models import MutationalSignature, Analysis, AnalysisTemplate
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.related_analyses import get_related_analysis_details_for_samples, \
     get_related_analysis_details_for_cohort, \
-    get_related_analysis_details_for_pedigree, get_related_analysis_details_for_trio
+    get_related_analysis_details_for_pedigree, get_related_analysis_details_for_quad, \
+    get_related_analysis_details_for_trio
 from pedigree.models import Pedigree
-from snpdb.models import Cohort, Trio
+from snpdb.models import Cohort, Trio, Quad
 
 register = Library()
 
 
-def get_all_analyses_for_user(user, samples, cohorts=None, trios=None, pedigrees=None):
+def get_all_analyses_for_user(user, samples, cohorts=None, trios=None, quads=None, pedigrees=None):
     analysis_details: dict[Analysis, list] = defaultdict(list)
     if pedigrees:
         for analysis, details in get_related_analysis_details_for_pedigree(user, pedigrees):
@@ -33,17 +34,22 @@ def get_all_analyses_for_user(user, samples, cohorts=None, trios=None, pedigrees
         for analysis, details in get_related_analysis_details_for_trio(user, trios):
             analysis_details[analysis].append(f'Trio: {details}')
 
+    if quads:
+        for analysis, details in get_related_analysis_details_for_quad(user, quads):
+            analysis_details[analysis].append(f'Quad: {details}')
+
     for analysis, details in get_related_analysis_details_for_samples(user, samples):
         analysis_details[analysis].append(f"Sample: {details}")
 
     return [(analysis, ", ".join(details)) for analysis, details in analysis_details.items()]
 
 
-def update_context_with_related_analysis(context, samples, cohorts=None, trios=None,
+def update_context_with_related_analysis(context, samples, cohorts=None, trios=None, quads=None,
                                          pedigrees=None, show_sample_info=True):
     user = context["user"]
-    analysis_details = get_all_analyses_for_user(user, samples, cohorts=cohorts, trios=trios, pedigrees=pedigrees)
-    karyomapping_analyses = KaryomappingAnalysis.filter_for_user(user).filter(trio__in=trios)
+    analysis_details = get_all_analyses_for_user(user, samples, cohorts=cohorts, trios=trios,
+                                                 quads=quads, pedigrees=pedigrees)
+    karyomapping_analyses = KaryomappingAnalysis.filter_for_user(user).filter(trio__in=trios or [])
     analyses_list = [i[0].pk for i in analysis_details]
     analyses_with_tags = Analysis.objects.filter(pk__in=analyses_list, varianttag__isnull=False)
     variant_tag_genome_build_names = analyses_with_tags.order_by("genome_build").values_list("genome_build", flat=True).distinct()
@@ -89,6 +95,14 @@ def related_analyses_for_trio(context, trio):
     return context
 
 
+@register.inclusion_tag("analysis/tags/related_analyses_for_quad.html", takes_context=True)
+def related_analyses_for_quad(context, quad):
+    pedigrees = quad.cohort.pedigree_set.all()
+    update_context_with_related_analysis(context, quad.get_samples(), [quad.cohort], quads=[quad], pedigrees=pedigrees)
+    context["quad"] = quad
+    return context
+
+
 @register.inclusion_tag("analysis/tags/related_analyses_for_pedigree.html", takes_context=True)
 def related_analyses_for_pedigree(context, pedigree):
     trios = pedigree.cohort.trio_set.all()
@@ -101,7 +115,7 @@ def related_analyses_for_pedigree(context, pedigree):
 def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_somatic_sample=False, has_sample_gene_list=False, requires_sample_gene_list=None,
                            **kwargs):
     user = context["user"]
-    single_model_args = {"sample", "cohort", "trio", "pedigree"}
+    single_model_args = {"sample", "cohort", "trio", "quad", "pedigree"}
     params_error_message = f"analysis_templates_tag should be passed dict with exactly one Model value for {','.join(single_model_args)}. Args: {kwargs}"
 
     hidden_inputs = {}  # values should be primary keys
@@ -121,6 +135,8 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
     # Hack to add proband as sample
     if trio := kwargs.get("trio"):
         hidden_inputs["sample"] = trio.proband.sample_id
+    if quad := kwargs.get("quad"):
+        hidden_inputs["sample"] = quad.proband.sample_id
 
     class_name = klass._meta.label
     # Show/Hide AnalysisTemplateVersions based on requires_sample_gene_list

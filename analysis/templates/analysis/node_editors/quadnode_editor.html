@@ -1,0 +1,120 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+{% load static %}
+{% block docreadyjs %}
+    var quadForm = $("#quad-form");
+
+    function getQuadId() {
+       return $("#id_quad", quadForm).find(":selected").val();
+    }
+
+    function displayQuadInfo(data) {
+        var quadInfo = $("#quad-info");
+        var SAMPLE_FIELDS = ["mother", "father", "proband", "sibling"];
+        var AFFECTED_FIELDS = ["mother_affected", "father_affected", "sibling_affected"];
+
+        for (var i=0 ; i<SAMPLE_FIELDS.length ; ++i) {
+            var f = SAMPLE_FIELDS[i];
+            var value = data[f];
+            $("." + f, quadInfo).text(value);
+        }
+
+        for (var af=0 ; af<AFFECTED_FIELDS.length ; ++af) {
+            var affected = AFFECTED_FIELDS[af];
+            var affectedText = data[affected]? "affected" : "unaffected";
+            $("." + affected, quadInfo).text(affectedText);
+        }
+
+        quadInfo.show();
+        var one_affected = data.mother_affected || data.father_affected;
+        setDominantSelectAvailable(one_affected);
+        loadCohortVCFLocusFilter(data.cohort);
+    }
+
+    function changeQuad() {
+        $("#quad-info").hide();
+        var quadId = getQuadId();
+        if (quadId) {
+            $.ajax({
+                url: Urls.api_view_quad(quadId),
+                success: displayQuadInfo,
+            });
+            setCrossLink($("#quad-link"), Urls.view_quad, quadId);
+        }
+    }
+    $("#id_quad").change(changeQuad);
+
+    function setDominantSelectAvailable(one_affected) {
+        var inheritance_select = $("#id_inheritance", quadForm);
+        var dominant_option = $("option[value=D]", inheritance_select);
+        if (!one_affected) {
+            dominant_option.removeAttr("selected");
+        }
+        dominant_option.attr("disabled", !one_affected);
+    }
+
+    changeQuad();
+
+    ajaxForm(quadForm);
+{% endblock docreadyjs %}
+
+
+{% block content %}
+<div>
+	<form id="quad-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+		<div>
+            <div>
+                <b>Quad:</b> {{ form.quad }}{{ form.quad.errors }} <a class="cross-link" id="quad-link" target="_blank">View Quad</a>
+            </div>
+            <div id='quad-info'>
+                <table>
+                <tr>
+                    <th>Mother:
+                    <td><span class='mother'></span> (<span class='affected mother_affected'></span>)
+                </tr>
+                <tr>
+                    <th>Father:
+                    <td><span class='father'></span> (<span class='affected father_affected'></span>)
+                </tr>
+                <tr>
+                    <th>Proband:
+                    <td><span class='proband'></span>
+                </tr>
+                <tr>
+                    <th>Sibling:
+                    <td><span class='sibling'></span> (<span class='affected sibling_affected'></span>)
+                </tr>
+                </table>
+            </div>
+            <div>
+    		  <b>Inheritance:</b> {{ form.inheritance }}{{ form.inheritance.errors }}
+              <b>Require Parent Zygosity Calls:</b> {{ form.require_zygosity }}{{ form.require_zygosity.errors }}
+            </div>
+            <div>
+                {% load vcf_locus_filter_tags %}
+                {% vcf_locus_filter node node.quad.cohort.vcf %}
+            </div>
+            <div class='genotype-row'>
+                <b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}
+                <b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}
+                <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}
+                <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }} {{ form.max_pl_op }}
+            </div>
+            <div>
+                <a id='view-allele-frequency-filter-link' href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+                {% load allele_frequency_tags %}
+                {% allele_frequency_controls node %}
+            </div>
+    		<div>
+                {% if has_write_permission %}
+    		        <button id='quad-save' class="btn btn-primary">save</button>
+                {% endif %}
+    		</div>
+		</div>
+    {{ form.media }}
+	</form>
+</div>
+{% endblock content %}

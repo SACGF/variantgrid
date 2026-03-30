@@ -682,6 +682,70 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
         return self.name or f"Trio {self.pk}"
 
 
+class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+    """Mother + Father + Proband + Sibling.
+
+    Extends the Trio concept to 4 family members. The sibling (typically
+    unaffected) narrows down candidate variants because they share the same
+    parental genome without sharing the proband's phenotype.
+    """
+    name = models.TextField(blank=True)
+    user = models.ForeignKey(User, null=True, on_delete=CASCADE)
+    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
+    mother = models.ForeignKey(CohortSample, related_name='quad_mother', on_delete=CASCADE)
+    mother_affected = models.BooleanField(default=False)
+    father = models.ForeignKey(CohortSample, related_name='quad_father', on_delete=CASCADE)
+    father_affected = models.BooleanField(default=False)
+    proband = models.ForeignKey(CohortSample, related_name='quad_proband', on_delete=CASCADE)
+    sibling = models.ForeignKey(CohortSample, related_name='quad_sibling', on_delete=CASCADE)
+    sibling_affected = models.BooleanField(default=False)
+
+    @classmethod
+    def get_permission_class(cls):
+        return Cohort
+
+    def get_permission_object(self):
+        return self.cohort
+
+    @classmethod
+    def _filter_from_permission_object_qs(cls, queryset):
+        return cls.objects.filter(cohort__in=queryset)
+
+    @property
+    def genome_build(self):
+        return self.cohort.genome_build
+
+    def get_cohort_samples(self):
+        return [self.mother, self.father, self.proband, self.sibling]
+
+    def get_samples(self):
+        return Sample.objects.filter(cohortsample__in=self.get_cohort_samples()).order_by("pk")
+
+    def get_absolute_url(self):
+        return reverse('view_quad', kwargs={"pk": self.pk})
+
+    def get_listing_url(self):
+        return reverse('quads')
+
+    @property
+    def mother_details(self):
+        affected = "affected" if self.mother_affected else "unaffected"
+        return f"{self.mother} ({affected})"
+
+    @property
+    def father_details(self):
+        affected = "affected" if self.father_affected else "unaffected"
+        return f"{self.father} ({affected})"
+
+    @property
+    def sibling_details(self):
+        affected = "affected" if self.sibling_affected else "unaffected"
+        return f"{self.sibling} ({affected})"
+
+    def __str__(self):
+        return self.name or f"Quad {self.pk}"
+
+
 # This has to be in this file so we don't end up with circular references
 @celery.shared_task(ignore_result=False)
 def delete_old_cohort_genotypes_task():

@@ -73,8 +73,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     VCF, CustomColumnsCollection, CustomColumn, Cohort, \
     CohortSample, GenomicIntervalsCollection, Sample, UserDataPrefix, UserGridConfig, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
-    Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
+    Trio, Quad, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, \
+    Lab, LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
     SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, AlleleConversionTool
@@ -1257,6 +1257,19 @@ def view_trio(request, pk):
     context = {"trio": trio,
                "has_write_permission": trio.cohort.can_write(request.user)}
     return render(request, 'snpdb/patients/view_trio.html', context)
+
+
+def quads(request):
+    show_group_data = UserGridConfig.get(request.user, 'Quads').show_group_data
+    context = {"show_group_data": show_group_data}
+    return render(request, 'snpdb/patients/quads.html', context)
+
+
+def view_quad(request, pk):
+    quad = Quad.get_for_user(request.user, pk)
+    context = {"quad": quad,
+               "has_write_permission": quad.cohort.can_write(request.user)}
+    return render(request, 'snpdb/patients/view_quad.html', context)
 
 
 @login_not_required

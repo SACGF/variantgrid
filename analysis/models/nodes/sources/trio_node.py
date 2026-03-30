@@ -16,6 +16,42 @@ from patients.models_enums import Zygosity, Sex
 from snpdb.models import Trio, Sample, Contig
 
 
+def _build_family_zyg_q(cohort_genotype_collection, sample_zyg_require: list[tuple]) -> Q:
+    """Build a zygosity Q for any number of family members.
+
+    Args:
+        cohort_genotype_collection: The CGC to build the Q for.
+        sample_zyg_require: List of (sample, zygosity_set, require_zygosity).
+            Entries with an empty zygosity_set are silently skipped
+            (used for father in X-linked recessive).
+    """
+    sample_zygosities_dict = {}
+    sample_require_zygosity_dict = {}
+    for sample, zyg_set, require in sample_zyg_require:
+        if zyg_set:
+            sample_zygosities_dict[sample] = zyg_set
+            sample_require_zygosity_dict[sample] = require
+    return cohort_genotype_collection.get_zygosity_q(
+        sample_zygosities_dict, sample_require_zygosity_dict
+    )
+
+
+def _dominant_requires_affected_parent_error(mother_affected: bool, father_affected: bool):
+    if not (mother_affected or father_affected):
+        return "Dominant inheritance requires an affected parent"
+    return None
+
+
+def _xlinked_recessive_errors(proband_sample, mother_affected: bool) -> list[str]:
+    errors = []
+    proband_is_female = proband_sample.patient and proband_sample.patient.sex == Sex.FEMALE
+    if proband_is_female:
+        errors.append("X-linked recessive inheritance doesn't currently work with female proband")
+    elif mother_affected:
+        errors.append("X-linked recessive inheritance requires an unaffected mother")
+    return errors
+
+
 class AbstractTrioInheritance(ABC):
     """ Do inheritance filtering in subclasses to keep filters/methods consistent """
     NO_VARIANT = {Zygosity.MISSING, Zygosity.HOM_REF}  # 2 different het would be "missing" (as has no ref)
@@ -27,16 +63,12 @@ class AbstractTrioInheritance(ABC):
 
     def _get_zyg_q(self, cohort_genotype_collection, trio_zyg_data) -> Q:
         """ trio_zyg_data = tuple of mum_zyg_set, dad_zyg_set, proband_zyg_set """
-        mother_sample = self.node.trio.mother.sample
-        father_sample = self.node.trio.father.sample
-        proband_sample = self.node.trio.proband.sample
-
-        mum_dad_proband = [mother_sample, father_sample, proband_sample]
-        sample_zygosities_dict = dict(zip(mum_dad_proband, trio_zyg_data))
-        sample_require_zygosity_dict = {mother_sample: self.node.require_zygosity,
-                                        father_sample: self.node.require_zygosity,
-                                        proband_sample: True}  # 947 - Always require zygosity for Proband
-        return cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict, sample_require_zygosity_dict)
+        trio = self.node.trio
+        return _build_family_zyg_q(cohort_genotype_collection, [
+            (trio.mother.sample, trio_zyg_data[0], self.node.require_zygosity),
+            (trio.father.sample, trio_zyg_data[1], self.node.require_zygosity),
+            (trio.proband.sample, trio_zyg_data[2], True),  # 947 - Always require zygosity for Proband
+        ])
 
     @staticmethod
     def _zygosity_options(zyg: set, allow_unknown=False):
@@ -193,15 +225,10 @@ class TrioNode(AbstractCohortBasedNode):
         errors = []
         if trio:
             if inheritance == TrioInheritance.DOMINANT:
-                if not (trio.mother_affected or trio.father_affected):
-                    errors.append("Dominant inheritance requires an affected parent")
+                if err := _dominant_requires_affected_parent_error(trio.mother_affected, trio.father_affected):
+                    errors.append(err)
             elif inheritance == TrioInheritance.XLINKED_RECESSIVE:
-                proband_sample = trio.proband.sample
-                proband_is_female = proband_sample.patient and proband_sample.patient.sex == Sex.FEMALE
-                if proband_is_female:
-                    errors.append("X-linked recessive inheritance doesn't currently work with female proband")
-                elif trio.mother_affected:
-                    errors.append("X-linked recessive inheritance requires an unaffected mother")
+                errors.extend(_xlinked_recessive_errors(trio.proband.sample, trio.mother_affected))
         return errors
 
     def get_errors(self, include_parent_errors=True, flat=False):

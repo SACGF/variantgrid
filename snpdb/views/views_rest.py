@@ -9,9 +9,9 @@ from rest_framework.views import APIView
 from library.constants import MINUTE_SECS
 from patients.models_enums import Zygosity
 from snpdb.clingen_allele import get_variant_allele_for_variant
-from snpdb.models import Sample, Variant, Trio, GenomeBuild
+from snpdb.models import Sample, Variant, Trio, Quad, GenomeBuild
 from snpdb.models.models_vcf import Project
-from snpdb.serializers import TrioSerializer, VariantAlleleSerializer, ProjectSerializer
+from snpdb.serializers import QuadSerializer, TrioSerializer, VariantAlleleSerializer, ProjectSerializer
 
 
 class VariantZygosityForSampleView(APIView):
@@ -41,6 +41,16 @@ class TrioView(RetrieveAPIView):
 
     def get_queryset(self):
         return Trio.filter_for_user(self.request.user)
+
+
+@method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
+class QuadView(RetrieveAPIView):
+    serializer_class = QuadSerializer
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+    lookup_fields = ('pk',)
+
+    def get_queryset(self):
+        return Quad.filter_for_user(self.request.user)
 
 
 class VariantAlleleForVariantView(APIView):
