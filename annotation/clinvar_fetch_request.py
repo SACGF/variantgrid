@@ -76,9 +76,12 @@ class ClinVarFetchRequest:
                         if allele := variant.allele:
                             allele_id = allele.pk
                 clinvar_record_collection.allele_id = allele_id
+                if allele_id and not fetch_from_clinvar:
+                    # Found the allele but not re-fetching from ClinVar, so save now to persist it
+                    clinvar_record_collection.save()
 
             if not allele_id:
-                raise ValueError(f"Couldn't determine Allele for clinvar_variation_id {self.clinvar_variation_id}")
+                logging.warning("Couldn't determine Allele for clinvar_variation_id %s", self.clinvar_variation_id)
 
             if fetch_from_clinvar:
                 # so while Entrez does automatically retry on 500s, ClinVar has been providing 400s (Bad Request) when

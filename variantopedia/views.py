@@ -21,7 +21,7 @@ from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
-    VariantAnnotationVersion, VariantAnnotation, AnnotationStatus
+    VariantAnnotationVersion, VariantAnnotation, AnnotationStatus, ClinVarRecordCollection
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
@@ -582,6 +582,7 @@ class AlleleOriginGroupingDescription:
 def view_allele(request, allele_id: int):
     allele: Allele = get_object_or_404(Allele, pk=allele_id)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+    ClinVarRecordCollection.set_allele_for_variants(allele)
 
     # Filter on classification grouping first, so we can find all unique AlleleGroupings
     # that the user has access to
@@ -690,6 +691,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         # provide the data so we will do an async call)
         if not variant_allele.needs_clingen_call():
             variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant_allele)
+        ClinVarRecordCollection.set_allele_for_variants(variant_allele.allele)
 
     annotation_description = {}
     if user_settings.tool_tips:

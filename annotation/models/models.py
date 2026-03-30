@@ -331,6 +331,20 @@ class ClinVarRecordCollection(TimeStampedModel):
     max_stars = models.IntegerField(blank=True, null=True)
     expert_panel = models.OneToOneField('ClinVarRecord', on_delete=SET_NULL, null=True, blank=True)
 
+    @classmethod
+    def set_allele_for_variants(cls, allele):
+        """Proactively link ClinVarRecordCollections to allele for all its associated variants.
+        Called when viewing the allele/variant page, so the allele is set before the ClinVar AJAX fires."""
+        clinvar_variation_ids = list(
+            ClinVar.objects.filter(variant__variantallele__allele=allele)
+            .values_list('clinvar_variation_id', flat=True).distinct()
+        )
+        if clinvar_variation_ids:
+            cls.objects.filter(
+                clinvar_variation_id__in=clinvar_variation_ids,
+                allele__isnull=True
+            ).update(allele=allele)
+
     def records_with_min_stars(self, min_stars: int) -> list['ClinVarRecord']:
         return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
 
