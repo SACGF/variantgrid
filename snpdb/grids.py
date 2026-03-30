@@ -18,7 +18,7 @@ from library.django_utils import get_url_from_view_path
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import calculate_age, JsonDataType, full_class_name
+from library.utils import calculate_age, JsonDataType
 from ontology.models import OntologyService
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
@@ -27,7 +27,7 @@ from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     ProcessingStatus, Allele
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
-from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_for_js
 
 
@@ -316,16 +316,6 @@ class TriosListColumns(DatatableConfig[Trio]):
     def get_initial_queryset(self) -> QuerySet[Trio]:
         return Trio.filter_for_user(self.user)
 
-    def render_delete(self, cell: CellData) -> Optional[str]:
-        try:
-            obj = Trio.objects.select_related('cohort').get(pk=cell.value)
-        except Trio.DoesNotExist:
-            return None
-        if not obj.can_write(self.user):
-            return None
-        return reverse('group_permissions_object_delete',
-                       kwargs={'class_name': full_class_name(Trio), 'primary_key': cell.value})
-
     def filter_queryset(self, qs: QuerySet[Trio]) -> QuerySet[Trio]:
         user_grid_config = UserGridConfig.get(self.user, 'Trios')
         if not user_grid_config.show_group_data:
@@ -358,16 +348,6 @@ class QuadsListColumns(DatatableConfig[Quad]):
 
     def get_initial_queryset(self) -> QuerySet[Quad]:
         return Quad.filter_for_user(self.user)
-
-    def render_delete(self, cell: CellData) -> Optional[str]:
-        try:
-            obj = Quad.objects.select_related('cohort').get(pk=cell.value)
-        except Quad.DoesNotExist:
-            return None
-        if not obj.can_write(self.user):
-            return None
-        return reverse('group_permissions_object_delete',
-                       kwargs={'class_name': full_class_name(Quad), 'primary_key': cell.value})
 
     def filter_queryset(self, qs: QuerySet[Quad]) -> QuerySet[Quad]:
         user_grid_config = UserGridConfig.get(self.user, 'Quads')

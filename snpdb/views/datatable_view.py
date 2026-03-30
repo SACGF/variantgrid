@@ -378,7 +378,10 @@ class DatatableConfig(Generic[DC]):
         }
 
     def render_delete(self, cell: CellData) -> Optional[str]:
-        obj = self._model(pk=cell.value)
+        try:
+            obj = self._model.get_instance_for_permission_check(cell.value)
+        except self._model.DoesNotExist:
+            return None
         if not obj.can_write(self.user):
             return None
         return reverse('group_permissions_object_delete',

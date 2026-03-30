@@ -87,6 +87,15 @@ class GuardianPermissionsMixin:
         return cls._filter_from_permission_object_qs(queryset)
 
     @classmethod
+    def get_instance_for_permission_check(cls, pk):
+        """ Return an instance sufficient for can_write/can_view checks.
+            If permissions live on this model, a stub with just pk is enough (Guardian only needs pk).
+            If permissions delegate to a related object, the full instance must be loaded from DB. """
+        if cls.get_permission_class() == cls:
+            return cls(pk=pk)
+        return cls.objects.get(pk=pk)
+
+    @classmethod
     def get_for_user(cls, user, pk, write=False):
         obj = get_object_or_404(cls, pk=pk)
         obj.check_permission(user, write)
