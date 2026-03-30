@@ -116,6 +116,8 @@ Do NOT add "Co-Authored-By: Claude" or any similar co-author trailer to commit m
 
 Reference GitHub issues in commit messages (e.g., `#1400`) but do NOT use keywords that auto-close issues (e.g., "fix", "close", "resolve"). Issues must go through a testing pipeline before being closed manually.
 
+Before committing, check `git status` for already-staged changes unrelated to the current task. If any exist, stop and confirm with the user before proceeding — do not include them in the commit.
+
 ## GitHub Comments
 
 When writing any comment on a GitHub issue or pull request, always preface it with 🤖 Written by Claude.
