@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+import io
 import logging
 
 import pandas as pd
+import requests
 
 from annotation.models import Citation
 from annotation.models.models import ClinVarCitation, ClinVarCitationsCollection
@@ -13,10 +15,14 @@ VARIATION_ID = 'VariationID'
 CITATION_SOURCE = 'citation_source'
 CITATION_ID = 'citation_id'
 CITATIONS_URL = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/var_citations.txt"
+DOWNLOAD_TIMEOUT_SECONDS = 120
 
 
 def store_clinvar_citations_from_web(cached_web_resource):
-    df = pd.read_csv(CITATIONS_URL, sep='\t', index_col=None,
+    response = requests.get(CITATIONS_URL, timeout=DOWNLOAD_TIMEOUT_SECONDS)
+    response.raise_for_status()
+
+    df = pd.read_csv(io.BytesIO(response.content), sep='\t', index_col=None,
                      dtype={ALLELE_ID: int,
                             VARIATION_ID: int,
                             "rs": str,
@@ -32,10 +38,22 @@ def store_clinvar_citations_from_web(cached_web_resource):
 
     rows = []
     citation_ids: set[CitationIdNormalized] = set()
+    skipped = 0
     for _, row in df.iterrows():
         citation_source = row[CITATION_SOURCE]
+        citation_id_val = row[CITATION_ID]
 
-        citation_id = CitationIdNormalized.from_parts(source=citation_source, index=row[CITATION_ID])
+        if not citation_source or not citation_id_val or pd.isna(citation_source) or pd.isna(citation_id_val):
+            skipped += 1
+            continue
+
+        try:
+            citation_id = CitationIdNormalized.from_parts(source=citation_source, index=citation_id_val)
+        except ValueError:
+            logging.warning("Skipping invalid citation row: source=%r id=%r", citation_source, citation_id_val)
+            skipped += 1
+            continue
+
         citation_ids.add(citation_id)
 
         cvc = ClinVarCitation(clinvar_citations_collection=clinvar_citations_collection,
@@ -43,6 +61,9 @@ def store_clinvar_citations_from_web(cached_web_resource):
                               clinvar_allele_id=row[ALLELE_ID],
                               citation_id=citation_id.full_id)
         rows.append(cvc)
+
+    if skipped:
+        logging.warning("Skipped %d invalid rows from %s", skipped, CITATIONS_URL)
 
     logging.info("About to ensure existence of %d citations", len(citation_ids))
     Citation.objects.bulk_create(objs=[citation_id.for_bulk_create() for citation_id in citation_ids], batch_size=2000, ignore_conflicts=True)

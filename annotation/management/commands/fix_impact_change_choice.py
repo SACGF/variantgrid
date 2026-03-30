@@ -55,7 +55,7 @@ class Command(BaseCommand):
     @staticmethod
     def _run_vacuum(table):
         with connection.cursor() as cursor:
-            cursor.execute(f"VACUUM FULL {table};")
+            cursor.execute(f"VACUUM FULL {connection.ops.quote_name(table)};")
 
     @staticmethod
     def _get_case(old_new, field_name) -> Case:

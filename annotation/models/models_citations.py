@@ -19,6 +19,8 @@ from library.log_utils import report_exc_info
 from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import JsonObjType, first
 
+Entrez.timeout = 30
+
 """
 Has the model for Citation as well as the methods for populating them.
 Short version
