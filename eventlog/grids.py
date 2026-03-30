@@ -36,7 +36,7 @@ class EventColumns(DatatableConfig[Event]):
 
     def get_initial_queryset(self) -> QuerySet[Event]:
         event_qs = Event.objects.all()
-        if not self.user.is_staff:
+        if not self.user.is_superuser:
             event_qs = event_qs.filter(user=self.user)
         return event_qs
 

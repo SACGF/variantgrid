@@ -56,6 +56,6 @@ class EventLogHandler(logging.Handler):  # Inherit from logging.Handler
             #                       request = record.request,
             #                       extra_data = {'name': name, 'app_name': app_name})
         except Exception:
-            pass
+            self.handleError(record)
 
         return

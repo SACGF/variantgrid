@@ -1,8 +1,7 @@
-import logging
-
-from django.http import HttpRequest
+from django.core.exceptions import PermissionDenied
+from django.http import HttpRequest, HttpResponseBadRequest
 from django.http.response import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -31,17 +30,25 @@ def eventlog(request):
 
 
 def eventlog_detail(request: HttpRequest, pk: int):
-    event = Event.objects.get(pk=pk)
+    event = get_object_or_404(Event, pk=pk)
+    if not (request.user.is_superuser or event.user == request.user):
+        raise PermissionDenied()
     return render(request, 'eventlog_detail.html', context={'event': event})
 
 
 @require_POST
 def create_event(request):
-    logging.info("create_event POST=%s", str(request.POST))
-    app_name = request.POST["app_name"]
-    event_name = request.POST["event_name"]
-    details = request.POST["details"]
-    severity = request.POST["severity"]
+    app_name = request.POST.get("app_name")
+    event_name = request.POST.get("event_name")
+    details = request.POST.get("details")
+    severity = request.POST.get("severity")
+
+    if not app_name or not event_name or not severity:
+        return HttpResponseBadRequest("Missing required parameters")
+
+    valid_severities = {choice[0] for choice in LogLevel.CHOICES}
+    if severity not in valid_severities:
+        return HttpResponseBadRequest("Invalid severity")
 
     Event.objects.create(user=request.user,
                          app_name=app_name,
