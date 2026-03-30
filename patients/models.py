@@ -385,10 +385,12 @@ class PatientModification(models.Model):
     patient_import = models.ForeignKey(PatientImport, null=True, on_delete=CASCADE)
 
     def get_import_url(self):
-        try:
-            url = self.patient_import.patientrecords.get_absolute_url()
-        except PatientRecords.DoesNotExist:
-            url = None
+        url = None
+        if self.patient_import:
+            try:
+                url = self.patient_import.patientrecords.get_absolute_url()
+            except PatientRecords.DoesNotExist:
+                pass
         return url
 
 class PatientComment(models.Model):
