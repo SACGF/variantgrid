@@ -74,7 +74,7 @@ class GeneListGeneSymbolSerializer(serializers.ModelSerializer):
 
 
 class GeneListSerializer(serializers.ModelSerializer):
-    category = GeneListCategorySerializer()
+    category = GeneListCategorySerializer(allow_null=True)
     user = serializers.StringRelatedField()
     genelistgenesymbol_set = GeneListGeneSymbolSerializer(many=True)
     can_write = serializers.SerializerMethodField()
@@ -85,7 +85,13 @@ class GeneListSerializer(serializers.ModelSerializer):
         fields = ('pk', 'category', 'name', 'user', 'import_status', 'genelistgenesymbol_set', 'can_write', 'absolute_url')
 
     def get_can_write(self, obj: GeneList):
-        user = self.context['request'].user
+        request = self.context.get('request')
+        if request is not None:
+            user = request.user
+        else:
+            user = self.context.get('user')
+        if user is None:
+            return False
 
         if obj.id:  # Can't check pk as may be FakeGeneList object
             can_write = obj.can_write(user)
@@ -99,6 +105,16 @@ class GeneListSerializer(serializers.ModelSerializer):
                 can_write = False
 
         return can_write
+
+    def create(self, validated_data):
+        genelistgenesymbol_set_data = validated_data.pop('genelistgenesymbol_set', [])
+        validated_data.pop('category', None)  # System-specific FK, skip on import
+        user = self.context.get('user')
+        gene_list = GeneList.objects.create(user=user, **validated_data)
+        for gs_data in genelistgenesymbol_set_data:
+            gs_data.pop('gene_symbol_alias', None)  # System-specific integer PK, skip on import
+            GeneListGeneSymbol.objects.create(gene_list=gene_list, **gs_data)
+        return gene_list
 
     def get_fields(self):
         # Code from https://timmytango.com/notes/excluding-fields-in-drf-serializers/

@@ -82,7 +82,7 @@ def analysis_import(user: User, genome_build: GenomeBuild, filename,
         ############### END REMOVE
 
         serializer = node_serializers[model_name]
-        s = serializer(data=data)
+        s = serializer(data=data, context={'user': user})
         if s.is_valid():
             try:
                 node = s.save()

@@ -9,9 +9,11 @@ from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyRange, NodeAlleleFrequencyFilter, AnalysisNode, \
     NodeWiki
 from analysis.models.nodes.filters.conservation_node import ConservationNode
+from genes.models import GeneList
 from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer
+from ontology.models import OntologyTerm
 from ontology.serializers import OntologyTermSerializer
 from snpdb.serializers import UserSerializer, TimestampField
 
@@ -142,7 +144,7 @@ class DamageNodeSerializer(AnalysisNodeSerializer):
 class FilterNodeItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = FilterNodeItem
-        fields = "__all__"
+        exclude = ("filter_node",)
 
 
 class FilterNodeSerializer(AnalysisNodeSerializer):
@@ -165,7 +167,15 @@ class GeneListNodeGeneListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = GeneListNodeGeneList
-        fields = "__all__"
+        exclude = ("gene_list_node",)
+
+    def to_internal_value(self, data):
+        gene_list_data = data.get('gene_list')
+        if isinstance(gene_list_data, dict):
+            gl_serializer = GeneListSerializer(data=gene_list_data, context=self.context)
+            gl_serializer.is_valid(raise_exception=True)
+            return {'gene_list': gl_serializer.save()}
+        return super().to_internal_value(data)
 
 
 class GeneListNodeSerializer(AnalysisNodeSerializer):
@@ -206,7 +216,15 @@ class PhenotypeNodeOntologyTermSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PhenotypeNodeOntologyTerm
-        fields = "__all__"
+        exclude = ("phenotype_node",)
+
+    def to_internal_value(self, data):
+        ontology_term_data = data.get('ontology_term')
+        if isinstance(ontology_term_data, dict):
+            ontology_id = ontology_term_data.get('id')
+            if ontology_id:
+                return {'ontology_term': OntologyTerm.objects.get(pk=ontology_id)}
+        return super().to_internal_value(data)
 
 
 class PhenotypeNodeSerializer(AnalysisNodeSerializer):
