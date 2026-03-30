@@ -299,6 +299,17 @@ class TrioNode(AbstractCohortBasedNode):
     def get_help_text() -> str:
         return "Mother/Father/Proband - filter for recessive/dominant/denovo inheritance"
 
+    def get_rendering_args(self):
+        if not self.trio:
+            return {}
+        proband_sample = self.trio.proband.sample
+        proband_sex = proband_sample.patient.sex if proband_sample.patient else "M"
+        return {
+            "mother_affected": self.trio.mother_affected,
+            "father_affected": self.trio.father_affected,
+            "proband_sex": proband_sex,
+        }
+
     def get_css_classes(self):
         css_classes = super().get_css_classes()
         if self.trio:

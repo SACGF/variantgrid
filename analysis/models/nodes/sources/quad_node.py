@@ -252,6 +252,21 @@ class QuadNode(AbstractCohortBasedNode):
             name_parts.append(f"({desc})")
         return "\n".join(name_parts)
 
+    def get_rendering_args(self):
+        if not self.quad:
+            return {}
+        proband_sample = self.quad.proband.sample
+        proband_sex = proband_sample.patient.sex if proband_sample.patient else "M"
+        sibling_sample = self.quad.sibling.sample
+        sibling_sex = sibling_sample.patient.sex if sibling_sample.patient else "M"
+        return {
+            "mother_affected":  self.quad.mother_affected,
+            "father_affected":  self.quad.father_affected,
+            "sibling_affected": self.quad.sibling_affected,
+            "proband_sex":      proband_sex,
+            "sibling_sex":      sibling_sex,
+        }
+
     @staticmethod
     def get_help_text() -> str:
         return "Mother/Father/Proband/Sibling - filter for recessive/dominant/denovo inheritance"
