@@ -147,6 +147,13 @@ class TrioSample(models.TextChoices):
     PROBAND = 'P', 'Proband'
 
 
+class QuadSample(models.TextChoices):
+    MOTHER  = 'M', 'Mother'
+    FATHER  = 'F', 'Father'
+    PROBAND = 'P', 'Proband'
+    SIBLING = 'S', 'Sibling'
+
+
 class TagNodeMode(models.TextChoices):
     THIS_ANALYSIS = 'T', 'This Analysis'
     ALL_TAGS = 'L', 'All Tags'

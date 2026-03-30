@@ -12,7 +12,7 @@ from snpdb.models.models_columns import CustomColumnsCollection
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection, GenomicIntervalsCategory
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
+from snpdb.tests.utils.fake_cohort_data import create_fake_trio, create_fake_quad
 
 
 class Test(URLTestCase):
@@ -34,6 +34,7 @@ class Test(URLTestCase):
 
         cls.trio = create_fake_trio(cls.user_owner, grch37)
         cls.cohort = cls.trio.cohort
+        cls.quad = create_fake_quad(cls.user_owner, grch37)
         cls.vcf = cls.cohort.vcf
         cls.sample = cls.vcf.sample_set.first()
 
@@ -71,8 +72,9 @@ class Test(URLTestCase):
             ('cohort_sample_count', {"cohort_id": cls.cohort.pk}, 200),
             ('cohort_sample_edit', {"cohort_id": cls.cohort.pk}, 200),
 
-            # Trio
+            # Trio / Quad
             ('view_trio', {"pk": cls.trio.pk}, 200),
+            ('view_quad', {"pk": cls.quad.pk}, 200),
 
             # Data objects
             ('view_genomic_intervals', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
@@ -99,6 +101,7 @@ class Test(URLTestCase):
             ("custom_columns_collections_datatable", {}, cls.custom_columns_collection),
             ("cohort_datatable", {}, cls.cohort2),
             ("trio_datatable", {}, cls.trio),
+            ("quad_datatable", {}, cls.quad),
             ("genomic_intervals_datatable", {}, cls.genomic_intervals_collection),
         ]
 
@@ -110,6 +113,7 @@ class Test(URLTestCase):
             ("bed_files", {}, 200),
             ("cohorts", {}, 200),
             ("trios", {}, 200),
+            ("quads", {}, 200),
             ("manual_variant_entry", {}, 200),
             ("custom_columns", {}, 200),
             ("tag_settings", {}, 200),

@@ -13,7 +13,7 @@ from django.forms.widgets import TextInput
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate, AnalysisTemplateVersion, \
     AnalysisNode, CandidateStatus, AutoLaunchAnalysisTemplate
-from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample, AnalysisType
+from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample, QuadSample, AnalysisType
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
 from annotation.models.models import AnnotationVersion
@@ -357,6 +357,30 @@ class UserTrioWizardForm(forms.Form):
             if a_v == b_v:
                 trio_sample = TrioSample(a_v)
                 msg = f"Samples {a}/{b} are both assigned to: {trio_sample.label}"
+                raise forms.ValidationError(msg)
+
+        return cleaned_data
+
+
+class UserQuadWizardForm(forms.Form):
+    mother_affected  = forms.BooleanField(required=False)
+    father_affected  = forms.BooleanField(required=False)
+    sibling_affected = forms.BooleanField(required=False)
+    sample_1 = forms.ChoiceField(choices=QuadSample.choices)
+    sample_2 = forms.ChoiceField(choices=QuadSample.choices)
+    sample_3 = forms.ChoiceField(choices=QuadSample.choices)
+    sample_4 = forms.ChoiceField(choices=QuadSample.choices)
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        SAMPLES = ["sample_1", "sample_2", "sample_3", "sample_4"]
+        for a, b in itertools.combinations(SAMPLES, 2):
+            a_v = cleaned_data.get(a)
+            b_v = cleaned_data.get(b)
+            if a_v == b_v:
+                quad_sample = QuadSample(a_v)
+                msg = f"Samples {a}/{b} are both assigned to: {quad_sample.label}"
                 raise forms.ValidationError(msg)
 
         return cleaned_data

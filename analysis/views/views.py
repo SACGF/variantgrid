@@ -29,14 +29,14 @@ from htmlmin.decorators import not_minified_response
 from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run, get_auto_launch_analysis_template_matches
 from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
-from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, \
+from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, UserQuadWizardForm, VCFLocusFilterForm, \
     AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm, AnalysisTemplateForm, \
     AnalysisTemplateAutoLaunchForm, AutoLaunchFormSet
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
     AnalysisTemplateRun, AnalysisLock, Analysis
-from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample
+from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample, QuadSample
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask
@@ -60,7 +60,7 @@ from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
-    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Variant, GenomeBuild
+    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Quad, Variant, GenomeBuild
 from variantgrid.celery import app
 
 
@@ -259,6 +259,79 @@ def trio_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id):
                "form": form,
                "patient_description_results": patient_description_results}
     return render(request, 'analysis/trio_wizard.html', context)
+
+
+def quad_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id, sample4_id):
+    cohort = Cohort.get_for_user(request.user, cohort_id)
+
+    if cohort.import_status != ImportStatus.SUCCESS:
+        import_status = cohort.get_import_status_display()
+        msg = f"Can't create analysis for {cohort} of status {import_status}"
+        raise PermissionDenied(msg)
+
+    samples = [Sample.get_for_user(request.user, sid)
+               for sid in [sample1_id, sample2_id, sample3_id, sample4_id]]
+
+    patient_description_results = []
+    for sample in samples:
+        description = ''
+        results = []
+        try:
+            description = sample.patient.phenotype
+            results = sample.patient.patient_text_phenotype.phenotype_description.get_results()
+        except:
+            pass
+        patient_description_results.append([description, results])
+
+    form = UserQuadWizardForm(request.POST or None)
+    if request.method == "POST":
+        if form.is_valid():
+            mother_affected  = form.cleaned_data['mother_affected']
+            father_affected  = form.cleaned_data['father_affected']
+            sibling_affected = form.cleaned_data['sibling_affected']
+            sample_roles = [form.cleaned_data[f'sample_{i}'] for i in range(1, 5)]
+
+            def get_cohort_sample(sample):
+                return cohort.cohortsample_set.get(sample=sample)
+
+            mother_cs = father_cs = proband_cs = sibling_cs = None
+            for sample, role in zip(samples, sample_roles):
+                cs = get_cohort_sample(sample)
+                if role == QuadSample.MOTHER:
+                    mother_cs = cs
+                elif role == QuadSample.FATHER:
+                    father_cs = cs
+                elif role == QuadSample.PROBAND:
+                    proband_cs = cs
+                elif role == QuadSample.SIBLING:
+                    sibling_cs = cs
+
+            quad_name = "/".join((mother_cs.name, father_cs.name, proband_cs.name, sibling_cs.name))
+            quad_name += f" from {cohort}"
+            quad, _ = Quad.objects.get_or_create(
+                cohort=cohort,
+                user=request.user,
+                mother=mother_cs,
+                mother_affected=mother_affected,
+                father=father_cs,
+                father_affected=father_affected,
+                proband=proband_cs,
+                sibling=sibling_cs,
+                sibling_affected=sibling_affected,
+                defaults={"name": quad_name},
+            )
+            return redirect(quad)
+
+    context = {
+        "cohort": cohort,
+        "sample_1": samples[0],
+        "sample_2": samples[1],
+        "sample_3": samples[2],
+        "sample_4": samples[3],
+        "form": form,
+        "patient_description_results": patient_description_results,
+    }
+    return render(request, 'analysis/quad_wizard.html', context)
 
 
 def analysis_editor_and_grid(request, analysis_id, stand_alone=False):

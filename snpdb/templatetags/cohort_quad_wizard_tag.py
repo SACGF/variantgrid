@@ -1,0 +1,12 @@
+from django.template import Library, loader
+
+register = Library()
+
+
+@register.simple_tag(takes_context=True)
+def cohort_quad_wizard(context, cohort):
+    context = {"url_name_visible": context["url_name_visible"],
+               'cohort': cohort,
+               'sample_count': cohort.cohortsample_set.count()}
+    t = loader.get_template("snpdb/tags/cohort_quad_wizard_tag.html")
+    return t.render(context)
