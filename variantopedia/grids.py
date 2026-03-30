@@ -123,26 +123,31 @@ class AllVariantsGrid(AbstractVariantGrid):
         if not paginate_by:
             return None, None, items
 
-        try:
-            estimate = self._get_approx_count(items)
-        except Exception:
-            return super().paginate_items(request, items)
+        if not self.get_filters(request):
+            try:
+                estimate = self._get_approx_count(items)
+            except Exception:
+                estimate = 0
 
-        paginator = Paginator(items, paginate_by, allow_empty_first_page=self.allow_empty)
-        # Pre-set the cached_property to avoid COUNT(*) on a huge table
-        paginator.__dict__['count'] = estimate
+            if estimate >= 1_000_000:
+                self._used_approx_count = True
+                paginator = Paginator(items, paginate_by, allow_empty_first_page=self.allow_empty)
+                # Pre-set the cached_property to avoid COUNT(*) on a huge table
+                paginator.__dict__['count'] = estimate
+                page_num = request.GET.get('page', 1)
+                try:
+                    page = paginator.page(int(page_num))
+                except (ValueError, InvalidPage):
+                    page = paginator.page(1)
+                return paginator, page, page.object_list
 
-        page_num = request.GET.get('page', 1)
-        try:
-            page_number = int(page_num)
-            page = paginator.page(page_number)
-        except (ValueError, InvalidPage):
-            page = paginator.page(1)
-        return paginator, page, page.object_list
+        return super().paginate_items(request, items)
 
     def get_data(self, request) -> dict:
+        self._used_approx_count = False
         data = super().get_data(request)
-        data['approximate_records'] = _format_approx_count(data['records'])
+        if self._used_approx_count:
+            data['approximate_records'] = _format_approx_count(data['records'])
         return data
 
 
