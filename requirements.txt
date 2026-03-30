@@ -27,6 +27,7 @@ djangorestframework==3.12.4
 django_starfield==1.0.post1
 django_termsandconditions==2.0.6
 easy_thumbnails==2.7
+fontawesomefree==6.6.0
 git+https://github.com/azavea/django-amazon-ses@a9dd749575cfaa6e1fc7c289b535cba9798b8018#egg=django-amazon-ses
 git+https://github.com/davmlaw/django-datetime-utc#egg=django-datetime-utc
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu

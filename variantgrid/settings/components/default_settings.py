@@ -604,6 +604,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.admin',
     # 3rd party libraries
+    'fontawesomefree',
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
     'django_messages',
