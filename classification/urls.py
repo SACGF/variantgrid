@@ -48,7 +48,7 @@ urlpatterns = [
     path('activity/report/<int:discordance_report_id>', views.activity, name='activity_discordance'),
     path('classifications', views.classifications, name='classifications'),
 
-    path('groupings', views.classification_groupings, name='classification_groupings'),
+    
     path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
     path('groupings/<int:classification_grouping_id>/records', views.view_classification_grouping_records_detail,
          name='classification_grouping_records_detail'),
@@ -119,7 +119,7 @@ urlpatterns = [
     # classification ID might have a version in it (e.g. a dot)
     path('classification/<classification_id>', views.view_classification, name='view_classification'),
 
-    path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
+    
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),
 
     # Classification Candidate Searching
