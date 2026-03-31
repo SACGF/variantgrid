@@ -15,19 +15,19 @@
         if (!map) return;
 
         var requireZyg = $("#id_require_zygosity").is(":checked");
-        var suffix = ', ?';
 
         function memberZyg(key, affected) {
-            var val = map[key + (affected ? '_affected' : '_unaffected')] || map[key];
+            var affectedKey = key + (affected ? '_affected' : '_unaffected');
+            var val = (affectedKey in map) ? map[affectedKey] : map[key];
             if (val === undefined || val === null) return '';
             if (!val) return '--';
-            if (!requireZyg && key !== 'proband') val += suffix;
+            if (!requireZyg && key !== 'proband') val += ', ?';
             return val;
         }
 
         $(".zyg-mother").text(memberZyg('mother', motherAffected));
         $(".zyg-father").text(memberZyg('father', fatherAffected));
-        $(".zyg-proband").text(map.proband || '');
+        $(".zyg-proband").text(memberZyg('proband', false));
         $(".zyg-sibling").text(memberZyg('sibling', siblingAffected));
         $("#zygosity-note").text(map.note || '');
     }

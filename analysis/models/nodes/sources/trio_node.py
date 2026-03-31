@@ -306,43 +306,42 @@ class TrioNode(AbstractCohortBasedNode):
 
         Instantiates each inheritance class and calls its zygosity methods directly,
         so the table always matches the actual filtering logic.
-        For Dominant (affected-dependent), includes both affected/unaffected variants.
+        For modes where affected status matters, includes both affected/unaffected variants.
         """
+        from types import SimpleNamespace
         fmt = AbstractTrioInheritance._zygosity_options
         members = ['mother', 'father', 'proband']
+        stub_node = SimpleNamespace(trio=SimpleNamespace())
 
-        # Stub node so inheritance classes can access self.node.trio.mother_affected etc.
-        class _Stub:
-            pass
-        stub_node = _Stub()
-        stub_node.trio = _Stub()
+        # Members whose zygosity varies with affected status per mode
+        affected_members = {
+            TrioInheritance.DOMINANT: ['mother', 'father'],
+        }
 
         data = {}
         for mode, klass in TrioNode.INHERITANCE_CLASSES.items():
             if issubclass(klass, SimpleTrioInheritance):
-                if mode == TrioInheritance.DOMINANT:
-                    # Dominant depends on affected status — generate both variants
+                varies = affected_members.get(mode, [])
+                if varies:
                     entry = {}
-                    for affected_combo in [(False, False), (True, True)]:
-                        stub_node.trio.mother_affected, stub_node.trio.father_affected = affected_combo
+                    for affected_val in (False, True):
+                        stub_node.trio.mother_affected = affected_val
+                        stub_node.trio.father_affected = affected_val
                         handler = klass(stub_node)
                         zyg = handler._get_mum_dad_proband_zygosities()
-                        suffix = '_affected' if affected_combo[0] else '_unaffected'
-                        for member, zyg_set in zip(members[:2], zyg[:2]):
-                            entry[member + suffix] = fmt(zyg_set)
-                    # Proband is the same regardless of affected status
-                    stub_node.trio.mother_affected = True
-                    stub_node.trio.father_affected = True
-                    handler = klass(stub_node)
-                    entry['proband'] = fmt(handler._get_mum_dad_proband_zygosities()[2])
+                        suffix = '_affected' if affected_val else '_unaffected'
+                        for member, zyg_set in zip(members, zyg):
+                            if member in varies:
+                                entry[member + suffix] = fmt(zyg_set)
+                            elif not affected_val:
+                                entry[member] = fmt(zyg_set)
                     data[mode] = entry
                 else:
                     handler = klass(stub_node)
                     zyg = handler._get_mum_dad_proband_zygosities()
-                    entry = {member: fmt(z) for member, z in zip(members, zyg)}
-                    data[mode] = entry
+                    data[mode] = {member: fmt(z) for member, z in zip(members, zyg)}
             else:
-                # CompHet — use _mum_but_not_dad / _dad_but_not_mum
+                # CompHet
                 handler = klass(stub_node)
                 mum1, dad1, proband1 = handler._mum_but_not_dad()
                 data[mode] = {
@@ -352,7 +351,6 @@ class TrioNode(AbstractCohortBasedNode):
                     'note': 'Proband HET with \u22652 hits in a gene, one from each parent',
                 }
 
-            # Add notes for modes with extra constraints
             if mode == TrioInheritance.XLINKED_RECESSIVE:
                 data[mode]['note'] = 'Chr X only'
 

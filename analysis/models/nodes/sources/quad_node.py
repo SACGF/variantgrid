@@ -282,14 +282,10 @@ class QuadNode(AbstractCohortBasedNode):
         so the table always matches the actual filtering logic.
         For modes where affected status matters, includes both affected/unaffected variants.
         """
+        from types import SimpleNamespace
         fmt = AbstractTrioInheritance._zygosity_options
         members = ['mother', 'father', 'proband', 'sibling']
-
-        # Stub node so inheritance classes can access self.node.quad.*_affected
-        class _Stub:
-            pass
-        stub_node = _Stub()
-        stub_node.quad = _Stub()
+        stub_node = SimpleNamespace(quad=SimpleNamespace())
 
         # Members whose zygosity varies with affected status per mode
         affected_members = {
