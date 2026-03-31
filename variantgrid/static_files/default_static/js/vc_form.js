@@ -1473,7 +1473,7 @@ const VCForm = (function() {
             let widgetDiv = $('<div>', {class: "col-7"});
 
             let noteDiv = $('<i/>', {
-                class: 'text-muted fa-comment-alt note',
+                class: 'text-muted fa-message note',
                 id: `note-${key}`,
                 click: () => {this.promptNote(key);}
             });
