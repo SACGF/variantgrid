@@ -1971,7 +1971,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if is_in_lab:
             return ShareLevel.LAB
         if is_in_org:
-            return ShareLevel.INSTITUTION
+            return ShareLevel.ORGANISATION
         if user.is_authenticated:
             return ShareLevel.ALL_USERS
         return ShareLevel.PUBLIC
@@ -2288,7 +2288,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         # for historical data before we tracked share_level
         for sl in [ShareLevel.PUBLIC,
                    ShareLevel.ALL_USERS,
-                   ShareLevel.INSTITUTION,
+                   ShareLevel.ORGANISATION,
                    ShareLevel.LAB]:
             if self.can_view(sl.group(lab=self.classification.lab)):
                 return sl

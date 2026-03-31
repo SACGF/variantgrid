@@ -229,7 +229,7 @@ class ClassificationGrouping(TimeStampedModel):
             labs = Lab.valid_labs_qs(user, admin_check=True).select_related("organization")
             orgs = {lab.organization for lab in labs}
             permission_q.append(Q(share_level=ShareLevel.LAB) & Q(lab__in=labs))
-            permission_q.append(Q(share_level=ShareLevel.INSTITUTION) & Q(lab__organization__in=orgs))
+            permission_q.append(Q(share_level=ShareLevel.ORGANISATION) & Q(lab__organization__in=orgs))
             permission_q.append(Q(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS))
             return qs.filter(reduce(operator.or_, permission_q))
         else:

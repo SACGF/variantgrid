@@ -89,7 +89,7 @@ def clinical_significance_change_check(
     """
 
     # TODO move this into classification_hooks_share_flags
-    if classification.share_level_enum.index > ShareLevel.INSTITUTION.index:
+    if classification.share_level_enum.index > ShareLevel.ORGANISATION.index:
         classification.flag_collection_safe.close_open_flags_of_type(
             flag_type=classification_flag_types.unshared_flag
         )

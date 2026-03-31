@@ -400,7 +400,7 @@ const VCForm = (function() {
                             message = "This record has unsubmitted changes.<br/>Changes won't be visible to other users.";
                         } else if (this.record.publish_level === 'lab') {
                             message = `This record is only visible to users in your lab group.`;
-                        } else if (this.record.publish_level === 'institution') {
+                        } else if (this.record.publish_level === 'organisation') {
                             message = `This record is only visible to users in your organisation.`;
                         } else {
                             let message_suffix = VcSettings.LOGGED_IN_USERS_MESSAGE || "This record is shared to Shariant users.";
