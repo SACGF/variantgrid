@@ -36,7 +36,7 @@ from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
     AnalysisTemplateRun, AnalysisLock, Analysis
-from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample, QuadSample
+from analysis.models.enums import AnalysisTemplateType, SNPMatrix, MinimisationResultType, NodeStatus, TrioSample, QuadSample
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask
@@ -818,14 +818,7 @@ def view_analysis_settings(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     analysis_settings = get_analysis_settings(request.user, analysis)
 
-    form = forms.CreateAnalysisTemplateForm(request.POST or None, user=request.user, analysis=analysis)
-    if request.method == "POST":
-        if form.is_valid():
-            analysis_template = form.save()
-            return JsonResponse({"analysis_id": analysis_template.analysis_id})
-
     context = {"analysis": analysis,
-               "create_analysis_template_form": form,
                "new_analysis_settings": analysis_settings,
                "has_write_permission": analysis.can_write(request.user),
                "can_unlock": analysis.can_unlock(request.user)}
@@ -895,17 +888,31 @@ def _analysis_settings_node_counts_tab(request, analysis, pass_analysis_settings
     return render(request, 'analysis/analysis_settings_node_counts_tab.html', context)
 
 
-def analysis_settings_template_run_tab(request, analysis_id):
+def analysis_settings_template_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
 
-    node_variables = defaultdict(list)
-    for node in analysis.analysisnode_set.filter(analysisvariable__isnull=False).distinct().order_by("y"):
-        for av in node.analysisvariable_set.all().order_by("field"):
-            node_variables[node].append(av)
+    context = {"analysis": analysis}
 
-    context = {"analysis_template_run": analysis.analysistemplaterun,
-               "node_variables": defaultdict_to_dict(node_variables)}
-    return render(request, 'analysis/analysis_settings_template_run_tab.html', context)
+    # Template run info (if this analysis was generated from a template)
+    if hasattr(analysis, 'analysistemplaterun'):
+        analysis_template_run = analysis.analysistemplaterun
+        node_variables = defaultdict(list)
+        for node in analysis.analysisnode_set.filter(analysisvariable__isnull=False).distinct().order_by("y"):
+            for av in node.analysisvariable_set.all().order_by("field"):
+                node_variables[node].append(av)
+        context["analysis_template_run"] = analysis_template_run
+        context["node_variables"] = defaultdict_to_dict(node_variables)
+
+    # Create template form (if this analysis is not itself a template)
+    if analysis.template_type != AnalysisTemplateType.TEMPLATE:
+        form = forms.CreateAnalysisTemplateForm(request.POST or None, user=request.user, analysis=analysis)
+        if request.method == "POST":
+            if form.is_valid():
+                analysis_template = form.save()
+                return JsonResponse({"analysis_id": analysis_template.analysis_id})
+        context["create_analysis_template_form"] = form
+
+    return render(request, 'analysis/analysis_settings_template_tab.html', context)
 
 
 class AnalysisLogEntryWrapper:

@@ -2,8 +2,6 @@
 {% load tz %}
 {% load ui_tabs_builder %}
 {% load js_tags %}
-{% load crispy_forms_field %}
-{% load ui_utils %}
 <div id='analysis-settings-container'>
 <script>
 	IN_ANALYSIS = $("#analysis-and-toolbar-container").length > 0;
@@ -46,17 +44,6 @@
 		  $("#force-reload-nodes-button").hide();
 		}
 
-        let options = {
-            target: "#analysis-settings-container",
-            success: function(data) {
-                if (data.analysis_id) {
-                    window.open(Urls.analysis(data.analysis_id), '_blank');
-                }
-            },
-        };
-        let analysisTemplateForm = $('form#analysis-template-form');
-        analysisTemplateForm.ajaxForm(options);
-
         $('#force-reload-nodes-button').click(reloadNodes);
         $("button#lock-analysis-button").click(function() { lockAnalysis(); });
         $("button#unlock-analysis-button").click(function() { lockAnalysis(false); });
@@ -76,25 +63,11 @@
         {% if analysis.annotation_version %}
             {% ui_register_tab tab_set="analysis_tab" url='view_annotation_version_details' param=analysis.annotation_version.pk label="Annotation Version" %}
         {% endif %}
-        {% if analysis.analysistemplaterun %}
-            {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_template_run_tab' param=analysis.pk label="Template Run" %}
+        {% if analysis.analysistemplaterun or analysis.template_type != 'T' %}
+            {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_template_tab' param=analysis.pk label="Template" %}
         {% endif %}
         {% if analysis.has_audit_log %}
             {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_audit_log_tab' param=analysis.pk label="Audit Log" %}
-        {% endif %}
-
-        {% if analysis.template_type != 'T' %}
-            {% ui_register_tab_embedded tab_set="analysis_tab" label="Create Template" %}
-                <div id="create-template">
-                  <form id="analysis-template-form" method="post" action="{{ request.path }}">
-                    {% csrf_token %}
-                      {% labelled label="Unique Name" %}
-                        {% crispy_field create_analysis_template_form.name %}
-                      {% endlabelled %}
-                    <button id='create-analysis-template' class="btn btn-outline-primary">Create template from this analysis</button>
-                  </form>
-                </div>
-            {% end_ui_register_tab_embedded %}
         {% endif %}
         {% with lock_history=analysis.lock_history %}
             {% if lock_history %}
