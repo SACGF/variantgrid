@@ -96,13 +96,13 @@ class ShareLevelTest(TestCase):
     def test_from_key_current_values(self):
         self.assertEqual(ShareLevel.from_key('user'), ShareLevel.CURRENT_USER)
         self.assertEqual(ShareLevel.from_key('lab'), ShareLevel.LAB)
-        self.assertEqual(ShareLevel.from_key('organisation'), ShareLevel.INSTITUTION)
+        self.assertEqual(ShareLevel.from_key('organisation'), ShareLevel.ORGANISATION)
         self.assertEqual(ShareLevel.from_key('logged_in_users'), ShareLevel.ALL_USERS)
         self.assertEqual(ShareLevel.from_key('public'), ShareLevel.PUBLIC)
 
     def test_from_key_institution_alias(self):
         # 'institution' is the old DB value — must still resolve after migration
-        self.assertEqual(ShareLevel.from_key('institution'), ShareLevel.INSTITUTION)
+        self.assertEqual(ShareLevel.from_key('institution'), ShareLevel.ORGANISATION)
 
     def test_from_key_none(self):
         self.assertIsNone(ShareLevel.from_key(None))
@@ -112,7 +112,7 @@ class ShareLevelTest(TestCase):
 
     def test_from_key_by_index(self):
         self.assertEqual(ShareLevel.from_key(0), ShareLevel.CURRENT_USER)
-        self.assertEqual(ShareLevel.from_key(2), ShareLevel.INSTITUTION)
+        self.assertEqual(ShareLevel.from_key(2), ShareLevel.ORGANISATION)
 
     def test_from_key_invalid(self):
         with self.assertRaises(ValueError):

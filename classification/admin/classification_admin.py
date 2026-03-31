@@ -436,7 +436,7 @@ class ClassificationAdmin(ModelAdminBasics):
 
     @admin_action("Publish: Organisation")
     def publish_org(self, request, queryset):
-        self.publish_share_level(request, queryset, ShareLevel.INSTITUTION)
+        self.publish_share_level(request, queryset, ShareLevel.ORGANISATION)
 
     @admin_action("Publish: Logged in Users")
     def publish_logged_in_users(self, request, queryset):

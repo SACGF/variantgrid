@@ -14,7 +14,7 @@ Responsible for injecting or removing the unshared flag based on share level
 
 @receiver(classification_revalidate_signal, sender=Classification)
 def revalidate(sender, classification: Classification, **kwargs):  # pylint: disable=unused-argument
-    if settings.UNSHARED_FLAG_ENABLED and classification.share_level_enum.index <= ShareLevel.INSTITUTION.index:
+    if settings.UNSHARED_FLAG_ENABLED and classification.share_level_enum.index <= ShareLevel.ORGANISATION.index:
         classification.flag_collection_safe.get_or_create_open_flag_of_type(
             flag_type=classification_flag_types.unshared_flag,
         )
