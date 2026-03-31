@@ -11,6 +11,7 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import QuadInheritance, NodeErrorSource, AnalysisTemplateType
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.sources.trio_node import (
+    AbstractTrioInheritance,
     _build_family_zyg_q,
     _dominant_requires_affected_parent_error,
     _xlinked_recessive_errors,
@@ -173,6 +174,14 @@ class QuadCompHet(AbstractQuadInheritance):
 
 
 class QuadNode(AbstractCohortBasedNode):
+    INHERITANCE_CLASSES = {
+        QuadInheritance.COMPOUND_HET:      QuadCompHet,
+        QuadInheritance.RECESSIVE:         QuadRecessive,
+        QuadInheritance.DOMINANT:          QuadDominant,
+        QuadInheritance.DENOVO:            QuadDenovo,
+        QuadInheritance.XLINKED_RECESSIVE: QuadXLinkedRecessive,
+    }
+
     quad = models.ForeignKey(Quad, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=QuadInheritance.choices,
                                    default=QuadInheritance.RECESSIVE)
@@ -217,14 +226,8 @@ class QuadNode(AbstractCohortBasedNode):
         return self.quad is not None
 
     def _inheritance_factory(self):
-        classes = {
-            QuadInheritance.COMPOUND_HET:      QuadCompHet,
-            QuadInheritance.RECESSIVE:         QuadRecessive,
-            QuadInheritance.DOMINANT:          QuadDominant,
-            QuadInheritance.DENOVO:            QuadDenovo,
-            QuadInheritance.XLINKED_RECESSIVE: QuadXLinkedRecessive,
-        }
-        return classes[QuadInheritance(self.inheritance)](self)
+        klass = self.INHERITANCE_CLASSES[QuadInheritance(self.inheritance)]
+        return klass(self)
 
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
@@ -270,6 +273,76 @@ class QuadNode(AbstractCohortBasedNode):
     @staticmethod
     def get_help_text() -> str:
         return "Mother/Father/Proband/Sibling - filter for recessive/dominant/denovo inheritance"
+
+    @staticmethod
+    def get_zygosity_table_data() -> dict:
+        """Build zygosity display data for all inheritance modes, for the node editor UI.
+
+        Instantiates each inheritance class and calls its zygosity methods directly,
+        so the table always matches the actual filtering logic.
+        For modes where affected status matters, includes both affected/unaffected variants.
+        """
+        fmt = AbstractTrioInheritance._zygosity_options
+        members = ['mother', 'father', 'proband', 'sibling']
+
+        # Stub node so inheritance classes can access self.node.quad.*_affected
+        class _Stub:
+            pass
+        stub_node = _Stub()
+        stub_node.quad = _Stub()
+
+        # Members whose zygosity varies with affected status per mode
+        affected_members = {
+            QuadInheritance.DOMINANT: ['mother', 'father', 'sibling'],
+            QuadInheritance.RECESSIVE: ['sibling'],
+            QuadInheritance.XLINKED_RECESSIVE: ['sibling'],
+        }
+
+        data = {}
+        for mode, klass in QuadNode.INHERITANCE_CLASSES.items():
+            if issubclass(klass, SimpleQuadInheritance):
+                varies = affected_members.get(mode, [])
+                if varies:
+                    entry = {}
+                    # Generate with all affected=True and all affected=False
+                    for affected_val in (False, True):
+                        stub_node.quad.mother_affected = affected_val
+                        stub_node.quad.father_affected = affected_val
+                        stub_node.quad.sibling_affected = affected_val
+                        handler = klass(stub_node)
+                        zyg = handler._get_mum_dad_proband_sibling_zygosities()
+                        suffix = '_affected' if affected_val else '_unaffected'
+                        for member, zyg_set in zip(members, zyg):
+                            if member in varies:
+                                entry[member + suffix] = fmt(zyg_set)
+                            elif not affected_val:
+                                # Only set plain key once (same either way)
+                                entry[member] = fmt(zyg_set)
+                    data[mode] = entry
+                else:
+                    # No affected-dependent members — set defaults and call once
+                    stub_node.quad.mother_affected = False
+                    stub_node.quad.father_affected = False
+                    stub_node.quad.sibling_affected = False
+                    handler = klass(stub_node)
+                    zyg = handler._get_mum_dad_proband_sibling_zygosities()
+                    data[mode] = {member: fmt(z) for member, z in zip(members, zyg)}
+            else:
+                # CompHet — use _mum_but_not_dad / _dad_but_not_mum
+                handler = klass(stub_node)
+                mum1, dad1, proband1, sibling1 = handler._mum_but_not_dad()
+                data[mode] = {
+                    'mother': '',
+                    'father': '',
+                    'proband': fmt(proband1),
+                    'sibling': fmt(sibling1),
+                    'note': 'Proband HET with \u22652 hits in a gene, one from each parent; sibling HET for each hit',
+                }
+
+            if mode == QuadInheritance.XLINKED_RECESSIVE:
+                data[mode]['note'] = 'Chr X only'
+
+        return data
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()

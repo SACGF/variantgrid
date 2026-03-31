@@ -33,6 +33,7 @@ from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
 from analysis.views.views_json import get_sample_patient_gene_disease_data
+from snpdb.models.models_user_settings import UserSettings
 from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
@@ -304,7 +305,18 @@ class TissueNodeView(NodeView):
     form_class = TissueNodeForm
 
 
-class TrioNodeView(NodeView):
+class ZygosityTableMixin:
+    """Adds zygosity table data and initial visibility setting to context."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_settings = UserSettings.get_for_user(self.request.user)
+        context["zygosity_table_data"] = self.model.get_zygosity_table_data()
+        context["initially_show_zygosity_table"] = user_settings.initially_show_zygosity_table
+        return context
+
+
+class TrioNodeView(ZygosityTableMixin, NodeView):
     model = TrioNode
     form_class = TrioNodeForm
 
@@ -314,7 +326,7 @@ class TrioNodeView(NodeView):
         return form_kwargs
 
 
-class QuadNodeView(NodeView):
+class QuadNodeView(ZygosityTableMixin, NodeView):
     model = QuadNode
     form_class = QuadNodeForm
 

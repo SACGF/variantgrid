@@ -206,6 +206,14 @@ class CompHet(AbstractTrioInheritance):
 
 
 class TrioNode(AbstractCohortBasedNode):
+    INHERITANCE_CLASSES = {
+        TrioInheritance.COMPOUND_HET: CompHet,
+        TrioInheritance.RECESSIVE: Recessive,
+        TrioInheritance.DOMINANT: Dominant,
+        TrioInheritance.DENOVO: Denovo,
+        TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive,
+    }
+
     trio = models.ForeignKey(Trio, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=TrioInheritance.choices, default=TrioInheritance.RECESSIVE)
     require_zygosity = models.BooleanField(default=True)
@@ -251,14 +259,7 @@ class TrioNode(AbstractCohortBasedNode):
         return self.trio is not None
 
     def _inheritance_factory(self):
-        inhertiance_classes = {
-            TrioInheritance.COMPOUND_HET: CompHet,
-            TrioInheritance.RECESSIVE: Recessive,
-            TrioInheritance.DOMINANT: Dominant,
-            TrioInheritance.DENOVO: Denovo,
-            TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive
-        }
-        klass = inhertiance_classes[TrioInheritance(self.inheritance)]
+        klass = self.INHERITANCE_CLASSES[TrioInheritance(self.inheritance)]
         return klass(self)
 
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
@@ -298,6 +299,64 @@ class TrioNode(AbstractCohortBasedNode):
     @staticmethod
     def get_help_text() -> str:
         return "Mother/Father/Proband - filter for recessive/dominant/denovo inheritance"
+
+    @staticmethod
+    def get_zygosity_table_data() -> dict:
+        """Build zygosity display data for all inheritance modes, for the node editor UI.
+
+        Instantiates each inheritance class and calls its zygosity methods directly,
+        so the table always matches the actual filtering logic.
+        For Dominant (affected-dependent), includes both affected/unaffected variants.
+        """
+        fmt = AbstractTrioInheritance._zygosity_options
+        members = ['mother', 'father', 'proband']
+
+        # Stub node so inheritance classes can access self.node.trio.mother_affected etc.
+        class _Stub:
+            pass
+        stub_node = _Stub()
+        stub_node.trio = _Stub()
+
+        data = {}
+        for mode, klass in TrioNode.INHERITANCE_CLASSES.items():
+            if issubclass(klass, SimpleTrioInheritance):
+                if mode == TrioInheritance.DOMINANT:
+                    # Dominant depends on affected status — generate both variants
+                    entry = {}
+                    for affected_combo in [(False, False), (True, True)]:
+                        stub_node.trio.mother_affected, stub_node.trio.father_affected = affected_combo
+                        handler = klass(stub_node)
+                        zyg = handler._get_mum_dad_proband_zygosities()
+                        suffix = '_affected' if affected_combo[0] else '_unaffected'
+                        for member, zyg_set in zip(members[:2], zyg[:2]):
+                            entry[member + suffix] = fmt(zyg_set)
+                    # Proband is the same regardless of affected status
+                    stub_node.trio.mother_affected = True
+                    stub_node.trio.father_affected = True
+                    handler = klass(stub_node)
+                    entry['proband'] = fmt(handler._get_mum_dad_proband_zygosities()[2])
+                    data[mode] = entry
+                else:
+                    handler = klass(stub_node)
+                    zyg = handler._get_mum_dad_proband_zygosities()
+                    entry = {member: fmt(z) for member, z in zip(members, zyg)}
+                    data[mode] = entry
+            else:
+                # CompHet — use _mum_but_not_dad / _dad_but_not_mum
+                handler = klass(stub_node)
+                mum1, dad1, proband1 = handler._mum_but_not_dad()
+                data[mode] = {
+                    'mother': '',
+                    'father': '',
+                    'proband': fmt(proband1),
+                    'note': 'Proband HET with \u22652 hits in a gene, one from each parent',
+                }
+
+            # Add notes for modes with extra constraints
+            if mode == TrioInheritance.XLINKED_RECESSIVE:
+                data[mode]['note'] = 'Chr X only'
+
+        return data
 
     def get_rendering_args(self):
         if not self.trio:

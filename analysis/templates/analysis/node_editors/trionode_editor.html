@@ -2,16 +2,40 @@
 {% load static %}
 {% block docreadyjs %}
     var trioForm = $("#trio-form");
+    var ZYGOSITY_MAP = JSON.parse(document.getElementById('zygosity-data').textContent);
+    var motherAffected = false, fatherAffected = false;
 
     function getTrioId() {
        return $("#id_trio", trioForm).find(":selected").val();
+    }
+
+    function updateZygosityTable() {
+        var mode = $("#id_inheritance").val();
+        var map = ZYGOSITY_MAP[mode];
+        if (!map) return;
+
+        var requireZyg = $("#id_require_zygosity").is(":checked");
+        var suffix = ', ?';
+
+        function memberZyg(key, affected) {
+            var val = map[key + (affected ? '_affected' : '_unaffected')] || map[key];
+            if (val === undefined || val === null) return '';
+            if (!val) return '--';
+            if (!requireZyg && key !== 'proband') val += suffix;
+            return val;
+        }
+
+        $(".zyg-mother").text(memberZyg('mother', motherAffected));
+        $(".zyg-father").text(memberZyg('father', fatherAffected));
+        $(".zyg-proband").text(map.proband || '');
+        $("#zygosity-note").text(map.note || '');
     }
 
     function displayTrioInfo(data) {
         var trioInfo = $("#trio-info");
         var SAMPLE_FIELDS = ["mother", "father", "proband"];
         var AFFECTED_FIELDS = ["mother_affected", "father_affected"];
-        
+
         for (var i=0 ; i<SAMPLE_FIELDS.length ; ++i) {
             var f = SAMPLE_FIELDS[i];
             var value = data[f];
@@ -23,11 +47,14 @@
             var affectedText = data[affected]? "affected" : "unaffected";
             $("." + affected, trioInfo).text(affectedText);
         }
-        
+
+        motherAffected = data.mother_affected;
+        fatherAffected = data.father_affected;
         trioInfo.show();
         var one_affected = data.mother_affected || data.father_affected;
         setDominantSelectAvailable(one_affected);
         loadCohortVCFLocusFilter(data.cohort);
+        updateZygosityTable();
     }
 
     function changeTrio() {
@@ -42,6 +69,8 @@
         }
     }
     $("#id_trio").change(changeTrio);
+    $("#id_inheritance").change(updateZygosityTable);
+    $("#id_require_zygosity").change(updateZygosityTable);
 
     function setDominantSelectAvailable(one_affected) {
         var inheritance_select = $("#id_inheritance", trioForm);
@@ -53,6 +82,7 @@
     }
 
     changeTrio();
+    updateZygosityTable();
 
     ajaxForm(trioForm);
 {% endblock docreadyjs %}
@@ -88,6 +118,28 @@
             <div>
     		  <b>Inheritance:</b> {{ form.inheritance }}{{ form.inheritance.errors }}
               <b>Require Parent Zygosity Calls:</b> {{ form.require_zygosity }}{{ form.require_zygosity.errors }}
+            </div>
+            {{ zygosity_table_data|json_script:"zygosity-data" }}
+            <div>
+                <a data-toggle="collapse" data-target="#zygosity-table-collapse"
+                   aria-expanded="{{ initially_show_zygosity_table|yesno:'true,false' }}"
+                   aria-controls="zygosity-table-collapse" href="#">
+                    Zygosity Requirements...
+                </a>
+                <div class="collapse {% if initially_show_zygosity_table %}show{% endif %}"
+                     id="zygosity-table-collapse">
+                    <table class="table table-sm table-bordered mt-1" id="zygosity-table">
+                        <thead>
+                            <tr><th>Member</th><th>Expected Zygosity</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Mother</td><td class="zyg-mother"></td></tr>
+                            <tr><td>Father</td><td class="zyg-father"></td></tr>
+                            <tr><td>Proband</td><td class="zyg-proband"></td></tr>
+                        </tbody>
+                    </table>
+                    <div id="zygosity-note" class="text-muted small"></div>
+                </div>
             </div>
             <div>
                 {% load vcf_locus_filter_tags %}

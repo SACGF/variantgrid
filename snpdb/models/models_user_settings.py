@@ -198,6 +198,9 @@ class SettingsOverride(models.Model):
     show_candidates_cross_sample_classification = models.BooleanField(null=True, blank=True, help_text="Show candidates on sample / classification pages (You can always explicitly go to the candidate pages)")
     show_candidates_classification_evidence_update = models.BooleanField(null=True, blank=True, help_text="Show candidates on sample / classification pages (You can always explicitly go to the candidate pages)")
 
+    initially_show_zygosity_table = models.BooleanField(null=True, blank=True,
+                                                         help_text="Initially expand the zygosity requirements table in Trio/Quad node editors")
+
 
 class GlobalSettings(SettingsOverride):
     def save(self, *args, **kwargs):
@@ -373,6 +376,7 @@ class UserSettings:
     show_candidates_reanalysis_new_annotation: bool
     show_candidates_cross_sample_classification: bool
     show_candidates_classification_evidence_update: bool
+    initially_show_zygosity_table: bool
 
     @staticmethod
     def parse_value(field_name: str, value: Any) -> Any:
