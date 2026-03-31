@@ -232,7 +232,7 @@ class OverlapEntryCompare:
 
     @property
     def is_cross_context(self) -> bool:
-        return self.entry_1.testing_context_bucket_obj != self.entry_2.testing_context_bucket_obj
+        return self.entry_1.testing_context_full != self.entry_2.testing_context_full
 
     @property
     def sort_value(self):

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from functools import reduce, cached_property
 from typing import Any, Optional
 
@@ -10,7 +11,7 @@ from django.db.models.enums import TextChoices
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 from annotation.models import ClinVarRecord
-from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys
+from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, TriageStatus, \
     OverlapEntrySourceTextChoices, EffectiveDateType, OverlapContributionChangeSource
@@ -93,6 +94,13 @@ class OverlapContribution(TimeStampedModel):
         super().__init__(*args, **kwargs)
         self._change_comment = None
 
+    @property
+    def testing_context_full(self) -> TestingContextFull:
+        return TestingContextFull(
+            testing_context_bucket=self.testing_context_bucket_obj,
+            tumor_type_category=self.tumor_type_category
+        )
+
     def set_change_comment(self, change_comment: str):
         self._change_comment = change_comment
 
@@ -141,6 +149,15 @@ class OverlapContribution(TimeStampedModel):
     @property
     def pretty_value(self) -> str:
         return OverlapContribution.pretty_value_for(self.value, self.value_type)
+
+    @property
+    def value_sort_index(self):
+        if self.value_type == ClassificationResultValue.ONC_PATH:
+            return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).classification_sorter_value(self.value)
+        elif self.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+            return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).classification_sorter_value(self.value)
+        else:
+            return 0
 
     @staticmethod
     def pretty_value_for(value: Optional[str], value_type: ClassificationResultValue):
@@ -355,3 +372,6 @@ class OverlapContributionSkew(TimeStampedModel):
     overlap = models.ForeignKey(Overlap, on_delete=CASCADE)
     contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
     skew_perspective = models.TextField(max_length=1, choices=TriageNextStep.choices, default=TriageNextStep.PENDING_CALCULATION)
+
+    def __str__(self):
+        return f"overlap = {self.overlap}, contribution = {self.contribution}, perspective = {self.skew_perspective}"

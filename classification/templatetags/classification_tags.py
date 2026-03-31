@@ -13,12 +13,12 @@ from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
 from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, TestingContextBucket
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
     EvidenceMixin, ClassificationSummaryCacheDictPathogenicity, Overlap, ClassificationGroupingEntry, \
     OverlapContribution, ClassificationSummaryCacheDictSomatic, \
-    ClassificationGrouping, ClassificationResultValue, TriageStatus
+    ClassificationGrouping, ClassificationResultValue, TriageStatus, TestingContextFull
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -253,6 +253,8 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
         value = value.get(evidence_key)
     if value is None and not show_if_none:
         return {"skip": True}
+    if isinstance(value, str) and "tier" in value:
+        evidence_key = SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE
 
     key = EvidenceKeyMap.cached_key(evidence_key)
     label = key.option_dictionary.get(value, value) or "No Data"
@@ -260,7 +262,8 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
     if value == "withdrawn":
         label = "Withdrawn"
 
-    prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"
+    #prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"
+    prefix = "cs"
     css_value = value.lower() if value else "none"
     css_class = f"{prefix} {prefix}-{css_value}"
 
@@ -772,9 +775,9 @@ def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompar
 
 
 @register.inclusion_tag("classification/tags/testing_context.html")
-def testing_context(obj: OverlapContribution):
+def testing_context(obj: Union[OverlapContribution, TestingContextFull]):
     return {
-        "testing_context": obj.testing_context_bucket_obj,
+        "testing_context": TestingContextBucket(obj.testing_context_bucket),
         "tumor_type": obj.tumor_type_category
     }
 

@@ -16,18 +16,24 @@ from snpdb.models import GenomeBuild
 
 @dataclass(frozen=True)
 class CSVFormatDetails:
-    full_detail = False
+    full_detail: bool = False
     html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
+    html_links: bool = True
 
 
 @dataclass(frozen=True)
 class CSVNonEvidence(ExportRow):
     classification_grouping: ClassificationGrouping
     date_str: str
+    formatter: CSVFormatDetails
 
     @export_column(label="URL")
     def url(self):
-        return get_url_from_view_path(self.classification_grouping.get_absolute_url()) + "?refer=csv&seen=" + self.date_str
+        base_link = get_url_from_view_path(self.classification_grouping.get_absolute_url())
+        if self.formatter.html_links:
+            return f"<a href=\"{base_link}\?refer=csv&seen={self.date_str}\">{base_link}</a>"
+        else:
+            return f"{base_link}?refer=csv&seen={self.date_str}"
 
     @export_column(label="Lab")
     def lab(self):
@@ -114,6 +120,6 @@ class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportForma
         for row in self.queryset().iterator():
             cm = row.latest_classification_modification
             row_data = []
-            row_data.extend(CSVNonEvidence(row, date_str=self.classification_grouping_filter.date_str).to_csv(export_tweak=self.export_tweak))
+            row_data.extend(CSVNonEvidence(row, date_str=self.classification_grouping_filter.date_str, formatter=self.csv_format_details).to_csv(export_tweak=self.export_tweak))
             row_data.extend(self.used_keys.row(cm, formatter=self.csv_format_details.html_handling.format))
             yield delimited_row(row_data, include_new_line=False)

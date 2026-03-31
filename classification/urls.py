@@ -11,6 +11,7 @@ from classification.views.classification_email_view import summary_email_preview
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
+from classification.views.classification_grouping_view import view_overlaps_for_classification_grouping
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
 from classification.views.classification_overlaps_views2 import TriageView, view_overlaps2, view_overlaps3
@@ -191,14 +192,15 @@ urlpatterns = [
     path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
     path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
 
-    path('overlaps2', view_overlaps2, name='overlaps2'),
-    path('overlaps2/<str:lab_id>', view_overlaps2, name='overlaps2'),
-    path('overlaps2/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingOverlapsColumns), name='overlaps2_datatables'),
+    # path('overlaps2', view_overlaps2, name='overlaps2'),
+    # path('overlaps2/<str:lab_id>', view_overlaps2, name='overlaps2'),
+    # path('overlaps2/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingOverlapsColumns), name='overlaps2_datatables'),
 
     path('overlaps3', view_overlaps3, name='overlaps2'),
     path('overlaps3/<str:lab_id>', view_overlaps3, name='overlaps2'),
     path('overlaps3/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingOverlapsColumns3),
          name='overlaps3_datatables'),
+    path('overlaps/for_classification_grouping/<int:classification_grouping_id>', view_overlaps_for_classification_grouping, name='overlaps_for_classification_grouping'),
 
     path('vus', view_overlaps_vus, name='vus'),
     path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),

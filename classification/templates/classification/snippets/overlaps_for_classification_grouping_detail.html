@@ -1,0 +1,31 @@
+{% load classification_tags %}
+{% load ui_utils %}
+{% labelled label="Allele" %}<a href="{{ allele.get_absolute_url }}">{{ allele }}</a>{% endlabelled %}
+{% for summary in summaries %}
+    <div class="card" style="margin:auto; max-width:800px; margin-top:20px; margin-bottom:20px">
+        <div class="card-header">{{ summary.value_type_label }}</div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Context</th>
+                        <th>Lab</th>
+                        <th>Value</th>
+                        <th>Triage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for overlap_entry in summary.overlap_entries %}
+                        <tr {% if overlap_entry.is_primary %}style="font-weight:bold"{% elif not overlap_entry.is_primary_context %}style="opacity:0.6"{% endif %}>
+                            <td>{% testing_context overlap_entry.overlap_contribution %}</td>
+                            <td>{{ overlap_entry.overlap_contribution.lab|default_if_none:"ClinVar" }}</td>
+                            <td>{% clinical_significance overlap_entry.overlap_contribution.value %}</td>
+                            <td>{% triage overlap_entry.overlap_contribution show_label=True show_link=overlap_entry.is_primary %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+{% endfor  %}

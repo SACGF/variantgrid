@@ -3,7 +3,7 @@
 {% endif %}
 {% for c_value in values.sorted %}
     {% if not forloop.first %}, {% endif %}
-    {% if c_value.your_contribution %}<b class="hover-detail" title="Your Value">{{ c_value.value }}</b>
-    {% elif not c_value.your_context %}<span class="no-value" title="Cross Context">{{ c_value.value }}</span>
-    {% else %}{{ c_value.value }}{% endif %}
+    {% if c_value.your_contribution %}<b class="hover-detail" title="Your Value">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.value }}{% endif %}</b>
+    {% elif not c_value.your_context %}<span class="no-value" title="Cross Context">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.value }}{% endif %}</span>
+    {% else %}{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.value }}{% endif %}{% endif %}
 {% endfor %}

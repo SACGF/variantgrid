@@ -1,4 +1,5 @@
 import typing
+from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
 from typing import Optional, Union, Self
@@ -83,6 +84,18 @@ class TestingContextBucket(TextChoices):
             case TestingContextBucket.UNKNOWN: return AlleleOriginBucket.UNKNOWN
             case TestingContextBucket.GERMLINE: return AlleleOriginBucket.GERMLINE
             case _: return AlleleOriginBucket.SOMATIC
+
+
+@dataclass(frozen=True)
+class TestingContextFull:
+    testing_context_bucket: TestingContextBucket
+    tumor_type_category: Optional[str] = None
+
+    def __str__(self):
+        if ttc := self.tumor_type_category:
+            return f"{self.testing_context_bucket.label} {ttc}"
+        else:
+            return self.testing_context_bucket.label
 
 
 class AlleleOriginBucket(TextChoices):

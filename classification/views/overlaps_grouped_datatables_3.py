@@ -150,7 +150,6 @@ class ClassificationGroupingOverlapsColumns3(DatatableConfig[ClassificationGroup
     def render_onc_path(self, cell: CellData):
         self.apply_extra_data(cell)
         onc_path_values: ContributionValues = cell.transient["onc_path"]
-        print(onc_path_values.sorted())
         context = {"values": onc_path_values}
         return render_to_string('classification/snippets/overlaps_value_cell.html',
                          context,
@@ -160,142 +159,24 @@ class ClassificationGroupingOverlapsColumns3(DatatableConfig[ClassificationGroup
     def render_clin_sig(self, cell: CellData):
         self.apply_extra_data(cell)
         clin_sig_values: ContributionValues = cell.transient["clin_sig"]
-        print(clin_sig_values.sorted())
-        context = {"values": clin_sig_values}
+        context = {"values": clin_sig_values, "pretty_value": True}
         return render_to_string('classification/snippets/overlaps_value_cell.html',
-                         context,
+                         context=context,
                          request=self.request,
                          )
-
-        # if your_classification_entry := cell.obj.overlapcontribution_set.filter(value_type=ClassificationResultValue.ONC_PATH, contribution=OverlapContributionStatus.CONTRIBUTING).first():
-        #     context["classification_entry"] = your_classification_entry
-        #     onc_path_entries = self.other_overlap_entries(onc_path_overlaps, cell.obj)
-        #     context["onc_path_entries"] = sorted([OverlapEntryCompare(your_classification_entry, entry, ClassificationResultValue.ONC_PATH) for entry in onc_path_entries], reverse=True)
-        #
-        # if your_clinical_significance_entry := cell.obj.overlapcontribution_set.filter(value_type=ClassificationResultValue.CLINICAL_SIGNIFICANCE, contribution=OverlapContributionStatus.CONTRIBUTING).first():
-        #     context["clinical_significance_entry"] = your_clinical_significance_entry
-        #     clin_sig_entries = self.other_overlap_entries(clin_sig_overlaps, cell.obj)
-        #     context["clin_sig_entries"] = sorted([OverlapEntryCompare(your_clinical_significance_entry, entry, ClassificationResultValue.CLINICAL_SIGNIFICANCE) for entry in clin_sig_entries], reverse=True)
-        #
-        # overlap_groupings = []
-        #
-        # if onc_path_grouping := OverlapGrouping.overlap_grouping_for(cell.obj, ClassificationResultValue.ONC_PATH, not self.is_single_context_only):
-        #     overlap_groupings.append(onc_path_grouping)
-        # if clin_sig_contributions := OverlapGrouping.overlap_grouping_for(cell.obj, ClassificationResultValue.CLINICAL_SIGNIFICANCE, not self.is_single_context_only):
-        #     overlap_groupings.append(clin_sig_contributions)
-        #
-        # cell.transient[]
-
-    #
-    # def render_classification_grouping(self, cell: CellData[ClassificationGrouping]):
-    #     overlaps = Overlap.objects.filter(
-    #         overlapcontributionskew__contribution__classification_grouping=cell.obj,
-    #         valid=True,
-    #         overlap_status__gte=OverlapStatus.NO_CONTRIBUTIONS)
-    #     # if self.is_single_context_only:
-    #     #     overlaps = overlaps.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
-    #
-    #     # we still want to render a bunch of non-discordant overlaps for context, but only list classifications that are in discordance
-    #     onc_path_overlaps = [overlap for overlap in overlaps if overlap.value_type == ClassificationResultValue.ONC_PATH]
-    #     clin_sig_overlaps = [overlap for overlap in overlaps if overlap.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE]
-    #
-    #     onc_path_values = set()
-    #     onc_path_multi_values = set()
-    #     for overlap in onc_path_overlaps:
-    #         for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING).all():
-    #             if contribution.testing_context_bucket != cell.obj.testing_context:
-    #                 onc_path_multi_values.add(contribution.value)
-    #             else:
-    #                 onc_path_values.add(contribution.value)
-    #
-    #     if self.is_single_context_only:
-    #         onc_path_multi_values = set()
-    #
-    #     clin_sig_values = set()
-    #     for overlap in clin_sig_overlaps:
-    #         for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING).all():
-    #             clin_sig_values.add(contribution.value)
-    #
-    #     e_clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-    #
-    #     # print(onc_path_values)
-    #     # print(onc_path_multi_values)
-    #     context = {
-    #         "grouping": cell.obj,
-    #         "multi_context": not self.is_single_context_only,
-    #         "onc_path_values": EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).sort_values(onc_path_values),
-    #         "onc_path_multi_values": EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).sort_values(onc_path_multi_values),
-    #         "clin_sig_values": [e_clin_sig.pretty_value(val) for val in e_clin_sig.sort_values(clin_sig_values)]
-    #     }
-    #     return render_to_string('classification/snippets/classification_grouping_cell.html',
-    #                             context,
-    #                             request=self.request,
-    #                             )
-    #
-    # # def other_overlap_entries(self, overlaps: list[Overlap], classification_grouping: ClassificationGrouping) -> set[OverlapContribution]:
-    # #     other_entries: set[OverlapContribution] = set()
-    # #     for overlap in overlaps:
-    # #         for contribution in overlap.contributions.filter(contribution=OverlapContributionStatus.CONTRIBUTING).all():
-    # #             # Only provide one entry per classification grouping
-    # #             if contribution.classification_grouping_id == classification_grouping.pk:
-    # #                 continue
-    # #                 # other_entries.add(contribution)
-    # #             else:
-    # #                 other_entries.add(contribution)
-    # #     return other_entries
-    #
-    # def render_overlaps(self, cell: CellData[ClassificationGrouping]):
-    #     # FIXME getting all overlaps during testing
-    #     # overlaps = Overlap.objects.filter(contributions__classification_grouping=cell.obj, valid=True, overlap_status__gte=OverlapStatus.NO_CONTRIBUTIONS)
-    #     # if self.is_single_context_only:
-    #     #     overlaps = overlaps.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
-    #     #
-    #     # # we still want to render a bunch of non-discordant overlaps for context, but only list classifications that are in discordance
-    #     # onc_path_overlaps = [overlap for overlap in overlaps if overlap.value_type == ClassificationResultValue.ONC_PATH]
-    #     # clin_sig_overlaps = [overlap for overlap in overlaps if overlap.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE]
-    #     #
-    #     # context = {
-    #     #     "classification_grouping": cell.obj,
-    #     #     "onc_path_overlaps": onc_path_overlaps,
-    #     #     "clin_sig_overlaps": clin_sig_overlaps
-    #     # }
-    #     #
-    #     # if your_classification_entry := cell.obj.overlapcontribution_set.filter(value_type=ClassificationResultValue.ONC_PATH, contribution=OverlapContributionStatus.CONTRIBUTING).first():
-    #     #     context["classification_entry"] = your_classification_entry
-    #     #     onc_path_entries = self.other_overlap_entries(onc_path_overlaps, cell.obj)
-    #     #     context["onc_path_entries"] = sorted([OverlapEntryCompare(your_classification_entry, entry, ClassificationResultValue.ONC_PATH) for entry in onc_path_entries], reverse=True)
-    #     #
-    #     # if your_clinical_significance_entry := cell.obj.overlapcontribution_set.filter(value_type=ClassificationResultValue.CLINICAL_SIGNIFICANCE, contribution=OverlapContributionStatus.CONTRIBUTING).first():
-    #     #     context["clinical_significance_entry"] = your_clinical_significance_entry
-    #     #     clin_sig_entries = self.other_overlap_entries(clin_sig_overlaps, cell.obj)
-    #     #     context["clin_sig_entries"] = sorted([OverlapEntryCompare(your_clinical_significance_entry, entry, ClassificationResultValue.CLINICAL_SIGNIFICANCE) for entry in clin_sig_entries], reverse=True)
-    #
-    #     overlap_groupings = []
-    #
-    #     if onc_path_grouping := OverlapGrouping.overlap_grouping_for(cell.obj, ClassificationResultValue.ONC_PATH, not self.is_single_context_only):
-    #         overlap_groupings.append(onc_path_grouping)
-    #     if clin_sig_contributions := OverlapGrouping.overlap_grouping_for(cell.obj, ClassificationResultValue.CLINICAL_SIGNIFICANCE, not self.is_single_context_only):
-    #         overlap_groupings.append(clin_sig_contributions)
-    #
-    #     context = {
-    #         "multi_context": not self.is_single_context_only,
-    #         "overlap_groupings": overlap_groupings
-    #     }
-    #
-    #     return render_to_string('classification/snippets/overlaps_cell.html',
-    #                             context=context,
-    #                             request=self.request
-    #                             )
 
     def render_c_hgvs(self, cell: CellData[ClassificationGrouping]):
         return CHGVS(cell.obj.latest_allele_info.imported_c_hgvs).to_json()
 
     def render_context(self, cell: CellData[ClassificationGrouping]):
-        return cell.obj.testing_context.name
+        return render_to_string('classification/snippets/testing_context_cell.html',
+                                context={"testing_context": cell.obj.testing_context_full},
+                                request=self.request)
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('overlaps_for_classification_grouping', expected_height=108)
         self.rich_columns = [
             RichColumn(
                 name="classification",
@@ -303,6 +184,12 @@ class ClassificationGroupingOverlapsColumns3(DatatableConfig[ClassificationGroup
                 sort_keys=["latest_allele_info__grch38__genomic_sort"],
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
+            ),
+
+            RichColumn(
+                name="id",
+                renderer=lambda x: x.obj.pk,
+                visible=False
             ),
 
             RichColumn(

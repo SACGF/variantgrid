@@ -3024,10 +3024,11 @@ a.clinical-context {
 .testing-context-box {
     font-size: 8pt;
     text-align: center;
-	border-radius: 8px;
     display: inline-block;
     position: relative;
     width: 80px;
+	padding: 4px;
+	border-radius: 6px;
     background-color: #ddbbdd;
 
     /*

@@ -14,7 +14,7 @@ from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
 
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket, TestingContextFull
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved, ConditionReference
@@ -221,6 +221,10 @@ class ClassificationGrouping(TimeStampedModel):
     @property
     def tumor_type(self) -> str:
         return self.allele_origin_grouping.tumor_type_category
+
+    @property
+    def testing_context_full(self) -> TestingContextFull:
+        return TestingContextFull(testing_context_bucket=self.testing_context, tumor_type_category=self.tumor_type)
 
     @property
     def allele_origin_bucket(self):
