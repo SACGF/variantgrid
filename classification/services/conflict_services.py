@@ -653,12 +653,12 @@
 #
 #         for testing_context_str, sub_sub_conflicts in sort_and_group_by(sub_conflicts, lambda c: c.testing_context_bucket):
 #
-#             testing_context = TestingContextBucket(testing_context_str)
-#             testing_link_parts = link_parts + [testing_context.value, testing_context.label]
+#             testing_context_bucket = TestingContextBucket(testing_context_str)
+#             testing_link_parts = link_parts + [testing_context_bucket.value, testing_context_bucket.label]
 #
 #             testing_context_css = [allele_origin_css]
 #             testing_context_matches = False
-#             if allele_origin_matches and currently_viewing and currently_viewing.testing_context_bucket == testing_context:
+#             if allele_origin_matches and currently_viewing and currently_viewing.testing_context_bucket == testing_context_bucket:
 #                 testing_context_matches = True
 #                 testing_context_css += ["currently-viewing"]
 #
@@ -667,7 +667,7 @@
 #                 # TODO what does germline or not have to do with it??
 #                 href = href_for_parts(testing_link_parts)
 #
-#             table.add_cell(1, RowSpanCellValue(testing_context.label, css_classes=testing_context_css, href=href, link_type=LinkType.JAVASCRIPT))
+#             table.add_cell(1, RowSpanCellValue(testing_context_bucket.label, css_classes=testing_context_css, href=href, link_type=LinkType.JAVASCRIPT))
 #
 #             for condition, sub_sub_sub_conflicts in sort_and_group_by(sub_sub_conflicts, lambda c: c.tumor_type_category or "PLACEHOLDER"):
 #                 condition_css = [allele_origin_css]
@@ -679,7 +679,7 @@
 #                 if condition == "PLACEHOLDER":
 #                     condition_css += ["no-value"]
 #                     condition = "N/A"
-#                     if testing_context.should_have_subdivide:
+#                     if testing_context_bucket.should_have_subdivide:
 #                         condition = "Indeterminate condition"
 #
 #                 table.add_cell(2, RowSpanCellValue(condition, css_classes=condition_css))
@@ -687,7 +687,7 @@
 #                 for value_type, sub_sub_sub_sub_conflicts in sort_and_group_by(sub_sub_sub_conflicts, lambda c: ConflictType(c.conflict_type)):
 #                     sub_sub_sub_sub_conflicts_list = list(sub_sub_sub_sub_conflicts)
 #                     if len(sub_sub_sub_sub_conflicts_list) != 1:
-#                         raise ValueError(f"Multiple conflicts found for {allele_origin} {testing_context} {condition} {sub_sub_sub_sub_conflicts_list}")
+#                         raise ValueError(f"Multiple conflicts found for {allele_origin} {testing_context_bucket} {condition} {sub_sub_sub_sub_conflicts_list}")
 #
 #                     conflict = sub_sub_sub_sub_conflicts_list[0]
 #                     value_type_label = ConflictType(value_type).label_for_context(allele_origin_bucket)

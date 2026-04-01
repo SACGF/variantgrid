@@ -35,7 +35,6 @@ from classification.views.exports_grouping.classification_grouping_export_view i
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
 from classification.views.overlaps_grouped_datatables import ClassificationGroupingOverlapsColumns
-from classification.views.overlaps_grouped_datatables_3 import ClassificationGroupingOverlapsColumns3
 from classification.views.views import classification_import_tool, AutopopulateView
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
@@ -198,7 +197,7 @@ urlpatterns = [
 
     path('overlaps3', view_overlaps3, name='overlaps2'),
     path('overlaps3/<str:lab_id>', view_overlaps3, name='overlaps2'),
-    path('overlaps3/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingOverlapsColumns3),
+    path('overlaps3/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingOverlapsColumns),
          name='overlaps3_datatables'),
     path('overlaps/for_classification_grouping/<int:classification_grouping_id>', view_overlaps_for_classification_grouping, name='overlaps_for_classification_grouping'),
 

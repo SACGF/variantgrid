@@ -31,7 +31,7 @@ class OverlapContributionAdmin(ModelAdminBasics):
 
 @admin.register(Overlap)
 class OverlapAdmin(ModelAdminBasics):
-    list_display = ('overlap_status_display', 'valid', 'overlap_type', 'value_type', 'allele', 'testing_context', 'tumor_type_category', 'contributions_list', 'modified_detailed')
+    list_display = ('overlap_status_display', 'valid', 'overlap_type', 'value_type', 'allele', 'testing_context_bucket', 'tumor_type_category', 'contributions_list', 'modified_detailed')
     # inlines = (OverlapContributionInline, )
     search_fields = ('pk', 'allele__id')
     list_filter = ('overlap_status', 'valid', 'overlap_type', 'value_type')

@@ -227,7 +227,7 @@ class Overlap(TimeStampedModel):
     overlap_type = models.TextField(choices=OverlapType.choices)
     value_type = models.TextField(max_length=1, choices=ClassificationResultValue.choices)
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE, null=True, blank=True)  # might be blank for gene symbol wide
-    testing_context = models.TextField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
+    testing_context_bucket = models.TextField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
     overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_CONTRIBUTIONS.value)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
@@ -267,7 +267,7 @@ class Overlap(TimeStampedModel):
 
     @property
     def testing_contexts_objs(self) -> list[TestingContextBucket]:
-        if testing_context := self.testing_context:
+        if testing_context := self.testing_context_bucket:
             return [TestingContextBucket(testing_context)]
         else:
             testing_contexts = set()

@@ -21,7 +21,7 @@ def _new_ekey_testing_context(apps, _schema_editor):
 
 def _delete_new_ekey(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
-    EvidenceKey.objects.filter(key="somatic:testing_context").delete()
+    EvidenceKey.objects.filter(key="somatic:testing_context_bucket").delete()
 
 
 class Migration(migrations.Migration):

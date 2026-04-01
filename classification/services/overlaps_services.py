@@ -53,7 +53,7 @@ class OverlapServices:
                 allele=classification_grouping.allele,
                 classification_grouping=classification_grouping,
                 testing_context_bucket=classification_grouping.testing_context,
-                tumor_type_category=classification_grouping.tumor_type,
+                tumor_type_category=classification_grouping.tumor_type_category,
                 value_type=value_type,
                 defaults={
                     "value": value,

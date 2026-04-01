@@ -777,8 +777,8 @@ def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompar
 @register.inclusion_tag("classification/tags/testing_context.html")
 def testing_context(obj: Union[OverlapContribution, TestingContextFull]):
     return {
-        "testing_context": TestingContextBucket(obj.testing_context_bucket),
-        "tumor_type": obj.tumor_type_category
+        "testing_context_bucket": TestingContextBucket(obj.testing_context_bucket),
+        "tumor_type_category": obj.tumor_type_category
     }
 
 
