@@ -119,19 +119,17 @@ class Command(BaseCommand):
             data.update(row.to_dict())
 
             lab_record_id = data.pop("lab_record_id")
-            id_str = f"{lab.group_name}/{lab_record_id}" # Format is lab_id/]record_id[.version
-            # Handle notes - need to pop out some ekeys and insert as dicts w/notes
-            internal_use = data.pop("internal_use")
-            internal_use_note = data.pop("internal_use_note")
+            id_str = f"{lab.group_name}/{lab_record_id}"  # Format is lab_id/]record_id[.version
+            # Special case: column name differs from ekey name
             data[internal_notes_ekey] = {
-                "value": internal_use,
-                "note": internal_use_note,
+                "value": data.pop("internal_use"),
+                "note": data.pop("internal_use_note"),
             }
-            somatic_tumor_cellularity_ekey = "somatic:tumor_cellularity"
-            data[somatic_tumor_cellularity_ekey] = {
-                "value": data.pop(somatic_tumor_cellularity_ekey),
-                "note": data.pop(f"{somatic_tumor_cellularity_ekey}_note"),
-            }
+            for ekey in ["somatic:tumor_cellularity", "somatic:tmb_status", "somatic:msi_status"]:
+                data[ekey] = {
+                    "value": data.pop(ekey),
+                    "note": data.pop(f"{ekey}_note"),
+                }
 
             record = {
                 "id": id_str,
