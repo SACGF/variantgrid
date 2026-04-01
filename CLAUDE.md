@@ -112,6 +112,8 @@ Several apps have `__<app>_readme.md` files documenting architecture (e.g., `snp
 
 ## Git Commits
 
+Do NOT commit unless the user explicitly asks you to commit. Instructions like "apply the fix", "make the change", or "implement X" mean edit the code only — not commit.
+
 Do NOT add "Co-Authored-By: Claude" or any similar co-author trailer to commit messages.
 
 Reference GitHub issues in commit messages (e.g., `#1400`) but do NOT use keywords that auto-close issues (e.g., "fix", "close", "resolve"). Issues must go through a testing pipeline before being closed manually.
