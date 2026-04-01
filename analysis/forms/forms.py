@@ -319,7 +319,7 @@ class GraphTypeChoiceForm(forms.Form):
     def __init__(self, node, columns, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # We don't join to observed variant anymore, but to keep compatability
+        # We don't join to observed variant anymore, but to keep compatibility
         # We can still get it if we have exactly 1 sample
         if len(node.get_sample_ids()) == 1:
             columns.append("observedvariant__zygosity")

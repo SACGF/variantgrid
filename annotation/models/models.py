@@ -570,7 +570,7 @@ class HumanProteinAtlasAnnotationVersion(SubVersionPartition):
     unit = models.TextField()  # What unit "value" is in
 
     def get_minimum_for_abundance_level(self, abundance: HumanProteinAtlasAbundance):
-        """ Attempt to remain backwards compatabile - see how this is calculated here:
+        """ Attempt to remain backwards compatibile - see how this is calculated here:
             https://github.com/SACGF/variantgrid/issues/9#issuecomment-563510678 """
         abundance_mins = {
             HumanProteinAtlasAbundance.NOT_DETECTED: 0,

@@ -132,7 +132,7 @@ urlpatterns += [
     path('', include(router.urls), name='seqauto_apis'),
     path('api/view_enrichment_kit_summary/<int:pk>', views_rest.EnrichmentKitSummaryView.as_view(), name='api_view_enrichment_kit_summary'),
     path('api/view_enrichment_kit/<int:pk>', EnrichmentKitViewSet.as_view({'get': 'retrieve'}),
-         name='api_view_enrichment_kit'),  # Deprecated, used for backwards compatability
+         name='api_view_enrichment_kit'),  # Deprecated, used for backwards compatibility
     path('api/enrichment_kit_gene_coverage/<int:enrichment_kit_id>/<gene_symbol>', views_rest.EnrichmentKitGeneCoverageView.as_view(), name='api_enrichment_kit_gene_coverage'),
     path('api/enrichment_kit_gene_gold_coverage/<int:enrichment_kit_id>/<gene_symbol>', views_rest.EnrichmentKitGeneGoldCoverageView.as_view(), name='api_enrichment_kit_gene_gold_coverage'),
     path('api/enrichment_kit_gene_gold_coverage_summary/<int:enrichment_kit_id>/<gene_symbol>', views_rest.GoldCoverageSummaryView.as_view(), name='api_enrichment_kit_gene_gold_coverage_summary'),
