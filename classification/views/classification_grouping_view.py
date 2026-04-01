@@ -76,11 +76,8 @@ class OverlapSummary:
             if overlap.valid:
                 overlap_summary_builders[overlap.value_type].append(overlap)
 
-        print(skew_by_value_type)
-        print(overlap_summary_builders)
         for value_type, overlaps in overlap_summary_builders.items():
             if skews := skew_by_value_type.get(value_type):
-                print("Found skews")
                 summaries.append(
                     OverlapSummary(skews=skews, value_type=value_type, overlaps=overlaps)
                 )
