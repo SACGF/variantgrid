@@ -110,7 +110,7 @@ def patient_file_upload(request, patient_id):
         file_dict = patient_attachment.get_file_dict()
     except Exception as e:
         log_traceback()
-        file_dict = {"error": str(e)}
+        file_dict = {"error": "Upload failed"}
 
     return UploadResponse(request, file_dict)
 
