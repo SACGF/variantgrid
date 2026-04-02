@@ -243,18 +243,6 @@ let DataTableDefinition = (function() {
             let dataTable = dom.DataTable(dtParams);
             this.dataTable = dataTable;
 
-            // Prevent the page from scrolling to the table on initial async load (#172).
-            // The first draw (after AJAX response) can trigger a browser scroll;
-            // save and restore the scroll position asynchronously so it runs after
-            // whatever causes the jump.
-            let mainContent = $('.main-content');
-            if (mainContent.length) {
-                dom.one('draw.dt', function() {
-                    let scrollTop = mainContent.scrollTop();
-                    setTimeout(function() { mainContent.scrollTop(scrollTop); }, 0);
-                });
-            }
-
             dom.on('error.dt', function (e, settings, techNote, message ) {
                 Rollbar.warning("DataTables error " + message);
                 dom.replaceWith($(`

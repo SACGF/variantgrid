@@ -145,12 +145,17 @@ If we want to use jqgrid cdn, works for half
 			{% if search %}
 		        // Make search always appear
                 const searchOptions = {multipleSearch: true, overlay: false, drag: false};
+                // searchGrid() inserts the dialog inside gbox then calls jqmShow(), which
+                // focuses the first visible input and causes the page to scroll. Hide gbox
+                // first so no inputs are :visible during init, preventing the scroll.
+                const gbox = $("#{{ gbox_id }}");
+                gbox.hide();
                 grid.searchGrid(searchOptions);
+                gbox.show();
 				// find the div which contain the searching dialog
                 const searchDialog = $("#searchmodfbox_" + grid[0].id);
                 searchDialog.addClass("ui-jqgrid ui-widget ui-widget-content ui-corner-all");
 			    searchDialog.css({position:"relative", "z-index":"auto", "float":"left"})
-                const gbox = $("#{{ gbox_id }}");
                 gbox.before(searchDialog);
 			    gbox.css({clear:"left"});
 				// Hide close button
