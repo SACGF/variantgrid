@@ -5,6 +5,7 @@ from typing import Iterable, Any, Union, Optional
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -103,11 +104,15 @@ class FlagHelper:
         comment = data.pop('comment', None)
         user_private = data.pop('user_private', False)
         resolution = data.pop('resolution', None)
-        if resolution:
-            resolution = FlagResolution.objects.get(pk=resolution)
+        try:
+            if resolution:
+                resolution = FlagResolution.objects.get(pk=resolution)
+            flag_type_obj = FlagType.objects.get(pk=flag_type)
+        except (FlagResolution.DoesNotExist, FlagType.DoesNotExist) as e:
+            raise ValueError(f"Invalid flag data: {e}") from e
 
         flag = flag_collection.add_flag(
-            FlagType.objects.get(pk=flag_type),
+            flag_type_obj,
             user=self.user,
             comment=comment,
             user_private=user_private,
@@ -221,8 +226,9 @@ class FlagHelper:
                 'name': avatar.preferred_label,
                 'avatar': avatar.url,
                 'color': avatar.background_color,
-                'lab': self.lab_text(user)
             }
+            if user == self.user:
+                json_entry['lab'] = self.lab_text(user)
             users_json.append(json_entry)
         json_data['users'] = users_json
 
@@ -352,11 +358,17 @@ class FlagsView(APIView):
 
         if history:
             # user has now seen the flags, mark them as such
-            history = int(history)
+            try:
+                history = int(history)
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid history parameter'}, status=400)
             flag_helper.include_history(history)
 
         if since:
-            since = ensure_timezone_aware(datetime.datetime.fromtimestamp(float(since)))
+            try:
+                since = ensure_timezone_aware(datetime.datetime.fromtimestamp(float(since)))
+            except (ValueError, OSError, TypeError):
+                return Response({'error': 'Invalid since parameter'}, status=400)
             flag_helper.include_comments_since(since)
 
         if not history and not since:
@@ -375,12 +387,10 @@ class FlagsView(APIView):
 
         flag_helper = FlagHelper(flag_collections=fc, user=request.user)
 
-        watch = request.data.get('watch')
-        if watch is not None:
-            fc.set_watcher(user=request.user, watch=watch)
-            flag_helper.include_collections()
-        else:
+        try:
             flag_helper.add_flag(data=request.data)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(flag_helper.to_json())
 
@@ -401,8 +411,11 @@ class FlagView(APIView):
         f = Flag.objects.get(pk=pk)  # type: Flag
         data = request.data
         resolution = data.get('resolution', None)
-        if resolution:
-            resolution = FlagResolution.objects.get(pk=resolution)
+        try:
+            if resolution:
+                resolution = FlagResolution.objects.get(pk=resolution)
+        except FlagResolution.DoesNotExist:
+            return Response({'error': 'Invalid resolution'}, status=400)
 
         f.flag_action(
             user=request.user,
