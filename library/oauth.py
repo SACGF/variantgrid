@@ -83,6 +83,9 @@ class ServerAuth:
         )
 
     def url(self, path: str):
-        if path[0:1] == '/':
-            path = path[1:]
-        return self.host + '/' + path
+        from urllib.parse import urlparse, urljoin
+        parsed = urlparse(self.host)
+        if parsed.scheme not in ('https', 'http'):
+            raise ValueError(f"ServerAuth host must use http(s) scheme, got: {parsed.scheme!r}")
+        base = self.host if self.host.endswith('/') else self.host + '/'
+        return urljoin(base, path.lstrip('/'))

@@ -123,40 +123,57 @@ class AlissaUploadSyncer(SyncRunner):
 
                 try:
                     if response_json := response.json():
-                        total_failed += int(response_json.get("numberFailed"))
-                        total_differs += int(response_json.get("numberDiffers"))
-                        total_imported += int(response_json.get("numberImported"))
+                        if not isinstance(response_json, dict):
+                            raise ValueError(f"Expected dict response from Alissa, got {type(response_json).__name__}")
 
-                        response_jsons.append(response_json)
+                        def _safe_int(val):
+                            try:
+                                return int(val)
+                            except (TypeError, ValueError):
+                                return 0
+
+                        num_failed = _safe_int(response_json.get("numberFailed"))
+                        num_differs = _safe_int(response_json.get("numberDiffers"))
+                        num_imported = _safe_int(response_json.get("numberImported"))
+                        total_failed += num_failed
+                        total_differs += num_differs
+                        total_imported += num_imported
+
+                        response_jsons.append({
+                            "numberFailed": num_failed,
+                            "numberDiffers": num_differs,
+                            "numberImported": num_imported,
+                            "failures": response_json.get("failures") or [],
+                            "infos": response_json.get("infos") or [],
+                        })
                         if response_error := response_json.get("error"):
                             notify = AdminNotificationBuilder(message="Error Uploading")
                             notify.add_field("Sync Destination", sync_run_instance.name)
-                            notify.add_field("Error", response_error)
+                            notify.add_field("Error", str(response_error)[:500])
                             notify.send()
-                        elif numberFailed := int(response_json.get("numberFailed")):
-                            if numberFailed > 0:
-                                notify = AdminNotificationBuilder(message="Error Uploading")
-                                notify.add_field("Sync Destination", sync_run_instance.sync_destination.name)
-                                notify.add_field("Failures", numberFailed)
+                        elif num_failed > 0:
+                            notify = AdminNotificationBuilder(message="Error Uploading")
+                            notify.add_field("Sync Destination", sync_run_instance.sync_destination.name)
+                            notify.add_field("Failures", num_failed)
 
-                                failure: str
-                                for failure in response_json.get("failures"):
-                                    if "\t" in failure:
-                                        parts = failure.split("\t")
-                                        message = parts[0]
-                                        json_data_str = parts[1]
-                                        try:
-                                            json_data = json.loads(json_data_str)
-                                            transcript = json_data.get("transcript")
-                                            c_nomen = json_data.get("cNomen")
-                                            notify.add_markdown(f"{transcript}:{c_nomen} - \"{message}\"")
-                                        except ValueError:
-                                            notify.add_markdown(failure)
-                                    else:
+                            failure: str
+                            for failure in (response_json.get("failures") or []):
+                                if "\t" in failure:
+                                    parts = failure.split("\t")
+                                    message = parts[0]
+                                    json_data_str = parts[1]
+                                    try:
+                                        json_data = json.loads(json_data_str)
+                                        transcript = json_data.get("transcript")
+                                        c_nomen = json_data.get("cNomen")
+                                        notify.add_markdown(f"{transcript}:{c_nomen} - \"{message}\"")
+                                    except (ValueError, KeyError):
                                         notify.add_markdown(failure)
+                                else:
+                                    notify.add_markdown(failure)
 
-                                notify.send()
-                except Exception:
+                            notify.send()
+                except (ValueError, AttributeError):
                     report_exc_info()
 
         since_timestamp = None
