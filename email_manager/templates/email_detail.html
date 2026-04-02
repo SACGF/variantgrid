@@ -19,5 +19,5 @@
 <label class="my-4">Content</label>:
 <a href="{% url 'email_pure' email.pk %}">See in stand-alone window with accurate styling</a>
 <div class="border rounded p-4" style="background-color:#fdfdfd">
-{{ email.html | safe }}
+    <iframe srcdoc="{{ email.html | escape }}" sandbox style="width:100%; height:600px; border:none;"></iframe>
 </div>
