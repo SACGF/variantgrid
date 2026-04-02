@@ -24,8 +24,6 @@ class FlagAdmin(ModelAdminBasics):
     inlines = (FlagCommentAdminTabular,)
 
     def is_readonly_field(self, f) -> bool:
-        if f.name == 'flag_type':
-            return False
         return super().is_readonly_field(f)
 
     def has_add_permission(self, request):
