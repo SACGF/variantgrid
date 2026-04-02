@@ -1,4 +1,5 @@
 import logging
+import urllib.parse
 from typing import Optional, Union
 
 import requests
@@ -28,7 +29,7 @@ def get_request(url):
 
 
 def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol: Union[str, GeneSymbol]) -> Optional[dict]:
-    url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + str(gene_symbol)
+    url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + urllib.parse.quote(str(gene_symbol), safe="")
     r = get_request(url)
     results = None
     if r.ok:
@@ -44,7 +45,8 @@ def _get_panel_app_panel_api_json(panel_app_panel):
     # Panel App isn't very REST-ful - returns 200 for missing data, but we'll return 404
     if detail := json_data.get("detail"):
         if detail == "Not found.":
-            raise NotFound(detail=f"PanelApp couldn't find {panel_app_panel.panel_id} ({r.url})")
+            logging.warning("PanelApp couldn't find panel %s at %s", panel_app_panel.panel_id, r.url)
+            raise NotFound(detail=f"PanelApp couldn't find panel {panel_app_panel.panel_id}")
 
     return json_data
 
