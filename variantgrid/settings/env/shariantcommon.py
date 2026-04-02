@@ -99,7 +99,9 @@ OIDC_OP_AUTHORIZATION_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/auth'
 OIDC_OP_TOKEN_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/token'
 OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
-OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
+OIDC_OP_LOGOUT_URL_METHOD = 'oidc_auth.backend.provider_logout'
+OIDC_USE_PKCE = True
+OIDC_PKCE_CODE_CHALLENGE_METHOD = 'S256'
 
 # login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
 
@@ -111,7 +113,7 @@ EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'
 # Overwrite settings for your system below
 
 DEBUG = False
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['shariant.org.au', 'www.shariant.org.au', 'test.shariant.org.au', 'demo.shariant.org.au']
 CSRF_TRUSTED_ORIGINS=['https://test.shariant.org.au', 'https://shariant.org.au', 'https://www.shariant.org.au', 'https://demo.shariant.org.au']
 
 ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = False  # Only used for analysis optimisation

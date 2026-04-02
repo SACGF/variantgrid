@@ -1,9 +1,45 @@
+import logging
+import re
+from urllib.parse import urlencode
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
+from django.core.exceptions import SuspiciousOperation, ValidationError
+from django.core.validators import EmailValidator
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
 from snpdb.models import UserSettingsOverride
+
+logger = logging.getLogger(__name__)
+
+_email_validator = EmailValidator()
+_CONTROL_CHAR_RE = re.compile(r'[\x00-\x1f\x7f]')
+_SAFE_GROUP_COMPONENT_RE = re.compile(r'^[\w][\w\-]*$')
+
+
+def provider_logout(request):
+    """Construct Keycloak end-session URL for OIDC_OP_LOGOUT_URL_METHOD."""
+    logout_url = settings.KEY_CLOAK_PROTOCOL_BASE + '/logout'
+    params = {}
+    id_token = request.session.get('oidc_id_token')
+    if id_token:
+        params['id_token_hint'] = id_token
+    if params:
+        logout_url += '?' + urlencode(params)
+    return logout_url
+
+
+def _sanitize_claim_str(value, max_length):
+    """Strip control characters and enforce max length on a claim string."""
+    return _CONTROL_CHAR_RE.sub('', value)[:max_length]
+
+
+def _is_valid_group_name(name):
+    """Return True if every path component contains only safe characters."""
+    if not name:
+        return False
+    return all(_SAFE_GROUP_COMPONENT_RE.match(part) for part in name.split('/') if part)
 
 
 class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
@@ -31,12 +67,21 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
     def create_or_update(self, user: User, claims):
 
+        # Validate and sanitize user fields from OIDC claims before writing to the database
+        username = _sanitize_claim_str(claims.get('preferred_username', ''), 150)
+        email = claims.get('email', '')
+        try:
+            _email_validator(email)
+        except ValidationError:
+            raise SuspiciousOperation(f"Invalid email in OIDC claims: {email!r}")
+        email = _sanitize_claim_str(email, 254)
+
         # Copy over basic details from open ID connect
         # Assume there will be no user-name clashes
-        user.username = claims.get('preferred_username')
-        user.email = claims.get('email', '')
-        user.first_name = claims.get('given_name', '')
-        user.last_name = claims.get('family_name', '')
+        user.username = username
+        user.email = email
+        user.first_name = _sanitize_claim_str(claims.get('given_name', ''), 150)
+        user.last_name = _sanitize_claim_str(claims.get('family_name', ''), 150)
         sub = claims.get('sub', None)
 
         # Work out what groups the user has joined/left since their last login
@@ -45,7 +90,9 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         # convert it so we get 'some_group_1', 'some_group_2'
 
         user.is_active = True
-        all_claim_groups = claims["groups"]
+        all_claim_groups = claims.get("groups", [])
+        if not isinstance(all_claim_groups, list):
+            raise SuspiciousOperation("Invalid groups claim format")
         if settings.OIDC_REQUIRED_GROUP and settings.OIDC_REQUIRED_GROUP not in all_claim_groups:
             user.is_active = False
             user.save()
@@ -69,7 +116,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             messages.add_message(self.request, messages.ERROR, message, extra_tags="html")
             return user
 
-        oauth_groups = [g.split('/')[1:] for g in claims['groups']]
+        oauth_groups = [g.split('/')[1:] for g in all_claim_groups]
 
         associations = [g[1:] for g in oauth_groups if len(g) > 1 and g[0] == 'associations']
         # Should make 'variantgrid' setting configurable at some point in case there are 2 variantgrid installations on the same OAuth instance
@@ -106,7 +153,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             if is_tester:
                 # testers are allowed to login during maintenance mode
                 pass
-            elif not is_super_user or is_bot:
+            elif (not is_super_user) or is_bot:  # deny: non-admin users and bots
                 # don't want bots logging in during maintenance mode
                 messages.add_message(self.request, messages.ERROR, "Non-administrator logins have temporary been disabled.")
                 return None
@@ -139,7 +186,11 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             user.groups.remove(group)
 
         for added_group in added_groups:
-            # print("adding to group %s" % added_group)
+            if not added_group:
+                continue
+            if not _is_valid_group_name(added_group):
+                logger.warning("Skipping group with invalid name from OIDC claims: %r", added_group)
+                continue
             group, _ = Group.objects.get_or_create(name=added_group)
             user.groups.add(group)
 
