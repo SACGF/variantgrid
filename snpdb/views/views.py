@@ -13,6 +13,7 @@ from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured, ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
+from django.utils.html import escape
 from django.forms.widgets import TextInput
 from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseRedirect, HttpResponseServerError, JsonResponse
@@ -1353,11 +1354,11 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
             sample_code = "%03d" % i
             if can_access:
                 view_sample_url = reverse('view_sample', kwargs={'sample_id': sample.pk})
-
-                sample_link = f'<a href="{view_sample_url}">{sample.name}</a>'
+                safe_name = escape(sample.name)
+                sample_link = f'<a href="{view_sample_url}">{safe_name}</a>'
                 if sample_link in used_sample_names:
-                    uniq_sample_name = sample.name + "_" + sample_code
-                    sample_link = f'<a href="{view_sample_url}">{uniq_sample_name}</a>'
+                    safe_uniq_name = escape(sample.name + "_" + sample_code)
+                    sample_link = f'<a href="{view_sample_url}">{safe_uniq_name}</a>'
 
                 sample_name = sample_link
             else:
