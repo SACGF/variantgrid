@@ -133,7 +133,7 @@ class ReviewedObject(TimeStampedModel):
         # or by us directly going through the
         foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('reviews')]
         for foreign_set in foreign_sets:
-            source_object = getattr(self, foreign_set).first()
+            source_object = getattr(self, foreign_set).order_by('pk').first()
             if source_object:
                 return source_object
 
