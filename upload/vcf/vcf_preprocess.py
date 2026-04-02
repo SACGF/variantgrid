@@ -144,9 +144,13 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
     # Split up the VCF
     split_file_rows = upload_step.split_file_rows or settings.VCF_IMPORT_FILE_SPLIT_ROWS
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
+    # Pass paths via env vars rather than interpolating them into the shell --filter string,
+    # so that metacharacters in paths cannot affect shell parsing.
+    # split runs the filter via sh -c; $VG_HEADER_FILE/$VG_SPLIT_VCF_DIR are expanded there.
+    split_env = {**os.environ, 'VG_HEADER_FILE': cleaned_vcf_header_filename, 'VG_SPLIT_VCF_DIR': split_vcf_dir}
     pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
                                          "--lines", str(split_file_rows),
-                                         f"--filter='bash -c \"set -eo pipefail; {{ cat {cleaned_vcf_header_filename}; cat; }} | bgzip -c > {split_vcf_dir}/$FILE\"'"]
+                                         "--filter='bash -c \"set -eo pipefail; { cat $VG_HEADER_FILE; cat; } | bgzip -c > $VG_SPLIT_VCF_DIR/$FILE\"'"]
 
     for sub_step_name in norm_substep_names:
         sub_step_commands = pipe_commands[sub_step_name]
@@ -167,6 +171,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
             executable="/bin/bash",  # pipefail requires bash, not sh
             stdout=PIPE,
             stderr=PIPE,
+            env=split_env,
         )
         p_stdout, p_stderr = p.communicate()
         logging.info("single command pipe/shell completed - return code: %d", p.returncode)
@@ -193,6 +198,8 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
                       "stderr": stderr_f}
             if p:
                 kwargs["stdin"] = p.stdout
+            if sub_step_name == SPLIT_VCF_SUB_STEP:
+                kwargs["env"] = split_env
             p = Popen(cmd, **kwargs)
             pipes[sub_step_name] = p
             stderr_filenames[sub_step_name] = stderr_filename
