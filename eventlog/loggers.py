@@ -21,9 +21,9 @@ class EventLogHandler(logging.Handler):  # Inherit from logging.Handler
             Event = import_class('eventlog.models.Event')
 
             request = getattr(record, 'request', None)
-            if request is None:
+            user = getattr(request, 'user', None)
+            if user is None or not getattr(user, 'is_authenticated', False):
                 return
-            user = request.user
             app_name = record.module.split('.')[0]
             if record.levelname == 'WARNING':
                 severity = LogLevel.WARNING
