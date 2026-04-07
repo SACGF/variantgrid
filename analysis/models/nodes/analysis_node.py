@@ -383,6 +383,14 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             if self._has_common_variants():
                 kwargs["common_variants"] = True
 
+            # Pass annotation gnomAD version so common filter version can be validated
+            # @see https://github.com/SACGF/variantgrid/issues/1119
+            if "annotation_gnomad_version" not in kwargs:
+                try:
+                    kwargs["annotation_gnomad_version"] = self.analysis.annotation_version.variant_annotation_version.gnomad
+                except AttributeError:
+                    pass
+
             for parent in self.get_non_empty_parents():
                 a_kwargs.update(parent.get_annotation_kwargs(**kwargs))
 

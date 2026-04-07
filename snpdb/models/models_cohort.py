@@ -456,8 +456,20 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         already_set = self.cohortgenotype_alias in kwargs.get("existing_annotation_kwargs", set())
         if not (already_set and kwargs.get("override") is False):
             collections = [self.pk]
-            if kwargs.get("common_variants", True) and self.common_collection_id is not None:
-                collections.append(self.common_collection_id)
+            if self.common_collection_id is not None:
+                include_common = kwargs.get("common_variants", True)
+                if not include_common:
+                    # The common partition optimization (skipping common variants) is only valid when
+                    # the gnomAD version used for partitioning matches the analysis annotation version.
+                    # If they differ, we must include all variants and let the AF filter handle it.
+                    # @see https://github.com/SACGF/variantgrid/issues/1119
+                    annotation_gnomad_version = kwargs.get("annotation_gnomad_version")
+                    if annotation_gnomad_version:
+                        common_filter = self.common_collection.common_filter
+                        if common_filter and common_filter.gnomad_version != annotation_gnomad_version:
+                            include_common = True
+                if include_common:
+                    collections.append(self.common_collection_id)
             cgc_condition = Q(cohortgenotype__collection__in=collections)
             annotation_kwargs[self.cohortgenotype_alias] = FilteredRelation('cohortgenotype', condition=cgc_condition)
         return annotation_kwargs
