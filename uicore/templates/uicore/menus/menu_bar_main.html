@@ -14,7 +14,7 @@
 {% menu_top 'variant_tags' app_name='variantopedia|variants|manual_variant_entry' title='Variants' %}
 {% menu_top 'annotation' app_name='annotation' title='Annotation' %}
 <a class="nav-link" target="_blank" href="{{ help_url }}">Help</a>
-<a id="suggestion" class="nav-link" data-toggle="tooltip" title="Suggestion / Bug Report" href="javascript:suggestionDialog('{{ user.username }}')"><i class="fas fa-bug mt-1"></i></a>
+<a id="suggestion" class="nav-link" data-toggle="tooltip" title="Suggestion / Bug Report" href="javascript:suggestionDialog('{{ user.username|escapejs }}')"><i class="fas fa-bug mt-1"></i></a>
 <!--
 <button type="button" style="color:#866" class="btn bg-transparent" data-toggle="modal" data-target="#vgReportModal"><i class="fas fa-bug mt-1"></i></button>
 -->

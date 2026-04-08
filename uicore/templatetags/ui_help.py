@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Optional
 
 from django import template
@@ -34,6 +35,9 @@ def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3")
 
     help_url = settings.HELP_URL
     page_help_html = None
+    if page_id and not re.fullmatch(r'[\w\-]+', page_id):
+        report_message(f"page_help: invalid page_id {page_id!r}")
+        page_id = None
     page_help_path = f"page_help/{page_id}.html"
     page_help_filename = finders.find(page_help_path)
     file_exists = False
