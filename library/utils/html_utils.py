@@ -1,11 +1,10 @@
-import html
 import re
 import uuid
 from html import escape
 from typing import Optional
 
 from bs4 import BeautifulSoup
-from django.utils.safestring import mark_safe, SafeString
+from django.utils.safestring import SafeString
 
 
 def html_id_safe(text: str) -> str:
@@ -20,12 +19,6 @@ def html_id_safe(text: str) -> str:
     if not text[0].isalpha():
         text = "x" + text
     return text
-
-
-def html_link(url: str, title: str) -> SafeString:
-    if not url:
-        return mark_safe(title)
-    return mark_safe(f"<a href='{url}'>{html.escape(title)}</a>")
 
 
 # note this tags expected in a single line of text
