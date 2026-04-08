@@ -1,8 +1,11 @@
 import operator
+import re
 from functools import reduce
 from typing import Any
 
 from django.db.models import Q
+
+_SAFE_KEY_RE = re.compile(r'^[a-zA-Z]\w*$')
 
 
 class QueryJsonFilter:
@@ -58,6 +61,8 @@ class QueryJsonFilter:
                 return self.convert_to_q(value, operator.__and__)
             else:
                 # key is assumed to be regular value key
+                if not _SAFE_KEY_RE.match(key):
+                    raise ValueError(f"Filter key contains unsafe characters: {key!r}")
                 if isinstance(value, list):
                     handle_none = False
                     is_not = False

@@ -1,5 +1,6 @@
-import os
+import re
 from typing import Optional
+from urllib.parse import urljoin
 
 from django.db import models
 from django.db.models.deletion import CASCADE
@@ -33,5 +34,8 @@ class ClassificationModificationSyncRecord(TimeStampedModel):
             raise ValueError(f"{self.classification_modification} not successfully synced")
         url = self.run.destination.sync_details["host"]
         remote_pk = self.meta["meta"]["id"]
+        if not re.fullmatch(r'[\w\-]+', str(remote_pk)):
+            raise ValueError(f"remote_pk contains unsafe characters: {remote_pk!r}")
         path = self.classification_modification.classification.get_url_for_pk(remote_pk)
-        return os.path.join(url, path)
+        base = url if url.endswith('/') else url + '/'
+        return urljoin(base, path.lstrip('/'))
