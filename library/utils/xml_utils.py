@@ -153,7 +153,8 @@ class XmlParser:
         self._candidates = [self.__class__.get_parser_methods(self._prefix)]
         self._execute = []
 
-        context = etree.iterparse(source, events=('start', 'end'), huge_tree=True, recover=True, encoding="utf-8")
+        context = etree.iterparse(source, events=('start', 'end'), huge_tree=True, recover=True, encoding="utf-8",
+                                   resolve_entities=False, no_network=True)
         for event, elem in context:
             if event == "start":
                 self._push(elem)

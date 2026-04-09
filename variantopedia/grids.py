@@ -1,9 +1,12 @@
 import operator
+import re
 from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
-from django.db.models import TextField, Value, QuerySet, Q
+from django.core.paginator import Paginator, InvalidPage
+from django.db import connection
+from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -19,6 +22,16 @@ from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, T
 from snpdb.models.models_user_settings import UserSettings, UserGridConfig
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from variantopedia.interesting_nearby import get_nearby_qs
+
+
+def _format_approx_count(n: int) -> str:
+    """Format a large approximate count as '~100M', '~1.2B', etc."""
+    for threshold, suffix in ((1_000_000_000, 'B'), (1_000_000, 'M'), (1_000, 'K')):
+        if n >= threshold:
+            rounded = n / threshold
+            fmt = f"{rounded:.0f}" if rounded >= 10 else f"{rounded:.1f}"
+            return f"~{fmt}{suffix}"
+    return f"~{n}"
 
 
 class VariantWikiColumns(DatatableConfig[VariantWiki]):
@@ -72,7 +85,7 @@ class AllVariantsGrid(AbstractVariantGrid):
         update_dict_of_dict_values(self._overrides, override)
         self.vzcc = VariantZygosityCountCollection.get_global_germline_counts()
         self.extra_filters = kwargs.pop("extra_filters", {})
-        self.extra_config.update({'sortname': self.vzcc.non_ref_call_alias,
+        self.extra_config.update({'sortname': 'id',
                                   'sortorder': "desc",
                                   'shrinkToFit': False})
 
@@ -94,6 +107,48 @@ class AllVariantsGrid(AbstractVariantGrid):
             filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gt": 0}))
 
         return reduce(operator.and_, filter_list)
+
+    def _get_approx_count(self, qs) -> int:
+        sql, params = qs.query.sql_with_params()
+        with connection.cursor() as cursor:
+            cursor.execute(f"EXPLAIN {sql}", params)
+            first_line = cursor.fetchone()[0]
+        match = re.search(r'rows=(\d+)', first_line)
+        if not match:
+            raise ValueError(f"Could not parse row estimate from EXPLAIN output: {first_line!r}")
+        return int(match.group(1))
+
+    def paginate_items(self, request, items):
+        paginate_by = self.get_paginate_by(request)
+        if not paginate_by:
+            return None, None, items
+
+        if not self.get_filters(request):
+            try:
+                estimate = self._get_approx_count(items)
+            except Exception:
+                estimate = 0
+
+            if estimate >= 1_000_000:
+                self._used_approx_count = True
+                paginator = Paginator(items, paginate_by, allow_empty_first_page=self.allow_empty)
+                # Pre-set the cached_property to avoid COUNT(*) on a huge table
+                paginator.__dict__['count'] = estimate
+                page_num = request.GET.get('page', 1)
+                try:
+                    page = paginator.page(int(page_num))
+                except (ValueError, InvalidPage):
+                    page = paginator.page(1)
+                return paginator, page, page.object_list
+
+        return super().paginate_items(request, items)
+
+    def get_data(self, request) -> dict:
+        self._used_approx_count = False
+        data = super().get_data(request)
+        if self._used_approx_count:
+            data['approximate_records'] = _format_approx_count(data['records'])
+        return data
 
 
 class NearbyVariantsGrid(AbstractVariantGrid):
@@ -151,6 +206,7 @@ class VariantTagsGrid(JqGridUserRowConfig):
         super().__init__(user)
 
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build_name = genome_build.name
         queryset = VariantTag.get_for_build(genome_build)
 
         if extra_filters:
@@ -178,11 +234,18 @@ class VariantTagsGrid(JqGridUserRowConfig):
         queryset = queryset.filter(allele__variantallele__genome_build=genome_build)
         queryset = Variant.annotate_variant_string(queryset,
                                                    path_to_variant="allele__variantallele__variant__")
-        queryset = queryset.annotate(view_genome_build=Value(genome_build.name, output_field=TextField()))
-        field_names = self.get_field_names() + ["variant_string", "view_genome_build"]
+        field_names = self.get_field_names() + ["variant_string"]
         self.queryset = queryset.values(*field_names)
         self.extra_config.update({'sortname': 'variant_string',
                                   'sortorder': 'asc'})
+
+    def iter_format_items(self, items):
+        """ Inject constant genome build value into iterator results """
+        items = super().iter_format_items(items)
+        genome_build_name = self.genome_build_name
+        for row in items:
+            row['view_genome_build'] = genome_build_name
+            yield row
 
     def get_colmodels(self, remove_server_side_only=False):
         before_colmodels = [
@@ -289,5 +352,6 @@ class VariantTagDetailColumns(DatatableConfig[VariantTag]):
         # Not going to use anything build specific so don't care about build
         genome_build = variant.any_genome_build
         qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+        qs = VariantTag.filter_for_user(self.user, queryset=qs)
         qs = qs.filter(tag=tag)
         return qs

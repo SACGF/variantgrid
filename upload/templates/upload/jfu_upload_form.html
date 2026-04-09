@@ -29,9 +29,9 @@
 {# No link for the thumbnail #}
 
 <td>
-    <span class="preview">
-        {{ JQ_OPEN }} if (file.status_image) { {{ JQ_CLOSE }}
-            <img class="thumbnail" src="{{ JQ_OPEN }}=file.status_image{{ JQ_CLOSE }}">
+    <span class="status-icon">
+        {{ JQ_OPEN }} if (file.status_icon && file.status_icon.icon) { {{ JQ_CLOSE }}
+            <i class="fas {{ JQ_OPEN }}=file.status_icon.icon{{ JQ_CLOSE }} {{ JQ_OPEN }}=file.status_icon.css || ''{{ JQ_CLOSE }}" title="{{ JQ_OPEN }}=file.status_icon.title{{ JQ_CLOSE }}"></i>
         {{ JQ_OPEN }} } {{ JQ_CLOSE }}
     </span>
 </td>

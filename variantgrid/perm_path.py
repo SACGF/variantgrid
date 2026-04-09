@@ -18,6 +18,11 @@ from django.urls.resolvers import get_resolver
 
 from library.cache import timed_cache
 from library.django_utils import require_superuser
+from library.utils.django_utils import view_to_string
+
+
+def _view_to_string(view):
+    return getattr(view, '__qualname__', type(view).__qualname__)
 
 
 def _perm_path(route, view, path_func, **kwargs):
@@ -26,8 +31,8 @@ def _perm_path(route, view, path_func, **kwargs):
         if not settings.URLS_NAME_REGISTER[name]:
             view = require_superuser(view)
     else:
-        logging.warning("url: route='%s/view=%s', has no name, so is not tested via URLS_NAME_REGISTER",
-                        route, str(view))
+        logging.warning("url: route='%s' view=%s, has no name, so is not tested via URLS_NAME_REGISTER",
+                        route, view_to_string(view))
     return path_func(route, view, **kwargs)
 
 

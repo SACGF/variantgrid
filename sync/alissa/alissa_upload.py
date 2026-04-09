@@ -156,7 +156,7 @@ class AlissaUploadSyncer(SyncRunner):
                                         notify.add_markdown(failure)
 
                                 notify.send()
-                except:
+                except Exception:
                     report_exc_info()
 
         since_timestamp = None

@@ -8,7 +8,7 @@ class SpaceThemedAvatarProvider:
     @classmethod
     def get_avatar_url(cls, user: User, width, height=None):
         """ signature used to be size but new django-avatar library uses width/height
-            since we ignore it anyway, I provided a default argument for backwards compatability """
+            since we ignore it anyway, I provided a default argument for backwards compatibility """
         if user.username == 'admin_bot':
             return '/static/icons/users/bot.svg'
         icons = [

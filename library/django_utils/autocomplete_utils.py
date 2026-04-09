@@ -39,12 +39,15 @@ class AutocompleteView(autocomplete.Select2QuerySetView):
 
 # Fix for Autocomplete light not showing if loaded via JQuery.load()
 # @see https://github.com/yourlabs/django-autocomplete-light/issues/1221
+#
+# DAL scripts (select2.full.js, autocomplete_light.js, select2.js, i18n/en.js) are loaded
+# once globally in base.html to prevent "DAL function select2 already registered" console
+# errors that occur when multiple forms with autocomplete widgets appear on the same page
+# (Django only deduplicates media when combined via + before rendering).
 class AutocompleteReloadMixin:
     @property
     def media(self):
-        m = super().media
-        m += forms.Media(js=["js/auto_complete_light_reload.js"])
-        return m
+        return forms.Media(js=["js/auto_complete_light_reload.js"])
 
 
 class ModelSelect2(AutocompleteReloadMixin, autocomplete.ModelSelect2):

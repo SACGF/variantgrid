@@ -371,10 +371,10 @@ def generalised_diff_function(coeffs, observed_freq, minimization="LS", sigdata=
     rec = recombine(coeffs, sigdata)
     diff = rec - observed_freq
     if minimization == "LS":
-        diff_sum = (diff ** 2).sum()
+        return (diff ** 2).sum()
     elif minimization == "LA":
-        diff_sum = np.abs(diff).sum()
-    return diff_sum
+        return np.abs(diff).sum()
+    raise ValueError(f"Unknown minimization method: {minimization!r}")
 
 
 # --------------------------------------------------------------

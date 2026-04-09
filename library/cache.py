@@ -19,10 +19,16 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
             # Generate a key based on arguments being passed
             key = (*args,) + tuple(kwargs.items())
 
-            # Check if they return value is already known
-            if key in storage:
+            # Check if the return value is already known and not expired
+            if key in storage and not (ttl != 0 and ttls[key] < time.time()):
                 result = storage[key]
             else:
+                if key in storage:
+                    # Present but expired — evict before recalculating
+                    del storage[key]
+                    del ttls[key]
+                    if quick_key_access and key in keys:
+                        keys.remove(key)
                 # If not, get the result
                 result = func(*args, **kwargs)
                 storage[key] = result

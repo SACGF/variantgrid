@@ -22,9 +22,9 @@ def run_sync(sync_destination: SyncDestination, full_sync: bool = False, max_row
                 # omitted labs will not be sent
             },
             "share_levels": {
-                (logged_in_users|public): (lab|institution|logged_in_users|public)
+                (logged_in_users|public): (lab|organisation|logged_in_users|public)
                 "logged_in_users": "lab",
-                "public": "institution"
+                "public": "organisation"
                 # only logged_in_users and public will be considered, if omitted they will be sent as is
             },
             "users": {

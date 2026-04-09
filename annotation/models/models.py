@@ -82,10 +82,10 @@ class ClinVarVersion(SubVersionPartition):
         if m := re.match(CLINVAR_PATTERN_37_38, base_name):
             date_time = m.group(1)
             return datetime.strptime(date_time, "%Y%m%d")
-        CLINVAR_PATTERN_T2T = r"^Homo_sapiens-GCA_009914755.4-(20\d{2})_(10)-clinvar.vcf.gz"
+        CLINVAR_PATTERN_T2T = r"^Homo_sapiens-GCA_009914755.4-(20\d{2})_(\d+)-clinvar.vcf.gz"
         if m := re.match(CLINVAR_PATTERN_T2T, base_name):
             year = m.group(1)
-            month = m.group(0)
+            month = m.group(2)
             return datetime(int(year), int(month), 1)  # Just go with 1st of month
 
         patterns = ", ".join([CLINVAR_PATTERN_37_38, CLINVAR_PATTERN_T2T])
@@ -331,6 +331,20 @@ class ClinVarRecordCollection(TimeStampedModel):
     max_stars = models.IntegerField(blank=True, null=True)
     expert_panel = models.OneToOneField('ClinVarRecord', on_delete=SET_NULL, null=True, blank=True)
 
+    @classmethod
+    def set_allele_for_variants(cls, allele):
+        """Proactively link ClinVarRecordCollections to allele for all its associated variants.
+        Called when viewing the allele/variant page, so the allele is set before the ClinVar AJAX fires."""
+        clinvar_variation_ids = list(
+            ClinVar.objects.filter(variant__variantallele__allele=allele)
+            .values_list('clinvar_variation_id', flat=True).distinct()
+        )
+        if clinvar_variation_ids:
+            cls.objects.filter(
+                clinvar_variation_id__in=clinvar_variation_ids,
+                allele__isnull=True
+            ).update(allele=allele)
+
     def records_with_min_stars(self, min_stars: int) -> list['ClinVarRecord']:
         return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
 
@@ -556,7 +570,7 @@ class HumanProteinAtlasAnnotationVersion(SubVersionPartition):
     unit = models.TextField()  # What unit "value" is in
 
     def get_minimum_for_abundance_level(self, abundance: HumanProteinAtlasAbundance):
-        """ Attempt to remain backwards compatabile - see how this is calculated here:
+        """ Attempt to remain backwards compatibile - see how this is calculated here:
             https://github.com/SACGF/variantgrid/issues/9#issuecomment-563510678 """
         abundance_mins = {
             HumanProteinAtlasAbundance.NOT_DETECTED: 0,
@@ -831,7 +845,7 @@ class VariantAnnotationVersion(SubVersionPartition):
                     release = m.group(1)
                     gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz"
                 else:
-                    (release, gff_filename) = self.refseq.split(" - ")
+                    (release, gff_filename) = self.refseq.split(" - ", maxsplit=1)
                     if not gff_filename.endswith(".gz"):
                         gff_filename += ".gz"
                     # This is good for VEP v108 (will need to keep on top of this)
@@ -934,7 +948,6 @@ class AnnotationRangeLock(models.Model):
     def can_subdivide(self) -> bool:
         """ This is approx (as could be interleaved w/structural etc) """
         return int(self.max_variant_id) - int(self.min_variant_id) >= self.MIN_SIZE_FOR_SUBDIVISION
-
 
 
 class AnnotationRun(TimeStampedModel):
@@ -1148,6 +1161,7 @@ class AbstractVariantAnnotation(models.Model):
         """ p.Ala2351Thr -> p.A2351T """
 
         aa_3_to_1 = invert_dict(protein_letters_1to3)
+        aa_3_to_1["Ter"] = "*"  # BioPython omits stop codon; HGVS uses Ter → *
         aa_3_regex_or = "|".join(aa_3_to_1)
 
         protein_aa1 = protein_string
@@ -1508,7 +1522,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
         if values:
             return max(values)
         return None
-
 
     @staticmethod
     def get_gnomad_population_field(population):
@@ -1880,6 +1893,10 @@ class AnnotationVersion(models.Model):
     def __lt__(self, other):
         return self.pk < other.pk
 
+    @property
+    def short_description(self) -> str:
+        return f"{self.pk} ({self.annotation_date.date()})"
+
     def __str__(self):
         sub_versions = [f"Variant: {self.variant_annotation_version}",
                         f"Gene: {self.gene_annotation_version}",
@@ -1887,7 +1904,7 @@ class AnnotationVersion(models.Model):
                         f"HPA: {self.human_protein_atlas_version}",
                         f"Ontology: {self.ontology_version}"]
         sub_versions_str = ", ".join(sub_versions)
-        return f"{self.pk} ({self.annotation_date.date()}). {sub_versions_str}"
+        return f"{self.short_description}. {sub_versions_str}"
 
 
 class CachedWebResource(TimeStampedModel):

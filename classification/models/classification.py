@@ -5,7 +5,7 @@ import uuid
 import pydantic
 from collections import Counter, namedtuple
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timedelta, date
 from enum import Enum, StrEnum
 from functools import cached_property, reduce
 from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
@@ -24,8 +24,10 @@ from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
+from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
@@ -52,7 +54,7 @@ from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, \
-    invalidate_cached_property, md5sum_str, get_timer
+    invalidate_cached_property, md5sum_str, get_timer, utc_from_timestamp
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -548,7 +550,7 @@ class ConditionResolved:
             try:
                 from classification.models import MultiCondition
                 return MultiCondition(join).label
-            except:
+            except Exception:
                 pass
         return None
 
@@ -843,8 +845,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def dashboard_report_classifications_of_interest(since) -> List[ClassificationOutstandingIssues]:
-        min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
-            minutes=2)  # give records 2 minutes to matching properly before reporting
+        min_age = django_timezone.now() - timedelta(minutes=2)  # give records 2 minutes to matching properly before reporting
 
         time_range_q = Q(created__gte=since) & Q(created__lte=min_age)
 
@@ -1013,12 +1014,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         Optional[ImportedAlleleInfo], bool]:
         created = False
         if not self.allele_info or force_allele_info_update_check:
-            try:
-                genome_build_patch_version = self.get_genome_build_patch_version()
-            except Exception:
-                raise
-                # no allele info if we can't derive a genome build
-                # return None, False
+            genome_build_patch_version = self.get_genome_build_patch_version()
 
             fields = {"imported_genome_build_patch_version": genome_build_patch_version}
             if c_hgvs := self.imported_c_hgvs:
@@ -1194,7 +1190,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if making_new_id:
                     record.lab_record_id = 'vc' + str(record.id)
                     record.save()
-            except:
+            except Exception:
                 pass
                 # in case of collision, leave the uuid
 
@@ -1412,7 +1408,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     self.sample = Sample.objects.get(pk=int(value))
                     # self.requires_auto_population = True
                     return None  # clear out the value
-                except:
+                except Exception:
                     cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
                                         message="Couldn't resolve Sample " + str(value) + ")")
 
@@ -1494,7 +1490,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     value = float(value)
                     cell.value = value
                     valid = 0 <= value <= 1
-                except:
+                except Exception:
                     pass
                 if not valid:
                     cell.add_validation(code=ValidationCode.INVALID_UNIT, severity='warning',
@@ -1506,7 +1502,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     value = float(value)
                     cell.value = value
                     valid = True
-                except:
+                except Exception:
                     pass
                 if not valid:
                     cell.add_validation(code=ValidationCode.INVALID_FLOAT, severity='warning',
@@ -1518,7 +1514,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     value = int(value)
                     cell.value = value
                     valid = True
-                except:
+                except Exception:
                     pass
                 if not valid:
                     cell.add_validation(code=ValidationCode.INVALID_INTEGER, severity='warning',
@@ -1554,7 +1550,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             cell.wipe(WipeMode.SET_NONE)
 
     def modification_at_timestamp(self, version_timestamp) -> 'ClassificationModification':
-        dt = datetime.utcfromtimestamp(version_timestamp).replace(tzinfo=timezone.utc)
+        dt = utc_from_timestamp(version_timestamp)
         vcm = ClassificationModification.objects.filter(classification=self, created__lte=dt).order_by(
             '-created').first()
         return vcm
@@ -1797,8 +1793,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     patch[e_key].wipe(WipeMode.SET_EMPTY)
 
         if remove_api_immutable:
-            for key in use_evidence.keys():
-                cell = use_evidence[key]
+            for key, cell in use_evidence.items():
                 if cell.immutability == SubmissionSource.API:
                     patch[key].immutability = None
 
@@ -2040,7 +2035,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                             valid_copy = validation.copy()
                             valid_copy['key'] = key
                             messages.append(valid_copy)
-                        except:
+                        except Exception:
                             pass
         # make order of messages predictable
         messages.sort(key=lambda m: m.get('key') + ':' + m.get('code'))
@@ -2154,7 +2149,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if is_in_lab:
             return ShareLevel.LAB
         if is_in_org:
-            return ShareLevel.INSTITUTION
+            return ShareLevel.ORGANISATION
         if user.is_authenticated:
             return ShareLevel.ALL_USERS
         return ShareLevel.PUBLIC
@@ -2403,7 +2398,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         classifications are shown (ie not partially edited ones)
     """
 
-
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)  # One who did last change, may not be classification.user
     created = DateTimeUTCField(db_index=True, auto_now_add=True)
@@ -2473,7 +2467,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         # for historical data before we tracked share_level
         for sl in [ShareLevel.PUBLIC,
                    ShareLevel.ALL_USERS,
-                   ShareLevel.INSTITUTION,
+                   ShareLevel.ORGANISATION,
                    ShareLevel.LAB]:
             if self.can_view(sl.group(lab=self.classification.lab)):
                 return sl
@@ -2620,7 +2614,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         """
         Return if we can edit this record instead of creating a new one
         """
-        edit_window = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(minutes=1)
+        edit_window = django_timezone.now() - timedelta(minutes=1)
 
         return \
                 self.source_enum == source \

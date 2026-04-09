@@ -468,7 +468,8 @@ EKeys.load = function() {
 
 EKeys.levelToIndex = {
     lab: 0,
-    institution: 1,
+    organisation: 1,
+    institution: 1,  // backwards compat for old DB rows not yet migrated
     logged_in_users: 2,
     'public': 3
 };
@@ -487,9 +488,10 @@ EKeys.shareLevelInfo = function(share_level, record, defaultToInstitution) {
                     icon : base + 'lab.png',
                     title : record && record.lab_name ? record.lab_name : 'Lab'
                 };
-            case 'institution':
+            case 'organisation':
+            case 'institution':  // backwards compat for old DB rows not yet migrated
                 return {
-                    icon: base + 'institution.png',
+                    icon: base + 'organisation.png',
                     title : record && record.institution_name ? record.institution_name : VcSettings.INSTITUTION
                 };
             case 'logged_in_users':

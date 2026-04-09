@@ -54,3 +54,15 @@ class TestModifiedImportedVariant(TestCase):
         OLD_VARIANT_MULTI = "5:132240059:CT/CTT/T"  # Already set
         old_variant_formatted = ModifiedImportedVariant.vt_format_old_variant(OLD_VARIANT_MULTI, grch37)
         self.assertEqual(len(old_variant_formatted), 2)
+
+    def test_bcftools_format_zero_alt_index_is_rejected(self):
+        """Index 0 is invalid (bcftools is 1-based). Code should raise, not silently return last alt.
+
+        BUG: int('0') - 1 = -1, and Python list[-1] returns the last element without error.
+        This test is expected to FAIL until the code adds a guard (e.g. alt_index < 0 → raise).
+        """
+        grch37 = GenomeBuild.get_name_or_alias('GRCh37')
+        # chrom|pos|ref|alt1,alt2|0  — index 0 is invalid in 1-based numbering
+        with self.assertRaises((ValueError, IndexError)):
+            ModifiedImportedVariant.bcftools_format_old_variant("1|100|A|C,T|0", svlen=None, genome_build=grch37)
+

@@ -25,7 +25,7 @@ class CohortGenotypeTestCase(TestCase):
         cohort.add_sample(samples[0].pk)
         cohort.add_sample(samples[1].pk)
         create_cohort_genotype_and_launch_task(cohort, run_async=False)
-        self.assertTrue(cohort.is_sub_cohort())
+        self.assertTrue(cohort.is_sub_cohort)
 
     def test_not_sub_cohort(self):
         """ Create a cohort which is NOT a sub-cohort """
@@ -34,11 +34,11 @@ class CohortGenotypeTestCase(TestCase):
         cohort.add_sample(samples[0].pk)
         cohort.add_sample(samples[1].pk)
         create_cohort_genotype_and_launch_task(cohort, run_async=False)
-        self.assertTrue(cohort.is_sub_cohort())  # Ok to be one
+        self.assertTrue(cohort.is_sub_cohort)  # Ok to be one
 
         samples2 = list(self.trio2.get_samples())
         cohort.add_sample(samples2[0].pk)  # Add a sample that is NOT in parent cohort, now can't be sub cohort
-        self.assertFalse(cohort.is_sub_cohort())  # Shouldn't be a sub cohort
+        self.assertFalse(cohort.is_sub_cohort)  # Shouldn't be a sub cohort
 
     def test_cohort_genotype_packed_field_index(self):
         """ Add/Remove CohortSamples - ensure cohort_genotype_packed_field_index stays in range """

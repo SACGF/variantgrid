@@ -121,7 +121,7 @@ def annotation_build_detail(request, genome_build_name):
                 other_gene_annotation[annotation_consortium_display] = _get_gene_and_transcript_stats(genome_build,
                                                                                                       other_ac)
             annotation_details["other_consortia"] = other_gene_annotation
-        except:
+        except Exception:
             pass
 
         gene_annotation_release = None
@@ -309,7 +309,7 @@ def version_diffs(request):
             version_to = last_2[0]
             version_diff = version_diff_klass.objects.get(version_from=version_from, version_to=version_to)
             data["diff"] = version_diff
-        except:
+        except Exception:
             pass
 
         for k, v in zip(['version', 'previous'], last_2):
@@ -329,8 +329,8 @@ def version_diffs(request):
 def view_version_diff(request, version_diff_id):
     try:
         diff = VersionDiff.objects.get_subclass(pk=version_diff_id)
-    except VersionDiff.DoesNotExist:
-        raise Http404(f"No VersionDiff pk={version_diff_id}")
+    except VersionDiff.DoesNotExist as exc:
+        raise Http404(f"No VersionDiff pk={version_diff_id}") from exc
 
     context = {"diff": diff}
     context.update(diff.get_diff_results())
@@ -453,7 +453,6 @@ def subdivide_annotation_run(request, annotation_run_id):
     annotation_run = annotation_run_retry(annotation_run)
     _new_annotation_run = annotation_run_retry(new_annotation_run)
     return redirect(annotation_run)
-
 
 
 @cache_page(WEEK_SECS)

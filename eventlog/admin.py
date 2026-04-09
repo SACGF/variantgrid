@@ -29,7 +29,7 @@ class LabFilter(admin.SimpleListFilter):
 
     def lookups(self, request, model_admin):
         labs = Lab.objects.all().values_list('group_name', 'name')
-        return [(group_name, name) for group_name, name in labs]
+        return list(labs)
 
     def queryset(self, request, queryset):
         if self.value():
@@ -43,7 +43,7 @@ class OrganizationFilter(admin.SimpleListFilter):
 
     def lookups(self, request, model_admin):
         organizations = Organization.objects.all().values_list('group_name', 'name')
-        return [(group_name, name) for group_name, name in organizations]
+        return list(organizations)
 
     def queryset(self, request, queryset):
         if self.value():

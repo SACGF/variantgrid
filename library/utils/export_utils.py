@@ -381,6 +381,6 @@ class ExportRow:
         if not records_key:
             records_key = filename.replace(" ", "_")
 
-        response = StreamingHttpResponse(cls.json_generator(data, records_key, export_tweak=export_tweak), content_type='application/json')
+        response = StreamingHttpResponse(cls.json_generator(data, records_key, export_tweak=export_tweak), content_type='application/json')  # pylint: disable=http-response-with-content-type-json
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_str}.json"'
         return response

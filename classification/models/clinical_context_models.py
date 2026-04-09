@@ -364,6 +364,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     def relevant_classification_count(self) -> int:
         return len([vcm for vcm in self.classification_modifications if DiscordanceStatus.cs_buckets().get(vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))])
 
+    @property
     def is_discordant(self):
         # WARNING: THIS IS APPLIES TO CACHED STATUS ONLY
         return self.status == ClinicalContextStatus.DISCORDANT

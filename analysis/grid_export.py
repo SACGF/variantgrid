@@ -80,6 +80,7 @@ def get_node_export_basename(node: AnalysisNode) -> str:
     if node.name:
         name_underscores = re.sub(r"\s", "_", node.name)
         name_parts.append(name_underscores)
+    name_parts.append(f"v{node.version}")
     return "_".join(name_parts)
 
 

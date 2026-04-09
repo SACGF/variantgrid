@@ -40,7 +40,6 @@ from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGe
 class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException):
     """ Could not contact server, or response != 200 """
     def __init__(self, url, method, status_code, response_json):
-        print(f"{response_json=}")
         json_str = ", ".join([f"{k}: {v}" for k, v in response_json.items()])
         msg = f"Error contacting ClinGen Allele Registry. {url=}, {method=}, {status_code=}. JSON: {json_str}"
         super().__init__(msg)
@@ -48,6 +47,7 @@ class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException)
         self.response_json = response_json
         self.description = json_str
 
+    @property
     def is_unknown_reference(self):
         """ e.g. error is they don't have that particular transcript - could retry """
         if self.status_code == 500:
@@ -434,7 +434,7 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
         require_allele_id - set to False if you don't need ClinGen Allele ID (only using for HGVS)
     """
 
-    rep = f"{variant_coordinate=}"
+    rep = variant_coordinate.format_short()
     _clingen_check_variant_coordinate_length(rep, genome_build, variant_coordinate)
     try:
         # Use variant if we have it in the system so we can lookup cache, or store result
@@ -457,9 +457,8 @@ def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
-    if not variant.can_have_clingen_allele:
-        msg = f"No ClinGenAllele possible for variant: {variant}"
-        raise ClinGenAlleleAPIException(msg)
+    if skip_reason := variant.clingen_allele_skip_reason():
+        raise ClinGenAlleleAPIException(f"No ClinGenAllele possible for variant {variant}: {skip_reason}")
 
     va = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     if va.allele.clingen_allele is None:

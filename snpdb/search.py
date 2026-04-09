@@ -676,7 +676,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
         if result.preview.category == Variant.preview_category():
             result.preview.category = Allele.preview_category()
 
-        result.messages = [r.with_genome_build(first(result.genome_builds)) for r in result.messages]
+        result.messages = [r.with_genome_build(genome_build) for genome_build in result.genome_builds for r in result.messages]
 
         if obj := result.preview.obj:
             if isinstance(obj, Variant):
@@ -913,9 +913,9 @@ def search_receiver(
                         if result == INVALID_INPUT:
                             matched_pattern = False
                             break
-                        elif result is None:
+                        if result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")
-                        elif isinstance(result, SearchMessageOverall):
+                        if isinstance(result, SearchMessageOverall):
                             overall_messages.add(result)
                         else:
 
@@ -958,7 +958,7 @@ def search_receiver(
             if settings.PREFER_ALLELE_LINKS and response.search_type.preview_category() == "Variant":
                 try:
                     response = _convert_variant_search_response_to_allele_search_response(response)
-                except:
+                except Exception:
                     report_exc_info()
                     response.messages_overall.append(SearchMessageOverall("Unexpected error when attempting to convert Variant results into Allele results"))
 

@@ -2,29 +2,17 @@
 {% load static %}
 {% block style %}
 
-.vcf-success {
-    background-image: url({% static 'icons/vcf_64.png' %})
-}
-
-.vcf-error {
-    background-image: url({% static 'icons/cross.png' %})
-}
-
-.vcf-loading {
-    background-image: url({% static 'icons/loading.gif' %})
-}
-
-{% endblock %} 
+{% endblock %}
 
 
 {% block jshead %}
-    function get_icon_class(importStatus) {
+    function get_vcf_icon(importStatus, variantCaller) {
         if (importStatus == 'S') {
-            return "vcf-success";
+            return `<div title='${variantCaller}' class='left grid-link-icon vcf-icon' style='background-image:url("{% static 'icons/vcf_64.png' %}")'></div>`;
         } else if (importStatus == 'E') {
-            return "vcf-error";
+            return `<i class="fas fa-times-circle text-danger" title='${variantCaller}'></i>`;
         } else if (importStatus == 'C' || importStatus == 'I') {
-            return "vcf-loading";
+            return `<i class="fas fa-spinner fa-spin" title='${variantCaller}'></i>`;
         }
         return null;
     }
@@ -62,15 +50,7 @@
                     let variantCaller = variantCallerList[i];
                     let importStatus = importStatusList[i];
                     let URL = Urls.view_vcf(vcfId);
-                    let iconClass = get_icon_class(importStatus);
-                    let linkInner;
-                    if (iconClass) {
-                        linkInner = `<div title='${variantCaller}' class='left grid-link-icon vcf-icon ${iconClass}'></div>`;
-                        console.log(linkInner);
-                    } else {
-                        linkInner = 'VCF ' + vcfId;
-                        linkInner += "(" + importStatus + ")";
-                    }
+                    const linkInner = get_vcf_icon(importStatus, variantCaller) || ('VCF ' + vcfId + '(' + importStatus + ')');
                     vcfLinks.push("<a href='" + URL + "'>" + linkInner + "</a>");
                 }
             }
@@ -93,7 +73,7 @@
         showBadIcon : function(val) {
             var cell_value = '';
             if (val) {
-                cell_value = '<div title="Run marked as bad" class="grid-link-icon bad-run-icon"></div>';
+                cell_value = '<i class="fas fa-times-circle text-danger" title="Run marked as bad"></i>';
             }
             return cell_value;
         }

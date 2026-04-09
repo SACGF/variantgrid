@@ -170,6 +170,26 @@ class Test(URLTestCase):
 
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 
+    def testDatatableUrls(self):
+        DATATABLE_URLS = [
+            ("analysis_node_issues_datatable", {}, 200),
+            ("karyomapping_analyses_datatable", {}, 200),
+        ]
+        self._test_datatable_urls(DATATABLE_URLS, self.user_non_owner)
+
+    def testDatatableListPermission(self):
+        PRIVATE_DATATABLE_LIST_URLS = [
+            ("karyomapping_analyses_datatable", {}, self.karyomapping_analysis),
+        ]
+        self._test_datatables_grid_urls_contains_objs(PRIVATE_DATATABLE_LIST_URLS, self.user_owner, True)
+
+    @prevent_request_warnings
+    def testDatatableListNoPermission(self):
+        PRIVATE_DATATABLE_LIST_URLS = [
+            ("karyomapping_analyses_datatable", {}, self.karyomapping_analysis),
+        ]
+        self._test_datatables_grid_urls_contains_objs(PRIVATE_DATATABLE_LIST_URLS, self.user_non_owner, False)
+
     def testPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_owner)
 

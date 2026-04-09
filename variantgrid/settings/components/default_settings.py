@@ -258,6 +258,13 @@ LIFTOVER_BCFTOOLS_ENABLED = True
 LIFTOVER_BCFTOOLS_SYMBOLIC = False
 LIFTOVER_BCFTOOLS_MAX_LENGTH = 1000
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
+# When False (default), BCFTools liftover SWAP=1 variants are rejected and the AlleleLiftover
+# is marked ERROR rather than inserting the swapped variant. VariantGrid lifts variants (not
+# genotypes), so a SWAP=1 record means the sample allele is already reference in the destination
+# build — storing it as a novel variant would be wrong.
+# Set True only to restore the legacy behavior (swap REF/ALT and insert). See SACGF/variantgrid_private#3763
+LIFTOVER_BCFTOOLS_ALLOW_SWAP = False
+
 BCFTOOLS_COMMAND = "bcftools"  # if not absolute, needs to be in path
 
 PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
@@ -320,6 +327,7 @@ ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True
 ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
+ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_SHOW_CANONICAL_HGVS = True
@@ -432,7 +440,7 @@ ROLLBAR = {
     'access_token': rollbar_access_token,
     'client_access_token': rollbar_client_access_token,
     'environment': socket.gethostname().lower().split('.')[0].replace('-', ''),
-    'enabled': bool(rollbar_access_token and rollbar_client_access_token),  # set to false in environments to disable rollbar
+    'enabled': bool(rollbar_access_token and rollbar_client_access_token) and not UNIT_TEST,  # set to false in environments to disable rollbar
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,

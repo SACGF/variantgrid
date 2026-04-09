@@ -30,7 +30,7 @@ from snpdb.models.models_genome import GenomeBuild
 def get_igv_data(user, genome_build: GenomeBuild = None):
     user_settings = UserSettings.get_for_user(user)
     replace_dict = UserDataPrefix.get_replace_dict(user)
-    igv_data = {'base_url': "http://localhost:%d" % user_settings.igv_port,
+    igv_data = {'base_url': f"http://localhost:{user_settings.igv_port}",
                 'replace_dict': replace_dict}
     if genome_build:
         igv_data['genome'] = genome_build.igv_genome
@@ -162,7 +162,7 @@ class SettingsOverride(models.Model):
     grid_sample_label_template = models.TextField(null=True, blank=True,
                                                   help_text="Python string template, eg: '%(patient)s (%(sample)s/%(specimen_id)s)||%(patient)s (%(sample)s)||%(sample)s'. Multiple values separated by '||', the first one to succeed will be used. Variables: sample_id, sample (name), patient_id, patient_code, patient (full name), specimen_id, specimen (name).")
     tag_colors = models.ForeignKey(TagColorsCollection, on_delete=SET_NULL, null=True, blank=True,
-                                   help_text="Set of colors assigned to tags (modify/create these in 'Tag settings')")
+                                   help_text="Set of colours assigned to tags (modify/create these in 'Tag settings')")
     variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True,
                                                                  help_text="Whether left click by default opens up variant details in new tab. No is to open details in the node editor location. It's always possible to right click and select 'open in new tab'")
     tool_tips = models.BooleanField(null=True, blank=True,
@@ -197,6 +197,9 @@ class SettingsOverride(models.Model):
     show_candidates_reanalysis_new_annotation = models.BooleanField(null=True, blank=True, help_text="Show candidates in analysis pages (You can always explicitly go to the candidate pages)")
     show_candidates_cross_sample_classification = models.BooleanField(null=True, blank=True, help_text="Show candidates on sample / classification pages (You can always explicitly go to the candidate pages)")
     show_candidates_classification_evidence_update = models.BooleanField(null=True, blank=True, help_text="Show candidates on sample / classification pages (You can always explicitly go to the candidate pages)")
+
+    initially_show_zygosity_table = models.BooleanField(null=True, blank=True,
+                                                         help_text="Initially expand the zygosity requirements table in Trio/Quad node editors")
 
 
 class GlobalSettings(SettingsOverride):
@@ -373,6 +376,7 @@ class UserSettings:
     show_candidates_reanalysis_new_annotation: bool
     show_candidates_cross_sample_classification: bool
     show_candidates_classification_evidence_update: bool
+    initially_show_zygosity_table: bool
 
     @staticmethod
     def parse_value(field_name: str, value: Any) -> Any:

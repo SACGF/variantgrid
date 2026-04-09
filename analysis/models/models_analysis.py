@@ -23,6 +23,7 @@ from genes.models import CanonicalTranscriptCollection
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
 from library.preview_request import PreviewModelMixin
+from seqauto.models import EnrichmentKit
 from snpdb.models import CustomColumnsCollection, CustomColumn, \
     UserSettings, AbstractNodeCountSettings, Sample, Cohort
 from snpdb.models.models_enums import BuiltInFilters
@@ -88,6 +89,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     def last_lock(self):
         return self.analysislock_set.order_by("pk").last()
 
+    @property
     def is_locked(self):
         is_snapshot = AnalysisTemplateVersion.objects.filter(analysis_snapshot=self).exists()
         return is_snapshot or (self.last_lock and self.last_lock.locked)
@@ -116,7 +118,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
         """ Disable modification when locked """
         if super().can_write(user_or_group):
-            return not self.is_locked()
+            return not self.is_locked
         return False
 
     def get_absolute_url(self):
@@ -173,6 +175,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                 warnings.append(str(e))
         return warnings
 
+    @property
     def is_valid(self):
         return not self.get_errors()
 
@@ -288,7 +291,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         warnings = []
         if self.lock_input_sources:
             warnings.append("INPUT LOCKED - cannot create new input source nodes.")
-        if not self.can_write(user) and not self.is_locked():  # Locked has own icon, no need for warning
+        if not self.can_write(user) and not self.is_locked:  # Locked has own icon, no need for warning
             warnings.append("This analysis is READ-ONLY - you do not have write permission to modify anything")
         return warnings
 
@@ -366,8 +369,8 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if template_name := getattr(settings, setting_name, None):
             try:
                 return AnalysisTemplate.objects.get(name=template_name)
-            except AnalysisTemplate.DoesNotExist:
-                raise ValueError(f"Analysis Template '{template_name}' does not exist!")
+            except AnalysisTemplate.DoesNotExist as exc:
+                raise ValueError(f"Analysis Template '{template_name}' does not exist!") from exc
         else:
             raise ValueError(f"settings.{setting_name} not set. Talk to your administrator")
 
@@ -400,6 +403,10 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if last:
             return last.version
         return 0
+
+    @property
+    def latest_version_obj(self):
+        return self.analysistemplateversion_set.order_by("-pk").first()
 
     @classmethod
     def filter_for_user(cls, user, queryset=None, **kwargs):
@@ -524,6 +531,15 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         return s
 
 
+class AutoLaunchAnalysisTemplate(TimeStampedModel):
+    template = models.ForeignKey(AnalysisTemplate, on_delete=CASCADE)
+    enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, blank=True, on_delete=CASCADE)
+    sample_regex = models.TextField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('template', 'enrichment_kit', 'sample_regex')
+
+
 class AnalysisTemplateVersion(TimeStampedModel):
     template = models.ForeignKey(AnalysisTemplate, on_delete=CASCADE)
     version = models.IntegerField()
@@ -596,14 +612,18 @@ class AnalysisTemplateRun(TimeStampedModel):
         av_qs = AnalysisVariable.objects.filter(node__analysis=self.analysis)
         return av_qs.exclude(analysistemplaterunargument__error__isnull=True)
 
+    @property
     def is_populated(self) -> bool:
         return not self._get_unset_or_errored_variables().exists()
 
     def check_populated(self):
         """ Throws exception if all AnalysisVariables not populated w/o error """
-        unpopulated = self._get_unset_or_errored_variables()
-        if unpopulated_fields := list(unpopulated.values_list("field", flat=True)):
-            raise ValueError(f"Missing/Errored analysis variables: {', '.join(unpopulated_fields)}")
+        problems = []
+        for variable_error in self._get_unset_or_errored_variables():
+            problems.append(f"{variable_error.field}: {variable_error.analysistemplaterunargument.error}")
+
+        if problems:
+            raise ValueError(f"Problem with Analysis Variables: {', '.join(problems)}")
 
     def populate_analysis_name(self):
         """ Populate analysis_name_template with params based on AnalysisVariable fields, and the magic values:

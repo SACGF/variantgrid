@@ -48,11 +48,6 @@ fi
 
 ./scripts/install/ubuntu_18_install_dependencies.sh
 
-echo "Download Natural Language Tool Kit data to help us parse sentences."
-su ${SYSTEM_VARIANTGRID_USER} -c 'python3 -m nltk.downloader punkt'
-su ${SYSTEM_VARIANTGRID_USER} -c 'python3 -m nltk.downloader averaged_perceptron_tagger'
-
-
 ##########
 # Database
 ##########

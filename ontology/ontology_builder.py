@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 from enum import Enum
@@ -69,8 +70,8 @@ class CachedObj(Generic[T]):
         created = [c.obj for c in cache if c.status == ModifiedStatus.CREATED]
         modified = [c.obj for c in cache if c.status == ModifiedStatus.MODIFIED]
         if verbose:
-            print(f"{model} Inserting {len(created):,}")
-            print(f"{model} Modifying {len(modified):,}")
+            logging.info("%s Inserting %s", model, f"{len(created):,}")
+            logging.info("%s Modifying %s", model, f"{len(modified):,}")
         batch_size = 2000
         if created:
             model.objects.bulk_create(created, batch_size=batch_size, ignore_conflicts=True)
@@ -124,13 +125,13 @@ class OntologyBuilder:
         """
         Call this to prefetch all data from the previous import, should greatly reduce time taken
         """
-        print("About to pre-cache all Ontology")
+        logging.info("About to pre-cache all Ontology")
         for t in OntologyTerm.objects.all():
             self.terms[t.id] = CachedObj(t)
 
         # We always insert a new OntologyTermRelation (to allow versions according to import)
         self.full_cache = True
-        print("Cache complete")
+        logging.info("Cache complete")
 
     def _fetch_term(self, term_id: str) -> CachedObj[OntologyTerm]:
         if pre_cached := self.terms.get(term_id):
@@ -281,11 +282,11 @@ class OntologyBuilder:
                 count = olds.count()
                 if count:
                     if verbose:
-                        print(f"{model} Deleting {count:,}")
+                        logging.info("%s Deleting %s", model, f"{count:,}")
                     olds.delete()
         if verbose:
             time_taken = datetime.now() - self.start
-            print(f"Bulk complete in {time_taken}")
+            logging.info("Bulk complete in %s", time_taken)
 
         self._ontology_import.completed = True
         self._ontology_import.save()

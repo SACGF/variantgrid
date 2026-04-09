@@ -20,7 +20,6 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
         search_max_samples = int(candidate_search_run.config_snapshot.get("max_samples"))
         zygosities = candidate_search_run.get_zygosities_from_config()
 
-
         records = []
         sample_records = self._get_sample_candidates(candidate_search_run, analysis_filters, zygosities)
         for sample, candidates in self.limit_sample_and_results(sample_records, search_max_results, search_max_samples):
@@ -83,7 +82,7 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                     new_patho_variants = new_clinvar_patho_qs.values_list("pk", flat=True)
 
                     for sample, analysis in samples_and_analyses_by_annotation_version[annotation_version]:
-                        print(sample, analysis)
+                        logging.info("Processing sample %s, analysis %s", sample, analysis)
                         sample_qs = sample.get_variant_qs().filter(pk__in=new_patho_variants)
                         filter_kwargs = {}
                         #if zygosities:

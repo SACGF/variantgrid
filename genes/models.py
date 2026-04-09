@@ -481,8 +481,7 @@ class Gene(PreviewModelMixin, models.Model):
         qs = Gene.objects.filter(identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
         ret = qs.delete()
         if ret:
-            print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
-            print(ret)
+            logging.info("Deleted orphaned %s records: %s", Gene.FAKE_GENE_ID_PREFIX, ret)
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """
@@ -559,7 +558,7 @@ class GeneVersion(models.Model):
         """ 1-based for humans """
         try:
             return f"{self.chrom}:{self.start + 1}-{self.end} ({self.strand})"
-        except:
+        except Exception:
             return ""
 
     @cached_property
@@ -587,7 +586,7 @@ class GeneVersion(models.Model):
         return {
             "chrom": contigs.pop().name,
             "start": min(all_transcripts_data["start"]),
-            "end": min(all_transcripts_data["end"]),
+            "end": max(all_transcripts_data["end"]),
             "strand": strand_set.pop(),
         }
 
@@ -1002,7 +1001,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         if version is not None:
             try:
                 transcript_version = transcript_versions_qs.get(version=version)
-            except TranscriptVersion.DoesNotExist:
+            except TranscriptVersion.DoesNotExist as exc:
                 possible_versions = set(transcript_versions_qs.values_list('version', flat=True))
                 possible_versions = [int(p) for p in possible_versions if p is not None]
                 possible_versions.sort()
@@ -1016,7 +1015,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                         transcript_version = transcript_versions_qs.filter(version=use_version).last()
                     else:
                         version_list = ', '.join((str(v) for v in possible_versions))
-                        raise MissingTranscript(f"No Transcript for '{transcript_name}' (build: {genome_build}) - but there are entries for versions {version_list}")
+                        raise MissingTranscript(f"No Transcript for '{transcript_name}' (build: {genome_build}) - but there are entries for versions {version_list}") from exc
         else:
             transcript_version = transcript_versions_qs.last()
 
@@ -1119,7 +1118,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         # 'tag' was in the transcript in versions 0.2.12 - 0.2.13
         # It is inside genome build data after 0.2.14
         if tag_list_str := self.genome_build_data.get("tag") or self.data.get("tag"):
-            tag_list = sorted(tag for tag in tag_list_str.split(",") if tag not in REMOVE_TAGS)
+            tag_list = sorted(tag.strip() for tag in tag_list_str.split(",") if tag.strip() not in REMOVE_TAGS)
         return tag_list
 
     @cached_property
@@ -1218,7 +1217,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                     if self.chrom != other_cleaned_chrom:
                         differences["contig"] = (f"{my_chrom} (contig name: {self.chrom})",
                                                  f"{other_chrom} (contig name: {other_cleaned_chrom})")
-                except:
+                except Exception:
                     # Can't convert - just show differences
                     differences["contig"] = (my_chrom, other_chrom)
 
@@ -1474,7 +1473,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                 )
                 tvi_by_id.update(TranscriptVersionSequenceInfo._insert_from_genbank_handle(fetch_handle))
             except RuntimeError as e:
-                print(f"Entrez failed w/params: {id_param}")
+                logging.warning("Entrez failed w/params: %s", id_param)
                 if fail_on_error:
                     raise e
 
@@ -1844,7 +1843,7 @@ class GeneList(TimeStampedModel):
         # Match original name and symbol so we can delete non-matched
         name_or_symbol_match = Q(original_name__in=gene_symbol_deletions) | Q(gene_symbol__in=gene_symbol_deletions)
         qs = self.genelistgenesymbol_set.filter(name_or_symbol_match)
-        num_deleted = qs.delete()
+        num_deleted, _ = qs.delete()
 
         if num_added or num_deleted:
             self.set_modified_to_now()
@@ -1855,12 +1854,12 @@ class GeneList(TimeStampedModel):
     def get_for_user(user, gene_list_id, success_only=True):
         try:
             return GeneList.filter_for_user(user, success_only).get(pk=gene_list_id)
-        except GeneList.DoesNotExist:
+        except GeneList.DoesNotExist as exc:
             # Need to distinguish between does not exist and no permission
             get_object_or_404(GeneList, pk=gene_list_id)  # potentially throws GeneList.DoesNotExist
             # If we're here, object exists but we have a permission error
             msg = f"You don't have permission to access gene_list {gene_list_id}"
-            raise PermissionDenied(msg)
+            raise PermissionDenied(msg) from exc
 
     @staticmethod
     def filter_for_user(user, success_only=True):
@@ -1996,6 +1995,7 @@ def sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: di
             try:
                 with transaction.atomic():
                     # There can only be 1 - if this works it's active
+                    # This will also trigger an event which is used to auto lauch analyses
                     ActiveSampleGeneList.objects.create(sample=sample, sample_gene_list=instance)
             except IntegrityError:
                 ActiveSampleGeneList.objects.filter(sample=sample).delete()
@@ -2092,10 +2092,10 @@ class PanelAppPanelLocalCache(TimeStampedModel):
             "url": self.panel_app_panel.url,
         }
         if gene_list := GeneList.objects.filter(**gene_list_kwargs).order_by("pk").first():
-            print(f"Reused existing gene list: {gene_list.pk}")
+            logging.info("Reused existing gene list: %s", gene_list.pk)
         else:
             gene_list = GeneList.objects.create(**gene_list_kwargs)
-            print(f"Created gene list: {gene_list.pk}")
+            logging.info("Created gene list: %s", gene_list.pk)
             gene_names_list = []
             for pap_lc_gs in self.panelapppanellocalcachegenesymbol_set.all():
                 confidence_level = int(pap_lc_gs.data["confidence_level"])
@@ -2103,7 +2103,7 @@ class PanelAppPanelLocalCache(TimeStampedModel):
                     gene_symbol = pap_lc_gs.data["gene_data"]["gene_symbol"]
                     gene_names_list.append(gene_symbol)
 
-            print(f"Creating symbols: {gene_names_list}")
+            logging.info("Creating symbols: %s", gene_names_list)
             gene_matcher = GeneSymbolMatcher()
             gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list)
             gene_list.import_status = ImportStatus.SUCCESS
@@ -2112,7 +2112,7 @@ class PanelAppPanelLocalCache(TimeStampedModel):
             # PanelApp gene list should be public
             add_public_group_read_permission(gene_list)
 
-        print(f"Returning gene list: {gene_list.pk}")
+        logging.info("Returning gene list: %s", gene_list.pk)
         return gene_list
 
     def __str__(self):
@@ -2208,7 +2208,7 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
                 logging.error("Wasn't exactly 1 qc for bam_file %s", bam_file)
         except ObjectDoesNotExist:
             pass
-        except:
+        except Exception:
             log_traceback()
 
         return gene_coverage
@@ -2325,17 +2325,9 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
 
 @receiver(pre_delete, sender=GeneCoverageCollection)
 def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    # We don't want to delete any linked QCGeneCoverage files
-    # they are made via SeqAuto, reload should link this again
-    try:
-        from seqauto.models import QCGeneCoverage
-        QCGeneCoverage.objects.filter(gene_coverage_collection=instance).update(gene_coverage_collection=None)
-    except:
-        pass
-
     try:
         instance.delete_related_objects()
-    except:
+    except Exception:
         pass
 
 

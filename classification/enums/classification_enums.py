@@ -341,7 +341,7 @@ class ShareLevel(ChoicesEnum):
     # These strings have to be <= 16 characters for choice field
     CURRENT_USER = 'user'
     LAB = 'lab'
-    INSTITUTION = 'institution'
+    ORGANISATION = 'organisation'
     ALL_USERS = 'logged_in_users'
     PUBLIC = 'public'
 
@@ -381,7 +381,7 @@ class ShareLevel(ChoicesEnum):
         groups = {
             ShareLevel.CURRENT_USER: user,
             ShareLevel.LAB: lab.group,
-            ShareLevel.INSTITUTION: lab.group_institution,
+            ShareLevel.ORGANISATION: lab.group_institution,
             ShareLevel.ALL_USERS: all_users_group(),
             ShareLevel.PUBLIC: public_group()
         }
@@ -391,7 +391,7 @@ class ShareLevel(ChoicesEnum):
         context_labels = {
             ShareLevel.CURRENT_USER: vc.user.username,
             ShareLevel.LAB: vc.lab.name,
-            ShareLevel.INSTITUTION: vc.lab.organization.name,
+            ShareLevel.ORGANISATION: vc.lab.organization.name,
         }
         return context_labels.get(self, self.label)
 
@@ -403,6 +403,13 @@ class ShareLevel(ChoicesEnum):
     @property
     def icon(self) -> str:
         return f'icons/share_level/{self.value}.png'
+
+    @classmethod
+    def _missing_(cls, value):
+        # Backwards compatibility: old DB rows used 'institution' before the rename to 'organisation'
+        if value == 'institution':
+            return cls.ORGANISATION
+        return None
 
     def __str__(self):
         return self.value
@@ -425,6 +432,10 @@ class ShareLevel(ChoicesEnum):
         elif str(source).isnumeric():
             index = int(source)
 
+        # Backwards compatibility: old DB rows and old API clients used 'institution'
+        if str(source) == 'institution':
+            return ShareLevel.ORGANISATION
+
         for sl in ShareLevel.ALL_LEVELS:
             if sl.value == str(source) or sl.index == index:
                 return sl
@@ -434,11 +445,11 @@ class ShareLevel(ChoicesEnum):
 ShareLevel._DATA = {
         ShareLevel.CURRENT_USER: _ShareLevelData(index=0, label='Current User'),
         ShareLevel.LAB: _ShareLevelData(index=1, label='Lab'),
-        ShareLevel.INSTITUTION: _ShareLevelData(index=2, label='Organisation'),
+        ShareLevel.ORGANISATION: _ShareLevelData(index=2, label='Organisation'),
         ShareLevel.ALL_USERS: _ShareLevelData(index=3, label='App Users'),
         ShareLevel.PUBLIC: _ShareLevelData(index=4, label='3rd Party Databases')
     }
-ShareLevel.ALL_LEVELS = [ShareLevel.CURRENT_USER, ShareLevel.LAB, ShareLevel.INSTITUTION, ShareLevel.ALL_USERS, ShareLevel.PUBLIC]
+ShareLevel.ALL_LEVELS = [ShareLevel.CURRENT_USER, ShareLevel.LAB, ShareLevel.ORGANISATION, ShareLevel.ALL_USERS, ShareLevel.PUBLIC]
 ShareLevel.DISCORDANT_LEVEL_KEYS = {ShareLevel.ALL_USERS.value, ShareLevel.PUBLIC.value}
 
 
@@ -454,6 +465,7 @@ class SubmissionSource(str, Enum):
     API = 'api'
     VARIANT_GRID = 'variantgrid'
 
+    @property
     def is_valid_user_source(self) -> bool:
         return self in (SubmissionSource.FORM, SubmissionSource.CONSENSUS, SubmissionSource.API)
 

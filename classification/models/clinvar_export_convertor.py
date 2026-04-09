@@ -22,7 +22,7 @@ It also applies data level validation
 """
 
 # ClinVar doesn't accept ENST for example
-CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
+CLINVAR_ACCEPTED_TRANSCRIPTS = {"NC_", "NM_", "NR_"}
 
 
 class ClinVarCitation(TypedDict, total=False):
@@ -117,7 +117,7 @@ class ClinVarExportData:
         if self.no_record:
             return None
         if previous_submission := self._previous_submission:
-            grouping_changes = JsonDiffs.differences(previous_submission.submission_grouping or dict(), self.grouping.pure_json())
+            grouping_changes = JsonDiffs.differences(previous_submission.submission_grouping or {}, self.grouping.pure_json())
             body_changes = JsonDiffs.differences(previous_submission.submission_body, self.body.pure_json())
 
             return ClinVarExportChanges(

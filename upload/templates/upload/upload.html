@@ -257,9 +257,15 @@ img.thumbnail {
         const uploaded_file_id = upload_status['uploaded_file_id'];
         const nameTd = $("td.upload-name[uploaded_file_id=" + uploaded_file_id + "]");
 
-        // Thumbnail
-        const thumbnail = $("img.thumbnail", nameTd.parents("tr"));
-        thumbnail.attr("src", upload_status["status_image"]);
+        // Status icon
+        const statusIconSpan = $("span.status-icon", nameTd.parents("tr"));
+        const iconData = upload_status["status_icon"];
+        if (iconData && iconData.icon) {
+            const css = iconData.css || '';
+            statusIconSpan.html($('<i>').addClass('fas ' + iconData.icon + ' ' + css).attr('title', iconData.title));
+        } else {
+            statusIconSpan.empty();
+        }
 
         const fileTypeDiv = $(".file-type", nameTd);
         fileTypeDiv.empty();

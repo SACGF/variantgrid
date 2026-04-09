@@ -51,7 +51,7 @@ class SomaticClinicalSignificanceValue:
     amp_level: Optional[str] = None
 
     @property
-    def without_amp_level(self) -> 'SopmaticClinicalSignificanceValue':
+    def without_amp_level(self) -> 'SomaticClinicalSignificanceValue':
         return SomaticClinicalSignificanceValue(tier_level=self.tier_level)
 
     @property
@@ -64,12 +64,12 @@ class SomaticClinicalSignificanceValue:
         return None
 
     def __lt__(self, other):
-        return self.sort_value or 0 < other.sort_value or 0
+        return (self.sort_value or 0) < (other.sort_value or 0)
 
     def as_json(self):
         return {
             "somatic_clinical_significance": self.tier_level,
-            "amp_level": self.level
+            "amp_level": self.amp_level
         }
 
     @property
@@ -164,13 +164,13 @@ class EvidenceMixin:
         build_name: str
         try:
             build_name = self[SpecialEKeys.GENOME_BUILD]
-        except KeyError:
-            raise ValueError("Classification does not have a value for genome build")
+        except KeyError as exc:
+            raise ValueError("Classification does not have a value for genome build") from exc
 
         try:
             return GenomeBuild.get_name_or_alias(build_name)
-        except GenomeBuild.DoesNotExist:
-            raise ValueError(f"Unsupported GenomeBuild {build_name}")
+        except GenomeBuild.DoesNotExist as exc:
+            raise ValueError(f"Unsupported GenomeBuild {build_name}") from exc
 
     def get_genome_build_opt(self) -> Optional[GenomeBuild]:
         try:

@@ -1,5 +1,4 @@
 import logging
-from time import sleep
 
 import celery
 from auditlog.context import disable_auditlog
@@ -46,7 +45,7 @@ def update_node_task(node_id, version):
                 node.set_node_task_and_status(update_node_task.request.id, NodeStatus.LOADING)
                 node.load()
                 # Check if we need to clear shadow color
-                if node.shadow_color == NodeColors.ERROR and node.is_valid():
+                if node.shadow_color == NodeColors.ERROR and node.is_valid:
                     node.update(shadow_color=None)
                 return  # load already modified status, no need to save again below
             except NodeOutOfDateException:
@@ -76,27 +75,23 @@ def update_node_task(node_id, version):
             pass  # Out of date or deleted - just ignore
 
 
-@celery.shared_task
-def wait_for_cache_task(node_cache_id):
+@celery.shared_task(bind=True)
+def wait_for_cache_task(self, node_cache_id):
     MAX_CHECKS = 60
-    num_checks = 0
-    while True:
-        try:
-            node_cache = NodeCache.objects.get(pk=node_cache_id)
-        except NodeCache.DoesNotExist:
-            raise CeleryTasksObsoleteException()  # Kills dependent tasks w/o reporting in Rollbar
+    try:
+        node_cache = NodeCache.objects.get(pk=node_cache_id)
+    except NodeCache.DoesNotExist:
+        raise CeleryTasksObsoleteException()  # Kills dependent tasks w/o reporting in Rollbar
 
-        status = node_cache.variant_collection.status
-        if status in ProcessingStatus.FINISHED_STATES:
-            print(f"{node_cache} DONE")
-            break
-        elif status not in (ProcessingStatus.CREATED, ProcessingStatus.PROCESSING):
-            raise ValueError(f"{node_cache} collection status={status}")
-        num_checks += 1
-        if num_checks > MAX_CHECKS:
-            raise ValueError(f"Timed out after {num_checks} waiting for {node_cache}")
-        sleep(1)
-        logging.debug(f"Waiting on {node_cache}")
+    status = node_cache.variant_collection.status
+    if status in ProcessingStatus.FINISHED_STATES:
+        return
+    if status not in (ProcessingStatus.CREATED, ProcessingStatus.PROCESSING):
+        raise ValueError(f"{node_cache} collection status={status}")
+    if self.request.retries >= MAX_CHECKS:
+        raise ValueError(f"Timed out after {self.request.retries} checks waiting for {node_cache}")
+    logging.debug(f"Waiting on {node_cache}")
+    raise self.retry(countdown=1, max_retries=MAX_CHECKS)
 
 
 @celery.shared_task
@@ -114,7 +109,7 @@ def node_cache_task(node_id, version):
     if variant_collection.status != ProcessingStatus.CREATED:
         return
 
-    if not (node.is_valid() and node.modifies_parents()):
+    if not (node.is_valid and node.modifies_parents()):
         logging.debug("Not doing anything for node %s", node.pk)
         variant_collection.status = ProcessingStatus.SKIPPED
         variant_collection.save()
@@ -155,55 +150,51 @@ def delete_analysis_old_node_versions(analysis_id):
     node_versions_qs.annotate(latest_version=sub_query).exclude(pk=F('latest_version')).delete()
 
 
-@celery.shared_task
-def wait_for_node(node_id):
+@celery.shared_task(bind=True)
+def wait_for_node(self, node_id):
     """ Used to build a dependency on a node that's already loading.
 
-        The danger here is that we'll end up taking up a celery worker, waiting for
-        the parent to become available... so we have to be careful
+        Uses Celery retry (not sleep) to free the worker between checks,
+        preventing deadlocks when all workers are occupied waiting for parent nodes.
      """
-
+    TIME_BETWEEN_CHECKS = [5, 5, 10, 10, 30, 30, 60, MINUTE_SECS * 2]
     EVENT_NAME = "wait_for_node"
 
-    #logging.info("wait_for_node: %s", node_id)
     try:
-        TIME_BETWEEN_CHECKS = [5, 5, 10, 10, 30, 30, 60, MINUTE_SECS * 2]
-        total_time = 0
-        for sleep_time in TIME_BETWEEN_CHECKS:
+        # Any exception will exit this task which is ok
+        node = AnalysisNode.objects.get(pk=node_id)
 
-            # Any exception will exit this task which is ok
-            node = AnalysisNode.objects.get(pk=node_id)
-            #logging.info("node status: %s", node.status)
+        if NodeStatus.is_ready(node.status):
+            logging.info(f"Node {node} status={node.get_status_display()} was ready")
+            return
 
-            if NodeStatus.is_ready(node.status):
-                logging.info(f"Node {node} status={node.get_status_display()} was ready")
+        try:
+            node_task = NodeTask.objects.get(node=node, version=node.version)
+            if node_task.celery_task:
+                wait_for_task(node_task.celery_task)
                 return
+        except NodeTask.DoesNotExist:
+            pass
 
-            try:
-                node_task = NodeTask.objects.get(node=node, version=node.version)
-                if node_task.celery_task:
-                    wait_for_task(node_task.celery_task)
-                    return
-            except NodeTask.DoesNotExist:
-                pass
-
-            # loading (eg QUEUED) - there won't be a celery task yet
-            if node.status in NodeStatus.LOADING_STATUSES:
+        # loading (eg QUEUED) - there won't be a celery task yet
+        if node.status in NodeStatus.LOADING_STATUSES:
+            retry_index = self.request.retries
+            if retry_index < len(TIME_BETWEEN_CHECKS):
+                sleep_time = TIME_BETWEEN_CHECKS[retry_index]
+                total_time = sum(TIME_BETWEEN_CHECKS[:retry_index])
                 details = f"Waiting on parent node {node_id} which is QUEUED"
                 details += f" - waiting for {sleep_time} secs, {total_time} so far!"
                 create_event(None, EVENT_NAME, details, severity=LogLevel.WARNING)
+                raise self.retry(countdown=sleep_time, max_retries=len(TIME_BETWEEN_CHECKS))
             else:
-                details = f"Waiting on parent node {node_id} NON LOADING status {node.get_status_display()} no celery task!"
+                total_time = sum(TIME_BETWEEN_CHECKS)
+                details = f"Waited on parent node {node_id} for {total_time} seconds. "
+                details += "Didn't become available, dying so we don't cause a deadlock!"
                 create_event(None, EVENT_NAME, details, severity=LogLevel.ERROR)
-                return
-
-            logging.info("Sleeping for %d seconds", sleep_time)
-            sleep(sleep_time)
-            total_time += sleep_time
-
-        # Timeout
-        details = f"Waited on parent node {node_id} for {total_time} seconds. "
-        details += "Didn't become available, dying so we don't cause a deadlock!"
-        create_event(None, EVENT_NAME, details, severity=LogLevel.ERROR)
+        else:
+            details = f"Waiting on parent node {node_id} NON LOADING status {node.get_status_display()} no celery task!"
+            create_event(None, EVENT_NAME, details, severity=LogLevel.ERROR)
+    except celery.exceptions.Retry:
+        raise
     except:
         log_traceback()

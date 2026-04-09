@@ -33,7 +33,6 @@ from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS, NON_PR_TERMS
 from snpdb.models import Lab
 
-
 condition_set_signal = django.dispatch.Signal()  # args: "classification", "resolved_condition"
 
 
@@ -572,7 +571,7 @@ class ConditionMatchingSuggestion:
                     return False
 
             if gene_symbol:
-                if self.is_all_leafs():
+                if self.is_all_leafs:
                     # if we're at a gene level, and we have a relationship and we're leafs
                     term = terms[0]
                     if OntologySnake.has_gene_relationship(term, gene_symbol):
@@ -631,6 +630,7 @@ class ConditionMatchingSuggestion:
                     self.add_message(
                         ConditionMatchingMessage(severity="error", text=f"{term.id} : \"{term.warning_text}\""))
 
+    @property
     def is_all_leafs(self):
         if terms := self.terms:
             for term in terms:
@@ -975,7 +975,7 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
                 matches.append(cms)
         if search_match := merge_matches(matches):
             return search_match
-    except:
+    except Exception:
         report_exc_info()
 
     if local_omim := find_local_term(match_text, OntologyService.OMIM):

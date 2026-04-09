@@ -44,6 +44,14 @@ class TrioInheritance(models.TextChoices):
     XLINKED_RECESSIVE = 'X', "X-Linked Recessive"
 
 
+class QuadInheritance(models.TextChoices):
+    RECESSIVE = 'R', 'Recessive'
+    COMPOUND_HET = 'C', 'C. Het'
+    DOMINANT = 'D', 'Dominant'
+    DENOVO = 'N', 'Denovo'
+    XLINKED_RECESSIVE = 'X', 'X-Linked Recessive'
+
+
 class GroupOperation(models.TextChoices):
     ALL = "L", "All"  # AND
     ANY = "Y", "Any"  # OR
@@ -137,6 +145,13 @@ class TrioSample(models.TextChoices):
     MOTHER = 'M', 'Mother'
     FATHER = 'F', 'Father'
     PROBAND = 'P', 'Proband'
+
+
+class QuadSample(models.TextChoices):
+    MOTHER  = 'M', 'Mother'
+    FATHER  = 'F', 'Father'
+    PROBAND = 'P', 'Proband'
+    SIBLING = 'S', 'Sibling'
 
 
 class TagNodeMode(models.TextChoices):

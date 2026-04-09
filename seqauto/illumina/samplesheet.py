@@ -159,7 +159,10 @@ def convert_sheet_to_df(sheet, date_on_file: str = None):
     barcode = get_first_col(["Index", 'index'])
     index2 = get_first_col(["Index2", 'index2'])
     if index2 is not None:
-        barcode += "|" + index2  # Concat them together
+        mask = index2.notna()
+        if mask.any():
+            barcode = barcode.copy()
+            barcode[mask] = barcode[mask] + "|" + index2[mask]
     df['barcode'] = barcode
     df['date'] = date
     df['platform'] = platform

@@ -24,7 +24,7 @@ class HasPhenotypeDescriptionMixin:
         try:
             klass, kwargs = self._get_phenotype_description_relation_class_and_kwargs()
             _phenotype_description_relation = klass.objects.get(**kwargs)
-        except:
+        except Exception:
             _phenotype_description_relation = None
         return _phenotype_description_relation
 

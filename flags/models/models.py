@@ -582,7 +582,7 @@ class FlagsMixin(models.Model):
         if not self.flag_collection:
             return False
         return Flag.objects.filter(collection=self.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS) \
-            .filter(**{'flag_type__attributes__%s' % attribute: value}).exists()
+            .filter(**{f'flag_type__attributes__{attribute}': value}).exists()
 
     def close_open_flags_of_type(
             self,

@@ -336,7 +336,7 @@ class OntologyMatching:
                     results = condition_text_search(server_search_text, row_limit=row_count)
                     for index, result in enumerate(results):
                         ontology_matches.searched_term(result.id, row_count - index)
-                except:
+                except Exception:
                     report_exc_info()
                     # TODO communicate to the user couldn't search mondo text search
 

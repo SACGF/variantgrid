@@ -1,3 +1,4 @@
+import logging
 import re
 from collections import defaultdict
 from functools import cached_property
@@ -252,7 +253,19 @@ class ReleaseGeneMatcher:
         return self._match_unmatched_gene_symbol_qs(gene_symbol_qs)
 
 
+log = logging.getLogger(__name__)
+
+MAX_GENE_SYMBOL_LENGTH = 100
+
+
 def tokenize_gene_symbols(text):
     """ returns set of strings """
     text = clean_string(text)
-    return set(re.findall(r'[^,;\s]+', text.upper()))
+    tokens = re.findall(r'[^,;\s]+', text.upper())
+    valid_tokens = set()
+    for t in tokens:
+        if len(t) > MAX_GENE_SYMBOL_LENGTH:
+            log.warning("Skipping token too long to be a gene symbol (%d chars): '%s...'", len(t), t[:40])
+        else:
+            valid_tokens.add(t)
+    return valid_tokens

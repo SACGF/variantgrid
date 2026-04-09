@@ -66,9 +66,9 @@ class HistoricalEKeyConverter:
                     if historical_key and shariant_key and historical_type != shariant_type:
                         try:
                             to_shariant = self.TYPE_CONVERTERS[historical_type][shariant_type]
-                        except:
+                        except Exception as exc:
                             msg = f"{historical_key} -> {shariant_key}. Don't know how to convert from {historical_type} => {shariant_type}"
-                            raise NotImplementedError(msg)
+                            raise NotImplementedError(msg) from exc
 
                     self.historical_to_shariant[historical_key] = (shariant_key, to_shariant)
 

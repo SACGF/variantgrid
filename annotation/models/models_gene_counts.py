@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from django.db import models
@@ -48,7 +49,7 @@ class GeneCountType(models.Model):
                 # Search through all modifications (not just last published) - so you recount if ever counted
                 qs = gene_count_type.get_classification_qs(last_published=False)
                 if qs.filter(pk=classification.pk).exists():
-                    print(f"Need to recalculate {gene_count_type} - for {classification}")
+                    logging.info("Need to recalculate %s - for %s", gene_count_type, classification)
                     for cgc in gene_count_type.cohortgenecounts_set.filter(cohort__cohortsample__sample=sample):
                         gene = gene_by_vav_id.get(cgc.variant_annotation_version.pk)
                         if gene:

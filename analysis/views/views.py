@@ -27,15 +27,16 @@ from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
 from analysis import forms
-from analysis.analysis_templates import populate_analysis_from_template_run
+from analysis.analysis_templates import populate_analysis_from_template_run, get_auto_launch_analysis_template_matches
 from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
-from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, \
-    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm, AnalysisTemplateForm
+from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, UserQuadWizardForm, VCFLocusFilterForm, \
+    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm, AnalysisTemplateForm, \
+    AnalysisTemplateAutoLaunchForm, AutoLaunchFormSet
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
     AnalysisTemplateRun, AnalysisLock, Analysis
-from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample
+from analysis.models.enums import AnalysisTemplateType, SNPMatrix, MinimisationResultType, NodeStatus, TrioSample, QuadSample
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask
@@ -55,10 +56,11 @@ from library.guardian_utils import is_superuser
 from library.utils import full_class_name, defaultdict_to_dict
 from library.utils.database_utils import run_sql, queryset_to_sql
 from pedigree.models import Pedigree
+from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
-    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Variant, GenomeBuild
+    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Quad, Variant, GenomeBuild
 from variantgrid.celery import app
 
 
@@ -85,6 +87,29 @@ def analysis_templates(request):
     context = {"create_analysis_template_form": form,
                "analysis_template_choice_form": AnalysisTemplateTypeChoiceForm()}
     return render(request, 'analysis/analysis_templates.html', context)
+
+
+def analysis_templates_auto_launch(request):
+    """ Shows how the auto launch will work to users """
+
+    template_auto_launch_form = AnalysisTemplateAutoLaunchForm(request.POST or None)
+
+    sample_enrichment_kit_name = None
+    sample_name = ""
+    if request.method == "POST":
+        if sample_enrichment_kit_id := request.POST.get("enrichment_kit"):
+            if enrichment_kit := EnrichmentKit.objects.filter(pk=sample_enrichment_kit_id).first():
+                sample_enrichment_kit_name = enrichment_kit.name
+        sample_name = request.POST["example_sample_name"]
+
+    auto_launch_analysis_template_matches = get_auto_launch_analysis_template_matches(request.user, sample_enrichment_kit_name, sample_name)
+    context = {
+        "auto_launch_analysis_template_matches": auto_launch_analysis_template_matches,
+        "template_auto_launch_form": template_auto_launch_form,
+        "sample_enrichment_kit_name": sample_enrichment_kit_name,
+        "sample_name": sample_name,
+    }
+    return render(request, 'analysis/analysis_templates_auto_launch.html', context)
 
 
 def get_analysis_settings(user, analysis):
@@ -236,6 +261,79 @@ def trio_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id):
     return render(request, 'analysis/trio_wizard.html', context)
 
 
+def quad_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id, sample4_id):
+    cohort = Cohort.get_for_user(request.user, cohort_id)
+
+    if cohort.import_status != ImportStatus.SUCCESS:
+        import_status = cohort.get_import_status_display()
+        msg = f"Can't create analysis for {cohort} of status {import_status}"
+        raise PermissionDenied(msg)
+
+    samples = [Sample.get_for_user(request.user, sid)
+               for sid in [sample1_id, sample2_id, sample3_id, sample4_id]]
+
+    patient_description_results = []
+    for sample in samples:
+        description = ''
+        results = []
+        try:
+            description = sample.patient.phenotype
+            results = sample.patient.patient_text_phenotype.phenotype_description.get_results()
+        except:
+            pass
+        patient_description_results.append([description, results])
+
+    form = UserQuadWizardForm(request.POST or None)
+    if request.method == "POST":
+        if form.is_valid():
+            mother_affected  = form.cleaned_data['mother_affected']
+            father_affected  = form.cleaned_data['father_affected']
+            sibling_affected = form.cleaned_data['sibling_affected']
+            sample_roles = [form.cleaned_data[f'sample_{i}'] for i in range(1, 5)]
+
+            def get_cohort_sample(sample):
+                return cohort.cohortsample_set.get(sample=sample)
+
+            mother_cs = father_cs = proband_cs = sibling_cs = None
+            for sample, role in zip(samples, sample_roles):
+                cs = get_cohort_sample(sample)
+                if role == QuadSample.MOTHER:
+                    mother_cs = cs
+                elif role == QuadSample.FATHER:
+                    father_cs = cs
+                elif role == QuadSample.PROBAND:
+                    proband_cs = cs
+                elif role == QuadSample.SIBLING:
+                    sibling_cs = cs
+
+            quad_name = "/".join((mother_cs.name, father_cs.name, proband_cs.name, sibling_cs.name))
+            quad_name += f" from {cohort}"
+            quad, _ = Quad.objects.get_or_create(
+                cohort=cohort,
+                user=request.user,
+                mother=mother_cs,
+                mother_affected=mother_affected,
+                father=father_cs,
+                father_affected=father_affected,
+                proband=proband_cs,
+                sibling=sibling_cs,
+                sibling_affected=sibling_affected,
+                defaults={"name": quad_name},
+            )
+            return redirect(quad)
+
+    context = {
+        "cohort": cohort,
+        "sample_1": samples[0],
+        "sample_2": samples[1],
+        "sample_3": samples[2],
+        "sample_4": samples[3],
+        "form": form,
+        "patient_description_results": patient_description_results,
+    }
+    return render(request, 'analysis/quad_wizard.html', context)
+
+
 def analysis_editor_and_grid(request, analysis_id, stand_alone=False):
     analysis = get_analysis_or_404(request.user, analysis_id)
     context = {"select_grid_column_form": SelectGridColumnForm(),
@@ -259,6 +357,7 @@ def analysis_template_settings(request, pk):
     has_write_permission = analysis_template.can_write(request.user)
 
     at_form = _get_form(request, AnalysisTemplateForm, 'at-pre', instance=analysis_template)
+    formset = AutoLaunchFormSet(request.POST or None, instance=analysis_template)
     atv_form = None
     if atv := analysis_template.active:
         atv_form = _get_form(request, AnalysisTemplateVersionForm, 'atv-pre', instance=atv)
@@ -266,6 +365,7 @@ def analysis_template_settings(request, pk):
     if not has_write_permission:
         set_form_read_only(at_form)
         set_form_read_only(atv_form)
+        set_form_read_only(formset)
         messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
 
     if request.method == 'POST':
@@ -273,9 +373,10 @@ def analysis_template_settings(request, pk):
             raise PermissionDenied(f"Don't have permission to modify {analysis_template}")
 
         if at_form and at_form.is_bound:
-            valid = at_form.is_valid()
+            valid = at_form.is_valid() and formset.is_valid()
             if valid:
                 at_form.save()
+                formset.save()
             add_save_message(request, valid, "Analysis Template")
 
         if atv_form and atv_form.is_bound:
@@ -288,6 +389,7 @@ def analysis_template_settings(request, pk):
         "analysis_template": analysis_template,
         "analysis_template_versions": analysis_template.analysistemplateversion_set.order_by("-pk"),
         "at_form": at_form,
+        "at_formset": formset,
         "atv_form": atv_form,
         "has_write_permission": has_write_permission,
     }
@@ -460,7 +562,7 @@ def get_snp_matrix_counts(user: User, node_id, version_id):
     for ref, alt, count in count_qs:
         if alt == Variant.REFERENCE_ALT:
             alt = ref
-        counts_df[ref][alt] = count
+        counts_df.loc[alt, ref] = count
     return counts_df
 
 
@@ -611,6 +713,7 @@ def node_cancel_load(request, analysis_id, node_id):
 
 
 def node_graph(request, analysis_id, node_id, graph_type_id, cmap):
+    """ This is used in node_data_graph """
     get_node_subclass_or_404(request.user, node_id)  # Permission check
     node_graph_type = NodeGraphType.objects.get(pk=graph_type_id)
     cached_graph = graphcache.async_graph(node_graph_type.graph_class, cmap, node_id)
@@ -618,6 +721,7 @@ def node_graph(request, analysis_id, node_id, graph_type_id, cmap):
 
 
 def column_summary_boxplot(request, analysis_id, node_id, label, variant_column):
+    """ This is used in node_column_summary """
     get_node_subclass_or_404(request.user, node_id)  # Permission check
     graph_class_name = full_class_name(ColumnBoxplotGraph)
     cached_graph = graphcache.async_graph(graph_class_name, node_id, label, variant_column)
@@ -714,14 +818,7 @@ def view_analysis_settings(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     analysis_settings = get_analysis_settings(request.user, analysis)
 
-    form = forms.CreateAnalysisTemplateForm(request.POST or None, user=request.user, analysis=analysis)
-    if request.method == "POST":
-        if form.is_valid():
-            analysis_template = form.save()
-            return JsonResponse({"analysis_id": analysis_template.analysis_id})
-
     context = {"analysis": analysis,
-               "create_analysis_template_form": form,
                "new_analysis_settings": analysis_settings,
                "has_write_permission": analysis.can_write(request.user),
                "can_unlock": analysis.can_unlock(request.user)}
@@ -791,17 +888,31 @@ def _analysis_settings_node_counts_tab(request, analysis, pass_analysis_settings
     return render(request, 'analysis/analysis_settings_node_counts_tab.html', context)
 
 
-def analysis_settings_template_run_tab(request, analysis_id):
+def analysis_settings_template_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
 
-    node_variables = defaultdict(list)
-    for node in analysis.analysisnode_set.filter(analysisvariable__isnull=False).distinct().order_by("y"):
-        for av in node.analysisvariable_set.all().order_by("field"):
-            node_variables[node].append(av)
+    context = {"analysis": analysis}
 
-    context = {"analysis_template_run": analysis.analysistemplaterun,
-               "node_variables": defaultdict_to_dict(node_variables)}
-    return render(request, 'analysis/analysis_settings_template_run_tab.html', context)
+    # Template run info (if this analysis was generated from a template)
+    if hasattr(analysis, 'analysistemplaterun'):
+        analysis_template_run = analysis.analysistemplaterun
+        node_variables = defaultdict(list)
+        for node in analysis.analysisnode_set.filter(analysisvariable__isnull=False).distinct().order_by("y"):
+            for av in node.analysisvariable_set.all().order_by("field"):
+                node_variables[node].append(av)
+        context["analysis_template_run"] = analysis_template_run
+        context["node_variables"] = defaultdict_to_dict(node_variables)
+
+    # Create template form (if this analysis is not itself a template)
+    if analysis.template_type != AnalysisTemplateType.TEMPLATE:
+        form = forms.CreateAnalysisTemplateForm(request.POST or None, user=request.user, analysis=analysis)
+        if request.method == "POST":
+            if form.is_valid():
+                analysis_template = form.save()
+                return JsonResponse({"analysis_id": analysis_template.analysis_id})
+        context["create_analysis_template_form"] = form
+
+    return render(request, 'analysis/analysis_settings_template_tab.html', context)
 
 
 class AnalysisLogEntryWrapper:

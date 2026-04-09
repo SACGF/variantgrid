@@ -73,8 +73,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     VCF, CustomColumnsCollection, CustomColumn, Cohort, \
     CohortSample, GenomicIntervalsCollection, Sample, UserDataPrefix, UserGridConfig, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
-    Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
+    Trio, Quad, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, \
+    Lab, LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
     SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, AlleleConversionTool
@@ -293,8 +293,9 @@ def view_vcf(request, vcf_id):
     for warning, _ in vcf.get_warnings():
         messages.add_message(request, messages.WARNING, warning, extra_tags='import-message')
 
-    for info in _get_vcf_infos(vcf):
-        messages.add_message(request, messages.INFO, info, extra_tags='import-message')
+    if not reload_vcf:
+        for info in _get_vcf_infos(vcf):
+            messages.add_message(request, messages.INFO, info, extra_tags='import-message')
 
     has_write_permission = vcf.can_write(request.user)
     if not has_write_permission:
@@ -1105,7 +1106,8 @@ def cohorts(request):
         else:
             add_save_message(request, valid, "Cohort", created=True)
 
-    context = {"form": form}
+    show_group_data = UserGridConfig.get(request.user, 'Cohorts').show_group_data
+    context = {"form": form, "show_group_data": show_group_data}
     return render(request, 'snpdb/patients/cohorts.html', context)
 
 
@@ -1245,7 +1247,8 @@ def cohort_gene_counts_matrix(request, cohort_id, gene_count_type_id, gene_list_
 
 
 def trios(request):
-    context = {}
+    show_group_data = UserGridConfig.get(request.user, 'Trios').show_group_data
+    context = {"show_group_data": show_group_data}
     return render(request, 'snpdb/patients/trios.html', context)
 
 
@@ -1254,6 +1257,19 @@ def view_trio(request, pk):
     context = {"trio": trio,
                "has_write_permission": trio.cohort.can_write(request.user)}
     return render(request, 'snpdb/patients/view_trio.html', context)
+
+
+def quads(request):
+    show_group_data = UserGridConfig.get(request.user, 'Quads').show_group_data
+    context = {"show_group_data": show_group_data}
+    return render(request, 'snpdb/patients/quads.html', context)
+
+
+def view_quad(request, pk):
+    quad = Quad.get_for_user(request.user, pk)
+    context = {"quad": quad,
+               "has_write_permission": quad.cohort.can_write(request.user)}
+    return render(request, 'snpdb/patients/view_quad.html', context)
 
 
 @login_not_required
@@ -1429,10 +1445,6 @@ def help_static_page(request, page_name):
     """ This embeds static pages in a help template """
     context = {"page_name": page_name}
     return render(request, 'snpdb/help/help_static_page.html', context)
-
-
-def ajax_hello_world(request, data:str):
-    return render(request, 'snpdb/ajax_hello_world.html', {'data': data})
 
 
 def staff_only(request):

@@ -58,7 +58,7 @@ class PopulationNode(AnalysisNode):
 
     def modifies_parents(self):
         return any([self.filtering_by_population, self.use_internal_counts,
-                    self.gnomad_hom_alt_max, not self.show_gnomad_filtered])
+                    self.gnomad_hom_alt_max is not None, not self.show_gnomad_filtered])
 
     def _has_common_variants(self) -> bool:
         rare_only = (self.gnomad_af or self.gnomad_popmax_af) and self.percent <= 5
@@ -190,7 +190,6 @@ class PopulationNode(AnalysisNode):
             q = reduce(operator.or_, or_q)
             node_arg_q_dict[None] = {str(q): q}
 
-        print(f"{node_arg_q_dict=}")
         return node_arg_q_dict
 
     @staticmethod

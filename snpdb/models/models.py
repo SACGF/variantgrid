@@ -133,9 +133,6 @@ def cgf_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unuse
     if instance.filename:
         if os.path.exists(instance.filename):
             os.unlink(instance.filename)
-        dirname = os.path.dirname(instance.filename)
-        if os.path.isdir(dirname):
-            os.rmdir(dirname)
 
 class Company(models.Model):
     name = models.TextField(primary_key=True)
@@ -431,8 +428,8 @@ class ClinVarKeyExcludePattern(TimeStampedModel):
     def clean(self):
         try:
             re.compile(self.pattern)
-        except:
-            raise ValidationError({'pattern': ValidationError(f'{self.pattern} is not a valid regular expression')})
+        except Exception as exc:
+            raise ValidationError({'pattern': ValidationError(f'{self.pattern} is not a valid regular expression')}) from exc
 
         from classification.models import EvidenceKeyMap
         if EvidenceKeyMap.cached_key(self.evidence_key).is_dummy:
@@ -620,7 +617,7 @@ class Lab(models.Model, PreviewModelMixin):
             if days == 0:
                 days = 1
             cpd = self.total_classifications / days
-        except:
+        except Exception:
             cpd = 0
         return cpd
 
@@ -799,7 +796,7 @@ class SiteMessage(models.Model):
             try:
                 site_message_dict = json.loads(site_message_str)
                 reload = False
-            except:
+            except Exception:
                 pass
 
         if reload:

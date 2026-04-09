@@ -146,11 +146,14 @@ let DataTableDefinition = (function() {
             }
 
             if (defn.downloadCsvButtonEnabled) {
+                let csvName = defn.csvName || 'export';
+                let dateStr = new Date().toISOString().slice(0, 10);
                 dtParams.buttons = [
                     {
                         extend: 'csvHtml5',
                         action: newExportAction,
                         text: "Download as CSV",
+                        filename: csvName + '_' + dateStr,
                     }
                 ]
             }
@@ -647,6 +650,37 @@ TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
         return '';
     }
 };
+
+TableFormat.deleteRow = function(data, type, row) {
+    if (!data) {
+        return '';
+    }
+    return $('<button>', {
+        type: 'button',
+        class: 'btn btn-sm btn-danger dt-delete-row',
+        'data-url': data,
+        html: $('<i>', {class: 'fas fa-trash'})
+    }).prop('outerHTML');
+};
+
+$(document).on('click', '.dt-delete-row', function() {
+    if (!confirm('Are you sure you want to delete this?')) {
+        return;
+    }
+    let btn = $(this);
+    let url = btn.data('url');
+    $.ajax({
+        type: 'POST',
+        url: url,
+        headers: {'X-CSRFToken': Cookies.get('csrftoken')},
+        success: function() {
+            btn.closest('table').DataTable().ajax.reload(null, false);
+        },
+        error: function(xhr) {
+            alert('Error: ' + (xhr.responseText || 'Failed to delete'));
+        }
+    });
+});
 
 TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
     let fieldset = $('<div>', {class:'mt-3'});

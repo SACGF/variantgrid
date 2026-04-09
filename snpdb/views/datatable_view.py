@@ -13,10 +13,11 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import QuerySet, Q, F, OrderBy
 from django.http import HttpRequest, QueryDict
+from django.urls import reverse
 from kombu.utils import json
 
 from library.log_utils import report_exc_info
-from library.utils import pretty_label, JsonDataType, JsonObjType
+from library.utils import pretty_label, nice_class_name, JsonDataType, JsonObjType, full_class_name
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
@@ -236,6 +237,7 @@ class DatatableConfig(Generic[DC]):
     """
     search_box_enabled = False
     download_csv_button_enabled = False
+    csv_name: Optional[str] = None  # filename for CSV download (date suffix added automatically)
     rich_columns: list[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
     scroll_x = False
@@ -390,19 +392,32 @@ class DatatableConfig(Generic[DC]):
         """
         pass
 
+    @cached_property
+    def _model(self) -> Type[DC]:
+        return self.get_initial_queryset().model
+
     def view_primary_key(self, row: CellData) -> JsonDataType:
         """ Relies on being 'id' and object defining get_absolute_url  """
-        qs = self.get_initial_queryset()
-        primary_key_name = qs.model._meta.pk.name
+        primary_key_name = self._model._meta.pk.name
         pk = row.get(primary_key_name)
         if not pk:
             raise ValueError(f"Need to include primary key ('{primary_key_name}') in columns")
         text = row.value
-        obj = qs.model(pk=pk)
+        obj = self._model(pk=pk)
         return {
             "text": text,
             "url": obj.get_absolute_url(),
         }
+
+    def render_delete(self, cell: CellData) -> Optional[str]:
+        try:
+            obj = self._model.get_instance_for_permission_check(cell.value)
+        except self._model.DoesNotExist:
+            return None
+        if not obj.can_write(self.user):
+            return None
+        return reverse('group_permissions_object_delete',
+                       kwargs={'class_name': full_class_name(self._model), 'primary_key': cell.value})
 
 
 class DatabaseTableView(Generic[DC], JSONResponseView):
@@ -554,10 +569,18 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
     def json_definition(self) -> JsonObjType:
         config = self.config
 
+        csv_name = config.csv_name
+        if not csv_name:
+            try:
+                csv_name = nice_class_name(config.get_initial_queryset().model)
+            except Exception:
+                csv_name = "export"
+
         data: JsonObjType = {
             "responsive": any(col.detail for col in config.enabled_columns),
             "searchBoxEnabled": config.search_box_enabled,
             "downloadCsvButtonEnabled": config.download_csv_button_enabled,
+            "csvName": csv_name,
             "expandClientRenderer": config.expand_client_renderer,
             "scrollX": config.scroll_x,
         }

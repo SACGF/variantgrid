@@ -9,6 +9,8 @@ SA Path use gnomad_oe_lof EKey which looks like:
 
 
 """
+import logging
+
 import pandas as pd
 
 from genes.models import GnomADGeneConstraint, GeneSymbol, TranscriptVersion
@@ -71,11 +73,11 @@ def store_gnomad_gene_constraint_from_df(cached_web_resource, df):
         gene_constraints.append(ggc)
 
     if new_gene_symbols:
-        print(f"Inserting {len(new_gene_symbols)} new gene symbols")
+        logging.info("Inserting %d new gene symbols", len(new_gene_symbols))
         GeneSymbol.objects.bulk_create(new_gene_symbols, batch_size=2000, ignore_conflicts=True)
 
     if skipped_records:
-        print(f"Skipped {skipped_records} records (due to missing gene symbol)")
+        logging.warning("Skipped %d records (due to missing gene symbol)", skipped_records)
     GnomADGeneConstraint.objects.bulk_create(gene_constraints)
     cached_web_resource.description = f"{len(gene_constraints)} genes."
     cached_web_resource.save()

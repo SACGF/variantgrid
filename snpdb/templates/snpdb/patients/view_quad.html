@@ -1,0 +1,36 @@
+{% extends menu_patients_base %}
+{% load static %}
+{% load model_tags %}
+{% load related_analyses_tags %}
+
+{% block title %}Quad {{ quad }}{% endblock %}
+
+{% block head %}
+{{ block.super }}
+<script type="text/javascript">
+    $(document).ready(function() {
+        $("#quad-tabs").tabs();
+    });
+</script>
+<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+{% endblock %}
+
+{% block submenu_page_content %}
+
+    <div id="quad-tabs">
+        <ul>
+            <li><a id='details-tab' href="#details">Details</a></li>
+            {% if has_write_permission %}
+            <li><a href="{% url 'group_permissions' 'snpdb.models.Quad' quad.pk %}">Sharing / Permissions</a></li>
+            {% endif %}
+        </ul>
+        <div id="details">
+            {% quad_table quad %}
+        </div>
+    </div>
+
+    <div id='related-data-container'>
+    {% related_analyses_for_quad quad %}
+    </div>
+
+{% endblock %}

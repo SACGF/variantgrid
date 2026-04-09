@@ -191,6 +191,8 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         if self.date_of_death:
             dod = self.date_of_death.strftime(settings.DATE_FORMAT)
             return f"dead (D.O.D. {dod})"
+        if self._deceased:
+            return "dead"
         return "alive"
 
     @property
@@ -303,7 +305,7 @@ class Specimen(models.Model):
 
     @property
     def age_at_collection_date(self):
-        if self._age_at_collection_date:
+        if self._age_at_collection_date is not None:
             age = self._age_at_collection_date
         else:
             age = None
@@ -383,10 +385,12 @@ class PatientModification(models.Model):
     patient_import = models.ForeignKey(PatientImport, null=True, on_delete=CASCADE)
 
     def get_import_url(self):
-        try:
-            url = self.patient_import.patientrecords.get_absolute_url()
-        except PatientRecords.DoesNotExist:
-            url = None
+        url = None
+        if self.patient_import:
+            try:
+                url = self.patient_import.patientrecords.get_absolute_url()
+            except PatientRecords.DoesNotExist:
+                pass
         return url
 
 class PatientComment(models.Model):
@@ -486,7 +490,7 @@ class Clinician(models.Model):
     def cleaned_get_or_create(clinician_string):
         try:
             clinician = Clinician.match(clinician_string)
-        except:
+        except Clinician.DoesNotExist:
             kwargs = {}
             name = nameparser.HumanName(clinician_string)
             if name.title:
@@ -608,6 +612,6 @@ class FollowLeadScientist(models.Model):
 
 def get_lead_scientist_users_for_user(user):
     users_list = [user]
-    ls_to_follow = FollowLeadScientist.objects.filter(user=user).values_list("follow")
+    ls_to_follow = FollowLeadScientist.objects.filter(user=user).values_list("follow", flat=True)
     users_list.extend(ls_to_follow)
     return users_list

@@ -14,7 +14,7 @@ from variantopedia.interesting_nearby import interesting_summary
 
 
 def _variant_preview_zygosity_extra(variant: Variant, genome_build: GenomeBuild):
-    qs = get_variant_queryset_for_latest_annotation_version(first(variant.genome_builds))
+    qs = get_variant_queryset_for_latest_annotation_version(genome_build)
     qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
     qs = qs.filter(pk=variant.pk)
 

@@ -52,11 +52,9 @@ def _get_analysis_update_tasks(analysis_id) -> list:
     for connected_components in nx.weakly_connected_components(all_nodes_graph):
         sub_graph = all_nodes_graph.subgraph(connected_components)
         sub_graph_node_ids = list(sub_graph)
-        # nx.topological_sort returns a flattened list, ie doesn’t break into groups which can run in parallel
-        # so use other toposort library
 
         # We need a way to lock/claim the nodes - so someone else calling get_analysis_update_task()
-        # doesn't also launch update tasks for them.
+        # doesn’t also launch update tasks for them.
         analysis_update_uuid = uuid.uuid4()
         node_task_records = []
         logging.info("Dirty nodes:")
@@ -79,6 +77,8 @@ def _get_analysis_update_tasks(analysis_id) -> list:
 
         groups = []
         if node_versions_to_update:
+            # Build parent→child mapping here — available for toposort, dependencies,
+            # and will also be used by _can_schedule_node once issue #346 is implemented
             parent_value_data = defaultdict(set)
             for parent, child_list in nx.to_dict_of_lists(sub_graph).items():
                 for child_node_id in child_list:

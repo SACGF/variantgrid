@@ -255,7 +255,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             Uses tasks not signatures so they are hashable in a set to be able to remove dupes """
 
         task_args_set = set()
-        if self.is_valid() and (force_cache or self.use_cache):
+        if self.is_valid and (force_cache or self.use_cache):
             if parent := self.get_unmodified_single_parent_node():
                 return parent.get_cache_task_args_set(force_cache=force_cache)
 
@@ -302,7 +302,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             Otherwise, return them as we don't know if they're empty or not """
         non_empty_parents = []
         for p in self.get_parent_subclasses():
-            if p.is_ready():
+            if p.is_ready:
                 if p.count == 0:
                     continue
             elif require_parents_ready:
@@ -329,7 +329,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def get_single_parent_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = {}
         parent = self.get_single_parent()
-        if parent.is_ready():
+        if parent.is_ready:
             if parent.count == 0:
                 q_none = self.q_none()
                 arg_q_dict[None] = {str(q_none): q_none}
@@ -342,7 +342,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
     def get_single_parent_contigs(self):
         parent = self.get_single_parent()
-        if parent.is_ready():
+        if parent.is_ready:
             if parent.count == 0:
                 contigs = set()
             else:
@@ -382,6 +382,14 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.has_input() and self.uses_parent_queryset:
             if self._has_common_variants():
                 kwargs["common_variants"] = True
+
+            # Pass annotation gnomAD version so common filter version can be validated
+            # @see https://github.com/SACGF/variantgrid/issues/1119
+            if "annotation_gnomad_version" not in kwargs:
+                try:
+                    kwargs["annotation_gnomad_version"] = self.analysis.annotation_version.variant_annotation_version.gnomad
+                except AttributeError:
+                    pass
 
             for parent in self.get_non_empty_parents():
                 a_kwargs.update(parent.get_annotation_kwargs(**kwargs))
@@ -451,7 +459,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             if self._cache_node_q:
                 try:
                     cache.set(cache_key, arg_q_dict)
-                except:
+                except Exception:
                     log_traceback()
         return arg_q_dict
 
@@ -652,6 +660,9 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ Automatic node name """
         raise NotImplementedError(f"Node Class: {self.get_class_name()}")
 
+    def get_name_or_identifier(self):
+        return self.get_node_name() or self.get_identifier()
+
     @staticmethod
     def get_help_text() -> str:
         raise NotImplementedError()
@@ -759,7 +770,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         extra_columns = cache.get(cache_key)
         if extra_columns is None:
             extra_columns = []
-            if self.is_valid():
+            if self.is_valid:
                 extra_columns.extend(self._get_inherited_columns())
             # Only add columns that are unique, as otherwise filters get added twice.
             node_extra_columns = self._get_node_extra_columns()
@@ -784,13 +795,13 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ For JQGrid - subclasses should override _get_node_extra_colmodel_overrides """
 
         extra_overrides = {}
-        if self.is_valid() and self.uses_parent_queryset:
+        if self.is_valid and self.uses_parent_queryset:
             extra_overrides.update(self._get_inherited_colmodel_overrides())
         extra_overrides.update(self._get_node_extra_colmodel_overrides())
         return extra_overrides
 
     def get_node_classification(self):
-        if self.is_source():
+        if self.is_source:
             classification = "source"
         else:
             classification = "filter"
@@ -799,12 +810,15 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def has_input(self):
         return self.max_inputs != 0
 
+    @property
     def is_source(self):
         return self.has_input() is False
 
+    @property
     def is_valid(self):
         return not self.get_errors()
 
+    @property
     def is_ready(self):
         return NodeStatus.is_ready(self.status)
 
@@ -825,7 +839,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def get_unmodified_single_parent_node(self) -> Optional['AnalysisNode']:
         """ If a node doesn't modify single parent - can use that in some places to re-use cache """
 
-        if self.has_input() and self.parent_count() == 1 and self.is_valid() and not self.modifies_parents():
+        if self.has_input() and self.parent_count() == 1 and self.is_valid and not self.modifies_parents():
             try:
                 return self.get_single_parent()
             except ValueError:
@@ -975,7 +989,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             self.name = self.get_node_name()
 
         # TODO: This causes lots of DB queries... should we change this?
-        self.valid = self.is_valid()
+        self.valid = self.is_valid
         if not self.valid:
             self.shadow_color = NodeColors.ERROR
             self.appearance_dirty = True
@@ -994,7 +1008,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
                 # We also need to bump if node has it's own sample - as in templates, we set fields in toposort order
                 # So we could go from having multiple proband samples to only one later (thus can set descendants)
                 for kid in self.children.select_subclasses():
-                    kid.ancestor_input_samples_changed = self.is_source() or self.ancestor_input_samples_changed or \
+                    kid.ancestor_input_samples_changed = self.is_source or self.ancestor_input_samples_changed or \
                                                          self.get_samples_from_node_only_not_ancestors()
                     kid.appearance_dirty = False
                     kid.queryset_dirty = True

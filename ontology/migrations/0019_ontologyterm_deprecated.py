@@ -8,11 +8,6 @@ def _populate_deprecated(apps, _schema_editor):
     OntologyTerm.objects.filter(name__icontains='obsolete').update(deprecated=True)
 
 
-def _dummy_reverse(_apps, _schema_editor):
-    # code is reversable
-    pass
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -25,5 +20,5 @@ class Migration(migrations.Migration):
             name='deprecated',
             field=models.BooleanField(blank=True, default=False),
         ),
-        migrations.RunPython(_populate_deprecated, reverse_code=_dummy_reverse)
+        migrations.RunPython(_populate_deprecated, migrations.RunPython.noop)
     ]

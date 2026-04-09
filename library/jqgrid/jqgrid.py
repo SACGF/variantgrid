@@ -271,7 +271,11 @@ class JqGrid:
     def _sort_items(self, items, sidx, sord):
         """ Moved code into here to make it easier to overwrite sidx in subclasses (as request.GET is immutable) """
         order_by_list = []
-        if sidx is not None:
+        if sidx is not None and sidx:
+            # Validate sidx looks like a valid Django field path (alphanumeric/underscores)
+            if not all(part.isidentifier() for part in sidx.split('__')):
+                sidx = None
+        if sidx is not None and sidx:
             order_by = F(sidx)
             # dlawrence - sort nulls first/last via
             # https://docs.djangoproject.com/en/3.1/ref/models/expressions/#using-f-to-sort-null-values
@@ -292,7 +296,7 @@ class JqGrid:
         try:
             items = items.order_by(*order_by_list)
         except FieldError as fe:
-            print(fe)
+            logging.warning(fe)
         return items
 
     def get_paginate_by(self, request):
@@ -416,8 +420,7 @@ class JqGrid:
                     if return_json_fields_as_tuple:
                         return fk_name, field_name
                     return field
-                foreign_model_options = field.related_model._meta
-            return JqGrid.lookup_foreign_key_field(foreign_model_options, field_name,
+                return JqGrid.lookup_foreign_key_field(field.related_model._meta, field_name,
                                                    return_json_fields_as_tuple=return_json_fields_as_tuple)
         return options.get_field(field_name)
 

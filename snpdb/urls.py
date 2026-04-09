@@ -2,14 +2,13 @@ from django.contrib.auth.views import PasswordChangeView, PasswordChangeDoneView
 from django.urls import include
 from django.urls.conf import path as path_standard
 from rest_framework.permissions import AllowAny
-from rest_framework.schemas import get_schema_view
 from rest_framework.renderers import OpenAPIRenderer
-
+from rest_framework.schemas import get_schema_view
 
 from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
-from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
-    CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns, \
+from snpdb.grids import CohortListColumns, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListColumns, \
+    CustomColumnsCollectionColumns, QuadsListColumns, TriosListColumns, VCFListGrid, TagColorsCollectionColumns, \
     LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, \
     ManualVariantEntryCollectionColumns, SampleColumns
 from snpdb.views import views, views_json, views_rest, views_autocomplete
@@ -56,6 +55,8 @@ urlpatterns = [
     path('cohort_sample_edit/<int:cohort_id>', views.cohort_sample_edit, name='cohort_sample_edit'),
     path('trios', views.trios, name='trios'),
     path('view_trio/<int:pk>', views.view_trio, name='view_trio'),
+    path('quads', views.quads, name='quads'),
+    path('view_quad/<int:pk>', views.view_quad, name='view_quad'),
     path('sample_files_tab/<int:sample_id>', views.sample_files_tab, name='sample_files_tab'),
     path('sample_variants_tab/<int:sample_id>', views.sample_variants_tab, name='sample_variants_tab'),
     path('sample_variants_gene_detail/<int:sample_id>/<gene_symbol>', views.sample_variants_gene_detail, name='sample_variants_gene_detail'),
@@ -119,10 +120,10 @@ urlpatterns = [
          name='manual_variant_entry_collection_detail'),
 
     # Grids
-    path('cohort/grid/<slug:op>/', JQGridView.as_view(grid=CohortListGrid, delete_row=True), name='cohort_grid'),
+    path('cohort/datatable/', DatabaseTableView.as_view(column_class=CohortListColumns), name='cohort_datatable'),
     path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),
     path('sample/grid/<slug:op>/', JQGridView.as_view(grid=SamplesListGrid, delete_row=True), name='samples_grid'),
-    path('genomic_intervals/grid/<slug:op>/', JQGridView.as_view(grid=GenomicIntervalsListGrid, delete_row=True), name='genomic_intervals_grid'),
+    path('genomic_intervals/datatable/', DatabaseTableView.as_view(column_class=GenomicIntervalsListColumns), name='genomic_intervals_datatable'),
     path('liftover/liftover_runs/datatable', DatabaseTableView.as_view(column_class=LiftoverRunColumns),
          name='liftover_runs_datatable'),
     path('liftover/allele_liftover/datatable', DatabaseTableView.as_view(column_class=LiftoverRunAlleleLiftoverColumns),
@@ -139,7 +140,8 @@ urlpatterns = [
     path('samples/datatable/',
          DatabaseTableView.as_view(column_class=SampleColumns),
          name='samples_datatable'),
-    path('trio/grid/<slug:op>/', JQGridView.as_view(grid=TriosListGrid, delete_row=True), name='trio_grid'),
+    path('trio/datatable/', DatabaseTableView.as_view(column_class=TriosListColumns), name='trio_datatable'),
+    path('quad/datatable/', DatabaseTableView.as_view(column_class=QuadsListColumns), name='quad_datatable'),
     path('vcfs/grid/<slug:op>/', JQGridView.as_view(grid=VCFListGrid, delete_row=True), name='vcfs_grid'),
 
     # Autocompletes
@@ -150,6 +152,7 @@ urlpatterns = [
     path('autocomplete/Sample/', views_autocomplete.SampleAutocompleteView.as_view(), name='sample_autocomplete'),
     path('autocomplete/Tag/', views_autocomplete.TagAutocompleteView.as_view(), name='tag_autocomplete'),
     path('autocomplete/Trio/', views_autocomplete.TrioAutocompleteView.as_view(), name='trio_autocomplete'),
+    path('autocomplete/Quad/', views_autocomplete.QuadAutocompleteView.as_view(), name='quad_autocomplete'),
     path('autocomplete/User/', views_autocomplete.UserAutocompleteView.as_view(), name='user_autocomplete'),
     path('autocomplete/Username/', views_autocomplete.UsernameAutocompleteView.as_view(), name='username_autocomplete'),
     path('autocomplete/Lab/', views_autocomplete.LabAutocompleteView.as_view(), name='lab_autocomplete'),
@@ -161,12 +164,10 @@ urlpatterns = [
     # For Uptime Robot
     path('uptime_check', views.view_uptime, name='uptime_check'),
 
-    # Debug dev help
-    path('ajax_hello_world/<str:data>', views.ajax_hello_world, name='ajax_hello_world'),
-
     path_standard('api-auth/', include('rest_framework.urls')),
     path('api/sample_variant_zygosity/<int:sample_id>/<int:variant_id>', views_rest.VariantZygosityForSampleView.as_view(), name='variant_zygosity_for_sample'),
     path('api/trio/<pk>', views_rest.TrioView.as_view(), name='api_view_trio'),
+    path('api/quad/<pk>', views_rest.QuadView.as_view(), name='api_view_quad'),
     path('api/variant_allele_for_variant/<int:variant_id>/<genome_build_name>',
          views_rest.VariantAlleleForVariantView.as_view(), name='variant_allele_for_variant'),
     path('api/project/create', views_rest.ProjectViewSet.as_view({"post": "create"}), name='api_project_create'),

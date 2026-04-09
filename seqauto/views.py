@@ -138,7 +138,7 @@ def get_illumina_qc_and_show_stats_for_sample_sheet(sample_sheet):
     try:
         illumina_qc = sample_sheet.illuminaflowcellqc
         show_stats = illumina_qc.data_state == 'C'
-    except:
+    except Exception:
         illumina_qc = None
         show_stats = False
 
@@ -200,7 +200,7 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
         context['has_sequencing_sample_data'] = has_sequencing_sample_data
         context["sequencing_samples"] = sample_sheet.get_sorted_sequencing_samples()
         context['data_out_of_date_from_current_sample_sheet'] = sequencing_run.is_data_out_of_date_from_current_sample_sheet
-    except:
+    except Exception:
         log_traceback()
 
     return render(request, 'seqauto/view_sequencing_run.html', context)
@@ -226,7 +226,7 @@ def view_sequencing_run_stats_tab(request, sequencing_run_id):
     read_q30s = None
     try:
         read_q30s = {read: illumina_qc.readq30_set.get(read=read).percent for read in ['R1', 'R2']}
-    except:
+    except Exception:
         pass
 
     context = {"sequencing_run": sequencing_run,
@@ -373,7 +373,7 @@ def view_qc_gene_coverage_collection_tab(request, qc_id):
     qc = get_object_or_404(QC, pk=qc_id)
     try:
         gene_coverage_collection = qc.qcgenecoverage.gene_coverage_collection
-    except:
+    except Exception:
         gene_coverage_collection = None
 
     context = {"qc": qc,
@@ -385,7 +385,7 @@ def view_sample_qc_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     try:
         qc = sample.samplefromsequencingsample.sequencing_sample.get_single_qc()
-    except:
+    except Exception:
         qc = None
 
     context = {"sample": sample,

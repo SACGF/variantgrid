@@ -19,6 +19,7 @@ from analysis.tasks.analysis_grid_export_tasks import export_cohort_to_downloada
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from library.constants import WEEK_SECS
+from library.utils.hash_utils import sha256sum_str
 from snpdb.models import Sample, Cohort, CachedGeneratedFile
 from snpdb.models.models_variant import Variant
 
@@ -61,7 +62,7 @@ class NodeGridHandler(NodeJSONViewMixin):
         node = self._get_node(request)
         url = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
         url = _add_allowed_node_grid_params(url, request.GET.dict())
-        lock_id = f"{url}_{request.user}"
+        lock_id = sha256sum_str(f"{url}_{request.user}")
         if cache.add(lock_id, "true", LOCK_EXPIRE):  # Acquire lock
             try:
                 logging.info("Got the lock...")

@@ -37,10 +37,10 @@ class FastaFileWrapper:
 
         try:
             return FastaFileContigWrapper(self.fasta_file, contig)
-        except KeyError:
+        except KeyError as exc:
             if contig != original_contig:
                 failed_lookup = f"'{contig}' (originally: '{original_contig}')"
             else:
                 failed_lookup = f"'{original_contig}'"
             msg = f"Error loading HGVS: contig {failed_lookup} not in the ref genome '{self.fasta_filename}'"
-            raise KeyError(msg)
+            raise KeyError(msg) from exc

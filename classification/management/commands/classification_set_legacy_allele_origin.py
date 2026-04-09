@@ -4,7 +4,6 @@ from django.db.models import Q
 from classification.enums import SubmissionSource
 from classification.models import Classification, SpecialEKeys
 from library.guardian_utils import admin_bot
-from library.utils import Value
 
 
 class Command(BaseCommand):

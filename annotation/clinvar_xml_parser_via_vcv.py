@@ -146,7 +146,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "Classification",
         "OncogenicityClassification",
         "Description")
-    def parse_oncogenicity_classification(self, elem):
+    def parse_oncogenicity_classification_desc(self, elem):
         if cs := elem.text:
             self.oncogenicity_classification = True
             cs = cs.lower()

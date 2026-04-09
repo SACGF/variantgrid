@@ -9,7 +9,7 @@ from django.views.decorators.vary import vary_on_cookie
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
-from snpdb.models import VCF, Sample, Cohort, CustomColumnsCollection, CustomColumn, Tag, Trio, \
+from snpdb.models import VCF, Sample, Cohort, CustomColumnsCollection, CustomColumn, Tag, Trio, Quad, \
     Lab, GenomicIntervalsCollection, GenomeBuild, ImportStatus, Project
 
 
@@ -128,4 +128,13 @@ class TrioAutocompleteView(GenomeBuildAutocompleteView):
 
     def get_user_queryset(self, user):
         qs = Trio.filter_for_user(user, success_status_only=True)
+        return self.filter_to_genome_build(qs, "cohort__genome_build")
+
+
+@method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
+class QuadAutocompleteView(GenomeBuildAutocompleteView):
+    fields = ['name']
+
+    def get_user_queryset(self, user):
+        qs = Quad.filter_for_user(user).filter(cohort__import_status=ImportStatus.SUCCESS)
         return self.filter_to_genome_build(qs, "cohort__genome_build")

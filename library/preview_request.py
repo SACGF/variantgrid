@@ -58,7 +58,7 @@ class PreviewKeyValue:
         if isinstance(self.value, (str, SafeString)):
             return self.value
         elif isinstance(self.value, datetime):
-            return f"{datetime:%Y-%m-%d}"
+            return f"{self.value:%Y-%m-%d}"
         else:
             return str(self.value)
 
@@ -309,19 +309,16 @@ class PreviewData:
         }
 
     def __hash__(self):
-        genome_builds = []
-        if self.genome_builds:
-            genome_builds = tuple(sorted(self.genome_builds))
-        annotation_consortia = []
-        if self.annotation_consortia:
-            annotation_consortia = tuple(sorted(self.annotation_consortia))
+        genome_builds = tuple(sorted(self.genome_builds)) if self.genome_builds else ()
+        annotation_consortia = tuple(sorted(self.annotation_consortia)) if self.annotation_consortia else ()
+        summary_extra = tuple((pkv.key, pkv.value_str) for pkv in self.summary_extra) if self.summary_extra else ()
 
         fields = (
             self.category,
             self.identifier,
             self.title,
             self.icon,
-            self.summary_extra,
+            summary_extra,
             self.internal_url,
             self.external_url,
             genome_builds,
@@ -329,7 +326,7 @@ class PreviewData:
             self.obj,
             self.is_operation,
         )
-        return hash((f for f in fields if f is not None))
+        return hash(tuple(f for f in fields if f is not None))
 
 class PreviewRequest:
     """

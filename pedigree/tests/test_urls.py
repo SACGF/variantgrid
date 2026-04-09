@@ -28,9 +28,9 @@ class Test(URLTestCase):
         ]
 
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
-        cls.PRIVATE_GRID_LIST_URLS = [
-            ("ped_files_grid", {}, cls.ped_file),
-            ("pedigree_grid", {}, cls.pedigree),
+        cls.PRIVATE_DATATABLE_LIST_URLS = [
+            ("ped_files_datatables", {}, cls.ped_file),
+            ("pedigree_datatables", {}, cls.pedigree),
         ]
 
         cls.PRIVATE_AUTOCOMPLETE_URLS = [
@@ -58,12 +58,12 @@ class Test(URLTestCase):
     def testAutocompleteNoPermission(self):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
 
-    def testJqGridListPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
+    def testDatatableListPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLE_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
-    def testJqGridListNoPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
+    def testDatatableListNoPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLE_LIST_URLS, self.user_non_owner, False)
 
 if __name__ == "__main__":
     unittest.main()

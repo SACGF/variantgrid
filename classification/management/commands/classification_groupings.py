@@ -1,5 +1,3 @@
-import argparse
-
 from django.core.management import BaseCommand
 
 from annotation.clinvar_fetch_request import ClinVarFetchRequest

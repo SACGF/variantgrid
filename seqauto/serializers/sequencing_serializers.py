@@ -1,4 +1,3 @@
-import logging
 import os.path
 
 from rest_framework import serializers
@@ -41,7 +40,6 @@ class SequencerModelSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_object(validated_data):
         return SequencerModel.objects.get(model=validated_data["model"])
-
 
 
 class SequencerSerializer(serializers.ModelSerializer):
@@ -161,7 +159,7 @@ class SequencingRunSerializer(serializers.ModelSerializer):
             try:
                 # This is set on ones sent up via API
                 data["path"] = vcf.uploadedvcf.uploaded_file.path
-            except:
+            except Exception:
                 pass
             vcfs.append(data)
         return vcfs
@@ -191,8 +189,8 @@ class SampleSheetLookupSerializer(serializers.Serializer):
                 sequencing_run__name=sequencing_run,
                 hash=hash,
             )
-        except SampleSheet.DoesNotExist:
-            raise serializers.ValidationError("SampleSheet not found.")
+        except SampleSheet.DoesNotExist as exc:
+            raise serializers.ValidationError("SampleSheet not found.") from exc
 
 
 class SequencingSampleLookupSerializer(serializers.Serializer):

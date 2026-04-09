@@ -15,7 +15,7 @@ from pedigree.models import PedFile, Pedigree, PedFileFamily, PedFileRecord, \
     CohortSamplePedFileRecord, create_automatch_pedigree
 from snpdb.forms import UserCohortForm
 from snpdb.graphs import graphcache
-from snpdb.models import Cohort
+from snpdb.models import Cohort, UserGridConfig
 
 
 def view_ped_file(request, ped_file_id):
@@ -46,7 +46,8 @@ def ped_files(request):
 
 def pedigrees(request):
     form = forms.UserCohortandPedFileFamilyForm(user=request.user)
-    context = {'form': form}
+    show_group_data = UserGridConfig.get(request.user, 'Pedigrees').show_group_data
+    context = {'form': form, 'show_group_data': show_group_data}
 
     return render(request, 'pedigree/pedigrees.html', context)
 

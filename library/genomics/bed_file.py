@@ -54,7 +54,7 @@ class BedFileReader:
             for word in lines[1:]:
                 k, v = word.split("=", 1)
                 data[k] = v
-        except:
+        except Exception:
             pass
         return data
 

@@ -1,4 +1,5 @@
 {% load static %}
+{% load js_tags %}
 {% load inbox %}
 {% load ui_menu_bars %}
 {% load compress %}
@@ -73,6 +74,10 @@
 
     <!-- JQuery, had to move to the top for the sake of autocomplete -->
     <script src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
+
+    <!-- DAL (Django Autocomplete Light) - loaded once globally to prevent duplicate registration warning.
+         form.media for autocomplete widgets only emits auto_complete_light_reload.js (see autocomplete_utils.py) -->
+    {% dal_media %}
 
     <!-- used to set custom cookies, for functionality not worth setting in the database -->
     <script src="{% static 'js/lib/js.cookie.min.js' %}"></script>

@@ -158,6 +158,10 @@ ul.customicons .ui-icon {
     background-image: url(/static/images/node_icons/trio.png);
 }
 
+.ui-icon.QuadNode {
+    background-image: url(/static/images/node_icons/quad.png);
+}
+
 .ui-icon.FilterNode { 
     background-image: url(/static/images/node_icons/filter.png);
 }
@@ -279,23 +283,8 @@ ul.customicons .ui-icon {
 	background-image: url(/static/images/node_icons/pedigree.png);
 }
 
-.node-overlay.TrioNode {
-    background-image: url(/static/images/node_icons/trio.png);
-    background-size: 30px 25px;
-    background-position: bottom;
-}
-
-.node-overlay.TrioNode.mother-affected {
-    background-image: url(/static/images/node_icons/trio_mother_affected.png);
-}
-
-.node-overlay.TrioNode.father-affected {
-    background-image: url(/static/images/node_icons/trio_father_affected.png);
-}
-
-.node-overlay.TrioNode.mother-affected.father-affected {
-    background-image: url(/static/images/node_icons/trio_mother_affected_father_affected.png);
-}
+.TrioNode { width: 64px; height: 50px; }
+.QuadNode { width: 80px; height: 55px; }
 
 .node-overlay.FilterNode {
 	background-image: url(/static/images/node_icons/filter.png);

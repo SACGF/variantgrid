@@ -97,7 +97,7 @@ class UploadedFile(TimeStampedModel):
         try:
             if os.path.exists(self.uploaded_file.path):
                 os.unlink(self.uploaded_file.path)
-        except:  # Someone may have deleted MEDIA_ROOT file already - causing uploaded_file to error here
+        except Exception:  # Someone may have deleted MEDIA_ROOT file already - causing uploaded_file to error here
             pass
 
     def __str__(self):
@@ -357,7 +357,7 @@ class UploadStep(models.Model):
             # try just regular traceback as the fancy one above isn't working
             # and we can't try them both since the fancy one will break and make that the new exception
             self.error_message += "\n" + str(traceback.format_exc())
-        except:
+        except Exception:
             self.error_message += "\nUnable to load traceback"
         self.upload_pipeline.error(self.error_message)
 
@@ -686,6 +686,8 @@ class ModifiedImportedVariant(models.Model):
         alt_list = alts.split(",")
         if len(cols) > 4:
             alt_index = int(cols[4]) - 1  # 1-based
+            if alt_index < 0:
+                raise ValueError(f"BCFTOOLS_OLD_VARIANT alt index must be >= 1 (got {cols[4]!r}): {old_variant!r}")
             alt = alt_list[alt_index]
         else:
             if len(alt_list) != 1:

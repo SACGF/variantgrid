@@ -15,6 +15,7 @@
 {% include "analysis/analysis_includes.html" %}
 
 <script type="text/javascript" src="{% static 'js/samplenode.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/pedigree_node.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_updates.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_nodes.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis.js' %}"></script>
@@ -229,20 +230,28 @@
                                value="{{ analysis.template.default_name_template }}" />
                     </div>
 
-                    <div class="display-flex">
+                    <div>
                         {% if analysis.template_type == 'S' %}
                         <label>Version:</label> <span>{{ analysis.analysistemplateversion.version }}</span>
                         {% else %}
-                            <label>Latest Version:</label> <span id="latest-template-version">{{ analysis.template.latest_version }}</span>
-                            {% if has_write_permission %}
-                            <button id="analysis-template-save-version" class="btn btn-outline-primary">save version</button>
-                            {% endif %}
+                            {% with latest=analysis.template.latest_version_obj %}
+                                {% if latest %}
+                                    <label>Latest Version:</label>
+                                    <span id="latest-template-version">v.{{ latest.version }} saved {{ latest.created|localtime|date:"Y-m-d H:i" }}</span>
+                                {% else %}
+                                    <span id="latest-template-version"><em>No saved versions - click "save version" to create an official version</em></span>
+                                {% endif %}
+                            {% endwith %}
                         {% endif %}
-
-                        <a href="{%  url 'analysis_template_settings' analysis.template.pk %}" target="_blank">
-                            <span class="toolbar-button settings-icon"></span>
-                            Template settings
-                        </a>
+                        <div class="display-flex">
+                            {% if analysis.template_type != 'S' and has_write_permission %}
+                            <button id="analysis-template-save-version" class="btn btn-outline-primary btn-sm">save version</button>
+                            {% endif %}
+                            <a href="{%  url 'analysis_template_settings' analysis.template.pk %}" target="_blank">
+                                <span class="toolbar-button settings-icon"></span>
+                                Template settings
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -269,13 +278,12 @@
                     {% endif %}
 
                     {% if warnings %}
-                        <img id='lock-input-sources-warning-icon' class="toolbar-button"
-                             src="{% static 'icons/warning.png' %}"
+                        <i id='lock-input-sources-warning-icon' class="fas fa-exclamation-triangle text-warning toolbar-button"
                              title="<ul style='background-color: #FEBC00;'>{% for w in warnings %}<li>{{ w }}{% endfor %}}</ul>"
                              data-toggle="tooltip"
                              data-placement="bottom"
                              data-html="true"
-                        />
+                        ></i>
                     {% endif %}
 
                     {% if has_write_permission %}

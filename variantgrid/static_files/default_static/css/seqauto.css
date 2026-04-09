@@ -22,9 +22,12 @@ li.qc {
 	background-image:url(/static/icons/reports.png);
 }
 
-li.data-state-N {
-	padding: 0.1em 0 0.9em 1.5em;
-	text-indent: 0.05em;
-	background-image:url(/static/icons/loading.gif);
+li.data-state-N::before {
+	font-family: "Font Awesome 5 Free";
+	content: "\f110";
+	font-weight: 900;
+	display: inline-block;
+	animation: fa-spin 2s linear infinite;
+	margin-right: 0.4em;
 }
 

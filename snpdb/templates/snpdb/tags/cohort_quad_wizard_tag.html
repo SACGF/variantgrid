@@ -1,0 +1,66 @@
+{# Analysis can be turned off in that case URLs won't resolve so just skip #}
+{% if url_name_visible.analysis and url_name_visible.quad_wizard %}
+    {% load static %}
+    {% if cohort.cohort_genotype_collection and sample_count >= 4 %}
+    <style>
+    #create-quad-button {
+        float: left;
+    }
+
+    .quad-button-component {
+        float: left;
+    }
+    </style>
+    <script>
+    function getQuadUrl(requireChecked) {
+        const sampleIdList = [];
+        $(".sample-select").each(function() {
+            if (!requireChecked || $(this).is(":checked")) {
+                const sampleId = $(this).attr("sample_id");
+                sampleIdList.push(sampleId);
+            }
+        });
+
+        let COHORT_ID = {{ cohort.pk }};
+        return Urls.quad_wizard(COHORT_ID, sampleIdList[0], sampleIdList[1], sampleIdList[2], sampleIdList[3]);
+    }
+
+    function quadClick() {
+        window.location = getQuadUrl(true);
+    }
+
+    function setupQuadButton() {
+        const numSelectedSamples = $("input.sample-select:checked").length;
+        $("#num-selected-samples-quad").html(numSelectedSamples);
+
+        const buttonEnabled = numSelectedSamples === 4;
+        $("#create-quad-button").prop("disabled", !buttonEnabled);
+    }
+
+    function initQuad() {
+        $("#create-quad-button").click(quadClick);
+        $(".sample-select").change(setupQuadButton);
+        setupQuadButton();
+    }
+
+    $(document).ready(function() {
+    {% if sample_count == 4 %}
+        const allSamplesUrl = getQuadUrl(false);
+        $("#create-quad-button").prop("disabled", false).click(function() {
+            window.location = allSamplesUrl;
+        });
+    {% else %}
+        initQuad();
+    {% endif %}
+    });
+    </script>
+    <button id='create-quad-button' disabled class="btn btn-outline-primary" type="button">
+      <img id="quad-icon" class="quad-button-component" alt="Quad" src="{% static 'images/node_icons/quad.png' %}" width="28" height="28" />
+      Perform quad analysis using template
+    </button>
+    {% if sample_count > 4 %}
+        <span>&gt;4 samples to choose from - select exactly 4 using checkboxes on the left to create Quad. <span id='num-selected-samples-quad'></span> samples selected. </span>
+    {% endif %}
+    <div class='clear'></div>
+    {% endif %}
+{% endif %}

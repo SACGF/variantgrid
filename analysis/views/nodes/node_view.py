@@ -76,7 +76,7 @@ class NodeView(UpdateView):
         form = super().get_form(form_class=form_class)
 
         # In templates, add a widget for analysis template variables for source nodes (sample etc input fields)
-        if self.object.analysis.template_type == AnalysisTemplateType.TEMPLATE and self.object.is_source():
+        if self.object.analysis.template_type == AnalysisTemplateType.TEMPLATE and self.object.is_source:
             for field_name, field in form.fields.items():
                 if not field.widget.is_hidden:
                     if field_name in ["pedigree", "trio", "cohort", "sample", "sample_gene_list"]:

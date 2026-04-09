@@ -38,7 +38,7 @@ class PhenotypeNode(AnalysisNode):
         for node in roots:
             samples.update(node.get_samples())
 
-        return Patient.filter_for_user(self.analysis.user).filter(sample__in=samples)
+        return Patient.filter_for_user(self.analysis.user).filter(sample__in=samples).distinct()
 
     @property
     def has_sample_inputs_with_patient(self) -> bool:
@@ -69,7 +69,6 @@ class PhenotypeNode(AnalysisNode):
                 modified = True
 
         if modified:
-            print("Modified so set appearance dirty")
             self.appearance_dirty = True
 
     def modifies_parents(self):

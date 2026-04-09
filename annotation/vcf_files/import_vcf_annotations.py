@@ -62,8 +62,8 @@ def handle_vep_skipped(annotation_run: AnnotationRun, bulk_inserter):
     annotation_run.vep_skipped_count = annotation_run.annotation_range_lock.count - annotation_run.annotated_count
     if annotation_run.vep_skipped_count:
         # These will be skipped by VEP (but also we don't write out ones we know will be skipped (eg too long)
-        vep_warning_filename = annotation_run.vcf_annotated_filename + "_warnings.txt"
-        print(f"Looking for '{vep_warning_filename}'")
+        vep_warning_filename = os.path.abspath(annotation_run.vcf_annotated_filename + "_warnings.txt")
+        logging.info("Looking for '%s'", vep_warning_filename)
         if os.path.exists(vep_warning_filename):
             with open(vep_warning_filename) as f:
                 annotation_run.vep_warnings = f.read()

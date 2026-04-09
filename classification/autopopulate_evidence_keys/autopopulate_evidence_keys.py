@@ -18,7 +18,7 @@ from classification.enums import SubmissionSource, SpecialEKeys
 from classification.models import EvidenceKey, Classification, ClassificationImport
 from classification.tasks.classification_import_process_variants_task import liftover_classification_import
 from library.git import Git
-from snpdb.models import GenomeBuild, ImportSource, Sample, UserSettings, Variant, Lab
+from snpdb.models import GenomeBuild, ImportSource, Sample, Variant, Lab
 
 
 def create_classification_for_sample_and_variant_objects(

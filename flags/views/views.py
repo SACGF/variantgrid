@@ -146,8 +146,7 @@ class FlagHelper:
         comments = FlagComment.objects.filter(flag__collection__in=self.flag_collections, created__gt=since).order_by('-created').select_related('flag', 'flag__collection')
         comments = [comment for comment in comments if self.is_viewable_flag(comment.flag)]
         for comment in comments:
-            if comment.created > since:
-                since = comment.created
+            since = max(since, comment.created)
 
             if self.is_viewable_flag(comment.flag):
                 self.include_comment(comment, detailed=True)
@@ -255,7 +254,7 @@ class FlagHelper:
                 try:
                     created = FlagComment.objects.filter(flag=flag, resolution__status=FlagStatus.OPEN).order_by('-created').\
                         values_list('created', flat=True).first()
-                except:
+                except Exception:
                     pass
 
             resolution = self.flag_resolutions[flag.resolution_id]

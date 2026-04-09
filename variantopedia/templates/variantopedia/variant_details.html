@@ -467,16 +467,20 @@ function applyVariantValues() {
 
             {% if show_annotation and variant_annotation %}
                 {% if annotation_version == latest_annotation_version %}
-                    Using Latest annotation version: <a class="hover-link" href="{% url 'annotation_versions' %}">{{ annotation_version }}</a>.
+                    Using Latest annotation version: {{ annotation_version.short_description }}
                 {% else %}
-                    Using annotation version: <a class="hover-link" href="{% url 'annotation_versions' %}">{{ annotation_version }}</a>.
-
-                    This is not the most recent version (which is {{ latest_annotation_version }}).
+                    Using annotation version: {{ annotation_version.short_description }} <span class="text-warning">(not latest)</span>
                 {% endif %}
-
-                {% if num_variant_annotation_versions > 1 %}
-                    <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_variant_annotation_versions }} historical versions</a>.
-                {% endif %}
+                <a class="hover-link" data-toggle="collapse" href="#annotation-version-detail" role="button" aria-expanded="false">(expand)</a>
+                <div class="collapse" id="annotation-version-detail">
+                    <a class="hover-link" href="{% url 'annotation_versions' %}">{{ annotation_version }}</a>
+                    {% if annotation_version != latest_annotation_version %}
+                        — latest is {{ latest_annotation_version.short_description }}
+                    {% endif %}
+                    {% if num_variant_annotation_versions > 1 %}
+                        — <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_variant_annotation_versions }} historical versions</a>
+                    {% endif %}
+                </div>
             {% endif %}
 
             {% if modified_normalised_variants.exists %}

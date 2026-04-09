@@ -219,7 +219,7 @@ class GoldCoverageSummaryView(APIView):
             data = serializer.data
         except GoldCoverageSummary.MultipleObjectsReturned:
             raise  # Should never happen!
-        except:
+        except Exception:
             data = {}  # No coverage
         return Response(data)
 

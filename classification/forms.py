@@ -54,4 +54,3 @@ class ClassificationEvidenceUpdateForm(forms.Form):
     clinvar_min_stars = forms.IntegerField(required=False, initial=2)
 
     computational_vus_spliceai_min = forms.FloatField(required=False, initial=0.5)
-

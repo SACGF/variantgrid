@@ -714,7 +714,7 @@ def if_user_can_edit(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
     nodelist = parser.parse(('end_if_user_can_edit',))
     parser.delete_first_token()
-    if not len(args) == 1:
+    if len(args) != 1:
         raise ValueError("if_user_can_edit requires 1 argument of object to check")
 
     return IfCanEditTag(nodelist,
@@ -744,6 +744,12 @@ def _embed(context, embed: LazyRender, **kwargs):
 @register.filter(name='emojify')
 def emojify(text: str):
     return emoji_to_unicode(text)
+
+@register.filter(name='bool_emojify')
+def bool_emojify(val: bool):
+    if val:
+        return "✅"
+    return "❌"
 
 
 @register.filter(name='debug')

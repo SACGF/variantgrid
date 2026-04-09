@@ -166,12 +166,13 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     def get_sample_ids(self):
         return self.get_samples_qs().values_list("pk", flat=True)
 
+    @property
     def is_sub_cohort(self):
         return self.parent_cohort is not None
 
     def get_base_cohort(self):
         """ Underlying cohort (ie deals with sub cohorts) """
-        if self.is_sub_cohort():
+        if self.is_sub_cohort:
             # recursion in case we ever decide to allow sub-sub cohorts
             cohort = self.parent_cohort.get_base_cohort()
         else:
@@ -455,8 +456,20 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         already_set = self.cohortgenotype_alias in kwargs.get("existing_annotation_kwargs", set())
         if not (already_set and kwargs.get("override") is False):
             collections = [self.pk]
-            if kwargs.get("common_variants", True):
-                collections.append(self.common_collection_id)
+            if self.common_collection_id is not None:
+                include_common = kwargs.get("common_variants", True)
+                if not include_common:
+                    # The common partition optimization (skipping common variants) is only valid when
+                    # the gnomAD version used for partitioning matches the analysis annotation version.
+                    # If they differ, we must include all variants and let the AF filter handle it.
+                    # @see https://github.com/SACGF/variantgrid/issues/1119
+                    annotation_gnomad_version = kwargs.get("annotation_gnomad_version")
+                    if annotation_gnomad_version:
+                        common_filter = self.common_collection.common_filter
+                        if common_filter and common_filter.gnomad_version != annotation_gnomad_version:
+                            include_common = True
+                if include_common:
+                    collections.append(self.common_collection_id)
             cgc_condition = Q(cohortgenotype__collection__in=collections)
             annotation_kwargs[self.cohortgenotype_alias] = FilteredRelation('cohortgenotype', condition=cgc_condition)
         return annotation_kwargs
@@ -525,7 +538,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
 def cohort_genotype_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
         instance.delete_related_objects()
-    except:
+    except Exception:
         pass
 
 @receiver(post_delete, sender=CohortGenotypeCollection)
@@ -679,6 +692,70 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
 
     def __str__(self):
         return self.name or f"Trio {self.pk}"
+
+
+class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+    """Mother + Father + Proband + Sibling.
+
+    Extends the Trio concept to 4 family members. The sibling (typically
+    unaffected) narrows down candidate variants because they share the same
+    parental genome without sharing the proband's phenotype.
+    """
+    name = models.TextField(blank=True)
+    user = models.ForeignKey(User, null=True, on_delete=CASCADE)
+    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
+    mother = models.ForeignKey(CohortSample, related_name='quad_mother', on_delete=CASCADE)
+    mother_affected = models.BooleanField(default=False)
+    father = models.ForeignKey(CohortSample, related_name='quad_father', on_delete=CASCADE)
+    father_affected = models.BooleanField(default=False)
+    proband = models.ForeignKey(CohortSample, related_name='quad_proband', on_delete=CASCADE)
+    sibling = models.ForeignKey(CohortSample, related_name='quad_sibling', on_delete=CASCADE)
+    sibling_affected = models.BooleanField(default=False)
+
+    @classmethod
+    def get_permission_class(cls):
+        return Cohort
+
+    def get_permission_object(self):
+        return self.cohort
+
+    @classmethod
+    def _filter_from_permission_object_qs(cls, queryset):
+        return cls.objects.filter(cohort__in=queryset)
+
+    @property
+    def genome_build(self):
+        return self.cohort.genome_build
+
+    def get_cohort_samples(self):
+        return [self.mother, self.father, self.proband, self.sibling]
+
+    def get_samples(self):
+        return Sample.objects.filter(cohortsample__in=self.get_cohort_samples()).order_by("pk")
+
+    def get_absolute_url(self):
+        return reverse('view_quad', kwargs={"pk": self.pk})
+
+    def get_listing_url(self):
+        return reverse('quads')
+
+    @property
+    def mother_details(self):
+        affected = "affected" if self.mother_affected else "unaffected"
+        return f"{self.mother} ({affected})"
+
+    @property
+    def father_details(self):
+        affected = "affected" if self.father_affected else "unaffected"
+        return f"{self.father} ({affected})"
+
+    @property
+    def sibling_details(self):
+        affected = "affected" if self.sibling_affected else "unaffected"
+        return f"{self.sibling} ({affected})"
+
+    def __str__(self):
+        return self.name or f"Quad {self.pk}"
 
 
 # This has to be in this file so we don't end up with circular references

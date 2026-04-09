@@ -75,7 +75,7 @@ def _write_somalier_vcf(cfg: SomalierConfig, processing_dir, vcf_extract: Somali
 
     tabix_command = ["tabix", exported_vcf_filename]
     return_code, stdout, stderr = execute_cmd(tabix_command)
-    print(f"return_code: {return_code}, stdout: {stdout}, stderr: {stderr}")
+    logging.info("return_code: %s, stdout: %s, stderr: %s", return_code, stdout, stderr)
     return exported_vcf_filename
 
 
@@ -116,7 +116,7 @@ def _somalier_relate(somalier_relate: SomalierRelate) -> Path:
     processing_dir = get_import_processing_dir(somalier_relate.pk, "somalier_relate")
 
     command = [somalier_bin, "relate"]
-    if not somalier_relate.is_joint_called_vcf():
+    if not somalier_relate.is_joint_called_vcf:
         # Somalier --unknown    set unknown genotypes to hom-ref.
         # it is often preferable to use this with VCF samples that were not jointly called
         command += ["--unknown"]

@@ -516,7 +516,7 @@ class BulkVEPVCFAnnotationInserter:
     def _merge_cosmic_ids(transcript_data: TranscriptData, custom_vcf_cosmic_id: str):
         """ VEP ships w/COSMIC so we always try and pull it out of the existing variation field
             We also support a custom vcf of COSMIC (for cosmic_count) - this is often more recent """
-        cosmic_ids = set(custom_vcf_cosmic_id.split(VEP_SEPARATOR))
+        cosmic_ids = {c for c in custom_vcf_cosmic_id.split(VEP_SEPARATOR) if c}
         if existing_cosmic_id := transcript_data.get("cosmic_id"):
             cosmic_ids.update(existing_cosmic_id.split(VEP_SEPARATOR))
         transcript_data["cosmic_id"] = VEP_SEPARATOR.join(sorted(cosmic_ids))
@@ -545,8 +545,8 @@ class BulkVEPVCFAnnotationInserter:
                 self._generated_hgvs_c["OK"] += 1
                 # TODO: Protein?? hgvs_p
             except Exception as e:
-                logging.error("Error calculating c.HGVS for '%s'/'%s': %s",
-                              variant_coordinate, transcript_accession, e)
+                logging.debug("Error calculating c.HGVS for '%s'/'%s': %s",
+                              variant_coordinate.format_short(), transcript_accession, e)
                 hgvs_c = None  # For c.HGVS - it's ok to be blank
                 self._generated_hgvs_c["error"] += 1
 
@@ -564,7 +564,7 @@ class BulkVEPVCFAnnotationInserter:
             try:
                 hgvs_g = self.hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate)
             except Exception as e:
-                logging.error("Error calculating g.HGVS for '%s': %s", variant_coordinate, e)
+                logging.warning("Error calculating g.HGVS for '%s': %s", variant_coordinate.format_short(), e)
                 hgvs_g = VariantAnnotation.SV_HGVS_ERROR_MESSAGE
 
         transcript_data['hgvs_g'] = hgvs_g

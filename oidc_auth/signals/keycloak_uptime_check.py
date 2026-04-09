@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from django.conf import settings
@@ -17,7 +18,7 @@ def keycloak_uptime_check(sender, **kwargs):
     try:
         Keycloak().ping()
     except Exception as ex:
-        print(str(ex))
+        logging.error("Keycloak ping failed: %s", ex)
         status = UptimeCheckStatus.CRITICAL_FAILURE
         note = str(ex)
 

@@ -308,7 +308,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         whens = [
             When(classification__share_level=ShareLevel.LAB.value, then=Value(1)),
-            When(classification__share_level=ShareLevel.INSTITUTION.value, then=Value(2)),
+            When(classification__share_level=ShareLevel.ORGANISATION.value, then=Value(2)),
             When(classification__share_level=ShareLevel.ALL_USERS.value, then=Value(3)),
             When(classification__share_level=ShareLevel.PUBLIC.value, then=Value(4))
         ]

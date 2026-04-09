@@ -2,10 +2,11 @@
 
 import django.db.models.deletion
 import django.utils.timezone
-import library.django_utils.guardian_permissions_mixin
 import model_utils.fields
 from django.conf import settings
 from django.db import migrations, models
+
+import library.django_utils.guardian_permissions_mixin
 
 
 class Migration(migrations.Migration):

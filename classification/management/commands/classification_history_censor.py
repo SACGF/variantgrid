@@ -1,10 +1,10 @@
+import datetime
+import re
 import socket
 from dataclasses import dataclass
-import datetime
 from typing import Any, Optional
 
 from django.core.management import BaseCommand
-import re
 
 from classification.models import Classification, EvidenceKeyMap
 from snpdb.models import Lab, Organization

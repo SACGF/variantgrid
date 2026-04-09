@@ -5,7 +5,7 @@ from django.contrib.postgres.operations import CITextExtension
 from django.db import migrations
 
 
-def _citext_message(apps, _schema_editor):
+def _citext_message(_apps, _schema_editor):
     print("--------")
     print("If this migration fails, you need to install the Postgres 'citex' extension to the DB (as DB superuser)")
     print("sudo su postgres")

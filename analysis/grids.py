@@ -1,3 +1,4 @@
+import logging
 import operator
 import time
 from collections import defaultdict
@@ -38,7 +39,7 @@ from snpdb.grid_columns.grid_sample_columns import get_available_format_columns,
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 
 
 class VariantGrid(AbstractVariantGrid):
@@ -116,7 +117,12 @@ class VariantGrid(AbstractVariantGrid):
         annotation_kwargs = get_variantgrid_extra_annotate(self.user, exclude_analysis=self.node.analysis)
         cohorts, _visibility = self.node.get_cohorts_and_sample_visibility()
         common_variants = self.node._has_common_variants()
-        annotation_kwargs.update(get_variantgrid_zygosity_annotation_kwargs(cohorts, common_variants))
+        try:
+            annotation_gnomad_version = self.node.analysis.annotation_version.variant_annotation_version.gnomad
+        except AttributeError:
+            annotation_gnomad_version = None
+        annotation_kwargs.update(get_variantgrid_zygosity_annotation_kwargs(cohorts, common_variants,
+                                                                            annotation_gnomad_version=annotation_gnomad_version))
         return annotation_kwargs
 
     def get_count(self, request):  # pylint: disable=unused-argument
@@ -246,7 +252,7 @@ class VariantGrid(AbstractVariantGrid):
                 if sample_formatter:
                     try:
                         sample_formatted_str = sample_formatter(sample)
-                    except:
+                    except Exception:
                         pass
                 if sample_formatted_str is None or len(sample_formatted_str) == 0:
                     sample_formatted_str = str(sample.name)
@@ -313,7 +319,7 @@ class ExportVariantGrid(VariantGrid):
         start = time.time()
         yield from items
         end = time.time()
-        print(f"Download took {end-start} seconds")
+        logging.debug("Download took %s seconds", end - start)
 
     @staticmethod
     def _iter_by_contigs(genome_build, items):
@@ -356,9 +362,9 @@ class AnalysesGrid(JqGridUserRowConfig):
 
         self.genome_builds = list(GenomeBuild.builds_with_annotation())
         if len(self.genome_builds) == 1:  # No need to show
-            genome_build_colmodel = self._overrides.get('genome_build', {})
+            genome_build_colmodel = self._overrides.get('genome_build__name', {})
             genome_build_colmodel['hidden'] = True
-            self._overrides['genome_build'] = genome_build_colmodel
+            self._overrides['genome_build__name'] = genome_build_colmodel
         user_grid_config = UserGridConfig.get(user, self.caption)
         qs = Analysis.filter_for_user(user)
         if not user_grid_config.show_group_data:
@@ -463,60 +469,6 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
         return df.sort_values("Counts", ascending=False)
 
 
-class AnalysisNodeIssuesGrid(JqGridUserRowConfig):
-    model = AnalysisNode
-    caption = 'Analysis Node Issues'
-    fields = ["id", "analysis__id", "analysis__name", "status", "modified", "errors"]
-    colmodel_overrides = {
-        "id": {"hidden": True},
-        'analysis__id': {"hidden": True},
-        'analysis__name': {"width": 400,
-                           'formatter': 'analysisNodeLink',
-                           'formatter_kwargs': {"icon_css_class": "analysis-icon",
-                                                "url_name": "analysis_node",
-                                                "url_object_column": "hack_kwargs"}},
-        "modified": {'label': 'Modified'},
-    }
-
-    def __init__(self, **kwargs):
-        user = kwargs.get("user")
-        super().__init__(user)
-
-        queryset = self.model.objects.filter(status=NodeStatus.ERROR)
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'modified',
-                                  'sortorder': 'desc'})
-
-
-class KaromappingAnalysesGrid(JqGridUserRowConfig):
-    model = KaryomappingAnalysis
-    caption = 'Karomapping Analyses'
-    fields = ['id', 'name', 'modified', "trio__cohort__genome_build__name", 'user__username',
-              'trio__name', 'trio__proband__sample__name']
-
-    colmodel_overrides = {
-        'id': {"hidden": True},
-        "name": {"width": 400,
-                 'formatter': 'linkFormatter',
-                 'formatter_kwargs': {"url_name": "view_karyomapping_analysis",
-                                      "url_object_column": "id"}},
-        "trio__cohort__genome_build": {"label": "Genome Build"},
-        "user__username": {'label': 'Created by'},
-        "trio__name": {"label": "Trio"},
-        "trio__proband__sample__name": {"label": "Proband"}
-    }
-
-    def __init__(self, user):
-        super().__init__(user)
-
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        queryset = KaryomappingAnalysis.filter_for_user(user)
-        if not user_grid_config.show_group_data:
-            queryset = queryset.filter(user=user)
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'modified', 'sortorder': 'desc'})
-
-
 class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
     colmodel_overrides = {
         "ID": {"width": 200},
@@ -561,33 +513,99 @@ class NodeGeneDiseaseClassificationGenesGrid(DataFrameJqGrid):
         return df.sort_index()
 
 
-class NodeTissueExpressionGenesGrid(JqGridUserRowConfig):
-    model = HumanProteinAtlasAnnotation
-    caption = 'Tissue Node: Human Protein Atlas'
-    fields = ['gene_symbol', 'gene', 'value']
+class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):
+    def __init__(self, request):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='id', visible=False),
+            RichColumn(key='analysis__id', visible=False),
+            RichColumn(key='analysis__name', label='Analysis', orderable=True,
+                       renderer=self.render_node_link,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='status', orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(NodeStatus.choices)),
+            RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn(key='errors', orderable=False),
+        ]
 
-    def __init__(self, user, analysis_id, node_id, version):
-        super().__init__(user)
-        node = get_node_subclass_or_404(user, node_id, version=version)
-        queryset = node.get_hpa_qs()
-        self.queryset = queryset.values(*self.get_field_names())
+    def render_node_link(self, row: CellData) -> JsonDataType:
+        analysis_id = row['analysis__id']
+        node_id = row['id']
+        url = reverse('analysis_node', kwargs={'analysis_id': analysis_id, 'active_node_id': node_id})
+        return {"text": row.value, "url": url}
+
+    def get_initial_queryset(self) -> QuerySet[AnalysisNode]:
+        return AnalysisNode.objects.filter(status=NodeStatus.ERROR)
 
 
-class NodeTissueUniProtTissueSpecificityGenesGrid(JqGridUserRowConfig):
-    model = HGNC
-    caption = 'Tissue Node: UniProt Tissue Specificity'
-    fields = ['gene_symbol__symbol', 'uniprot__accession', 'uniprot__tissue_specificity']
+class KaryomappingAnalysesColumns(DatatableConfig[KaryomappingAnalysis]):
+    def __init__(self, request):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='id', visible=False),
+            RichColumn(key='name', label='Name', orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn(key='trio__cohort__genome_build__name', label='Genome Build', orderable=True),
+            RichColumn(key='user__username', label='Created by', orderable=True),
+            RichColumn(key='trio__name', label='Trio', orderable=True),
+            RichColumn(key='trio__proband__sample__name', label='Proband', orderable=True),
+            RichColumn(key='id', name='delete', label='', orderable=False,
+                       renderer=self.render_delete,
+                       client_renderer='TableFormat.deleteRow'),
+        ]
 
-    def __init__(self, user, analysis_id, node_id, version):
-        super().__init__(user)
-        node = get_node_subclass_or_404(user, node_id, version=version)
+    def get_initial_queryset(self) -> QuerySet[KaryomappingAnalysis]:
+        return KaryomappingAnalysis.filter_for_user(self.user)
+
+    def filter_queryset(self, qs: QuerySet[KaryomappingAnalysis]) -> QuerySet[KaryomappingAnalysis]:
+        user_grid_config = UserGridConfig.get(self.user, 'Karomapping Analyses')
+        if not user_grid_config.show_group_data:
+            qs = qs.filter(user=self.user)
+        return qs
+
+
+class NodeTissueExpressionGenesColumns(DatatableConfig[HumanProteinAtlasAnnotation]):
+    download_csv_button_enabled = True
+
+    def __init__(self, request):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='gene_symbol', label='Gene Symbol', orderable=True),
+            RichColumn(key='gene', label='Gene', orderable=True),
+            RichColumn(key='value', orderable=True),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[HumanProteinAtlasAnnotation]:
+        node_id = self.get_query_param('node_id')
+        version = self.get_query_param('version')
+        node = get_node_subclass_or_404(self.user, node_id, version=version)
+        return node.get_hpa_qs()
+
+
+class NodeTissueUniProtGenesColumns(DatatableConfig[HGNC]):
+    download_csv_button_enabled = True
+
+    def __init__(self, request):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key='gene_symbol__symbol', label='Gene Symbol', orderable=True),
+            RichColumn(key='uniprot__accession', label='UniProt Accession', orderable=True),
+            RichColumn(key='uniprot__tissue_specificity', label='Tissue Specificity', orderable=True),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[HGNC]:
+        node_id = self.get_query_param('node_id')
+        version = self.get_query_param('version')
+        node = get_node_subclass_or_404(self.user, node_id, version=version)
         filters = []
         for word in node.text_tissue.split():
-            f = Q(uniprot__tissue_specificity__icontains=word)
-            filters.append(f)
+            filters.append(Q(uniprot__tissue_specificity__icontains=word))
         q = GroupOperation.reduce(filters, node.group_operation)
-        queryset = self.model.objects.filter(q)
-        self.queryset = queryset.values(*self.get_field_names())
+        return HGNC.objects.filter(q)
 
 
 class NodeGeneListGenesColumns(GeneListGenesColumns):
@@ -876,7 +894,7 @@ class CandidateColumns(DatatableConfig[LogEntry]):
         if row["status"] in (CandidateStatus.OPEN, CandidateStatus.HIGHLIGHTED):
             # Only do this if there is a sample
             if row.get("sample_id"):
-                data["url"] = reverse("classify_candidate", args=[row["id"]]),
+                data["url"] = reverse("classify_candidate", args=[row["id"]])
                 data["text"] = "📑"
                 data["title"] = "Classify sample"
 
@@ -886,7 +904,7 @@ class CandidateColumns(DatatableConfig[LogEntry]):
     def render_clinvar(row: dict[str, Any]) -> JsonDataType:
         data = {}
         if evidence := row.get("evidence"):
-            data = evidence.get("clinvar", {})
+            data = evidence.get("ClinVar diff", {})
         return data
 
 
@@ -942,4 +960,3 @@ class AnalysesColumns(DatatableConfig[Analysis]):
         if analysis_type := row["analysis_type"]:
             analysis_type = AnalysisType(row["analysis_type"]).label
         return analysis_type
-

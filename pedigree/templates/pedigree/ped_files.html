@@ -1,4 +1,3 @@
 <div>
-	{% load jqgrid_tags %}
-	{% jqgrid 'ped_files_grid' 'ped-files' search=False delete=True %}
+	<table id="ped-files-datatable" data-datatable-url="{% url 'ped_files_datatables' %}" class="sticky-header"></table>
 </div>

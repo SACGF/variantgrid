@@ -1,6 +1,3 @@
-import re
-from typing import Optional
-
 from django.db import models
 from django.db.models import CASCADE, PROTECT
 from django.urls import reverse
@@ -49,7 +46,7 @@ class Sequencer(models.Model):
                 try:
                     sequencer_model = SequencerModel.objects.get(model=model_name,
                                                                  manufacturer=illumina)
-                except:
+                except Exception:
                     if 'HiSeq' in model_name:
                         data_naming_convention = DataGeneration.HISEQ
                     else:
@@ -74,7 +71,7 @@ class Sequencer(models.Model):
         return f"{self.name} ({self.sequencer_model})"
 
 
-class EnrichmentKit(models.Model):
+class EnrichmentKit(PreviewModelMixin, models.Model):
     """ A lab method to enrich a sample (eg Capture Panel or Amplicon etc) """
     name = models.TextField()
     version = models.IntegerField(default=1)
@@ -105,6 +102,15 @@ class EnrichmentKit(models.Model):
 
     def get_gold_sequencing_runs_qs(self):
         return self.sequencingrun_set.filter(gold_standard=True)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-flask"
+
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        from django.conf import settings
+        return settings.SEQAUTO_ENABLED
 
     def get_absolute_url(self):
         return reverse('view_enrichment_kit', kwargs={"pk": self.pk})

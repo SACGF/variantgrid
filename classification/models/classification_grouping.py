@@ -8,14 +8,19 @@ import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
+from django.db import models, transaction
 from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
 
+<<<<<<< HEAD
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket, TestingContextFull
 from django.db import models, transaction
+=======
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
+>>>>>>> refs/heads/master
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved, ConditionReference
 from classification.models.overlaps_enums import ClassificationResultValue
@@ -257,7 +262,7 @@ class ClassificationGrouping(TimeStampedModel):
             labs = Lab.valid_labs_qs(user, admin_check=True).select_related("organization")
             orgs = {lab.organization for lab in labs}
             permission_q.append(Q(share_level=ShareLevel.LAB) & Q(lab__in=labs))
-            permission_q.append(Q(share_level=ShareLevel.INSTITUTION) & Q(lab__organization__in=orgs))
+            permission_q.append(Q(share_level=ShareLevel.ORGANISATION) & Q(lab__organization__in=orgs))
             permission_q.append(Q(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS))
             return qs.filter(reduce(operator.or_, permission_q))
         else:

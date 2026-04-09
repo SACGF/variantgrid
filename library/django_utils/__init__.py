@@ -35,7 +35,9 @@ def get_url_from_view_path(view_path):
     current_site = Site.objects.get_current()
     protocol = 'http'
     # TODO can do better than this for determining https vs http
-    if 'shariant.org.au' in current_site.domain or 'variantgrid.com.au' in current_site.domain:
+    https_domains = ('shariant.org.au', 'variantgrid.com')
+    domain = current_site.domain
+    if domain in https_domains or any(domain.endswith(f'.{d}') for d in https_domains):
         protocol = 'https'
     return f'{protocol}://{current_site.domain}{view_path}'
 
@@ -101,7 +103,7 @@ def get_model_fields_and_formatted_values_tuples_list(model):
         try:
             get_display_func = getattr(model, f"get_{name}_display")
             field = get_display_func()
-        except:
+        except Exception:
             raw_field = getattr(model, name)
             if raw_field is not None:
 #                logging.info("%s: %s", name, type(raw_field))
@@ -190,14 +192,19 @@ def ensure_timezone_aware(datetime_date):
 def ensure_mutally_exclusive_fields_not_set(obj, field_a, field_b):
     a_val = getattr(obj, field_a)
     b_val = getattr(obj, field_b)
-    if a_val and b_val:
+    if a_val is not None and b_val is not None:
         msg = f"{obj} ({obj.pk}): You cannot set both fields '{field_a}' ('{a_val}') and '{field_b}' ('{b_val}') at the same time."
         raise ValueError(msg)
 
 
 def set_form_read_only(form):
-    for field in form.fields.values():
-        field.disabled = True
+    if form is None:
+        return
+    # We need to loop over forms if passed a formset
+    forms = form.forms if hasattr(form, 'forms') else [form]
+    for f in forms:
+        for field in f.fields.values():
+            field.disabled = True
 
 
 def thread_safe_unique_together_get_or_create(klass, **kwargs):

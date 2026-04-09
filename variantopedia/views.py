@@ -1,4 +1,5 @@
 import json
+import logging
 import operator
 import re
 from collections import defaultdict
@@ -14,14 +15,13 @@ from django.db import connection
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.timesince import timesince
 from django.utils.timezone import localtime
 from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
-    VariantAnnotationVersion, VariantAnnotation, AnnotationStatus
+    VariantAnnotationVersion, VariantAnnotation, AnnotationStatus, ClinVarRecordCollection
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
@@ -114,7 +114,7 @@ def server_status(request):
             nb.add_markdown("This is a Slack Test :ladybug:")
             nb.send()
             messages.add_message(request, level=messages.INFO, message="Slack should have been sent a test message.")
-        if action == 'Health Check':
+        elif action == 'Health Check':
             notify_server_status_now()
             messages.add_message(request, level=messages.INFO, message="Slack should have been sent the health check.")
         elif action == 'Test Rollbar':
@@ -133,7 +133,7 @@ def server_status(request):
                 terminated = cursor.fetchone()[0]
                 messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
         else:
-            print(f"Unrecognised action {action}")
+            logging.warning("Unrecognised action %s", action)
 
         # return redirect(reverse('server_status'))
 
@@ -176,7 +176,7 @@ def server_status(request):
             active_jobs = []
             if worker_active := active.get(worker):
                 num_active = len(worker_active)
-                print(f"{worker=} active: {worker_active}")
+                logging.debug("worker %s active: %s", worker, worker_active)
                 name_time_stamps = defaultdict(list)
                 for worker_data in worker_active:
                     name = worker_data.get("name")
@@ -381,7 +381,7 @@ def view_variant(request, variant_id, genome_build_name=None):
     if genome_build_name:
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         if genome_build not in variant.genome_builds:
-            raise ValueError(f"Variant {variant} not in '{genome_build}'")
+            return redirect(reverse('view_variant', kwargs={'variant_id': variant_id}))
     else:
         if in_multiple_genome_builds:
             user_settings = UserSettings.get_for_user(request.user)
@@ -583,6 +583,7 @@ class ShareLevelRecordCounts:
 def view_allele(request, allele_id: int):
     allele: Allele = get_object_or_404(Allele, pk=allele_id)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+    ClinVarRecordCollection.set_allele_for_variants(allele)
 
     # Filter on classification grouping first, so we can find all unique AlleleGroupings
     # that the user has access to
@@ -686,7 +687,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
             genes_canonical_transcripts = get_genes_canonical_transcripts(variant, annotation_version)
 
-        except:  # May not have been annotated?
+        except Exception:  # May not have been annotated?
             log_traceback()
 
     modified_normalised_variants = variant.modifiedimportedvariant_set.filter(old_variant__isnull=False)
@@ -699,6 +700,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         # provide the data so we will do an async call)
         if not variant_allele.needs_clingen_call():
             variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant_allele)
+        ClinVarRecordCollection.set_allele_for_variants(variant_allele.allele)
 
     annotation_description = {}
     if user_settings.tool_tips:
@@ -747,10 +749,12 @@ def variant_sample_information(request, variant_id, genome_build_name):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     vsi = VariantSampleInformation(request.user, variant, genome_build)
     other_loci_variants_by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(variant)
+    g_hgvs = VariantAnnotation.get_hgvs_g(variant)
 
     context = {
         "variant": variant,
         "vsi": vsi,
+        "g_hgvs": g_hgvs,
         "other_loci_variants_by_multiallelic": other_loci_variants_by_multiallelic,
         "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build=genome_build).exists(),
     }
@@ -805,10 +809,7 @@ def nearby_variants(request, variant_id, annotation_version_id):
 
 
 def _get_grid_name(request, name) -> str:
-    name_parts = [
-        name,
-        timezone.now().strftime('%Y-%m-%d'),
-    ]
+    name_parts = [name]
     if extra_filters := request.GET.get("extra_filters"):
         extra_filters = json.loads(extra_filters)
         if tag_id := extra_filters.get("tag"):

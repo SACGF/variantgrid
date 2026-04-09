@@ -13,6 +13,7 @@
 {% load datatable_tags %}
 {% load gene_disease_tags %}
 {% load panel_app_tags %}
+{% load gene_symbol_tags %}
 {% load gnomad_gene_constraint_tags %}
 {% load settings_tags %}
 {% load classification_tags %}
@@ -234,11 +235,8 @@
                 <div class="card mt-4">
                     <div class="card-header">Summary</div>
                     <div class="card-body">
-                        {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
-                        {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}
-                            <a href="{{ hgnc.get_absolute_url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }})
-                            <a href="{{ hgnc.url }}">HGNC site</a>
-                        {% endlabelled %}
+                        {% hgnc_tag hgnc annotation_description %}
+                        {% if hgnc %}
                         {% labelled label="Location" help=annotation_description.band %}{{ hgnc.location }}{% endlabelled %}
                         {% labelled label="Gene Groups" help=annotation_description.gene_family_description %}
                             {{ hgnc.gene_groups }}
@@ -246,6 +244,7 @@
                                 ({% for gene_group_id in hgnc.gene_group_id_list %}<a href="https://www.genenames.org/data/genegroup/#!/group/{{ gene_group_id }}">{{ gene_group_id }}</a>{% endfor %})
                             {% endif %}
                         {% endlabelled %}
+                        {% endif %}
                         {% labelled label="Summary" help=annotation_description.refseq_gene_summary %}{{ gene_summary }}{% endlabelled %}
 
                         <a class="toggle-link" data-toggle="collapse" href="#more-external-ids">Show external IDs...</a>
@@ -406,13 +405,12 @@
             <div class="card mt-4">
                 <div class="card-header">Summary</div>
                 <div class="card-body">
-                    {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
-                    {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}
-                        <a href="{{ hgnc.url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }})<br/>
-                    {% endlabelled %}
-                    {% labelled label="Ontology Links" help="Shows links to ontology terms within our system for "|add:gene_symbol.symbol %}
-                        <a href="{{ hgnc.get_absolute_url }}">{{ site_name }} HGNC:{{ hgnc.pk }}</a>
-                    {% endlabelled %}
+                    {% hgnc_tag hgnc annotation_description %}
+                    {% if hgnc %}
+                        {% labelled label="Ontology Links" help="Shows links to ontology terms within our system for "|add:gene_symbol.symbol %}
+                            <a href="{{ hgnc.get_absolute_url }}">{{ site_name }} HGNC:{{ hgnc.pk }}</a>
+                        {% endlabelled %}
+                    {% endif %}
                 </div>
             </div>
         {% endif %}

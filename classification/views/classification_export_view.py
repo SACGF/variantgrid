@@ -28,6 +28,7 @@ from classification.views.exports.classification_export_formatter_redcap import 
 from classification.views.exports.classification_export_view import serve_export
 from library.django_utils import get_url_from_view_path
 from library.log_utils import report_exc_info
+from library.utils import utc_from_timestamp
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import AlleleOriginFilterDefault
 from snpdb.models.models import Lab, Organization
@@ -56,9 +57,9 @@ def parse_since(since_str: str) -> datetime:
             unit = unit.strip().lower()
 
         if amount > 100000 and not unit:
-            return datetime.utcfromtimestamp(float(since_str)).replace(tzinfo=timezone.utc)
+            return utc_from_timestamp(float(since_str))
 
-        since = datetime.utcnow().replace(tzinfo=timezone.utc)
+        since = timezone.now()
         if not unit or unit == 'd':
             since -= timedelta(days=amount)
         elif unit == 'm':
@@ -72,7 +73,7 @@ def parse_since(since_str: str) -> datetime:
         return since
 
     try:
-        return datetime.utcfromtimestamp(float(since_str)).replace(tzinfo=timezone.utc)
+        return utc_from_timestamp(float(since_str))
     except BaseException:
         pass
 

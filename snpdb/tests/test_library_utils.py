@@ -1,7 +1,9 @@
+from datetime import datetime, timezone
+
 from django.test import TestCase
 
 from library.log_utils import NotificationBuilder
-from library.utils import format_significant_digits
+from library.utils import format_significant_digits, utc_from_timestamp
 
 
 class TestUtils(TestCase):
@@ -23,3 +25,8 @@ class TestUtils(TestCase):
         markdown_text = ":hospital: This is **bold**"
         html = NotificationBuilder.slack_markdown_to_html(markdown_text)
         self.assertEqual("This is <strong>bold</strong>", html)
+
+    def test_utc_from_timestamp(self):
+        ts = 0
+        expected = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        self.assertEqual(utc_from_timestamp(ts), expected)

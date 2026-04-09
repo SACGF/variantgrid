@@ -133,8 +133,10 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
         annotation_run.pipeline_command = " ".join(cmd)
         annotation_run.save()
         return_code, std_out, std_err = execute_cmd(cmd)
-        annotation_run.pipeline_stdout = std_out
-        annotation_run.pipeline_stderr = std_err
+        # VEP can produce enormous output (>1GB) for large batches - PostgreSQL has a 1GB field limit
+        max_output = 1_000_000
+        annotation_run.pipeline_stdout = std_out[:max_output] if std_out else std_out
+        annotation_run.pipeline_stderr = std_err[:max_output] if std_err else std_err
         logging.info(f"VEP returned code: {return_code}")
 
         if return_code != 0:

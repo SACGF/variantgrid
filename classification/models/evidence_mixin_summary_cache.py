@@ -120,7 +120,7 @@ class ClassificationSummaryCalculator:
 
         full_json: ClassificationSummaryCacheDict = {
             "criteria_labels": self.criteria_labels,
-            "pathogenicity": pathology,
+            "pathogenicity": {
             "allele_origin_bucket": self.allele_origin_bucket,
             "somatic": somatic,
             "date": date_json

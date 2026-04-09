@@ -1,6 +1,5 @@
 import itertools
 from typing import Iterable, Optional
-from urllib.error import HTTPError
 
 from django.conf import settings
 from django.contrib.sites.models import Site

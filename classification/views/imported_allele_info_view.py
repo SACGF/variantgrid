@@ -249,7 +249,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
     for rvi, is_reference in resolved_variant_info_is_reference:
         if is_reference:
-            origin = "Normalized"
+            origin = "Normalised"
         else:
             origin = "Liftover"
         if rvi:
@@ -259,7 +259,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
         parts.append(MultiDiffInput(label, rvi.c_hgvs if rvi else None,
                                     is_reference=is_reference))
-        c_hgvs_resolved_variant_info.append((label + " c.HGVS by", rvi.c_hgvs_converter_version if rvi else ""))
+        c_hgvs_resolved_variant_info.append((label + " c.HGVS by", rvi.c_hgvs_converter_version if rvi else "",
+                                              label + " c.HGVS data version", rvi.c_hgvs_converter_data_version if rvi else ""))
 
     diff_output = multi_diff.diffs(parts)
     if not allele_info.imported_c_hgvs:

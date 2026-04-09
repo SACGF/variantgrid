@@ -116,7 +116,7 @@ class VennNode(AnalysisNode):
             in node_utils.get_analysis_update_task before children are loaded  """
 
         task_args_set = set()
-        if self.is_valid():
+        if self.is_valid:
             try:
                 a, b = self.ordered_parents
                 for intersection_type in self.get_vennodecache_intersection_types():
@@ -243,7 +243,6 @@ def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disab
 
 @celery.shared_task
 def venn_cache_count(vennode_cache_id):
-    print(f"venn_cache_count: {vennode_cache_id}")
     try:
         vennode_cache = VennNodeCache.objects.get(pk=vennode_cache_id)
     except VennNodeCache.DoesNotExist:

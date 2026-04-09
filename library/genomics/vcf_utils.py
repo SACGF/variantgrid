@@ -27,7 +27,7 @@ def cyvcf2_header_types(cyvcf2_reader) -> defaultdict:
 def cyvcf2_header_get(cyvcf2_reader, key, default=None):
     try:
         header_dict = cyvcf2_reader.get_header_type(key)
-    except:
+    except Exception:
         header_dict = {}
     return header_dict.get(key, default)
 
@@ -272,3 +272,17 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
 
         if not found_column_names_line:
             raise ValueError("VCF header was missing line starting with '#CHROM'")
+
+
+def parse_vcf_info_column(info: str) -> dict[str, str]:
+    """ You should probably use a proper VCF parser - this is only if you just have a column """
+    d = {}
+    if info == "." or not info:
+        return d
+    for item in info.split(";"):
+        if "=" in item:
+            k, v = item.split("=", 1)
+        else:
+            k, v = item, True
+        d[k] = v
+    return d

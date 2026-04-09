@@ -74,7 +74,6 @@ class MergeNode(AnalysisNode):
             non_none_keys = [k for k in arg_q_dict.keys() if k is not None]
 
             if non_none_keys:
-                print(f"{non_none_keys=}")
                 # We don't pass in arg_q_dict (ie run all where clauses in inner query)
                 # This has worse best-case performance but better worse case performance
                 qs = parent.get_queryset(disable_cache=True)

@@ -1423,7 +1423,7 @@ def _create_bot_user(apps, _schema_editor):
 def _import_contigs(apps, _schema_editor):
     BUILDS_ALIAS_IGV = {
         "hg19": (None, "hg19"),
-        "GRCh37": ("hg19", "b37"),
+        "GRCh37": ("hg19", "hg19"),
         "GRCh38": ("hg38", "hg38"),
     }
 

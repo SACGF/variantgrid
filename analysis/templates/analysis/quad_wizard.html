@@ -1,0 +1,164 @@
+{% extends menu_analysis_base %}
+{% load static %}
+{% load js_tags %}
+{% block title %}Quad Wizard{% endblock title %}
+
+{% block head %}
+<style>
+#form-submitted-dialog {
+    display: none;
+    text-align: center;
+}
+
+#quad-title {
+    float: left;
+}
+
+#quad-logo {
+    float: left;
+}
+
+#quad-table {
+  border-collapse: collapse;
+}
+
+td.patient-phenotype {
+  border: solid;
+  border-width: 1px 0;
+  padding: 5px;
+}
+
+tr:first-child td.patient-phenotype {
+  border-top: none;
+}
+
+tr:last-child td.patient-phenotype {
+  border-bottom: none;
+}
+
+#form-submitted-dialog > .QuadNode {
+    margin: 0 auto;
+}
+
+#proband-description {
+    text-align: left;
+}
+
+.QuadNode {
+    background-image: url({% static 'images/node_icons/quad.png' %});
+    width: 118px;
+    height: 100px;
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+</style>
+<script src="{% static 'js/patient_phenotype.js' %}"></script>
+<script>
+var patient_description_results = {{ patient_description_results | jsonify }};
+
+function setProbandPhenoText() {
+    var pp = $("#proband-phenos");
+    pp.empty();
+    var i = 0;
+    var displayedTerms = new Set();
+
+    $("select", ".sample-select").each(function() {
+        if ($(this).val() == 'P') {
+            var results = patient_description_results[i][1];
+            if (results) {
+                $("#proband-text").html("Using proband phenotypes:");
+                for (var m = 0; m < results.length; ++m) {
+                    var result = results[m];
+                    var ontologyService = result["ontology_service"];
+                    var resultMatch = result["match"];
+                    if (!displayedTerms.has(resultMatch) && (ontologyService == 'HPO' || ontologyService == 'OMIM')) {
+                        pp.append($("<li>" + resultMatch + "</li>"));
+                        displayedTerms.add(resultMatch);
+                    }
+                }
+            }
+        }
+        i++;
+    });
+}
+</script>
+{% endblock head %}
+
+{% block jsdocumentready %}
+
+    for (var i = 0; i < patient_description_results.length; ++i) {
+        var pdr = patient_description_results[i];
+        var phenotypeText = pdr[0];
+        var phenotypeMatches = pdr[1];
+
+        if (phenotypeText) {
+            var resultSelector = $("#patient-results-" + (i + 1));
+            displayPhenotypeMatches(resultSelector, phenotypeText, phenotypeMatches);
+        }
+    }
+
+    $("#create-quad-button").click(function() {
+        setProbandPhenoText();
+        $("#form-submitted-dialog").dialog({
+            dialogClass: "no-close",
+            minWidth: 500,
+        });
+    });
+
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+    <div>
+        <div id='quad-logo' class="QuadNode"></div>
+        <h3 id="quad-title">Create Quad Wizard</h3>
+        <div class='clear'></div>
+    </div>
+
+    <form id="quad-form" method="post">
+        {% csrf_token %}
+        <div>
+            <b>Mother Affected:</b> {{ form.mother_affected }}{{ form.mother_affected.errors }}
+            <b>Father Affected:</b> {{ form.father_affected }}{{ form.father_affected.errors }}
+            <b>Sibling Affected:</b> {{ form.sibling_affected }}{{ form.sibling_affected.errors }}
+        </div>
+
+        <table id='quad-table'>
+            <tr><td> {{ sample_1.name }}
+                <td class='sample-select'> {{ form.sample_1 }}{{ form.sample_1.errors }}
+                <td> {{ sample_1.patient | default_if_none:"" }}
+                <td id='patient-results-1' class='patient-phenotype'>
+            <tr><td> {{ sample_2.name }}
+                <td class='sample-select'> {{ form.sample_2 }}{{ form.sample_2.errors }}
+                <td> {{ sample_2.patient | default_if_none:"" }}
+                <td id='patient-results-2' class='patient-phenotype'>
+            <tr><td> {{ sample_3.name }}
+                <td class='sample-select'> {{ form.sample_3 }}{{ form.sample_3.errors }}
+                <td> {{ sample_3.patient | default_if_none:"" }}
+                <td id='patient-results-3' class='patient-phenotype'>
+            <tr><td> {{ sample_4.name }}
+                <td class='sample-select'> {{ form.sample_4 }}{{ form.sample_4.errors }}
+                <td> {{ sample_4.patient | default_if_none:"" }}
+                <td id='patient-results-4' class='patient-phenotype'>
+        </table>
+
+        {% if form.non_field_errors %}
+            <ul class='messages'>
+            {% for error in form.non_field_errors %}
+                <li class="error">{{ error|escape }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+
+        <button id='create-quad-button' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create Quad</button>
+    </form>
+
+    <div id='form-submitted-dialog'>
+        <div><i class="fa fa-spinner"></i> Creating Quad...</div>
+        <div class="QuadNode"></div>
+        <div id='proband-description'>
+            <div id='proband-text'></div>
+            <ul id='proband-phenos'></ul>
+        </div>
+    </div>
+
+{% endblock submenu_page_content %}

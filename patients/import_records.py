@@ -80,7 +80,7 @@ def parse_date(row, column, validation_messages):
         if date_string.upper() != UNKNOWN_STRING:
             try:
                 d = parser.parse(date_string)
-            except:
+            except Exception:
                 message = f"{column}: Could not parse date '{date_string}'"
                 validation_messages.append(message)
 
@@ -101,6 +101,7 @@ def parse_boolean(row, column, validation_messages, nullable=True):
         else:
             message = f"{column}: couldn't interpret boolean from '{value}'"
             validation_messages.append(message)
+            value = None
     else:
         if not nullable:
             message = f"{column}: Non-nullable boolean field was None"
@@ -140,7 +141,7 @@ def match_sample(user, sample_id, sample_name, validation_messages):
 
         if sample_id:
             kwargs = {"id": sample_id}
-        elif sample_name:
+        else:
             kwargs = {"name": sample_name}
 
         try:
@@ -191,7 +192,7 @@ def set_fields_if_blank(obj, field_values):
     changed = False
     for k, v in field_values.items():
         existing_value = getattr(obj, k)
-        if existing_value:
+        if not existing_value:
             changed = True
             setattr(obj, k, v)
 
@@ -263,7 +264,7 @@ def process_record(patient_records, record_id, row):
                 patient._deceased = patient_deceased
                 patient.save()
                 description = "Updated patient as deceased = True"
-        elif not patient_deceased:
+        elif patient_deceased is False:
             patient.date_of_death = None
             patient._deceased = patient_deceased
             patient.save(check_patient_text_phenotype=False)
@@ -365,7 +366,7 @@ def process_record(patient_records, record_id, row):
             specimen.received_date = specimen_received_date
             specimen.mutation_type = specimen_mutation_type
             specimen.nucleic_acid_source = specimen_nucleic_acid_source
-            specimen.age_at_collection = specimen_age_at_collection
+            specimen._age_at_collection_date = specimen_age_at_collection
 
             specimen.save()
     else:
@@ -425,8 +426,8 @@ def pandas_read_encoded_csv(*args, **kwargs):
         kwargs["encoding"] = 'cp1252'
         try:
             df = pd.read_csv(*args, **kwargs)
-        except:
-            raise ude
+        except Exception as exc:
+            raise ude from exc
 
     return df
 

@@ -17,7 +17,7 @@
     <h4>Locus</h4>
     <p>
     Reference - Homozygous reference calls are only reported in samples uploaded in multi-sample VCF files, when another sample has a variant at this locus.<br>
-    Variants - REF for a variants means the depth/quality was below the zygosity calling threshold. These may be somatic or artifacts.
+    Variants - REF for a variants means the depth/quality was below the zygosity calling threshold. These may be somatic or artefacts.
     </p>
 
     <table class="table">
@@ -50,7 +50,7 @@
     <div id='other_loci_variants_by_multiallelic' class="container">
         <h4>Variants from multi-allelic VCF records</h4>
         <p>
-            Multi-allelic VCF records are split then separately normalized. This may cause records that were on a line
+            Multi-allelic VCF records are split then separately normalised. This may cause records that were on a line
             together in a VCF to now have different loci.
         </p>
 
@@ -73,6 +73,7 @@
     <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
     <script src="{% static 'js/include_jqgrid.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/phenotype.js' %}"></script>
     <style>
         /* Fix for grid being 100% size for some unknown reason after bootstrap */
         #gbox_genotype-grid .ui-jqgrid-bdiv {
@@ -124,18 +125,6 @@
             return formatFieldString;
         }
 
-        function getTermLinks(term_type, term_list) {
-            let links = '';
-            if (term_list) {
-                const terms = term_list.split('|');
-                for (let i=0 ; i<terms.length ; ++i) {
-                    const term = terms[i];
-                    let url = Urls.ontology_term_text(term_type, term);
-                    links += "<span class='grid-term-link " + term_type + "' title='" + term + "' term='" + term + "' term_type='" + term_type + "'><a href='" + url + "' target='_blank'>" + term + "</a></span>";
-                }
-            }
-            return links;
-        }
 
         function plotSampleAlleleFrequencies(visible_rows) {
             let x = [];
@@ -238,6 +227,35 @@
         }
 
 
+        function exportGenotypeGridCSV() {
+            const grid = $("#genotype-grid");
+            const colModel = grid.jqGrid('getGridParam', 'colModel');
+            const cols = colModel.filter(c => !c.hidden);
+            const ZYGOSITY_DICT = {'O': 'HOM_ALT', 'E': 'HET', 'R': 'REF', 'U': 'Unknown Zygosity'};
+
+            let rows = [cols.map(c => '"' + (c.label || c.name) + '"').join(',')];
+            grid.jqGrid('getGridParam', 'data').forEach(function(rowData) {
+                const values = cols.map(function(c) {
+                    let val = rowData[c.name];
+                    if (val === null || val === undefined) val = '';
+                    if (c.name === 'zygosity') val = ZYGOSITY_DICT[val] || val;
+                    return '"' + String(val).replace(/"/g, '""') + '"';
+                });
+                rows.push(values.join(','));
+            });
+
+            const gHgvs = "{{ g_hgvs|default:variant }}";
+            const slug = gHgvs.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+            const blob = new Blob([rows.join('\n')], {type: 'text/csv'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            a.download = 'variant_genotypes_' + slug + '_' + dateStr + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         $(document).ready(function() {
             const visible_rows = {{ vsi.visible_rows | jsonify }};
             const ZYGOSITY_DICT = {
@@ -246,6 +264,10 @@
                 'R': 'REF',
                 'U': 'Unknown Zygosity',
             };
+
+            function getOntologyTermUrl(term_type, term) {
+                return Urls.ontology_term_text(term_type, term);
+            }
 
             jQuery.extend($.fn.fmatter , {
                 viewSampleLink : function(sampleName, options, rowObject) {
@@ -256,16 +278,20 @@
                     return ZYGOSITY_DICT[zygosity] || zygosity;
                 },
                 hpoFormatter : function(phenotype_terms) {
-                    return getTermLinks('HP', phenotype_terms);
+                    return getOntologyTermLinks('HP', phenotype_terms, getOntologyTermUrl);
                 },
                 omimFormatter : function(omim_terms) {
-                    return getTermLinks('OMIM', omim_terms);
+                    return getOntologyTermLinks('OMIM', omim_terms, getOntologyTermUrl);
                 },
                 mondoFormatter : function(mondo_terms) {
-                    return getTermLinks('MONDO', mondo_terms);
+                    return getOntologyTermLinks('MONDO', mondo_terms, getOntologyTermUrl);
                 },
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
             });
+
+            // This is made in getOntologyTermLinks
+            // have to do this on document then delegate as they won't be there until grid renders column
+            $(document).on('click', '.ontology-terms-container .collapsed-term', expandCollapsedOntologyTerm);
 
             let filters = getGenotypeFilters();
             jQuery("#genotype-grid").jqGrid({
@@ -292,6 +318,15 @@
                 },
                 rowNum: 20,
                 pager: 'genotype-grid-pager',
+            });
+
+            jQuery("#genotype-grid").jqGrid('navGrid', '#genotype-grid-pager', {add:false, edit:false, del:false, search:false, refresh:false});
+            jQuery("#genotype-grid").jqGrid('navButtonAdd', '#genotype-grid-pager', {
+                caption: "CSV",
+                buttonicon: "ui-icon-arrowthickstop-1-s",
+                onClickButton: exportGenotypeGridCSV,
+                title: "Download as CSV",
+                cursor: "pointer"
             });
 
             $(".genotype-filter").change(filterGenotypes);

@@ -302,7 +302,7 @@ class ClassificationGroup:
     def is_discordant(self):
         if self.most_recent.share_level in ShareLevel.DISCORDANT_LEVEL_KEYS:
             if cc := self.most_recent.classification.clinical_context:
-                return cc.is_discordant()
+                return cc.is_discordant
 
     @staticmethod
     def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> CHGVS:

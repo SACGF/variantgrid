@@ -1,5 +1,6 @@
 # DO NOT import any models, so keep this safe to be used by migrations
 import contextlib
+import logging
 from collections import defaultdict
 from typing import Optional
 
@@ -94,14 +95,14 @@ class BulkUpdator:
             self.model.objects.bulk_update(self.batch, fields=self.fields)
             self.records_updated += len(self.batch)
             self.batch = []
-            print(f"Bulk updated {self.model} x {self.records_updated}")
+            logging.info("Bulk updated %s x %s", self.model, self.records_updated)
 
     def finish(self):
         if self.batch:
             self.model.objects.bulk_update(self.batch, fields=self.fields)
             self.records_updated += len(self.batch)
             self.batch = []
-        print(f"Bulk updated {self.model} x {self.records_updated}")
+        logging.info("Bulk updated %s x %s", self.model, self.records_updated)
 
     @staticmethod
     @contextlib.contextmanager
@@ -135,7 +136,7 @@ class EvidenceKeyRenamer:
             if self.EvidenceKey.objects.filter(key=new_key).exists():
                 raise ValueError(f"New evidence key {new_key} already exists")
             if old_e_key := self.EvidenceKey.objects.filter(key=old_key).first():
-                print(f"Moving {old_key} to be {new_key}")
+                logging.info("Moving %s to be %s", old_key, new_key)
                 old_e_key.key = new_key
                 old_e_key.save()
                 self.EvidenceKey.objects.filter(key=old_key).delete()
@@ -156,7 +157,7 @@ class EvidenceKeyRenamer:
         ClassificationModification = self.apps.get_model("classification", "ClassificationModification")
 
         self._move_evidence_keys()
-        print("Moving historic values")
+        logging.info("Moving historic values")
 
         with BulkUpdator.instance(model=Classification, fields=["evidence"]) as batch_update:
             for vc in Classification.objects.iterator():

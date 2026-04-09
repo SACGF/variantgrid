@@ -11,9 +11,13 @@ register = Library()
 @register.inclusion_tag("snpdb/tags/genome_build_url_arg.html")
 def genome_build_url_arg(genome_build, url_name, **url_kwargs):
     """ Generates links for user to switch page to their active genome builds
-        url_name - must take a parameter 'genome_build_name' """
+        url_name - must take a parameter 'genome_build_name'
+        Pass limit_builds (a collection of GenomeBuild) to restrict which builds are shown """
 
+    limit_builds = url_kwargs.pop('limit_builds', None)
     builds_with_annotation = GenomeBuild.builds_with_annotation()
+    if limit_builds is not None:
+        builds_with_annotation = builds_with_annotation.filter(pk__in=[b.pk for b in limit_builds])
     other_genome_builds_exist = builds_with_annotation.exclude(pk=genome_build.pk).exists()
 
     class BuildUrlDict(TypedDict):

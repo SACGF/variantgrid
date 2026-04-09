@@ -61,7 +61,7 @@ class CohortMixin:
     @property
     def count_column_prefix(self):
         cohort = self._get_cohort()
-        if cohort and cohort.is_sub_cohort():
+        if cohort and cohort.is_sub_cohort:
             column_prefix = f"sub_cohort_{cohort.pk}_"
         else:
             cgc = self.cohort_genotype_collection
@@ -85,7 +85,7 @@ class CohortMixin:
     def ref_count_annotation_arg(self):
         """ key in annotation_kwargs """
         cohort = self._get_cohort()
-        if cohort and cohort.is_sub_cohort():
+        if cohort and cohort.is_sub_cohort:
             return self.ref_count_column
         return self.cohort_genotype_collection.cohortgenotype_alias
 
@@ -93,7 +93,7 @@ class CohortMixin:
     def het_count_annotation_arg(self):
         """ key in annotation_kwargs """
         cohort = self._get_cohort()
-        if cohort and cohort.is_sub_cohort():
+        if cohort and cohort.is_sub_cohort:
             return self.het_count_column
         return self.cohort_genotype_collection.cohortgenotype_alias
 
@@ -101,7 +101,7 @@ class CohortMixin:
     def hom_count_annotation_arg(self):
         """ key in annotation_kwargs """
         cohort = self._get_cohort()
-        if cohort and cohort.is_sub_cohort():
+        if cohort and cohort.is_sub_cohort:
             return self.hom_count_column
         return self.cohort_genotype_collection.cohortgenotype_alias
 
@@ -135,14 +135,13 @@ class CohortMixin:
         if cohort:
             cgc = self.cohort_genotype_collection
             q_and = []
-            if cohort.is_sub_cohort():
+            if cohort.is_sub_cohort:
                 missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
                 sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
                 q_sub = cgc.get_zygosity_q(sample_zygosities_dict, exclude=True)
                 q_and.append(q_sub)
             q_and.extend(self._get_q_and_list())
             if q_and:
-                print(q_and)
                 q = reduce(operator.and_, q_and)
                 arg_q_dict[cgc.cohortgenotype_alias] = {str(q): q}
         else:
@@ -313,10 +312,15 @@ class AncestorSampleMixin(SampleMixin):
         return errors
 
     def _get_ancestor_samples(self) -> set[Sample]:
+        """ Get all samples from ancestor nodes, including those from VCFs without genotypes.
+            Uses cohort samples directly rather than visibility-filtered get_samples(),
+            so that variant-only VCFs (has_genotype=False) are still recognized as valid ancestors. """
         parent_sample_set = set()
         parents, _errors = self.get_parent_subclasses_and_errors()
         for parent in parents:  # Use parent samples not own as own inserts self.sample
-            parent_sample_set.update(parent.get_samples())
+            cohorts, _ = parent.get_cohorts_and_sample_visibility(sort=False)
+            for c in cohorts:
+                parent_sample_set.update(c.get_samples())
         return parent_sample_set
 
     def handle_ancestor_input_samples_changed(self):

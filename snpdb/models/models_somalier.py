@@ -155,6 +155,7 @@ class SomalierRelate(AbstractSomalierModel):
     def get_samples(self) -> Iterable[Sample]:
         return []
 
+    @property
     def is_joint_called_vcf(self) -> bool:
         samples_qs = self.get_samples()
         num_vcfs = samples_qs.order_by("vcf").distinct("vcf").count()
@@ -279,11 +280,7 @@ class SomalierConfig:
     def get_sites_vcf(self, genome_build: 'GenomeBuild'):
         sites_name = self.get_sites_vcf_name(genome_build)
         sites_vcf_kwargs = {"name": sites_name, "genome_build": genome_build}
-        try:
-            return VCF.objects.get(**sites_vcf_kwargs)
-        except VCF.DoesNotExist as dne:
-            print(f"Expected single VCF loaded via: {sites_vcf_kwargs}")
-            raise dne
+        return VCF.objects.get(**sites_vcf_kwargs)
 
     def __getitem__(self, key):
         return self.settings[key]

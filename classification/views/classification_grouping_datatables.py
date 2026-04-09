@@ -2,6 +2,7 @@ import operator
 from collections import defaultdict
 from functools import cached_property, reduce
 from typing import Dict, List, Optional, Tuple
+
 from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
@@ -266,7 +267,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             variant_qs = Variant.objects.filter(varianttranscriptannotation__transcript_version=transcript_version,
                                                 varianttranscriptannotation__protein_position__icontains=protein_position)
             # Join through allele so it works across genome builds
-            filters.append(Q(allele_origin_grouping__allele_grouing__allele__variantallele__variant__in=variant_qs))
+            filters.append(Q(allele_origin_grouping__allele_grouping__allele__variantallele__variant__in=variant_qs))
 
         if page != "gene_symbol":
             if gene_symbol_str := self.get_query_param("gene_symbol"):
@@ -338,7 +339,19 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CLINVAR_SCV, scv)
         return None
 
-    def condition_filter(self, text, must_exist: bool = False) -> Optional[Q]:
+	@staticmethod
+    def get_ontology_q(ontology_terms: str) -> Q | None:
+        condition_filters = []
+        for condition in ontology_terms.split(","):
+            if c_filter := ClassificationGroupingColumns.condition_filter(condition):
+                condition_filters.append(c_filter)
+        q = None
+        if condition_filters:
+            q = reduce(operator.or_, condition_filters)
+        return q
+
+	@staticmethod
+    def condition_filter(text, must_exist: bool = False) -> Optional[Q]:
         try:
             term = OntologyTerm.get_or_stub(text)
             if must_exist and term.is_stub:

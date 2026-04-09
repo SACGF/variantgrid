@@ -47,7 +47,7 @@ class FormatDetailsMVL:
             'LP': 'LIKELY_PATHOGENIC',
             'P': 'PATHOGENIC'
         }
-        self.compatability_mode = False
+        self.compatibility_mode = False
         self.conflict_strategy = ConflictStrategy.MOST_PATHOGENIC
         self.is_shell = False
         self.format: FormatDetailsMVLFileFormat = FormatDetailsMVLFileFormat.TSV
@@ -95,7 +95,7 @@ class FormatDetailsMVL:
             format_details.is_shell = True
 
         if request.query_params.get('mode') == 'compatibility':
-            format_details.compatability_mode = True
+            format_details.compatibility_mode = True
 
         if file_format := request.query_params.get('file_format'):
             format_details.format = FormatDetailsMVLFileFormat(file_format)
@@ -217,7 +217,7 @@ class MVLEntry(ExportRow):
     @cached_property
     def variant_anchor_tag(self):
         # if we want to produce the same URLs as before for comparison, at the cost of a lot of speed
-        if self.formatter.compatability_mode:
+        if self.formatter.compatibility_mode:
             v = Allele.objects.get(pk=self._cm.classification.allele_id).variant_for_any_build(self.mvl_data.data.source.genome_build)
             url = v.get_absolute_url()
             url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.date_str}'

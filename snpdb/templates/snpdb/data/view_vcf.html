@@ -62,11 +62,6 @@ table#sample-formset input[type=checkbox] {
     margin-left: 5px;
 }
 
-.loading {
-    background-image: url(/static/icons/loading.gif);
-    background-repeat: no-repeat;
-}
-
 </style>
 <script>
 function showBulkSet() {
@@ -478,6 +473,8 @@ $(document).ready(function() {
 
             {% load cohort_trio_wizard_tag %}
             {% cohort_trio_wizard vcf.cohort %}
+            {% load cohort_quad_wizard_tag %}
+            {% cohort_quad_wizard vcf.cohort %}
         {% endif %}
         <div class='clear'></div>
         
@@ -534,7 +531,7 @@ $(document).ready(function() {
                                 {%  if vcf.allele_frequency_field %}
                                     {{ vcf.allele_frequency_field }}
                                 {% else %}
-                                    Calculated as <code>AD / (sum of all AD for that locus)</code> after VCF normalization
+                                    Calculated as <code>AD / (sum of all AD for that locus)</code> after VCF normalisation
                                 {% endif %}
                             </td>
                         </tr>

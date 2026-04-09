@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from functools import cached_property
 from typing import Optional, Tuple
 
@@ -12,7 +12,7 @@ from classification.enums import SubmissionSource
 from classification.models import ClassificationJsonParams, ClassificationPatchResponse
 from classification.models.classification import Classification, \
     ClassificationProcessError, ClassificationModification
-from library.utils import empty_to_none
+from library.utils import empty_to_none, utc_from_timestamp
 from snpdb.models import Lab
 
 
@@ -110,7 +110,7 @@ class ClassificationRef:
     @cached_property
     def version_datetime(self) -> Optional[datetime]:
         if self.version:
-            return datetime.utcfromtimestamp(self.version).replace(tzinfo=timezone.utc)
+            return utc_from_timestamp(self.version)
         return None
 
     def exists(self) -> bool:
@@ -199,19 +199,35 @@ class ClassificationRef:
             user=user, lab=lab, rid=record_id, lab_record_id=lab_record_id, version=version)
 
     @staticmethod
+    def parse_id_str(id_str: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        """Parse a classification ref string into (lab_ref, record_id, version).
+
+        Format: [lab_id/]record_id[.version]
+        lab_id may itself contain slashes (e.g. org/lab_name); the last slash
+        before the version separates lab_id from record_id.
+        """
+        if '.' in id_str:
+            rest, version_str = id_str.split('.', 1)
+        else:
+            rest, version_str = id_str, None
+
+        if '/' in rest:
+            lab_ref_str, record_id_str = rest.rsplit('/', 1)
+        else:
+            lab_ref_str, record_id_str = None, rest
+
+        return (
+            empty_to_none(lab_ref_str),
+            empty_to_none(record_id_str),
+            empty_to_none(version_str),
+        )
+
+    @staticmethod
     def init_from_str(user: User, id_str: str) -> Optional['ClassificationRef']:
         if not id_str:
             return None
-        id_str = str(id_str)
 
-        # group 1 is the lab
-        # group 2 is the lab_record_id or regular id
-        # group 3 is the version
-        match = re.match(r'^(?:([^.]*?)(?:/)?)([^/.]*?)(?:[.](.*))?$', id_str)
-
-        lab_ref = empty_to_none(match[1])
-        record_id = empty_to_none(match[2])
-        version = empty_to_none(match[3])
+        lab_ref, record_id, version = ClassificationRef.parse_id_str(str(id_str))
 
         kwargs = {}
         if lab_ref:

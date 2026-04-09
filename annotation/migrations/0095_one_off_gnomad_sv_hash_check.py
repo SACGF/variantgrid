@@ -8,7 +8,7 @@ from library.utils import file_sha256sum
 from manual.operations.manual_operations import ManualOperation
 
 
-def _structuralvariantoverlap_hash_check(apps):
+def _structuralvariantoverlap_hash_check(_apps):
     """ Return True if file hash is different """
 
     # We renamed the setting in 0097 switching from plugin -> custom VCF

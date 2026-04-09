@@ -2,7 +2,6 @@ import math
 import re
 from collections import defaultdict
 from copy import deepcopy
-from dataclasses import field
 from enum import Enum
 from functools import cached_property
 from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
@@ -202,9 +201,9 @@ class EvidenceKey(TimeStampedModel):
         suffix_str = ''
         if suffix:
             if is_note:
-                suffix_str = '_n%s' % str(suffix)
+                suffix_str = f'_n{suffix}'
             else:
-                suffix_str = '_%s' % str(suffix)
+                suffix_str = f'_{suffix}'
 
         lower_key = self.key.lower().replace(' ', '_')
         if re.match('^[0-9].*', lower_key):
@@ -374,14 +373,14 @@ class EvidenceKey(TimeStampedModel):
     def namespace(self) -> Optional[str]:
         try:
             return self.key[0:self.key.index(':')]
-        except:
+        except Exception:
             return None
 
     @property
     def without_namespace(self) -> str:
         try:
             return self.key[self.key.index(':')+1:]
-        except:
+        except Exception:
             return self.key
 
     @property
@@ -694,7 +693,7 @@ class VCDataCell:
         if val:
             try:
                 return SubmissionSource(val)
-            except:
+            except Exception:
                 return SubmissionSource.FORM
         else:
             return None

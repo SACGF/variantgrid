@@ -49,7 +49,9 @@ function createVennNode() {
 function createNodeFromData(nodeData) {
 	const NODE_FACTORIES = {
 		"SampleNode" : createSampleNode,
-		"VennNode" : createVennNode
+		"VennNode" : createVennNode,
+		"TrioNode" : createTrioNode,
+		"QuadNode" : createQuadNode,
 	};
 
 	let nodeClass = nodeData['node_class'];

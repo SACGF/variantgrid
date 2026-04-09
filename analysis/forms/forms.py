@@ -1,5 +1,6 @@
 import itertools
 import operator
+import re
 from collections import defaultdict
 
 from crispy_forms.bootstrap import FieldWithButtons, StrictButton
@@ -7,11 +8,12 @@ from crispy_forms.layout import Layout, Field
 from dal import forward
 from django import forms
 from django.core.exceptions import ValidationError
+from django.forms import inlineformset_factory
 from django.forms.widgets import TextInput
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate, AnalysisTemplateVersion, \
-    AnalysisNode, CandidateStatus
-from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample, AnalysisType
+    AnalysisNode, CandidateStatus, AutoLaunchAnalysisTemplate
+from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample, QuadSample, AnalysisType
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
 from annotation.models.models import AnnotationVersion
@@ -19,6 +21,7 @@ from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
+from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, VariantGridColumn, Trio, UserSettings
 from uicore.utils.form_helpers import form_helper_horizontal
@@ -110,7 +113,39 @@ class AnalysisTemplateForm(forms.ModelForm):
     class Meta:
         fields = ('name', 'description')
         model = AnalysisTemplate
-        widgets = {'name': TextInput()}
+        widgets = {'name': TextInput(),
+                   'description': TextInput()}
+
+
+class AutoLaunchAnalysisTemplateForm(forms.ModelForm):
+    class Meta:
+        model = AutoLaunchAnalysisTemplate
+        fields = ("enrichment_kit", "sample_regex")
+        widgets = {
+            "enrichment_kit": ModelSelect2(url='enrichment_kit_autocomplete',
+                                           attrs={'data-placeholder': 'Enrichment Kit...'}),
+            "sample_regex": forms.TextInput(attrs={
+                "size": 20,
+                "class": "form-control form-control-sm",
+            })
+        }
+
+    def clean_sample_regex(self):
+        if value := self.cleaned_data.get("sample_regex"):
+            try:
+                re.compile(value)
+            except re.error as e:
+                raise forms.ValidationError(f"RegEx error: {e}")
+        return value
+
+
+AutoLaunchFormSet = inlineformset_factory(
+    AnalysisTemplate,
+    AutoLaunchAnalysisTemplate,
+    form=AutoLaunchAnalysisTemplateForm,
+    extra=1,
+    can_delete=True
+)
 
 
 class CreateAnalysisTemplateForm(forms.ModelForm):
@@ -284,7 +319,7 @@ class GraphTypeChoiceForm(forms.Form):
     def __init__(self, node, columns, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # We don't join to observed variant anymore, but to keep compatability
+        # We don't join to observed variant anymore, but to keep compatibility
         # We can still get it if we have exactly 1 sample
         if len(node.get_sample_ids()) == 1:
             columns.append("observedvariant__zygosity")
@@ -322,6 +357,30 @@ class UserTrioWizardForm(forms.Form):
             if a_v == b_v:
                 trio_sample = TrioSample(a_v)
                 msg = f"Samples {a}/{b} are both assigned to: {trio_sample.label}"
+                raise forms.ValidationError(msg)
+
+        return cleaned_data
+
+
+class UserQuadWizardForm(forms.Form):
+    mother_affected  = forms.BooleanField(required=False)
+    father_affected  = forms.BooleanField(required=False)
+    sibling_affected = forms.BooleanField(required=False)
+    sample_1 = forms.ChoiceField(choices=QuadSample.choices)
+    sample_2 = forms.ChoiceField(choices=QuadSample.choices)
+    sample_3 = forms.ChoiceField(choices=QuadSample.choices)
+    sample_4 = forms.ChoiceField(choices=QuadSample.choices)
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        SAMPLES = ["sample_1", "sample_2", "sample_3", "sample_4"]
+        for a, b in itertools.combinations(SAMPLES, 2):
+            a_v = cleaned_data.get(a)
+            b_v = cleaned_data.get(b)
+            if a_v == b_v:
+                quad_sample = QuadSample(a_v)
+                msg = f"Samples {a}/{b} are both assigned to: {quad_sample.label}"
                 raise forms.ValidationError(msg)
 
         return cleaned_data
@@ -386,7 +445,6 @@ class AnalysisFilterForm(forms.Form):
             raise ValidationError('date_min must be <= date_max')
 
 
-
 class SampleCandidatesSearchForm(forms.Form):
     max_samples = forms.IntegerField(required=False, initial=10, min_value=1)
     max_results = forms.IntegerField(required=False, initial=20, min_value=1)
@@ -429,3 +487,11 @@ def get_mult_choice_form(choices, field_name: str, initial=None):
             self.fields[field_name].initial = initial
 
     return WrappedForm
+
+
+class AnalysisTemplateAutoLaunchForm(forms.Form):
+    enrichment_kit = forms.ModelChoiceField(queryset=EnrichmentKit.objects.all(),
+                                            required=False, blank=True,
+                                            widget=ModelSelect2(url='enrichment_kit_autocomplete',
+                                                                attrs={'data-placeholder': 'Enrichment Kit...'}))
+    example_sample_name = forms.CharField(required=False)

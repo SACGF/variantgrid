@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+from classification.enums import ShareLevel
 from classification.models import ValidationMerger, EvidenceMixin, Classification
 
 
@@ -88,3 +89,31 @@ class ClassificationTestCaseUtils(TestCase):
     def test_is_valid_transcript(self):
         self.assertTrue(Classification.is_supported_transcript("NM_002739.5(PRKCG):c.1397T>C"))
         self.assertFalse(Classification.is_supported_transcript("NX_023343.1(RNU4ATAC):n.50G>A"))
+
+
+class ShareLevelTest(TestCase):
+
+    def test_from_key_current_values(self):
+        self.assertEqual(ShareLevel.from_key('user'), ShareLevel.CURRENT_USER)
+        self.assertEqual(ShareLevel.from_key('lab'), ShareLevel.LAB)
+        self.assertEqual(ShareLevel.from_key('organisation'), ShareLevel.ORGANISATION)
+        self.assertEqual(ShareLevel.from_key('logged_in_users'), ShareLevel.ALL_USERS)
+        self.assertEqual(ShareLevel.from_key('public'), ShareLevel.PUBLIC)
+
+    def test_from_key_institution_alias(self):
+        # 'institution' is the old DB value — must still resolve after migration
+        self.assertEqual(ShareLevel.from_key('institution'), ShareLevel.ORGANISATION)
+
+    def test_from_key_none(self):
+        self.assertIsNone(ShareLevel.from_key(None))
+
+    def test_from_key_passthrough(self):
+        self.assertEqual(ShareLevel.from_key(ShareLevel.LAB), ShareLevel.LAB)
+
+    def test_from_key_by_index(self):
+        self.assertEqual(ShareLevel.from_key(0), ShareLevel.CURRENT_USER)
+        self.assertEqual(ShareLevel.from_key(2), ShareLevel.ORGANISATION)
+
+    def test_from_key_invalid(self):
+        with self.assertRaises(ValueError):
+            ShareLevel.from_key('nonexistent')

@@ -27,6 +27,7 @@ from analysis.models.nodes.sources.cohort_node import CohortNode, CohortNodeZygo
     CohortNodeZygosityFilter
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
+from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from annotation.models import VariantAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
@@ -500,7 +501,7 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
                 genomic_interval.end = self.cleaned_data["end"]
                 genomic_interval.save()
                 node.genomic_interval = genomic_interval
-            except:
+            except Exception:
                 pass
 
         if "hgvs_string" in self.changed_data:
@@ -824,6 +825,32 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         if self.instance.analysis.template_type != AnalysisTemplateType.TEMPLATE:
             if trio and inheritance:
                 for error in TrioNode.get_trio_inheritance_errors(trio, inheritance):
+                    self.add_error("inheritance", error)
+
+
+class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
+    genome_build_fields = ["quad"]
+
+    class Meta:
+        model = QuadNode
+        exclude = ANALYSIS_NODE_FIELDS
+        widgets = {
+            "quad": ModelSelect2(url='quad_autocomplete',
+                                 attrs={'data-placeholder': 'Quad...'}),
+            "min_ad": WIDGET_INTEGER_MIN_0,
+            "min_dp": WIDGET_INTEGER_MIN_0,
+            "min_gq": WIDGET_INTEGER_MIN_0,
+            "max_pl": WIDGET_INTEGER_MIN_0,
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        quad = cleaned_data.get("quad")
+        inheritance = cleaned_data.get("inheritance")
+        # Don't perform validation on template - so we can configure how we like
+        if self.instance.analysis.template_type != AnalysisTemplateType.TEMPLATE:
+            if quad and inheritance:
+                for error in QuadNode.get_quad_inheritance_errors(quad, inheritance):
                     self.add_error("inheritance", error)
 
 

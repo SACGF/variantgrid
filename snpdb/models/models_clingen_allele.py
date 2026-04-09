@@ -242,8 +242,7 @@ class ClinGenAllele(TimeStampedModel):
 
     @property
     def human_url(self):
-        params = (settings.CLINGEN_ALLELE_REGISTRY_DOMAIN, self)
-        return "%s/redmine/projects/registry/genboree_registry/by_caid?caid=%s" % params
+        return f"{settings.CLINGEN_ALLELE_REGISTRY_DOMAIN}/redmine/projects/registry/genboree_registry/by_caid?caid={self}"
 
     @staticmethod
     def format_clingen_allele(pk):

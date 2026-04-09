@@ -36,7 +36,7 @@ def check_library_versions() -> dict:
             else:
                 version_str = metadata.version(name)
                 version = tuple(int(i) for i in version_str.split("."))
-                assert version >= version_required, "Library %s (%s) requires version >= %s" % (name, version, version_required)
+                assert version >= version_required, f"Library {name} ({version}) requires version >= {version_required}"
             library_version_valid[name] = {
                 "valid": True,
                 "fix": "All good",

@@ -9,17 +9,18 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.urls import reverse
+from hgvs_shim import HGVSException, HGVSImplementationException, HGVSNomenclatureException
 
 from annotation.cosmic import CosmicAPI
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher, HGVSException, VariantResolvingError, HGVSImplementationException, \
-    HGVSNomenclatureException, HgvsOriginallyNormalized
+from genes.hgvs import HGVSMatcher, VariantResolvingError, HgvsOriginallyNormalized
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.models import MissingTranscript, MANE, TranscriptVersion, BadTranscript
 from genes.models_enums import AnnotationConsortium
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
+from library.log_utils import report_exc_info
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
@@ -219,7 +220,7 @@ def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, va
                                                  variant_string=variant_string):
         yield SearchResult(cmv, messages=search_messages)
 
-    if variant_coordinate.is_symbolic():
+    if variant_coordinate.is_symbolic:
         original_alt_desc = _sv_alt_description(variant_coordinate)
     else:
         original_alt_desc = Sequence.abbreviate(variant_coordinate.alt)
@@ -273,7 +274,7 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
             continue
 
         search_messages = []
-        if not variant_coordinate.is_symbolic():
+        if not variant_coordinate.is_symbolic:
             # Only check refs if explicit, non-symbolic refs
             calculated_ref = variant_coordinate.calculated_reference(genome_build)
             logging.info("calc ref: %s, provided ref: %s", calculated_ref, variant_coordinate.ref)
@@ -527,7 +528,12 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
             if search_input.user.is_superuser:
                 error_message = str(e)
             else:
-                error_message = "Error resolving HGVS"
+                report_exc_info()
+                # error_message = "Error resolving HGVS"
+                error_message = str(e)
+                # work has been done to improve the error messages
+                # planning a future change where the technical errors identify themselves rather than the
+                # user-friendly errors identifying themselves
 
         if error_message:
             results = [SearchResult.error_result(error_message, genome_build)]
@@ -558,7 +564,11 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     try:
         vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
-        variant_coordinate, used_transcript_accession, kind, _used_converter_type, method, matches_reference, originally_normalized = vc_details
+        variant_coordinate = vc_details.variant_coordinate
+        used_transcript_accession = vc_details.transcript_accession
+        kind = vc_details.kind
+        matches_reference = vc_details.matches_reference
+        originally_normalized = vc_details.originally_normalized
         logging.info("get_variant_coordinate_and_details - variant_coordinate=%s", variant_coordinate)
         if not matches_reference:
             # reporting on the "provided" reference is slightly problematic as it's not always provided directly, it could be indirectly
@@ -591,8 +601,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 msg = f"{contig_accession=} is from builds {build_names} which are not enabled/annotated."
                 yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
         else:
-            known_builds = GenomeBuild.get_known_builds_comma_separated_string()
-            msg = f"{contig_accession=} not in known_builds: {known_builds}"
+            enabled_builds = GenomeBuild.get_enabled_builds_comma_separated_string()
+            msg = f"{contig_accession=} not in enabled builds: {enabled_builds}"
             yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
 
     except (ValueError, NotImplementedError) as hgvs_error:
@@ -608,7 +618,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                         msg_hgvs_given_symbol += " Can't find MANE transcripts without gene symbol"
                     else:
                         raise ValueError(
-                            msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts")
+                        msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts") from hgvs_error
 
                 gene_aliases_to_mane_symbols = set()
                 genes_with_non_mane_transcripts = set()
@@ -684,7 +694,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             raise hgvs_error
     except HGVSNomenclatureException as hgvs_ex:
         raw_message = str(hgvs_ex)
-        if "char" not in raw_message and not "EOF" in raw_message:
+        if "char" not in raw_message and "EOF" not in raw_message:
             # this is likely not a technical message, send it directly to the user
             yield SearchMessageOverall(raw_message)
             return

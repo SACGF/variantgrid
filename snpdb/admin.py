@@ -1,6 +1,5 @@
 import re
 
-from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet

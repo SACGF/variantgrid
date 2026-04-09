@@ -50,7 +50,7 @@ class JqGridUserRowConfig(JqGrid):
         obj = self.model.objects.get(pk=pk)
         try:
             check_can_write(obj, self.user)
-        except AttributeError:
+        except AttributeError as exc:
             msg = "delete_row should be overridden where object does not provide a can_write method "
-            raise NotImplementedError(msg)
+            raise NotImplementedError(msg) from exc
         obj.delete()

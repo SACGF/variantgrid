@@ -80,7 +80,7 @@ class BuiltInFilterNode(AnalysisNode):
                     parent = self.get_single_parent()
                     parent_node_count = NodeCount.load_for_node(parent, self.built_in_filter)
                     count = parent_node_count.count
-                except:
+                except Exception:
                     pass
         return count
 

@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Any, TypedDict, Literal
@@ -83,6 +84,8 @@ class CHGVSResolution:
     c_hgvs: str
     c_hgvs_compatible: str
     c_hgvs_converter_version: HGVSConverterVersion
+    c_hgvs_converter_data_version: str
+    """ cdot data version or ClinGen date used during this resolution """
     transcript_version: Optional[str]
     gene_symbol: Optional[str]
 
@@ -120,6 +123,9 @@ class ResolvedVariantInfo(TimeStampedModel):
 
     c_hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
     """ Tool used to generate c_hgvs  """
+
+    c_hgvs_converter_data_version = TextField(blank=True, default='')
+    """ cdot data version (TranscriptVersion.data['cdot']) or ClinGen date used when computing c_hgvs """
 
     gene_symbol = ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
     """ The GeneSymbol of the c.HGVS """
@@ -171,6 +177,7 @@ class ResolvedVariantInfo(TimeStampedModel):
             self.c_hgvs_converter_version = c_hgvs_resolution.c_hgvs_converter_version
             self.transcript_version = c_hgvs_resolution.transcript_version
             self.gene_symbol = c_hgvs_resolution.gene_symbol
+            self.c_hgvs_converter_data_version = c_hgvs_resolution.c_hgvs_converter_data_version
         except Exception as exception:
             self.error = str(exception)
             report_exc_info(extra_data={
@@ -187,23 +194,26 @@ class ResolvedVariantInfo(TimeStampedModel):
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
         hgvs_matcher = HGVSMatcher(genome_build=genome_build)
-        # hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
-        # version = hgvs_matcher.hgvs_converter.get_version()
 
-        hgvs_variant, used_converter_type, method = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
-        c_hgvs = hgvs_variant.format()
+        result = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
+        c_hgvs = result.hgvs_variant.format()
         c_hgvs_obj = CHGVS(c_hgvs)
 
         hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         version = hgvs_matcher.hgvs_converter.get_version()
+        transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
+        # Prefer data version from the transcript directly used; fall back to the c_hgvs_obj lookup
+        data_version = (result.converter_info.hgvs_converter_data_version
+                        or (transcript_version.data.get('cdot', '') if transcript_version else ''))
         c_hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
-                                                          used_converter_type=used_converter_type)
+                                                          used_converter_type=result.converter_info.used_converter_type)
         return CHGVSResolution(
                 c_hgvs=c_hgvs,
-                c_hgvs_compatible=hgvs_variant.format(use_compat=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
+                c_hgvs_compatible=result.hgvs_variant.format(use_delins_for_inv=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
                 c_hgvs_converter_version=c_hgvs_converter_version,
-                transcript_version=c_hgvs_obj.transcript_version_model(genome_build=genome_build),
-                gene_symbol=GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
+                c_hgvs_converter_data_version=data_version,
+                transcript_version=transcript_version,
+                gene_symbol=GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first(),
         )
 
     @staticmethod
@@ -400,6 +410,8 @@ class CalculatedVariantCoordinate:
     genome_build: GenomeBuild
     message: str
     hgvs_converter_version: Optional[HGVSConverterVersion]
+    hgvs_converter_data_version: str = ''
+    """ cdot data version or ClinGen date used during this resolution """
 
     @property
     def variant_coordinate_str(self) -> Optional[str]:
@@ -435,6 +447,9 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
     """ Tool used to resolve hgvs  """
+
+    hgvs_converter_data_version = TextField(blank=True, default='')
+    """ cdot data version (TranscriptVersion.data['cdot']) or ClinGen date used when resolving imported HGVS """
 
     imported_transcript = TextField(null=True, blank=True)
     """
@@ -739,28 +754,39 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @property
     def resolved_builds(self) -> list[ResolvedVariantInfo]:
-        return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related('genome_build'))
+        return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related(
+            'genome_build', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt'))
 
     def calculate_variant_coordinate(self) -> CalculatedVariantCoordinate:
         vc: Optional[VariantCoordinate] = None
-        genome_build: Optional[GenomeBuild] = None
-        hgvs_converter_version: Optional[HGVSConverterVersion] = None
-        try:
-            genome_build = self.imported_genome_build_patch_version.genome_build
-            use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
-            hgvs_matcher = HGVSMatcher(genome_build)
-            hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
-            version = hgvs_matcher.hgvs_converter.get_version()
+        message = None
+        genome_build = self.imported_genome_build_patch_version.genome_build
+        use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
+        hgvs_matcher = HGVSMatcher(genome_build)
+        hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
+        version = hgvs_matcher.hgvs_converter.get_version()
+        used_converter_type = hgvs_converter_type
+        data_version = ''
 
+        try:
             vc_extra = hgvs_matcher.get_variant_coordinate_and_details(use_hgvs)
-            message = f"HGVS matched by \"{vc_extra.method}\""
-            hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
-                                                              used_converter_type=vc_extra.used_converter_type)
+            message = f"HGVS matched by \"{vc_extra.converter_info.method}\""
+            used_converter_type = vc_extra.converter_info.used_converter_type
+            data_version = vc_extra.converter_info.hgvs_converter_data_version
             vc = vc_extra.variant_coordinate
         except Exception as ex:
             message = str(ex)
+
+        # Fallback: if we couldn't determine a data version (failed resolution, g.HGVS, LRG without local TV),
+        # use the most recently imported cdot version for this build
+        if not data_version:
+            data_version = hgvs_matcher.get_latest_cdot_data_version()
+
+        hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
+                                                          used_converter_type=used_converter_type)
         return CalculatedVariantCoordinate(variant_coordinate=vc, genome_build=genome_build,
-                                           message=message, hgvs_converter_version=hgvs_converter_version)
+                                           message=message, hgvs_converter_version=hgvs_converter_version,
+                                           hgvs_converter_data_version=data_version)
 
     def update_variant_coordinate(self):
         """ returns if a valid variant_coordinate could be derived """
@@ -771,6 +797,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         cvc = self.calculate_variant_coordinate()
         self.message = cvc.message
         self.hgvs_converter_version = cvc.hgvs_converter_version
+        self.hgvs_converter_data_version = cvc.hgvs_converter_data_version
         self.variant_coordinate = cvc.variant_coordinate_str
         if not cvc.is_valid:
             self.status = ImportedAlleleInfoStatus.FAILED
@@ -845,7 +872,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         if self.dirty_message != new_dirty_message:
             self.dirty_message = new_dirty_message
-            print(f"Found {new_dirty_message}")
+            logging.info("Found %s", new_dirty_message)
             self.save()
 
     def update_status(self):
@@ -904,6 +931,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.status = ImportedAlleleInfoStatus.PROCESSING
         self.matched_variant = None
         self.hgvs_converter_version = None
+        self.hgvs_converter_data_version = ''
         self.allele = None
         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
             self._update_variant(genome_build=genome_build, variant=None)
