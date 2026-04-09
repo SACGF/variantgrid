@@ -14,13 +14,9 @@ from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
-
-<<<<<<< HEAD
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket, TestingContextFull
 from django.db import models, transaction
-=======
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
->>>>>>> refs/heads/master
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved, ConditionReference
 from classification.models.overlaps_enums import ClassificationResultValue

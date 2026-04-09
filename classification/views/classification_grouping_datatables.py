@@ -339,7 +339,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CLINVAR_SCV, scv)
         return None
 
-	@staticmethod
+    @staticmethod
     def get_ontology_q(ontology_terms: str) -> Q | None:
         condition_filters = []
         for condition in ontology_terms.split(","):
@@ -350,7 +350,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             q = reduce(operator.or_, condition_filters)
         return q
 
-	@staticmethod
+    @staticmethod
     def condition_filter(text, must_exist: bool = False) -> Optional[Q]:
         try:
             term = OntologyTerm.get_or_stub(text)
@@ -514,4 +514,3 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 default_sort=SortOrder.DESC
             )
         ]
-

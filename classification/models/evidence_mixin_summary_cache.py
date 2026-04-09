@@ -1,10 +1,6 @@
 from dataclasses import dataclass
-from enum import StrEnum
 from functools import cached_property
 from typing import TypedDict, Optional, Self
-
-from django.db.models import TextChoices
-
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation, TestingContextBucket
 from library.utils import strip_json
@@ -100,7 +96,7 @@ class ClassificationSummaryCalculator:
         from classification.models import CuratedDate
         curated_date = CuratedDate(self.cm).relevant_date
 
-        pathology: ClassificationSummaryCacheDictPathogenicity = {
+        pathogenicity: ClassificationSummaryCacheDictPathogenicity = {
             "classification": self.classification_value,
             "sort": self.classification_sort,
             # "bucket": self.germline_bucket,
@@ -120,7 +116,7 @@ class ClassificationSummaryCalculator:
 
         full_json: ClassificationSummaryCacheDict = {
             "criteria_labels": self.criteria_labels,
-            "pathogenicity": {
+            "pathogenicity": pathogenicity,
             "allele_origin_bucket": self.allele_origin_bucket,
             "somatic": somatic,
             "date": date_json

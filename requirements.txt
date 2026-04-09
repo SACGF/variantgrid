@@ -489,3 +489,4 @@ zipp==3.23.0
     # via
     #   importlib-metadata
     #   martor
+dataclasses-json==0.6.7
