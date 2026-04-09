@@ -1,6 +1,8 @@
 {% load classification_tags %}
 {% load ui_utils %}
-{% labelled label="Allele" %}<a href="{{ allele.get_absolute_url }}">{{ allele }}</a>{% endlabelled %}
+<div class="mt-2">
+{% labelled label="Allele" %}<a class="hover-link" href="{{ allele.get_absolute_url }}">{{ allele }}</a>{% endlabelled %}
+</div>
 {% for summary in summaries %}
     <div class="card" style="margin:auto; max-width:800px; margin-top:20px; margin-bottom:20px">
         <div class="card-header">{{ summary.value_type_label }}</div>

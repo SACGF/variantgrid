@@ -9,72 +9,53 @@
 <div class="container">
     <script>
         function groupingFilter(data) {
-            data.lab_selection = {{ lab_picker_data.selection | jsonify }};
-            data.multi_context = $('#multi-context').is(":checked");
+            let selectedMode = $('[name=triage_status_filter]:checked').val();
+            console.log(selectedMode);
+            data.skew_status = selectedMode;
+            // data.lab_selection = {{ lab_picker_data.selection | jsonify }};
         }
         function filterGrid() {
             $('#overlaps-table').DataTable().ajax.reload();
         }
         $(document).ready(() => {
-            $('#multi-context').change(() => {
+            $('#triage_status_filter').change(() => {
                 filterGrid();
+                console.log("Filtering GRID!!");
             });
         });
     </script>
-    <style>
-        .thick-border > tbody > tr > td, .thick-border > tbody tr:first-of-type > th {
-            border-top: 3px solid #dee2e6 !important;
-            padding-bottom: 30px;
-        }
 
-        .users-contribution, .users-contribution span.no-value {
-            font-weight:bold;
-        }
-
-        .users-contribution a {
-            font-weight: normal;
-        }
-
-        .contribution-table .users-contribution td {
-            border-top-width:0;
-        }
-
-        .contribution-table + .contribution-table .users-contribution td {
-            border-top-width: 1px;
-        }
-
-        .contribution-table + .contribution-table {
-            margin-top: 50px;
-        }
-
-        .contribution-table:not(:last-of-type) tr:last-of-type td {
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        td.overlap-summary {
-            background-color: #f4f4f4;
-            border-top-left-radius: 8px;
-            border-bottom-left-radius: 8px;
-        }
-
-        .dt-overlaps {
-            width: 80%;
-        }
-
-        td.date-column {
-            width: 90px;
-        }
-    </style>
     {% lab_picker data=lab_picker_data %}
 
-    <label class="form-check-label checkbox-row py-2 ml-4">
-         <input type="checkbox" class="form-check-input" style="position:relative" id="multi-context" value="multi">
-        <span class="ml-1">Show cross context overlaps</span>
-    </label>
+{##}
+{#    <ul class="nav nav-tabs">#}
+{#      <li class="nav-item">#}
+{#        <a class="nav-link active" href="#">Active</a>#}
+{#      </li>#}
+{#      <li class="nav-item">#}
+{#        <a class="nav-link" href="#">Link</a>#}
+{#      </li>#}
+{#      <li class="nav-item">#}
+{#        <a class="nav-link" href="#">Link</a>#}
+{#      </li>#}
+{#      <li class="nav-item">#}
+{#        <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Disabled</a>#}
+{#      </li>#}
+{#    </ul>#}
+
+    <div id="triage_status_filter" class="my-4">
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+            <label class="btn btn-outline-danger"><input type="radio" name="triage_status_filter" id="triage_status_filter-t" value="T" checked="checked">Awaiting Triage</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-d" value="D">Ready to Discuss</label>
+            <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="A">Awaiting Amendment</label>
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="O">Waiting on Other Lab</label>
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="C">Complex</label>
+        </div>
+    </div>
 
     <table
            data-datatable-data='groupingFilter'
-           data-datatable-url="{% url 'overlaps2_datatables' %}"
+           data-datatable-url="{% url 'overlaps2_datatables' lab_picker_data.selection %}"
            class="sticky-header thick-border"
            id="overlaps-table"
            data-adjust-columns="false">

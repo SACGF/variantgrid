@@ -2,14 +2,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
 
-from django.db.models import QuerySet, Subquery, OuterRef, IntegerField
+from django.db.models import QuerySet, Subquery, OuterRef, IntegerField, TextField, Q
 from django.db.models.aggregates import Max
 from django.db.models.functions import Greatest
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 from classification.enums import OverlapStatus, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, Overlap, \
-    ClassificationResultValue, OverlapContribution, EvidenceKeyMap, EvidenceKey, OverlapContributionSkew
+    ClassificationResultValue, OverlapContribution, EvidenceKeyMap, EvidenceKey, OverlapContributionSkew, TriageNextStep
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus
 from classification.services.overlaps_services import OverlapGrouping
 from genes.hgvs import CHGVS
@@ -24,6 +24,10 @@ class ContributionValueSource:
     your_context: bool = False
     pretty_value: str = ""
 
+    @property
+    def short_value(self):
+        return self.value.replace("_", "-")
+
 
 class ContributionValues:
 
@@ -31,6 +35,12 @@ class ContributionValues:
         self.e_key = e_key
         self.skew: Optional[OverlapContributionSkew] = None
         self._values: dict[str, ContributionValueSource] = defaultdict(lambda: ContributionValueSource())
+
+    @property
+    def overlap_status(self) -> OverlapContributionStatus:
+        if skew := self.skew:
+            return skew.overlap.overlap_status_obj
+        return OverlapStatus.NO_CONTRIBUTIONS
 
     def cont_value_for(self, item):
         result = self._values[item]
@@ -91,15 +101,14 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             output_field=IntegerField()
         ))
 
-        if self.is_single_context_only:
-            qs = qs.annotate(
-                max_status=Greatest('onc_path_discordance_single_status', 'clin_sig_discordance_single_status',
-                                    'onc_path_discordance_multi_status'))
-        else:
-            qs = qs.annotate(
-                max_status=Greatest('onc_path_discordance_single_status', 'clin_sig_discordance_single_status'))
-
-        qs = qs.filter(max_status__gt=OverlapStatus.SINGLE_SUBMITTER)
+        # if self.is_single_context_only:
+        #     qs = qs.annotate(
+        #         max_status=Greatest('onc_path_discordance_single_status', 'clin_sig_discordance_single_status',
+        #                             'onc_path_discordance_multi_status'))
+        # else:
+        qs = qs.annotate(max_status=Greatest('onc_path_discordance_single_status', 'clin_sig_discordance_single_status'))
+        # TODO determine this value if on overlaps or discordances
+        qs = qs.filter(max_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
 
         if lab_selection_str := self.get_query_param("lab_selection"):
             lab_picker = LabPickerData.from_request(self.request, lab_selection_str)
@@ -108,6 +117,37 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
 
         qs = qs.prefetch_related("overlapcontribution_set")
         return qs
+
+    @property
+    def triage_next_step_filter(self) -> Optional[TriageNextStep]:
+        if triage_status_str := self.get_query_param("skew_status"):
+            return TriageNextStep(triage_status_str)
+        return None
+
+    def filter_queryset(self, qs: QuerySet[DC]) -> QuerySet[DC]:
+        if triage_status := self.triage_next_step_filter:
+
+            qs = qs.annotate(onc_path_triage_status=Subquery(
+                OverlapContributionSkew.objects.filter(
+                    contribution__classification_grouping=OuterRef('pk'),
+                    contribution__value_type=ClassificationResultValue.ONC_PATH,
+                    overlap__overlap_type=OverlapType.SINGLE_CONTEXT
+                ).annotate(max_status=Max('skew_perspective')).values_list('skew_perspective'),
+                output_field=TextField()
+            ))
+
+            qs = qs.annotate(clin_sig_triage_status=Subquery(
+                OverlapContributionSkew.objects.filter(
+                    contribution__classification_grouping=OuterRef('pk'),
+                    contribution__value_type=ClassificationResultValue.CLINICAL_SIGNIFICANCE,
+                    overlap__overlap_type=OverlapType.SINGLE_CONTEXT
+                ).annotate(max_status=Max('skew_perspective')).values_list('skew_perspective'),
+                output_field=TextField()
+            ))
+
+            qs = qs.filter(Q(onc_path_triage_status=triage_status) | Q(clin_sig_triage_status=triage_status))
+        return qs
+
 
     def apply_extra_data(self, cell: CellData[ClassificationGrouping]):
         if cell.transient.get("onc_path"):
@@ -150,7 +190,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
     def render_onc_path(self, cell: CellData):
         self.apply_extra_data(cell)
         onc_path_values: ContributionValues = cell.transient["onc_path"]
-        context = {"values": onc_path_values}
+        context = {"values": onc_path_values, "triage_filter": self.triage_next_step_filter}
         return render_to_string('classification/snippets/overlaps_value_cell.html',
                          context,
                          request=self.request,
@@ -159,7 +199,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
     def render_clin_sig(self, cell: CellData):
         self.apply_extra_data(cell)
         clin_sig_values: ContributionValues = cell.transient["clin_sig"]
-        context = {"values": clin_sig_values, "pretty_value": True}
+        context = {"values": clin_sig_values, "pretty_value": True, "triage_filter": self.triage_next_step_filter}
         return render_to_string('classification/snippets/overlaps_value_cell.html',
                          context=context,
                          request=self.request,

@@ -3243,6 +3243,14 @@ a .c-hgvs-body {
 	opacity: 0.5;
 }
 
+.cs-dot {
+	min-width: 16px;
+	border-radius: 6px;
+	padding: 6px;
+	text-align: center;
+	display: inline-block;
+}
+
 .cs-card {
 	text-align: center;
 	padding: 0 10px 16px 10px;
