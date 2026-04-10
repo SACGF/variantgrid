@@ -12,6 +12,7 @@ from requests import Response
 from classification.enums import OverlapStatus, TestingContextBucket
 from classification.models import ClassificationGrouping, Overlap, ClassificationResultValue, OverlapContributionStatus, \
     OverlapType, OverlapContribution, OverlapContributionSkew
+from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapEntryCompare, OverlapGrouping
 
 
@@ -65,6 +66,9 @@ class OverlapSummary:
     def overlap_summaries_for(cg: ClassificationGrouping) -> list[Self]:
         overlap_contributions = OverlapContribution.objects.filter(classification_grouping=cg,
                                                                    contribution_status=OverlapContributionStatus.CONTRIBUTING)
+        if not OVERLAP_CLIN_SIG_ENABLED:
+            overlap_contributions = overlap_contributions.filter(value_type=ClassificationResultValue.ONC_PATH)
+
         skews = OverlapContributionSkew.objects.filter(contribution__in=overlap_contributions)
         skew_by_value_type = defaultdict(list)
         overlap_summary_builders: dict[ClassificationResultValue, list] = defaultdict(list)

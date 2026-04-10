@@ -11,6 +11,11 @@ from library.utils import first
 from snpdb.models import Allele
 
 
+OVERLAP_CLIN_SIG_ENABLED = False  # ensure reference this whenever doing some functionality when ClinSign should be supported
+# So it's easy to work out where to write functionality when we start supporting it
+# The idea is NOT to have some environments support it and some not
+
+
 class OverlapCalculatorBase(ABC):
 
     @classmethod

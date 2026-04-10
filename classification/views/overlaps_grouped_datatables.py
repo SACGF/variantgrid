@@ -11,6 +11,7 @@ from classification.enums import OverlapStatus, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, Overlap, \
     ClassificationResultValue, OverlapContribution, EvidenceKeyMap, EvidenceKey, OverlapContributionSkew, TriageNextStep
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus
+from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapGrouping
 from genes.hgvs import CHGVS
 from snpdb.lab_picker import LabPickerData
@@ -106,7 +107,10 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
         #         max_status=Greatest('onc_path_discordance_single_status', 'clin_sig_discordance_single_status',
         #                             'onc_path_discordance_multi_status'))
         # else:
-        qs = qs.annotate(max_status=Greatest('onc_path_discordance_single_status', 'clin_sig_discordance_single_status'))
+        if not OVERLAP_CLIN_SIG_ENABLED:
+            qs = qs.annotate(max_status=Greatest('onc_path_discordance_single_status', 'onc_path_discordance_single_status'))
+        else:
+            qs = qs.annotate(max_status=Greatest('onc_path_discordance_single_status', 'clin_sig_discordance_single_status'))
         # TODO determine this value if on overlaps or discordances
         qs = qs.filter(max_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
 
@@ -145,7 +149,10 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                 output_field=TextField()
             ))
 
-            qs = qs.filter(Q(onc_path_triage_status=triage_status) | Q(clin_sig_triage_status=triage_status))
+            if not OVERLAP_CLIN_SIG_ENABLED:
+                qs = qs.filter(Q(onc_path_triage_status=triage_status))
+            else:
+                qs = qs.filter(Q(onc_path_triage_status=triage_status) | Q(clin_sig_triage_status=triage_status))
         return qs
 
 
@@ -185,7 +192,8 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                     contribution_value.your_contribution |= your_contribution
 
         cell.transient["onc_path"] = onc_path_values
-        cell.transient["clin_sig"] = clin_sig_values
+        if OVERLAP_CLIN_SIG_ENABLED:
+            cell.transient["clin_sig"] = clin_sig_values
 
     def render_onc_path(self, cell: CellData):
         self.apply_extra_data(cell)
@@ -243,12 +251,14 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                 label="Onc/Path",
                 renderer=self.render_onc_path
             ),
+        ]
 
-            RichColumn(
+        if OVERLAP_CLIN_SIG_ENABLED:
+            self.rich_columns += [RichColumn(
                 name="clin_sig",
                 label="Somatic Clin Sig",
                 renderer=self.render_clin_sig
-            )
+            )]
 
             #
             # RichColumn(
@@ -258,4 +268,3 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             #     sort_keys=["max_status"],
             #     default_sort=SortOrder.DESC
             # )
-        ]

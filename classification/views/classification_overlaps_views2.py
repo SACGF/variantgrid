@@ -13,6 +13,7 @@ from classification.enums import SpecialEKeys
 from classification.models import ClassificationResultValue, \
     EvidenceKey, EvidenceKeyMap, TriageStatus, OverlapContribution, OverlapContributionLog, \
     OverlapContributionChangeSource
+from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapGrouping, OverlapServices
 from snpdb.lab_picker import LabPickerData
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
@@ -130,6 +131,9 @@ class TriageView(AjaxFormView[OverlapContribution]):
 
         if request.GET.get("edit") == "true":
             if value_type == ClassificationResultValue.ONC_PATH:
+                if not OVERLAP_CLIN_SIG_ENABLED:
+                    raise NotImplementedError("Overlap Clinical Sig not yet supported")
+
                 form = ClassificationGroupingValueTriageOncPathForm(
                     # data=request.POST or None,
                     data=request.POST if request.method == "POST" else None,
