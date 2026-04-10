@@ -1,10 +1,10 @@
 import logging
 from collections import defaultdict
 
-import numpy as np
-import pandas as pd
 from matplotlib.patches import Rectangle
 
+from genes.models import GeneList
+from library.graphs.chromosomes_graph import read_cytoband, centromere_mid
 from library.utils import sha256sum_str
 from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models.models_genome import GenomeBuild
@@ -72,7 +72,7 @@ class GeneListChromosomeGraph(CacheableGraph):
 
     def plot_figure(self, figure):
         genome_build = GenomeBuild.grch38()
-        cytoband_data = self._read_cytoband(genome_build.settings["cytoband"])
+        cytoband_data = read_cytoband(genome_build.settings["cytoband"])
         gene_data = self._collect_gene_data(genome_build)
 
         # Work out proportional row heights (based on tallest chromosome in row)
@@ -97,28 +97,8 @@ class GeneListChromosomeGraph(CacheableGraph):
     # Data loading                                                         #
     # ------------------------------------------------------------------ #
 
-    @staticmethod
-    def _read_cytoband(path):
-        """Return dict: 'chrN' → sorted list of (start, end, name, stain)."""
-        df = pd.read_csv(path, sep='\t')
-        result = defaultdict(list)
-        for _, row in df.iterrows():
-            result[row['chr']].append((row['start'], row['end'], row['band'], row['stain']))
-        # Sort by start (usually already sorted, but be safe)
-        return {ch: sorted(bands, key=lambda b: b[0]) for ch, bands in result.items()}
-
-    @staticmethod
-    def _centromere_mid(bands):
-        acen = [(s, e) for s, e, _, stain in bands if stain == 'acen']
-        if acen:
-            return (min(s for s, _ in acen) + max(e for _, e in acen)) / 2
-        # Fallback: midpoint of chromosome
-        return bands[-1][1] / 2
-
     def _collect_gene_data(self, genome_build):
         """Return dict: bare_chrom ('1','X'…) → list of (pos_bp, name, strand)."""
-        from genes.models import GeneList
-
         gene_list = GeneList.objects.get(pk=self.gene_list_id)
         chrom_genes = defaultdict(list)
 
@@ -153,7 +133,7 @@ class GeneListChromosomeGraph(CacheableGraph):
             bands = cytoband_data.get(f"chr{chrom_num}", [])
             if not bands:
                 continue
-            cen_mid = self._centromere_mid(bands)
+            cen_mid = centromere_mid(bands)
             p_mb = cen_mid / SCALE
             q_mb = (bands[-1][1] - cen_mid) / SCALE
             max_p_mb = max(max_p_mb, p_mb)
