@@ -29,6 +29,7 @@ from classification.views.exports.classification_export_formatter_csv import For
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
+from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
@@ -38,10 +39,11 @@ from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import WEEK_SECS
 from library.django_utils import get_field_counts, add_save_message
-from library.utils import defaultdict_to_dict, LazyAttribute
+from library.utils import defaultdict_to_dict, LazyAttribute, full_class_name
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
 from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.graphs import graphcache
 from snpdb.models import VariantZygosityCountCollection, Sample, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -819,10 +821,6 @@ def gene_list_graphs_tab(request, gene_list_id):
 
 
 def gene_list_chromosome_graph(request, gene_list_id):
-    from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
-    from library.utils import full_class_name
-    from snpdb.graphs import graphcache
-
     GeneList.get_for_user(request.user, gene_list_id)  # permission check
     graph_class_name = full_class_name(GeneListChromosomeGraph)
     cached_graph = graphcache.async_graph(graph_class_name, gene_list_id)
