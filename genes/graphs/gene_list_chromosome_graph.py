@@ -25,6 +25,9 @@ _FIG_USABLE_FRAC = 0.98     # left=0.01, right=0.99
 _CHAR_WIDTH_FACTOR = 0.55   # character width as fraction of font size (in points)
 _MIN_INTER_LABEL_GAP_IN = 0.10  # minimum gap between adjacent gene labels (inches)
 _MIN_CHROM_SPACING = 0.18   # ~39% fill ratio (CW/spacing); formula expands for long names
+_LABEL_MIN_SEP_PTS = GENE_LABEL_FONT_SIZE * 1.15  # min vertical separation ≈ 1 line height (pts)
+CONNECTOR_LINE_WIDTH = 0.4
+CONNECTOR_ALPHA = 0.5
 
 # Simplified banding colours
 BAND_COLORS = {
@@ -40,6 +43,34 @@ BAND_COLORS = {
 
 MINUS_COLOR = 'blue'   # '-' strand → left
 PLUS_COLOR  = 'red'    # '+' strand → right
+
+
+def _spread_labels(labels, min_sep):
+    """
+    Spread label y-positions so no two adjacent labels are closer than min_sep.
+
+    labels  — sorted list of (orig_y, gene_name) by orig_y ascending.
+    min_sep — minimum gap between adjacent labels in data units (Mb).
+
+    Returns list of (orig_y, adj_y, gene_name).  The centroid of each
+    overlapping cluster is preserved (pairs are pushed symmetrically apart).
+    """
+    if not labels:
+        return []
+    n = len(labels)
+    adj = [l[0] for l in labels]
+    for _ in range(300):
+        moved = False
+        for i in range(1, n):
+            gap = adj[i] - adj[i - 1]
+            if gap < min_sep:
+                push = (min_sep - gap) / 2
+                adj[i - 1] -= push
+                adj[i] += push
+                moved = True
+        if not moved:
+            break
+    return [(labels[i][0], adj[i], labels[i][1]) for i in range(n)]
 
 
 class GeneListChromosomeGraph(CacheableGraph):
@@ -175,9 +206,14 @@ class GeneListChromosomeGraph(CacheableGraph):
                                   height_ratios=row_heights,
                                   hspace=0.15)
 
+        total_row_h = sum(row_heights)
+        fig_h_in = self.figsize[1]
         for row_idx, row_chroms in enumerate(rows):
             ax = figure.add_subplot(gs[row_idx])
-            self._draw_row(ax, row_chroms, cytoband_data, gene_data, spacing, xlim)
+            # Approximate this row's usable height in inches (0.82 accounts for
+            # hspace gaps and top/bottom margins in the gridspec layout).
+            row_h_in = max(0.5, fig_h_in * 0.82 * row_heights[row_idx] / total_row_h)
+            self._draw_row(ax, row_chroms, cytoband_data, gene_data, spacing, xlim, row_h_in)
 
     # ------------------------------------------------------------------ #
     # Data loading                                                         #
@@ -209,7 +245,7 @@ class GeneListChromosomeGraph(CacheableGraph):
     # Drawing                                                              #
     # ------------------------------------------------------------------ #
 
-    def _draw_row(self, ax, row_chroms, cytoband_data, gene_data, spacing, xlim):
+    def _draw_row(self, ax, row_chroms, cytoband_data, gene_data, spacing, xlim, row_h_in):
         max_p_mb = 0   # max p-arm length across this row
         max_q_mb = 0   # max q-arm length across this row
 
@@ -228,6 +264,11 @@ class GeneListChromosomeGraph(CacheableGraph):
 
         # All chromosome labels share the same y: bottom of longest q-arm + padding
         row_label_y = -(max_q_mb + CHROM_LABEL_PADDING)
+
+        # Minimum label separation in data units (Mb) for this row.
+        data_range_mb = max(max_p_mb + max_q_mb + CHROM_LABEL_PADDING + 3, 1)
+        pts_per_mb = row_h_in * 72 / data_range_mb
+        min_label_sep = _LABEL_MIN_SEP_PTS / pts_per_mb
 
         # Second pass: draw
         for x_idx, chrom_num in enumerate(row_chroms):
@@ -264,22 +305,46 @@ class GeneListChromosomeGraph(CacheableGraph):
                     ha='center', va='top',
                     fontsize=CHROM_LABEL_FONT_SIZE, color='black')
 
-            # --- Gene labels (no tick line, placed directly beside chromosome) ---
-            for pos_bp, gene_name, strand in gene_data.get(chrom_num, []):
-                gene_y = -(pos_bp - cen_mid) / SCALE   # same inversion
+            # --- Gene labels (spread to avoid overlap; connector when moved) ---
+            genes_on_chrom = gene_data.get(chrom_num, [])
+            left_labels = sorted(
+                [(-(pos_bp - cen_mid) / SCALE, name)
+                 for pos_bp, name, strand in genes_on_chrom if strand == '-'],
+                key=lambda l: l[0],
+            )
+            right_labels = sorted(
+                [(-(pos_bp - cen_mid) / SCALE, name)
+                 for pos_bp, name, strand in genes_on_chrom if strand != '-'],
+                key=lambda l: l[0],
+            )
 
-                if strand == '-':
-                    ax.text(x - CHROMOSOME_WIDTH / 2 - GENE_LABEL_GAP, gene_y,
-                            gene_name, ha='right', va='center',
-                            fontsize=GENE_LABEL_FONT_SIZE,
-                            fontweight=GENE_LABEL_FONT_WEIGHT,
-                            color=MINUS_COLOR, clip_on=False)
-                else:
-                    ax.text(x + CHROMOSOME_WIDTH / 2 + GENE_LABEL_GAP, gene_y,
-                            gene_name, ha='left', va='center',
-                            fontsize=GENE_LABEL_FONT_SIZE,
-                            fontweight=GENE_LABEL_FONT_WEIGHT,
-                            color=PLUS_COLOR, clip_on=False)
+            for orig_y, adj_y, gene_name in _spread_labels(left_labels, min_label_sep):
+                if abs(adj_y - orig_y) > min_label_sep * 0.1:
+                    ax.plot(
+                        [x - CHROMOSOME_WIDTH / 2, x - CHROMOSOME_WIDTH / 2 - GENE_LABEL_GAP],
+                        [orig_y, adj_y],
+                        color=MINUS_COLOR, linewidth=CONNECTOR_LINE_WIDTH,
+                        alpha=CONNECTOR_ALPHA, solid_capstyle='round', clip_on=False,
+                    )
+                ax.text(x - CHROMOSOME_WIDTH / 2 - GENE_LABEL_GAP, adj_y,
+                        gene_name, ha='right', va='center',
+                        fontsize=GENE_LABEL_FONT_SIZE,
+                        fontweight=GENE_LABEL_FONT_WEIGHT,
+                        color=MINUS_COLOR, clip_on=False)
+
+            for orig_y, adj_y, gene_name in _spread_labels(right_labels, min_label_sep):
+                if abs(adj_y - orig_y) > min_label_sep * 0.1:
+                    ax.plot(
+                        [x + CHROMOSOME_WIDTH / 2, x + CHROMOSOME_WIDTH / 2 + GENE_LABEL_GAP],
+                        [orig_y, adj_y],
+                        color=PLUS_COLOR, linewidth=CONNECTOR_LINE_WIDTH,
+                        alpha=CONNECTOR_ALPHA, solid_capstyle='round', clip_on=False,
+                    )
+                ax.text(x + CHROMOSOME_WIDTH / 2 + GENE_LABEL_GAP, adj_y,
+                        gene_name, ha='left', va='center',
+                        fontsize=GENE_LABEL_FONT_SIZE,
+                        fontweight=GENE_LABEL_FONT_WEIGHT,
+                        color=PLUS_COLOR, clip_on=False)
 
         # --- Centromere dashed baseline ---
         ax.axhline(0, color='#888888', linestyle='--', linewidth=0.7, alpha=0.8)
