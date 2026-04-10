@@ -550,6 +550,14 @@ def view_genomic_intervals(request, genomic_intervals_collection_id):
     return render(request, 'snpdb/data/view_genomic_intervals.html', context)
 
 
+def genomic_intervals_graphs_tab(request, genomic_intervals_collection_id):
+    gic = get_object_or_404(GenomicIntervalsCollection, pk=genomic_intervals_collection_id)
+    if not request.user.has_perm('view_genomicintervalscollection', gic):
+        raise PermissionDenied()
+    context = {'gic': gic}
+    return render(request, 'snpdb/data/genomic_intervals_graphs_tab.html', context)
+
+
 @require_POST
 def cached_generated_file_delete(request):
     cgf_id = request.POST["cgf_id"]

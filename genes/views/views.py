@@ -12,7 +12,7 @@ from django.db.models import QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.http.response import JsonResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.datastructures import OrderedSet
 from django.views.decorators.cache import cache_page
@@ -810,3 +810,20 @@ def sample_gene_lists_tab(request, sample_id):
 
 def gene_wiki(request):
     return render(request, "genes/gene_wiki.html")
+
+
+def gene_list_graphs_tab(request, gene_list_id):
+    gene_list = GeneList.get_for_user(request.user, gene_list_id, success_only=False)
+    context = {'gene_list': gene_list}
+    return render(request, 'genes/gene_list_graphs_tab.html', context)
+
+
+def gene_list_chromosome_graph(request, gene_list_id):
+    from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
+    from library.utils import full_class_name
+    from snpdb.graphs import graphcache
+
+    GeneList.get_for_user(request.user, gene_list_id)  # permission check
+    graph_class_name = full_class_name(GeneListChromosomeGraph)
+    cached_graph = graphcache.async_graph(graph_class_name, gene_list_id)
+    return redirect(cached_graph)
