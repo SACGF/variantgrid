@@ -9,13 +9,21 @@ from library.utils import sha256sum_str
 from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models.models_genome import GenomeBuild
 
-CHROMOSOME_WIDTH = 0.35      # data units (x axis)
-CHROM_SPACING = 1.0          # distance between chromosome centres (x axis)
+CHROMOSOME_WIDTH = 0.14      # data units – ~20% of MIN_CHROM_SPACING so bars look thin
 SCALE = 1e6                  # 1 data unit = 1 Mb (y axis)
-GENE_LABEL_FONT_SIZE = 6
-GENE_LABEL_GAP = 0.05        # gap between chromosome edge and gene label text
+GENE_LABEL_FONT_SIZE = 7
+GENE_LABEL_FONT_WEIGHT = 'bold'
+GENE_LABEL_GAP = 0.03        # gap between chromosome edge and gene label text (data units)
 CHROM_LABEL_FONT_SIZE = 9
 CHROM_LABEL_PADDING = 3.0   # Mb below the lowest chromosome bottom in each row
+
+# Spacing calculation constants
+_FIG_WIDTH_IN = 14.0
+_FIG_USABLE_FRAC = 0.98     # left=0.01, right=0.99
+_CHAR_WIDTH_FACTOR = 0.55   # character width as fraction of font size (in points)
+_MIN_INTER_LABEL_GAP_IN = 0.10  # minimum gap between adjacent gene labels (inches)
+_MIN_CHROM_SPACING = 0.70   # baseline spacing; formula only expands beyond this for
+                             # very long gene names
 
 ROWS = [
     ['1', '2', '3', '4', '5', '6', '7', '8'],
@@ -70,6 +78,40 @@ class GeneListChromosomeGraph(CacheableGraph):
     def plot(self, ax):
         """Not used – plot_figure() drives everything."""
 
+    @staticmethod
+    def _compute_spacing(row_chroms, gene_data):
+        """
+        Compute minimum uniform inter-chromosome spacing so that adjacent gene
+        labels just don't touch, solved analytically from figure geometry.
+        """
+        n = len(row_chroms)
+        W = _FIG_WIDTH_IN * _FIG_USABLE_FRAC
+        char_w_in = GENE_LABEL_FONT_SIZE * _CHAR_WIDTH_FACTOR / 72
+
+        # Worst-case adjacent pair: right label of chrom[i] + left label of chrom[i+1]
+        max_pair_chars = 0
+        for i in range(n - 1):
+            right_max = max(
+                (len(nm) for _, nm, s in gene_data.get(row_chroms[i], []) if s != '-'),
+                default=0,
+            )
+            left_max = max(
+                (len(nm) for _, nm, s in gene_data.get(row_chroms[i + 1], []) if s == '-'),
+                default=0,
+            )
+            max_pair_chars = max(max_pair_chars, right_max + left_max)
+
+        # label gap in inches for the worst adjacent pair
+        label_gap_in = max_pair_chars * char_w_in + _MIN_INTER_LABEL_GAP_IN
+
+        # Solve: S = CHROMOSOME_WIDTH + S·n·label_gap_in/W
+        # → S = CHROMOSOME_WIDTH / (1 - n·label_gap_in/W)
+        factor = n * label_gap_in / W
+        if factor >= 0.95:
+            return CHROMOSOME_WIDTH + label_gap_in  # degenerate fallback
+        spacing = CHROMOSOME_WIDTH / (1 - factor)
+        return max(spacing, _MIN_CHROM_SPACING)
+
     def plot_figure(self, figure):
         genome_build = GenomeBuild.grch38()
         cytoband_data = read_cytoband(genome_build.settings["cytoband"])
@@ -91,7 +133,8 @@ class GeneListChromosomeGraph(CacheableGraph):
 
         for row_idx, row_chroms in enumerate(ROWS):
             ax = figure.add_subplot(gs[row_idx])
-            self._draw_row(ax, row_chroms, cytoband_data, gene_data)
+            spacing = self._compute_spacing(row_chroms, gene_data)
+            self._draw_row(ax, row_chroms, cytoband_data, gene_data, spacing)
 
     # ------------------------------------------------------------------ #
     # Data loading                                                         #
@@ -123,7 +166,7 @@ class GeneListChromosomeGraph(CacheableGraph):
     # Drawing                                                              #
     # ------------------------------------------------------------------ #
 
-    def _draw_row(self, ax, row_chroms, cytoband_data, gene_data):
+    def _draw_row(self, ax, row_chroms, cytoband_data, gene_data, spacing):
         max_p_mb = 0   # max p-arm length across this row
         max_q_mb = 0   # max q-arm length across this row
 
@@ -148,7 +191,7 @@ class GeneListChromosomeGraph(CacheableGraph):
             if chrom_num not in row_info:
                 continue
             cen_mid, bands = row_info[chrom_num]
-            x = x_idx * CHROM_SPACING
+            x = x_idx * spacing
 
             # --- Bands ---
             for b_start, b_end, _name, stain in bands:
@@ -185,20 +228,35 @@ class GeneListChromosomeGraph(CacheableGraph):
                 if strand == '-':
                     ax.text(x - CHROMOSOME_WIDTH / 2 - GENE_LABEL_GAP, gene_y,
                             gene_name, ha='right', va='center',
-                            fontsize=GENE_LABEL_FONT_SIZE, color=MINUS_COLOR,
-                            clip_on=False)
+                            fontsize=GENE_LABEL_FONT_SIZE,
+                            fontweight=GENE_LABEL_FONT_WEIGHT,
+                            color=MINUS_COLOR, clip_on=False)
                 else:
                     ax.text(x + CHROMOSOME_WIDTH / 2 + GENE_LABEL_GAP, gene_y,
                             gene_name, ha='left', va='center',
-                            fontsize=GENE_LABEL_FONT_SIZE, color=PLUS_COLOR,
-                            clip_on=False)
+                            fontsize=GENE_LABEL_FONT_SIZE,
+                            fontweight=GENE_LABEL_FONT_WEIGHT,
+                            color=PLUS_COLOR, clip_on=False)
 
         # --- Centromere dashed baseline ---
         ax.axhline(0, color='#888888', linestyle='--', linewidth=0.7, alpha=0.8)
 
         # --- Axis limits and styling ---
+        # Give extra room for labels on the outer chromosomes so they aren't
+        # clipped against the figure margin.
         n = len(row_chroms)
-        ax.set_xlim(-CHROM_SPACING * 0.5, (n - 1) * CHROM_SPACING + CHROM_SPACING * 0.5)
+        char_w_data = (GENE_LABEL_FONT_SIZE * _CHAR_WIDTH_FACTOR / 72) * (n * spacing) / (_FIG_WIDTH_IN * _FIG_USABLE_FRAC)
+        left_outer = max(
+            (len(nm) * char_w_data + CHROMOSOME_WIDTH / 2 + GENE_LABEL_GAP
+             for _, nm, s in gene_data.get(row_chroms[0], []) if s == '-'),
+            default=spacing * 0.5,
+        )
+        right_outer = max(
+            (len(nm) * char_w_data + CHROMOSOME_WIDTH / 2 + GENE_LABEL_GAP
+             for _, nm, s in gene_data.get(row_chroms[-1], []) if s != '-'),
+            default=spacing * 0.5,
+        )
+        ax.set_xlim(-left_outer, (n - 1) * spacing + right_outer)
         ax.set_ylim(row_label_y - 2, max_p_mb + 1)
         ax.axis('off')
 
