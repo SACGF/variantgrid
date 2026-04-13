@@ -316,8 +316,10 @@ class OverlapGrouping:
                     old_triage_status = TriageStatus.REVIEWED_WILL_FIX
                     new_triage_status = TriageStatus.REVIEWED_WILL_FIX
                     if triage_status_change:
-                        old_triage_status = TriageStatus(triage_status_change[0])
-                        new_triage_status = TriageStatus(triage_status_change[1])
+                        if old_triage_str := triage_status_change[0]:
+                            old_triage_status = TriageStatus(old_triage_str)
+                        if new_triage_str := triage_status_change[1]:
+                            new_triage_status = TriageStatus(new_triage_str)
 
                     old_new_value = new_value_change[0] if new_value_change else None
                     new_new_value = new_value_change[1] if new_value_change else None
