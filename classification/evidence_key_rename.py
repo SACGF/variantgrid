@@ -4,6 +4,8 @@ import logging
 from collections import defaultdict
 from typing import Optional
 
+from django.db.models import Q
+
 
 class OptionUpdator:
 
@@ -222,11 +224,13 @@ class EvidenceSelectKeyRenamer:
         ClassificationModification = self.apps.get_model("classification", "ClassificationModification")
 
         kwargs = {f"evidence__{self.key}__isnull": False}
-        for vc in Classification.objects.filter(**kwargs):
+        for vc in Classification.objects.filter(**kwargs).iterator():
             self._update_in_dict(vc.evidence)
             vc.save(update_fields=["evidence"])
 
-        for vcm in ClassificationModification.objects.filter():
+        delta_kwargs = {f"delta__{self.key}__isnull": False}
+        published_kwargs = {f"published_evidence__{self.key}__isnull": False}
+        for vcm in ClassificationModification.objects.filter(Q(**delta_kwargs) | Q(**published_kwargs)).iterator():
             self._update_in_dict(vcm.published_evidence)
             self._update_in_dict(vcm.delta)
 
