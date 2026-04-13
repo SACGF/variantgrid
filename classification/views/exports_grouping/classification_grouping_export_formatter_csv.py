@@ -31,7 +31,7 @@ class CSVNonEvidence(ExportRow):
     def url(self):
         base_link = get_url_from_view_path(self.classification_grouping.get_absolute_url())
         if self.formatter.html_links:
-            return f"<a href=\"{base_link}\?refer=csv&seen={self.date_str}\">{base_link}</a>"
+            return f"<a href=\"{base_link}\"?refer=csv&seen={self.date_str}\">{base_link}</a>"
         else:
             return f"{base_link}?refer=csv&seen={self.date_str}"
 
