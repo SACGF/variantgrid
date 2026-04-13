@@ -132,16 +132,16 @@ class TriageView(AjaxFormView[OverlapContribution]):
         if request.GET.get("edit") == "true":
             if value_type == ClassificationResultValue.ONC_PATH:
                 if not OVERLAP_CLIN_SIG_ENABLED:
-                    raise NotImplementedError("Overlap Clinical Sig not yet supported")
-
-                form = ClassificationGroupingValueTriageOncPathForm(
-                    # data=request.POST or None,
-                    data=request.POST if request.method == "POST" else None,
-                    initial={
-                        "triage_status": triage.triage_status,
-                        "new_value": triage.new_value
-                    }
-                )
+                    form = None
+                else:
+                    form = ClassificationGroupingValueTriageOncPathForm(
+                        # data=request.POST or None,
+                        data=request.POST if request.method == "POST" else None,
+                        initial={
+                            "triage_status": triage.triage_status,
+                            "new_value": triage.new_value
+                        }
+                    )
             else:
                 form = ClassificationGroupingValueTriageClinSigForm(
                     # data=request.POST or None,
