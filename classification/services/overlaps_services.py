@@ -45,8 +45,9 @@ class OverlapServices:
             else:
                 contribution = OverlapContributionStatus.CONTRIBUTING
 
-            # FIXME
-            effective_date = classification_grouping.latest_classification_modification.curated_date
+            effective_date = None
+            if lastest_modification := classification_grouping.latest_classification_modification:
+                effective_date = lastest_modification.curated_date
 
             overlap_contribution, created = OverlapContribution.objects.update_or_create(
                 source=OverlapEntrySourceTextChoices.CLASSIFICATION,
