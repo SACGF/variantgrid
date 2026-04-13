@@ -145,7 +145,6 @@ class OverlapServices:
             if skew.contribution.triage_status_obj != TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
                 all_interactive_skews.append(skew)
 
-        print(status_buckets)
         pending = status_buckets[TriageStatus.PENDING]
         reviewed_will_change = status_buckets[TriageStatus.REVIEWED_WILL_FIX]
         reviewed_will_discuss = status_buckets[TriageStatus.REVIEWED_WILL_DISCUSS]
