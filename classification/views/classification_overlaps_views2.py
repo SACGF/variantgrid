@@ -153,7 +153,7 @@ class TriageView(AjaxFormView[OverlapContribution]):
                 )
             context["form"] = form
 
-            if form.is_valid() and request.method == "POST":
+            if form and form.is_valid() and request.method == "POST":
                 # triage.user = request.user
                 triage.triage_status = form.cleaned_data["triage_status"]
                 if triage.triage_status == TriageStatus.REVIEWED_WILL_FIX:
