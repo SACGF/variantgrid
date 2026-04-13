@@ -104,7 +104,7 @@ class OverlapServices:
             overlap_type=OverlapType.SINGLE_CONTEXT,
             value_type=overlap_contribution.value_type,
             allele=overlap_contribution.allele,
-            testing_context=overlap_contribution.testing_context_bucket,
+            testing_context_bucket=overlap_contribution.testing_context_bucket,
             tumor_type_category=overlap_contribution.tumor_type_category,
             defaults={
                 "overlap_status": OverlapStatus.NO_CONTRIBUTIONS,
@@ -121,7 +121,7 @@ class OverlapServices:
             overlap_type=OverlapType.CROSS_CONTEXT,
             value_type=overlap_contribution.value_type,
             allele=overlap_contribution.allele,
-            testing_context=None,
+            testing_context_bucket=None,
             tumor_type_category=None,
             defaults={
                 "overlap_status": OverlapStatus.NO_CONTRIBUTIONS,
