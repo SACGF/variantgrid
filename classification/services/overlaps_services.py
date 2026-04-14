@@ -307,14 +307,20 @@ class OverlapGrouping:
         for triage in all_triages:
             triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage)
             for entry in triage_log:
+                # FIXME, make a filter that change the str 'None' to None
+                if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
+                    continue
+                if (value_change := entry.changes_dict.get("value")) and value_change[0] == 'None':
+                    continue
+
                 field_changes = []
 
                 new_value_change = none_str_to_none(entry.changes_dict.get("new_value"))
                 triage_status_change = none_str_to_none(entry.changes_dict.get("triage_status"))
                 if new_value_change or triage_status_change:
 
-                    old_triage_status = TriageStatus.REVIEWED_WILL_FIX
-                    new_triage_status = TriageStatus.REVIEWED_WILL_FIX
+                    old_triage_status = TriageStatus.PENDING
+                    new_triage_status = TriageStatus.PENDING
                     if triage_status_change:
                         if old_triage_str := triage_status_change[0]:
                             old_triage_status = TriageStatus(old_triage_str)
@@ -340,8 +346,6 @@ class OverlapGrouping:
                 for key, value_list in entry.changes_display_dict.items():
                     if key in {"new value", "triage status"}:
                         continue
-                    else:
-                        print(key)
 
                     field_change = FieldChange(key, value_list[0], value_list[1])
                     field_changes.append(field_change)
