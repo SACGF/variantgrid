@@ -59,7 +59,8 @@
                     {% ifchanged change.overlap_contribution %}
                         <div>{% testing_context change.overlap_contribution %} {{ change.overlap_contribution.lab }}</div>
                         {% ifchanged change.user %}
-                        <div>{% user change.user size="tiny" %}</div>
+                            {% if change.user %}<div>{% user change.user size="tiny" %}</div>
+                            {% else %}<div class="no-user">No user</div>{% endif %}
                         {% endifchanged %}
                     {% endifchanged %}
                     <div>{% timestamp change.timestamp time_ago=True %}</div>
