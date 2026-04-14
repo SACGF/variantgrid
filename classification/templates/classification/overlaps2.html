@@ -12,7 +12,7 @@
             let selectedMode = $('[name=triage_status_filter]:checked').val();
             console.log(selectedMode);
             data.skew_status = selectedMode;
-            // data.lab_selection = {{ lab_picker_data.selection | jsonify }};
+            data.lab_selection = {{ lab_picker_data.selection | jsonify }};
         }
         function filterGrid() {
             $('#overlaps-table').DataTable().ajax.reload();
