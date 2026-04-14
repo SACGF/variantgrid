@@ -1,5 +1,5 @@
-from collections import defaultdict
-from dataclasses import dataclass
+import html
+from dataclasses import dataclass, field
 from typing import Optional
 
 from django.db.models import QuerySet, Subquery, OuterRef, IntegerField, TextField, Q
@@ -7,27 +7,50 @@ from django.db.models.aggregates import Max
 from django.db.models.functions import Greatest
 from django.http import HttpRequest
 from django.template.loader import render_to_string
+from django.utils.safestring import SafeString
+
 from classification.enums import OverlapStatus, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, Overlap, \
     ClassificationResultValue, OverlapContribution, EvidenceKeyMap, EvidenceKey, OverlapContributionSkew, TriageNextStep
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
-from classification.services.overlaps_services import OverlapGrouping
 from genes.hgvs import CHGVS
 from snpdb.lab_picker import LabPickerData
+from snpdb.models import Lab, Organization
 from snpdb.views.datatable_view import DatatableConfig, DC, RichColumn, DatatableConfigQuerySetMode, CellData, SortOrder
 
 
 @dataclass
 class ContributionValueSource:
-    value: str = ""
+    e_key: EvidenceKey
+    value: str
     your_contribution: bool = False
+    """
+    Indicates if the user's skew provided this value (other labs may have also provided the value)
+    """
     your_context: bool = False
-    pretty_value: str = ""
+    """
+    Indicates if at least one entry with this value came from the same testing context as the user's skew
+    """
+    labs: set[Lab] = field(default_factory=set)
+
+    @property
+    def pretty_value(self) -> str:
+        return self.e_key.pretty_value(self.value)
 
     @property
     def short_value(self):
         return self.value.replace("_", "-")
+
+    @property
+    def lab_title(self):
+        lab_strs = []
+        if self.your_contribution:
+            # TODO, avoid double counting "Your value" and listing your lab
+            lab_strs.append("Your value")
+        for lab in sorted(self.labs):
+            lab_strs.append(str(lab))
+        return "<br/>".join(lab_strs)
 
 
 class ContributionValues:
@@ -35,7 +58,7 @@ class ContributionValues:
     def __init__(self, e_key: EvidenceKey):
         self.e_key = e_key
         self.skew: Optional[OverlapContributionSkew] = None
-        self._values: dict[str, ContributionValueSource] = defaultdict(lambda: ContributionValueSource())
+        self._values: dict[str, ContributionValueSource] = {}
 
     @property
     def overlap_status(self) -> OverlapContributionStatus:
@@ -43,10 +66,13 @@ class ContributionValues:
             return skew.overlap.overlap_status_obj
         return OverlapStatus.NO_CONTRIBUTIONS
 
-    def cont_value_for(self, item):
-        result = self._values[item]
-        result.value = item
-        result.pretty_value = self.e_key.pretty_value(item)
+    def __getitem__(self, item: str) -> ContributionValueSource:
+        if hasattr(self, item):
+            return getattr(self, item)
+        if existing := self._values.get(item):
+            return existing
+        result = ContributionValueSource(e_key=self.e_key, value=item)
+        self._values[item] = result
         return result
 
     def sorted(self) -> list[ContributionValueSource]:
@@ -157,7 +183,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
 
 
     def apply_extra_data(self, cell: CellData[ClassificationGrouping]):
-        if cell.transient.get("onc_path"):
+        if cell.transient.get("applied_extra"):
             return
 
         onc_path_values = ContributionValues(EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH))
@@ -173,8 +199,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             overlap_status__gte=OverlapStatus.NO_CONTRIBUTIONS
         )
         for overlap in overlaps:
-            for contribution in overlap.contributions.filter(
-                    contribution_status=OverlapContributionStatus.CONTRIBUTING).all():
+            for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING).all():
                 same_context = contribution.testing_context_bucket_obj == cell.obj.testing_context
                 # same_lab = contribution.lab == cell.obj.lab
                 your_contribution = contribution.classification_grouping == cell.obj
@@ -187,13 +212,17 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                         ).first():
                             values.skew = your_skew
 
-                    contribution_value = values.cont_value_for(contribution.effective_value)
+                    contribution_value: ContributionValueSource = values[contribution.effective_value]
                     contribution_value.your_context |= same_context
                     contribution_value.your_contribution |= your_contribution
+                if contribution_grouping := contribution.classification_grouping:
+                    contribution_value.labs.add(contribution_grouping.lab)
 
         cell.transient["onc_path"] = onc_path_values
         if OVERLAP_CLIN_SIG_ENABLED:
             cell.transient["clin_sig"] = clin_sig_values
+
+        cell.transient["applied_extra"] = True
 
     def render_onc_path(self, cell: CellData):
         self.apply_extra_data(cell)
@@ -203,6 +232,18 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                          context,
                          request=self.request,
                          )
+
+    def render_orgs(self, cell: CellData):
+        self.apply_extra_data(cell)
+        onc_path_values: ContributionValues = cell.transient["onc_path"]
+        labs = set()
+        for cv in onc_path_values.sorted():
+            if cv.your_context:
+                labs.update(cv.labs)
+        orgs: set[Organization] = set()
+        for lab in labs:
+            orgs.add(lab.organization)
+        return SafeString("<br/>".join(sorted(html.escape(org.shortest_name) for org in orgs)))
 
     def render_clin_sig(self, cell: CellData):
         self.apply_extra_data(cell)
@@ -243,7 +284,8 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             RichColumn(
                 name="testing_context",
                 label="Testing Context",
-                renderer=self.render_context
+                renderer=self.render_context,
+                sort_keys=['allele_origin_grouping__testing_context_bucket']
             ),
 
             RichColumn(
@@ -251,6 +293,12 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                 label="Onc/Path",
                 renderer=self.render_onc_path
             ),
+
+            RichColumn(
+                name="orgs",
+                label="Orgs",
+                renderer=self.render_orgs
+            )
         ]
 
         if OVERLAP_CLIN_SIG_ENABLED:

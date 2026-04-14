@@ -9,8 +9,8 @@
 {% endif %}
 {% for c_value in values.sorted %}
     <span class="cs cs-dot cs-{{ c_value.value }}">
-    {% if c_value.your_contribution %}<b class="hover-detail" title="Your Value">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</b>
+    {% if c_value.your_contribution %}<b class="hover-detail" title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</b>
     {% elif not c_value.your_context %}<span class="no-value" title="Cross Context">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>
-    {% else %}{% if pretty_value %}<span>{{ c_value.pretty_value }}</span>{% else %}{{ c_value.short_value }}</span>{% endif %}{% endif %}
+    {% else %}<span title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>{% endif %}
     </span>
 {% endfor %}
