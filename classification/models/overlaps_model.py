@@ -143,7 +143,15 @@ class OverlapContribution(TimeStampedModel):
         elif scv := self.scv:
             if record := ClinVarRecord.objects.filter(record_id=scv).first():
                 if condition_strs := record.conditions:
-                    return ConditionResolved.from_uncounted_terms(terms=[OntologyTerm.get_or_stub(condition_str) for condition_str in condition_strs])
+                    terms = []
+                    plain_texts = []
+                    for condition_str in condition_strs:
+                        try:
+                            term = OntologyTerm.get_or_stub(condition_str)
+                            terms.append(term)
+                        except ValueError:
+                            plain_texts.append(condition_str)
+                    return ConditionResolved.from_uncounted_terms(terms=terms, plain_text_terms=plain_texts)
         return None
 
     @property
