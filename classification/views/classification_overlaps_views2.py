@@ -11,8 +11,7 @@ from django.utils.safestring import mark_safe
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationResultValue, \
-    EvidenceKey, EvidenceKeyMap, TriageStatus, OverlapContribution, OverlapContributionLog, \
-    OverlapContributionChangeSource
+    EvidenceKey, EvidenceKeyMap, TriageStatus, OverlapContribution
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapGrouping, OverlapServices
 from snpdb.lab_picker import LabPickerData
@@ -165,13 +164,6 @@ class TriageView(AjaxFormView[OverlapContribution]):
 
                 triage.set_change_comment(comment)
                 triage.save()
-
-                OverlapContributionLog.from_current_overlap_state(
-                    overlap_contribution=triage,
-                    change_source=OverlapContributionChangeSource.TRIAGE,
-                    comment=comment,
-                    user=user
-                ).save()
 
                 for overlap_contribution in triage.classification_grouping.overlapcontribution_set.filter(value_type=value_type):
                     for overlap in overlap_contribution.overlaps:

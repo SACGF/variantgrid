@@ -14,7 +14,7 @@ from annotation.models import ClinVarRecord
 from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, TriageStatus, \
-    OverlapEntrySourceTextChoices, EffectiveDateType, OverlapContributionChangeSource
+    OverlapEntrySourceTextChoices, EffectiveDateType
 from library.utils import first
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
@@ -180,52 +180,6 @@ class OverlapContribution(TimeStampedModel):
 
 
 auditlog.register(OverlapContribution)
-
-
-class OverlapContributionLog(TimeStampedModel):
-    overlap_contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
-    change_source = models.TextField(choices=OverlapContributionChangeSource.choices)
-    new_value = models.TextField(null=True, blank=True)  # TODO rename to amended value
-    triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, null=True, blank=True)
-    comment = models.TextField(null=True, blank=True)
-    user = models.ForeignKey(User, null=True, blank=True, on_delete=PROTECT)  # only used for triages
-
-    # values changed by upload
-    value = models.TextField(null=True, blank=True)
-    effective_date = models.DateField(null=True, blank=True)
-    effective_date_type = models.TextField(choices=EffectiveDateType.choices, default=EffectiveDateType.UNKNOWN)
-    contribution_status = models.TextField(choices=OverlapContributionStatus.choices)
-
-    @property
-    def pretty_value(self) -> str:
-        # FIXME remove duplication
-        if not self.value:
-            return "no-value"
-        if self.overlap_contribution.value_type == ClassificationResultValue.ONC_PATH:
-            return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).pretty_value(self.value)
-        elif self.overlap_contribution.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
-            return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.value)
-        else:
-            raise ValueError(f"Unsupported ValueType {self.overlap_contribution.value_type}")
-
-    @staticmethod
-    def from_current_overlap_state(
-            overlap_contribution: OverlapContribution,
-            change_source: OverlapContributionChangeSource,
-            comment: Optional[str] = None,
-            user: Optional[User] = None):
-        return OverlapContributionLog(
-            overlap_contribution=overlap_contribution,
-            change_source=change_source,
-            new_value=overlap_contribution.new_value,
-            triage_status=overlap_contribution.triage_status,
-            comment=comment,
-            user=user,
-            value=overlap_contribution.value,
-            effective_date=overlap_contribution.effective_date,
-            effective_date_type=overlap_contribution.effective_date_type,
-            contribution_status=overlap_contribution.contribution_status
-        )
 
 
 class Overlap(TimeStampedModel):

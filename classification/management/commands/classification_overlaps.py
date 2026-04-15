@@ -4,7 +4,7 @@ from annotation.models import ClinVarRecordCollection
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import TestingContextBucket
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
-    EvidenceKeyMap, EffectiveDateType, TriageStatus, OverlapContributionLog, OverlapContributionChangeSource
+    EvidenceKeyMap, EffectiveDateType, TriageStatus
 from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices
 from classification.services.overlaps_services import OverlapServices
 
@@ -52,12 +52,6 @@ class Command(BaseCommand):
                     effective_date_type=EffectiveDateType.CURATED,
                     triage_status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY
                 )
-                if created:
-                    ol = OverlapContributionLog.from_current_overlap_state(
-                        contribution,
-                        change_source=OverlapContributionChangeSource.UPLOAD
-                    )
-                    ol.save()
 
                 OverlapServices.link_overlap_contribution(contribution)
                 for skew in contribution.overlapcontributionskew_set.select_related('overlap').all():

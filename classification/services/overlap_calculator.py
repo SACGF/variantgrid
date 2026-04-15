@@ -5,7 +5,7 @@ from annotation.models import ClinVarRecord
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationResultValue, ClassificationSummaryCacheDict, \
-    EvidenceKeyMap, OverlapContribution, TriageStatus, OverlapContributionChangeSource, OverlapContributionLog
+    EvidenceKeyMap, OverlapContribution, TriageStatus
 from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices
 from library.utils import first
 from snpdb.models import Allele
@@ -129,7 +129,6 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
                         # effective_date_type= # FIXME
                         triage_status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY
                     )
-                    OverlapContributionLog.from_current_overlap_state(oc, OverlapContributionChangeSource.UPLOAD).save()
                     return oc
         return None
 

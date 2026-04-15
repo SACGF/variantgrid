@@ -12,7 +12,7 @@ from django.db.models import QuerySet
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, TriageStatus, \
-    TriageNextStep, OverlapContributionLog, OverlapContributionChangeSource
+    TriageNextStep
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig
 
@@ -64,17 +64,9 @@ class OverlapServices:
                 }
             )
             if created:
-                OverlapContributionLog.from_current_overlap_state(overlap_contribution, OverlapContributionChangeSource.UPLOAD).save()
                 OverlapServices.link_overlap_contribution(overlap_contribution)
                 # make sure this is added to or creates the relevant overlaps
                 overlap_contribution.refresh_from_db()
-            else:
-                last_log = OverlapContributionLog.objects.filter(overlap_contribution=overlap_contribution).order_by('-created').first()
-                if value != last_log.value or contribution != last_log.contribution_status or effective_date != last_log.effective_date:
-                    OverlapContributionLog.from_current_overlap_state(
-                        overlap_contribution,
-                        OverlapContributionChangeSource.UPLOAD
-                    ).save()
 
             # now update status of any created overlaps or existing linked overlaps
             for skew in overlap_contribution.overlapcontributionskew_set.select_related('overlap').all():
