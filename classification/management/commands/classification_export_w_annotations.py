@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 # "selected", "sift", "splice_region", "symbol", "tags", "transcript", "transcript_id",
                 # "transcript_version", "variant", "version",
                 "mavedb_score",
-                "mavedb_urn"
+                "mavedb_urn",
                 
                 "amino_acids",
                 "cadd_phred",
