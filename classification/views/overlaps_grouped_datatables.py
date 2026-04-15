@@ -33,6 +33,7 @@ class ContributionValueSource:
     Indicates if at least one entry with this value came from the same testing context as the user's skew
     """
     labs: set[Lab] = field(default_factory=set)
+    clinvar: bool = False
 
     @property
     def pretty_value(self) -> str:
@@ -217,6 +218,8 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                     contribution_value.your_contribution |= your_contribution
                 if contribution_grouping := contribution.classification_grouping:
                     contribution_value.labs.add(contribution_grouping.lab)
+                elif contribution.scv:
+                    contribution_value.clinvar = True
 
         cell.transient["onc_path"] = onc_path_values
         if OVERLAP_CLIN_SIG_ENABLED:
@@ -237,13 +240,20 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
         self.apply_extra_data(cell)
         onc_path_values: ContributionValues = cell.transient["onc_path"]
         labs = set()
+        clinvar = False
         for cv in onc_path_values.sorted():
             if cv.your_context:
                 labs.update(cv.labs)
+                clinvar |= cv.clinvar
         orgs: set[Organization] = set()
         for lab in labs:
             orgs.add(lab.organization)
-        return SafeString("<br/>".join(sorted(html.escape(org.shortest_name) for org in orgs)))
+
+        result = "<br/>".join(sorted(html.escape(org.shortest_name) for org in orgs))
+        if clinvar:
+            result += "<br/>ClinVar Expert Panel"
+
+        return SafeString(result)
 
     def render_clin_sig(self, cell: CellData):
         self.apply_extra_data(cell)
