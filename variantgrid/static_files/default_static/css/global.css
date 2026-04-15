@@ -2904,8 +2904,14 @@ a .c-hgvs-body .c-hgvs-nomen {
   padding-right: 8px;
 }
 
-th.overlap-condition {
+table.overlap-summary th.overlap-condition {
   width: 200px;
+}
+table.overlap-summary tr.users-row {
+  background-color: #eeeeee;
+}
+table.overlap-summary tr.cross-context-row {
+  opacity: 0.6;
 }
 
 /*# sourceMappingURL=global.css.map */

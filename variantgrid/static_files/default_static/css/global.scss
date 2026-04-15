@@ -3327,6 +3327,14 @@ a .c-hgvs-body {
 	}
 }
 
-th.overlap-condition {
-	width: 200px;
+table.overlap-summary {
+	th.overlap-condition {
+		width: 200px;
+	}
+	tr.users-row {
+		background-color: #eeeeee;
+	}
+	tr.cross-context-row {
+		opacity: 0.6;
+	}
 }
