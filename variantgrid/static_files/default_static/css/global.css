@@ -2904,4 +2904,8 @@ a .c-hgvs-body .c-hgvs-nomen {
   padding-right: 8px;
 }
 
+th.overlap-condition {
+  width: 200px;
+}
+
 /*# sourceMappingURL=global.css.map */

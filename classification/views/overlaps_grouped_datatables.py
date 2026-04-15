@@ -51,6 +51,8 @@ class ContributionValueSource:
             lab_strs.append("Your value")
         for lab in sorted(self.labs):
             lab_strs.append(str(lab))
+        if self.clinvar:
+            lab_strs.append("ClinVar Expert Panel")
         return "<br/>".join(lab_strs)
 
 
