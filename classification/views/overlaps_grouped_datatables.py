@@ -291,7 +291,9 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             RichColumn(
                 name="onc_path",
                 label="Onc/Path",
-                renderer=self.render_onc_path
+                renderer=self.render_onc_path,
+                sort_keys=['max_status'],
+                default_sort=SortOrder.DESC
             ),
 
             RichColumn(
