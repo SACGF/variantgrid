@@ -21,20 +21,54 @@ class Command(BaseCommand):
 
             c: Classification
             genome_build = GenomeBuild.grch38()
-            evidence_keys_list = list(EvidenceKey.objects.filter(variantgrid_column__isnull=False).select_related("variantgrid_column"))
+            #evidence_keys_list = list(EvidenceKey.objects.filter(variantgrid_column__isnull=False).select_related("variantgrid_column"))
 
             transcript_annotation_keys: Optional[list[str]] = [
-                "amino_acids", "annotation_run", "cadd_phred", "canonical", "canonical_score", "codons", "consequence",
-                "distance", "domains", "ensembl_protein", "ensembl_transcript_accession", "exon",
-                "fathmm_pred_most_damaging", "flags", "gene", "gene_id", "gene_symbol", "gerp_pp_rs",
-                "gnomad_gene_constraint_method", "gnomad_gene_constraint_oe_lof_summary", "gnomad_gene_constraint_url",
-                "grantham", "hgvs_c", "hgvs_p", "id", "impact", "interpro_domain", "intron", "maxentscan_alt",
-                "maxentscan_diff", "maxentscan_percent_diff_ref", "maxentscan_ref",
+                # "amino_acids", "annotation_run", "cadd_phred", "canonical", "canonical_score", "codons", "consequence",
+                # "distance", "domains", "ensembl_protein", "ensembl_transcript_accession", "exon",
+                # "fathmm_pred_most_damaging", "flags", "gene", "gene_id", "gene_symbol", "gerp_pp_rs",
+                # "gnomad_gene_constraint_method", "gnomad_gene_constraint_oe_lof_summary", "gnomad_gene_constraint_url",
+                # "grantham", "hgvs_c", "hgvs_p", "id", "impact", "interpro_domain", "intron", "maxentscan_alt",
+                # "maxentscan_diff", "maxentscan_percent_diff_ref", "maxentscan_ref",
+                # "mutation_assessor_pred_most_damaging",
+                # "mutation_taster_pred_most_damaging", "nmd_escaping_variant", "polyphen2_hvar_pred_most_damaging",
+                # "protein_length", "protein_position", "refseq_transcript_accession", "representative", "revel_score",
+                # "selected", "sift", "splice_region", "symbol", "tags", "transcript", "transcript_id",
+                # "transcript_version", "variant", "version",
+                "mavedb_score",
+                "mavedb_urn"
+                
+                "amino_acids",
+                "cadd_phred",
+                "canonical",
+                "nmd_escaping_variant",
+                "codons",
+                "consequence",
+                "distance",
+                "domains",
+                "ensembl_protein",
+                "exon",
+                "fathmm_pred_most_damaging",
+                "flags",
+                "gerp_pp_rs",
+                "grantham",
+                "hgvs_c",
+                "hgvs_p",
+                "impact",
+                "interpro_domain",
+                "intron",
+                "maxentscan_alt",
+                "maxentscan_diff",
+                "maxentscan_ref",
+                "maxentscan_percent_diff_ref",
                 "mutation_assessor_pred_most_damaging",
-                "mutation_taster_pred_most_damaging", "nmd_escaping_variant", "polyphen2_hvar_pred_most_damaging",
-                "protein_length", "protein_position", "refseq_transcript_accession", "representative", "revel_score",
-                "selected", "sift", "splice_region", "symbol", "tags", "transcript", "transcript_id",
-                "transcript_version", "variant", "version"
+                "mutation_taster_pred_most_damaging",
+                "polyphen2_hvar_pred_most_damaging",
+                "protein_position",
+                "revel_score",
+                "sift",
+                "splice_region",
+                "symbol",
             ]
 
             csv_writer.writerow([
