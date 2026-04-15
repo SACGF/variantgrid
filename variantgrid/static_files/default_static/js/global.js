@@ -565,9 +565,7 @@ function enhanceAndMonitor() {
 function cardToModal(content) {
     let modalContentDiv = content.closest('.modal-content');
     if (modalContentDiv.length) {
-        console.log("Looking to convert card to modal");
         if (content.find('.card .modalable')) {
-            console.log("Converting to card to modal");
             content.find('.card').removeClass('card');
             let cardHeader = content.find(".card-header");
             let h5 = $("<h5>", {"class": "modal-title"}).append(cardHeader.contents());
