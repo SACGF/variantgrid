@@ -88,6 +88,11 @@ The project uses `global_login_required.GlobalLoginRequiredMiddleware`, which en
 
 DRF is configured with `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`, so all REST API endpoints require authentication by default. Individual API views do not need explicit `permission_classes` — their absence is intentional, not a security gap.
 
+## Python Style
+
+### Imports
+Place imports at the top level of the file by default. Inline imports inside functions are acceptable only to break genuine circular import cycles — if that situation arises, flag it and ask the user whether to refactor the code instead.
+
 ## Key Patterns
 
 ### Object-level permissions

@@ -6,6 +6,10 @@
 {% load wiki_tags %}
 {% block title %}{{ site_name }} GeneList: {{ gene_list.name }}{% endblock title %}
 
+{% block head %}
+    <script src="{% static 'js/cached_generated_files.js' %}"></script>
+{% endblock head %}
+
 {% block jsdocumentready %}
     $("#gene-list-tabs").tabs();
 {% endblock jsdocumentready %}
@@ -17,6 +21,9 @@
         <ul>
             <li><a href="#details">Details</a></li>
             <li><a href="#wiki">Wiki{% if gene_list.genelistwiki %}*{% endif %}</a></li>
+            {% if gene_list.import_status == 'S' %}
+            <li><a href="{% url 'gene_list_graphs_tab' gene_list.pk %}">Graphs</a></li>
+            {% endif %}
             {% if has_write_permission %}
             <li><a href="{% url 'group_permissions' 'genes.models.GeneList' gene_list.pk %}">Sharing / Permissions</a></li>
             {% endif %}

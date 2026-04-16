@@ -614,10 +614,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
                 mane_and_aliases = MANE.get_mane_and_aliases_list_from_symbol(gene_symbol_str)
                 if not mane_and_aliases:
-                    if not gene_symbol_str or gene_symbol_str == "None":
-                        msg_hgvs_given_symbol += " Can't find MANE transcripts without gene symbol"
-                    else:
-                        raise ValueError(
+                    raise ValueError(
                         msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts") from hgvs_error
 
                 gene_aliases_to_mane_symbols = set()
@@ -723,7 +720,6 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
         else:
             yield SearchMessageOverall(f"Invalid HGVS cDNA allele \"{hgvs_string}\"")  # {hgvs_ex}
-
 
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:

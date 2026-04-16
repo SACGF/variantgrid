@@ -2,6 +2,8 @@
 Based on example code from Ryan Dale - https://www.biostars.org/p/9922/#9969
 """
 
+from collections import defaultdict
+
 import pandas as pd
 
 from library.genomics import format_chrom
@@ -17,30 +19,28 @@ DEFAULT_COLOR_LOOKUP = {'gneg': (1., 1., 1.),
                         'stalk': (.9, .9, .9)}
 
 
-def ideograms(filename, color_lookup):
-    last_chrom = None
-    df = pd.read_csv(filename, sep='\t')
-
-    xranges, colors = [], []
+def read_cytoband(path):
+    """Return dict: chrom_name → sorted list of (start, end, band_name, stain)."""
+    df = pd.read_csv(path, sep='\t')
+    result = defaultdict(list)
     for _, row in df.iterrows():
-        chrom = row["chr"]
-        start = row["start"]
-        stop = row["end"]
-        stain = row["stain"]
-        width = stop - start
-        if chrom == last_chrom or (last_chrom is None):
-            xranges.append((start, width))
-            colors.append(color_lookup[stain])
-            last_chrom = chrom
-            continue
+        result[row['chr']].append((row['start'], row['end'], row['band'], row['stain']))
+    return {ch: sorted(bands, key=lambda b: b[0]) for ch, bands in result.items()}
 
-        yield xranges, colors, last_chrom
-        xranges, colors = [], []
-        xranges.append((start, width))
-        colors.append(color_lookup[stain])
-        last_chrom = chrom
 
-    yield xranges, colors, last_chrom
+def centromere_mid(bands):
+    """Return midpoint of the centromere (acen bands), or chromosome midpoint as fallback."""
+    acen = [(s, e) for s, e, _, stain in bands if stain == 'acen']
+    if acen:
+        return (min(s for s, _ in acen) + max(e for _, e in acen)) / 2
+    return bands[-1][1] / 2
+
+
+def ideograms(filename, color_lookup):
+    for chrom, bands in read_cytoband(filename).items():
+        xranges = [(start, end - start) for start, end, _, stain in bands]
+        colors = [color_lookup.get(stain, (.5, .5, .5)) for _, _, _, stain in bands]
+        yield xranges, colors, chrom
 
 
 def sorted_ideograms(filename, **kwargs):

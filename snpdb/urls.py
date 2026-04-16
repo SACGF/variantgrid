@@ -45,6 +45,7 @@ urlpatterns = [
 
     path('view_sample/<int:sample_id>', views.view_sample, name='view_sample'),
     path('view_genomic_intervals/<int:genomic_intervals_collection_id>', views.view_genomic_intervals, name='view_genomic_intervals'),
+    path('genomic_intervals_graphs_tab/<int:genomic_intervals_collection_id>', views.genomic_intervals_graphs_tab, name='genomic_intervals_graphs_tab'),
     path('view_cohort_details_tab/<int:cohort_id>', views.view_cohort_details_tab, name='view_cohort_details_tab'),
     path('view_cohort/<int:cohort_id>', views.view_cohort, name='view_cohort'),
     path('cohort/hotspot/<int:cohort_id>', views.cohort_hotspot, name='cohort_hotspot'),
