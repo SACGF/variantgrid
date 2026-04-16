@@ -305,6 +305,8 @@ class OntologyIdNormalized:
         elif prefix.upper() == "MESH":
             prefix = "MeSH"
             postfix = postfix.upper()
+        elif prefix.upper() == "HPO":
+            prefix = "HP"
         prefix = OntologyService(prefix)
 
         try:
@@ -666,7 +668,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
 
     @staticmethod
     def relations_of(term: OntologyTerm, otr_qs: Optional[QuerySet['OntologyTermRelation']] = None) -> list['OntologyTermRelation']:
-        def sort_relationships(rel1, rel2):
+        def sort_relationships(rel1, rel2) -> int:
             other1 = rel1.other_end(term)
             other2 = rel2.other_end(term)
             if other1.ontology_service != other2.ontology_service:
@@ -675,6 +677,8 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
             rel2source = rel2.source_term_id == term.id
             if rel1source != rel2source:
                 return -1 if rel1source else 1
+            if other1.index == other2.index:
+                return 0
             return -1 if other1.index < other2.index else 1
 
         if otr_qs is None:
@@ -983,17 +987,18 @@ class OntologySnake:
                                                            OntologyImportSource.GENCC,
                                                            OntologyImportSource.MONDO}:
                 return step.relation
+        return None
 
     @staticmethod
     def check_if_ancestor(descendant: OntologyTerm, ancestor: OntologyTerm, max_levels=4) -> list['OntologySnake']:
         if ancestor == descendant:
-            return OntologySnake(source_term=ancestor, leaf_term=descendant)
+            return [OntologySnake(source_term=ancestor, leaf_term=descendant)]
 
         if descendant.ontology_service != ancestor.ontology_service:
             raise ValueError(f"Can only check for ancestry within the same ontology service, not {descendant.ontology_service} vs {ancestor.ontology_service}")
 
         seen: set[OntologyTerm] = {descendant}
-        new_snakes: list[OntologySnake] = list([OntologySnake(source_term=descendant)])
+        new_snakes: list[OntologySnake] = [OntologySnake(source_term=descendant)]
         valid_snakes: list[OntologySnake] = []
         level = 0
         while new_snakes:
@@ -1037,7 +1042,7 @@ class OntologySnake:
 
         depth = 1
         while review_terms:
-            next_level = OntologyVersion.get_latest_and_live_ontology_qs().filter(dest_term__in=review_terms, relation=OntologyRelation.IS_A)
+            next_level = otr_qs.filter(dest_term__in=review_terms, relation=OntologyRelation.IS_A)
             review_terms = set()
 
             for child_relationship in next_level:
