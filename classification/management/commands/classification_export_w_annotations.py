@@ -23,18 +23,7 @@ class Command(BaseCommand):
             genome_build = GenomeBuild.grch38()
             #evidence_keys_list = list(EvidenceKey.objects.filter(variantgrid_column__isnull=False).select_related("variantgrid_column"))
 
-            transcript_annotation_keys: Optional[list[str]] = [
-                # "amino_acids", "annotation_run", "cadd_phred", "canonical", "canonical_score", "codons", "consequence",
-                # "distance", "domains", "ensembl_protein", "ensembl_transcript_accession", "exon",
-                # "fathmm_pred_most_damaging", "flags", "gene", "gene_id", "gene_symbol", "gerp_pp_rs",
-                # "gnomad_gene_constraint_method", "gnomad_gene_constraint_oe_lof_summary", "gnomad_gene_constraint_url",
-                # "grantham", "hgvs_c", "hgvs_p", "id", "impact", "interpro_domain", "intron", "maxentscan_alt",
-                # "maxentscan_diff", "maxentscan_percent_diff_ref", "maxentscan_ref",
-                # "mutation_assessor_pred_most_damaging",
-                # "mutation_taster_pred_most_damaging", "nmd_escaping_variant", "polyphen2_hvar_pred_most_damaging",
-                # "protein_length", "protein_position", "refseq_transcript_accession", "representative", "revel_score",
-                # "selected", "sift", "splice_region", "symbol", "tags", "transcript", "transcript_id",
-                # "transcript_version", "variant", "version",
+            transcript_annotation_keys = [
                 "mavedb_score",
                 "mavedb_urn",
                 
@@ -68,7 +57,20 @@ class Command(BaseCommand):
                 "revel_score",
                 "sift",
                 "splice_region",
-                "symbol",
+                "symbol"
+            ]
+            gnomad_keys = [
+                "gnomad_af",
+                "gnomad_popmax",
+                "gnomad_popmax_af",
+                "gnomad_url"
+            ]
+
+            splice_ai_keys = [
+                "spliceai_pred_ds_ag",
+                "spliceai_pred_ds_al",
+                "spliceai_pred_ds_dg",
+                "spliceai_pred_ds_dl"
             ]
 
             csv_writer.writerow([
@@ -77,16 +79,7 @@ class Command(BaseCommand):
                 "lab_record_id",
                 "c_hgvs_38",
                 "substituted_transcript_version",
-                "status",
-                "gnomad_af",
-                "gnomad_popmax",
-                "gnomad_popmax_af",
-                "gnomad_url",
-                "splice_ai_acceptor_gain",
-                "splice_ai_acceptor_loss",
-                "splice_ai_donor_gain",
-                "splice_ai_donor_loss"
-            ] + transcript_annotation_keys)
+                "status"] + gnomad_keys + splice_ai_keys + transcript_annotation_keys)
 
             annotation_version = AnnotationVersion.latest(genome_build)
             last_variant: Optional[Variant] = None
@@ -97,8 +90,9 @@ class Command(BaseCommand):
                 count += 1
                 if count % 100 == 0:
                     print(f"Processed {count}")
-                variant_annotation_cells = [None] * 4
-                gnomad_cells = [None] * 4
+
+                gnomad_cells = [None] * len(gnomad_keys)
+                variant_annotation_cells = [None] * len(splice_ai_keys)
                 transcript_annotations_cells = [None] * len(transcript_annotation_keys)
                 substituted_transcript_version = None
 
@@ -124,18 +118,9 @@ class Command(BaseCommand):
                                     status = "variant-annotated"
 
                                     if variant_annotation.has_spliceai():
-                                        variant_annotation_cells = [
-                                            variant_annotation.spliceai_pred_ds_ag,
-                                            variant_annotation.spliceai_pred_ds_al,
-                                            variant_annotation.spliceai_pred_ds_dg,
-                                            variant_annotation.spliceai_pred_ds_dl,
-                                        ]
-                                    gnomad_cells = [
-                                        variant_annotation.gnomad_af,
-                                        variant_annotation.gnomad_popmax,
-                                        variant_annotation.gnomad_popmax_af,
-                                        variant_annotation.gnomad_url
-                                    ]
+                                        variant_annotation_cells = [getattr(variant_annotation, splice_ai_key) for splice_ai_key in gnomad_keys]
+
+                                    gnomad_cells = [getattr(variant_annotation, gnomad_key) for gnomad_key in gnomad_keys]
 
                                 annotation_data: Optional[dict] = None
                                 try:
@@ -162,6 +147,7 @@ class Command(BaseCommand):
                                         transcript_annotations_cells.append(annotation_data.get(key))
 
                         except Exception as e:
+                            print(e)
                             pass
 
                 row = [
