@@ -38,9 +38,18 @@ class OverlapEntry:
 
 @dataclass(frozen=True)
 class OverlapSummary:
+    classification_grouping: ClassificationGrouping
     skews: list[OverlapContributionSkew]
     value_type: ClassificationResultValue
     overlaps: list[Overlap]
+
+    @property
+    def id(self) -> str:
+        return f"{self.classification_grouping.pk}{self.value_type}"
+
+    @cached_property
+    def overlap_grouping(self):
+        return OverlapGrouping.overlap_grouping_for(self.classification_grouping, self.value_type, True)
 
     @property
     def value_type_label(self):
@@ -83,7 +92,7 @@ class OverlapSummary:
         for value_type, overlaps in overlap_summary_builders.items():
             if skews := skew_by_value_type.get(value_type):
                 summaries.append(
-                    OverlapSummary(skews=skews, value_type=value_type, overlaps=overlaps)
+                    OverlapSummary(classification_grouping=cg, skews=skews, value_type=value_type, overlaps=overlaps)
                 )
             else:
                 print(f"No skews for {value_type}")
