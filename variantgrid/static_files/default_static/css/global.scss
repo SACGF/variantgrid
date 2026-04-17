@@ -3314,9 +3314,7 @@ a .c-hgvs-body {
 }
 
 .comment {
-	padding: 8px;
-	border: 1px solid #ccc;
-	border-radius: 0 8px 8px 8px;
+	padding: 8px 8px 8px 0;
 	color: #888;
 
 	&:before {

@@ -2892,9 +2892,7 @@ a .c-hgvs-body .c-hgvs-nomen {
 }
 
 .comment {
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 0 8px 8px 8px;
+  padding: 8px 8px 8px 0;
   color: #888;
 }
 .comment:before {
