@@ -35,22 +35,39 @@ echo "Processing $INPUT_VCF -> $OUTPUT_VCF"
 echo "  keep expression: $KEEP_EXPR"
 echo "  rename file:     $RENAME_FILE"
 
-# Pipeline:
-#   1. bcftools annotate --remove  : drop every INFO field except KEEP_FIELDS
-#   2. bcftools annotate --rename-annots : apply _joint -> legacy renames
-#      (split across two invocations because bcftools can't remove+rename in one pass
-#       when the rename targets the kept fields)
-#   3. sed : rewrite Number=A -> Number=1 in INFO header lines.
-#      gnomAD VCFs are already split to one ALT per row, so A-typed fields are
-#      effectively scalar; downstream tools read the renamed fields as Number=1.
-#   4. bcftools view -O z : bgzip the output
-bcftools annotate \
-    --remove "${KEEP_EXPR}" \
+# Pass 1 — pure bcftools pipeline, streamed with BCF (-O u) between stages.
+# Writes the bgzipped intermediate with header attributes untouched (AC/AF/AN
+# stay declared Number=A here, which is VCF-spec-correct for reserved names).
+#
+#   1. bcftools norm --multiallelics -any : split any multi-allelic rows first so
+#      every later stage operates on biallelic data. gnomAD v4.x is usually
+#      pre-split, but this is a cheap safety net.
+#   2. bcftools annotate --remove : drop every INFO field except KEEP_FIELDS
+#   3. bcftools annotate --rename-annots : rename _joint -> legacy v4.0 names,
+#      writing the final bgzipped intermediate directly via -O z.
+TMP_VCF="${OUTPUT_VCF}.tmp.vcf.gz"
+TMP_HDR="${OUTPUT_VCF}.tmp.hdr"
+trap 'rm -f "$TMP_VCF" "$TMP_HDR"' EXIT
+
+bcftools norm \
+    --multiallelics -any \
     "${INPUT_VCF}" \
+    -O u \
+    | bcftools annotate \
+        --remove "${KEEP_EXPR}" \
+        -O u \
     | bcftools annotate \
         --rename-annots "${RENAME_FILE}" \
-    | sed 's/,Number=A,/,Number=1,/' \
-    | bcftools view -O z -o "${OUTPUT_VCF}"
+        -O z \
+        -o "${TMP_VCF}"
+
+# Pass 2 — rewrite Number=A -> Number=1 in the header for reserved names.
+# Downstream parsers expect Number=1 to match v4.0 output. This has to happen
+# after the last bcftools stage reads anything: newer bcftools (>=1.23) treats
+# Number!=A on reserved names as a sanity failure when reading such a header.
+# bcftools reheader swaps the header without running those sanity checks.
+bcftools view -h "${TMP_VCF}" | sed 's/,Number=A,/,Number=1,/' > "${TMP_HDR}"
+bcftools reheader -h "${TMP_HDR}" -o "${OUTPUT_VCF}" "${TMP_VCF}"
 
 tabix -f -p vcf "${OUTPUT_VCF}"
 
