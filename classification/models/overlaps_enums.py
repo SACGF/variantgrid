@@ -1,6 +1,8 @@
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe
 
+from classification.models import ClassificationDateType
+
 
 class EffectiveDateType(TextChoices):
     CREATED = "created", "Created"
@@ -8,6 +10,15 @@ class EffectiveDateType(TextChoices):
     SAMPLE_DATE = "sample", "Sample"
     VERIFIED = "verified", "Verified"
     UNKNOWN = "unknown", "Unknown"
+
+    @staticmethod
+    def from_classification_date_type(classification_date_type: ClassificationDateType) -> 'EffectiveDateType':
+        match classification_date_type:
+            case ClassificationDateType.CREATED: return EffectiveDateType.CREATED
+            case ClassificationDateType.CURATION: return EffectiveDateType.CURATED
+            case ClassificationDateType.SAMPLE_DATE: return EffectiveDateType.SAMPLE_DATE
+            case ClassificationDateType.VERIFIED: return EffectiveDateType.VERIFIED
+            case _: return EffectiveDateType.UNKNOWN
 
 
 class OverlapType(TextChoices):

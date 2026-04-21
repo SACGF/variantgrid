@@ -29,7 +29,7 @@
                                 {% lab overlap_entry.overlap_contribution.lab %}{% endif %}
                             <td>{% clinical_significance overlap_entry.overlap_contribution.value %}</td>
                             <td>{% condition overlap_entry.overlap_contribution.conditions %}</td>
-                            <td>{% timestamp overlap_entry.overlap_contribution.effective_date time_ago=True %}</td>
+                            <td>{% timestamp overlap_entry.overlap_contribution.effective_date.date time_ago=True %}</td>
                             <td>{% triage overlap_entry.overlap_contribution show_label=True show_link=overlap_entry.is_primary %}</td>
                         </tr>
                     {% endfor %}

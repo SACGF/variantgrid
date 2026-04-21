@@ -5,7 +5,7 @@ from annotation.models import ClinVarRecord
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationResultValue, ClassificationSummaryCacheDict, \
-    EvidenceKeyMap, OverlapContribution, TriageStatus
+    EvidenceKeyMap, OverlapContribution, TriageStatus, EffectiveDate, TriageState, EffectiveDateType
 from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices
 from library.utils import first
 from snpdb.models import Allele
@@ -115,19 +115,20 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
                     value = expert_panel.clinical_significance
                     relevant_value = ClassificationResultValue.ONC_PATH and EvidenceKeyMap.clinical_significance_to_bucket().get(value) is not None
                     effective_date = expert_panel.date_last_evaluated or expert_panel.date_clinvar_updated
-                    print(effective_date)
 
-                    oc = OverlapContribution(
+                    oc = OverlapContribution.objects.update_or_create(
                         source=OverlapEntrySourceTextChoices.CLINVAR,
                         scv=expert_panel.record_id,
                         testing_context_bucket=TestingContextBucket.GERMLINE,
                         allele=allele,
                         classification_grouping_id=None,
-                        value=value,
+                        defaults={
+                            "value": value,
+                            "effective_date": EffectiveDate.from_datetime(effective_date,
+                                                                         date_type=EffectiveDateType.CURATED),
+                        },
                         contribution_status=OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE,
-                        effective_date=effective_date,
-                        # effective_date_type= # FIXME
-                        triage_status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY
+                        triage_state=TriageState(TriageStatus.NON_INTERACTIVE_THIRD_PARTY)
                     )
                     return oc
         return None

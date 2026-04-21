@@ -1,21 +1,24 @@
 from dataclasses import dataclass
+from datetime import date, datetime
 from functools import reduce, cached_property
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
-from django.contrib.auth.models import User
-from django.db.models import CASCADE, QuerySet, PROTECT
+from dataclasses_json import DataClassJsonMixin
+from django.db.models import CASCADE, QuerySet
 from django.db import models
 from django.db.models.enums import TextChoices
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 from annotation.models import ClinVarRecord
 from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull
-from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
+from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue, \
+    CuratedDate
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, TriageStatus, \
     OverlapEntrySourceTextChoices, EffectiveDateType
 from library.utils import first
+from library.utils.database_utils import TextFieldChoices, JSONDataclassField
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 
@@ -70,6 +73,64 @@ from snpdb.models import Allele, Lab
 #         return None
 
 
+@dataclass
+class TriageState(DataClassJsonMixin):
+    status: TriageStatus = TriageStatus.PENDING
+    amend_value: Optional[str] = None
+
+    def __str__(self):
+        return self.status.label
+
+    @staticmethod
+    def default_json():
+        return TriageState().to_dict()
+
+
+@dataclass
+class TriageComment(DataClassJsonMixin):
+    text: Optional[str] = None
+    count: int = 0
+
+    @staticmethod
+    def default_json():
+        return TriageComment().to_dict()
+
+    def __str__(self):
+        return self.text
+
+
+@dataclass
+class EffectiveDate(DataClassJsonMixin):
+    date: Optional[str] = None
+    date_type: EffectiveDateType = EffectiveDateType.UNKNOWN
+
+    @staticmethod
+    def from_datetime(value: Union[datetime, date], date_type: EffectiveDateType = EffectiveDateType.UNKNOWN):
+        date_str: Optional[str] = None
+        value_date: Optional[date]
+        if isinstance(value, date):
+            value_date = value
+        elif isinstance(value, datetime):
+            value_date = datetime.date()
+        else:
+            raise ValueError(f"Not datetime or date {value}")
+        if value_date:
+            date_str = f"{value_date.year:04}-{value_date.month:02}-{value_date.day:02}"
+        return EffectiveDate(date=date_str, date_type=date_type)
+
+    @staticmethod
+    def from_curated_date(value: CuratedDate):
+        relevant_date = value.relevant_date
+        return EffectiveDate(
+            date=relevant_date.date_str,
+            date_type=EffectiveDateType.from_classification_date_type(relevant_date.date_type)
+        )
+
+    @staticmethod
+    def default_json():
+        return EffectiveDate().to_dict()
+
+
 class OverlapContribution(TimeStampedModel):
     history = AuditlogHistoryField()
 
@@ -80,19 +141,23 @@ class OverlapContribution(TimeStampedModel):
     value_type = models.TextField(choices=ClassificationResultValue.choices)
     value = models.TextField(null=True, blank=True)
     # annoying thing about contribution_status is it takes a little bit of context knowledge to work out
-    contribution_status = models.TextField(choices=OverlapContributionStatus.choices)  # TODO rename to contribution_status
+
+    # TODO do we want to keep date type somewhere?
+    # effective_date = models.DateField(null=True, blank=True)
+    # effective_date_type = models.TextField(choices=EffectiveDateType.choices, default=EffectiveDateType.UNKNOWN)
+
+    # TODO rename to contribution_status
+    contribution_status = TextFieldChoices(choices_type=OverlapContributionStatus)    # type: OverlapContributionStatus
     testing_context_bucket = models.TextField(choices=TestingContextBucket.choices)
     tumor_type_category = models.TextField(null=True, blank=True)
-    # TODO do we want to keep date type somewhere?
-    effective_date = models.DateField(null=True, blank=True)
-    effective_date_type = models.TextField(choices=EffectiveDateType.choices, default=EffectiveDateType.UNKNOWN)
 
-    new_value = models.TextField(null=True, blank=True)  # TODO rename to amended value
-    triage_status = models.TextField(max_length=1, choices=TriageStatus.choices, default=TriageStatus.PENDING)
+    effective_date = JSONDataclassField(dataclass_type=EffectiveDate, null=False, blank=False, default=EffectiveDate.default_json)  # type: EffectiveDate
+    triage_state = JSONDataclassField(dataclass_type=TriageState, null=False, blank=False, default=TriageState.default_json)  # type: TriageState
+    comment = JSONDataclassField(dataclass_type=TriageComment, null=False, blank=False, default=TriageComment.default_json)  # type: TriageComment
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._change_comment = None
+        # self._change_comment = None
 
     @property
     def testing_context_full(self) -> TestingContextFull:
@@ -101,22 +166,12 @@ class OverlapContribution(TimeStampedModel):
             tumor_type_category=self.tumor_type_category
         )
 
-    def set_change_comment(self, change_comment: str):
-        self._change_comment = change_comment
-
-    def get_additional_data(self) -> dict:
-        return {"comment": self._change_comment}
-
     @property
     def effective_value(self):
-        return self.new_value or self.value
+        return self.triage_state.amend_value or self.value
 
     class Meta:
         unique_together = ('classification_grouping', 'value_type')
-
-    @property
-    def triage_status_obj(self) -> TriageStatus:
-        return TriageStatus(self.triage_status)
 
     @property
     def overlaps(self) -> QuerySet['Overlap']:
@@ -219,7 +274,6 @@ class Overlap(TimeStampedModel):
 
     @property
     def overlap_status_label(self):
-        label = self.overlap_status_obj.label
         if self.overlap_type == OverlapType.CROSS_CONTEXT:
             match self.overlap_status_obj:
                 case OverlapStatus.MAJOR_DIFFERENCES: return "Difference"

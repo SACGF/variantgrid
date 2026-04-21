@@ -11,9 +11,10 @@ from django.utils.safestring import mark_safe
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationResultValue, \
-    EvidenceKey, EvidenceKeyMap, TriageStatus, OverlapContribution
+    EvidenceKey, EvidenceKeyMap, TriageStatus, OverlapContribution, TriageComment, TriageState
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapGrouping, OverlapServices
+from library.utils import empty_to_none
 from snpdb.lab_picker import LabPickerData
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
@@ -129,14 +130,15 @@ class TriageView(AjaxFormView[OverlapContribution]):
         context["evidence_key"] = value_e_key
 
         if request.GET.get("edit") == "true":
+            initial_data = {
+                "triage_status": triage.triage_state.status,
+                "new_value": triage.triage_state.amend_value
+            }
             if value_type == ClassificationResultValue.ONC_PATH:
                 form = ClassificationGroupingValueTriageOncPathForm(
                     # data=request.POST or None,
                     data=request.POST if request.method == "POST" else None,
-                    initial={
-                        "triage_status": triage.triage_status,
-                        "new_value": triage.new_value
-                    }
+                    initial=initial_data
                 )
             else:
                 if not OVERLAP_CLIN_SIG_ENABLED:
@@ -145,22 +147,26 @@ class TriageView(AjaxFormView[OverlapContribution]):
                     form = ClassificationGroupingValueTriageClinSigForm(
                         # data=request.POST or None,
                         data=request.POST if request.method == "POST" else None,
-                        initial={
-                            "triage_status": triage.triage_status,
-                            "new_value": triage.new_value
-                        }
+                        initial=initial_data
                     )
             context["form"] = form
 
             if form and form.is_valid() and request.method == "POST":
-                triage.triage_status = form.cleaned_data["triage_status"]
-                if triage.triage_status == TriageStatus.REVIEWED_WILL_FIX:
-                    triage.new_value = form.cleaned_data["new_value"]
-                else:
-                    triage.new_value = None
-                comment = form.cleaned_data["comment"]
 
-                triage.set_change_comment(comment)
+                # TODO do we even need to do this, or does dataclass_json do it automatically
+
+                new_value = empty_to_none(form.cleaned_data["new_value"])
+                if new_value == 'undecided':
+                    new_value = None
+
+                triage.triage_state = TriageState(
+                    TriageStatus(form.cleaned_data["triage_status"]),
+                    new_value
+                )
+
+                if comment := form.cleaned_data["comment"]:
+                    triage.comment = TriageComment(comment, triage.comment.count+1)
+
                 triage.save()
 
                 for overlap_contribution in triage.classification_grouping.overlapcontribution_set.filter(value_type=value_type):

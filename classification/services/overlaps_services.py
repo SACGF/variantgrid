@@ -2,8 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Iterable, Iterator
-
+from typing import Optional, Iterable, Iterator, Any
 from auditlog.context import set_actor
 from auditlog.models import LogEntry
 from django.contrib.auth.models import User
@@ -12,9 +11,10 @@ from django.db.models import QuerySet
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, TriageStatus, \
-    TriageNextStep
+    TriageNextStep, TriageState, EffectiveDate, TriageComment
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig
+import json
 
 
 class OverlapServices:
@@ -47,7 +47,7 @@ class OverlapServices:
 
             effective_date = None
             if lastest_modification := classification_grouping.latest_classification_modification:
-                effective_date = lastest_modification.curated_date
+                effective_date = EffectiveDate.from_curated_date(lastest_modification.curated_date_check)
 
             overlap_contribution, created = OverlapContribution.objects.update_or_create(
                 source=OverlapEntrySourceTextChoices.CLASSIFICATION,
@@ -133,8 +133,8 @@ class OverlapServices:
         all_interactive_skews: list[OverlapContributionSkew] = []
         for skew in overlap.overlapcontributionskew_set.all():
             # move skews into - user has done something, user is waiting on something
-            status_buckets[skew.contribution.triage_status].append(skew)
-            if skew.contribution.triage_status_obj != TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
+            status_buckets[skew.contribution.triage_state.status].append(skew)
+            if skew.contribution.triage_state.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
                 all_interactive_skews.append(skew)
 
         pending = status_buckets[TriageStatus.PENDING]
@@ -286,15 +286,24 @@ class OverlapGrouping:
                 return TriageNextStep(skew.skew_perspective)
         return TriageNextStep.PENDING_CALCULATION
 
+    @staticmethod
+    def tidy_change(overlap_contribution: OverlapContribution, field_name: str, value: Any):
+        if value == "None":
+            return None
+
+        match field_name:
+            case "triage state":
+                return TriageState.from_json(json.loads(value))
+            case "effective date":
+                return EffectiveDate.from_json(json.loads(value))
+            case "comment":
+                return TriageComment.from_json(json.loads(value))
+        return value
+
     @cached_property
     def change_log(self) -> list[ChangeRow]:
         all_triages = self.contributions | set([self.user_contribution])
         change_rows: list[ChangeRow] = []
-
-        def none_str_to_none(changes: list[str]) -> list[Optional[str]]:
-            if changes:
-                return [None if value == "None" else value for value in changes]
-            return None
 
         for triage in all_triages:
             triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage)
@@ -305,42 +314,18 @@ class OverlapGrouping:
                 if (value_change := entry.changes_dict.get("value")) and value_change[0] == 'None':
                     continue
 
+                comment: Optional[TriageComment] = None
                 field_changes = []
-
-                new_value_change = none_str_to_none(entry.changes_dict.get("new_value"))
-                triage_status_change = none_str_to_none(entry.changes_dict.get("triage_status"))
-                if new_value_change or triage_status_change:
-
-                    old_triage_status = TriageStatus.PENDING
-                    new_triage_status = TriageStatus.PENDING
-                    if triage_status_change:
-                        if old_triage_str := triage_status_change[0]:
-                            old_triage_status = TriageStatus(old_triage_str)
-                        if new_triage_str := triage_status_change[1]:
-                            new_triage_status = TriageStatus(new_triage_str)
-
-                    old_new_value = new_value_change[0] if new_value_change else None
-                    new_new_value = new_value_change[1] if new_value_change else None
-
-                    old_triage_str = old_triage_status.label
-                    if old_new_value:
-                        old_new_value = OverlapContribution.pretty_value_for(old_new_value, triage.value_type)
-                        old_triage_str += f" ({old_new_value})"
-
-                    new_triage_str = new_triage_status.label
-                    if new_new_value:
-                        new_new_value = OverlapContribution.pretty_value_for(new_new_value, triage.value_type)
-                        new_triage_str += f" ({new_new_value})"
-
-                    field_change = FieldChange("triage_status", old_triage_str, new_triage_str)
-                    field_changes.append(field_change)
-
                 for key, value_list in entry.changes_display_dict.items():
-                    if key in {"new value", "triage status"}:
-                        continue
-
-                    field_change = FieldChange(key, value_list[0], value_list[1])
-                    field_changes.append(field_change)
+                    if key == "comment":
+                        comment = OverlapGrouping.tidy_change(triage, key, value_list[1])
+                    else:
+                        field_change = FieldChange(
+                            key,
+                            OverlapGrouping.tidy_change(triage, key, value_list[0]),
+                            OverlapGrouping.tidy_change(triage, key, value_list[1])
+                        )
+                        field_changes.append(field_change)
 
                 user: Optional[User] = entry.actor
 
@@ -348,7 +333,7 @@ class OverlapGrouping:
                     overlap_contribution=triage,
                     user=user,
                     changes=list(sorted(field_changes)),
-                    comment=entry.additional_data.get("comment") if entry.additional_data else None,
+                    comment=comment,
                     timestamp=entry.timestamp
                 )
                 change_rows.append(change_row)

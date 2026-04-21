@@ -70,8 +70,8 @@
                         {% for field_change in change.changes %}
                             <div>{{ field_change.old_value }} -> {{ field_change.new_value }}</div>
                         {% endfor %}
-                        {% if change.comment and change.user %}
-                            <div class="comment">{{ change.comment }}</div>
+                        {% if change.comment %}
+                            <div class="comment">{{ change.comment.text }}</div>
                         {% endif %}
                     </div>
                 </div>
