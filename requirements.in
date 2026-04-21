@@ -90,3 +90,5 @@ frozendict
 pydantic>=2.4.0
 deepdiff
 dataclasses-json==0.6.7
+# required for omniimporter
+openpyxl
