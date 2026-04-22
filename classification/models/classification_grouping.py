@@ -78,33 +78,19 @@ def classification_sort_order(clin_sig: str) -> int:
 #     DISCORDANCE_MEDICALLY_SIGNIFICANT = 60, "Discordance"
 
 
-class AlleleGrouping(TimeStampedModel):
-    allele = models.OneToOneField(Allele, on_delete=models.CASCADE)
-    # TODO probably some more summary fields ew could have here?
-    # otherwise what is this serving that Allele isn't?
-
-    def __str__(self):
-        return f"({self.pk}) Allele Grouping for {self.allele}"
-
-    def get_absolute_url(self) -> str:
-        return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.pk})
-
-    @cached_property
-    def allele_origin_dict(self) -> dict[AlleleOriginBucket, 'AlleleOriginGrouping']:
-        by_bucket = {}
-        for ao in AlleleOriginGrouping.objects.filter(allele_grouping=self).prefetch_related("classificationgrouping_set"):
-            by_bucket[ao.allele_origin_bucket] = ao
-        return by_bucket
-
-    def allele_origin_grouping(self, allele_origin_bucket: AlleleOriginBucket) -> Optional['AlleleOriginGrouping']:
-        return self.allele_origin_dict.get(allele_origin_bucket)
-
 
 class AlleleOriginGrouping(TimeStampedModel):
-    allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
+    allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.UNKNOWN)
     testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, default=TestingContextBucket.UNKNOWN)
     tumor_type_category = models.TextField(null=True, blank=True)
+
+    @staticmethod
+    def allele_origin_dict(allele: Allele) -> dict[AlleleOriginBucket, 'AlleleOriginGrouping']:
+        by_bucket = {}
+        for ao in AlleleOriginGrouping.objects.filter(allele=allele).prefetch_related("classificationgrouping_set"):
+            by_bucket[ao.allele_origin_bucket] = ao
+        return by_bucket
 
     @property
     def testing_context_bucket_obj(self):
@@ -118,7 +104,7 @@ class AlleleOriginGrouping(TimeStampedModel):
         )
 
     def __str__(self):
-        return f"{self.allele_grouping.allele} {self.get_allele_origin_bucket_display()} Testing Context: {self.get_testing_context_bucket_display()} Sub-Type: {self.tumor_type_category}"
+        return f"{self.allele} {self.get_allele_origin_bucket_display()} Testing Context: {self.get_testing_context_bucket_display()} Sub-Type: {self.tumor_type_category}"
 
     def labels(self, include_allele_origin=True) -> list[Optional[str]]:
         parts = []
@@ -144,7 +130,7 @@ class AlleleOriginGrouping(TimeStampedModel):
         return AlleleOriginBucket(self.allele_origin_bucket)
 
     class Meta:
-        unique_together = ("allele_grouping", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
+        unique_together = ("allele", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
     # overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_SHARED_RECORDS)
     dirty = models.BooleanField(default=True)
@@ -152,12 +138,9 @@ class AlleleOriginGrouping(TimeStampedModel):
     # somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
 
     def __lt__(self, other: Self):
-        if id_diff := self.allele_grouping.pk - other.allele_grouping.pk:
+        if id_diff := self.allele.pk - other.allele.pk:
             return id_diff
         return self.allele_origin_bucket < other.allele_origin_bucket
-
-    def get_absolute_url(self) -> str:
-        return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.allele_grouping_id})
 
     def update(self):
         # FIXME as overlaps now belong in
@@ -204,7 +187,7 @@ class ClassificationGrouping(TimeStampedModel):
         parts = [
             f"({self.pk})",
             "Classification-Grouping",
-            f"{self.allele_origin_grouping.allele_grouping.allele:CA}",
+            f"{self.allele_origin_grouping.allele:CA}",
             self.allele_origin_grouping.get_testing_context_bucket_display(),
             str(self.lab),
             "Shared" if self.share_level_obj.is_discordant_level else "Not-shared",
@@ -288,9 +271,8 @@ class ClassificationGrouping(TimeStampedModel):
         lab = classification.lab
         share_level = classification.share_level
         if allele:
-            allele_grouping, _ = AlleleGrouping.objects.get_or_create(allele=allele)
             allele_origin_grouping, _ = AlleleOriginGrouping.objects.get_or_create(
-                allele_grouping=allele_grouping,
+                allele_grouping=allele,
                 allele_origin_bucket=classification.allele_origin_bucket,
                 testing_context_bucket=classification.testing_context_bucket,
                 tumor_type_category=classification.tumor_type_category

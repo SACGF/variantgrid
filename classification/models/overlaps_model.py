@@ -142,10 +142,6 @@ class OverlapContribution(TimeStampedModel):
     value = models.TextField(null=True, blank=True)
     # annoying thing about contribution_status is it takes a little bit of context knowledge to work out
 
-    # TODO do we want to keep date type somewhere?
-    # effective_date = models.DateField(null=True, blank=True)
-    # effective_date_type = models.TextField(choices=EffectiveDateType.choices, default=EffectiveDateType.UNKNOWN)
-
     # TODO rename to contribution_status
     contribution_status = TextFieldChoices(choices_type=OverlapContributionStatus)    # type: OverlapContributionStatus
     testing_context_bucket = models.TextField(choices=TestingContextBucket.choices)

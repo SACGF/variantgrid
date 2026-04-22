@@ -39,7 +39,7 @@ from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, Wit
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping, AlleleOriginGrouping, \
+    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleOriginGrouping, \
     ImportedAlleleInfo, ImportedAlleleInfoStatus, ClassificationImportRun, Overlap, OverlapContributionSkew, \
     OverlapContribution
 from classification.models.classification import ClassificationModification
@@ -958,13 +958,6 @@ def clin_sig_change_data(request):
     return response
 
 
-def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
-    lab_picker = LabPickerData.from_request(request, lab_id, 'allele_groupings_lab')
-    return render(request, 'classification/allele_groupings.html', {
-        "dlab": ClassificationDashboard(lab_picker=lab_picker)
-    })
-
-
 def view_classification_grouping_detail(request, classification_grouping_id: int):
     grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
     grouping.check_can_view(request.user)
@@ -990,42 +983,4 @@ def view_classification_grouping_records_detail(request, classification_grouping
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_records_detail.html', {
         "classification_grouping": grouping
-    })
-
-
-@dataclass(frozen=True)
-class AlleleOriginGroupingVisible:
-    allele_origin_grouping: list[AlleleOriginGrouping]
-    classification_groupings: list[ClassificationGrouping]
-    discordance_reports: list[DiscordanceReport]
-
-    @staticmethod
-    def from_grouping(allele_grouping: AlleleGrouping, user: User) -> list['AlleleOriginGroupingVisible']:
-        # FIXME add security checks to filter out
-
-        visible_groups: list[AlleleOriginGroupingVisible] = []
-        for bucket in [AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC, AlleleOriginBucket.UNKNOWN]:
-            if allele_origin_grouping := allele_grouping.allele_origin_dict.get(bucket):
-
-                discordance_reports = list(DiscordanceReport.objects.filter(
-                    clinical_context__in=ClinicalContext.objects.filter(allele=allele_grouping.allele,
-                                                                        allele_origin_bucket=bucket)
-                ).order_by('-report_started_date'))
-
-                visible_groups.append(
-                    AlleleOriginGroupingVisible(
-                        allele_origin_grouping=allele_origin_grouping,
-                        classification_groupings=list(sorted(allele_origin_grouping.classificationgrouping_set.all())),
-                        discordance_reports=discordance_reports
-                    )
-                )
-        return visible_groups
-
-
-def view_allele_grouping_detail(request, allele_grouping_id: int):
-    allele_grouping = AlleleGrouping.objects.get(pk=allele_grouping_id)
-
-    return render_ajax_view(request, 'classification/allele_grouping_detail.html', {
-        "allele_grouping": allele_grouping,
-        "groupings": AlleleOriginGroupingVisible.from_grouping(allele_grouping=allele_grouping, user=request.user)
     })

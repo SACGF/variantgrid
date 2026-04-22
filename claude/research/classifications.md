@@ -492,10 +492,6 @@ Database-backed grouping of classifications for the same variant/allele. Used fo
 - Computing consensus significance
 - Detecting discordance
 
-### `AlleleGrouping` (`models/classification_grouping.py`)
-
-Groups by allele origin (germline vs somatic). A single allele can have both germline and somatic classifications.
-
 ### `ClassificationLabSummary` (`models/classification_lab_summaries.py`)
 
 Cached per-lab statistics:

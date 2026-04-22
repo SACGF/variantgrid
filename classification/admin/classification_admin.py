@@ -19,7 +19,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm
+    AlleleOriginGrouping, ClassificationGroupingSearchTerm
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -1409,18 +1409,13 @@ class ClassificationGroupingTabularAdmin(TabularInline):
 
 @admin.register(AlleleOriginGrouping)
 class AlleleOriginGroupingAdmin(ModelAdminBasics):
-    list_display = ("allele_grouping", "dirty")
+    list_display = ("allele", "dirty")
     inlines = (ClassificationGroupingTabularAdmin,)
 
     @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
     def refresh_all(self, request):
         AlleleOriginGrouping.objects.update(dirty=True)
         ClassificationGrouping.update_all_dirty()
-
-    @admin_action("Recalculate Overlap")
-    def recalculate_single_context_overlaps(self, request, queryset: QuerySet[AlleleOriginGrouping]):
-        for aog in queryset:
-            OverlapServices().calculate_and_apply_overlaps_for_ao(aog)
 
 
 class AlleleOriginGroupingTabularAdmin(TabularInline):
@@ -1435,7 +1430,3 @@ class AlleleOriginGroupingTabularAdmin(TabularInline):
     def has_change_permission(self, request, obj=None):
         return False
 
-
-@admin.register(AlleleGrouping)
-class AlleleGroupingAdmin(ModelAdminBasics):
-    inlines = (AlleleOriginGroupingTabularAdmin,)

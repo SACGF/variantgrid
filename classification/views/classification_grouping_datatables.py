@@ -222,7 +222,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         #         filters.append(Q(allele_origin_grouping__tumor_type_category=tumor_type_category))
 
         if allele_id := self.get_query_param('allele_id'):
-            filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))
+            filters.append(Q(allele_origin_grouping__allele_id=int(allele_id)))
 
         if condition := self.get_query_param('ontology_term_id'):
             if c_filter := self.condition_filter(condition):

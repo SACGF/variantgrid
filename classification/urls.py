@@ -4,7 +4,6 @@ from classification.views import clinvar_export_view, search_view_metrics, class
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, \
     classification_accumulation_graph
-from classification.views.allele_grouping_datatables import AlleleGroupingColumns
 from classification.views.classification_dashboard_view import issues_download
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import summary_email_preview_html, \
@@ -62,11 +61,6 @@ urlpatterns = [
 
 
     path('triage/<int:triage_id>/triage', TriageView.as_view(), name='triage'),
-
-    path('allele_groupings', views.allele_groupings, name='allele_groupings'),
-    path('allele_groupings/<str:lab_id>', views.allele_groupings, name='allele_groupings_lab'),
-    path('allele_grouping/<allele_grouping_id>', views.view_allele_grouping_detail, name='allele_grouping_detail'),
-
     path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
          name='create_classification_for_variant'),
 
@@ -231,8 +225,6 @@ urlpatterns = [
     path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
     path('api/classifications/datatables/', DatabaseTableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
     path('api/classification/groups/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingColumns), name='classification_grouping_datatables'),
-    path('api/classification/allele_groups/datatables/<str:lab_id>', DatabaseTableView.as_view(column_class=AlleleGroupingColumns), name='allele_grouping_datatables'),
-
     path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
          name='lab_gene_classification_counts_api'),
 
