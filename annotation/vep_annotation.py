@@ -7,9 +7,10 @@ from shlex import shlex
 
 from django.conf import settings
 
+from annotation import vep_columns
 from annotation.fake_annotation import get_fake_vep_version
-from annotation.models.models import ColumnVEPField
 from annotation.models.models_enums import VEPPlugin, VEPCustom, VariantAnnotationPipelineType
+from annotation.vep_columns import VEPColumnDef
 from genes.models_enums import AnnotationConsortium
 from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
@@ -44,16 +45,18 @@ class VEPConfig:
 
 
 def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
-    """ Build from ColumnVEPField.source_field where vep_plugin = DBNSFP """
+    """ Build from VEPColumnDef.source_field where vep_plugin = DBNSFP """
 
     dbnsfp_data_path = vc["dbnsfp"]
-    q = ColumnVEPField.get_columns_version_q(vc.columns_version)
-    fields = ColumnVEPField.get_source_fields(genome_build, q, vep_plugin=VEPPlugin.DBNSFP)
-    joined_columns = ",".join(fields)
-    return f"dbNSFP,{dbnsfp_data_path},{joined_columns}"
+    fields = vep_columns.source_fields_for(
+        genome_build_name=genome_build.name,
+        columns_version=vc.columns_version,
+        vep_plugin=VEPPlugin.DBNSFP,
+    )
+    return f"dbNSFP,{dbnsfp_data_path},{','.join(fields)}"
 
 
-def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -> list:
+def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path) -> list:
     """ All our deployments are VEP >= 110 so we can use key/value pairs """
     int_vep_version = int(settings.ANNOTATION_VEP_VERSION)
     if int_vep_version < 110:
@@ -225,10 +228,22 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         plugin_data_func = {}  # No plugins for SVs
 
     # Custom
-    for vep_custom, prefix in dict(VEPCustom.choices).items():
+    for vep_custom in VEPCustom:
+        prefix = vep_custom.label
         try:
-            q = ColumnVEPField.get_q(genome_build, vc.vep_version, vc.columns_version, pipeline_type)
-            if cvf_list := list(ColumnVEPField.get(genome_build, q, vep_custom=vep_custom)):
+            # Match original ColumnVEPField.get(): distinct source_field, ordered by source_field
+            # (postgres default collation = case-insensitive).
+            cvf_list = sorted(
+                {c.source_field: c for c in vep_columns.filter_for(
+                    genome_build_name=genome_build.name,
+                    pipeline_type=pipeline_type,
+                    columns_version=vc.columns_version,
+                    vep_version=vc.vep_version,
+                    vep_custom=vep_custom,
+                )}.values(),
+                key=lambda c: (c.source_field or "").lower(),
+            )
+            if cvf_list:
                 prefix_lc = prefix.lower()
                 if cfg := vc[prefix_lc]:  # annotation settings are lower case
                     cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg))
@@ -353,12 +368,15 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
         pass
 
     # we use our own gnomAD custom annotation, not the default VEP one
-    q_cvf = ColumnVEPField.get_columns_version_q(vep_config.columns_version)
-    if cvf := ColumnVEPField.objects.filter(q_cvf, variant_grid_column='gnomad_af', genome_build=genome_build).first():
+    candidates = [c for c in vep_columns.for_variant_grid_column('gnomad_af')
+                  if genome_build.name in c.genome_builds
+                  and c.applies_to(columns_version=vep_config.columns_version)]
+    if candidates:
+        cvf = candidates[0]
         try:
             # annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz
             # gnomad3.1_GRCh38_merged.vcf.bgz
-            gnomad_filename = vep_config[cvf.get_vep_custom_display().lower()]
+            gnomad_filename = vep_config[cvf.vep_custom.label.lower()]
             if os.path.exists(gnomad_filename):
                 gnomad_basename = os.path.basename(gnomad_filename)
                 if m := re.match(r"^gnomad(.*?)_(GRCh37|GRCh38|hg19|hg38|T2T-CHM13v2.0)", gnomad_basename, flags=re.IGNORECASE):
