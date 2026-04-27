@@ -3,19 +3,27 @@ set -euo pipefail
 
 #
 # Strip a single gnomAD v4.1 joint VCF down to the INFO fields we need,
-# rename _joint -> legacy (v4.0-style) names, bgzip + tabix the output.
+# rename _joint -> legacy (v4.0-style) names, rename contigs (e.g.
+# NC_000001.11 -> 1) using a bcftools chrom map, bgzip + tabix the output.
 #
 # Usage:
-#   strip_gnomad41_one.sh INPUT_VCF OUTPUT_VCF [RENAME_FILE]
+#   strip_gnomad41_one.sh INPUT_VCF OUTPUT_VCF CHROM_MAP
 #
-# If RENAME_FILE is omitted, one is written next to OUTPUT_VCF.
+# RENAME_FILE for the _joint -> v4.0 name TSV is auto-generated next to
+# OUTPUT_VCF; override by exporting RENAME_FILE in the environment.
 #
 # Requires bcftools + tabix on PATH.
 #
 
-INPUT_VCF="${1:?Usage: $0 INPUT_VCF OUTPUT_VCF [RENAME_FILE]}"
-OUTPUT_VCF="${2:?Usage: $0 INPUT_VCF OUTPUT_VCF [RENAME_FILE]}"
-RENAME_FILE="${3:-}"
+INPUT_VCF="${1:?Usage: $0 INPUT_VCF OUTPUT_VCF CHROM_MAP}"
+OUTPUT_VCF="${2:?Usage: $0 INPUT_VCF OUTPUT_VCF CHROM_MAP}"
+CHROM_MAP="${3:?Usage: $0 INPUT_VCF OUTPUT_VCF CHROM_MAP}"
+RENAME_FILE="${RENAME_FILE:-}"
+
+if [ ! -f "$CHROM_MAP" ]; then
+    echo "CHROM_MAP not found: $CHROM_MAP" >&2
+    exit 1
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=gnomad41_fields.sh
@@ -34,6 +42,7 @@ KEEP_EXPR="$(build_keep_expr)"
 echo "Processing $INPUT_VCF -> $OUTPUT_VCF"
 echo "  keep expression: $KEEP_EXPR"
 echo "  rename file:     $RENAME_FILE"
+echo "  chrom map:       $CHROM_MAP"
 
 # Pass 1 — pure bcftools pipeline, streamed with BCF (-O u) between stages.
 # Writes the bgzipped intermediate with header attributes untouched (AC/AF/AN
@@ -43,8 +52,9 @@ echo "  rename file:     $RENAME_FILE"
 #      every later stage operates on biallelic data. gnomAD v4.x is usually
 #      pre-split, but this is a cheap safety net.
 #   2. bcftools annotate --remove : drop every INFO field except KEEP_FIELDS
-#   3. bcftools annotate --rename-annots : rename _joint -> legacy v4.0 names,
-#      writing the final bgzipped intermediate directly via -O z.
+#   3. bcftools annotate --rename-annots + --rename-chrs : rename _joint ->
+#      legacy v4.0 names AND rename contigs (e.g. NC_000001.11 -> 1) in one
+#      pass, writing the final bgzipped intermediate directly via -O z.
 TMP_VCF="${OUTPUT_VCF}.tmp.vcf.gz"
 TMP_HDR="${OUTPUT_VCF}.tmp.hdr"
 trap 'rm -f "$TMP_VCF" "$TMP_HDR"' EXIT
@@ -58,6 +68,7 @@ bcftools norm \
         -O u \
     | bcftools annotate \
         --rename-annots "${RENAME_FILE}" \
+        --rename-chrs "${CHROM_MAP}" \
         -O z \
         -o "${TMP_VCF}"
 

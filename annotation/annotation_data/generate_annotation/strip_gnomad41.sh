@@ -3,17 +3,26 @@ set -euo pipefail
 
 #
 # Submit one SLURM job per chromosome to strip gnomAD v4.1 joint VCFs.
-# Each job calls strip_gnomad41_one.sh for its chromosome.
+# Each job calls strip_gnomad41_one.sh for its chromosome, which also renames
+# contigs (NC_000001.11 -> 1 etc) using the supplied bcftools chrom map.
 #
 # Usage:
-#   bash strip_gnomad41.sh /path/to/input/dir /path/to/output/dir PARTITION
-#   bash strip_gnomad41.sh /path/to/input/dir /path/to/output/dir PARTITION --dry-run
+#   bash strip_gnomad41.sh INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]
+#
+# CHROM_MAP is a bcftools --rename-chrs TSV, e.g.
+#   snpdb/genome/chrom_mapping_GRCh38.map
 #
 
-INPUT_DIR="${1:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION [--dry-run]}"
-OUTPUT_DIR="${2:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION [--dry-run]}"
-PARTITION="${3:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION [--dry-run]}"
-DRY_RUN="${4:-}"
+INPUT_DIR="${1:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]}"
+OUTPUT_DIR="${2:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]}"
+PARTITION="${3:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]}"
+CHROM_MAP="${4:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]}"
+DRY_RUN="${5:-}"
+
+if [ ! -f "$CHROM_MAP" ]; then
+    echo "CHROM_MAP not found: $CHROM_MAP" >&2
+    exit 1
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKER="${SCRIPT_DIR}/strip_gnomad41_one.sh"
@@ -57,7 +66,7 @@ set -euo pipefail
 export PATH="${EXTRA_PATH}:\${PATH}"
 echo "Processing chr${CHR} - \$(date)"
 
-bash "${WORKER}" "${INPUT_VCF}" "${OUTPUT_VCF}" "${RENAME_FILE}"
+RENAME_FILE="${RENAME_FILE}" bash "${WORKER}" "${INPUT_VCF}" "${OUTPUT_VCF}" "${CHROM_MAP}"
 
 echo "Done chr${CHR} - \$(date)"
 SLURM
