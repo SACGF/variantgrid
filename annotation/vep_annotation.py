@@ -231,13 +231,18 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     for vep_custom in VEPCustom:
         prefix = vep_custom.label
         try:
-            cvf_list = list(vep_columns.filter_for(
-                genome_build_name=genome_build.name,
-                pipeline_type=pipeline_type,
-                columns_version=vc.columns_version,
-                vep_version=vc.vep_version,
-                vep_custom=vep_custom,
-            ))
+            # Match original ColumnVEPField.get(): distinct source_field, ordered by source_field
+            # (postgres default collation = case-insensitive).
+            cvf_list = sorted(
+                {c.source_field: c for c in vep_columns.filter_for(
+                    genome_build_name=genome_build.name,
+                    pipeline_type=pipeline_type,
+                    columns_version=vc.columns_version,
+                    vep_version=vc.vep_version,
+                    vep_custom=vep_custom,
+                )}.values(),
+                key=lambda c: (c.source_field or "").lower(),
+            )
             if cvf_list:
                 prefix_lc = prefix.lower()
                 if cfg := vc[prefix_lc]:  # annotation settings are lower case

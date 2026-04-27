@@ -239,8 +239,8 @@ class BulkVEPVCFAnnotationInserter:
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
-        # Sort to have consistent VCF headers
-        for cvf in sorted(cvf_list, key=lambda c: c.source_field or ""):
+        # Sort to have consistent VCF headers (case-insensitive to match postgres `ORDER BY source_field`)
+        for cvf in sorted(cvf_list, key=lambda c: (c.source_field or "").lower()):
             try:
                 if cvf.vep_custom:  # May not be configured
                     prefix = cvf.vep_custom.label

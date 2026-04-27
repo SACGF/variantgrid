@@ -1592,8 +1592,9 @@ def filter_for(
 
 
 def source_fields_for(**kwargs) -> list[str]:
-    """ Distinct, sorted source_fields for the given filter. """
-    return sorted({c.source_field for c in filter_for(**kwargs) if c.source_field})
+    """ Distinct source_fields for the given filter, sorted case-insensitively
+        (matches postgres `ORDER BY source_field` under default en_US collation). """
+    return sorted({c.source_field for c in filter_for(**kwargs) if c.source_field}, key=str.lower)
 
 
 def for_variant_grid_column(vgc_id: str) -> tuple[VEPColumnDef, ...]:
