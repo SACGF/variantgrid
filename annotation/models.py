@@ -3,7 +3,7 @@
 from annotation.models.models import ClinVarVersion, ClinVar, ClinVarRecordCollection, ClinVarRecord, \
     ClinVarCitationsCollection, ClinVarCitation, DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation, \
     GeneAnnotationVersion, GeneAnnotation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample, \
-    HumanProteinAtlasAnnotation, ColumnVEPField, VariantAnnotationVersion, VCFAnnotationStats, AnnotationRangeLock, \
+    HumanProteinAtlasAnnotation, VariantAnnotationVersion, VCFAnnotationStats, AnnotationRangeLock, \
     AnnotationRun, VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap, ManualVariantEntryCollection, \
     ManualVariantEntry, CreatedManualVariant, AnnotationVersion, CachedWebResource, GeneSymbolCitation, \
     GenePubMedCount, MutationalSignatureInfo

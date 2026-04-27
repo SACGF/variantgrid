@@ -1,10 +1,9 @@
 import logging
-import operator
 import os
 import re
 from collections import defaultdict
 from datetime import datetime
-from functools import cached_property, reduce
+from functools import cached_property
 from typing import Optional, Callable, Iterable
 
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -27,7 +26,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import AnnotationStatus, \
-    ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
+    ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
     EssentialGeneGeneTrap, VariantAnnotationPipelineType
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
@@ -607,106 +606,6 @@ class HumanProteinAtlasAnnotation(models.Model):
     gene = models.ForeignKey(Gene, null=True, on_delete=CASCADE)  # Always Ensembl
     tissue_sample = models.ForeignKey(HumanProteinAtlasTissueSample, on_delete=CASCADE)
     value = models.FloatField()
-
-
-class ColumnVEPField(models.Model):
-    """ For VariantAnnotation/Transcript columns derived from VEP fields """
-    column = models.TextField(unique=True)  # TODO: Do we actually need this?
-    variant_grid_column = models.ForeignKey(VariantGridColumn, on_delete=CASCADE)  # VariantAnnotation.column dest
-    genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE)  # null = all builds
-    pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices,
-                                     null=True, blank=True)  # Null = all pipeline types
-    category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.choices)
-    source_field = models.TextField(null=True)  # @see use vep_info_field
-    source_field_processing_description = models.TextField(null=True)
-    vep_plugin = models.CharField(max_length=1, choices=VEPPlugin.choices, null=True)
-    vep_custom = models.CharField(max_length=1, choices=VEPCustom.choices, null=True)
-    source_field_has_custom_prefix = models.BooleanField(default=False)
-    # We can use these min/max versions to turn on/off columns over time
-    min_columns_version = models.IntegerField(null=True)
-    max_columns_version = models.IntegerField(null=True)
-    min_vep_version = models.IntegerField(null=True)
-    max_vep_version = models.IntegerField(null=True)
-    summary_stats = models.TextField(blank=True, null=True)  # Only used VEP 111 and on...
-
-    def __str__(self) -> str:
-        return self.column
-
-    @property
-    def vep_info_field(self):
-        """ For VCFs, be sure to set source_field_has_custom_prefix=True
-            Annotating with a VCF (short name = TopMed) brings in the DB column as "TopMed" and
-            prefixes INFO fields, e.g. 'TOPMED' => TopMed_TOPMED.
-            We need to adjust for this in BulkVEPVCFAnnotationInserter """
-
-        vif = self.source_field
-        if self.vep_custom and self.source_field_has_custom_prefix:
-            if vif:
-                vif = self.get_vep_custom_display() + "_" + vif
-            else:
-                vif = self.get_vep_custom_display()  # Just the prefix - used eg to return ID in VEP custom VCFs
-        return vif
-
-    @cached_property
-    def columns_version_description(self) -> str:
-        limits = []
-        if self.min_columns_version:
-            limits.append(f"column version >= {self.min_columns_version}")
-        if self.max_columns_version:
-            limits.append(f"column version <= {self.max_columns_version}")
-        return " and ".join(limits)
-
-    @staticmethod
-    def get_columns_version_q(columns_version: int) -> Q:
-        q_min = Q(min_columns_version__isnull=True) | Q(min_columns_version__lte=columns_version)
-        q_max = Q(max_columns_version__isnull=True) | Q(max_columns_version__gte=columns_version)
-        return q_min & q_max
-
-    @staticmethod
-    def get_vep_version_q(vep_version: int) -> Q:
-        q_min = Q(min_vep_version__isnull=True) | Q(min_vep_version__lte=vep_version)
-        q_max = Q(max_vep_version__isnull=True) | Q(max_vep_version__gte=vep_version)
-        return q_min & q_max
-
-    @staticmethod
-    def get_pipeline_type_q(pipeline_type) -> Q:
-        return Q(pipeline_type__isnull=True) | Q(pipeline_type=pipeline_type)
-
-    @staticmethod
-    def get_genome_build_q(genome_build) -> Q:
-        return Q(genome_build=genome_build) | Q(genome_build__isnull=True)
-
-    @staticmethod
-    def get_q(genome_build: GenomeBuild, vep_version, columns_version, pipeline_type) -> Q:
-        filters = [
-            ColumnVEPField.get_genome_build_q(genome_build),
-            ColumnVEPField.get_columns_version_q(columns_version),
-            ColumnVEPField.get_vep_version_q(vep_version),
-            ColumnVEPField.get_pipeline_type_q(pipeline_type),
-        ]
-        return reduce(operator.and_, filters)
-
-    @staticmethod
-    def filter(genome_build: GenomeBuild, vep_version: int, columns_version: int, pipeline_type):
-        q = ColumnVEPField.get_q(genome_build, vep_version, columns_version, pipeline_type)
-        return ColumnVEPField.objects.filter(q)
-
-    @staticmethod
-    def filter_for_build(genome_build: GenomeBuild):
-        """ genome_build = NULL (no build) or matches provided build """
-        return ColumnVEPField.objects.filter(ColumnVEPField.get_genome_build_q(genome_build))
-
-    @staticmethod
-    def get(genome_build: GenomeBuild, *columnvepfield_args, **columnvepfield_kwargs) -> QuerySet['ColumnVEPField']:
-        qs = ColumnVEPField.filter_for_build(genome_build)
-        qs = qs.filter(*columnvepfield_args, **columnvepfield_kwargs)
-        return qs.distinct("source_field").order_by("source_field")
-
-    @staticmethod
-    def get_source_fields(genome_build: GenomeBuild, *columnvepfield_args, **columnvepfield_kwargs):
-        qs = ColumnVEPField.filter_for_build(genome_build)
-        qs = qs.filter(*columnvepfield_args, **columnvepfield_kwargs).distinct("source_field")
-        return list(qs.values_list("source_field", flat=True).order_by("source_field"))
 
 
 class VariantAnnotationVersion(SubVersionPartition):
