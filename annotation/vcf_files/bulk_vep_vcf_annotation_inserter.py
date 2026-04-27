@@ -135,6 +135,7 @@ class BulkVEPVCFAnnotationInserter:
             pipeline_type=self.annotation_run.pipeline_type,
             columns_version=self.vep_config.columns_version,
             vep_version=self.vep_config.vep_version,
+            gnomad4_minor_version=self.vep_config.gnomad4_minor_version,
         )
 
         self._setup_vep_fields_and_db_columns(validate_columns, cvf_list)
@@ -232,8 +233,12 @@ class BulkVEPVCFAnnotationInserter:
         }
 
         # gnomad3 wasn't combined using gnomad_data.py so just uses FILTER
-        # while combined exome/genomes use "gnomad_filtered=1" (which should auto-convert bool)
-        if self.genome_build == GenomeBuild.grch38() and self.vep_config.columns_version <= 2:
+        # while combined exome/genomes use "gnomad_filtered=1" (which should auto-convert bool).
+        # gnomAD 4.1 is joint-called by gnomAD with the filter signal in the VCF FILTER column.
+        needs_filter_text_parse = (
+            self.genome_build == GenomeBuild.grch38() and self.vep_config.columns_version <= 2
+        ) or self.vep_config.gnomad4_minor_version == "4.1"
+        if needs_filter_text_parse:
             self.field_formatters["gnomad_filtered"] = gnomad_filtered_func
 
         self.source_field_to_columns = defaultdict(set)

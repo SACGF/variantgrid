@@ -26,6 +26,7 @@ class VEPColumnDef:
     max_columns_version: Optional[int] = None
     min_vep_version: Optional[int] = None
     max_vep_version: Optional[int] = None
+    gnomad4_minor_version: Optional[str] = None
     summary_stats: Optional[str] = None
     source_field_processing_description: Optional[str] = None
 
@@ -54,6 +55,7 @@ class VEPColumnDef:
         pipeline_type: Optional[VariantAnnotationPipelineType] = None,
         columns_version: Optional[int] = None,
         vep_version: Optional[int] = None,
+        gnomad4_minor_version: Optional[str] = None,
     ) -> bool:
         if genome_build_name is not None and self.genome_builds and genome_build_name not in self.genome_builds:
             return False
@@ -69,6 +71,9 @@ class VEPColumnDef:
                 return False
             if self.max_vep_version is not None and vep_version > self.max_vep_version:
                 return False
+        if gnomad4_minor_version is not None and self.gnomad4_minor_version is not None \
+                and gnomad4_minor_version != self.gnomad4_minor_version:
+            return False
         return True
 
 
@@ -661,6 +666,18 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=frozenset({'GRCh38', 'T2T-CHM13v2.0'}),
         pipeline_types=frozenset({VariantAnnotationPipelineType.STANDARD}),
         min_columns_version=3,
+        gnomad4_minor_version="4.0",
+    ),
+    VEPColumnDef(
+        source_field='FILTER',
+        variant_grid_columns=('gnomad_filtered',),
+        category=ColumnAnnotationCategory.FREQUENCY_DATA,
+        vep_custom=VEPCustom.GNOMAD_4,
+        source_field_has_custom_prefix=True,
+        genome_builds=frozenset({'GRCh38', 'T2T-CHM13v2.0'}),
+        pipeline_types=frozenset({VariantAnnotationPipelineType.STANDARD}),
+        min_columns_version=3,
+        gnomad4_minor_version="4.1",
     ),
     VEPColumnDef(
         source_field='gnomad_filtered',
@@ -1575,6 +1592,7 @@ def filter_for(
     pipeline_type: Optional[VariantAnnotationPipelineType] = None,
     columns_version: Optional[int] = None,
     vep_version: Optional[int] = None,
+    gnomad4_minor_version: Optional[str] = None,
     vep_plugin: Optional[VEPPlugin] = None,
     vep_custom: Optional[VEPCustom] = None,
 ) -> tuple[VEPColumnDef, ...]:
@@ -1585,6 +1603,7 @@ def filter_for(
             pipeline_type=pipeline_type,
             columns_version=columns_version,
             vep_version=vep_version,
+            gnomad4_minor_version=gnomad4_minor_version,
         )
         and (vep_plugin is None or c.vep_plugin == vep_plugin)
         and (vep_custom is None or c.vep_custom == vep_custom)

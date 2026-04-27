@@ -4,6 +4,7 @@ import re
 import uuid
 from copy import deepcopy
 from shlex import shlex
+from typing import Optional
 
 from django.conf import settings
 
@@ -19,6 +20,14 @@ from snpdb.models.models_genome import GenomeBuild
 
 class VEPVersionMismatchError(ValueError):
     pass
+
+
+def parse_gnomad_version_from_filename(path: str) -> Optional[str]:
+    basename = os.path.basename(path)
+    if m := re.match(r"^gnomad(.*?)_(GRCh37|GRCh38|hg19|hg38|T2T-CHM13v2.0)",
+                     basename, flags=re.IGNORECASE):
+        return m.group(1)
+    return None
 
 
 class VEPConfig:
@@ -42,6 +51,17 @@ class VEPConfig:
         if value is None:
             raise KeyError(key)
         return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
+
+    @property
+    def gnomad4_minor_version(self) -> str:
+        try:
+            gnomad4_path = self["gnomad4"]
+        except KeyError:
+            return "4.0"
+        version = parse_gnomad_version_from_filename(gnomad4_path)
+        if version is None:
+            return "4.0"
+        return version
 
 
 def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
@@ -239,6 +259,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                     pipeline_type=pipeline_type,
                     columns_version=vc.columns_version,
                     vep_version=vc.vep_version,
+                    gnomad4_minor_version=vc.gnomad4_minor_version,
                     vep_custom=vep_custom,
                 )}.values(),
                 key=lambda c: (c.source_field or "").lower(),
@@ -378,11 +399,11 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
             # gnomad3.1_GRCh38_merged.vcf.bgz
             gnomad_filename = vep_config[cvf.vep_custom.label.lower()]
             if os.path.exists(gnomad_filename):
-                gnomad_basename = os.path.basename(gnomad_filename)
-                if m := re.match(r"^gnomad(.*?)_(GRCh37|GRCh38|hg19|hg38|T2T-CHM13v2.0)", gnomad_basename, flags=re.IGNORECASE):
-                    kwargs["gnomad"] = m.group(1)
+                gnomad_version = parse_gnomad_version_from_filename(gnomad_filename)
+                if gnomad_version is not None:
+                    kwargs["gnomad"] = gnomad_version
                 else:
-                    msg = f"Couldn't determine gnomAD version from file: {gnomad_basename}"
+                    msg = f"Couldn't determine gnomAD version from file: {os.path.basename(gnomad_filename)}"
                     raise ValueError(msg)
         except KeyError:
             pass  # Will just use VEP values

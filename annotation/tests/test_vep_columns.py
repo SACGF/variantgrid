@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
 from annotation.vep_columns import VEP_COLUMNS, all_variant_grid_column_ids, filter_for
 from snpdb.models import VariantGridColumn
 
@@ -31,3 +32,19 @@ class VepColumnsRegistryTest(TestCase):
         filtered = filter_for(genome_build_name="GRCh37")
         self.assertLessEqual(len(filtered), all_count)
         self.assertGreater(len(filtered), 0)
+
+    def test_gnomad4_minor_version_filter(self):
+        common_kwargs = dict(
+            genome_build_name="GRCh38",
+            pipeline_type=VariantAnnotationPipelineType.STANDARD,
+            columns_version=3,
+            vep_custom=VEPCustom.GNOMAD_4,
+        )
+        rows_40 = [c for c in filter_for(gnomad4_minor_version="4.0", **common_kwargs)
+                   if "gnomad_filtered" in c.variant_grid_columns]
+        rows_41 = [c for c in filter_for(gnomad4_minor_version="4.1", **common_kwargs)
+                   if "gnomad_filtered" in c.variant_grid_columns]
+        self.assertEqual(len(rows_40), 1)
+        self.assertEqual(rows_40[0].source_field, "gnomad_filtered")
+        self.assertEqual(len(rows_41), 1)
+        self.assertEqual(rows_41[0].source_field, "FILTER")

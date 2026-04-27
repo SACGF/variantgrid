@@ -40,6 +40,9 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
         "phastcons30way": None,
         "phylop100way": None,
         "phylop30way": None,
+        # Test fixtures were generated against gnomAD 4.0; pin so they don't pick up a developer's
+        # local 4.1 override (which would shift VEP CSQ fields and break fixture parsing).
+        "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",
     })
 
     ANNOTATION_COLUMNS = copy.deepcopy(TEST_ANNOTATION)
