@@ -29,6 +29,9 @@ KEEP_FIELDS=(
     AC_joint_sas AN_joint_sas AF_joint_sas
     # ChrX sex-specific
     AC_joint_XY AN_joint_XY AF_joint_XY
+    # ChrX/chrY non-PAR flag (only present on sex chromosomes; Flag type so
+    # no _joint suffix — used to derive gnomad_hemi_count downstream)
+    non_par
 )
 
 # Build the bcftools --remove expression: "^INFO/foo,INFO/bar,..."
