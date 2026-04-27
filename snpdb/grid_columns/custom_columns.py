@@ -4,7 +4,8 @@ from django.db.models import Q, OuterRef, Subquery, Max, Value
 from django.db.models.functions import Coalesce
 
 from analysis.models import VariantTag
-from annotation.models import AnnotationVersion, ColumnVEPField
+from annotation import vep_columns
+from annotation.models import AnnotationVersion
 from classification.models import ClassificationModification
 from library.jqgrid.jqgrid_sql import get_overrides
 from snpdb.models import CustomColumn, CustomColumnsCollection
@@ -14,9 +15,13 @@ from snpdb.models.models_enums import ColumnAnnotationLevel
 def get_custom_column_fields_override_and_sample_position(custom_columns_collection: CustomColumnsCollection,
                                                           annotation_version: AnnotationVersion,
                                                           analysis_tags=False):
-    q_cvf = ColumnVEPField.get_columns_version_q(annotation_version.variant_annotation_version.columns_version)
-    cvf_qs = ColumnVEPField.objects.filter(q_cvf)
-    q_columns_this_version = Q(column__columnvepfield__isnull=True) | Q(column__columnvepfield__in=cvf_qs)
+    columns_version = annotation_version.variant_annotation_version.columns_version
+    in_version_vgcs = {
+        vgc for c in vep_columns.filter_for(columns_version=columns_version)
+        for vgc in c.variant_grid_columns
+    }
+    ever_referenced = vep_columns.all_variant_grid_column_ids()
+    q_columns_this_version = ~Q(column__in=ever_referenced) | Q(column__in=in_version_vgcs)
     columns_queryset = CustomColumn.objects.filter(q_columns_this_version,
                                                    custom_columns_collection=custom_columns_collection)
     columns_queryset = columns_queryset.select_related("column").order_by("sort_order").distinct()

@@ -6,16 +6,17 @@ from functools import cached_property
 from typing import Optional, Iterable, TypeAlias
 
 from django.conf import settings
-from django.db.models import QuerySet
 
+from annotation import vep_columns as vep_columns_registry
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
     PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
-from annotation.models.models import ColumnVEPField, VariantAnnotation, \
+from annotation.models.models import VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
 from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
+from annotation.vep_columns import VEPColumnDef
 from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
@@ -129,19 +130,21 @@ class BulkVEPVCFAnnotationInserter:
         self.aloft_columns = False
         logging.info("CSQ: %s", self.vep_columns)
 
-        cvf_qs = ColumnVEPField.filter(self.genome_build,
-                                       self.vep_config.vep_version,
-                                       self.vep_config.columns_version,
-                                       self.annotation_run.pipeline_type)
+        cvf_list = vep_columns_registry.filter_for(
+            genome_build_name=self.genome_build.name,
+            pipeline_type=self.annotation_run.pipeline_type,
+            columns_version=self.vep_config.columns_version,
+            vep_version=self.vep_config.vep_version,
+        )
 
-        self._setup_vep_fields_and_db_columns(validate_columns, cvf_qs)
+        self._setup_vep_fields_and_db_columns(validate_columns, cvf_list)
         self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build,
                                         # We only want exact transcript version for annotation
                                         allow_alternative_transcript_version=False)
 
         sv_overlap_processor = None
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
-            sv_overlap_processor = SVOverlapProcessor(cvf_qs)
+            sv_overlap_processor = SVOverlapProcessor(cvf_list)
         self.sv_overlap_processor = sv_overlap_processor
         self._generated_hgvs_c = Counter()
 
@@ -168,7 +171,7 @@ class BulkVEPVCFAnnotationInserter:
             columns = columns_str.split("|")
         return columns
 
-    def _add_vep_field_handlers(self, cvf_qs):
+    def _add_vep_field_handlers(self, cvf_list):
         # TOPMED and 1k genomes can return multiple values - take highest
         empty_mave_float_values = EMPTY_VALUES | {"NA"}
         format_pick_lowest_float = get_clean_and_pick_single_value_func(min, float,
@@ -237,26 +240,23 @@ class BulkVEPVCFAnnotationInserter:
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
         # Sort to have consistent VCF headers
-        for cvf in cvf_qs.order_by("source_field"):
+        for cvf in sorted(cvf_list, key=lambda c: c.source_field or ""):
             try:
                 if cvf.vep_custom:  # May not be configured
-                    prefix = cvf.get_vep_custom_display()
+                    prefix = cvf.vep_custom.label
                     setting_key = prefix.lower()
                     _ = self.vep_config[setting_key]  # May throw exception if not setup
-                    # VEP custom often adds a column of just the prefix which we often don't use
-                    # if cvf.source_field_has_custom_prefix:
-                    #     self.ignored_vep_fields.append(prefix)
 
-                self.source_field_to_columns[cvf.vep_info_field].add(cvf.variant_grid_column_id)
-                # logging.info("Handling column %s => %s", cvf.vep_info_field, cvf.variant_grid_column_id)
+                for vgc_id in cvf.variant_grid_columns:
+                    self.source_field_to_columns[cvf.vep_info_field].add(vgc_id)
             except:
                 logging.warning("Skipping custom %s due to missing settings", cvf.vep_info_field)
 
         vav = self.annotation_run.variant_annotation_version
         self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
 
-    def _setup_vep_fields_and_db_columns(self, validate_columns: bool, cvf_qs: QuerySet[ColumnVEPField]):
-        self._add_vep_field_handlers(cvf_qs)
+    def _setup_vep_fields_and_db_columns(self, validate_columns: bool, cvf_list: tuple[VEPColumnDef, ...]):
+        self._add_vep_field_handlers(cvf_list)
 
         ignore_columns = set(self.DB_FIXED_COLUMNS +
                              self.DB_MANUALLY_POPULATED_COLUMNS +
@@ -265,9 +265,9 @@ class BulkVEPVCFAnnotationInserter:
             ignore_columns.update(self.VEP_NOT_COPIED_REFSEQ_ONLY)
 
         # Find the ones that don't apply to this version, and exclude them
-        other_cvf_qs = ColumnVEPField.objects.all().difference(cvf_qs)
-        vep_fields_not_this_version = set(other_cvf_qs.values_list("variant_grid_column_id", flat=True))
-        ignore_columns.update(vep_fields_not_this_version)
+        in_scope = {vgc for c in cvf_list for vgc in c.variant_grid_columns}
+        all_known = vep_columns_registry.all_variant_grid_column_ids()
+        ignore_columns.update(all_known - in_scope)
 
         for c in list(ignore_columns):
             # FIXME, why do we convery ignore_clumns to a list here? it's a set which would work fine
@@ -846,9 +846,12 @@ class SVOverlapProcessor:
         due to some issues: https://github.com/Ensembl/VEP_plugins/issues/710
         This requires a bit of post-processing
     """
-    def __init__(self, cvf_qs: QuerySet[ColumnVEPField]):
-        cvf_qs = cvf_qs.filter(vep_custom__in=[VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME])
-        self.sv_fields = set(cvf_qs.values_list("variant_grid_column_id", flat=True))
+    def __init__(self, cvf_list: tuple[VEPColumnDef, ...]):
+        sv_customs = {VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME}
+        self.sv_fields = {
+            vgc for c in cvf_list if c.vep_custom in sv_customs
+            for vgc in c.variant_grid_columns
+        }
 
     @staticmethod
     def _get_required_substrings(variant_class: str) -> list[str]:

@@ -18,8 +18,9 @@ from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
     VariantAnnotationVersionDiff, Citation
+from annotation import vep_columns
 from annotation.models.models import CachedWebResource, HumanProteinAtlasAnnotationVersion, \
-    HumanProteinAtlasAnnotation, ColumnVEPField, DBNSFPGeneAnnotationVersion
+    HumanProteinAtlasAnnotation, DBNSFPGeneAnnotationVersion
 from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_version_diff import VersionDiff
@@ -463,11 +464,16 @@ def view_annotation_descriptions(request, genome_build_name=None):
     vep_annotation_levels = [ColumnAnnotationLevel.TRANSCRIPT_LEVEL, ColumnAnnotationLevel.VARIANT_LEVEL]
     columns_and_vep_by_annotation_level = {al.label: {} for al in vep_annotation_levels}
 
-    vep_qs = ColumnVEPField.filter_for_build(genome_build)
+    def _first_for_build(vgc_id, build_name):
+        for c in vep_columns.for_variant_grid_column(vgc_id):
+            if c.applies_to(genome_build_name=build_name):
+                return c
+        return None
+
     for vgc in VariantGridColumn.objects.all().order_by("grid_column_name"):
         if vgc.annotation_level in vep_annotation_levels:
             # For Transcript/Variant that use VEP - only show if visible in that build
-            if vep := vep_qs.filter(variant_grid_column=vgc).first():
+            if vep := _first_for_build(vgc.pk, genome_build.name):
                 columns_and_vep_by_annotation_level[vgc.get_annotation_level_display()][vgc] = vep
         else:
             variantgrid_columns_by_annotation_level[vgc.annotation_level].append(vgc)
