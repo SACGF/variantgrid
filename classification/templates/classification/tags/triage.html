@@ -2,4 +2,5 @@
 {% if show_link %} <a href="{% url 'triage' triage.pk %}?edit=true" data-toggle="ajax-modal">{% endif %}
 {% if show_icon %}{{ triage.triage_state.status.icon }}{% endif %}{% if show_label %} <i>{{ triage.triage_state.status.label }}</i>{% endif %}{% if new_value %} <i>(<span style="color:#888">{{ new_value }}</span>)</i>{% endif %}
 {% if show_link %}</a>{% endif %}
+{% if last_comment.text %}<i class="ml-1 fa-solid fa-message" style="opacity:0.5"></i>{% endif %}
 </span>

@@ -8,7 +8,7 @@
 <div data-replace="#triage-{{ triage.pk}}-status">{% triage triage show_label=True%}</div>
 <div class="embed-wrapper">
     {% if overlap_grouping.change_log %}
-        <label class="w-100 text-center">History</label>
+        <label class="w-100 text-center">History - oldest to newest</label>
         {% for change in overlap_grouping.change_log %}
             {% ifchanged change.overlap_contribution %}
                 <hr/>
@@ -56,7 +56,7 @@
                 });
             </script>
             <div class="buttons">
-                <input type="submit" class="btn btn-primary" value="Submit">
+                <input type="submit" class="btn btn-primary" value="Update Triage Status">
             </div>
         </form>
     {% endif %}
