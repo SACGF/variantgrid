@@ -7,8 +7,10 @@ from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
 from annotation.models import AnnotationRun, re, VEPSkippedReason
+from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vep_annotation import vep_check_annotated_file_version_match
+from snpdb.models import VariantCoordinate
 
 
 def import_vcf_annotations(
@@ -102,8 +104,17 @@ def handle_vep_skipped(annotation_run: AnnotationRun, bulk_inserter):
             va = {"version_id": version.pk, "variant_id": v.pk,
                   "annotation_run_id": annotation_run.pk, "vep_skipped_reason": reason,
                   "predictions_num_pathogenic": 0, "predictions_num_benign": 0}
+            if (annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+                    and reason == VEPSkippedReason.TOO_LONG):
+                variant_coordinate = VariantCoordinate(chrom=v.locus.contig.name,
+                                                       position=v.locus.position,
+                                                       ref=v.locus.ref.seq,
+                                                       alt=v.alt.seq,
+                                                       svlen=v.svlen)
+                bulk_inserter.add_sv_gene_overlaps(v.pk, variant_coordinate, va)
             bulk_inserter.variant_annotation_list.append(va)
 
         # Only insert the columns we care about
-        bulk_inserter.all_variant_columns = ["vep_skipped_reason"]
+        bulk_inserter.all_variant_columns = ["vep_skipped_reason", "overlapping_symbols",
+                                             "predictions_num_pathogenic", "predictions_num_benign"]
         bulk_inserter.finish()
