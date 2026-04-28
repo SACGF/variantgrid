@@ -272,7 +272,7 @@ class ClassificationGrouping(TimeStampedModel):
         share_level = classification.share_level
         if allele:
             allele_origin_grouping, _ = AlleleOriginGrouping.objects.get_or_create(
-                allele_grouping=allele,
+                allele=allele,
                 allele_origin_bucket=classification.allele_origin_bucket,
                 testing_context_bucket=classification.testing_context_bucket,
                 tumor_type_category=classification.tumor_type_category
