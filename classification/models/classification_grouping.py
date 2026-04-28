@@ -340,7 +340,7 @@ class ClassificationGrouping(TimeStampedModel):
 
     @cached_property
     def allele(self) -> Allele:
-        return self.allele_origin_grouping.allele_grouping.allele
+        return self.allele_origin_grouping.allele
 
     @transaction.atomic
     def update(self):
