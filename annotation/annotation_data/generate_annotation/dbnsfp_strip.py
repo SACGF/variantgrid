@@ -174,40 +174,39 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
         "",
     ]
 
+    file_list = " ".join(shlex.quote(f) for f in files)
+
+    # Build the data pipeline. Both modes share zgrep | cut | cat header | bgzip;
+    # the unsorted (T2T) path additionally drops rows unmapped in this build
+    # (build chr == '.') and does a global sort.
+    pipeline = [f"zgrep -h -v '^#chr' {file_list}"]
+    cut_cmd = f"cut -f {cut_arg}"
+
     if sorted_input:
-        # Already sorted single file - just cut and re-index
-        lines += [
-            f"echo '[{build}] cutting columns + bgzipping -> {out_gz}'",
-            f"zgrep -h -v '^#chr' {shlex.quote(files[0])} \\",
-            f"    | cut -f {cut_arg} \\",
-            f"    | cat {header_file} - \\",
-            f"    | bgzip -c > {out_gz}",
-            "",
-            f"echo '[{build}] building tabix index'",
-            f"tabix -f -s {seq_col} -b {pos_col} -e {pos_col} {out_gz}",
-        ]
+        stage_desc = f"echo '[{build}] cutting columns + bgzipping -> {out_gz}'"
+        pipeline += [cut_cmd]
     else:
-        # Per-chrom inputs (T2T): build chrom can differ from source file chrom,
-        # so concat first, drop unmapped (build chr == '.'), then global sort.
         src_chr_idx = column_index(header, spec.chr_col)
-        file_list = " ".join(shlex.quote(f) for f in files)
+        awk_cmd = f"awk -F'\\t' '${src_chr_idx} != \".\"'"
+        sort_cmd = f"sort -T \"$TMP_DIR\" -k{seq_col},{seq_col} -k{pos_col},{pos_col}n"
+        stage_desc = (f"echo '[{build}] concat + sort + bgzip "
+                      f"({len(files)} input files) -> {out_gz}'")
+        pipeline += [awk_cmd, cut_cmd, sort_cmd]
         lines += [
             f"TMP_DIR={shlex.quote(tmp_dir)}",
             'mkdir -p "$TMP_DIR"',
             "",
-            f"echo '[{build}] concat + sort + bgzip ({len(files)} input files) -> {out_gz}'",
-            "zgrep -h -v '^#chr' " + file_list + " \\",
-            f"    | awk -F'\\t' '${src_chr_idx} != \".\"' \\",
-            f"    | cut -f {cut_arg} \\",
-            f"    | sort -T \"$TMP_DIR\" -k{seq_col},{seq_col} -k{pos_col},{pos_col}n \\",
-            f"    | cat {header_file} - \\",
-            f"    | bgzip -c > {out_gz}",
-            "",
-            f"echo '[{build}] building tabix index'",
-            f"tabix -f -s {seq_col} -b {pos_col} -e {pos_col} {out_gz}",
         ]
 
+    pipeline += [f"cat {header_file} -",
+                 f"bgzip -c > {out_gz}"]
+
     lines += [
+        stage_desc,
+        " \\\n    | ".join(pipeline),
+        "",
+        f"echo '[{build}] building tabix index'",
+        f"tabix -f -s {seq_col} -b {pos_col} -e {pos_col} {out_gz}",
         "",
         f"echo '[{build}] OK'; ls -lh {out_gz} {out_gz}.tbi",
     ]
