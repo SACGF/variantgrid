@@ -3,149 +3,40 @@
 {% load user_tags %}
 {% load classification_tags %}
 {% load js_tags %}
-{% if mode == "inline" %}
-    INLINE
-{% else %}
-    <form data-toggle="ajax-form" method="POST" action="{% url 'triage' triage.pk %}?edit=true&mode={{ mode }}">
-    <div class="card-header">
-        {% if value_type == "O" %}Onco-Path{% elif value_type == "S" %}Clinical Significance{% endif %}
-        Triage {% admin_link triage %}
-    </div>
-    <div class="card-body">
-        {% if user.is_superuser %}
-            <div class="admin-only my-4">
-                {% if overlap_grouping.single_context_overlap %}<div>{{ overlap_grouping.single_context_overlap }}{% admin_link overlap_grouping.single_context_overlap %}</div>{% endif %}
-                {% if overlap_grouping.cross_context_overlap %}<div>{{ overlap_grouping.cross_context_overlap }}{% admin_link overlap_grouping.cross_context_overlap %}</div>{% endif %}
-            </div>
-        {% endif %}
-        {% include "uicore/messages/messages.html" %}
 
-        {% labelled label="Relevant Submissions" %}
-            <table class="table contribution-table" style="table-layout: fixed; width:100%">
-                <tbody>
-                    <tr class="users-contribution">
-                        <td style="text-align:center"><span class="testing-context-box testing-context-{{ overlap_grouping.user_contribution.testing_context_bucket_obj.value }}">{{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span></td>
-                        <td class="cs-{{ overlap_grouping.user_contribution.value }}"><b>{{  overlap_grouping.user_contribution.pretty_value }}</b> {% triage overlap_grouping.user_triage %}</td>
-                        <td>{% condition overlap_grouping.user_contribution.conditions %}</td>
-                        <td>{{ overlap_grouping.user_contribution.lab }}</td>
-                        <td>{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}<i class="fa-regular fa-hand-point-left" title="Your record"></i></td>
-                    </tr>
-                {% for overlap_comparison in overlap_grouping.comparisons %}
-                    <tr {% if overlap_comparison.is_cross_context %}style="opacity:0.7"{% endif %}>
-                        <td style="text-align:center">{% testing_context overlap_comparison.entry_2 %}</td>
-                        <td class="cs-{{ overlap_comparison.entry_2.value }}">{{ overlap_comparison.entry_2.pretty_value }} {% if overlap_comparison.triage %}{% triage overlap_comparison.triage %}{% endif %}</td>
-                        <td>{% condition overlap_comparison.entry_2.conditions %}</td>
-                        <td>{% if overlap_comparison.entry_2.scv %}ClinVar Expert Panel<br/>{{ overlap_comparison.entry_2.scv }}{% else %}{{ overlap_comparison.entry_2.lab }}{% endif %}</td>
-                        <td>{% timestamp overlap_comparison.entry_2.effective_date time_ago=True %}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            {% comment %}
-            {% for alternative_grouping in alternative_groupings %}
-                <div class="my-1">{% classification_quick alternative_grouping.latest_classification_modification show_category=True show_share_level=False %}</div>
-                {% if not forloop.last %}<hr/>{% endif %}
-            {% endfor %}
-            {% endcomment %}
-        {% endlabelled %}
-
-        {% if overlap_grouping.change_log %}
-            <label class="w-100 text-center">History</label>
-            {% for change in overlap_grouping.change_log %}
-                {% ifchanged change.overlap_contribution %}
-                    <hr/>
-                {% endifchanged %}
-                <div class="row my-4">
-                    <div class="col-3 text-right">
-                        {% ifchanged change.overlap_contribution %}
-                            <div>{% testing_context change.overlap_contribution %} {{ change.overlap_contribution.lab }}</div>
-                            {% ifchanged change.user %}
-                                {% if change.user %}<div>{% user change.user size="tiny" %}</div>
-                                {% else %}<div class="no-user">No user</div>{% endif %}
-                            {% endifchanged %}
-                        {% endifchanged %}
-                        <div>{% timestamp change.timestamp time_ago=True %}</div>
-                    </div>
-                    <div class="col-9">
-                        {% for field_change in change.changes %}
-                            <div>{{ field_change.old_value }} -> {{ field_change.new_value }}</div>
-                        {% endfor %}
-                        {% if change.comment %}
-                            <div class="comment">{{ change.comment.text }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-            {% endfor %}
-        {% endif %}
-
-
-        {% comment %}
-        {% for linked_history in overlap_grouping.history %}
+{% comment %}Probably need to make this{% endcomment %}
+<div data-replace="#triage-{{ triage.pk}}-status">{% triage triage show_label=True%}</div>
+<div class="embed-wrapper">
+    {% if overlap_grouping.change_log %}
+        <label class="w-100 text-center">History</label>
+        {% for change in overlap_grouping.change_log %}
+            {% ifchanged change.overlap_contribution %}
+                <hr/>
+            {% endifchanged %}
             <div class="row my-4">
                 <div class="col-3 text-right">
-                    <div>{% timestamp linked_history.new_object.created time_ago=True %}</div>
-                    <div class="mt-1">
-                        {% if linked_history.new_object.user %}
-                        {% user linked_history.new_object.user size="tiny" %}
-                        {% endif %}
-                    </div>
-                    {% if linked_history.new_object.overlap_contribution.lab %}
-                         <div class="mt-2">
-                            {{ linked_history.new_object.overlap_contribution.lab  }}
-                        </div>
-                     {% else %}
-                        <div class="mt-2">{{ linked_history.new_object.overlap_contribution.scv }}</div>
-                    {% endif %}
-                    <div class="mt-2">
-                        <span class="testing-context-box testing-context-{{ linked_history.new_object.overlap_contribution.testing_context_bucket_obj.value }}">{{ linked_history.new_object.overlap_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</span>
-                    </div>
-
-                </div>
-                <div class="col-9 text-left">
-                    {% ifchanged linked_history.new_object.overlap_contribution %}
-                    <div>
-                        {% with contribution_log=linked_history.new_object %}
-                            <div style="display:flex; width: 600px">
-                                <div>
-                                    <b>{{ contribution_log.pretty_value }}</b>
-                                </div>
-                                <div class="ml-2">
-                                    {% condition contribution_log.conditions %}
-                                </div>
-                            </div>
-                        {% endwith %}
-                    </div>
+                    {% ifchanged change.overlap_contribution change.user %}
+                        <div>{% testing_context change.overlap_contribution %}<br/>{{ change.overlap_contribution.lab }}</div>
+                        {% if change.user %}<div class="mt-1">{% user change.user size="tiny" %}</div>
+                        {% else %}<div class="mt-1 no-user">No user</div>{% endif %}
                     {% endifchanged %}
-                    <div>
-{#                        {% if not linked_history.old_object %}#}
-{#                            <div>New Submission: {{ linked_history.new_object.pretty_value }}</div>#}
-{#                        {% endif %}#}
-                        {% if linked_history.old_object %}
-                            {% if linked_history.value.is_change %}
-                                <div>{{ linked_history.old_object.pretty_value }} -> {{ linked_history.new_object.pretty_value }}</div>
-                            {% endif %}
-                            {% if linked_history.conditions.is_change %}
-                                <div>{% condition linked_history.old_object.conditions %} -> {% condition linked_history.new_object.conditions %}}</div>
-                            {% endif %}
-                            {% if linked_history.triage_status.is_change %}
-                                <div>{{ linked_history.old_object.get_triage_status_display }} -> {{ linked_history.new_object.get_triage_status_display }}</div>
-                            {% endif %}
-                        {% endif %}
-                    </div>
-                    {% if linked_history.new_object.comment %}
-                        <div class="mt-1">{{ linked_history.new_object.comment }}</div>
-                    {% elif not linked_history.old_object %}
-                        <div class="mt-1"><i>Initial Upload</i></div>
+                    <div>{% timestamp change.timestamp time_ago=True %}</div>
+                </div>
+                <div class="col-9">
+                    {% for field_change in change.changes %}
+                        <div>{{ field_change.old_value }} -> {{ field_change.new_value }}</div>
+                    {% endfor %}
+                    {% if change.comment %}
+                        <div class="comment">{{ change.comment.text }}</div>
                     {% endif %}
                 </div>
             </div>
-            {% if not forloop.last %}<hr/>{% endif %}
         {% endfor %}
-        <hr/>
-        {% endcomment %}
+    {% endif %}
 
-        {% if form %}
-            <label class="w-100 text-center">Update</label>
+    {% if form %}
+        <form data-toggle="ajax-form" method="POST" action="{% url 'triage' triage.pk %}?edit=true&mode={{ mode }}">
+            <label class="w-100 text-center">Update {{ triage.lab }}'s Status</label>
             {% crispy form form_helper.horizontal %}
             <script>
                 function triage_status_updated() {
@@ -164,13 +55,14 @@
                     });
                 });
             </script>
-        {% endif %}
-    </div>
-    {% if form %}
-    <div class="card-footer">
-        <input type="submit" class="btn btn-primary" value="Submit">
-    </div>
+            <div class="buttons">
+                <input type="submit" class="btn btn-primary" value="Submit">
+            </div>
+        </form>
     {% endif %}
-    </form>
 
-{% endif %}
+    <div class="my-1">
+    {% include "uicore/messages/messages.html" %}
+    </div>
+
+</div>

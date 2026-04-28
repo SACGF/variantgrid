@@ -805,5 +805,14 @@ def triage(context,
         elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
             new_value = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(new_value)
 
+    last_comment = triage.comment
+
     # TODO rename new_value
-    return {"triage": triage, "new_value": new_value, "show_label": show_label, "show_link": show_link, "show_icon": show_icon}
+    return {
+        "triage": triage,
+        "new_value": new_value,
+        "show_label": show_label,
+        "show_link": show_link,
+        "show_icon": show_icon,
+        "last_comment": last_comment
+    }

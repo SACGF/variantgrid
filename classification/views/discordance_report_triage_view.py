@@ -12,6 +12,8 @@ from snpdb.lab_picker import LabPickerData
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
+# IMPORTANT, THESE ARE THE OLD TRIAGE OBJECTS
+
 class DiscordanceReportTriageForm(forms.ModelForm):
 
     class Meta:

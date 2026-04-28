@@ -96,6 +96,7 @@ function enhanceAndMonitor() {
             let $node = $(node);
             let url = $node.attr('href');
             let wrapper = $node.closest(".modal-content, .embed-wrapper");
+            console.log("data-toggle=embed-content");
             node.click(function() {
                 loadAjaxBlock(wrapper, url).then(() => {
                     if (wrapper.hasClass("modal-content")) {
@@ -122,8 +123,10 @@ function enhanceAndMonitor() {
             }
             $node.attr('ajaxed', 'true');
             let wrapper = $node.closest(".modal-content, .embed-wrapper");
+            if (wrapper.length == 0) {
+                console.log("WARNING, ajax-form does not have an embed-wrapper");
+            }
             $node.on('submit', function(event) { // catch the form's submit event
-                console.log("Submitting");
                 event.preventDefault(event);
                 let $this = $(this);
                 $.ajax({ // create an AJAX call...
@@ -131,7 +134,6 @@ function enhanceAndMonitor() {
                     type: $this.attr('method'), // GET or POST
                     url: $this.attr('action'), // the file to call
                     success: function(response) { // on success..
-                        console.log("Success");
                         wrapper.html(response); // update the DIV
                         if (wrapper.hasClass("modal-content")) {
                             cardToModal(wrapper);

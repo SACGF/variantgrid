@@ -120,6 +120,7 @@ class TriageView(AjaxFormView[OverlapContribution]):
         # TODO can we sort these values on how similar the context is?
         context["classification_grouping"] = classification_grouping
         context["value_type"] = value_type
+        context["mode"] = "inline"
 
         value_e_key: EvidenceKey
         if value_type == ClassificationResultValue.ONC_PATH:
@@ -129,53 +130,53 @@ class TriageView(AjaxFormView[OverlapContribution]):
 
         context["evidence_key"] = value_e_key
 
-        if request.GET.get("edit") == "true":
-            initial_data = {
-                "triage_status": triage.triage_state.status,
-                "new_value": triage.triage_state.amend_value
-            }
-            if value_type == ClassificationResultValue.ONC_PATH:
-                form = ClassificationGroupingValueTriageOncPathForm(
+        # if request.GET.get("edit") == "true":
+        initial_data = {
+            "triage_status": triage.triage_state.status,
+            "new_value": triage.triage_state.amend_value
+        }
+        if value_type == ClassificationResultValue.ONC_PATH:
+            form = ClassificationGroupingValueTriageOncPathForm(
+                # data=request.POST or None,
+                data=request.POST if request.method == "POST" else None,
+                initial=initial_data
+            )
+        else:
+            if not OVERLAP_CLIN_SIG_ENABLED:
+                form = None
+            else:
+                form = ClassificationGroupingValueTriageClinSigForm(
                     # data=request.POST or None,
                     data=request.POST if request.method == "POST" else None,
                     initial=initial_data
                 )
-            else:
-                if not OVERLAP_CLIN_SIG_ENABLED:
-                    form = None
-                else:
-                    form = ClassificationGroupingValueTriageClinSigForm(
-                        # data=request.POST or None,
-                        data=request.POST if request.method == "POST" else None,
-                        initial=initial_data
-                    )
-            context["form"] = form
+        context["form"] = form
 
-            if form and form.is_valid() and request.method == "POST":
+        if form and form.is_valid() and request.method == "POST":
 
-                # TODO do we even need to do this, or does dataclass_json do it automatically
+            # TODO do we even need to do this, or does dataclass_json do it automatically
 
-                new_value = empty_to_none(form.cleaned_data["new_value"])
-                if new_value == 'undecided':
-                    new_value = None
+            new_value = empty_to_none(form.cleaned_data["new_value"])
+            if new_value == 'undecided':
+                new_value = None
 
-                triage.triage_state = TriageState(
-                    TriageStatus(form.cleaned_data["triage_status"]),
-                    new_value
-                )
+            triage.triage_state = TriageState(
+                TriageStatus(form.cleaned_data["triage_status"]),
+                new_value
+            )
 
-                if comment := form.cleaned_data["comment"]:
-                    triage.comment = TriageComment(comment, triage.comment.count+1)
+            if comment := form.cleaned_data["comment"]:
+                triage.comment = TriageComment(comment, triage.comment.count+1)
 
-                triage.save()
+            triage.save()
 
-                for overlap_contribution in triage.classification_grouping.overlapcontribution_set.filter(value_type=value_type):
-                    for overlap in overlap_contribution.overlaps:
-                        OverlapServices.update_skews(overlap)
+            for overlap_contribution in triage.classification_grouping.overlapcontribution_set.filter(value_type=value_type):
+                for overlap in overlap_contribution.overlaps:
+                    OverlapServices.update_skews(overlap)
 
-                messages.add_message(request, level=messages.SUCCESS, message="Triage saved successfully")
-                context["saved"] = True
+            messages.add_message(request, level=messages.SUCCESS, message="Triage saved successfully")
+            context["saved"] = True
 
-                return redirect(reverse('triage', kwargs={"triage_id": triage.pk}))
+            return redirect(reverse('triage', kwargs={"triage_id": triage.pk}))
 
         return TriageView.lazy_render(triage, context).render(request, saved=saved)

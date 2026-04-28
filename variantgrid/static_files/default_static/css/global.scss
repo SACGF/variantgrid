@@ -1186,13 +1186,16 @@ table.datatable.expandable tr {
 }
 
 /* be able to show alerts in tables without them making the row giant */
-
+/* the below worked when we're in a table table cell, but screws up formatting if
+ we just so happen to be in a table (maybe an expanded row) */
+/*
 .table .alert {
 	margin-bottom: 1px;
 	height: 20px;
 	line-height: 16px;
 	padding: 0px 15px 3px 15px;
 }
+ */
 
 .dtrg-start td {
 	background-color: #efefef;

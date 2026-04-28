@@ -79,7 +79,7 @@ class LazyRender(Generic[T]):
         """
         if mode == "inline":
             return (
-                f'<div class="d-inline-block" id="{self.core_object_name}-{ self.core_object.pk }">',
+                f'<div class="d-inline-block w-100" id="{self.core_object_name}-{ self.core_object.pk }">',
                 AjaxFormMode.INLINE,
                 '</div>'
             )
@@ -111,6 +111,8 @@ class LazyRender(Generic[T]):
     def render(self, request, saved: bool = False) -> HttpResponse:
         mode = AjaxFormMode(request.GET.get("mode", "card"))
         use_context = self._context(request)
+        if "mode" in use_context:
+            mode = AjaxFormMode(use_context.get("mode", "card"))
         content_str = self._render_to_string(request, use_context, mode=mode, saved=saved)
         return HttpResponse(bytes(content_str, "utf-8"))
 

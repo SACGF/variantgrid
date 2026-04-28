@@ -30,42 +30,18 @@
                             <td>{% clinical_significance overlap_entry.overlap_contribution.value %}</td>
                             <td>{% condition overlap_entry.overlap_contribution.conditions %}</td>
                             <td>{% timestamp overlap_entry.overlap_contribution.effective_date.date time_ago=True %}</td>
-                            <td>{% triage overlap_entry.overlap_contribution show_label=True show_link=overlap_entry.is_primary %}</td>
+                            <td>
+                                {% if overlap_entry.is_primary %}
+                                    <span id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_label=True %}</span>
+                                {% else %}
+                                    {% triage overlap_entry.overlap_contribution show_label=True %}
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
-
-            {% if summary.overlap_grouping.change_log %}
-                <a class="toggle-link" href="#history-{{ summary.id }}" data-toggle="collapse" style="display:inline-block;width:100%;background-color:#fbfbfb;padding:6px">Show History</a>
-                <div id="history-{{ summary.id }}" class="collapse">
-                    {% for change in summary.overlap_grouping.change_log %}
-                        {% ifchanged change.overlap_contribution %}
-                            <hr/>
-                        {% endifchanged %}
-                        <div class="row my-4">
-                            <div class="col-3 text-right">
-                                {% ifchanged change.overlap_contribution %}
-                                    <div>{% testing_context change.overlap_contribution %} {{ change.overlap_contribution.lab }}</div>
-                                    {% ifchanged change.user %}
-                                        {% if change.user %}<div>{% user change.user size="tiny" %}</div>
-                                        {% else %}<div class="no-user">No user</div>{% endif %}
-                                    {% endifchanged %}
-                                {% endifchanged %}
-                                <div>{% timestamp change.timestamp %}</div>
-                            </div>
-                            <div class="col-9">
-                                {% for field_change in change.changes %}
-                                    <div>{{ field_change.old_value }} <span class="text-secondary">-></span> {{ field_change.new_value }}</div>
-                                {% endfor %}
-                                {% if change.comment and change.user %}
-                                    <div class="comment">{{ change.comment }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
+            <div data-toggle="ajax" href="{% url 'triage' summary.overlap_grouping.user_contribution.pk %}?edit=true&mode=inline"></div>
         </div>
     </div>
 
