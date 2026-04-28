@@ -29,9 +29,14 @@ KEEP_FIELDS=(
     AC_joint_sas AN_joint_sas AF_joint_sas
     # ChrX sex-specific
     AC_joint_XY AN_joint_XY AF_joint_XY
-    # ChrX/chrY non-PAR flag (only present on sex chromosomes; Flag type so
-    # no _joint suffix — used to derive gnomad_hemi_count downstream)
-    non_par
+    # Witness fields used to derive a synthetic non_par flag (see
+    # stamp_non_par_from_witness below). v4.1 dropped the top-level non_par
+    # INFO flag that v4.0 had, but the per-sex FAF fields are populated only
+    # on non-PAR records (their header descriptions read "...in non-PAR
+    # regions of sex chromosomes only"), so their presence is the marker.
+    # These are stripped again by stamp_non_par_from_witness after the flag
+    # has been set, so they never reach the final VCF.
+    faf99_joint_XX faf99_joint_XY
 )
 
 # Build the bcftools --remove expression: "^INFO/foo,INFO/bar,..."
@@ -90,4 +95,49 @@ INFO/AC_joint_XY	AC_XY
 INFO/AN_joint_XY	AN_XY
 INFO/AF_joint_XY	AF_XY
 RENAME
+}
+
+# Write the non_par INFO header line to $1, suitable for use with
+# `bcftools annotate --header-lines`. Adding the line via bcftools (instead
+# of via awk) lets the header land for free during an existing streaming
+# stage, which matters on autosomes where no body rewrite is otherwise
+# needed.
+write_non_par_header_file() {
+    local out="$1"
+    cat > "$out" <<'HDR'
+##INFO=<ID=non_par,Number=0,Type=Flag,Description="Variant (on sex chromosome) falls outside a pseudoautosomal region">
+HDR
+}
+
+# Stream filter: read VCF on stdin, write VCF on stdout. Used only on
+# chrX/chrY (autosomes don't need it).
+#   - on data rows, sets non_par in INFO when any witness FAF field
+#     (faf99_joint_XX / faf99_joint_XY) is present
+#   - strips the witness fields from INFO afterwards (they exist only to
+#     drive this stage)
+# The non_par INFO header line is added upstream via
+# `bcftools annotate --header-lines`, so this filter does not touch the
+# header — it just streams meta rows through unchanged.
+stamp_non_par_from_witness() {
+    awk '
+    BEGIN { FS = OFS = "\t" }
+    /^#/ { print; next }
+    {
+        n = split($8, kv, ";")
+        is_non_par = 0
+        out = ""
+        for (i = 1; i <= n; i++) {
+            f = kv[i]
+            tag = f
+            sub(/=.*/, "", tag)
+            if (tag == "faf99_joint_XX" || tag == "faf99_joint_XY") {
+                is_non_par = 1
+                continue
+            }
+            out = (out == "" ? f : out ";" f)
+        }
+        if (is_non_par) out = (out == "" ? "non_par" : out ";non_par")
+        $8 = out
+        print
+    }'
 }

@@ -39,10 +39,14 @@ CHROMOSOMES="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y"
 
 mkdir -p "$OUTPUT_DIR"
 
-# Write rename file once; all per-chrom jobs share it.
+# Write rename file + non_par header file once; all per-chrom jobs share them.
 RENAME_FILE="$OUTPUT_DIR/rename_annots.txt"
 write_rename_file "$RENAME_FILE"
 echo "Wrote $RENAME_FILE"
+
+NON_PAR_HEADER_FILE="$OUTPUT_DIR/non_par.hdr"
+write_non_par_header_file "$NON_PAR_HEADER_FILE"
+echo "Wrote $NON_PAR_HEADER_FILE"
 
 EXTRA_PATH=$(IFS=:; echo "${TOOL_PATHS[*]}")
 
@@ -66,7 +70,7 @@ set -euo pipefail
 export PATH="${EXTRA_PATH}:\${PATH}"
 echo "Processing chr${CHR} - \$(date)"
 
-RENAME_FILE="${RENAME_FILE}" bash "${WORKER}" "${INPUT_VCF}" "${OUTPUT_VCF}" "${CHROM_MAP}"
+RENAME_FILE="${RENAME_FILE}" NON_PAR_HEADER_FILE="${NON_PAR_HEADER_FILE}" bash "${WORKER}" "${INPUT_VCF}" "${OUTPUT_VCF}" "${CHROM_MAP}"
 
 echo "Done chr${CHR} - \$(date)"
 SLURM
