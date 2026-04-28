@@ -2,22 +2,30 @@
 set -euo pipefail
 
 #
-# Submit one SLURM job per chromosome to strip gnomAD v4.1 joint VCFs.
-# Each job calls strip_gnomad41_one.sh for its chromosome, which also renames
-# contigs (NC_000001.11 -> 1 etc) using the supplied bcftools chrom map.
+# Generate one per-chromosome script that strips a gnomAD v4.1 joint VCF
+# down to the INFO fields we need. Each script calls strip_gnomad41_one.sh
+# for its chromosome and also renames contigs (NC_000001.11 -> 1 etc) using
+# the supplied bcftools chrom map.
+#
+# Behaviour:
+#   - No PARTITION argument: write the per-chrom scripts and stop. The
+#     user runs them however they like (gnu parallel, plain bash loop,
+#     manual sbatch, etc).
+#   - PARTITION supplied: write the scripts with a #SBATCH --partition=...
+#     directive AND submit them via sbatch.
 #
 # Usage:
-#   bash strip_gnomad41.sh INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]
+#   bash strip_gnomad41.sh INPUT_DIR OUTPUT_DIR CHROM_MAP [PARTITION]
 #
 # CHROM_MAP is a bcftools --rename-chrs TSV, e.g.
 #   snpdb/genome/chrom_mapping_GRCh38.map
 #
 
-INPUT_DIR="${1:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]}"
-OUTPUT_DIR="${2:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]}"
-PARTITION="${3:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]}"
-CHROM_MAP="${4:?Usage: $0 INPUT_DIR OUTPUT_DIR PARTITION CHROM_MAP [--dry-run]}"
-DRY_RUN="${5:-}"
+USAGE="Usage: $0 INPUT_DIR OUTPUT_DIR CHROM_MAP [PARTITION]"
+INPUT_DIR="${1:?$USAGE}"
+OUTPUT_DIR="${2:?$USAGE}"
+CHROM_MAP="${3:?$USAGE}"
+PARTITION="${4:-}"
 
 if [ ! -f "$CHROM_MAP" ]; then
     echo "CHROM_MAP not found: $CHROM_MAP" >&2
@@ -50,6 +58,19 @@ echo "Wrote $NON_PAR_HEADER_FILE"
 
 EXTRA_PATH=$(IFS=:; echo "${TOOL_PATHS[*]}")
 
+# PARTITION presence drives both the #SBATCH directive and whether we
+# auto-submit. Without it we still emit valid SLURM scripts (just minus
+# the partition line, so a later manual `sbatch` would fall back to the
+# cluster default — or the user can edit the file).
+if [ -n "$PARTITION" ]; then
+    PARTITION_DIRECTIVE="#SBATCH --partition=${PARTITION}"
+    SUBMIT=1
+else
+    PARTITION_DIRECTIVE=""
+    SUBMIT=0
+fi
+
+SCRIPTS=()
 JOBIDS=()
 for CHR in $CHROMOSOMES; do
     INPUT_VCF="$INPUT_DIR/gnomad.joint.v4.1.sites.chr${CHR}.vcf.bgz"
@@ -62,7 +83,7 @@ for CHR in $CHROMOSOMES; do
 #SBATCH --output=${OUTPUT_DIR}/gnomad41_chr${CHR}_%j.out
 #SBATCH --error=${OUTPUT_DIR}/gnomad41_chr${CHR}_%j.err
 #SBATCH --time=12:00:00
-#SBATCH --partition=${PARTITION}
+${PARTITION_DIRECTIVE}
 #SBATCH --mem=8G
 #SBATCH --cpus-per-task=1
 
@@ -74,21 +95,27 @@ RENAME_FILE="${RENAME_FILE}" NON_PAR_HEADER_FILE="${NON_PAR_HEADER_FILE}" bash "
 
 echo "Done chr${CHR} - \$(date)"
 SLURM
+    chmod +x "$SLURM_SCRIPT"
+    SCRIPTS+=("$SLURM_SCRIPT")
 
-    if [ "$DRY_RUN" = "--dry-run" ]; then
-        echo "  [dry-run] Would submit $SLURM_SCRIPT"
-    else
+    if [ "$SUBMIT" = "1" ]; then
         JID=$(sbatch --parsable "$SLURM_SCRIPT")
         echo "  Submitted chr${CHR} -> job $JID"
         JOBIDS+=($JID)
+    else
+        echo "  Wrote $SLURM_SCRIPT"
     fi
 done
 
 echo ""
-if [ "$DRY_RUN" = "--dry-run" ]; then
-    echo "Dry run complete. 24 scripts written to $OUTPUT_DIR"
-    echo "Review a script, then re-run without --dry-run to submit."
-else
-    echo "Submitted ${#JOBIDS[@]} jobs"
+if [ "$SUBMIT" = "1" ]; then
+    echo "Submitted ${#JOBIDS[@]} jobs to partition '${PARTITION}'"
     echo "Monitor with: squeue -u $USER"
+else
+    echo "Wrote ${#SCRIPTS[@]} scripts to $OUTPUT_DIR"
+    echo ""
+    echo "Run them however you like, e.g.:"
+    echo "  sbatch:        re-run this script with a PARTITION argument"
+    echo "  gnu parallel:  parallel --jobs 4 bash {} ::: $OUTPUT_DIR/strip_chr*.slurm"
+    echo "  serial loop:   for s in $OUTPUT_DIR/strip_chr*.slurm; do bash \"\$s\"; done"
 fi
