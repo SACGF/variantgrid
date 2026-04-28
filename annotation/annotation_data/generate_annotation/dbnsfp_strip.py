@@ -62,43 +62,39 @@ BUILDS: dict[str, BuildSpec] = {
 KEY_COLUMNS = ["ref", "alt", "aaref", "aaalt", "Ensembl_transcriptid"]
 
 # Existing rankscore / Aloft / conservation / domain columns we already pull
-EXISTING_DBNSFP_COLUMNS = [
+DBNSFP_COLUMNS = [
+    "Aloft_Confidence",
+    "Aloft_pred",
+    "Aloft_prob_Dominant",
+    "Aloft_prob_Recessive",
+    "Aloft_prob_Tolerant",
+    "AlphaMissense_pred",
+    "AlphaMissense_rankscore",
+    "AlphaMissense_score",
+    "BayesDel_noAF_rankscore",
+    "BayesDel_noAF_score",
+    "CADD_phred",
+    "CADD_raw",
+    "CADD_raw_rankscore",
+    "ClinPred_pred",
+    "ClinPred_rankscore",
+    "ClinPred_score",
     "GERP++_RS",
     "Interpro_domain",
-    "CADD_raw_rankscore",
-    "REVEL_rankscore",
-    "BayesDel_noAF_rankscore",
-    "ClinPred_rankscore",
-    "VEST4_rankscore",
+    "MPC_score",
     "MetaLR_rankscore",
-    "Aloft_prob_Tolerant",
-    "Aloft_prob_Recessive",
-    "Aloft_prob_Dominant",
-    "Aloft_pred",
-    "Aloft_Confidence",
-    "AlphaMissense_rankscore",
-]
-
-# New raw pathogenicity score columns (issue #1131)
-NEW_DBNSFP_COLUMNS = [
-    "CADD_raw",
-    "CADD_phred",
-    "REVEL_score",
-    "BayesDel_noAF_score",
-    "ClinPred_score",
-    "ClinPred_pred",
-    "VEST4_score",
-    "MetaRNN_score",
     "MetaRNN_pred",
-    "AlphaMissense_score",
-    "AlphaMissense_pred",
-    "VARITY_R_score",
-    "VARITY_ER_score",
+    "MetaRNN_score",
     "MutPred2_score",
     "MutPred2_top5_mechanisms",
-    "PrimateAI_score",
     "PrimateAI_pred",
-    "MPC_score",
+    "PrimateAI_score",
+    "REVEL_rankscore",
+    "REVEL_score",
+    "VARITY_ER_score",
+    "VARITY_R_score",
+    "VEST4_rankscore",
+    "VEST4_score",
 ]
 
 
@@ -134,7 +130,7 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
 
     header = read_header(files[0])
 
-    wanted = KEY_COLUMNS + EXISTING_DBNSFP_COLUMNS + NEW_DBNSFP_COLUMNS
+    wanted = KEY_COLUMNS + DBNSFP_COLUMNS
     # Always include the build's chr+pos so the stripped file is tabix-able
     wanted = [spec.chr_col, spec.pos_col] + [c for c in wanted if c not in (spec.chr_col, spec.pos_col)]
 
@@ -176,9 +172,6 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
 
     file_list = " ".join(shlex.quote(f) for f in files)
 
-    # Build the data pipeline. Both modes share zgrep | cut | cat header | bgzip;
-    # the unsorted (T2T) path additionally drops rows unmapped in this build
-    # (build chr == '.') and does a global sort.
     pipeline = [f"zgrep -h -v '^#chr' {file_list}"]
     cut_cmd = f"cut -f {cut_arg}"
 
