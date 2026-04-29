@@ -81,6 +81,7 @@ ANNOTATION = {
             "cosmic": "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz",
             "dbnsfp": "annotation_data/GRCh37/dbNSFP4.5a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
+            "denovo_db": None,  # set per-deployment, e.g. "annotation_data/GRCh37/denovo-db.variants.v.1.6.1.GRCh37.vcf.gz"
             "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
             # We use gnomAD SV VCF with --custom twice
             "gnomad_sv": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
@@ -125,6 +126,7 @@ ANNOTATION = {
             "cosmic": "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz",
             "dbnsfp": "annotation_data/GRCh38/dbNSFP4.5a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
+            "denovo_db": None,  # set per-deployment, e.g. "annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz"
             # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
             "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.toplevel.fa.gz"),
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
@@ -168,6 +170,7 @@ ANNOTATION = {
             "cosmic": None,  # N/A
             "dbnsfp": None,
             "dbscsnv": None,
+            "denovo_db": None,  # N/A
             "gnomad4": "annotation_data/T2T-CHM13v2.0/gnomad4.1.t2t_liftover_T2T-CHM13v2.0_combined_af.vcf.bgz",
             "gnomad_sv": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",

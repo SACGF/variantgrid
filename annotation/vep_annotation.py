@@ -418,6 +418,21 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     except KeyError:
         pass
 
+    try:
+        # denovo-db is GRCh37/38 only
+        denovo_db_filename = vep_config["denovo_db"]
+        if denovo_db_filename and os.path.exists(denovo_db_filename):
+            denovo_db_basename = os.path.basename(denovo_db_filename)
+            # e.g. denovo-db.variants.v.1.6.1.GRCh37.vcf.gz
+            if m := re.match(r"^denovo-db\.variants\.v\.(?P<version>[\d.]+)\.(GRCh37|GRCh38)\.vcf\.gz$",
+                             denovo_db_basename):
+                kwargs["denovo_db"] = m.group("version")
+            else:
+                msg = f"Couldn't determine denovo-db version from file: {denovo_db_basename}"
+                raise ValueError(msg)
+    except KeyError:
+        pass
+
     return kwargs
 
 

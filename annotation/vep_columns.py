@@ -789,6 +789,53 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
     ),
 
+    # ---------- denovo-db (custom VCF, GRCh37/38) --------------------------
+    VEPColumnDef(
+        source_field='StudyName',
+        variant_grid_columns=('denovo_db_studies',),
+        category=ColumnAnnotationCategory.LITERATURE,
+        vep_custom=VEPCustom.DENOVO_DB,
+        source_field_has_custom_prefix=True,
+        genome_builds=GRCH37_38,
+        pipeline_types=STANDARD,
+    ),
+    VEPColumnDef(
+        source_field='PubmedID',
+        variant_grid_columns=('denovo_db_pubmed_ids',),
+        category=ColumnAnnotationCategory.LITERATURE,
+        vep_custom=VEPCustom.DENOVO_DB,
+        source_field_has_custom_prefix=True,
+        genome_builds=GRCH37_38,
+        pipeline_types=STANDARD,
+    ),
+    VEPColumnDef(
+        source_field='PrimaryPhenotype',
+        variant_grid_columns=('denovo_db_primary_phenotypes',),
+        category=ColumnAnnotationCategory.PHENOTYPE,
+        vep_custom=VEPCustom.DENOVO_DB,
+        source_field_has_custom_prefix=True,
+        genome_builds=GRCH37_38,
+        pipeline_types=STANDARD,
+    ),
+    VEPColumnDef(
+        source_field='CASE_CT',
+        variant_grid_columns=('denovo_db_case_count',),
+        category=ColumnAnnotationCategory.FREQUENCY_DATA,
+        vep_custom=VEPCustom.DENOVO_DB,
+        source_field_has_custom_prefix=True,
+        genome_builds=GRCH37_38,
+        pipeline_types=STANDARD,
+    ),
+    VEPColumnDef(
+        source_field='CONTROL_CT',
+        variant_grid_columns=('denovo_db_control_count',),
+        category=ColumnAnnotationCategory.FREQUENCY_DATA,
+        vep_custom=VEPCustom.DENOVO_DB,
+        source_field_has_custom_prefix=True,
+        genome_builds=GRCH37_38,
+        pipeline_types=STANDARD,
+    ),
+
     # ---------- Other plugins ----------------------------------------------
     VEPColumnDef(
         source_field='ada_score',

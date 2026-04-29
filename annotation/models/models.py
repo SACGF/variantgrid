@@ -643,6 +643,7 @@ class VariantAnnotationVersion(SubVersionPartition):
     regbuild = models.TextField(blank=True, null=True)  # 37/38 only
     sift = models.TextField(blank=True, null=True)  # 37/38 only
     dbnsfp = models.TextField(blank=True, null=True)  # 37/38 only
+    denovo_db = models.TextField(blank=True, null=True)  # 37/38 only
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
     @property
@@ -1168,6 +1169,13 @@ class VariantAnnotation(AbstractVariantAnnotation):
     cosmic_id = models.TextField(null=True, blank=True)  # COSV - Genomic Mutation ID
     cosmic_legacy_id = models.TextField(null=True, blank=True)  # COSM
     cosmic_count = models.IntegerField(null=True, blank=True)
+    # denovo-db - https://denovo-db.gs.washington.edu/. '&'-separated parallel arrays
+    # (one element per contributing record), counts split case vs. PrimaryPhenotype=control
+    denovo_db_studies = models.TextField(null=True, blank=True)
+    denovo_db_pubmed_ids = models.TextField(null=True, blank=True)
+    denovo_db_primary_phenotypes = models.TextField(null=True, blank=True)
+    denovo_db_case_count = models.IntegerField(null=True, blank=True)
+    denovo_db_control_count = models.IntegerField(null=True, blank=True)
     pubmed = models.TextField(null=True, blank=True)
     # Mastermind Cited Variants Reference. @see https://www.genomenon.com/cvr/
     mastermind_count_1_cdna = models.IntegerField(null=True, blank=True)

@@ -126,6 +126,7 @@ class VEPCustom(models.TextChoices):
     TOPMED = 't', 'TopMed'
     UK10K = 'u', 'UK10k'
     COSMIC = 'c', 'COSMIC'
+    DENOVO_DB = 'D', 'denovo_db'
 
 
 class VEPSkippedReason(models.TextChoices):

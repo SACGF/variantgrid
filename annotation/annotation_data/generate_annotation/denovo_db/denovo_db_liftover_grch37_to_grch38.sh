@@ -9,18 +9,18 @@
 
 set -euo pipefail
 
-if [[ -z "${VEP_ANNOTATION_DIR:-}" ]]; then
-  echo "Please set 'VEP_ANNOTATION_DIR' to point at the annotation data root" >&2
+if [[ -z "${ANNOTATION_DIR:-}" ]]; then
+  echo "Please set 'ANNOTATION_DIR' to point at the annotation data root" >&2
   exit 1
 fi
 
-INPUT_GRCH37=${VEP_ANNOTATION_DIR}/annotation_data/GRCh37/denovo-db.variants.v.1.6.1.vcf.gz
-OUTPUT_GRCH38=${VEP_ANNOTATION_DIR}/annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz
-REJECTED_GRCH38=${VEP_ANNOTATION_DIR}/annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.rejected.vcf.gz
+INPUT_GRCH37=${ANNOTATION_DIR}/VEP/annotation_data/GRCh37/denovo-db.variants.v.1.6.1.vcf.gz
+OUTPUT_GRCH38=${ANNOTATION_DIR}/VEP/annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz
+REJECTED_GRCH38=${ANNOTATION_DIR}/VEP/annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.rejected.vcf.gz
 
-SRC_FASTA=${VEP_ANNOTATION_DIR}/annotation_data/fasta/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz
-TGT_FASTA=${VEP_ANNOTATION_DIR}/annotation_data/fasta/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
-CHAIN=${VEP_ANNOTATION_DIR}/annotation_data/liftover/GRCh37_to_GRCh38.chain.gz
+SRC_FASTA=${ANNOTATION_DIR}/fasta/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz
+TGT_FASTA=${ANNOTATION_DIR}/fasta/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
+CHAIN=${ANNOTATION_DIR}/liftover/GRCh37_to_GRCh38.chain.gz
 
 if [[ ! -e "${INPUT_GRCH37}" ]]; then
   echo "Input not found: ${INPUT_GRCH37}" >&2
@@ -39,23 +39,31 @@ done
 
 if ! bcftools plugin -l 2>/dev/null | grep -q '^liftover$'; then
   echo "bcftools +liftover plugin not found. Need bcftools >= 1.18 with plugins." >&2
+  echo "If plugins are installed but not on the default search path, set e.g.:" >&2
+  echo "  export BCFTOOLS_PLUGINS=/usr/share/bcftools/plugins" >&2
   exit 1
 fi
 
-# chr1 -> 1, ..., chrM -> MT  (Ensembl naming used by our GRCh37 / GRCh38 fastas + chain)
+# Strip 'chr' prefix from every contig in the input VCF (chrM -> MT specifically;
+# everything else just drops the prefix). Built from the input header so unplaced
+# contigs like chrGL000209.1 -> GL000209.1 are handled too. Ensembl naming is
+# what our GRCh37 / GRCh38 fastas + chain use.
 CHR_RENAME=$(mktemp)
 trap 'rm -f "${CHR_RENAME}"' EXIT
-{
-  for n in $(seq 1 22) X Y; do
-    echo -e "chr${n}\t${n}"
-  done
-  echo -e "chrM\tMT"
-} > "${CHR_RENAME}"
+bcftools view -h "${INPUT_GRCH37}" \
+  | awk '/^##contig=<ID=/ { match($0, /ID=[^,>]+/); id = substr($0, RSTART+3, RLENGTH-3); print id }' \
+  | awk 'BEGIN{OFS="\t"} { new = $1; if (new == "chrM") new = "MT"; else sub(/^chr/, "", new); print $1, new }' \
+  > "${CHR_RENAME}"
 
 mkdir -p "$(dirname "${OUTPUT_GRCH38}")"
 
 echo "Renaming chromosomes (chr1 -> 1, chrM -> MT) and lifting GRCh37 -> GRCh38..."
+# denovo-db has a handful of records whose REF doesn't match the GRCh37 fasta
+# (e.g. 1:1720573 REF=AAGA vs. reference AGAA). bcftools +liftover errors out on
+# the first such mismatch, killing the whole run, so drop them up front with
+# `bcftools norm --check-ref x` (excludes bad sites; count is reported to stderr).
 bcftools annotate --rename-chrs "${CHR_RENAME}" "${INPUT_GRCH37}" -Ou \
+  | bcftools norm --check-ref x --fasta-ref "${SRC_FASTA}" -Ou \
   | bcftools sort -Ou \
   | bcftools +liftover -Ou -- \
       -s "${SRC_FASTA}" \
@@ -76,10 +84,5 @@ LOST=0
 [[ -e "${REJECTED_GRCH38}" ]] && LOST=$(bcftools view -H "${REJECTED_GRCH38}" | wc -l)
 echo "kept:     ${KEPT}"
 echo "rejected: ${LOST}"
-if [[ "${LOST}" -gt 0 ]]; then
-  echo "rejection reasons:"
-  bcftools view "${REJECTED_GRCH38}" \
-    | grep -oP 'REJECT_REASON=[^;[:space:]]*' \
-    | sort | uniq -c | sort -rn
-fi
 echo "Output:   ${OUTPUT_GRCH38}"
+echo "Rejected: ${REJECTED_GRCH38}"
