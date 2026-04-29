@@ -161,3 +161,39 @@ class AlphaMissensePrediction(models.TextChoices):
     LIKELY_BENIGN = 'b', 'likely_benign'
     AMBIGUOUS = "a", 'ambiguous'
     LIKELY_PATHOGENIC = "p", 'likely_pathogenic'
+
+
+class ClinPredPrediction(AbstractPathogenicity):
+    TOLERATED = 'T'
+    DAMAGING = 'D'
+
+    CHOICES = [
+        (TOLERATED, "Tolerated"),
+        (DAMAGING, "Damaging"),
+    ]
+    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+    VARIANT_PATH = "variantannotation__clinpred_pred"
+
+
+class MetaRNNPrediction(AbstractPathogenicity):
+    TOLERATED = 'T'
+    DAMAGING = 'D'
+
+    CHOICES = [
+        (TOLERATED, "Tolerated"),
+        (DAMAGING, "Damaging"),
+    ]
+    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+    VARIANT_PATH = "variantannotation__metarnn_pred"
+
+
+class PrimateAIPrediction(AbstractPathogenicity):
+    TOLERATED = 'T'
+    DAMAGING = 'D'
+
+    CHOICES = [
+        (TOLERATED, "Tolerated"),
+        (DAMAGING, "Damaging"),
+    ]
+    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+    VARIANT_PATH = "variantannotation__primateai_pred"

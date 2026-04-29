@@ -86,6 +86,7 @@ GRCH37 = frozenset({'GRCh37'})
 GRCH38 = frozenset({'GRCh38'})
 GRCH37_38 = frozenset({'GRCh37', 'GRCh38'})
 GRCH38_T2T = frozenset({'GRCh38', 'T2T-CHM13v2.0'})
+GRCH37_38_T2T = frozenset({'GRCh37', 'GRCh38', 'T2T-CHM13v2.0'})
 STANDARD = frozenset({VariantAnnotationPipelineType.STANDARD})
 STRUCTURAL = frozenset({VariantAnnotationPipelineType.STRUCTURAL_VARIANT})
 
@@ -126,8 +127,27 @@ def _dbnsfp_v1_most_damaging(source_field: str, vgc, **overrides) -> VEPColumnDe
     })
 
 
-def _aloft(source_field: str, vgc) -> VEPColumnDef:
-    return _dbnsfp_v2(source_field, vgc, source_field_processing_description=_ALOFT_DESC)
+def _aloft(source_field: str, vgc, **overrides) -> VEPColumnDef:
+    return _dbnsfp_v2(source_field, vgc, source_field_processing_description=_ALOFT_DESC, **overrides)
+
+
+def _dbnsfp_v4(source_field: str, vgc, **overrides) -> VEPColumnDef:
+    """ DBNSFP plugin, GRCh37/38/T2T, columns_version >= 4 (dbNSFP 5.3.1a),
+        pathogenicity bucket. """
+    return VEPColumnDef(**{
+        "source_field": source_field,
+        "variant_grid_columns": _to_vgc_tuple(vgc),
+        "category": ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS,
+        "vep_plugin": VEPPlugin.DBNSFP,
+        "genome_builds": GRCH37_38_T2T,
+        "pipeline_types": STANDARD,
+        "min_columns_version": 4,
+        **overrides,
+    })
+
+
+def _aloft_v4(source_field: str, vgc) -> VEPColumnDef:
+    return _dbnsfp_v4(source_field, vgc, source_field_processing_description=_ALOFT_DESC)
 
 
 def _gnomad4(source_field: str, vgc, **overrides) -> VEPColumnDef:
@@ -190,22 +210,22 @@ def _gnomad_sv(source_field: str, vgc, **overrides) -> VEPColumnDef:
 
 
 VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
-    # ---------- Aloft (DBNSFP, GRCh37/38, v2+) -----------------------------
-    _aloft('Ensembl_transcriptid', 'aloft_ensembl_transcript'),
-    _aloft('Aloft_Confidence',     'aloft_high_confidence'),
-    _aloft('Aloft_pred',           'aloft_pred'),
-    _aloft('Aloft_prob_Dominant',  'aloft_prob_dominant'),
-    _aloft('Aloft_prob_Recessive', 'aloft_prob_recessive'),
-    _aloft('Aloft_prob_Tolerant',  'aloft_prob_tolerant'),
+    # ---------- Aloft (DBNSFP, GRCh37/38, v2-3) ----------------------------
+    _aloft('Ensembl_transcriptid', 'aloft_ensembl_transcript', max_columns_version=3),
+    _aloft('Aloft_Confidence',     'aloft_high_confidence',    max_columns_version=3),
+    _aloft('Aloft_pred',           'aloft_pred',               max_columns_version=3),
+    _aloft('Aloft_prob_Dominant',  'aloft_prob_dominant',      max_columns_version=3),
+    _aloft('Aloft_prob_Recessive', 'aloft_prob_recessive',     max_columns_version=3),
+    _aloft('Aloft_prob_Tolerant',  'aloft_prob_tolerant',      max_columns_version=3),
 
-    # ---------- DBNSFP rankscore family (v2+) ------------------------------
-    _dbnsfp_v2('AlphaMissense_rankscore', 'alphamissense_rankscore', min_columns_version=3),
-    _dbnsfp_v2('BayesDel_noAF_rankscore', 'bayesdel_noaf_rankscore'),
-    _dbnsfp_v2('CADD_raw_rankscore',      'cadd_raw_rankscore'),
-    _dbnsfp_v2('ClinPred_rankscore',      'clinpred_rankscore'),
-    _dbnsfp_v2('MetaLR_rankscore',        'metalr_rankscore'),
-    _dbnsfp_v2('REVEL_rankscore',         'revel_rankscore'),
-    _dbnsfp_v2('VEST4_rankscore',         'vest4_rankscore'),
+    # ---------- DBNSFP rankscore family (v2-3, GRCh37/38) ------------------
+    _dbnsfp_v2('AlphaMissense_rankscore', 'alphamissense_rankscore', min_columns_version=3, max_columns_version=3),
+    _dbnsfp_v2('BayesDel_noAF_rankscore', 'bayesdel_noaf_rankscore', max_columns_version=3),
+    _dbnsfp_v2('CADD_raw_rankscore',      'cadd_raw_rankscore',      max_columns_version=3),
+    _dbnsfp_v2('ClinPred_rankscore',      'clinpred_rankscore',      max_columns_version=3),
+    _dbnsfp_v2('MetaLR_rankscore',        'metalr_rankscore',        max_columns_version=3),
+    _dbnsfp_v2('REVEL_rankscore',         'revel_rankscore',         max_columns_version=3),
+    _dbnsfp_v2('VEST4_rankscore',         'vest4_rankscore',         max_columns_version=3),
 
     # ---------- DBNSFP "Most damaging" (columns_version == 1) --------------
     _dbnsfp_v1_most_damaging('FATHMM_pred',           'fathmm_pred_most_damaging'),
@@ -237,6 +257,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_plugin=VEPPlugin.DBNSFP,
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
+        max_columns_version=3,
     ),
     VEPColumnDef(
         source_field='Interpro_domain',
@@ -245,6 +266,65 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_plugin=VEPPlugin.DBNSFP,
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
+        max_columns_version=3,
+    ),
+
+    # ---------- DBNSFP v4 (dbNSFP 5.3.1a, GRCh37/38/T2T, columns_version >= 4) ----------
+    # ALoFT
+    _aloft_v4('Ensembl_transcriptid', 'aloft_ensembl_transcript'),
+    _aloft_v4('Aloft_Confidence',     'aloft_high_confidence'),
+    _aloft_v4('Aloft_pred',           'aloft_pred'),
+    _aloft_v4('Aloft_prob_Dominant',  'aloft_prob_dominant'),
+    _aloft_v4('Aloft_prob_Recessive', 'aloft_prob_recessive'),
+    _aloft_v4('Aloft_prob_Tolerant',  'aloft_prob_tolerant'),
+
+    # Rankscores carried forward
+    _dbnsfp_v4('AlphaMissense_rankscore', 'alphamissense_rankscore'),
+    _dbnsfp_v4('BayesDel_noAF_rankscore', 'bayesdel_noaf_rankscore'),
+    _dbnsfp_v4('CADD_raw_rankscore',      'cadd_raw_rankscore'),
+    _dbnsfp_v4('ClinPred_rankscore',      'clinpred_rankscore'),
+    _dbnsfp_v4('MetaLR_rankscore',        'metalr_rankscore'),
+    _dbnsfp_v4('REVEL_rankscore',         'revel_rankscore'),
+    _dbnsfp_v4('VEST4_rankscore',         'vest4_rankscore'),
+
+    # Raw scores + predictions newly extracted at v4
+    _dbnsfp_v4('AlphaMissense_pred',         'alphamissense_pred'),
+    _dbnsfp_v4('AlphaMissense_score',        'alphamissense_score'),
+    _dbnsfp_v4('BayesDel_noAF_score',        'bayesdel_noaf_score'),
+    _dbnsfp_v4('CADD_phred',                 'cadd_phred'),
+    _dbnsfp_v4('CADD_raw',                   'cadd_raw'),
+    _dbnsfp_v4('ClinPred_pred',              'clinpred_pred'),
+    _dbnsfp_v4('ClinPred_score',             'clinpred_score'),
+    _dbnsfp_v4('MPC_score',                  'mpc_score'),
+    _dbnsfp_v4('MetaRNN_pred',               'metarnn_pred'),
+    _dbnsfp_v4('MetaRNN_score',              'metarnn_score'),
+    _dbnsfp_v4('MutPred2_score',             'mutpred2_score'),
+    _dbnsfp_v4('MutPred2_top5_mechanisms',   'mutpred2_top5_mechanisms'),
+    _dbnsfp_v4('PrimateAI_pred',             'primateai_pred'),
+    _dbnsfp_v4('PrimateAI_score',            'primateai_score'),
+    _dbnsfp_v4('REVEL_score',                'revel_score'),
+    _dbnsfp_v4('VARITY_ER_score',            'varity_er_score'),
+    _dbnsfp_v4('VARITY_R_score',             'varity_r_score'),
+    _dbnsfp_v4('VEST4_score',                'vest4_score'),
+
+    # Conservation + protein domains carried forward across all 3 builds
+    VEPColumnDef(
+        source_field='GERP++_RS',
+        variant_grid_columns=('gerp_pp_rs',),
+        category=ColumnAnnotationCategory.CONSERVATION,
+        vep_plugin=VEPPlugin.DBNSFP,
+        genome_builds=GRCH37_38_T2T,
+        pipeline_types=STANDARD,
+        min_columns_version=4,
+    ),
+    VEPColumnDef(
+        source_field='Interpro_domain',
+        variant_grid_columns=('interpro_domain',),
+        category=ColumnAnnotationCategory.PROTEIN_DOMAINS,
+        vep_plugin=VEPPlugin.DBNSFP,
+        genome_builds=GRCH37_38_T2T,
+        pipeline_types=STANDARD,
+        min_columns_version=4,
     ),
 
     # ---------- gnomAD v4 (GRCh38 + T2T, columns_version >= 3) -------------

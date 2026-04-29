@@ -23,7 +23,8 @@ from psqlextra.types import PostgresPartitioningMethod
 
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
-    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
+    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction, \
+    AlphaMissensePrediction, ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import AnnotationStatus, \
     ClinVarReviewStatus, VEPSkippedReason, \
@@ -993,10 +994,16 @@ class AbstractVariantAnnotation(models.Model):
 
     # VEP Fields
     # The best way to see how these map to VEP fields is via the annotation details page
+    alphamissense_pred = models.CharField(max_length=1, choices=AlphaMissensePrediction.choices, null=True, blank=True)
+    alphamissense_score = models.FloatField(null=True, blank=True)
     amino_acids = models.TextField(null=True, blank=True)
+    bayesdel_noaf_score = models.FloatField(null=True, blank=True)
     cadd_phred = models.FloatField(null=True, blank=True)
+    cadd_raw = models.FloatField(null=True, blank=True)
     # TODO: This doesn't need to be nullable (default=False) - but will be slow. Change with next schema change
     canonical = models.BooleanField(null=True, blank=True)
+    clinpred_pred = models.CharField(max_length=1, choices=ClinPredPrediction.CHOICES, null=True, blank=True)
+    clinpred_score = models.FloatField(null=True, blank=True)
     nmd_escaping_variant = models.BooleanField(null=True, blank=True)
     codons = models.TextField(null=True, blank=True)
     consequence = models.TextField(null=True, blank=True)
@@ -1017,15 +1024,25 @@ class AbstractVariantAnnotation(models.Model):
     maxentscan_diff = models.FloatField(null=True, blank=True)
     maxentscan_ref = models.FloatField(null=True, blank=True)
     maxentscan_percent_diff_ref = models.FloatField(null=True, blank=True)
+    metarnn_pred = models.CharField(max_length=1, choices=MetaRNNPrediction.CHOICES, null=True, blank=True)
+    metarnn_score = models.FloatField(null=True, blank=True)
+    mpc_score = models.FloatField(null=True, blank=True)
     mutation_assessor_pred_most_damaging = models.CharField(max_length=1, choices=MutationAssessorPrediction.CHOICES, null=True, blank=True)
     mutation_taster_pred_most_damaging = models.CharField(max_length=1, choices=MutationTasterPrediction.CHOICES, null=True, blank=True)
+    mutpred2_score = models.FloatField(null=True, blank=True)
+    mutpred2_top5_mechanisms = models.TextField(null=True, blank=True)
     polyphen2_hvar_pred_most_damaging = models.CharField(max_length=1, choices=Polyphen2Prediction.CHOICES, null=True, blank=True)
+    primateai_pred = models.CharField(max_length=1, choices=PrimateAIPrediction.CHOICES, null=True, blank=True)
+    primateai_score = models.FloatField(null=True, blank=True)
     # protein_position = text as it can be e.g. indel: "22-23" or splicing: "?-10" or "10-?"
     protein_position = models.TextField(null=True, blank=True)
     revel_score = models.FloatField(null=True, blank=True)
     sift = models.CharField(max_length=1, choices=SIFTPrediction.CHOICES, null=True, blank=True)
     splice_region = models.TextField(null=True, blank=True)
     symbol = models.TextField(null=True, blank=True)
+    varity_er_score = models.FloatField(null=True, blank=True)
+    varity_r_score = models.FloatField(null=True, blank=True)
+    vest4_score = models.FloatField(null=True, blank=True)
 
     mavedb_score = models.FloatField(null=True, blank=True)
     mavedb_urn = models.TextField(null=True, blank=True)
