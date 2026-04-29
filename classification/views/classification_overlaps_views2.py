@@ -166,7 +166,7 @@ class TriageView(AjaxFormView[OverlapContribution]):
             )
 
             if comment := form.cleaned_data["comment"]:
-                triage.comment = TriageComment(comment, triage.comment.count+1)
+                triage.comment = triage.comment.next_comment(comment)
 
             triage.save()
 

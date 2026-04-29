@@ -1,5 +1,5 @@
-from typing import Type
-
+from dataclasses import dataclass
+from typing import Type, Callable, Optional, TypeVar, Generic
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from django.db.models import Model
@@ -46,3 +46,40 @@ def model_has_field(model: Type[Model], field_name: str) -> bool:
         pass
 
     return False
+
+
+T = TypeVar("T")
+
+
+@dataclass
+class AuditSingleChange(Generic[T]):
+    value: T
+    log_entry: 'LogEntry'
+
+    @property
+    def user(self):
+        return self.log_entry.actor
+
+    @property
+    def timestamp(self):
+        return self.log_entry.timestamp
+
+
+class AuditUtils:
+
+    @staticmethod
+    def last_change_for(model_instance: Model, field: str, parser: Optional[Callable[[str], T]] = None) -> AuditSingleChange[T]:
+        from auditlog.models import LogEntry
+        if log_entry := (LogEntry.objects.get_for_object(model_instance)
+                .filter(**{f"changes__{field}__isnull": False})
+                .exclude(**{f"changes__{field}__1": "None"})  # the changes are stored very stringified, to the point where None is saved as "None"
+                .order_by('-timestamp').first()):
+            value_str = log_entry.changes.get(field)[1]
+            value = value_str
+            if parser:
+                try:
+                    value = parser(value_str)
+                except Exception:
+                    raise ValueError(f"Couldn't parse {field} \"{value_str}\"")
+            return AuditSingleChange(value, log_entry)
+        return None, None

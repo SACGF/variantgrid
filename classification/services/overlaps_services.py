@@ -7,6 +7,7 @@ from auditlog.context import set_actor
 from auditlog.models import LogEntry
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
+from django.utils.timezone import now
 
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
@@ -152,11 +153,18 @@ class OverlapServices:
         # If your triage is pending, your task is always to triage
         if pending:
             had_pending_or_changing = True
+
+            partially_triaged = False
+            # now while there are pending, see if there are records that aren't pending
+            for not_pending in reviewed_will_discuss + reviewed_confident + reviewed_complex:
+                not_pending.skew_perspective = TriageNextStep.AWAITING_OTHER_LAB
+                partially_triaged = True
+
             for pend in pending:
-                pend.skew_perspective = TriageNextStep.AWAITING_YOUR_TRIAGE
-                # if someone else is pending, your task is always to wait on them
-                for not_pending in reviewed_will_discuss + reviewed_confident + reviewed_complex:
-                    not_pending.skew_perspective = TriageNextStep.AWAITING_OTHER_LAB
+                if partially_triaged:
+                    pend.skew_perspective = TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED
+                else:
+                    pend.skew_perspective = TriageNextStep.AWAITING_YOUR_TRIAGE
 
         if reviewed_will_change:
             had_pending_or_changing = True
@@ -196,7 +204,10 @@ class OverlapServices:
     def recalc_overlap(overlap: Overlap):
         calculator = calculator_for_value_type(overlap.value_type)
         overlap_status = calculator.calculate_entries(list(overlap.contributions.all()))
+        old_overlap_status = overlap.overlap_status
         overlap.overlap_status = overlap_status
+        if overlap_status != old_overlap_status:
+            overlap.overlap_status_change_timestamp = now()
 
         if overlap.overlap_type == OverlapType.SINGLE_CONTEXT:
             overlap.valid = True

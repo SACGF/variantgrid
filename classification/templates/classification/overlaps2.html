@@ -10,7 +10,6 @@
     <script>
         function groupingFilter(data) {
             let selectedMode = $('[name=triage_status_filter]:checked').val();
-            console.log(selectedMode);
             data.skew_status = selectedMode;
             data.lab_selection = {{ lab_picker_data.selection | jsonify }};
         }
@@ -20,7 +19,6 @@
         $(document).ready(() => {
             $('#triage_status_filter').change(() => {
                 filterGrid();
-                console.log("Filtering GRID!!");
             });
         });
     </script>
@@ -45,7 +43,7 @@
 
     <div id="triage_status_filter" class="my-4">
         <div class="btn-group btn-group-toggle" data-toggle="buttons">
-            <label class="btn btn-outline-danger"><input type="radio" name="triage_status_filter" id="triage_status_filter-t" value="T" checked="checked">Awaiting Triage</label>
+            <label class="btn btn-outline-danger"><input type="radio" name="triage_status_filter" id="triage_status_filter-t" value="TT" checked="checked">Awaiting Triage</label>
             <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-d" value="D">Ready to Discuss</label>
             <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="A">Awaiting Amendment</label>
             <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="O">Waiting on Other Lab</label>

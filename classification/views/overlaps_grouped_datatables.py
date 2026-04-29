@@ -1,6 +1,6 @@
 import html
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Set
 
 from django.db.models import QuerySet, Subquery, OuterRef, IntegerField, TextField, Q
 from django.db.models.aggregates import Max
@@ -68,6 +68,12 @@ class ContributionValues:
         if skew := self.skew:
             return skew.overlap.overlap_status_obj
         return OverlapStatus.NO_CONTRIBUTIONS
+
+    @property
+    def status_date(self):
+        if skew := self.skew:
+            return skew.overlap.overlap_status_change_timestamp
+        return None
 
     def __getitem__(self, item: str) -> ContributionValueSource:
         if hasattr(self, item):
@@ -140,6 +146,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             qs = qs.annotate(max_status=Greatest('onc_path_discordance_single_status', 'onc_path_discordance_single_status'))
         else:
             qs = qs.annotate(max_status=Greatest('onc_path_discordance_single_status', 'clin_sig_discordance_single_status'))
+
         # TODO determine this value if on overlaps or discordances
         qs = qs.filter(max_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
 
@@ -152,9 +159,12 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
         return qs
 
     @property
-    def triage_next_step_filter(self) -> Optional[TriageNextStep]:
+    def triage_next_step_filter(self) -> Optional[Set[TriageNextStep]]:
         if triage_status_str := self.get_query_param("skew_status"):
-            return TriageNextStep(triage_status_str)
+            if triage_status_str == "TT": # special code for meaning both awaiting and awaiting others have triaged
+                return {TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED}
+            else:
+                return {TriageNextStep(triage_status_str)}
         return None
 
     def filter_queryset(self, qs: QuerySet[DC]) -> QuerySet[DC]:
@@ -179,9 +189,9 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             ))
 
             if not OVERLAP_CLIN_SIG_ENABLED:
-                qs = qs.filter(Q(onc_path_triage_status=triage_status))
+                qs = qs.filter(Q(onc_path_triage_status__in=triage_status))
             else:
-                qs = qs.filter(Q(onc_path_triage_status=triage_status) | Q(clin_sig_triage_status=triage_status))
+                qs = qs.filter(Q(onc_path_triage_status__in=triage_status) | Q(clin_sig_triage_status__in=triage_status))
         return qs
 
 
@@ -196,11 +206,12 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             ClassificationResultValue.CLINICAL_SIGNIFICANCE: clin_sig_values
         }
 
-        overlaps = Overlap.objects.filter(
+        overlaps = list(Overlap.objects.filter(
             overlapcontributionskew__contribution__classification_grouping=cell.obj,
             valid=True,
             overlap_status__gte=OverlapStatus.NO_CONTRIBUTIONS
-        )
+        ).all())
+        cell.transient["overlaps"] = overlaps
         for overlap in overlaps:
             for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING).all():
                 same_context = contribution.testing_context_bucket_obj == cell.obj.testing_context
@@ -312,7 +323,13 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                 name="orgs",
                 label="Orgs",
                 renderer=self.render_orgs
-            )
+            ),
+
+            # RichColumn(
+            #     name="status_changed",
+            #     label="Overlap Status Changed",
+            #     render=lambda cell: cell.obj.testing_context
+            # )
         ]
 
         if OVERLAP_CLIN_SIG_ENABLED:

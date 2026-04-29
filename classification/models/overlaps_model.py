@@ -1,11 +1,12 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from functools import reduce, cached_property
 from typing import Any, Optional, Union
-
+import json
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
-from dataclasses_json import DataClassJsonMixin
+from dataclasses_json import DataClassJsonMixin, config
+from django.contrib.auth.models import User
 from django.db.models import CASCADE, QuerySet
 from django.db import models
 from django.db.models.enums import TextChoices
@@ -17,7 +18,7 @@ from classification.models import ClassificationGrouping, EvidenceKeyMap, Condit
     CuratedDate
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, TriageStatus, \
     OverlapEntrySourceTextChoices, EffectiveDateType
-from library.utils import first
+from library.utils import first, AuditUtils
 from library.utils.database_utils import TextFieldChoices, JSONDataclassField
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
@@ -79,6 +80,9 @@ class TriageState(DataClassJsonMixin):
     amend_value: Optional[str] = None
 
     def __str__(self):
+        if self.amend_value:
+            # TODO does amend_value need to be formatted?
+            return f"{self.status.label} ({self.amend_value.replace("_", "-")})"
         return self.status.label
 
     @staticmethod
@@ -86,10 +90,16 @@ class TriageState(DataClassJsonMixin):
         return TriageState().to_dict()
 
 
-@dataclass
+@dataclass(frozen=True)
 class TriageComment(DataClassJsonMixin):
     text: Optional[str] = None
     count: int = 0
+
+    def next_comment(self, text: Optional[str] = None):
+        return TriageComment(
+            text=text,
+            count=self.count + 1,
+        )
 
     @staticmethod
     def default_json():
@@ -154,6 +164,10 @@ class OverlapContribution(TimeStampedModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # self._change_comment = None
+
+    @cached_property
+    def last_comment(self):
+        return AuditUtils.last_change_for(self, "comment", lambda x: TriageComment.from_json(json.loads(x)))
 
     @property
     def testing_context_full(self) -> TestingContextFull:
@@ -243,6 +257,7 @@ class Overlap(TimeStampedModel):
     testing_context_bucket = models.TextField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
     overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_CONTRIBUTIONS.value)
+    overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
 
     # have to cache the values
@@ -354,6 +369,7 @@ class TriageNextStep(TextChoices):
     PENDING_CALCULATION = "X", "Pending Calculation"
     UNANIMOUSLY_COMPLEX = "C", "Unanimously Complex"
     AWAITING_YOUR_TRIAGE = "T", "Awaiting Your Triage"
+    AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = "Y", "Awaiting your Triage - others have triaged"
     AWAITING_YOUR_AMEND = "A", "Awaiting Your Amendment"
     AWAITING_OTHER_LAB = "O", "Awaiting Other Lab"
     TO_DISCUSS = "D", "To Discuss"
@@ -363,6 +379,7 @@ class TriageNextStep(TextChoices):
     def user_should_action(self) -> bool:
         match self:
             case TriageNextStep.AWAITING_YOUR_TRIAGE: return True
+            case TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED: return True
             case TriageNextStep.AWAITING_YOUR_AMEND: return True
             case TriageNextStep.TO_DISCUSS: return True
             case _: return False
@@ -371,6 +388,9 @@ class TriageNextStep(TextChoices):
     def icon(self):
         match self:
             case TriageNextStep.AWAITING_YOUR_TRIAGE:
+                return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
+            case TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED:
+                #TODO show a more impatient clock
                 return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
             case TriageNextStep.AWAITING_YOUR_AMEND:
                 return mark_safe('<i class="fa-solid fa-square-pen mr-1" style="opacity:0.6"></i>')
