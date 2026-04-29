@@ -13,9 +13,14 @@ almost 1:1 to AnnotSV's TSV output schema, so this issue adds **AnnotSV
 as a post-VEP stage** of the existing SV pipeline rather than try to
 reimplement those columns via VEP `--custom` BED files.
 
-Out of scope for this iteration (parked for follow-ups):
-CADD-SV, SVAFotate, ClassifyCNV, DeepSVP. The integration shape we
-choose for AnnotSV should make adding any of these as an additional
+ClassifyCNV is **already implemented inside AnnotSV** (it's the engine
+behind `ACMG_class` / `AnnotSV_ranking_score`), so this iteration covers
+ClassifyCNV-equivalent output as part of the AnnotSV stage rather than
+as a separate tool.
+
+Out of scope for this iteration (parked for follow-ups, none of which
+ship with AnnotSV): CADD-SV, SVAFotate, DeepSVP. The integration shape
+we choose for AnnotSV should make adding any of these as an additional
 stage straightforward.
 
 ## Current SV pipeline (what's there today)
@@ -112,8 +117,8 @@ point at it via settings.
 
 ```python
 ANNOTATION_ANNOTSV_ENABLED = False  # opt-in per env
-ANNOTATION_ANNOTSV_BIN = "/opt/AnnotSV/bin/AnnotSV"          # the TCL entry point
-ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/AnnotSV/Annotations_Human"
+ANNOTATION_ANNOTSV_BIN = "/data/annotation/AnnotSV/bin/AnnotSV"          # the TCL entry point
+ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/AnnotSV/share/AnnotSV/Annotations_Human"
 ANNOTATION_ANNOTSV_GENOME_BUILD = {                          # AnnotSV's build flag
     "GRCh37": "GRCh37",
     "GRCh38": "GRCh38",
@@ -121,6 +126,14 @@ ANNOTATION_ANNOTSV_GENOME_BUILD = {                          # AnnotSV's build f
 ANNOTATION_ANNOTSV_EXTRA_ARGS: list[str] = []                # e.g. ["-SVminSize", "50"]
 ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60                 # SV volume is low; cap anyway
 ```
+
+`-tx` is set per-run from the project's `AnnotationConsortium`
+(`REFSEQ` → `RefSeq`, `ENSEMBL` → `ENSEMBL`) so AnnotSV's transcript
+provider matches VEP's. Note that AnnotSV's transcript snapshot is
+pinned by the annotations bundle and is **not synchronised with VEP's
+cache version** — only the provider aligns. Per-gene rows therefore
+key off `Gene` (not transcript), and the bundle version
+(`annotsv_bundle`) acts as the version pin for that snapshot.
 
 A version sentinel goes on `VariantAnnotationVersion` (see #4).
 
@@ -137,14 +150,17 @@ from snpdb.models import GenomeBuild
 
 
 def get_annotsv_command(vcf_filename: str, output_dir: str,
-                        genome_build: GenomeBuild) -> list[str]:
+                        genome_build: GenomeBuild,
+                        annotation_consortium: AnnotationConsortium) -> list[str]:
     build_arg = settings.ANNOTATION_ANNOTSV_GENOME_BUILD[genome_build.name]
+    tx_arg = "RefSeq" if annotation_consortium == AnnotationConsortium.REFSEQ else "ENSEMBL"
     cmd = [
         settings.ANNOTATION_ANNOTSV_BIN,
         "-SVinputFile", vcf_filename,
         "-outputDir", output_dir,
         "-genomeBuild", build_arg,
         "-annotationsDir", settings.ANNOTATION_ANNOTSV_ANNOTATIONS_DIR,
+        "-tx", tx_arg,                # match VEP's transcript provider
         "-SVinputInfo", "1",          # keep INFO from input VCF
         "-includeCI", "0",            # don't expand by CIPOS/CIEND
         "-overwrite", "1",
@@ -207,21 +223,45 @@ admin grid (e.g. a new `AnnotationStatus.PARTIAL` value), or — simpler
 — leave overall status driven by VEP and expose AnnotSV state as its
 own column in `AnnotationRunColumns` (`annotation/grids.py:13`).
 
-### 4. New annotation version field
+### 4. New annotation version fields
 
-`VariantAnnotationVersion` already gates VEP/columns versions. Add an
-AnnotSV version pin so a bundle upgrade triggers reannotation the same
-way a VEP version bump does:
+`VariantAnnotationVersion` already gates VEP/columns versions. Add two
+AnnotSV version pins — kept **separate and explicit** because the
+binary and the annotations bundle have independent release cadences and
+upgrades will be rare; an explicit mismatch is preferable to a single
+collapsed version string:
 
 ```python
 # annotation/models/models.py — VariantAnnotationVersion
-annotsv_version = models.TextField(null=True, blank=True)
-annotsv_annotations_version = models.TextField(null=True, blank=True)
+annotsv_code = models.TextField(null=True, blank=True)     # e.g. "3.5.8" — `AnnotSV -version`
+annotsv_bundle = models.TextField(null=True, blank=True)   # annotations bundle stamp
 ```
 
+**Backwards-compatible defaults.** Both fields default to `null` /
+unset, and `ANNOTATION_ANNOTSV_ENABLED=False` in the shipped defaults.
+Upgrading VariantGrid alone — without installing AnnotSV or flipping
+the enable flag — does **not** change `VariantAnnotationVersion` and
+therefore does **not** trigger reannotation of existing variants. The
+version pins only become populated (and only become reannotation
+triggers) on deployments that explicitly opt in by:
+
+1. Installing AnnotSV + the annotations bundle.
+2. Setting `ANNOTATION_ANNOTSV_ENABLED=True` and the path settings in
+   the deployment-specific settings file.
+3. Running the management command that creates a new
+   `VariantAnnotationVersion` populating `annotsv_code` and
+   `annotsv_bundle` from the installed binary/bundle.
+
 `vep_check_command_line_version_match` has a counterpart
-`annotsv_check_command_line_version_match` that runs `AnnotSV --version`
-and compares with `VariantAnnotationVersion.annotsv_version`.
+`annotsv_check_command_line_version_match` that runs `AnnotSV -version`
+and compares with `VariantAnnotationVersion.annotsv_code`. The bundle
+version is read from the annotations directory (AnnotSV ships a
+`Annotations_Human/Users/configfile` / version stamp; the importer
+captures the string and compares against `annotsv_bundle`). The check
+is **skipped entirely** when `ANNOTATION_ANNOTSV_ENABLED=False` so a
+default install never tries to call a binary that isn't there. Once
+opted in, bumping either field triggers reannotation via the standard
+`VariantAnnotationVersion` path.
 
 ### 5. Schema changes on `VariantAnnotation` (whole-SV columns)
 
@@ -255,47 +295,23 @@ If/when CoLoRSdb is added, it slots in here as
 `colorsdb_af / _ac / _ac_hemi / _nhomalt / _maxaf`. Same for
 DeepSVP's `del_z / dup_z / cnv_z`.
 
-### 6. Per-gene SV overlap rows (AnnotSV "split" lines)
+### 6. Per-gene SV overlap rows (AnnotSV "split" lines) — **deferred**
 
 AnnotSV emits one **full** line per SV, then N **split** lines, one per
 overlapped gene, each carrying gene-scoped morbidity / OMIM /
-inheritance / exons-spanned / frameshift columns. These don't slot well
-into `VariantTranscriptAnnotation` (which is per-transcript, not
-per-gene-overlap-of-an-SV) — recommend a new model:
+inheritance / exons-spanned / frameshift columns.
 
-```python
-# annotation/models/models.py
-class VariantSVGeneOverlap(models.Model):
-    version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
-    variant = models.ForeignKey(Variant, on_delete=CASCADE)
-    annotation_run = models.ForeignKey(AnnotationRun, on_delete=CASCADE)
-    gene = models.ForeignKey(Gene, null=True, on_delete=SET_NULL)
-    gene_symbol = models.TextField(null=True, blank=True)
+**Not in this iteration.** AnnotSV's gene/transcript snapshot is
+bundle-pinned, so its gene symbols and IDs come from a different release
+than the project's `Gene` table (driven by VEP / cdot). Persisting split
+rows now would require a gene-release mapping layer we don't have, and
+would risk dangling FKs / silent symbol drift.
 
-    overlap_type = models.CharField(max_length=16, null=True, blank=True)  # full / partial
-    exons_spanned = models.IntegerField(null=True, blank=True)
-    frameshift = models.BooleanField(null=True)
-    nearest_ss_type = models.CharField(max_length=2, null=True, blank=True)  # 3' / 5'
-
-    omim_id = models.TextField(null=True, blank=True)
-    omim_inheritance = models.TextField(null=True, blank=True)
-    omim_morbid = models.BooleanField(null=True)
-
-    class Meta:
-        indexes = [models.Index(fields=["variant", "version"])]
-```
-
-Sharded the same way other annotation tables are
-(`annotation_version_querysets.get_queryset_for_annotation_version`).
-`AnnotationRun.delete_related_objects` (`models.py:947`) gets the new
-class added to its loop:
-
-```python
-for klass in [VariantAnnotation, VariantTranscriptAnnotation,
-              VariantGeneOverlap, VariantSVGeneOverlap]:
-    qs = get_queryset_for_annotation_version(klass, annotation_version)
-    qs.filter(annotation_run=self).delete()
-```
+For this iteration we ingest **only the "full" lines** onto
+`VariantAnnotation`. Split lines are parsed for diagnostic logging but
+not stored. A follow-up issue will design the gene-release mapping and
+introduce a `VariantSVGeneOverlap`-equivalent model once the mapping
+strategy is settled.
 
 ### 7. TSV ingestion
 
@@ -306,7 +322,7 @@ pandas (or `csv.DictReader`) and bulk-inserts via existing
 
 ```python
 import pandas as pd
-from annotation.models import VariantAnnotation, VariantSVGeneOverlap
+from annotation.models import VariantAnnotation
 
 
 # AnnotSV TSV → our model field name. Names below are the AnnotSV
@@ -327,20 +343,9 @@ FULL_COLUMN_MAP = {
     "IMH_AF": "annotsv_imh_max_af",
 }
 
-SPLIT_COLUMN_MAP = {
-    "Gene_name": "gene_symbol",
-    "Overlapped_tx_length": None,     # derived
-    "Tx_start": None,
-    "Tx_end": None,
-    "Location": "overlap_type",
-    "Frameshift": "frameshift",
-    "Exon_count": None,
-    "Dist_nearest_SS": None,
-    "Nearest_SS_type": "nearest_ss_type",
-    "OMIM_ID": "omim_id",
-    "OMIM_inheritance": "omim_inheritance",
-    "OMIM_morbid": "omim_morbid",
-}
+# Split lines are NOT persisted in this iteration — AnnotSV's gene
+# snapshot is on a different release than our Gene table, and we don't
+# have a mapping yet. Defer until follow-up.
 
 
 def import_annotsv_tsv(annotation_run):
@@ -353,10 +358,7 @@ def import_annotsv_tsv(annotation_run):
     # variant_id during dump (see _unannotated_variants_to_vcf), so
     # we can join straight back to Variant.pk.
     full = df[df["Annotation_mode"] == "full"]
-    splits = df[df["Annotation_mode"] == "split"]
-
     _bulk_update_full(annotation_run, full)
-    _bulk_create_splits(annotation_run, splits)
     annotation_run.annotsv_imported = True
     annotation_run.save()
 ```
@@ -371,9 +373,10 @@ Existing variant detail templates already render the
 `gnomad_sv_overlap_*` fields when present. Extend the SV detail panel
 to display:
 - AnnotSV ACMG class + score (with the standard 1–5 colour scale).
-- Per-gene rows from `VariantSVGeneOverlap`.
 - Region columns (RE_gene, repeats, SegDup, ENCODE blacklist) in a
   collapsible "Genomic context" section.
+
+Per-gene split-line rows are deferred — see §6.
 
 `annotation/templates/annotation/variantannotation_detail.html` (or
 the SV-specific partial — confirm location during implementation) is
@@ -382,14 +385,22 @@ the touchpoint. No new datatable views required for the first cut.
 ## Migration & rollout
 
 1. **Schema** — one Django migration adds AnnotSV fields to
-   `AnnotationRun`, `VariantAnnotationVersion`, and `VariantAnnotation`,
-   plus the new `VariantSVGeneOverlap` partitioned table.
+   `AnnotationRun`, `VariantAnnotationVersion`, and `VariantAnnotation`.
+   All new fields are nullable / default off, so an upgrade with no
+   AnnotSV install is a no-op for existing rows. No new per-gene table
+   this iteration (deferred — see §6).
 2. **Settings** — `ANNOTATION_ANNOTSV_ENABLED=False` in default,
    opt-in per env. Shariant / SAP can enable when the bundle is
-   installed; vgtest stays off until verified.
-3. **Backfill** — bumping `VariantAnnotationVersion.annotsv_version`
-   will trigger reannotation the standard way. SV volume is low
-   (orders of magnitude fewer than SNVs), so a full backfill is cheap.
+   installed; vgtest stays off until verified. **A VG version bump
+   alone must not flip any AnnotSV setting on** — the enable flag and
+   path overrides only ever come from the deployment-specific settings
+   file, never from the shipped defaults.
+3. **Backfill** — `annotsv_code` / `annotsv_bundle` start `null` and
+   only become populated when a deployment opts in and creates a new
+   `VariantAnnotationVersion`. Until then, no reannotation is
+   triggered. Once opted in, bumping either field triggers reannotation
+   the standard way. SV volume is low (orders of magnitude fewer than
+   SNVs), so a full backfill is cheap.
 4. **Failure isolation** — AnnotSV stage is best-effort. A failed
    AnnotSV stage leaves `annotsv_imported=False` and an error string;
    ops can rerun that stage alone via a management command:
@@ -406,35 +417,45 @@ the touchpoint. No new datatable views required for the first cut.
    that mocks `subprocess.run` and asserts the importer wires data to
    the right `Variant` rows.
 
-## Open questions
+## Decisions (resolved 2026-04-29)
 
-1. **Per-gene overlaps storage** — new `VariantSVGeneOverlap` model
-   (recommended above) vs reusing `VariantGeneOverlap` (which exists
-   today for SNV gene proximity). The latter may be ambiguous — SV
-   "overlap" semantics differ from SNV `--overlap`-style proximity.
-   New model is cleaner; happy to revisit.
-2. **ACMG class surfacing in classification app** — should AnnotSV's
-   ACMG class auto-populate any classification evidence keys, or stay
-   purely in `annotation`? My instinct: annotation only; the
-   classification app pulls from it explicitly when curators want it.
+1. **Per-gene overlaps storage** — **deferred**. AnnotSV's split lines
+   reference a bundle-pinned gene release that doesn't match our `Gene`
+   table; persisting them needs a gene-release mapping we don't have
+   yet. This iteration ingests only the AnnotSV "full" lines onto
+   `VariantAnnotation`. A follow-up issue will design the mapping and
+   introduce a dedicated `VariantSVGeneOverlap`-style table — kept
+   separate from `VariantGeneOverlap` so AnnotSV vs VEP overlap calls
+   can be compared.
+2. **ACMG class** — annotation-only. Stored on `VariantAnnotation`,
+   surfaced in the variant detail UI; **not** auto-populating any
+   classification evidence keys. Classification app can pull it
+   explicitly later if curators want it.
 3. **Score thresholds vs raw values** — store the raw
-   `AnnotSV_ranking_score` and let the UI bucket, rather than baking
-   thresholds into the schema.
-4. **Bundle versioning** — AnnotSV's annotation directory has its own
-   release cadence. Capturing the bundle version (e.g. via a stamp
-   file in the annotations dir) is worth doing in
-   `annotsv_annotations_version` so reannotation triggers correctly
-   when sources update without the binary changing.
+   `AnnotSV_ranking_score`. UI does any bucketing.
+4. **Versioning** — two explicit fields, `annotsv_code` (binary) and
+   `annotsv_bundle` (annotations directory). Upgrades are rare; an
+   explicit mismatch is preferable to a single collapsed version
+   string. Both default to `null` so a VG version bump on a deployment
+   that hasn't installed AnnotSV does not change
+   `VariantAnnotationVersion` and does not trigger reannotation —
+   AnnotSV is **strictly opt-in via deployment settings**.
+5. **Transcript provider** — pass `-tx` matching the project's
+   `AnnotationConsortium` so the provider aligns with VEP. Versions
+   inside the AnnotSV bundle are independent of the VEP cache and will
+   drift; per-gene rows therefore key off `Gene`, not transcript.
 
 ## Future stages (not in this iteration)
 
-Once the AnnotSV stage exists, additional stages drop in by repeating
-steps 2/5/7:
+ClassifyCNV is dropped from this list — AnnotSV's `ACMG_class` /
+`AnnotSV_ranking_score` are produced by ClassifyCNV's criteria
+internally, so this iteration already delivers it.
+
+Once the AnnotSV stage exists, additional external tools drop in by
+repeating steps 2/5/7:
 - **CADD-SV** — single-score column.
 - **SVAFotate** — alternate population AF source (CoLoRSdb, etc.) keyed
   by overlap.
-- **ClassifyCNV** — second ACMG/AMP scorer for CNVs specifically; store
-  alongside `annotsv_acmg_class` so curators can compare.
 - **DeepSVP** — `del_z / dup_z / cnv_z`.
 
 Each is a small, independent stage on the SV `AnnotationRun`, gated by
