@@ -620,7 +620,8 @@ class VariantAnnotationVersion(SubVersionPartition):
     # GeneAnnotationRelease - imported GTF we can use to get gene/transcript versions that match VEP
     gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, null=True, on_delete=CASCADE)
     last_checked_date = models.DateTimeField(null=True)
-    active = models.BooleanField(default=True)
+    # Created False - admin flips True once the underlying tables are populated. @see private issue #577
+    active = models.BooleanField(default=False)
 
     vep = models.IntegerField()  # code version
     vep_cache = models.IntegerField(null=True)  # May need to have diff code/cache versions eg T2T
