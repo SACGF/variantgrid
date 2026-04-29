@@ -8,11 +8,12 @@
 # to VEP.
 #
 # Inputs (download from https://denovo-db.gs.washington.edu/denovo-db/Download.jsp):
-#   ${VEP_ANNOTATION_DIR}/annotation_data/GRCh37/denovo-db.ssc-samples.variants.v.1.6.1.tsv.gz
-#   ${VEP_ANNOTATION_DIR}/annotation_data/GRCh37/denovo-db.non-ssc-samples.variants.v.1.6.1.tsv.gz
+#   ${VEP_ANNOTATION_DIR}/annotation_data/GRCh37/denovo-db.ssc-samples.variants.tsv.gz
+#   ${VEP_ANNOTATION_DIR}/annotation_data/GRCh37/denovo-db.non-ssc-samples.variants.tsv.gz
 #
 # Output:
-#   ${VEP_ANNOTATION_DIR}/annotation_data/GRCh37/denovo-db.variants.v.1.6.1.vcf.gz
+#   ${VEP_ANNOTATION_DIR}/annotation_data/GRCh37/denovo-db.variants.v.<VERSION>.vcf.gz
+# (VERSION is read from the '##version=denovo-db.v.<VERSION>' line at the top of each TSV.)
 
 set -euo pipefail
 
@@ -23,9 +24,8 @@ fi
 
 SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 GRCH37_DIR=${VEP_ANNOTATION_DIR}/annotation_data/GRCh37
-SSC_TSV=${GRCH37_DIR}/denovo-db.ssc-samples.variants.v.1.6.1.tsv.gz
-NONSSC_TSV=${GRCH37_DIR}/denovo-db.non-ssc-samples.variants.v.1.6.1.tsv.gz
-OUTPUT=${GRCH37_DIR}/denovo-db.variants.v.1.6.1.vcf.gz
+SSC_TSV=${GRCH37_DIR}/denovo-db.ssc-samples.variants.tsv.gz
+NONSSC_TSV=${GRCH37_DIR}/denovo-db.non-ssc-samples.variants.tsv.gz
 
 for f in "${SSC_TSV}" "${NONSSC_TSV}"; do
   if [[ ! -e "${f}" ]]; then
@@ -34,6 +34,18 @@ for f in "${SSC_TSV}" "${NONSSC_TSV}"; do
     exit 1
   fi
 done
+
+# Pull the version from the '##version=denovo-db.v.<VERSION>' line at the top of the TSV.
+# Use process substitution + a single `read` so we don't SIGPIPE zcat (which would
+# trip `set -o pipefail`).
+read -r FIRST_LINE < <(zcat "${SSC_TSV}")
+VERSION=$(echo "${FIRST_LINE}" | sed -n 's/^##version=denovo-db\.v\.\(\S\+\).*$/\1/p')
+if [[ -z "${VERSION}" ]]; then
+  echo "Could not parse '##version=denovo-db.v.<VERSION>' from first line of ${SSC_TSV}" >&2
+  exit 1
+fi
+echo "Detected denovo-db version: ${VERSION}"
+OUTPUT=${GRCH37_DIR}/denovo-db.variants.v.${VERSION}.vcf.gz
 
 echo "Converting denovo-db TSV(s) to VCF and sorting..."
 python3 "${SCRIPT_DIR}/denovo_db_tsv_to_vcf.py" "${SSC_TSV}" "${NONSSC_TSV}" \
