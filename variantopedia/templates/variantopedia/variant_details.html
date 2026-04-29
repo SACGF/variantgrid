@@ -801,6 +801,44 @@ function applyVariantValues() {
                                         {% labelled id='gnomad_sv_overlap_percent' label='SV Overlap %' help=annotation_description.gnomad_sv_overlap_percent hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_percent }}{% endlabelled %}
                                     {% endfor %}
                                 </div>
+
+                                {% if variant_annotation.annotsv_acmg_class is not None or variant_annotation.annotsv_acmg_score is not None %}
+                                    {% labelled id='annotsv_acmg_class' label='AnnotSV ACMG class' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_acmg_class|default_if_none:"-" }}{% endlabelled %}
+                                    {% labelled id='annotsv_acmg_score' label='AnnotSV ACMG score' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_acmg_score|default_if_none:"-" }}{% endlabelled %}
+                                {% endif %}
+
+                                {% labelled label="Genomic context (AnnotSV)" hint="tiny" %}
+                                    <a class='toggle-link' data-toggle="collapse" href='#annotsv-context'>Show AnnotSV genomic context</a>
+                                {% endlabelled %}
+                                <div id="annotsv-context" class="collapse">
+                                    {% if variant_annotation.annotsv_re_gene %}
+                                        {% labelled id='annotsv_re_gene' label='Regulatory element gene' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_re_gene }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_repeat_type_left or variant_annotation.annotsv_repeat_type_right %}
+                                        {% labelled id='annotsv_repeat_left' label='Repeat (left)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_repeat_type_left|default_if_none:"-" }}{% endlabelled %}
+                                        {% labelled id='annotsv_repeat_right' label='Repeat (right)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_repeat_type_right|default_if_none:"-" }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_segdup_left or variant_annotation.annotsv_segdup_right %}
+                                        {% labelled id='annotsv_segdup_left' label='SegDup (left)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_segdup_left|default_if_none:"-" }}{% endlabelled %}
+                                        {% labelled id='annotsv_segdup_right' label='SegDup (right)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_segdup_right|default_if_none:"-" }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_encode_blacklist_left or variant_annotation.annotsv_encode_blacklist_right %}
+                                        {% labelled id='annotsv_encode_blacklist_left' label='ENCODE blacklist (left)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_encode_blacklist_left|default_if_none:"-" }}{% if variant_annotation.annotsv_encode_blacklist_characteristics_left %} ({{ variant_annotation.annotsv_encode_blacklist_characteristics_left }}){% endif %}{% endlabelled %}
+                                        {% labelled id='annotsv_encode_blacklist_right' label='ENCODE blacklist (right)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_encode_blacklist_right|default_if_none:"-" }}{% if variant_annotation.annotsv_encode_blacklist_characteristics_right %} ({{ variant_annotation.annotsv_encode_blacklist_characteristics_right }}){% endif %}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_b_gain_af_max is not None %}
+                                        {% labelled id='annotsv_b_gain_af_max' label='AnnotSV benign gain AF max' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_b_gain_af_max|format_unit_as_percent }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_b_loss_af_max is not None %}
+                                        {% labelled id='annotsv_b_loss_af_max' label='AnnotSV benign loss AF max' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_b_loss_af_max|format_unit_as_percent }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_b_ins_af_max is not None %}
+                                        {% labelled id='annotsv_b_ins_af_max' label='AnnotSV benign ins AF max' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_b_ins_af_max|format_unit_as_percent }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_b_inv_af_max is not None %}
+                                        {% labelled id='annotsv_b_inv_af_max' label='AnnotSV benign inv AF max' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_b_inv_af_max|format_unit_as_percent }}{% endlabelled %}
+                                    {% endif %}
+                                </div>
                             {% elif variant_annotation.gnomad_url %}
                                 {% labelled label="View in gnomAD" hint="tiny" %}
                                     <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>

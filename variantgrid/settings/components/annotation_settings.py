@@ -196,6 +196,24 @@ ANNOTATION = {
 }
 
 ANNOTATION_VCF_DUMP_DIR = os.path.join(PRIVATE_DATA_ROOT, 'annotation_dump')
+
+# AnnotSV (post-VEP stage on the STRUCTURAL_VARIANT pipeline). Strictly opt-in:
+# leaving ANNOTATION_ANNOTSV_ENABLED=False means no AnnotSV invocation, no version
+# pin populated on VariantAnnotationVersion, and no reannotation triggered. Deployments
+# enable this in their per-host settings file once the binary + bundle are installed.
+ANNOTATION_ANNOTSV_ENABLED = False
+ANNOTATION_ANNOTSV_BIN = "/data/annotation/AnnotSV/bin/AnnotSV"
+ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/AnnotSV/share/AnnotSV/Annotations_Human"
+# Map our genome build name -> AnnotSV's -genomeBuild value
+ANNOTATION_ANNOTSV_GENOME_BUILD = {
+    BUILD_GRCH37: "GRCh37",
+    BUILD_GRCH38: "GRCh38",
+}
+# Annotations bundle has no version stamp file; admin sets this to the bundle release
+# string they installed (eg "3.5.8"). Compared against VariantAnnotationVersion.annotsv_bundle.
+ANNOTATION_ANNOTSV_BUNDLE_VERSION = None
+ANNOTATION_ANNOTSV_EXTRA_ARGS: list[str] = []
+ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60
 # Admin email used in PubMed queries to contact before throttling/banning
 ANNOTATION_ENTREZ_EMAIL = get_secret("ENTREZ.email")  # Automatically set in in annotation.apps.AnnotationConfig
 ANNOTATION_ENTREZ_API_KEY = get_secret("ENTREZ.api_key")

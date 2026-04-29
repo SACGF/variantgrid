@@ -9,6 +9,7 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
+from annotation.annotsv_annotation import run_annotsv, annotsv_check_command_line_version_match
 from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals.manual_signals import annotation_run_complete_signal
@@ -105,6 +106,10 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
     if vep_version_check:
         # Do a check before we annotate
         vep_check_command_line_version_match(annotation_run.variant_annotation_version)
+        # Counterpart for AnnotSV - skipped entirely when not enabled
+        if (settings.ANNOTATION_ANNOTSV_ENABLED
+                and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
+            annotsv_check_command_line_version_match(annotation_run.variant_annotation_version)
 
     vcf_dump_filename = annotation_run.get_dump_filename()
     annotation_run.dump_start = timezone.now()
@@ -145,6 +150,20 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
 
         annotation_run.vcf_annotated_filename = vcf_annotated_filename
         annotation_run.annotation_end = timezone.now()
+
+        if (settings.ANNOTATION_ANNOTSV_ENABLED
+                and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
+            annotsv_dir = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR,
+                                       f"annotsv_{annotation_run.pk}")
+            tsv, rc, _stdout, stderr = run_annotsv(vcf_dump_filename, annotsv_dir,
+                                                   genome_build, annotation_consortium)
+            if rc == 0 and os.path.exists(tsv):
+                annotation_run.annotsv_tsv_filename = tsv
+                annotation_run.annotsv_error = None
+            else:
+                annotation_run.annotsv_error = (stderr or "")[:100_000]
+                logging.warning("AnnotSV stage failed for AnnotationRun %s: rc=%s",
+                                annotation_run.pk, rc)
     else:
         # Now we have standard/CNV type pipelines, it's possible some can be empty
         annotation_run.annotated_count = 0

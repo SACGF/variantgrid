@@ -646,6 +646,13 @@ class VariantAnnotationVersion(SubVersionPartition):
     denovo_db = models.TextField(blank=True, null=True)  # 37/38 only
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
+    # AnnotSV version pins. Both default to NULL. Populated only on deployments
+    # that opt-in to AnnotSV via settings + management command. Either value
+    # changing triggers reannotation via the standard VariantAnnotationVersion
+    # path.
+    annotsv_code = models.TextField(null=True, blank=True)     # eg "3.5.8" - from `AnnotSV -version`
+    annotsv_bundle = models.TextField(null=True, blank=True)   # admin-set bundle release string
+
     @property
     def gnomad_major_version(self) -> int:
         return int(self.gnomad.split(".", maxsplit=1)[0])
@@ -878,6 +885,13 @@ class AnnotationRun(TimeStampedModel):
     dump_count = models.IntegerField(null=True)
     annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
+
+    # AnnotSV stage (post-VEP, STRUCTURAL_VARIANT pipeline only). Best-effort:
+    # the run is not failed if AnnotSV errors; an error string is recorded and
+    # the VEP-only result is still imported.
+    annotsv_tsv_filename = models.TextField(null=True)
+    annotsv_error = models.TextField(null=True)
+    annotsv_imported = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('annotation_range_lock', 'pipeline_type')
@@ -1160,6 +1174,25 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_sv_overlap_coords = models.TextField(null=True, blank=True)
     # Can't use filters unfortunately due to VEP custom bug, @see https://github.com/Ensembl/ensembl-vep/issues/1646
     # gnomad_sv_overlap_filters = models.TextField(null=True, blank=True)
+
+    # AnnotSV (full-line) annotations - SV-only, populated by the AnnotSV stage on
+    # the STRUCTURAL_VARIANT pipeline. Per-gene split-line rows are deferred (#1533).
+    annotsv_acmg_class = models.IntegerField(null=True, blank=True)        # 1..5
+    annotsv_acmg_score = models.FloatField(null=True, blank=True)          # AnnotSV_ranking_score
+    annotsv_re_gene = models.TextField(null=True, blank=True)              # RE_gene
+    annotsv_repeat_type_left = models.TextField(null=True, blank=True)
+    annotsv_repeat_type_right = models.TextField(null=True, blank=True)
+    annotsv_segdup_left = models.TextField(null=True, blank=True)
+    annotsv_segdup_right = models.TextField(null=True, blank=True)
+    annotsv_encode_blacklist_left = models.TextField(null=True, blank=True)
+    annotsv_encode_blacklist_right = models.TextField(null=True, blank=True)
+    annotsv_encode_blacklist_characteristics_left = models.TextField(null=True, blank=True)
+    annotsv_encode_blacklist_characteristics_right = models.TextField(null=True, blank=True)
+    # Bundled population AFs from AnnotSV's BenignSV sources, per SV-type.
+    annotsv_b_gain_af_max = models.FloatField(null=True, blank=True)       # B_gain_AFmax
+    annotsv_b_loss_af_max = models.FloatField(null=True, blank=True)       # B_loss_AFmax
+    annotsv_b_ins_af_max = models.FloatField(null=True, blank=True)        # B_ins_AFmax
+    annotsv_b_inv_af_max = models.FloatField(null=True, blank=True)        # B_inv_AFmax
 
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
     # "optimum cutoff value identified in the ROC analysis (0.6)"
