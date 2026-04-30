@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from typing import Type, Callable, Optional, TypeVar, Generic
+from typing import Type, Callable, Optional, TypeVar, Generic, Union
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from django.db.models import Model
+import json
 
 
 class ModelUtilsMixin:
@@ -68,18 +69,26 @@ class AuditSingleChange(Generic[T]):
 class AuditUtils:
 
     @staticmethod
-    def last_change_for(model_instance: Model, field: str, parser: Optional[Callable[[str], T]] = None) -> AuditSingleChange[T]:
+    def last_change_for(model_instance: Model, field: str, is_json: bool = False, parser: Optional[Callable[[Union[str, dict]], T]] = None) -> AuditSingleChange[T]:
         from auditlog.models import LogEntry
         if log_entry := (LogEntry.objects.get_for_object(model_instance)
                 .filter(**{f"changes__{field}__isnull": False})
                 .exclude(**{f"changes__{field}__1": "None"})  # the changes are stored very stringified, to the point where None is saved as "None"
                 .order_by('-timestamp').first()):
-            value_str = log_entry.changes.get(field)[1]
-            value = value_str
+            value = log_entry.changes.get(field)[1]
+            if isinstance(value, str) and is_json:
+                try:
+                    value = json.loads(value)
+                    if isinstance(value, str):
+                        # not sure what's going on with double encoding
+                        value = json.loads(value)
+                except:
+                    pass
             if parser:
                 try:
-                    value = parser(value_str)
-                except Exception:
-                    raise ValueError(f"Couldn't parse {field} \"{value_str}\"")
+                    value = parser(value)
+                except Exception as ex:
+                    raise ex
+                    # raise ValueError(f"Couldn't parse {field} \"{value_str}\"")
             return AuditSingleChange(value, log_entry)
         return None, None

@@ -167,7 +167,7 @@ class OverlapContribution(TimeStampedModel):
 
     @cached_property
     def last_comment(self):
-        return AuditUtils.last_change_for(self, "comment", lambda x: TriageComment.from_json(json.loads(x)))
+        return AuditUtils.last_change_for(self, "comment", is_json=True, parser=lambda x: TriageComment.from_dict(x))
 
     @property
     def testing_context_full(self) -> TestingContextFull:
