@@ -3,6 +3,72 @@
 from django.db import migrations, models
 
 
+# Why this migration needs raw SQL:
+#
+# 0075 renamed the GeneSymbol PK column `symbol` -> `old_symbol` so we could
+# replace the deprecated CITextField with a TextField + case-insensitive
+# collation (issue #831). 0076 added the new `symbol` column, 0077 copied data
+# across, and 0078 (this migration) was meant to drop `old_symbol` and promote
+# `symbol` to PK.
+#
+# Django's autodetector models a ForeignKey as "points at model X" and treats
+# the referenced column as an implementation detail. RenameField on a PK
+# therefore updates Django's in-memory state but emits no DDL for the ~21
+# dependent tables across analysis/annotation/classification/genes/pathtests/
+# seqauto that have an FK to GeneSymbol. Postgres, however, stores FK
+# constraints against a *named column*, so after 0075 every dependent FK is
+# still `REFERENCES genes_genesymbol(old_symbol)` and Django's state has
+# silently diverged from the database.
+#
+# That divergence only surfaces here: dropping `old_symbol` fails with
+# "cannot drop column ... because other objects depend on it" because all
+# those FK constraints (plus the PK itself) still reference it. Django has no
+# first-class "retarget this FK" operation, so the standard workaround is
+# SeparateDatabaseAndState wrapping a RunSQL that does the drop/swap/recreate
+# in one transaction. We discover the FKs dynamically from pg_constraint so
+# that any FK added to GeneSymbol since 0075 (or in a fork) is handled too.
+SWAP_GENE_SYMBOL_PK_FORWARD = r"""
+DO $$
+DECLARE
+    r RECORD;
+    fk_recreate TEXT[] := ARRAY[]::TEXT[];
+    fk_def TEXT;
+BEGIN
+    FOR r IN
+        SELECT conname,
+               conrelid::regclass::text AS table_name,
+               pg_get_constraintdef(oid) AS def
+        FROM pg_constraint
+        WHERE confrelid = 'genes_genesymbol'::regclass
+          AND contype = 'f'
+    LOOP
+        fk_recreate := array_append(
+            fk_recreate,
+            format(
+                'ALTER TABLE %s ADD CONSTRAINT %I %s',
+                r.table_name,
+                r.conname,
+                replace(r.def,
+                        'REFERENCES genes_genesymbol(old_symbol)',
+                        'REFERENCES genes_genesymbol(symbol)')
+            )
+        );
+        EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I',
+                       r.table_name, r.conname);
+    END LOOP;
+
+    ALTER TABLE genes_genesymbol DROP CONSTRAINT genes_genesymbol_pkey;
+    ALTER TABLE genes_genesymbol ALTER COLUMN symbol SET NOT NULL;
+    ALTER TABLE genes_genesymbol ADD CONSTRAINT genes_genesymbol_pkey PRIMARY KEY (symbol);
+    ALTER TABLE genes_genesymbol DROP COLUMN old_symbol;
+
+    FOREACH fk_def IN ARRAY fk_recreate LOOP
+        EXECUTE fk_def;
+    END LOOP;
+END$$;
+"""
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("genes", "0077_one_off_copy_citext_to_textfield"),
@@ -13,16 +79,26 @@ class Migration(migrations.Migration):
             name="genesymbolalias",
             unique_together=set(),
         ),
-        migrations.RemoveField(
-            model_name="genesymbol",
-            name="old_symbol",
-        ),
-        migrations.AlterField(
-            model_name="genesymbol",
-            name="symbol",
-            field=models.TextField(
-                db_collation="case_insensitive", primary_key=True, serialize=False
-            ),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    SWAP_GENE_SYMBOL_PK_FORWARD,
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+            ],
+            state_operations=[
+                migrations.RemoveField(
+                    model_name="genesymbol",
+                    name="old_symbol",
+                ),
+                migrations.AlterField(
+                    model_name="genesymbol",
+                    name="symbol",
+                    field=models.TextField(
+                        db_collation="case_insensitive", primary_key=True, serialize=False
+                    ),
+                ),
+            ],
         ),
         migrations.AlterField(
             model_name="genesymbolalias",
