@@ -7,7 +7,6 @@ from django.db.models import Q
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.expressions import Value, F
 from django.db.models.functions import Concat, Substr, Length, Replace
-from django.urls.base import reverse
 
 from analysis.models import GroupOperation, AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
@@ -243,15 +242,6 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             errors.append("No cohort selected.")
         else:
             errors.extend(self._get_genome_build_errors("cohort", self.cohort.genome_build))
-            try:
-                _ = self.cohort.cohort_genotype_collection
-            except CohortGenotypeCollection.DoesNotExist:
-                cohort_name = self.cohort.name or "cohort"
-                url = reverse("view_cohort", kwargs={"cohort_id": self.cohort.pk})
-                msg = "Your cohort has not finished processing - please visit cohort page for "
-                msg += f"<a href='{url}'>{cohort_name}</a>"
-                errors.append(msg)
-
         return errors
 
     def _get_node_extra_columns(self):

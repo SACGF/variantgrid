@@ -9,7 +9,7 @@ from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from patients.models_enums import Zygosity
-from snpdb.models import VCFFilter, Cohort, Sample
+from snpdb.models import VCFFilter, Cohort, Sample, CohortGenotypeCollection
 from upload.models import UploadedVCF
 
 
@@ -256,6 +256,11 @@ class CohortMixin:
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
+        if cohort := self._get_cohort():
+            try:
+                _ = cohort.cohort_genotype_collection
+            except CohortGenotypeCollection.DoesNotExist:
+                errors.append("Source data missing: underlying genotype data is no longer available")
         if vcf := self._get_vcf():
             try:
                 uv: UploadedVCF = vcf.uploadedvcf
