@@ -114,6 +114,13 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             output_field=IntegerField()
         ))
 
+        qs = qs.annotate(onc_path_discordance_single_date=Subquery(
+            Overlap.objects.filter(
+                overlap_type=OverlapType.SINGLE_CONTEXT,
+                overlapcontributionskew__contribution=OuterRef('onc_path_contribution'),
+            ).order_by('-overlap_status').values_list('overlap_status_change_timestamp')[:1]
+        ))
+
         qs = qs.annotate(onc_path_discordance_multi_status=Subquery(
             Overlap.objects.filter(
                 overlap_type=OverlapType.SINGLE_CONTEXT,
@@ -315,7 +322,7 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                 name="onc_path",
                 label="Onc/Path",
                 renderer=self.render_onc_path,
-                sort_keys=['max_status'],
+                sort_keys=['max_status', 'onc_path_discordance_single_date'],
                 default_sort=SortOrder.DESC
             ),
 
