@@ -140,6 +140,11 @@ class EffectiveDate(DataClassJsonMixin):
     def default_json():
         return EffectiveDate().to_dict()
 
+    def __str__(self):
+        if date_val := self.date:
+            return f"{date_val} {self.date_type.label}"
+        return "Date Unknown"
+
 
 class OverlapContribution(TimeStampedModel):
     history = AuditlogHistoryField()
