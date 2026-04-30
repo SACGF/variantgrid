@@ -161,12 +161,9 @@ class DamageNode(AnalysisNode):
                     Q(variantannotation__dbscsnv_rf_score__isnull=True),
                 ])
 
-            for _, (ds, _) in VariantAnnotation.SPLICEAI_DS_DP.items():
-                q_spliceai = Q(**{f"variantannotation__{ds}__gte": self.splice_min})
-                splicing_q_list.append(q_spliceai)
-                if self.splice_required and self.splice_allow_null:
-                    q_spliceai_null = Q(**{f"variantannotation__{ds}__isnull": True})
-                    splicing_q_list.append(q_spliceai_null)
+            splicing_q_list.append(Q(variantannotation__spliceai_max_ds__gte=self.splice_min))
+            if self.splice_required and self.splice_allow_null:
+                splicing_q_list.append(Q(variantannotation__spliceai_max_ds__isnull=True))
 
             q_splicing = reduce(operator.or_, splicing_q_list)
             if self.splice_required:

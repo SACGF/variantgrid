@@ -321,6 +321,28 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
     return vep_version
 
 
+def _spliceai_label(spliceai_filename: str) -> str:
+    flavour = "masked" if "masked" in os.path.basename(spliceai_filename).lower() else "raw"
+    version = _spliceai_version_from_vcf_header(spliceai_filename)
+    if version:
+        return f"{flavour} {version}"
+    return flavour
+
+
+def _spliceai_version_from_vcf_header(spliceai_filename: str) -> Optional[str]:
+    try:
+        with open_handle_gzip(spliceai_filename, "rt") as f:
+            for line in f:
+                if not line.startswith("#"):
+                    break
+                if "ID=SpliceAI" in line:
+                    if m := re.search(r"SpliceAIv(\d+(?:\.\d+)*)", line):
+                        return m.group(1)
+    except OSError:
+        logging.warning("Could not read SpliceAI VCF header: %s", spliceai_filename)
+    return None
+
+
 def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: dict) -> dict:
     def _vep_int_version(vep_string_version):
         m = re.match(r"v(\d+)", vep_string_version)
@@ -415,6 +437,13 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
             cosmic_basename = os.path.basename(cosmic_filename)
             if m := re.match(r"^Cosmic.*_v(\d{2,})_.*.vcf.gz", cosmic_basename):
                 kwargs["cosmic"] = int(m.group(1))
+    except KeyError:
+        pass
+
+    try:
+        spliceai_snv_filename = vep_config["spliceai_snv"]
+        if spliceai_snv_filename and os.path.exists(spliceai_snv_filename):
+            kwargs["spliceai"] = _spliceai_label(spliceai_snv_filename)
     except KeyError:
         pass
 

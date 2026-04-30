@@ -107,6 +107,7 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
             RichColumn(key="thousand_genomes", orderable=True, detail=True),
             RichColumn(key="cosmic", orderable=True, detail=True),
             RichColumn(key="hgmd", label="HGMD", orderable=True, detail=True),
+            RichColumn(key="spliceai", label="SpliceAI", orderable=True, detail=True),
             RichColumn(key="assembly", orderable=True, detail=True),
             RichColumn(key="gencode", label="GENCODE", orderable=True, detail=True),
             RichColumn(key="genebuild", label="GeneBuild", orderable=True, detail=True),

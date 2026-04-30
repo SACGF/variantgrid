@@ -82,6 +82,7 @@ class BulkVEPVCFAnnotationInserter:
         "overlapping_symbols",
         "gnomad_hemi_count",
         "hgvs_g",
+        "spliceai_max_ds",
     ]
     DB_IGNORED_COLUMNS = ["id", "transcript", "MaveDB_nt", "MaveDB_pro"]
     VEP_NOT_COPIED_FIELDS = [
@@ -476,8 +477,20 @@ class BulkVEPVCFAnnotationInserter:
         self._add_hemi_count(transcript_data)
         self._add_hgvs_g(variant_coordinate, transcript_data)
         self._add_calculated_num_predictions(transcript_data)
+        self._add_spliceai_max_ds(transcript_data)
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             self._calculate_gnomad_sv_overlap_percentage(variant_coordinate, transcript_data)
+
+    @staticmethod
+    def _add_spliceai_max_ds(transcript_data: TranscriptData):
+        ds_values = []
+        for key in ("spliceai_pred_ds_ag", "spliceai_pred_ds_al",
+                    "spliceai_pred_ds_dg", "spliceai_pred_ds_dl"):
+            v = transcript_data.get(key)
+            if v is not None:
+                ds_values.append(float(v))
+        if ds_values:
+            transcript_data["spliceai_max_ds"] = max(ds_values)
 
     def _add_calculated_num_predictions(self, transcript_data):
         num_pathogenic = 0

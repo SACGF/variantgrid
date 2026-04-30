@@ -12,8 +12,9 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction, connection
-from django.db.models import QuerySet, Subquery, OuterRef
+from django.db.models import F, Q, QuerySet, Subquery, OuterRef
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
+from django.db.models.functions import Coalesce, Greatest
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
@@ -644,6 +645,7 @@ class VariantAnnotationVersion(SubVersionPartition):
     sift = models.TextField(blank=True, null=True)  # 37/38 only
     dbnsfp = models.TextField(blank=True, null=True)  # 37/38 only
     denovo_db = models.TextField(blank=True, null=True)  # 37/38 only
+    spliceai = models.TextField(blank=True, null=True)
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
     # AnnotSV version pins. Both default to NULL. Populated only on deployments
@@ -1252,6 +1254,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     spliceai_pred_ds_al = models.FloatField(null=True, blank=True)
     spliceai_pred_ds_dg = models.FloatField(null=True, blank=True)
     spliceai_pred_ds_dl = models.FloatField(null=True, blank=True)
+    spliceai_max_ds = models.FloatField(null=True, blank=True, db_index=True)
     spliceai_gene_symbol = models.TextField(null=True, blank=True)
 
     repeat_masker = models.TextField(null=True, blank=True)
@@ -1480,6 +1483,23 @@ class VariantAnnotation(AbstractVariantAnnotation):
         if values:
             return max(values)
         return None
+
+    @classmethod
+    def backfill_spliceai_max_ds(cls, version: 'VariantAnnotationVersion') -> int:
+        any_ds_set = (
+            Q(spliceai_pred_ds_ag__isnull=False)
+            | Q(spliceai_pred_ds_al__isnull=False)
+            | Q(spliceai_pred_ds_dg__isnull=False)
+            | Q(spliceai_pred_ds_dl__isnull=False)
+        )
+        return cls.objects.filter(version=version).filter(any_ds_set).update(
+            spliceai_max_ds=Greatest(
+                Coalesce(F("spliceai_pred_ds_ag"), 0.0),
+                Coalesce(F("spliceai_pred_ds_al"), 0.0),
+                Coalesce(F("spliceai_pred_ds_dg"), 0.0),
+                Coalesce(F("spliceai_pred_ds_dl"), 0.0),
+            ),
+        )
 
     @staticmethod
     def get_gnomad_population_field(population):
