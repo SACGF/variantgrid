@@ -1,3 +1,4 @@
+from auditlog.context import disable_auditlog
 from django.core.management import BaseCommand
 
 from annotation.models import ClinVarRecordCollection
@@ -51,12 +52,12 @@ class Command(BaseCommand):
                 overlap.save(update_fields=["overlap_status_change_timestamp"])
 
         # dates on overlap contributions
-        for overlap_contribution in OverlapContribution.objects.filter(effective_date__date=None).iterator():
-            if grouping := overlap_contribution.classification_grouping:
-                date_check = grouping.latest_classification_modification.curated_date_check
-                overlap_contribution.effective_date = EffectiveDate.from_curated_date(date_check)
-                overlap_contribution.save(update_fields=["effective_date"])
-
+        with disable_auditlog():
+            for overlap_contribution in OverlapContribution.objects.filter(effective_date__date=None).iterator():
+                if grouping := overlap_contribution.classification_grouping:
+                    date_check = grouping.latest_classification_modification.curated_date_check
+                    overlap_contribution.effective_date = EffectiveDate.from_curated_date(date_check)
+                    overlap_contribution.save(update_fields=["effective_date"])
 
     def make_clinvar_expert_panel_contributions(self):
         # only check already made ClinVarRecord collections in sync
