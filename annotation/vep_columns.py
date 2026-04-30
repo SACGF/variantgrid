@@ -7,6 +7,7 @@ from annotation.models.models_enums import (
     VEPCustom,
     VEPPlugin,
 )
+from annotation.vep_config import VEPConfig
 
 
 @dataclass(frozen=True)
@@ -896,8 +897,48 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
 )
 
 
+# vep_config setting keys (under settings.ANNOTATION[<build>]["vep_config"]) that must be
+# present (non-None) for a VEPColumnDef to actually be populated. Empty tuple means the
+# def needs no data file (plain VEP CSQ, or a plugin with no data — Grantham/SpliceRegion/
+# NMD/LoFtool). VEPCustom keys are derived from `vep_custom.label.lower()`.
+_VEP_PLUGIN_SETTING_KEYS: dict[VEPPlugin, tuple[str, ...]] = {
+    VEPPlugin.DBNSFP: ("dbnsfp",),
+    VEPPlugin.DBSCSNV: ("dbscsnv",),
+    VEPPlugin.MASTERMIND: ("mastermind",),
+    VEPPlugin.MAVEDB: ("mave",),
+    VEPPlugin.MAXENTSCAN: ("maxentscan",),
+    VEPPlugin.SPLICEAI: ("spliceai_snv", "spliceai_indel"),
+    VEPPlugin.GRANTHAM: (),
+    VEPPlugin.LOFTOOL: (),
+    VEPPlugin.NMD: (),
+    VEPPlugin.SPLICEREGION: (),
+}
+
+
+def required_data_keys(c: VEPColumnDef) -> tuple[str, ...]:
+    """ vep_config setting keys this def needs in order to actually be populated.
+        Empty tuple = no data file required. """
+    if c.vep_custom:
+        return (c.vep_custom.label.lower(),)
+    if c.vep_plugin:
+        return _VEP_PLUGIN_SETTING_KEYS.get(c.vep_plugin, ())
+    return ()
+
+
+def has_data_files(c: VEPColumnDef, vep_config: VEPConfig) -> bool:
+    """ True iff every required vep_config key is set (non-None) for this def's build.
+        VEPConfig.__getitem__ raises KeyError when the value is missing or None. """
+    for key in required_data_keys(c):
+        try:
+            _ = vep_config[key]
+        except KeyError:
+            return False
+    return True
+
+
 def filter_for(
     *,
+    vep_config: Optional[VEPConfig] = None,
     genome_build_name: Optional[str] = None,
     pipeline_type: Optional[VariantAnnotationPipelineType] = None,
     columns_version: Optional[int] = None,
@@ -906,6 +947,18 @@ def filter_for(
     vep_plugin: Optional[VEPPlugin] = None,
     vep_custom: Optional[VEPCustom] = None,
 ) -> tuple[VEPColumnDef, ...]:
+    """ When `vep_config` is provided, fills in build/columns/vep/gnomad versions from it
+        and drops any def whose data file isn't configured for the build. """
+    if vep_config is not None:
+        if genome_build_name is None:
+            genome_build_name = vep_config.genome_build.name
+        if columns_version is None:
+            columns_version = vep_config.columns_version
+        if vep_version is None:
+            vep_version = vep_config.vep_version
+        if gnomad4_minor_version is None:
+            gnomad4_minor_version = vep_config.gnomad4_minor_version
+
     return tuple(
         c for c in VEP_COLUMNS
         if c.applies_to(
@@ -917,6 +970,7 @@ def filter_for(
         )
         and (vep_plugin is None or c.vep_plugin == vep_plugin)
         and (vep_custom is None or c.vep_custom == vep_custom)
+        and (vep_config is None or has_data_files(c, vep_config))
     )
 
 
@@ -926,8 +980,13 @@ def source_fields_for(**kwargs) -> list[str]:
     return sorted({c.source_field for c in filter_for(**kwargs) if c.source_field}, key=str.lower)
 
 
-def for_variant_grid_column(vgc_id: str) -> tuple[VEPColumnDef, ...]:
-    return tuple(c for c in VEP_COLUMNS if vgc_id in c.variant_grid_columns)
+def for_variant_grid_column(vgc_id: str, *, vep_config: Optional[VEPConfig] = None) -> tuple[VEPColumnDef, ...]:
+    """ When `vep_config` is provided, drops defs whose data file isn't configured. """
+    return tuple(
+        c for c in VEP_COLUMNS
+        if vgc_id in c.variant_grid_columns
+        and (vep_config is None or has_data_files(c, vep_config))
+    )
 
 
 def all_variant_grid_column_ids() -> frozenset[str]:

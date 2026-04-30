@@ -2,7 +2,6 @@ import logging
 import os
 import re
 import uuid
-from copy import deepcopy
 from shlex import shlex
 from typing import Optional
 
@@ -12,6 +11,7 @@ from annotation import vep_columns
 from annotation.fake_annotation import get_fake_vep_version
 from annotation.models.models_enums import VEPPlugin, VEPCustom, VariantAnnotationPipelineType
 from annotation.vep_columns import VEPColumnDef
+from annotation.vep_config import VEPConfig, parse_gnomad_version_from_filename
 from genes.models_enums import AnnotationConsortium
 from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
@@ -22,55 +22,12 @@ class VEPVersionMismatchError(ValueError):
     pass
 
 
-def parse_gnomad_version_from_filename(path: str) -> Optional[str]:
-    basename = os.path.basename(path)
-    if m := re.match(r"^gnomad(.*?)_(GRCh37|GRCh38|hg19|hg38|T2T-CHM13v2.0)",
-                     basename, flags=re.IGNORECASE):
-        return m.group(1)
-    return None
-
-
-class VEPConfig:
-
-    def __init__(self, genome_build: GenomeBuild):
-        self.annotation_consortium = genome_build.annotation_consortium
-        self.genome_build = genome_build
-        self.vep_version = int(settings.ANNOTATION_VEP_VERSION)
-
-        # We'll strip out any config - anything left is files/data
-        vep_config = deepcopy(genome_build.settings["vep_config"])
-        self.use_sift = vep_config.pop("sift", False)
-        self.cache_version = vep_config.pop("cache_version", self.vep_version)
-
-        self.vep_data = vep_config
-        self.columns_version = genome_build.settings["columns_version"]
-
-    def __getitem__(self, key):
-        """ Throws KeyError if missing """
-        value = self.vep_data[key]  # All callers need to catch KeyError
-        if value is None:
-            raise KeyError(key)
-        return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
-
-    @property
-    def gnomad4_minor_version(self) -> str:
-        try:
-            gnomad4_path = self["gnomad4"]
-        except KeyError:
-            return "4.0"
-        version = parse_gnomad_version_from_filename(gnomad4_path)
-        if version is None:
-            return "4.0"
-        return version
-
-
 def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
     """ Build from VEPColumnDef.source_field where vep_plugin = DBNSFP """
 
     dbnsfp_data_path = vc["dbnsfp"]
     fields = vep_columns.source_fields_for(
-        genome_build_name=genome_build.name,
-        columns_version=vc.columns_version,
+        vep_config=vc,
         vep_plugin=VEPPlugin.DBNSFP,
     )
     return f"dbNSFP,{dbnsfp_data_path},{','.join(fields)}"
@@ -247,34 +204,23 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     else:
         plugin_data_func = {}  # No plugins for SVs
 
-    # Custom
+    # Custom - filter_for(vep_config=vc) drops anything whose data file isn't configured,
+    # so we don't need to probe vc[prefix_lc] separately.
     for vep_custom in VEPCustom:
         prefix = vep_custom.label
-        try:
-            # Match original ColumnVEPField.get(): distinct source_field, ordered by source_field
-            # (postgres default collation = case-insensitive).
-            cvf_list = sorted(
-                {c.source_field: c for c in vep_columns.filter_for(
-                    genome_build_name=genome_build.name,
-                    pipeline_type=pipeline_type,
-                    columns_version=vc.columns_version,
-                    vep_version=vc.vep_version,
-                    gnomad4_minor_version=vc.gnomad4_minor_version,
-                    vep_custom=vep_custom,
-                )}.values(),
-                key=lambda c: (c.source_field or "").lower(),
-            )
-            if cvf_list:
-                prefix_lc = prefix.lower()
-                if cfg := vc[prefix_lc]:  # annotation settings are lower case
-                    cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg))
-                else:
-                    logging.info("Skipping due to settings.ANNOTATION[%s][vep_config][%s] = None",
-                                 genome_build.name, prefix_lc)
-        except Exception as e:
-            logging.warning(e)
-            # Not all annotations available for all builds - ok to just warn
-            logging.warning("Skipped custom annotation: %s", prefix)
+        # Match original ColumnVEPField.get(): distinct source_field, ordered by source_field
+        # (postgres default collation = case-insensitive).
+        cvf_list = sorted(
+            {c.source_field: c for c in vep_columns.filter_for(
+                vep_config=vc,
+                pipeline_type=pipeline_type,
+                vep_custom=vep_custom,
+            )}.values(),
+            key=lambda c: (c.source_field or "").lower(),
+        )
+        if cvf_list:
+            cfg = vc[prefix.lower()]
+            cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg))
 
     for vep_plugin, plugin_arg_func in plugin_data_func.items():
         try:

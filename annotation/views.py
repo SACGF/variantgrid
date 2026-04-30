@@ -26,7 +26,7 @@ from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPi
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler, subdivide_annotation_range_lock
-from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
+from annotation.vep_annotation import VEPConfig, get_vep_command, get_vep_variant_annotation_version_kwargs
 from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
@@ -464,8 +464,12 @@ def view_annotation_descriptions(request, genome_build_name=None):
     vep_annotation_levels = [ColumnAnnotationLevel.TRANSCRIPT_LEVEL, ColumnAnnotationLevel.VARIANT_LEVEL]
     columns_and_vep_by_annotation_level = {al.label: {} for al in vep_annotation_levels}
 
+    # Use a VEPConfig so we hide columns whose data file isn't configured for this build
+    # (e.g. dbNSFP under T2T) - same source of truth as get_vep_command/BulkVEPVCFAnnotationInserter.
+    vep_config = VEPConfig(genome_build)
+
     def _first_for_build(vgc_id, build_name):
-        for c in vep_columns.for_variant_grid_column(vgc_id):
+        for c in vep_columns.for_variant_grid_column(vgc_id, vep_config=vep_config):
             if c.applies_to(genome_build_name=build_name):
                 return c
         return None

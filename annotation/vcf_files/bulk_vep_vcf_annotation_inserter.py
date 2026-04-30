@@ -134,11 +134,8 @@ class BulkVEPVCFAnnotationInserter:
         logging.info("CSQ: %s", self.vep_columns)
 
         cvf_list = vep_columns_registry.filter_for(
-            genome_build_name=self.genome_build.name,
+            vep_config=self.vep_config,
             pipeline_type=self.annotation_run.pipeline_type,
-            columns_version=self.vep_config.columns_version,
-            vep_version=self.vep_config.vep_version,
-            gnomad4_minor_version=self.vep_config.gnomad4_minor_version,
         )
 
         self._setup_vep_fields_and_db_columns(validate_columns, cvf_list)
@@ -250,18 +247,11 @@ class BulkVEPVCFAnnotationInserter:
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
+        # cvf_list is already filtered through vep_config so unconfigured customs are dropped.
         # Sort to have consistent VCF headers (case-insensitive to match postgres `ORDER BY source_field`)
         for cvf in sorted(cvf_list, key=lambda c: (c.source_field or "").lower()):
-            try:
-                if cvf.vep_custom:  # May not be configured
-                    prefix = cvf.vep_custom.label
-                    setting_key = prefix.lower()
-                    _ = self.vep_config[setting_key]  # May throw exception if not setup
-
-                for vgc_id in cvf.variant_grid_columns:
-                    self.source_field_to_columns[cvf.vep_info_field].add(vgc_id)
-            except:
-                logging.warning("Skipping custom %s due to missing settings", cvf.vep_info_field)
+            for vgc_id in cvf.variant_grid_columns:
+                self.source_field_to_columns[cvf.vep_info_field].add(vgc_id)
 
         vav = self.annotation_run.variant_annotation_version
         self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
