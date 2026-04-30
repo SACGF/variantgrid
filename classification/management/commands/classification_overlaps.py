@@ -37,7 +37,8 @@ class Command(BaseCommand):
         print(f"Overlap Contribution Count = {OverlapContribution.objects.count()}")
 
     def populate_status_change(self):
-        for overlap in Overlap.objects.iterator():
+        # timestamp on overlaps
+        for overlap in Overlap.objects.filter(overlap_status_change_timestamp__isnull=True).iterator():
             latest_date = None
             for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
                 if grouping := contribution.classification_grouping:
@@ -48,6 +49,14 @@ class Command(BaseCommand):
             if latest_date:
                 overlap.overlap_status_change_timestamp = latest_date
                 overlap.save(update_fields=["overlap_status_change_timestamp"])
+
+        # dates on overlap contributions
+        for overlap_contribution in OverlapContribution.objects.filter(effective_date__date_isnull=True).iterator():
+            if grouping := overlap_contribution.classification_grouping:
+                date_check = grouping.latest_classification_modification.curated_date_check
+                overlap_contribution.effective_date = EffectiveDate.from_curated_date(date_check)
+                overlap_contribution.save(update_fields=["effective_date"])
+
 
     def make_clinvar_expert_panel_contributions(self):
         # only check already made ClinVarRecord collections in sync
