@@ -51,7 +51,7 @@ class Command(BaseCommand):
                 overlap.save(update_fields=["overlap_status_change_timestamp"])
 
         # dates on overlap contributions
-        for overlap_contribution in OverlapContribution.objects.filter(effective_date__date_isnull=True).iterator():
+        for overlap_contribution in OverlapContribution.objects.filter(effective_date__date=None).iterator():
             if grouping := overlap_contribution.classification_grouping:
                 date_check = grouping.latest_classification_modification.curated_date_check
                 overlap_contribution.effective_date = EffectiveDate.from_curated_date(date_check)
