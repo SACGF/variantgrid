@@ -9,7 +9,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from annotation.models import Citation
 from annotation.models.damage_enums import FATHMMPrediction, \
     MutationTasterPrediction, Polyphen2Prediction, SIFTPrediction, \
-    MutationAssessorPrediction, ALoFTPrediction
+    MutationAssessorPrediction, ALoFTPrediction, MetaRNNPrediction
 from annotation.models.models import VariantAnnotation, AnnotationVersion, GenePubMedCount
 from annotation.models.models_enums import ClinVarReviewStatus
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
@@ -173,6 +173,7 @@ def ekey_from_vg_column_formatters():
         "clinvar_review_status": lambda crs: clinvar_review_status_to_vcf_dict.get(crs),
         "fathmm_pred_most_damaging": get_choices_formatter(FATHMMPrediction.CHOICES),
         "mavedb": mavedb_formatter,
+        'metarnn_pred': get_choices_formatter(MetaRNNPrediction.CHOICES),
         "molecular_consequence": molecular_consequence_formatter,
         'mutation_assessor': get_choices_formatter(MutationAssessorPrediction.CHOICES),
         'mutation_taster': get_choices_formatter(MutationTasterPrediction.CHOICES),
