@@ -106,7 +106,7 @@ $(document).ready(function() {
     <div id="sample-tabs">
         <ul>
             <li><a href="#details">Details</a></li>
-            {% if sample.samplestats.import_status == 'S' %}
+            {% if sample_genotype_stats.import_status == 'S' %}
             <li><a href="#sample-stats">Stats</a></li>
             {% endif %}
             <li><a href="{% url 'sample_files_tab' sample.pk %}">Files</a></li>
@@ -160,7 +160,7 @@ $(document).ready(function() {
                 {{ form.media }}
             </form>
         </div>
-    {% if sample.samplestats.import_status == 'S' %}
+    {% if sample_genotype_stats.import_status == 'S' %}
         <div id="sample-stats">
         {% if not sample_stats_variant_class_df.empty %}
             <h4>Variant Class</h4>
@@ -194,7 +194,7 @@ $(document).ready(function() {
 
         {% if sex_guess %}
         <h4>Sex</h4>
-        {{ sample.samplestats.chrx_sex_guess }} (chrX Hom: {{ sample.samplestats.x_hom_count }}, Het: {{ sample.samplestats.x_het_count }})
+        {{ sample_genotype_stats.chrx_sex_guess }} (chrX Hom: {{ sample_genotype_stats.x_hom_count }}, Het: {{ sample_genotype_stats.x_het_count }})
         {% endif %}
         </div>
 	{% endif %}

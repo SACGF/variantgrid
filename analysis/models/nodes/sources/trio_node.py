@@ -10,6 +10,9 @@ from django.db.models.query_utils import Q
 
 from analysis.models.enums import TrioInheritance, NodeErrorSource, AnalysisTemplateType
 from analysis.models.nodes.sources import AbstractCohortBasedNode
+from analysis.models.nodes.sources._stats_cache import (
+    get_cached_label_count_for_cohort, get_handler_for_node, UNCACHEABLE,
+)
 from annotation.models.models import VariantTranscriptAnnotation
 from library.constants import DAY_SECS
 from patients.models_enums import Zygosity, Sex
@@ -254,6 +257,34 @@ class TrioNode(AbstractCohortBasedNode):
         if self.trio:
             cohort = self.trio.cohort
         return cohort
+
+    def _has_filters_that_affect_label_counts(self) -> bool:
+        # Inheritance is a CACHE DIMENSION (precomputed via filter_key), not a
+        # defeating filter. Quality filters from AbstractCohortBasedNode still
+        # defeat the cache.
+        return AbstractCohortBasedNode._has_filters_that_affect_label_counts(self)
+
+    def _get_cached_label_count(self, label):
+        if self.trio is None:
+            return None
+        if self._has_filters_that_affect_label_counts():
+            return None
+        filter_code = self.get_filter_code()
+        if filter_code not in (0, 1):
+            return None
+        handler = get_handler_for_node(self)
+        filter_key = handler.filter_key_for_node(self)
+        if filter_key is UNCACHEABLE:
+            return None
+        return get_cached_label_count_for_cohort(
+            cohort=self.trio.cohort,
+            sample=None,
+            filter_key=filter_key,
+            annotation_version=self.analysis.annotation_version,
+            passing_filter=bool(filter_code),
+            zygosities=self._cached_label_count_zygosities(),
+            label=label,
+        )
 
     def modifies_parents(self):
         return self.trio is not None

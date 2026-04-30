@@ -391,6 +391,21 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         for o in related_objects:
             o.all().delete()
 
+        # New CohortGenotype*Stats family — only the per-sample (sample IS NOT NULL)
+        # rows belong to this Sample. Aggregate / filter-keyed rows are owned by
+        # the CGC and die when the CGC is deleted. Imports are inline to avoid
+        # a snpdb-internal load-order cycle (CohortGenotypeStats → SampleStatsCodeVersion
+        # in this module) and a snpdb→annotation cycle.
+        from annotation.models import (
+            CohortGenotypeClinVarAnnotationStats, CohortGenotypeGeneAnnotationStats,
+            CohortGenotypeVariantAnnotationStats,
+        )
+        from snpdb.models.models_cohort_stats import CohortGenotypeStats as _CGS
+        _CGS.objects.filter(sample=self).delete()
+        CohortGenotypeVariantAnnotationStats.objects.filter(sample=self).delete()
+        CohortGenotypeGeneAnnotationStats.objects.filter(sample=self).delete()
+        CohortGenotypeClinVarAnnotationStats.objects.filter(sample=self).delete()
+
     @cached_property
     def cohort_genotype_collection(self):
         return self.vcf.cohort.cohort_genotype_collection

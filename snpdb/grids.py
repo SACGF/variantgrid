@@ -4,7 +4,7 @@ from typing import Optional, Any
 
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import F, QuerySet, Value, Func
+from django.db.models import F, IntegerField, OuterRef, QuerySet, Subquery, Value, Func
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import CharField, TextField
 from django.db.models.query_utils import Q
@@ -21,7 +21,7 @@ from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age, JsonDataType
 from ontology.models import OntologyService
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
-from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
+from snpdb.models import VCF, Cohort, CohortGenotypeStats, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, Quad, UserGridConfig, GenomeBuild, ClinGenAllele, \
     VariantZygosityCountCollection, TagColorsCollection, LiftoverRun, AlleleConversionTool, AlleleLiftover, \
     ProcessingStatus, Allele
@@ -191,9 +191,16 @@ class SamplesListGrid(JqGridUserRowConfig):
         view_sample_url_prefix = get_url_from_view_path(view_sample_url)
         view_vcf_url_prefix = get_url_from_view_path(view_vcf_url)
 
+        # het_hom_count comes from the per-sample CohortGenotypeStats row
+        # (sample IS NOT NULL, filter_key NULL, passing_filter=False).
+        cgs_subquery = (CohortGenotypeStats.objects
+                        .filter(sample=OuterRef("pk"),
+                                filter_key__isnull=True, passing_filter=False)
+                        .annotate(het_plus_hom=F("het_count") + F("hom_count"))
+                        .values("het_plus_hom")[:1])
         annotation_kwargs = {
             "sample_gene_list_count": Count("samplegenelist", distinct=True),
-            "het_hom_count": F("samplestats__het_count") + F("samplestats__hom_count"),
+            "het_hom_count": Subquery(cgs_subquery, output_field=IntegerField()),
             "sample_url": Func(
                 Value(view_sample_url_prefix),
                 F("pk"),

@@ -19,6 +19,7 @@ from snpdb.models.models_user_settings import UserDataPrefix, TagColorsCollectio
 from snpdb.models.models_variant import Allele, AlleleMergeLog, Sequence, Locus, Variant, VariantWiki, VariantAllele, \
     VariantCollection, VariantCollectionRecord, AlleleSource, VariantAlleleSource, VariantAlleleCollectionSource, \
     VariantAlleleCollectionRecord, LiftoverRun, AlleleLiftover
+from snpdb.models.models_cohort_stats import CohortGenotypeStats
 from snpdb.models.models_vcf import Project, VCF, VCFFilter, VCFTag, Sample, SampleFilePath, SampleTag, VCFAlleleSource, \
     SampleStatsCodeVersion, SampleStats, SampleStatsPassingFilter, SampleLocusCount, SampleLabProject, \
     VCFSourceSettings, VCFBedIntersection

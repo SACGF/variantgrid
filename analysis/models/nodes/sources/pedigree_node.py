@@ -6,6 +6,9 @@ from django.db.models import Q
 from django.db.models.deletion import SET_NULL
 
 from analysis.models.nodes.sources import AbstractCohortBasedNode
+from analysis.models.nodes.sources._stats_cache import (
+    get_cached_label_count_for_cohort, get_handler_for_node, UNCACHEABLE,
+)
 from patients.models_enums import Zygosity
 from pedigree.models import Pedigree, PedigreeInheritance, CohortSamplePedFileRecord
 
@@ -22,6 +25,36 @@ class PedigreeNode(AbstractCohortBasedNode):
         if self.pedigree:
             cohort = self.pedigree.cohort
         return cohort
+
+    def _has_filters_that_affect_label_counts(self) -> bool:
+        # Inheritance model is a per-pedigree shape we don't precompute today,
+        # so any inheritance setting defeats the cache. Quality filters
+        # (min_ad/dp/gq, max_pl) still defeat as well.
+        if super()._has_filters_that_affect_label_counts():
+            return True
+        return bool(self.inheritance_model)
+
+    def _get_cached_label_count(self, label):
+        if self.pedigree is None:
+            return None
+        if self._has_filters_that_affect_label_counts():
+            return None
+        filter_code = self.get_filter_code()
+        if filter_code not in (0, 1):
+            return None
+        handler = get_handler_for_node(self)
+        filter_key = handler.filter_key_for_node(self)
+        if filter_key is UNCACHEABLE:
+            return None
+        return get_cached_label_count_for_cohort(
+            cohort=self.pedigree.cohort,
+            sample=None,
+            filter_key=filter_key,
+            annotation_version=self.analysis.annotation_version,
+            passing_filter=bool(filter_code),
+            zygosities=self._cached_label_count_zygosities(),
+            label=label,
+        )
 
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()

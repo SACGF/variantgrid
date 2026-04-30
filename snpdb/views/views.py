@@ -32,9 +32,8 @@ from analysis.models import AnalysisTemplate
 from analysis.tasks.analysis_grid_export_tasks import get_annotated_download_files_cgf
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import create_manual_variants, can_create_variants
-from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
-    SampleClinVarAnnotationStats, SampleVariantAnnotationStatsPassingFilter, SampleGeneAnnotationStatsPassingFilter, \
-    SampleClinVarAnnotationStatsPassingFilter
+from annotation.models import AnnotationVersion, CohortGenotypeVariantAnnotationStats, \
+    CohortGenotypeGeneAnnotationStats, CohortGenotypeClinVarAnnotationStats
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
@@ -75,8 +74,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, Quad, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, \
     Lab, LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
+    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, \
+    CohortGenotypeStats, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, AlleleConversionTool
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.liftover_tasks import liftover_alleles
@@ -202,10 +201,21 @@ def bulk_group_permissions(request, class_name):
     return render(request, 'snpdb/data/bulk_group_permissions.html', context)
 
 
-def _get_vcf_sample_stats(vcf, klass):
-    """ Count is het + hom """
-    ss_fields = ("sample_id", "sample__name", "variant_count", "ref_count", "het_count", "hom_count", "unk_count")
-    ss_values_qs = klass.objects.filter(sample__vcf=vcf).order_by("sample").values(*ss_fields)
+def _get_vcf_sample_stats(vcf, passing_filter: bool):
+    """ Count is het + hom. Reads CohortGenotypeStats per-sample rows
+        (sample IS NOT NULL, filter_key NULL) for the VCF's cohort. """
+    try:
+        cgc = vcf.cohort.cohort_genotype_collection
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
+        return {}, [], ()
+
+    ss_fields = ("sample_id", "sample__name", "variant_count", "ref_count",
+                 "het_count", "hom_count", "unk_count")
+    ss_values_qs = (CohortGenotypeStats.objects
+                    .filter(cohort_genotype_collection=cgc, sample__vcf=vcf,
+                            filter_key__isnull=True, passing_filter=passing_filter)
+                    .order_by("sample")
+                    .values(*ss_fields))
 
     sample_stats_het_hom_count = {}
     sample_names = []
@@ -251,8 +261,8 @@ def view_vcf(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
 
-    sample_stats_het_hom_count, sample_names, sample_zygosities = _get_vcf_sample_stats(vcf, SampleStats)
-    sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, SampleStatsPassingFilter)
+    sample_stats_het_hom_count, sample_names, sample_zygosities = _get_vcf_sample_stats(vcf, passing_filter=False)
+    sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, passing_filter=True)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
                                              fields=["vcf_sample_name", "name", "patient", "specimen"],
@@ -348,11 +358,16 @@ def get_patient_upload_csv_for_vcf(request, pk):
 
 def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
     annotation_version = AnnotationVersion.latest(sample.genome_build)
+    try:
+        cgc = sample.vcf.cohort.cohort_genotype_collection
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
+        return pd.DataFrame(), pd.DataFrame()
+
     STATS = {
-        "Total": (SampleStats, SampleStatsPassingFilter, set()),
-        "dbSNP": (SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter, {"variant_annotation_version"}),
-        "OMIM pheno": (SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter, {"gene_annotation_version"}),
-        "ClinVar LP/P": (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, {"clinvar_version"})
+        "Total": (CohortGenotypeStats, set()),
+        "dbSNP": (CohortGenotypeVariantAnnotationStats, {"variant_annotation_version"}),
+        "OMIM pheno": (CohortGenotypeGeneAnnotationStats, {"gene_annotation_version"}),
+        "ClinVar LP/P": (CohortGenotypeClinVarAnnotationStats, {"clinvar_version"}),
     }
 
     VARIANT_CLASS = ["variant", "snp", "insertions", "deletions"]
@@ -360,19 +375,23 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     variant_class_data = {}
     zygosity_data = {}
-    for name, (stats_klass, stats_passing_filters_klass, shared_fields) in STATS.items():
-        kwargs = {"sample": sample}
+    for name, (stats_klass, shared_fields) in STATS.items():
+        base_kwargs = {
+            "cohort_genotype_collection": cgc,
+            "sample": sample,
+            "filter_key__isnull": True,
+        }
         for sf in shared_fields:
-            kwargs[sf] = getattr(annotation_version, sf)
+            base_kwargs[sf] = getattr(annotation_version, sf)
 
         objs = {}
         try:
-            objs[name] = stats_klass.objects.get(**kwargs)
+            objs[name] = stats_klass.objects.get(passing_filter=False, **base_kwargs)
         except ObjectDoesNotExist:
             pass
 
         try:
-            objs[f"{name} PASS filters"] = stats_passing_filters_klass.objects.get(**kwargs)
+            objs[f"{name} PASS filters"] = stats_klass.objects.get(passing_filter=True, **base_kwargs)
         except ObjectDoesNotExist:
             pass
 
@@ -404,6 +423,22 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
     return sample_stats_variant_class_df, sample_stats_zygosity_df
 
 
+def _get_sample_genotype_stats(sample):
+    """ Resolve the per-sample CohortGenotypeStats row (passing_filter=False,
+        filter_key NULL) for the template, replacing the old `sample.samplestats`
+        reverse accessor. Returns None if missing (e.g. legacy data). """
+    try:
+        cgc = sample.vcf.cohort.cohort_genotype_collection
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
+        return None
+    try:
+        return CohortGenotypeStats.objects.get(
+            cohort_genotype_collection=cgc, sample=sample,
+            filter_key__isnull=True, passing_filter=False)
+    except ObjectDoesNotExist:
+        return None
+
+
 def view_sample(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     has_write_permission = sample.can_write(request.user)
@@ -433,6 +468,7 @@ def view_sample(request, sample_id):
         related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
     sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
+    sample_genotype_stats = _get_sample_genotype_stats(sample)
     annotated_download_files = {}
     if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
         if sample.import_status == ImportStatus.SUCCESS:
@@ -451,6 +487,7 @@ def view_sample(request, sample_id):
         "bam_list": sample.get_bam_files(),
         "sample_stats_variant_class_df": sample_stats_variant_class_df,
         "sample_stats_zygosity_df": sample_stats_zygosity_df,
+        "sample_genotype_stats": sample_genotype_stats,
         "related_samples": related_samples
     }
     return render(request, 'snpdb/data/view_sample.html', context)

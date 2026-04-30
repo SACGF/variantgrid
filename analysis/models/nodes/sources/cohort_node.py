@@ -10,6 +10,9 @@ from django.db.models.functions import Concat, Substr, Length, Replace
 
 from analysis.models import GroupOperation, AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
+from analysis.models.nodes.sources._stats_cache import (
+    get_cached_label_count_for_cohort, get_handler_for_node, UNCACHEABLE,
+)
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from patients.models_enums import Zygosity, SimpleZygosity
 from snpdb.models import Cohort, CohortSample, VariantsType, CohortGenotypeCollection
@@ -29,9 +32,19 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
                                       ("min_dp", "samples_read_depth", "gte"),
                                       ("min_gq", "samples_genotype_quality", "gte"),
                                       ("max_pl", "samples_phred_likelihood", "lte")]
+    QUALITY_FILTER_FIELDS = ("min_ad", "min_dp", "min_gq", "max_pl")
 
     class Meta:
         abstract = True
+
+    def _has_filters_that_affect_label_counts(self) -> bool:
+        return any(getattr(self, f) for f in self.QUALITY_FILTER_FIELDS)
+
+    def _cached_label_count_zygosities(self):
+        """ Override in subclasses that expose zygosity flags. By default, the
+            cached lookup asks for "all zygosities" which sums to variant_count
+            in count_for_zygosity. """
+        return [True, True, True, True]
 
     def _get_q_and_list(self) -> list[Q]:
         q_and = super()._get_q_and_list()
@@ -71,6 +84,38 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             if msg := self.get_min_above_max_warning_message(self.cohort.sample_count):
                 warnings.append(msg)
         return warnings
+
+    def _has_filters_that_affect_label_counts(self) -> bool:
+        # Anything other than the raw "no zygosity filtering" config defeats the
+        # cache — the precomputed aggregate row only matches accordion_panel=COUNT
+        # with no extra zygosity restriction.
+        if super()._has_filters_that_affect_label_counts():
+            return True
+        if self.accordion_panel != self.COUNT:
+            return True
+        return False
+
+    def _get_cached_label_count(self, label):
+        if self.cohort is None:
+            return None
+        if self._has_filters_that_affect_label_counts():
+            return None
+        filter_code = self.get_filter_code()
+        if filter_code not in (0, 1):
+            return None
+        handler = get_handler_for_node(self)
+        filter_key = handler.filter_key_for_node(self)
+        if filter_key is UNCACHEABLE:
+            return None
+        return get_cached_label_count_for_cohort(
+            cohort=self.cohort,
+            sample=None,  # aggregate row
+            filter_key=filter_key,
+            annotation_version=self.analysis.annotation_version,
+            passing_filter=bool(filter_code),
+            zygosities=self._cached_label_count_zygosities(),
+            label=label,
+        )
 
     def _get_cohort(self):
         return self.cohort
