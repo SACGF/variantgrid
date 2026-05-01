@@ -1,4 +1,3 @@
-import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -111,4 +110,4 @@ def sync_runner_for_destination(sync_destination: SyncDestination) -> SyncRunner
         if factory_requirements.matches(sync_destination):
             return factory_requirements.factory()
 
-    raise ValueError(f"None of the {len(_sync_runner_registry)} SyncRunners is configured for the config of {sync_destination}: ({json.dumps(sync_destination.config)})")
+    raise ValueError(f"None of the {len(_sync_runner_registry)} SyncRunners matched destination {sync_destination!r}")
