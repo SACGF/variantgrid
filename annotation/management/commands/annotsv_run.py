@@ -42,7 +42,7 @@ class Command(BaseCommand):
 
             annotsv_dir = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR,
                                        f"annotsv_{annotation_run.pk}")
-            tsv, rc, _stdout, stderr = run_annotsv(
+            tsv, rc, stdout, stderr = run_annotsv(
                 annotation_run.vcf_dump_filename, annotsv_dir,
                 annotation_run.genome_build, annotation_run.annotation_consortium,
             )
@@ -50,9 +50,15 @@ class Command(BaseCommand):
                 annotation_run.annotsv_tsv_filename = tsv
                 annotation_run.annotsv_error = None
             else:
-                annotation_run.annotsv_error = (stderr or "")[:100_000]
+                tsv_missing = "" if os.path.exists(tsv) else f" (expected TSV not found: {tsv})"
+                error_blob = (
+                    f"rc={rc}{tsv_missing}\n"
+                    f"--- stderr ---\n{stderr or ''}\n"
+                    f"--- stdout ---\n{stdout or ''}"
+                )
+                annotation_run.annotsv_error = error_blob[:100_000]
                 annotation_run.save()
-                raise CommandError(f"AnnotSV run failed (rc={rc}): {stderr[:1000]}")
+                raise CommandError(f"AnnotSV run failed (rc={rc}){tsv_missing}: {(stderr or '')[:1000]}")
             annotation_run.save()
 
         if not annotation_run.annotsv_tsv_filename:

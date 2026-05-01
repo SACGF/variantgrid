@@ -155,15 +155,24 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
                 and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
             annotsv_dir = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR,
                                        f"annotsv_{annotation_run.pk}")
-            tsv, rc, _stdout, stderr = run_annotsv(vcf_dump_filename, annotsv_dir,
-                                                   genome_build, annotation_consortium)
+            tsv, rc, stdout, stderr = run_annotsv(vcf_dump_filename, annotsv_dir,
+                                                  genome_build, annotation_consortium)
             if rc == 0 and os.path.exists(tsv):
                 annotation_run.annotsv_tsv_filename = tsv
                 annotation_run.annotsv_error = None
             else:
-                annotation_run.annotsv_error = (stderr or "")[:100_000]
-                logging.warning("AnnotSV stage failed for AnnotationRun %s: rc=%s",
-                                annotation_run.pk, rc)
+                tsv_missing = "" if os.path.exists(tsv) else f" (expected TSV not found: {tsv})"
+                error_blob = (
+                    f"rc={rc}{tsv_missing}\n"
+                    f"--- stderr ---\n{stderr or ''}\n"
+                    f"--- stdout ---\n{stdout or ''}"
+                )
+                annotation_run.annotsv_error = error_blob[:100_000]
+                logging.warning(
+                    "AnnotSV stage failed for AnnotationRun %s: rc=%s%s\nstderr:\n%s\nstdout:\n%s",
+                    annotation_run.pk, rc, tsv_missing,
+                    (stderr or "")[-4000:], (stdout or "")[-4000:],
+                )
     else:
         # Now we have standard/CNV type pipelines, it's possible some can be empty
         annotation_run.annotated_count = 0
