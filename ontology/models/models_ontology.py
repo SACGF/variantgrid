@@ -16,6 +16,7 @@ from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
 from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max, TextChoices
+from django.http import Http404
 from django.urls import reverse
 from model_utils.models import TimeStampedModel, now
 from psqlextra.models import PostgresPartitionedModel
@@ -288,6 +289,8 @@ class OntologyIdNormalized:
 
     @staticmethod
     def normalize(dirty_id: str) -> 'OntologyIdNormalized':
+        if len(dirty_id) > 200:
+            raise ValueError(f"Input too long ({len(dirty_id)} chars) to normalize as an ontology ID")
         parts = re.split("[:|_]", dirty_id)
         if len(parts) != 2:
             raise ValueError(f"Can not convert {dirty_id} to a proper id")
@@ -433,7 +436,10 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
     @staticmethod
     def get_from_slug(slug_pk):
         pk = slug_pk.replace("_", ":")
-        return OntologyTerm.objects.get(pk=pk)
+        try:
+            return OntologyTerm.objects.get(pk=pk)
+        except OntologyTerm.DoesNotExist:
+            raise Http404
 
     @staticmethod
     def get_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> 'OntologyTerm':
@@ -509,7 +515,7 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
                 return existing
             try:
                 index_num_part_value = normal_id.num_part
-            except Exception:
+            except ValueError:
                 index_num_part_value = normal_id.num_part_safe  # Ontologies like MedGen can have alpha characters in the "index", providing an index of 0 until we update the model
             return OntologyTerm(
                 id=normal_id.full_id,

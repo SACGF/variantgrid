@@ -1,5 +1,6 @@
-import urllib
+import re
 
+from django.http import Http404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from rest_framework.response import Response
@@ -14,6 +15,8 @@ from ontology.models import OntologyTerm, OntologyVersion, \
 from ontology.ontology_matching import OntologyMatching
 from ontology.serializers import OntologyTermRelationSerializer
 
+_GENE_SYMBOL_RE = re.compile(r'^[A-Za-z0-9\-]+$')
+
 
 class SearchMondoText(APIView):
     def get(self, request, **kwargs) -> Response:
@@ -21,7 +24,6 @@ class SearchMondoText(APIView):
         search_term = request.GET.get('search_term') or ''
         gene_symbol = request.GET.get('gene_symbol')
 
-        urllib.parse.quote(search_term).replace('/', '%252F')  # a regular escape / gets confused for a URL divider
         selected = [term.strip() for term in (request.GET.get('selected') or '').split(",") if term.strip()]
 
         ontology_matches = OntologyMatching.from_search(search_text=search_term, gene_symbol=gene_symbol, selected=selected)
@@ -58,8 +60,11 @@ class OntologyTermGeneListView(APIView):
 @method_decorator(cache_page(WEEK_SECS), name='get')
 class GeneDiseaseRelationshipView(APIView):
     def get(self, request, *args, **kwargs):
+        gene_symbol = self.kwargs['gene_symbol']
+        if not _GENE_SYMBOL_RE.match(gene_symbol):
+            raise Http404
         data = []
         ontology_version = OntologyVersion.latest()
-        for otr in ontology_version.gene_disease_relations(self.kwargs['gene_symbol'], quality_filter=ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER):
+        for otr in ontology_version.gene_disease_relations(gene_symbol, quality_filter=ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER):
             data.append(OntologyTermRelationSerializer(otr).data)
         return Response(data)
