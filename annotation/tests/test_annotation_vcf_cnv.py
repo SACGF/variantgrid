@@ -106,3 +106,38 @@ class TestAnnotationVCFCNV(TestCase):
         va = VariantAnnotation.objects.get(variant_id=102)
         self.assertEqual(va.variant_class, VariantClass.DELETION)
         self.assertEqual(va.impact, PathogenicityImpact.HIGH)
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=4))
+class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
+    """ columns_version 4 = VEP 115 + gnomAD 4.1 + masked SpliceAI. SV CSQ adds
+        phastCons/phyloP conservation tracks (summary_stats=max bigwig overlap). """
+    TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
+    TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version4_grch37_sv.vep_annotated.vcf")
+    TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_columns_version4_grch38_sv.vep_annotated.vcf")
+
+    def test_import_variant_annotations_grch37(self):
+        super().test_import_variant_annotations_grch37()
+        # Conservation tracks (bigwig --custom, summary_stats=max). v4 only.
+        va = VariantAnnotation.objects.get(variant_id=202)
+        self.assertAlmostEqual(va.phastcons_100_way_vertebrate, 1.0)
+        self.assertAlmostEqual(va.phastcons_46_way_mammalian, 1.0)
+        self.assertAlmostEqual(va.phylop_100_way_vertebrate, 9.873, places=3)
+        self.assertAlmostEqual(va.phylop_46_way_mammalian, 2.894, places=3)
+
+        va = VariantAnnotation.objects.get(variant_id=203)
+        self.assertAlmostEqual(va.phylop_100_way_vertebrate, 6.180, places=3)
+        self.assertAlmostEqual(va.phylop_46_way_mammalian, 2.873, places=3)
+
+    def test_import_variant_annotations_grch38(self):
+        super().test_import_variant_annotations_grch38()
+        # Conservation tracks (bigwig --custom, summary_stats=max). v4 only.
+        va = VariantAnnotation.objects.get(variant_id=101)
+        self.assertAlmostEqual(va.phastcons_100_way_vertebrate, 1.0)
+        self.assertAlmostEqual(va.phastcons_30_way_mammalian, 1.0)
+        self.assertAlmostEqual(va.phylop_100_way_vertebrate, 9.556, places=3)
+        self.assertAlmostEqual(va.phylop_30_way_mammalian, 1.251, places=3)
+
+        va = VariantAnnotation.objects.get(variant_id=102)
+        self.assertAlmostEqual(va.phylop_100_way_vertebrate, 7.272, places=3)
+        self.assertAlmostEqual(va.phylop_30_way_mammalian, 1.312, places=3)
