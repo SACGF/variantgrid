@@ -127,6 +127,5 @@ def handle_vep_skipped(annotation_run: AnnotationRun, bulk_inserter):
             bulk_inserter.variant_annotation_list.append(va)
 
         # Only insert the columns we care about
-        bulk_inserter.all_variant_columns = ["vep_skipped_reason", "overlapping_symbols",
-                                             "predictions_num_pathogenic", "predictions_num_benign"]
+        bulk_inserter.all_variant_columns = ["vep_skipped_reason"]
         bulk_inserter.finish()

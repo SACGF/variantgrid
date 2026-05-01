@@ -394,7 +394,9 @@ class BulkVEPVCFAnnotationInserter:
             columns = self.transcript_columns
         else:
             raise ValueError(f"Unknown VariantAnnotationVersion base_table_name: '{base_table_name}'")
-        return self.DB_FIXED_COLUMNS + manual_columns + list(sorted(columns))
+        # Manual columns are emitted first; remove any overlap so the COPY header has no duplicates.
+        columns = set(columns) - set(manual_columns)
+        return self.DB_FIXED_COLUMNS + manual_columns + sorted(columns)
 
     def vep_to_db_dict(self, vep_transcript_data: TranscriptData, model_columns: Iterable[str]) -> dict:
         # logging.debug("vep_to_db_dict:")
