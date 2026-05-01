@@ -50,6 +50,11 @@ def create_event(request):
     if severity not in valid_severities:
         return HttpResponseBadRequest("Invalid severity")
 
+    app_name = app_name[:100]
+    event_name = event_name[:200]
+    if details:
+        details = details[:10_000]
+
     Event.objects.create(user=request.user,
                          app_name=app_name,
                          name=event_name,
