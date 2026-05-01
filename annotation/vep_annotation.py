@@ -394,6 +394,20 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
         pass
 
     try:
+        # MaveDB is GRCh38 only - filename encodes the dataset date,
+        # e.g. annotation_data/GRCh38/MaveDB_variants_2023-11-29.tsv.gz
+        mave_filename = vep_config["mave"]
+        if mave_filename and os.path.exists(mave_filename):
+            mave_basename = os.path.basename(mave_filename)
+            if m := re.match(r"^MaveDB_variants_(\d{4}-\d{2}-\d{2})\.tsv\.gz$", mave_basename):
+                kwargs["mave_db"] = m.group(1)
+            else:
+                msg = f"Couldn't determine MaveDB version from file: {mave_basename}"
+                raise ValueError(msg)
+    except KeyError:
+        pass
+
+    try:
         # denovo-db is GRCh37/38 only
         denovo_db_filename = vep_config["denovo_db"]
         if denovo_db_filename and os.path.exists(denovo_db_filename):

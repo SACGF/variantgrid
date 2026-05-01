@@ -136,7 +136,7 @@ ANNOTATION = {
             "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
-            "mave": "annotation_data/GRCh38/MaveDB_variants.tsv.gz",
+            "mave": "annotation_data/GRCh38/MaveDB_variants_2023-11-29.tsv.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh38/hg38.phastCons100way.bw",
             'phastcons46way': None,  # n/a for GRCh38

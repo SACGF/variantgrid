@@ -645,6 +645,7 @@ class VariantAnnotationVersion(SubVersionPartition):
     sift = models.TextField(blank=True, null=True)  # 37/38 only
     dbnsfp = models.TextField(blank=True, null=True)  # 37/38 only
     denovo_db = models.TextField(blank=True, null=True)  # 37/38 only
+    mave_db = models.TextField(blank=True, null=True)  # GRCh38 only - date string parsed from MaveDB filename
     spliceai = models.TextField(blank=True, null=True)
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
