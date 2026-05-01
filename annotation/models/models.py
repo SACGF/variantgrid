@@ -1205,6 +1205,20 @@ class VariantAnnotation(AbstractVariantAnnotation):
     annotsv_b_ins_af_max = models.FloatField(null=True, blank=True)        # B_ins_AFmax
     annotsv_b_inv_af_max = models.FloatField(null=True, blank=True)        # B_inv_AFmax
 
+    # AnnotSV (cont.) - additional fields captured in columns_version 4 (#1040 / #1533).
+    annotsv_acmg_criteria = models.TextField(null=True, blank=True)        # AnnotSV_ranking_criteria
+    annotsv_frameshift = models.BooleanField(null=True)                    # Frameshift (yes/no)
+    annotsv_exons_spanned = models.IntegerField(null=True, blank=True)     # Exons_spanned
+    annotsv_dist_nearest_ss = models.IntegerField(null=True, blank=True)   # Dist_nearest_SS
+    annotsv_nearest_ss_type = models.TextField(null=True, blank=True)      # Nearest_SS_type
+    annotsv_omim_inheritance = models.TextField(null=True, blank=True)     # OMIM_inheritance
+    annotsv_omim_morbid = models.BooleanField(null=True)                   # OMIM_morbid
+    annotsv_omim_phenotype = models.TextField(null=True, blank=True)       # OMIM_phenotype
+    annotsv_omim_id = models.TextField(null=True, blank=True)              # OMIM_ID
+    # Reference-only summary of pathogenic-SV overlaps (ClinVar / dbVar / ClinGen / OMIM-morbid).
+    # Folds 16 P_{event}_{phen,hpo,source,coord} TSV columns into one JSONB blob keyed by event-type.
+    annotsv_pathogenic_overlaps = models.JSONField(null=True)
+
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
     # "optimum cutoff value identified in the ROC analysis (0.6)"
     dbscsnv_ada_score = models.FloatField(null=True, blank=True)

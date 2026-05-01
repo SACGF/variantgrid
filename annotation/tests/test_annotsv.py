@@ -16,6 +16,7 @@ from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion
 from annotation.vcf_files.bulk_annotsv_tsv_inserter import (
+    _extract_pathogenic_overlaps,
     _extract_variant_id,
     _row_to_update,
     import_annotsv_tsv,
@@ -33,7 +34,7 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_
 
 TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
 TEST_ANNOTSV_TSV = os.path.join(TEST_DATA_DIR, "annotsv", "test_grch37_sv.annotated.tsv")
-TEST_SV_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch37_sv.vep_annotated.vcf")
+TEST_SV_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version4_grch37_sv.vep_annotated.vcf")
 
 
 class TestExtractVariantId(TestCase):
@@ -72,6 +73,97 @@ class TestRowToUpdate(TestCase):
             "AnnotSV_ranking_score": "NA",
         }
         self.assertEqual(_row_to_update(row), {})
+
+    def test_parses_new_typed_fields(self):
+        row = {
+            "AnnotSV_ranking_criteria": "1A,2C",
+            "Frameshift": "yes",
+            "Exons_spanned": "3",
+            "Dist_nearest_SS": "120",
+            "Nearest_SS_type": "5'",
+            "OMIM_inheritance": "AD",
+            "OMIM_morbid": "yes",
+            "OMIM_phenotype": "Breast cancer",
+            "OMIM_ID": "113705",
+        }
+        update = _row_to_update(row)
+        self.assertEqual(update["annotsv_acmg_criteria"], "1A,2C")
+        self.assertIs(update["annotsv_frameshift"], True)
+        self.assertEqual(update["annotsv_exons_spanned"], 3)
+        self.assertEqual(update["annotsv_dist_nearest_ss"], 120)
+        self.assertEqual(update["annotsv_nearest_ss_type"], "5'")
+        self.assertEqual(update["annotsv_omim_inheritance"], "AD")
+        self.assertIs(update["annotsv_omim_morbid"], True)
+        self.assertEqual(update["annotsv_omim_phenotype"], "Breast cancer")
+        self.assertEqual(update["annotsv_omim_id"], "113705")
+
+    def test_bool_field_na(self):
+        # NA -> not present in update
+        update = _row_to_update({"Frameshift": "NA", "OMIM_morbid": "NA"})
+        self.assertNotIn("annotsv_frameshift", update)
+        self.assertNotIn("annotsv_omim_morbid", update)
+        # yes -> True
+        self.assertIs(_row_to_update({"OMIM_morbid": "yes"})["annotsv_omim_morbid"], True)
+        # no -> False
+        self.assertIs(_row_to_update({"OMIM_morbid": "no"})["annotsv_omim_morbid"], False)
+        # bogus -> dropped (parser returns None)
+        self.assertNotIn("annotsv_omim_morbid",
+                         _row_to_update({"OMIM_morbid": "maybe"}))
+
+
+class TestPathogenicOverlapsAssembly(TestCase):
+    def test_drops_empty_keeps_populated(self):
+        row = {
+            "P_loss_source": "ClinGen",
+            "P_loss_phen": "Hereditary breast cancer",
+            "P_loss_hpo": "NA",
+            "P_loss_coord": "chr17:41200000-41260000",
+            "P_inv_source": "ClinVar&dbVar",
+            "P_inv_phen": "NA",
+            "P_inv_hpo": "HP:0001234",
+            "P_inv_coord": "chr3:127500000-128800000",
+            "P_gain_source": "NA",
+            "P_gain_phen": "NA",
+            "P_gain_hpo": "NA",
+            "P_gain_coord": "NA",
+            "P_ins_source": "",
+            "P_ins_phen": ".",
+            "P_ins_hpo": "NA",
+            "P_ins_coord": "NA",
+        }
+        overlaps = _extract_pathogenic_overlaps(row)
+        self.assertEqual(set(overlaps.keys()), {"loss", "inv"})
+        self.assertEqual(overlaps["loss"], {
+            "source": "ClinGen",
+            "phen": "Hereditary breast cancer",
+            "coord": "chr17:41200000-41260000",
+        })
+        self.assertEqual(overlaps["inv"], {
+            "source": "ClinVar&dbVar",
+            "hpo": "HP:0001234",
+            "coord": "chr3:127500000-128800000",
+        })
+
+    def test_returns_none_when_all_na(self):
+        row = {
+            f"P_{event}_{sub}": "NA"
+            for event in ("gain", "loss", "ins", "inv")
+            for sub in ("source", "phen", "hpo", "coord")
+        }
+        self.assertIsNone(_extract_pathogenic_overlaps(row))
+
+    def test_row_to_update_includes_overlaps(self):
+        row = {
+            "P_loss_source": "ClinGen",
+            "P_loss_coord": "chr1:1-2",
+        }
+        update = _row_to_update(row)
+        self.assertEqual(update["annotsv_pathogenic_overlaps"],
+                         {"loss": {"source": "ClinGen", "coord": "chr1:1-2"}})
+
+    def test_row_to_update_omits_overlaps_when_none(self):
+        update = _row_to_update({"ACMG_class": "5"})
+        self.assertNotIn("annotsv_pathogenic_overlaps", update)
 
 
 class TestGetAnnotsvCommand(TestCase):
@@ -163,7 +255,7 @@ class TestVersionCheck(TestCase):
             annotsv_check_command_line_version_match(vav)
 
 
-@override_settings(**get_fake_annotation_settings_dict(columns_version=3))
+@override_settings(**get_fake_annotation_settings_dict(columns_version=4))
 class TestImportAnnotsvTsv(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -206,18 +298,45 @@ class TestImportAnnotsvTsv(TestCase):
         va_202 = VariantAnnotation.objects.get(variant_id=202)
         self.assertEqual(va_202.annotsv_acmg_class, 2)
         self.assertAlmostEqual(va_202.annotsv_acmg_score, 0.123)
+        self.assertEqual(va_202.annotsv_pathogenic_overlaps, {
+            "inv": {
+                "phen": "Inversion test phenotype",
+                "hpo": "HP:0001234",
+                "source": "ClinVar&dbVar",
+                "coord": "chr3:127500000-128800000",
+            },
+        })
 
         va_203 = VariantAnnotation.objects.get(variant_id=203)
         self.assertEqual(va_203.annotsv_acmg_class, 5)
         self.assertAlmostEqual(va_203.annotsv_acmg_score, 2.5)
+        self.assertEqual(va_203.annotsv_acmg_criteria, "1A,2C")
         self.assertEqual(va_203.annotsv_segdup_left, "segdup_X")
         self.assertAlmostEqual(va_203.annotsv_b_ins_af_max, 0.005)
+        self.assertIs(va_203.annotsv_frameshift, True)
+        self.assertEqual(va_203.annotsv_exons_spanned, 3)
+        self.assertEqual(va_203.annotsv_dist_nearest_ss, 120)
+        self.assertEqual(va_203.annotsv_nearest_ss_type, "5'")
+        self.assertEqual(va_203.annotsv_omim_inheritance, "AD")
+        self.assertIs(va_203.annotsv_omim_morbid, True)
+        self.assertEqual(va_203.annotsv_omim_phenotype, "Breast cancer")
+        self.assertEqual(va_203.annotsv_omim_id, "113705")
+        self.assertEqual(va_203.annotsv_pathogenic_overlaps, {
+            "loss": {
+                "phen": "Hereditary breast cancer",
+                "hpo": "HP:0003002",
+                "source": "ClinGen",
+                "coord": "chr17:41200000-41260000",
+            },
+        })
 
         va_205 = VariantAnnotation.objects.get(variant_id=205)
         self.assertEqual(va_205.annotsv_acmg_class, 1)
         self.assertEqual(va_205.annotsv_re_gene, "enh_RUNX1")
         self.assertEqual(va_205.annotsv_encode_blacklist_left, "blocklist")
         self.assertEqual(va_205.annotsv_encode_blacklist_characteristics_left, "low_mappability")
+        self.assertIs(va_205.annotsv_omim_morbid, False)
+        self.assertIsNone(va_205.annotsv_pathogenic_overlaps)
 
     def test_no_op_when_no_tsv_filename(self):
         # Ensure unset filename is a no-op (and does not flip annotsv_imported)

@@ -25,6 +25,7 @@ _VARIANT_ID_RE = re.compile(r"(?:^|;)variant_id=(\d+)")
 FULL_COLUMN_MAP: dict[str, str] = {
     "ACMG_class": "annotsv_acmg_class",
     "AnnotSV_ranking_score": "annotsv_acmg_score",
+    "AnnotSV_ranking_criteria": "annotsv_acmg_criteria",
     "RE_gene": "annotsv_re_gene",
     "Repeat_type_left": "annotsv_repeat_type_left",
     "Repeat_type_right": "annotsv_repeat_type_right",
@@ -38,9 +39,21 @@ FULL_COLUMN_MAP: dict[str, str] = {
     "B_loss_AFmax": "annotsv_b_loss_af_max",
     "B_ins_AFmax": "annotsv_b_ins_af_max",
     "B_inv_AFmax": "annotsv_b_inv_af_max",
+    "Frameshift": "annotsv_frameshift",
+    "Exons_spanned": "annotsv_exons_spanned",
+    "Dist_nearest_SS": "annotsv_dist_nearest_ss",
+    "Nearest_SS_type": "annotsv_nearest_ss_type",
+    "OMIM_inheritance": "annotsv_omim_inheritance",
+    "OMIM_morbid": "annotsv_omim_morbid",
+    "OMIM_phenotype": "annotsv_omim_phenotype",
+    "OMIM_ID": "annotsv_omim_id",
 }
 
-INT_FIELDS = {"annotsv_acmg_class"}
+INT_FIELDS = {
+    "annotsv_acmg_class",
+    "annotsv_exons_spanned",
+    "annotsv_dist_nearest_ss",
+}
 FLOAT_FIELDS = {
     "annotsv_acmg_score",
     "annotsv_b_gain_af_max",
@@ -48,8 +61,18 @@ FLOAT_FIELDS = {
     "annotsv_b_ins_af_max",
     "annotsv_b_inv_af_max",
 }
+BOOL_FIELDS = {
+    "annotsv_frameshift",
+    "annotsv_omim_morbid",
+}
 
 EMPTY_VALUES = {"", "NA", ".", "-1", "NaN", "nan"}
+
+_BOOL_TRUE = {"yes", "true", "1"}
+_BOOL_FALSE = {"no", "false", "0"}
+
+_P_EVENTS = ("gain", "loss", "ins", "inv")
+_P_SUBFIELDS = ("source", "phen", "hpo", "coord")
 
 
 def _parse_value(field: str, raw: str) -> Optional[Any]:
@@ -64,9 +87,36 @@ def _parse_value(field: str, raw: str) -> Optional[Any]:
             return int(raw)
         if field in FLOAT_FIELDS:
             return float(raw)
+        if field in BOOL_FIELDS:
+            low = raw.lower()
+            if low in _BOOL_TRUE:
+                return True
+            if low in _BOOL_FALSE:
+                return False
+            return None
     except (TypeError, ValueError):
         return None
     return raw
+
+
+def _extract_pathogenic_overlaps(row: dict[str, str]) -> Optional[dict]:
+    """ Collapse AnnotSV's 16 P_{event}_{sub} columns into a nested dict.
+        Empty/NA values are dropped; events with no surviving values are
+        omitted; returns None if nothing remained. """
+    result: dict[str, dict[str, str]] = {}
+    for event in _P_EVENTS:
+        event_data: dict[str, str] = {}
+        for sub in _P_SUBFIELDS:
+            raw = row.get(f"P_{event}_{sub}")
+            if raw is None:
+                continue
+            value = raw.strip()
+            if value in EMPTY_VALUES:
+                continue
+            event_data[sub] = value
+        if event_data:
+            result[event] = event_data
+    return result or None
 
 
 def _extract_variant_id(row: dict[str, str]) -> Optional[int]:
@@ -96,6 +146,9 @@ def _row_to_update(row: dict[str, str]) -> dict[str, Any]:
         value = _parse_value(model_field, row[tsv_col])
         if value is not None:
             update[model_field] = value
+    overlaps = _extract_pathogenic_overlaps(row)
+    if overlaps is not None:
+        update["annotsv_pathogenic_overlaps"] = overlaps
     return update
 
 
