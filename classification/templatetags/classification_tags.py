@@ -293,10 +293,13 @@ def clinical_significance_inline(value):
     }
 
 @register.inclusion_tag("classification/tags/lab.html")
-def lab(lab: Lab, your_lab: Optional[Lab] = None):
+def lab(lab: Lab, your_lab: Optional[Lab] = None, show_contact_link: bool = False, contact_subject: Optional[str] = None, contact_body: Optional[str] = None):
     return {
         "lab": lab,
-        "is_your_lab": your_lab is True or your_lab == lab
+        "is_your_lab": your_lab is True or your_lab == lab,
+        "show_contact_link": show_contact_link,
+        "subject": contact_subject or "",
+        "body": contact_body
     }
 
 

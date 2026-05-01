@@ -1,4 +1,15 @@
+{% if is_your_lab %}
+    <span style="font-weight:600">
+         <span style="color: #666">{{ lab.organization.shortest_name }} / </span> {{ lab.name }}
+    </span>
+{% else %}
 <span style="opacity:{% if is_your_lab %}0.5{% else %}1{% endif %}; font-weight: 600">
-    <span style="color: #666">{{ lab.organization.shortest_name }} / </span>
-    {{ lab.name }}
+    {% if show_contact_link %}
+        <a data-toggle="ajax-modal" href="{% url 'lab_contact_details' lab.pk %}?subject={{ subject }}">
+        <span style="color: #666; opacity:0.6">{{ lab.organization.shortest_name }} / </span> {{ lab.name }}
+        </a>
+    {% else %}
+        <span style="color: #666; opacity:0.6">{{ lab.organization.shortest_name }} / </span> {{ lab.name }}
+    {% endif %}
 </span>
+{% endif %}

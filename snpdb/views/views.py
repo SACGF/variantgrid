@@ -55,6 +55,7 @@ from library.django_utils import add_save_message, get_model_fields, set_form_re
 from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
+from library.utils.django_utils import render_ajax_view
 from ontology.models import OntologyTerm
 from patients.forms import PatientForm
 from patients.models import Patient, Clinician
@@ -829,6 +830,19 @@ def _add_read_only_settings_message(request, lab_list: Iterable[Lab]):
         lab_head_msg = ""
     read_only_message = f"Only administrators{lab_head_msg} can modify these settings"
     messages.add_message(request, messages.INFO, read_only_message)
+
+
+def lab_contact_details(request, lab_id: int):
+    lab = get_object_or_404(Lab, pk=lab_id)
+    subject = request.GET.get("subject") or ""
+    return render_ajax_view(
+        request,
+        'snpdb/lab_contact_details.html',
+        {
+            "lab": lab,
+            "subject": subject
+        }
+    )
 
 
 def view_lab(request, lab_id: int):

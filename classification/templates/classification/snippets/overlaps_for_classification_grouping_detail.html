@@ -26,7 +26,7 @@
                             <td>{% testing_context overlap_entry.overlap_contribution %}</td>
                             <td>
                                 {% if overlap_entry.overlap_contribution.scv %}ClinVar Expert Panel<br/>{{ overlap_entry.overlap_contribution.scv }}{% else %}
-                                {% lab overlap_entry.overlap_contribution.lab %}{% endif %}
+                                {% lab overlap_entry.overlap_contribution.lab your_lab=lab show_contact_link=True contact_subject=contact_subject %}{% endif %}
                             <td>{% clinical_significance overlap_entry.overlap_contribution.value %}
                             <div class="overlap-criteria">
                                 {% for criteria_label in overlap_entry.overlap_contribution.classification_grouping.latest_cached_summary.criteria_labels %}<span class="comma-sep">{{ criteria_label }}</span>{% endfor %}

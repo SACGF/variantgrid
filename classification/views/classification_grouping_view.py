@@ -14,6 +14,7 @@ from classification.models import ClassificationGrouping, Overlap, Classificatio
     OverlapType, OverlapContribution, OverlapContributionSkew
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapEntryCompare, OverlapGrouping
+from snpdb.models import GenomeBuild
 
 
 @dataclass(frozen=True)
@@ -101,11 +102,17 @@ class OverlapSummary:
 
 def view_overlaps_for_classification_grouping(request: HttpRequest, classification_grouping_id: int) -> Response:
     cg = ClassificationGrouping.objects.filter(pk=classification_grouping_id).get()
+
+    # TODO, select the c.HGVS that the other lab used?
+    c_hgvs = cg.latest_classification_modification.c_hgvs_best(GenomeBuild.grch38())
+
     # overlap_contributions = OverlapContribution.objects.filter(classification_grouping=cg, contribution_status=OverlapContributionStatus.CONTRIBUTING)
     # skews = OverlapContributionSkew.objects.filter(contribution__in=overlap_contributions)
     summaries = OverlapSummary.overlap_summaries_for(cg)
 
     return render(request, 'classification/snippets/overlaps_for_classification_grouping_detail.html', {
+        "lab": cg.lab,
         "allele": cg.allele,
-        "summaries": summaries
+        "summaries": summaries,
+        "contact_subject": f"Discordance on {c_hgvs}"
     })

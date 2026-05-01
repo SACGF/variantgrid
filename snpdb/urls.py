@@ -94,6 +94,7 @@ urlpatterns = [
 
     path('user/<pk>', views.view_user, name='view_user'),
     path('group/<pk>', views.view_group, name='view_group'),
+    path('lab/<int:lab_id>/contact', views.lab_contact_details, name='lab_contact_details'),
     path('lab/<int:lab_id>', views.view_lab, name='view_lab'),
     path('clinvar_key/<str:pk>', views.view_clinvar_key, name='clinvar_key'),
     path('organization/<int:organization_id>', views.view_organization, name='view_organization'),
