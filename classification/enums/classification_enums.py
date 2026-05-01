@@ -370,7 +370,7 @@ class ShareLevel(ChoicesEnum):
         match self:
             case _ if self.is_discordant_level:
                 return True
-            case ShareLevel.INSTITUTION:
+            case ShareLevel.ORGANISATION:
                 return user.groups.filter(name=lab.group_institution).exists()
             case ShareLevel.LAB:
                 return user.groups.filter(name=lab.group).exists()

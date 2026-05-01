@@ -5,8 +5,9 @@ from annotation.models import ClinVarRecord
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationResultValue, ClassificationSummaryCacheDict, \
-    EvidenceKeyMap, OverlapContribution, TriageStatus, EffectiveDate, TriageState, EffectiveDateType
-from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices
+    EvidenceKeyMap, OverlapContribution
+from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices, TriageState, \
+    TriageStatus
 from library.utils import first
 from snpdb.models import Allele
 
@@ -114,7 +115,6 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
                 if expert_panel := clinvar_record_collection.expert_panel:
                     value = expert_panel.clinical_significance
                     relevant_value = ClassificationResultValue.ONC_PATH and EvidenceKeyMap.clinical_significance_to_bucket().get(value) is not None
-                    effective_date = expert_panel.date_last_evaluated or expert_panel.date_clinvar_updated
 
                     oc = OverlapContribution.objects.update_or_create(
                         source=OverlapEntrySourceTextChoices.CLINVAR,
@@ -124,8 +124,7 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
                         classification_grouping_id=None,
                         defaults={
                             "value": value,
-                            "effective_date": EffectiveDate.from_datetime(effective_date,
-                                                                         date_type=EffectiveDateType.CURATED),
+                            "effective_date": expert_panel.effective_date,
                         },
                         contribution_status=OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE,
                         triage_state=TriageState(TriageStatus.NON_INTERACTIVE_THIRD_PARTY)

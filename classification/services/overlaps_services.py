@@ -11,8 +11,9 @@ from django.utils.timezone import now
 
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
-    OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, TriageStatus, \
+    OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, \
     TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType
+from classification.models.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig
 import json
@@ -48,7 +49,7 @@ class OverlapServices:
 
             effective_date = EffectiveDate(None, EffectiveDateType.UNKNOWN)
             if lastest_modification := classification_grouping.latest_classification_modification:
-                effective_date = EffectiveDate.from_curated_date(lastest_modification.curated_date_check)
+                effective_date = lastest_modification.curated_date_check.to_effective_date
 
             overlap_contribution, created = OverlapContribution.objects.update_or_create(
                 source=OverlapEntrySourceTextChoices.CLASSIFICATION,

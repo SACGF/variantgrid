@@ -25,6 +25,7 @@ from psqlextra.types import PostgresPartitioningMethod
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
+from annotation.models.data_enums import EffectiveDate, EffectiveDateType
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import AnnotationStatus, \
     ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
@@ -396,6 +397,16 @@ class ClinVarRecord(TimeStampedModel):
     assertion_method = models.TextField(null=True, blank=True)
     allele_origin = models.TextField(null=True, blank=True)
     allele_origin_bucket = models.TextField(choices=AlleleOriginBucket.choices, null=True, blank=True)
+
+    @property
+    def effective_date(self) -> EffectiveDate:
+        if date_last_evaluated := self.date_last_evaluated:
+            return EffectiveDate.from_datetime(date_last_evaluated, EffectiveDateType.CURATED)
+        elif date_clinvar_created := self.date_clinvar_created:
+            return EffectiveDate.from_datetime(date_clinvar_created, EffectiveDateType.CREATED)
+        else:
+            return EffectiveDate(None, EffectiveDateType.UNKNOWN)
+
 
     @property
     def conditions(self) -> list[str]:

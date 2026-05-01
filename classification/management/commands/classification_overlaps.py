@@ -1,12 +1,13 @@
 from auditlog.context import disable_auditlog
 from django.core.management import BaseCommand
 
-from annotation.models import ClinVarRecordCollection
+from annotation.models import ClinVarRecordCollection, ClinVarRecord, EffectiveDate
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import TestingContextBucket
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
-    EvidenceKeyMap, EffectiveDateType, TriageStatus, EffectiveDate, TriageState
-from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices
+    EvidenceKeyMap, EffectiveDateType
+from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices, TriageState, \
+    TriageStatus
 from classification.services.overlaps_services import OverlapServices
 
 
@@ -40,6 +41,8 @@ class Command(BaseCommand):
     def populate_status_change(self):
         # timestamp on overlaps
         for overlap in Overlap.objects.filter(overlap_status_change_timestamp__isnull=True).iterator():
+            # note we're looking for the latest published date of a classification here
+            # as the upload date is when a discordance would occur
             latest_date = None
             for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
                 if grouping := contribution.classification_grouping:
@@ -47,6 +50,7 @@ class Command(BaseCommand):
                         latest_mod_date = mod.created
                         if latest_date is None or latest_mod_date > latest_date:
                             latest_date = latest_mod_date
+
             if latest_date:
                 overlap.overlap_status_change_timestamp = latest_date
                 overlap.save(update_fields=["overlap_status_change_timestamp"])
@@ -56,8 +60,12 @@ class Command(BaseCommand):
             for overlap_contribution in OverlapContribution.objects.filter(effective_date__date=None).iterator():
                 if grouping := overlap_contribution.classification_grouping:
                     date_check = grouping.latest_classification_modification.curated_date_check
-                    overlap_contribution.effective_date = EffectiveDate.from_curated_date(date_check)
+                    overlap_contribution.effective_date = date_check.to_effective_date
                     overlap_contribution.save(update_fields=["effective_date"])
+                elif scv := overlap_contribution.scv:
+                    if clinvar_record := ClinVarRecord.objects.filter(record_id=scv).first():
+                        overlap_contribution.effective_date = clinvar_record.effective_date
+                        overlap_contribution.save(update_fields=["effective_date"])
 
     def make_clinvar_expert_panel_contributions(self):
         # only check already made ClinVarRecord collections in sync

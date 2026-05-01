@@ -6,7 +6,7 @@ import pydantic
 from collections import Counter, namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta, date
-from enum import Enum, StrEnum
+from enum import Enum
 from functools import cached_property, reduce
 from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
 import django.dispatch
@@ -28,10 +28,12 @@ from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
 
+from annotation.models import EffectiveDate, EffectiveDateType
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
     CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation, WithdrawReason, AlleleOriginBucket, TestingContextBucket
+from annotation.models.data_enums import ClassificationDateType, ClassificationDate
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
@@ -2856,45 +2858,6 @@ class ClassificationConsensus:
         return patch
 
 
-# FIXME use CuratedDateType
-class ClassificationDateType(StrEnum):
-    CURATION = ""  # default
-    VERIFIED = "Verified"
-    SAMPLE_DATE = "Sample Date"
-    CREATED = "Created"
-
-
-@dataclass(frozen=True)
-class ClassificationDate:
-    date_type: ClassificationDateType
-    datetime: Optional[datetime] = None
-    date: Optional[date] = None
-
-    def __post_init__(self):
-        if not self.date and not self.datetime:
-            raise ValueError("Either datetime or date must be provided")
-
-    @property
-    def name(self):
-        return self.date_type.value
-
-    @property
-    def value(self) -> Union[date, datetime]:
-        if self.date:
-            return self.date
-        return self.datetime
-
-    @property
-    def date_str(self) -> str:
-        return Classification.to_date_str(self.value)
-
-    def __lt__(self, other: 'ClassificationDate'):
-        if self.datetime and other.datetime:
-            return self.datetime < other.datetime
-        else:
-            return (self.date or date.min) < (other.date or date.min)
-
-
 CLASSIFICATION_DATE_REGEX = re.compile(r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})")
 
 
@@ -2907,6 +2870,13 @@ class CuratedDate:
 
     def __init__(self, modification: ClassificationModification):
         self._modification = modification
+
+    @property
+    def to_effective_date(self):
+        return EffectiveDate(
+            date=self.relevant_date.date_str,
+            date_type=EffectiveDateType.from_classification_date_type(self.relevant_date.date_type)
+        )
 
     @cached_property
     def timezone(self):

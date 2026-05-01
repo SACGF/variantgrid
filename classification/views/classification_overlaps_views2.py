@@ -11,7 +11,8 @@ from django.utils.safestring import mark_safe
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationResultValue, \
-    EvidenceKey, EvidenceKeyMap, TriageStatus, OverlapContribution, TriageComment, TriageState
+    EvidenceKey, EvidenceKeyMap, OverlapContribution
+from classification.models.overlaps_enums import TriageState, TriageComment, TriageStatus
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapGrouping, OverlapServices
 from library.utils import empty_to_none

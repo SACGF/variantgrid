@@ -27,7 +27,11 @@
                             <td>
                                 {% if overlap_entry.overlap_contribution.scv %}ClinVar Expert Panel<br/>{{ overlap_entry.overlap_contribution.scv }}{% else %}
                                 {% lab overlap_entry.overlap_contribution.lab %}{% endif %}
-                            <td>{% clinical_significance overlap_entry.overlap_contribution.value %}</td>
+                            <td>{% clinical_significance overlap_entry.overlap_contribution.value %}
+                            <div class="overlap-criteria">
+                                {% for criteria_label in overlap_entry.overlap_contribution.classification_grouping.latest_cached_summary.criteria_labels %}<span class="comma-sep">{{ criteria_label }}</span>{% endfor %}
+                            </div>
+                            </td>
                             <td>{% condition overlap_entry.overlap_contribution.conditions %}</td>
                             <td>{% timestamp overlap_entry.overlap_contribution.effective_date.date time_ago=True %}</td>
                             <td>

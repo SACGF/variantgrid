@@ -1,23 +1,17 @@
-from dataclasses import dataclass, field
-from datetime import date, datetime
 from functools import reduce, cached_property
-from typing import Any, Optional, Union
-import json
+from typing import Any, Optional
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
-from dataclasses_json import DataClassJsonMixin, config
-from django.contrib.auth.models import User
 from django.db.models import CASCADE, QuerySet
 from django.db import models
 from django.db.models.enums import TextChoices
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
-from annotation.models import ClinVarRecord
+from annotation.models import ClinVarRecord, EffectiveDate
 from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull
-from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue, \
-    CuratedDate
-from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, TriageStatus, \
-    OverlapEntrySourceTextChoices, EffectiveDateType
+from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
+from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
+    TriageState, TriageComment
 from library.utils import first, AuditUtils
 from library.utils.database_utils import TextFieldChoices, JSONDataclassField
 from ontology.models import OntologyTerm
@@ -72,78 +66,6 @@ from snpdb.models import Allele, Lab
 #         if lab_id := self.lab_id:
 #             return Lab.objects.get(pk=lab_id)
 #         return None
-
-
-@dataclass
-class TriageState(DataClassJsonMixin):
-    status: TriageStatus = TriageStatus.PENDING
-    amend_value: Optional[str] = None
-
-    def __str__(self):
-        if self.amend_value:
-            # TODO does amend_value need to be formatted?
-            return f"{self.status.label} ({self.amend_value.replace("_", "-")})"
-        return self.status.label
-
-    @staticmethod
-    def default_json():
-        return TriageState().to_dict()
-
-
-@dataclass(frozen=True)
-class TriageComment(DataClassJsonMixin):
-    text: Optional[str] = None
-    count: int = 0
-
-    def next_comment(self, text: Optional[str] = None):
-        return TriageComment(
-            text=text,
-            count=self.count + 1,
-        )
-
-    @staticmethod
-    def default_json():
-        return TriageComment().to_dict()
-
-    def __str__(self):
-        return self.text
-
-
-@dataclass
-class EffectiveDate(DataClassJsonMixin):
-    date: Optional[str] = None
-    date_type: EffectiveDateType = EffectiveDateType.UNKNOWN
-
-    @staticmethod
-    def from_datetime(value: Union[datetime, date], date_type: EffectiveDateType = EffectiveDateType.UNKNOWN):
-        date_str: Optional[str] = None
-        value_date: Optional[date]
-        if isinstance(value, date):
-            value_date = value
-        elif isinstance(value, datetime):
-            value_date = datetime.date()
-        else:
-            raise ValueError(f"Not datetime or date {value}")
-        if value_date:
-            date_str = f"{value_date.year:04}-{value_date.month:02}-{value_date.day:02}"
-        return EffectiveDate(date=date_str, date_type=date_type)
-
-    @staticmethod
-    def from_curated_date(value: CuratedDate):
-        relevant_date = value.relevant_date
-        return EffectiveDate(
-            date=relevant_date.date_str,
-            date_type=EffectiveDateType.from_classification_date_type(relevant_date.date_type)
-        )
-
-    @staticmethod
-    def default_json():
-        return EffectiveDate().to_dict()
-
-    def __str__(self):
-        if date_val := self.date:
-            return f"{date_val} {self.date_type.label}"
-        return "Date Unknown"
 
 
 class OverlapContribution(TimeStampedModel):

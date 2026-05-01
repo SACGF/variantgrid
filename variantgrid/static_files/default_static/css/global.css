@@ -2914,5 +2914,9 @@ table.overlap-summary tr.users-row {
 table.overlap-summary tr.cross-context-row {
   opacity: 0.6;
 }
+table.overlap-summary .overlap-criteria {
+  padding: 3px 0 3px 0;
+  color: #444;
+}
 
 /*# sourceMappingURL=global.css.map */

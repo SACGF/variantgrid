@@ -1,24 +1,13 @@
+from dataclasses import dataclass
+from datetime import datetime, date
+from typing import Optional, Union
+
+from dataclasses_json import DataClassJsonMixin
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe
 
-from classification.models import ClassificationDateType
+from classification.models import CuratedDate
 
-
-class EffectiveDateType(TextChoices):
-    CREATED = "created", "Created"
-    CURATED = "curated", "Curated"
-    SAMPLE_DATE = "sample", "Sample"
-    VERIFIED = "verified", "Verified"
-    UNKNOWN = "unknown", "Unknown"
-
-    @staticmethod
-    def from_classification_date_type(classification_date_type: ClassificationDateType) -> 'EffectiveDateType':
-        match classification_date_type:
-            case ClassificationDateType.CREATED: return EffectiveDateType.CREATED
-            case ClassificationDateType.CURATION: return EffectiveDateType.CURATED
-            case ClassificationDateType.SAMPLE_DATE: return EffectiveDateType.SAMPLE_DATE
-            case ClassificationDateType.VERIFIED: return EffectiveDateType.VERIFIED
-            case _: return EffectiveDateType.UNKNOWN
 
 
 class OverlapType(TextChoices):
@@ -100,3 +89,38 @@ class TriageStatus(TextChoices):
 class OverlapEntrySourceTextChoices(TextChoices):
     CLASSIFICATION = "CLASS", "CLASSIFICATION"
     CLINVAR = "CLIN", "CLINVAR"
+
+
+@dataclass
+class TriageState(DataClassJsonMixin):
+    status: TriageStatus = TriageStatus.PENDING
+    amend_value: Optional[str] = None
+
+    def __str__(self):
+        if self.amend_value:
+            # TODO does amend_value need to be formatted?
+            return f"{self.status.label} ({self.amend_value.replace("_", "-")})"
+        return self.status.label
+
+    @staticmethod
+    def default_json():
+        return TriageState().to_dict()
+
+
+@dataclass(frozen=True)
+class TriageComment(DataClassJsonMixin):
+    text: Optional[str] = None
+    count: int = 0
+
+    def next_comment(self, text: Optional[str] = None):
+        return TriageComment(
+            text=text,
+            count=self.count + 1,
+        )
+
+    @staticmethod
+    def default_json():
+        return TriageComment().to_dict()
+
+    def __str__(self):
+        return self.text

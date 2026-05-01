@@ -5,6 +5,9 @@ import classification.models.overlaps_model
 import library.utils.database_utils
 from django.db import migrations
 
+from annotation.models import EffectiveDate
+from classification.models import TriageComment, TriageState
+
 
 class Migration(migrations.Migration):
 
@@ -28,12 +31,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='overlapcontribution',
             name='comment',
-            field=library.utils.database_utils.JSONDataclassField(dataclass_type=classification.models.overlaps_model.TriageComment, default=classification.models.overlaps_model.TriageComment.default_json, illegal_value_result=None),
+            field=library.utils.database_utils.JSONDataclassField(dataclass_type=TriageComment, default=TriageComment.default_json, illegal_value_result=None),
         ),
         migrations.AddField(
             model_name='overlapcontribution',
             name='triage_state',
-            field=library.utils.database_utils.JSONDataclassField(dataclass_type=classification.models.overlaps_model.TriageState, default=classification.models.overlaps_model.TriageState.default_json, illegal_value_result=None),
+            field=library.utils.database_utils.JSONDataclassField(dataclass_type=TriageState, default=TriageState.default_json, illegal_value_result=None),
         ),
         migrations.AlterField(
             model_name='overlapcontribution',
@@ -47,6 +50,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='overlapcontribution',
             name='effective_date',
-            field=library.utils.database_utils.JSONDataclassField(dataclass_type=classification.models.overlaps_model.EffectiveDate, default=classification.models.overlaps_model.EffectiveDate.default_json, illegal_value_result=None),
+            field=library.utils.database_utils.JSONDataclassField(dataclass_type=EffectiveDate, default=EffectiveDate.default_json, illegal_value_result=None),
         ),
     ]

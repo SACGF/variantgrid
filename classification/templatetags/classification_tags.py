@@ -19,7 +19,7 @@ from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
     EvidenceMixin, ClassificationSummaryCacheDictPathogenicity, Overlap, ClassificationGroupingEntry, \
     OverlapContribution, ClassificationSummaryCacheDictSomatic, \
-    ClassificationGrouping, ClassificationResultValue, TriageStatus, TestingContextFull
+    ClassificationGrouping, ClassificationResultValue, TestingContextFull
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -29,6 +29,7 @@ from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
+from classification.models.overlaps_enums import TriageStatus
 from classification.services.overlaps_services import OverlapEntryCompare
 from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS

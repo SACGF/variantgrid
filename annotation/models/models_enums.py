@@ -213,3 +213,5 @@ class EssentialGeneGeneTrap(models.TextChoices):
     NON_ESSENTIAL_PHENOTYPE_CHANGING = "N", "Non-essential phenotype-changing"
     HAP1_SPECIFIC_ESSENTIAL = "H", "HAP1-Specific essential"
     KBM7_SPECIFIC_ESSENTIAL = "K", "KBM7-Specific essential"
+
+# Shared between ClinVar and Classifications
