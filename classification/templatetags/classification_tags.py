@@ -620,7 +620,6 @@ def condition(condition_obj: Union[OntologyTerm, ConditionResolved, dict],
               show_link: Optional[bool] = True,
               no_condition_message: bool = False):
     if isinstance(condition_obj, dict):
-        print(condition_obj)
         condition_obj = ConditionResolved.from_dict(condition_obj)
     elif isinstance(condition_obj, OntologyTerm):
         condition_obj = ConditionResolved(terms=[condition_obj])
