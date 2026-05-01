@@ -5,7 +5,6 @@
 # denovo-db ships hg19 (UCSC chr-prefixed) only — we rename to Ensembl naming
 # (1, 2, ..., MT) before lift to match VariantGrid's GRCh37/GRCh38 fastas + chain.
 #
-# See: claude/issue_1531_denovodb_plan.md
 
 set -euo pipefail
 
