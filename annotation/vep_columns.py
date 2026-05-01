@@ -790,7 +790,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
     ),
 
-    # ---------- denovo-db (custom VCF, GRCh37/38) --------------------------
+    # ---------- denovo-db (custom VCF, GRCh37/38, columns_version >= 4) ----
     VEPColumnDef(
         source_field='StudyName',
         variant_grid_columns=('denovo_db_studies',),
@@ -799,6 +799,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field_has_custom_prefix=True,
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
+        min_columns_version=4,
     ),
     VEPColumnDef(
         source_field='PubmedID',
@@ -808,6 +809,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field_has_custom_prefix=True,
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
+        min_columns_version=4,
     ),
     VEPColumnDef(
         source_field='PrimaryPhenotype',
@@ -817,6 +819,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field_has_custom_prefix=True,
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
+        min_columns_version=4,
     ),
     VEPColumnDef(
         source_field='CASE_CT',
@@ -826,6 +829,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field_has_custom_prefix=True,
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
+        min_columns_version=4,
     ),
     VEPColumnDef(
         source_field='CONTROL_CT',
@@ -835,6 +839,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field_has_custom_prefix=True,
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
+        min_columns_version=4,
     ),
 
     # ---------- Other plugins ----------------------------------------------

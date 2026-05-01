@@ -8,7 +8,7 @@ from annotation.annotation_versions import get_or_create_variant_annotation_vers
     get_annotation_range_lock_and_unannotated_count
 from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation
-from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction
+from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
@@ -134,7 +134,15 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.consequence, 'stop_gained')
         self.assertEqual(va.symbol, "ARHGAP11A")
 
-        # 2 | 20 | -5 | 20 | 0.05 | 0.17 | 0.01 | 0.04 | OR4F5
+        self._test_131165_spliceai_grch38()
+
+        # RPE65:G197E | 1&1&1
+        va = VariantAnnotation.objects.get(variant_id=131167)
+        self._test_extra_grch38()
+
+    def _test_131165_spliceai_grch38(self):
+        """ Raw SpliceAI: 2 | 20 | -5 | 20 | 0.05 | 0.17 | 0.01 | 0.04 | OR4F5
+            Subclasses override when fixture uses masked SpliceAI. """
         va = VariantAnnotation.objects.get(variant_id=131165)
         self.assertEqual(va.spliceai_pred_dp_ag, 2)
         self.assertEqual(va.spliceai_pred_dp_al, 20)
@@ -146,10 +154,6 @@ class TestAnnotationVCF(TestCase):
         self.assertAlmostEqual(va.spliceai_pred_ds_dl, 0.04)
         self.assertAlmostEqual(va.spliceai_max_ds, 0.17)
         self.assertEqual(va.spliceai_gene_symbol, "OR4F5")
-
-        # RPE65:G197E | 1&1&1
-        va = VariantAnnotation.objects.get(variant_id=131167)
-        self._test_extra_grch38()
 
     def _test_extra_grch38(self):
         """ Do columns_version specific stuff """
@@ -236,6 +240,195 @@ class TestAnnotationVCF3(TestAnnotationVCF):
 
         vta = VariantTranscriptAnnotation.objects.get(variant_id=42, hgvs_c='NM_199357.3:c.1417C>T')
         self.assertTrue(vta.nmd_escaping_variant)
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=4))
+class TestAnnotationVCF4(TestAnnotationVCF):
+    """ columns_version 4 = VEP 115 + dbNSFP 5.3.1a + gnomAD 4.1 + masked SpliceAI + MaveDB 2026-04-30 """
+    TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
+    TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version4_grch37.vep_annotated.vcf")
+    TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_columns_version4_grch38.vep_annotated.vcf")
+
+    def _test_131165_spliceai_grch38(self):
+        """ Masked SpliceAI suppresses scores at common variants — ds_al / ds_dl drop to 0. """
+        va = VariantAnnotation.objects.get(variant_id=131165)
+        self.assertEqual(va.spliceai_pred_dp_ag, 2)
+        self.assertEqual(va.spliceai_pred_dp_al, 20)
+        self.assertEqual(va.spliceai_pred_dp_dg, -5)
+        self.assertEqual(va.spliceai_pred_dp_dl, 20)
+        self.assertAlmostEqual(va.spliceai_pred_ds_ag, 0.05)
+        self.assertAlmostEqual(va.spliceai_pred_ds_al, 0.0)
+        self.assertAlmostEqual(va.spliceai_pred_ds_dg, 0.01)
+        self.assertAlmostEqual(va.spliceai_pred_ds_dl, 0.0)
+        self.assertAlmostEqual(va.spliceai_max_ds, 0.05)
+        self.assertEqual(va.spliceai_gene_symbol, "OR4F5")
+
+    def _test_extra_grch37(self):
+        # Per-variant rank scores still populate for dbNSFP 5.3.1a on GRCh37
+        va = VariantAnnotation.objects.get(variant_id=13629762)
+        self.assertAlmostEqual(va.metalr_rankscore, 0.80387)
+        self.assertAlmostEqual(va.revel_rankscore, 0.69351)
+        self.assertAlmostEqual(va.vest4_rankscore, 0.56432)
+        self.assertAlmostEqual(va.bayesdel_noaf_rankscore, 0.62982)
+        self.assertAlmostEqual(va.bayesdel_noaf_score, -0.101445)
+        self.assertAlmostEqual(va.cadd_phred, 24.9)
+        self.assertAlmostEqual(va.cadd_raw, 4.30771)
+        self.assertAlmostEqual(va.cadd_raw_rankscore, 0.66503)
+        self.assertAlmostEqual(va.alphamissense_rankscore, 0.21918)
+        self.assertAlmostEqual(va.clinpred_rankscore, 0.14983)
+
+    def _test_24601_gnomad_grch38(self, va):
+        """ gnomAD v4.1 — uses FILTER column rather than gnomad_filtered=1 """
+        # https://gnomad.broadinstitute.org/variant/13-95186748-C-T?dataset=gnomad_r4
+        self.assertAlmostEqual(va.gnomad_af, 6.75316e-05, places=8)
+        # New v4.1 fafmax fields
+        self.assertAlmostEqual(va.gnomad_fafmax_faf95_max, 0.00096313, places=7)
+        self.assertAlmostEqual(va.gnomad_fafmax_faf99_max, 0.00088981, places=7)
+        # FILTER=PASS → not filtered (gnomad4_minor_version='4.1' triggers text parse)
+        self.assertEqual(va.gnomad_filtered, False)
+        self.assertEqual(va.gnomad_popmax, "AFR")  # formatter upper-cases 'afr'
+        self.assertAlmostEqual(va.gnomad_popmax_af, 0.00115985, places=7)
+        self.assertAlmostEqual(va.gnomad_afr_af, 0.00115985, places=7)
+        self.assertEqual(va.gnomad_hom_alt, 0)
+
+    def _test_extra_grch38(self):
+        # ---- dbNSFP 5.3.1a per-variant rank scores ----
+        va = VariantAnnotation.objects.get(variant_id=24601)
+        self.assertAlmostEqual(va.metalr_rankscore, 0.80387)
+        self.assertAlmostEqual(va.revel_rankscore, 0.69351)
+        self.assertAlmostEqual(va.vest4_rankscore, 0.56432)
+        self.assertAlmostEqual(va.alphamissense_rankscore, 0.21918)
+        self.assertAlmostEqual(va.bayesdel_noaf_rankscore, 0.62982)
+        self.assertAlmostEqual(va.cadd_raw_rankscore, 0.66503)
+        self.assertAlmostEqual(va.clinpred_rankscore, 0.14983)
+
+        # ---- ALoFT (still per-transcript pick, dbNSFP 5.3.1a) ----
+        va = VariantAnnotation.objects.get(variant_id=42)
+        self.assertEqual(va.aloft_high_confidence, True)
+        self.assertEqual(va.aloft_pred, ALoFTPrediction.RECESSIVE)
+        self.assertAlmostEqual(va.aloft_prob_dominant, 0.13585)
+        self.assertAlmostEqual(va.aloft_prob_recessive, 0.81255)
+        self.assertAlmostEqual(va.aloft_prob_tolerant, 0.0516)
+
+        # NMD (variant 42 picked transcript NM_014783.6 doesn't have NMD flag in v4 fixture,
+        # but variant_id=42 NM_199357.3 transcript does — verify via VariantTranscriptAnnotation)
+        vta = VariantTranscriptAnnotation.objects.get(variant_id=42, hgvs_c='NM_199357.3:c.1417C>T')
+        self.assertTrue(vta.nmd_escaping_variant)
+
+        # ---- New dbNSFP 5.3.1a score / pred fields (RPE65 G197E, single Ensembl transcript) ----
+        va = VariantAnnotation.objects.get(variant_id=131167)
+        # dbNSFP raw 'P' → PATHOGENIC (preserved separately from LIKELY_PATHOGENIC)
+        self.assertEqual(va.alphamissense_pred, AlphaMissensePrediction.PATHOGENIC)
+        self.assertAlmostEqual(va.alphamissense_score, 0.9466)
+        self.assertAlmostEqual(va.cadd_phred, 27.5)
+        self.assertAlmostEqual(va.cadd_raw, 4.923567)
+        self.assertAlmostEqual(va.mpc_score, 0.393936689695)
+        self.assertEqual(va.metarnn_pred, "D")
+        self.assertAlmostEqual(va.metarnn_score, 0.9328449)
+        self.assertAlmostEqual(va.mutpred2_score, 0.907)
+        self.assertIn("Altered_Cytoplasmic_loop", va.mutpred2_top5_mechanisms)
+        self.assertEqual(va.primateai_pred, "T")
+        self.assertAlmostEqual(va.primateai_score, 0.798840403557)
+        self.assertAlmostEqual(va.revel_score, 0.895)
+        self.assertAlmostEqual(va.varity_er_score, 0.7558126)
+        self.assertAlmostEqual(va.varity_r_score, 0.8022984)
+        self.assertAlmostEqual(va.vest4_score, 0.946)
+        self.assertAlmostEqual(va.bayesdel_noaf_score, 0.453759)
+        self.assertEqual(va.clinpred_pred, "D")
+        self.assertAlmostEqual(va.clinpred_score, 0.996512711048126)
+
+        # ---- Masked SpliceAI (same fields, different source data — verify load) ----
+        self.assertEqual(va.spliceai_pred_dp_ag, -35)
+        self.assertEqual(va.spliceai_pred_dp_al, 43)
+        self.assertEqual(va.spliceai_pred_dp_dg, 13)
+        self.assertEqual(va.spliceai_pred_dp_dl, -49)
+        self.assertAlmostEqual(va.spliceai_pred_ds_ag, 0.0)
+        self.assertAlmostEqual(va.spliceai_pred_ds_al, 0.0)
+        self.assertAlmostEqual(va.spliceai_pred_ds_dg, 0.01)
+        self.assertAlmostEqual(va.spliceai_pred_ds_dl, 0.0)
+        self.assertAlmostEqual(va.spliceai_max_ds, 0.01)
+        self.assertEqual(va.spliceai_gene_symbol, "RPE65")
+
+        # ---- denovo-db / MaveDB columns are present in CSQ but no overlapping data
+        # for these test variants. Verify columns parse to NULL rather than crashing. ----
+        va = VariantAnnotation.objects.get(variant_id=24601)
+        self.assertIsNone(va.denovo_db_studies)
+        self.assertIsNone(va.denovo_db_case_count)
+        self.assertIsNone(va.mavedb_score)
+        self.assertIsNone(va.mavedb_urn)
+
+
+class TestDBNSFPPerTranscriptPick(TestCase):
+    """ Exercise BulkVEPVCFAnnotationInserter._pick_dbnsfp_per_transcript_values
+        with a stub resolver — DBNSFPGeneAnnotation isn't populated in test DBs,
+        so we can't drive this through a full import. """
+
+    class _StubResolver:
+        name = "stub"
+
+        def __init__(self, mapping: dict[tuple[str, str], str]):
+            self._mapping = mapping
+
+        def refseq_to_ensembl(self, gene_symbol, refseq):
+            return self._mapping.get((gene_symbol, refseq))
+
+        def ensembl_to_refseq(self, gene_symbol, ensembl):
+            return None
+
+    def _make_inserter(self, resolver):
+        from annotation.models.models_enums import VariantAnnotationPipelineType
+        from genes.models_enums import AnnotationConsortium
+
+        inserter = BulkVEPVCFAnnotationInserter.__new__(BulkVEPVCFAnnotationInserter)
+        inserter.transcript_resolver = resolver
+        inserter.annotation_run = type("AR", (), {
+            "annotation_consortium": AnnotationConsortium.REFSEQ,
+            "pipeline_type": VariantAnnotationPipelineType.STANDARD,
+        })()
+        return inserter
+
+    def test_pick_resolves_refseq_to_ensembl_index(self):
+        """ ABCC4 NM_005845 -> ENST00000645237 is at index 2 of Ensembl_transcriptid array.
+            Pick should rewrite per-transcript fields to the index-2 value. """
+        inserter = self._make_inserter(
+            self._StubResolver({("ABCC4", "NM_005845"): "ENST00000645237"}))
+        td = {
+            "Feature": "NM_005845.5",
+            "SYMBOL": "ABCC4",
+            "Ensembl_transcriptid": "ENST00000903574&ENST00000932204&ENST00000645237&ENST00000903573",
+            "AlphaMissense_pred": ".&.&B&LB",
+            "AlphaMissense_score": ".&.&0.1101&0.0946",
+            "REVEL_score": ".&.&.&0.377",
+        }
+        inserter._pick_dbnsfp_per_transcript_values(td)
+        self.assertEqual(td["AlphaMissense_pred"], "B")
+        self.assertEqual(td["AlphaMissense_score"], "0.1101")
+        self.assertEqual(td["REVEL_score"], ".")
+
+    def test_pick_falls_through_when_resolver_returns_none(self):
+        """ Resolver miss → arrays left unchanged so field formatters can collapse them. """
+        inserter = self._make_inserter(self._StubResolver({}))
+        td = {
+            "Feature": "NM_005845.5",
+            "SYMBOL": "ABCC4",
+            "Ensembl_transcriptid": "ENST00000903574&ENST00000645237",
+            "AlphaMissense_score": ".&0.1101",
+        }
+        inserter._pick_dbnsfp_per_transcript_values(td)
+        self.assertEqual(td["AlphaMissense_score"], ".&0.1101")
+
+    def test_pick_skips_when_no_array(self):
+        """ Single Ensembl_transcriptid (no &) → no-op; fields are already single values. """
+        inserter = self._make_inserter(
+            self._StubResolver({("RPE65", "NM_000329"): "ENST00000262340"}))
+        td = {
+            "Feature": "NM_000329.3",
+            "SYMBOL": "RPE65",
+            "Ensembl_transcriptid": "ENST00000262340",
+            "AlphaMissense_score": "0.9466",
+        }
+        inserter._pick_dbnsfp_per_transcript_values(td)
+        self.assertEqual(td["AlphaMissense_score"], "0.9466")
 
 
 class TestVEP(TestCase):

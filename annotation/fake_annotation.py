@@ -35,14 +35,23 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
         "phylop100way": None,
         "phylop46way": None,
     })
+    # columns_version 4 fixtures were generated against gnomAD 4.1 (the FILTER column shifts
+    # VEPConfig.gnomad4_minor_version, which gates which gnomAD CSQ fields apply); earlier
+    # fixtures used gnomAD 4.0. Plugin/version-only data files (denovo_db, mave, etc.) are
+    # gated through vep_columns column-defs (min_columns_version), so we don't need to null
+    # them out per-version here.
+    if columns_version >= 4:
+        gnomad4_path = "annotation_data/GRCh38/gnomad4.1_GRCh38_contigs.vcf.gz"
+    else:
+        gnomad4_path = "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz"
+
     TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
         "phastcons100way": None,
         "phastcons30way": None,
         "phylop100way": None,
         "phylop30way": None,
-        # Test fixtures were generated against gnomAD 4.0; pin so they don't pick up a developer's
-        # local 4.1 override (which would shift VEP CSQ fields and break fixture parsing).
-        "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",
+        # Pin gnomAD so a developer's local override doesn't shift VEP CSQ fields and break fixture parsing.
+        "gnomad4": gnomad4_path,
     })
 
     ANNOTATION_COLUMNS = copy.deepcopy(TEST_ANNOTATION)

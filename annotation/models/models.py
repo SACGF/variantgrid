@@ -656,6 +656,14 @@ class VariantAnnotationVersion(SubVersionPartition):
     annotsv_code = models.TextField(null=True, blank=True)     # eg "3.5.8" - from `AnnotSV -version`
     annotsv_bundle = models.TextField(null=True, blank=True)   # admin-set bundle release string
 
+    # Strategy used to map RefSeq <-> Ensembl transcripts when picking dbNSFP
+    # per-transcript scores at insert time. Populated on RefSeq pipelines for
+    # columns_version >= 4; NULL otherwise (older versions only consumed
+    # variant-level dbNSFP fields, so no mapping was needed). Value is the
+    # `name` of a RefSeqEnsemblTranscriptResolver implementation, e.g.
+    # "dbnsfp_gene". @see annotation/refseq_ensembl_resolver.py
+    transcript_resolver = models.TextField(null=True, blank=True)
+
     @property
     def gnomad_major_version(self) -> int:
         return int(self.gnomad.split(".", maxsplit=1)[0])
@@ -691,11 +699,11 @@ class VariantAnnotationVersion(SubVersionPartition):
                 'mutation_taster_pred_most_damaging': lambda d: d in MutationTasterPrediction.get_damage_or_greater_levels(),
                 'polyphen2_hvar_pred_most_damaging': lambda d: d in Polyphen2Prediction.get_damage_or_greater_levels(),
             }
-        elif self.columns_version in (2, 3):
+        elif self.columns_version in (2, 3, 4):
             pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
             pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
                                              'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
-            if self.columns_version == 3:
+            if self.columns_version >= 3:
                 pathogenic_prediction_columns.append("alphamissense_rankscore")
 
             return {c: lambda d: float(d) >= pathogenic_rankscore for c in pathogenic_prediction_columns}

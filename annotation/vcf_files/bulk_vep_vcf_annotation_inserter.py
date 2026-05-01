@@ -12,10 +12,12 @@ from django.conf import settings
 from annotation import vep_columns as vep_columns_registry
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
-    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
+    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction, \
+    MetaRNNPrediction, PrimateAIPrediction
 from annotation.models.models import VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
 from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
+from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
@@ -112,6 +114,21 @@ class BulkVEPVCFAnnotationInserter:
     ALOFT_COLUMNS = ['aloft_prob_tolerant', 'aloft_prob_recessive', 'aloft_prob_dominant',
                      'aloft_pred', 'aloft_high_confidence', 'aloft_ensembl_transcript']
 
+    # dbNSFP source fields that come as &-separated arrays parallel to Ensembl_transcriptid
+    # (columns_version >= 4 only — earlier versions only consumed dbNSFP variant-level fields).
+    # _pick_dbnsfp_per_transcript_values rewrites these to the single value matching the picked
+    # VEP transcript when the resolver finds a mapping; otherwise their formatters collapse
+    # the array to a representative value.
+    DBNSFP_PER_TRANSCRIPT_SOURCE_FIELDS = (
+        "AlphaMissense_pred", "AlphaMissense_score",
+        "MPC_score",
+        "MetaRNN_pred", "MetaRNN_score",
+        "MutPred2_score", "MutPred2_top5_mechanisms",
+        "REVEL_score",
+        "VARITY_ER_score", "VARITY_R_score",
+        "VEST4_score",
+    )
+
     def __init__(self,
                  annotation_run: AnnotationRun,
                  infos: Optional[dict] = None,
@@ -151,6 +168,18 @@ class BulkVEPVCFAnnotationInserter:
         self.sv_overlap_processor = sv_overlap_processor
         self.sv_gene_overlap_resolver = sv_gene_overlap_resolver
         self._generated_hgvs_c = Counter()
+
+        # Resolver for picking per-transcript dbNSFP values (RefSeq <-> Ensembl translation).
+        # Only relevant for columns_version >= 4 (which introduced per-transcript dbNSFP
+        # score fields). Persist the resolver name on the VAV so we have provenance for
+        # which strategy populated the scores.
+        self.transcript_resolver = None
+        if self.vep_config.columns_version >= 4:
+            self.transcript_resolver = DBNSFPGeneResolver()
+            vav = self.annotation_run.variant_annotation_version
+            if vav.transcript_resolver != self.transcript_resolver.name:
+                vav.transcript_resolver = self.transcript_resolver.name
+                vav.save(update_fields=["transcript_resolver"])
 
     @property
     def description(self) -> str:
@@ -243,6 +272,36 @@ class BulkVEPVCFAnnotationInserter:
         ) or self.vep_config.gnomad4_minor_version == "4.1"
         if needs_filter_text_parse:
             self.field_formatters["gnomad_filtered"] = gnomad_filtered_func
+
+        # columns_version >= 4 adds dbNSFP score / pred fields beyond the existing rankscores.
+        # Some are per-transcript (parallel to Ensembl_transcriptid: AlphaMissense_*, REVEL_score,
+        # VEST4_score, VARITY_*, MetaRNN_*, MutPred2_*, MPC_score) — those are picked upstream by
+        # _pick_dbnsfp_per_transcript_values; the formatters here handle either the single picked
+        # value, OR the residual &-array if the resolver couldn't find a match.
+        # Others (BayesDel_noAF_score, CADD_phred, CADD_raw, ClinPred_score, PrimateAI_*) are
+        # variant-level so usually single values, but dbNSFP can still emit &-joined values when
+        # a variant matches multiple dbNSFP rows — formatters here keep parsing safe (no-op on
+        # single values). AlphaMissense_pred additionally needs B/LB/A/LP/P -> code mapping.
+        if self.vep_config.columns_version >= 4:
+            self.field_formatters.update({
+                "alphamissense_pred": format_alphamissense_pred,
+                "alphamissense_score": format_pick_highest_float,
+                "bayesdel_noaf_score": format_pick_highest_float,
+                "cadd_phred": format_pick_highest_float,
+                "cadd_raw": format_pick_highest_float,
+                "clinpred_score": format_pick_highest_float,
+                "metarnn_pred": get_most_damaging_func(MetaRNNPrediction),
+                "metarnn_score": format_pick_highest_float,
+                "mpc_score": format_pick_highest_float,
+                "mutpred2_score": format_pick_highest_float,
+                "mutpred2_top5_mechanisms": remove_empty_multiples,
+                "primateai_pred": get_most_damaging_func(PrimateAIPrediction),
+                "primateai_score": format_pick_highest_float,
+                "revel_score": format_pick_highest_float,
+                "varity_er_score": format_pick_highest_float,
+                "varity_r_score": format_pick_highest_float,
+                "vest4_score": format_pick_highest_float,
+            })
 
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
@@ -341,6 +400,9 @@ class BulkVEPVCFAnnotationInserter:
         # logging.debug("vep_to_db_dict:")
         # logging.debug(vep_transcript_data)
 
+        if self.transcript_resolver is not None:
+            self._pick_dbnsfp_per_transcript_values(vep_transcript_data)
+
         raw_db_data = {}
 
         # These can be straight copied
@@ -369,6 +431,49 @@ class BulkVEPVCFAnnotationInserter:
             db_data[c] = value
 
         return db_data
+
+    def _pick_dbnsfp_per_transcript_values(self, vep_transcript_data: TranscriptData):
+        """ dbNSFP returns several score/pred fields as &-separated arrays parallel to
+            Ensembl_transcriptid. Look up the Ensembl id matching the current VEP transcript
+            via self.transcript_resolver, find its index in the array, and rewrite the
+            per-transcript fields to that single value. Leaves arrays untouched if no
+            mapping is available — the field formatters will then collapse them to a
+            representative value (max float / most-damaging pred).
+
+            Note: dbNSFP's Ensembl_transcriptid column is unversioned (e.g. ENST00000262340),
+            so we strip the .N suffix from the VEP Feature on both sides. """
+        ensembl_ids_raw = vep_transcript_data.get("Ensembl_transcriptid")
+        if not ensembl_ids_raw or VEP_SEPARATOR not in ensembl_ids_raw:
+            return  # Single value (or absent) — no array to pick from
+
+        feature = vep_transcript_data.get("Feature")
+        if not feature:
+            return
+        feature_unversioned = feature.split(".", 1)[0]
+
+        if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
+            symbol = vep_transcript_data.get("SYMBOL")
+            if not symbol:
+                return
+            target_ensembl = self.transcript_resolver.refseq_to_ensembl(symbol, feature_unversioned)
+        else:
+            target_ensembl = feature_unversioned  # Ensembl pipeline: VEP Feature is already ENST
+
+        if not target_ensembl:
+            return
+
+        ensembl_ids = ensembl_ids_raw.split(VEP_SEPARATOR)
+        try:
+            idx = ensembl_ids.index(target_ensembl)
+        except ValueError:
+            return  # Target ENST not in the array — fall through to formatter collapse
+
+        for source_field in self.DBNSFP_PER_TRANSCRIPT_SOURCE_FIELDS:
+            value = vep_transcript_data.get(source_field)
+            if value and VEP_SEPARATOR in value:
+                parts = value.split(VEP_SEPARATOR)
+                if idx < len(parts):
+                    vep_transcript_data[source_field] = parts[idx]
 
     @staticmethod
     def _pick_aloft_values(raw_db_data: dict):
@@ -866,6 +971,33 @@ def format_aloft_high_confidence(value) -> bool:
 
 def format_canonical(value) -> bool:
     return value == "YES"
+
+
+# dbNSFP 5.3.1a (columns_version >= 4) emits AlphaMissense_pred as 'B'/'LB'/'A'/'LP'/'P',
+# optionally as &-separated arrays parallel to Ensembl_transcriptid. Map to the
+# AlphaMissensePrediction code and pick the most-pathogenic value across the array.
+_ALPHAMISSENSE_PRED_MAP = {
+    "B": AlphaMissensePrediction.BENIGN,
+    "LB": AlphaMissensePrediction.LIKELY_BENIGN,
+    "A": AlphaMissensePrediction.AMBIGUOUS,
+    "LP": AlphaMissensePrediction.LIKELY_PATHOGENIC,
+    "P": AlphaMissensePrediction.PATHOGENIC,
+}
+_ALPHAMISSENSE_PRED_ORDER = [
+    AlphaMissensePrediction.PATHOGENIC,
+    AlphaMissensePrediction.LIKELY_PATHOGENIC,
+    AlphaMissensePrediction.AMBIGUOUS,
+    AlphaMissensePrediction.LIKELY_BENIGN,
+    AlphaMissensePrediction.BENIGN,
+]
+
+
+def format_alphamissense_pred(raw_value):
+    seen = {_ALPHAMISSENSE_PRED_MAP[v] for v in raw_value.split(VEP_SEPARATOR) if v in _ALPHAMISSENSE_PRED_MAP}
+    for code in _ALPHAMISSENSE_PRED_ORDER:
+        if code in seen:
+            return code
+    return None
 
 
 class SVOverlapProcessor:
