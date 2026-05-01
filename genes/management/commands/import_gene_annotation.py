@@ -113,6 +113,11 @@ class Command(BaseCommand):
         release_transcript_version_list = []
         gene_versions_used_by_transcripts = set()
         for transcript_accession, tv_data in cdot_data["transcripts"].items():
+            # cdot has some fake transcripts (e.g. 'fake-rna-ATP6') that import_cdot_data skips
+            # because they have no version — they won't be in transcript_version_ids_by_accession.
+            _, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+            if version is None:
+                continue
             transcript_version_id = transcript_version_ids_by_accession[transcript_accession]
             rtv = ReleaseTranscriptVersion(release=release, transcript_version_id=transcript_version_id)
             release_transcript_version_list.append(rtv)
