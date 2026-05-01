@@ -125,6 +125,15 @@ Reference GitHub issues in commit messages (e.g., `#1400`) but do NOT use keywor
 
 Before committing, check `git status` for already-staged changes unrelated to the current task. If any exist, stop and confirm with the user before proceeding — do not include them in the commit.
 
+## Implementation Prompts
+
+When asked to draft a prompt for an agent to implement a plan in another conversation:
+
+- The plan file is the spec. Reference it; don't restate it.
+- Do not mention decisions that were rejected during planning (e.g. "use JSON not 16 fields", "don't split into a separate table"). The plan reflects the final decision; the agent reading the plan won't see the alternatives. Including negatives only confuses or implies the plan is incomplete.
+- The only exception: an explicit "don't do X" is warranted when X is a default the agent would plausibly do *without* that nudge (e.g. "don't add `@login_required`", "no `Co-Authored-By` trailer"). Even then, prefer fixing the plan to carry that guidance.
+- Keep prompts short: read-list, "follow plan §X-§Y", constraints that override defaults, report-back format. No "pre-resolved decisions" section.
+
 ## GitHub Comments
 
 When writing any comment on a GitHub issue or pull request, always preface it with 🤖 Written by Claude.
