@@ -58,10 +58,13 @@ class Command(BaseCommand):
         else:
             pipeline_type = VariantAnnotationPipelineType.STANDARD
 
-        output_filename = os.path.join(output_dir, f"{base_name}.{vep_suffix}.vcf.gz")
+        # Test fixtures are committed uncompressed so diffs are reviewable
+        compress_output = not test
+        output_ext = "vcf.gz" if compress_output else "vcf"
+        output_filename = os.path.join(output_dir, f"{base_name}.{vep_suffix}.{output_ext}")
         return_code, std_out, std_err = run_vep(vcf_filename, output_filename,
                                                 genome_build, genome_build.annotation_consortium,
-                                                pipeline_type)
+                                                pipeline_type, compress_output=compress_output)
         if return_code != 0:
             logging.info(std_out)
             logging.error(std_err)

@@ -357,6 +357,16 @@ class TestAnnotationVCF4(TestAnnotationVCF):
         self.assertIsNone(va.mavedb_score)
         self.assertIsNone(va.mavedb_urn)
 
+        # ---- chrX PAR1 (SHOX intron) — non_par flag absent in gnomAD 4.1 ----
+        va = VariantAnnotation.objects.get(variant_id=131168)
+        self.assertIsNone(va.gnomad_non_par)
+        self.assertEqual(va.gnomad_filtered, False)
+
+        # ---- chrX non-PAR (DMD intron) — non_par flag set, FILTER=GENOMES_FILTERED ----
+        va = VariantAnnotation.objects.get(variant_id=131169)
+        self.assertEqual(va.gnomad_non_par, True)
+        self.assertEqual(va.gnomad_filtered, True)
+
 
 class TestDBNSFPPerTranscriptPick(TestCase):
     """ Exercise BulkVEPVCFAnnotationInserter._pick_dbnsfp_per_transcript_values

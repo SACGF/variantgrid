@@ -98,7 +98,7 @@ def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path) -> 
 
 
 def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
-                    pipeline_type: VariantAnnotationPipelineType):
+                    pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True):
     vc = VEPConfig(genome_build)
     vep_cmd = os.path.join(settings.ANNOTATION_VEP_CODE_DIR, "vep")
 
@@ -114,7 +114,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         # Need to provide VEP a fasta rather than use the default - https://github.com/Ensembl/VEP_plugins/issues/708
         "--fasta", vc["fasta"],
         "--assembly", genome_build.name,
-        "--offline", "--use_given_ref", "--vcf", "--compress_output", "gzip",
+        "--offline", "--use_given_ref", "--vcf",
         "--force_overwrite", "--flag_pick", "--exclude_predicted", "--no_stats",
         "--check_existing",  # COSMIC ids
         "--no_escape",  # Don't URI escape HGVS strings
@@ -133,6 +133,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--pubmed",
         "--variant_class",
     ]
+
+    if compress_output:
+        cmd.extend(["--compress_output", "gzip"])
 
     if vc.use_sift:
         cmd.extend(["--sift", "b"])
@@ -233,10 +236,11 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
 
 
 def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
-            pipeline_type: VariantAnnotationPipelineType):
+            pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True):
     """ executes VEP command. Returns (command_line, code, stdout, stderr) """
 
-    cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium, pipeline_type)
+    cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium, pipeline_type,
+                          compress_output=compress_output)
     return execute_cmd(cmd, shell=False)
 
 
