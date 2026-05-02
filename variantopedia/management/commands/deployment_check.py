@@ -14,6 +14,7 @@ from variantgrid.deployment_validation.somalier_check import check_somalier
 from variantgrid.deployment_validation.tool_version_checks import check_tool_versions
 from variantgrid.deployment_validation.variant_check import check_symbolic_variants
 from variantgrid.deployment_validation.vep_check import check_vep
+from variantgrid.deployment_validation.vep_columns_check import check_vep_columns_registry
 
 
 class Command(BaseCommand):
@@ -35,6 +36,7 @@ class Command(BaseCommand):
             "Celery Tasks": check_celery_tasks(),
             "Classification Reports": check_classification_reports(),
             "Columns": check_variantgrid_columns(),
+            "VEP Columns Registry": check_vep_columns_registry(),
             "VEP": check_vep(),
             "Symbolic variants": check_symbolic_variants(),
         }
