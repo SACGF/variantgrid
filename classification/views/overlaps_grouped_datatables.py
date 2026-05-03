@@ -163,6 +163,8 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
                 qs = qs.filter(lab__in=lab_picker.lab_ids)
 
         qs = qs.prefetch_related("overlapcontribution_set")
+        qs = qs.select_related("latest_allele_info")
+
         return qs
 
     @property
@@ -213,13 +215,16 @@ class ClassificationGroupingOverlapsColumns(DatatableConfig[ClassificationGroupi
             ClassificationResultValue.CLINICAL_SIGNIFICANCE: clin_sig_values
         }
 
-        overlaps = list(Overlap.objects.filter(
+        overlap_qs = Overlap.objects.filter(
             overlapcontributionskew__contribution__classification_grouping=cell.obj,
             valid=True,
             overlap_status__gte=OverlapStatus.NO_CONTRIBUTIONS
-        ).all())
+        ).prefetch_related("overlapcontributionskew_set")
+
+        overlaps = list(overlap_qs.all())
         cell.transient["overlaps"] = overlaps
         for overlap in overlaps:
+            # this is really slowing things down by forcing a sub select for every row
             for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING).all():
                 same_context = contribution.testing_context_bucket_obj == cell.obj.testing_context
                 # same_lab = contribution.lab == cell.obj.lab

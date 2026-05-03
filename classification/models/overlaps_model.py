@@ -191,7 +191,7 @@ class Overlap(TimeStampedModel):
     # contributions = models.ManyToManyField(OverlapContribution)
     @property
     def contributions(self) -> QuerySet[OverlapContribution]:
-        return OverlapContribution.objects.filter(pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True))
+        return OverlapContribution.objects.filter(pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)).select_related("classification_grouping__lab__organization")
 
     class Meta:
         indexes = [models.Index(fields=['overlap_type']), models.Index(fields=['value_type']), models.Index(fields=['allele'])]
