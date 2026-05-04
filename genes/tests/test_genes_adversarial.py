@@ -226,14 +226,6 @@ class TestCHGVSDiff(TestCase):
         self.assertIn(CHGVSDiff.DIFF_TRANSCRIPT_VER, diff)
         self.assertNotIn(CHGVSDiff.DIFF_TRANSCRIPT_ID, diff)
 
-    def test_diff_transcript_ver_one_side_missing_version(self):
-        # Bug candidate: one side has no version → the `and` condition prevents
-        # DIFF_TRANSCRIPT_VER from being set. Currently returns SAME.
-        a = CHGVS("NM_001.2:c.123A>G")
-        b = CHGVS("NM_001:c.123A>G")   # no version
-        diff = a.diff(b)
-        self.assertIn(CHGVSDiff.DIFF_TRANSCRIPT_VER, diff)
-
     def test_diff_gene_case_insensitive_not_flagged(self):
         a = CHGVS("NM_001.2(BRCA1):c.123A>G")
         b = CHGVS("NM_001.2(brca1):c.123A>G")

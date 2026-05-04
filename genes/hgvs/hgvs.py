@@ -15,6 +15,7 @@ class CHGVSDiff(enum.Flag):
     # the transcript identifier has changed
     DIFF_TRANSCRIPT_ID = enum.auto()
     # the transcript identifier is the same but the version has changed
+    # no version compared to a version should not raise a diff as some labs don't provide any versions
     DIFF_TRANSCRIPT_VER = enum.auto()
     # the gene symbol has changed
     DIFF_GENE = enum.auto()
@@ -373,6 +374,7 @@ class CHGVS:
         if my_tran.identifier != o_tran.identifier:
             cdiff = cdiff | CHGVSDiff.DIFF_TRANSCRIPT_ID
         elif my_tran.version and o_tran.version and my_tran.version != o_tran.version:
+            # no version compared to a version should not raise a diff as some labs don't provide any versions
             cdiff = cdiff | CHGVSDiff.DIFF_TRANSCRIPT_VER
 
         if self.gene and other.gene:
