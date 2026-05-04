@@ -34,7 +34,8 @@ from uicore.templatetags.js_tags import jsonify_for_js
 class VCFListGrid(JqGridUserRowConfig):
     model = VCF
     caption = 'VCFs'
-    fields = ["id", "name", "vcf_url", "date", "import_status", "genome_build__name", "user__username", "source",
+    fields = ["id", "name", "vcf_url", "date", "import_status", "data_archived_date", "genome_build__name",
+              "user__username", "source",
               "uploadedvcf__uploaded_file__import_source", "genotype_samples", "project__name", "cohort__import_status",
               "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
     colmodel_overrides = {
@@ -46,6 +47,7 @@ class VCFListGrid(JqGridUserRowConfig):
                                       "url_object_column": "id"}},
         "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},
         'import_status': {'formatter': 'viewImportStatus'},
+        'data_archived_date': {'label': 'Archived'},
         "genome_build__name": {"label": "Genome Build"},
         'user__username': {'label': 'Uploaded by', 'width': 60},
         'source': {'label': 'VCF source'},

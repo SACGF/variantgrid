@@ -21,6 +21,7 @@ from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 
 from library.django_utils import SortByPKMixin
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback, report_event
@@ -58,7 +59,7 @@ class Project(models.Model):
         return name
 
 
-class VCF(models.Model, PreviewModelMixin):
+class VCF(DataArchiveMixin, PreviewModelMixin):
     name = models.TextField(null=True)
     date = models.DateTimeField()
     # genome_build will be set if imported successfully
@@ -117,7 +118,7 @@ class VCF(models.Model, PreviewModelMixin):
         return percent
 
     @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False):
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
         if has_write_permission:
             perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
         else:
@@ -128,7 +129,10 @@ class VCF(models.Model, PreviewModelMixin):
         else:
             queryset = VCF.objects.filter(user=user)
 
-        return queryset.exclude(import_status__in=ImportStatus.DELETION_STATES)
+        queryset = queryset.exclude(import_status__in=ImportStatus.DELETION_STATES)
+        if not include_archived:
+            queryset = queryset.filter(data_archived_date__isnull=True)
+        return queryset
 
     @staticmethod
     def get_for_user(user, vcf_id):
@@ -191,8 +195,12 @@ class VCF(models.Model, PreviewModelMixin):
         qs = qs.annotate(**cgc.get_annotation_kwargs())
         return qs.filter(**{f"{cgc.cohortgenotype_alias}__isnull": False})  # Inner join to CohortGenotype
 
-    def delete_internal_data(self):
-        """ Remove internal data but keep VCF and samples for reloading in place """
+    def delete_internal_data(self, recreate_partitions: bool = True):
+        """ Remove internal data but keep VCF and samples for reloading in place.
+
+            recreate_partitions=False is used by archive (snpdb/archive.py) — we want
+            the partitions dropped, not replaced with empty ones.
+        """
 
         # Remove VCF filters - some old ones had diff symbol/filter combos that cause errors trying to re-use
         self.vcffilter_set.all().delete()
@@ -213,11 +221,17 @@ class VCF(models.Model, PreviewModelMixin):
         except ObjectDoesNotExist:
             pass
 
-        # Delete and recreate rather than truncate as we may have had a schema change since
-        logging.warning("*** Deleting then recreating partitions ***")
-        for p in partitions:
-            p.delete_related_objects()
-            p.create_partition()
+        if recreate_partitions:
+            # Delete and recreate rather than truncate as we may have had a schema change since
+            logging.warning("*** Deleting then recreating partitions ***")
+            for p in partitions:
+                p.delete_related_objects()
+                p.create_partition()
+        else:
+            logging.warning("*** Deleting partitions and CohortGenotypeCollection rows ***")
+            for p in partitions:
+                p.delete_related_objects()
+                p.delete()
 
 
 @receiver(pre_delete, sender=VCF)
@@ -330,6 +344,10 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
     @property
     def has_genotype(self):
         return self.vcf.has_genotype
+
+    @property
+    def data_archived(self) -> bool:
+        return self.vcf.data_archived
 
     @property
     def is_somatic(self):
@@ -474,9 +492,10 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         return reverse('data')
 
     @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False):
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
         """ May be given permission for whole VCF or just a sample """
-        vcfs = VCF.filter_for_user(user, group_data, has_write_permission=has_write_permission)
+        vcfs = VCF.filter_for_user(user, group_data, has_write_permission=has_write_permission,
+                                   include_archived=include_archived)
         q_filters = [Q(vcf__in=vcfs)]
         if group_data:
             if has_write_permission:
@@ -484,7 +503,10 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
             else:
                 perm = DjangoPermission.perm(Sample, DjangoPermission.READ)
             queryset = get_objects_for_user(user, perm, klass=Sample, accept_global_perms=True)
-            q_filters.append(Q(pk__in=queryset.values_list("pk", flat=True)))
+            sample_q = Q(pk__in=queryset.values_list("pk", flat=True))
+            if not include_archived:
+                sample_q &= Q(vcf__data_archived_date__isnull=True)
+            q_filters.append(sample_q)
 
         ored_q_filters = reduce(operator.or_, q_filters)
         return Sample.objects.filter(ored_q_filters).exclude(import_status__in=ImportStatus.DELETION_STATES)
@@ -596,7 +618,7 @@ class VCFAlleleSource(AlleleSource):
         return genome_build
 
     def get_variant_qs(self):
-        if self.vcf:
+        if self.vcf and not self.vcf.data_archived:
             qs = self.vcf.get_variant_qs()
         else:
             qs = Variant.objects.none()

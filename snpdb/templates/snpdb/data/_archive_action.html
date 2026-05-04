@@ -1,0 +1,39 @@
+{% if has_write_permission and not obj.data_archived %}
+    {% if can_archive %}
+        <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#archiveModal">
+            Archive data
+        </button>
+        <div class="modal fade" id="archiveModal" tabindex="-1" role="dialog" aria-labelledby="archiveModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <form method="post" action="{% url archive_url_name obj.pk %}">
+                    {% csrf_token %}
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="archiveModalLabel">Archive data</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <p>This will drop the underlying data and keep only metadata. The source file
+                                <code>{{ obj.uploadedvcf.uploaded_file.get_filename }}</code> will be remembered so the data can be re-imported later.</p>
+                            <div class="form-group">
+                                <label for="archive-reason">Reason</label>
+                                <textarea id="archive-reason" name="reason" class="form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-warning">Archive</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <strong>Uploaded file doesn't exist — cannot archive.</strong>
+            If you want to free up space you can permanently delete this object via the existing delete flow.
+        </div>
+    {% endif %}
+{% endif %}

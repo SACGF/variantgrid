@@ -81,7 +81,10 @@ class VariantSampleInformation:
 
     @staticmethod
     def _get_sample_values_for_variant_via_cohort_genotype(locus_qs):
-        """ This is the new, preferred way - as it gets all of the samples for a VCF at once """
+        """ This is the new, preferred way - as it gets all of the samples for a VCF at once.
+
+            Archived VCFs naturally fall out: archive deletes the CohortGenotypeCollection rows
+            (and partitions), so the cohortgenotype join yields no rows for archived VCFs. """
         no_cohort = Q(variant__cohortgenotype__isnull=True)
         vcf_cohort = Q(variant__cohortgenotype__collection__cohort__vcf__isnull=False)
         qs = locus_qs.filter(no_cohort | vcf_cohort)  # Only VCF CohortGenotypes (not generated cohorts)

@@ -41,8 +41,10 @@ from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAlias
 from library.cache import timed_cache
 from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS, DAY_SECS
 from library.django_utils import SortByPKMixin
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
+from snpdb.archive import DataArchivedError
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
     add_public_group_read_permission
 from library.log_utils import log_traceback
@@ -2181,7 +2183,7 @@ class CanonicalTranscript(models.Model):
     original_transcript = models.TextField()
 
 
-class GeneCoverageCollection(RelatedModelsPartitionModel):
+class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
     """ Note both GeneCoverage and GeneCoverageCanonicalTranscript point off same collection object """
     RECORDS_BASE_TABLE_NAMES = ["genes_genecoverage", "genes_genecoveragecanonicaltranscript"]
     RECORDS_FK_FIELD_TO_THIS_MODEL = "gene_coverage_collection_id"
@@ -2313,6 +2315,8 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
         return warnings
 
     def get_uncovered_gene_symbols(self, gene_symbols, min_coverage):
+        if self.data_archived:
+            raise DataArchivedError(self)
         # Do as inner query to ensure we restrict to gene coverage partition
         covered_qs = GeneCoverageCanonicalTranscript.objects.filter(gene_coverage_collection=self,
                                                                     min__gte=min_coverage)

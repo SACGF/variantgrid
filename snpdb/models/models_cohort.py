@@ -90,6 +90,12 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             return self.vcf.has_genotype
         return True  # Created cohorts must contain genotype
 
+    @property
+    def data_archived(self) -> bool:
+        """ True when underlying data is archived. Custom (multi-VCF) cohorts copy data
+            into their own CGC at build time, so they aren't gated by parent VCF archive. """
+        return bool(self.vcf and self.vcf.data_archived)
+
     def increment_version(self):
         # Check if any samples not in parent cohort (can no longer be a sub cohort)
         if self.parent_cohort:
@@ -182,8 +188,16 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     @cached_property
     def cohort_genotype_collection(self):
         """ This is used to get the alias - which is either UNCOMMON if doing a rare filter, or BOTH common/uncommon
-            if not doing rare pop filter """
+            if not doing rare pop filter.
+
+            Raises DataArchivedError when the underlying VCF is archived (the
+            CohortGenotype partition has been dropped). Sub-cohorts inherit
+            the parent VCF via get_base_cohort() so this also covers them.
+        """
         cohort = self.get_base_cohort()
+        if cohort.vcf and cohort.vcf.data_archived:
+            from snpdb.archive import DataArchivedError
+            raise DataArchivedError(cohort.vcf)
         return CohortGenotypeCollection.objects.get(cohort=cohort,
                                                     cohort_version=cohort.version,
                                                     collection_type=CohortGenotypeCollectionType.UNCOMMON)
@@ -668,6 +682,10 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     def genome_build(self):
         return self.cohort.genome_build
 
+    @property
+    def data_archived(self) -> bool:
+        return self.cohort.data_archived
+
     def get_cohort_samples(self):
         return [self.mother, self.father, self.proband]
 
@@ -726,6 +744,10 @@ class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     @property
     def genome_build(self):
         return self.cohort.genome_build
+
+    @property
+    def data_archived(self) -> bool:
+        return self.cohort.data_archived
 
     def get_cohort_samples(self):
         return [self.mother, self.father, self.proband, self.sibling]

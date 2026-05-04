@@ -349,6 +349,8 @@ $(document).ready(function() {
 {% load vcf_history_trail_tags %}
 {% vcf_history_trail vcf %}
 <h1>VCF: {{ vcf.name }}</h1>
+{% include "snpdb/data/_data_archived_banner.html" with obj=vcf restore_url_name='restore_vcf' %}
+{% include "snpdb/data/_archive_action.html" with obj=vcf archive_url_name='archive_vcf' %}
 <div id="vcf-tabs">
     <ul>
         <li><a href="#details">Details</a></li>

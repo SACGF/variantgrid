@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from auditlog.models import LogEntry
 from celery.contrib.abortable import AbortableAsyncResult
+from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
@@ -185,6 +186,20 @@ def create_analysis_from_template(request, genome_build_name):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=request.user)
     template_run.populate_arguments(data)
+
+    # Block creation against archived sources. populate_arguments has already resolved
+    # each variable to its model instance; just check the common `data_archived` interface.
+    for arg in template_run.analysistemplaterunargument_set.all():
+        if not arg.object_pk:
+            continue
+        klass = apps.get_model(arg.variable.class_name)
+        obj = klass.objects.filter(pk=arg.object_pk).first()
+        if obj is not None and getattr(obj, "data_archived", False):
+            raise PermissionDenied(
+                "Cannot create new analysis: source data is archived. "
+                "Restore the data first."
+            )
+
     populate_analysis_from_template_run(template_run)
 
     return view_active_node(template_run.analysis, None)

@@ -252,7 +252,7 @@ class CohortNodeForm(VCFSourceNodeForm):
     def __init__(self, *args, **kwargs):
         genome_build = kwargs.pop("genome_build", None)
         super().__init__(*args, **kwargs)
-        widget_forward = []
+        widget_forward = [forward.Const(True, "exclude_archived")]
         if genome_build:
             widget_forward.append(forward.Const(genome_build.pk, "genome_build_id"))
         self.fields["cohort"].widget.forward = widget_forward
@@ -625,6 +625,7 @@ class MOINodeForm(BaseNodeForm):
 
 class PedigreeNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
     genome_build_fields = ["pedigree"]
+    exclude_archived = True
 
     class Meta:
         model = PedigreeNode
@@ -715,6 +716,7 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
                        "allele_frequency"]
     LOCKED_INPUT_FIELDS = ['sample', 'restrict_to_qc_gene_list']
     genome_build_fields = ["sample"]
+    exclude_archived = True
 
     class Meta:
         model = SampleNode
@@ -803,6 +805,7 @@ class TissueNodeForm(BaseNodeForm):
 
 class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
     genome_build_fields = ["trio"]
+    exclude_archived = True
 
     class Meta:
         model = TrioNode
@@ -830,6 +833,7 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
 
 class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
     genome_build_fields = ["quad"]
+    exclude_archived = True
 
     class Meta:
         model = QuadNode

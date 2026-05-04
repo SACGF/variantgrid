@@ -111,12 +111,36 @@ def related_analyses_for_pedigree(context, pedigree):
     return context
 
 
+def _source_is_archived(kwargs: dict) -> bool:
+    """ True when any sample/cohort/trio/quad/pedigree passed in is archived.
+        Each source model implements its own `data_archived` property that walks
+        down to the underlying VCF/CohortGenotypeCollection. """
+    for key in ("sample", "cohort", "trio", "quad", "pedigree"):
+        obj = kwargs.get(key)
+        if obj is not None and getattr(obj, "data_archived", False):
+            return True
+    return False
+
+
 @register.inclusion_tag("analysis/tags/analysis_templates_tag.html", takes_context=True)
 def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_somatic_sample=False, has_sample_gene_list=False, requires_sample_gene_list=None,
                            **kwargs):
     user = context["user"]
     single_model_args = {"sample", "cohort", "trio", "quad", "pedigree"}
     params_error_message = f"analysis_templates_tag should be passed dict with exactly one Model value for {','.join(single_model_args)}. Args: {kwargs}"
+
+    if _source_is_archived(kwargs):
+        # Don't offer to create new analyses against archived data.
+        return {
+            "genome_build": genome_build,
+            "flattened_uuid": "",
+            "autocomplete_field": autocomplete_field,
+            "analysis_template_form": None,
+            "analysis_template_links": AnalysisTemplate.objects.none(),
+            "hidden_inputs": {},
+            "missing_templates": "",
+            "source_archived": True,
+        }
 
     hidden_inputs = {}  # values should be primary keys
     klass = None

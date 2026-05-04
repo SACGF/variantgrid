@@ -217,6 +217,9 @@ ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60
 # Admin email used in PubMed queries to contact before throttling/banning
 ANNOTATION_ENTREZ_EMAIL = get_secret("ENTREZ.email")  # Automatically set in in annotation.apps.AnnotationConfig
 ANNOTATION_ENTREZ_API_KEY = get_secret("ENTREZ.api_key")
+
+# Where annotation partition dump files are written when an annotation version is archived (#1536/#1537).
+ANNOTATION_ARCHIVE_DIR = get_secret("ANNOTATION.ARCHIVE_DIR", mandatory=False) or "/data/annotation_archive/"
 ANNOTATION_PUBMED_GENE_SYMBOL_COUNT_CACHE_DAYS = 30
 ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED = False
 

@@ -1,6 +1,7 @@
 import itertools
 import json
 import logging
+import os
 from collections import OrderedDict, defaultdict
 from typing import Iterable
 
@@ -59,6 +60,7 @@ from patients.forms import PatientForm
 from patients.models import Patient, Clinician
 from patients.views import get_patient_upload_csv
 from snpdb import forms
+from snpdb.archive import DataArchivedError
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
     UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
     OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
@@ -206,7 +208,7 @@ def _get_vcf_sample_stats(vcf, passing_filter: bool):
         (sample IS NOT NULL, filter_key NULL) for the VCF's cohort. """
     try:
         cgc = vcf.cohort.cohort_genotype_collection
-    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
         return {}, [], ()
 
     ss_fields = ("sample_id", "sample__name", "variant_count", "ref_count",
@@ -293,6 +295,9 @@ def view_vcf(request, vcf_id):
         _ = vcf.cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
         messages.add_message(request, messages.ERROR, "This legacy VCF is missing data and needs to be reloaded.")
+    except DataArchivedError:
+        # Banner from _data_archived_banner.html shows the message; cohort_id stays set if available.
+        pass
 
     if reload_vcf:
         set_vcf_and_samples_import_status(vcf, ImportStatus.IMPORTING)
@@ -331,6 +336,10 @@ def view_vcf(request, vcf_id):
 
     vcf_length_stats = _get_vcf_length_stats(vcf)
 
+    from snpdb.archive import vcf_can_be_archived
+    can_archive = has_write_permission and vcf_can_be_archived(vcf)
+    restore_source_exists = bool(vcf.data_restorable_from) and os.path.exists(vcf.data_restorable_from)
+
     context = {
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
@@ -345,8 +354,41 @@ def view_vcf(request, vcf_id):
         'annotated_download_files': annotated_download_files,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
         "vcf_length_stats": vcf_length_stats,
+        "can_archive": can_archive,
+        "restore_source_exists": restore_source_exists,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
+
+
+def archive_vcf_view(request, vcf_id):
+    from snpdb.archive import archive_vcf, ArchivePreconditionError
+    vcf = VCF.get_for_user(request.user, vcf_id)
+    if not vcf.can_write(request.user):
+        raise PermissionDenied("You do not have write permission for this VCF")
+    if request.method != "POST":
+        return HttpResponseRedirect(vcf.get_absolute_url())
+    reason = request.POST.get("reason", "")
+    try:
+        archive_vcf(vcf, request.user, reason=reason)
+        messages.add_message(request, messages.SUCCESS, "VCF data archived.")
+    except ArchivePreconditionError as e:
+        messages.add_message(request, messages.ERROR, str(e))
+    return HttpResponseRedirect(vcf.get_absolute_url())
+
+
+def restore_vcf_view(request, vcf_id):
+    from snpdb.archive import restore_vcf
+    vcf = VCF.get_for_user(request.user, vcf_id)
+    if not vcf.can_write(request.user):
+        raise PermissionDenied("You do not have write permission for this VCF")
+    if request.method != "POST":
+        return HttpResponseRedirect(vcf.get_absolute_url())
+    try:
+        restore_vcf(vcf, request.user)
+        messages.add_message(request, messages.SUCCESS, "VCF restore started — re-importing data.")
+    except ValueError as e:
+        messages.add_message(request, messages.ERROR, str(e))
+    return HttpResponseRedirect(vcf.get_absolute_url())
 
 
 def get_patient_upload_csv_for_vcf(request, pk):
@@ -360,7 +402,7 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
     annotation_version = AnnotationVersion.latest(sample.genome_build)
     try:
         cgc = sample.vcf.cohort.cohort_genotype_collection
-    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
         return pd.DataFrame(), pd.DataFrame()
 
     STATS = {
@@ -429,7 +471,7 @@ def _get_sample_genotype_stats(sample):
         reverse accessor. Returns None if missing (e.g. legacy data). """
     try:
         cgc = sample.vcf.cohort.cohort_genotype_collection
-    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
         return None
     try:
         return CohortGenotypeStats.objects.get(
@@ -1170,7 +1212,7 @@ def view_cohort(request, cohort_id):
 
     try:
         cohort_genotype_collection = cohort.cohort_genotype_collection
-    except CohortGenotypeCollection.DoesNotExist:
+    except (CohortGenotypeCollection.DoesNotExist, DataArchivedError):
         cohort_genotype_collection = None
 
     form = forms.CohortForm(request.POST or None, instance=cohort)

@@ -387,7 +387,12 @@ admin.site.register(models.SampleTag, ModelAdminBasics)
 admin.site.register(models.SettingsInitialGroupPermission, ModelAdminBasics)
 admin.site.register(models.Tag, ModelAdminBasics)
 admin.site.register(models.Trio, ModelAdminBasics)
-admin.site.register(models.VCF, GuardedModelAdminBasics)
+@admin.register(models.VCF)
+class VCFAdmin(GuardedModelAdminBasics):
+    list_display = ("pk", "name", "date", "genome_build", "import_status", "data_archived_date")
+    list_filter = ("import_status", "genome_build", "data_archived_date")
+
+
 admin.site.register(models.VCFSourceSettings, ModelAdminBasics)
 admin.site.register(models.VCFTag, ModelAdminBasics)
 admin.site.register(models.VariantGridColumn, ModelAdminBasics)

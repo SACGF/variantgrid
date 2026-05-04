@@ -56,6 +56,9 @@ class BaseModelForm(forms.ModelForm):
 
 class GenomeBuildAutocompleteForwardMixin:
     genome_build_fields = []
+    # Subclasses set exclude_archived=True to forward exclude_archived to the
+    # underlying autocomplete view, dropping rows whose source data is archived.
+    exclude_archived = False
 
     def __init__(self, *args, **kwargs):
         genome_build = kwargs.pop("genome_build", None)
@@ -64,6 +67,8 @@ class GenomeBuildAutocompleteForwardMixin:
             widget_forward = []
             if genome_build:
                 widget_forward.append(forward.Const(genome_build.pk, "genome_build_id"))
+            if self.exclude_archived:
+                widget_forward.append(forward.Const(True, "exclude_archived"))
             self.fields[f].widget.forward = widget_forward
 
 

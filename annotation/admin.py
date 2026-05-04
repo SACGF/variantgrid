@@ -30,9 +30,10 @@ _STATUS_BADGE_COLOURS = {
 @admin.register(VariantAnnotationVersion)
 class VariantAnnotationVersionAdmin(ModelAdminBasics):
     list_display = ("pk", "genome_build", "annotation_consortium", "annotation_date",
-                    "vep", "columns_version", "status_badge")
-    list_filter = ("status", "genome_build", "annotation_consortium")
-    readonly_fields = ("status",)
+                    "vep", "columns_version", "status_badge", "data_archived_date")
+    list_filter = ("status", "genome_build", "annotation_consortium", "data_archived_date")
+    readonly_fields = ("status", "data_archived_date", "data_archived_by",
+                       "data_archive_reason", "data_restorable_from")
     ordering = ("genome_build", "-annotation_date")
 
     @admin_list_column("Status", order_field="status")

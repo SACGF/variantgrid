@@ -20,6 +20,7 @@ from django.db.models.query_utils import Q
 
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
+from snpdb.archive import DataArchivedError
 from snpdb.models import Variant, GenomeBuild
 
 
@@ -29,6 +30,9 @@ def get_variant_queryset_for_latest_annotation_version(genome_build: GenomeBuild
 
 
 def get_variant_queryset_for_annotation_version(annotation_version: AnnotationVersion) -> QuerySet[Variant]:
+    vav = annotation_version.variant_annotation_version
+    if vav.data_archived:
+        raise DataArchivedError(vav)
     return get_queryset_for_annotation_version(Variant, annotation_version)
 
 
@@ -54,6 +58,9 @@ def get_variants_qs_for_annotation(
         pipeline_type: Optional[VariantAnnotationPipelineType] = None,
         min_variant_id: Optional[int] = None, max_variant_id: Optional[int] = None,
         annotated: bool = False):
+    vav = annotation_version.variant_annotation_version
+    if vav.data_archived:
+        raise DataArchivedError(vav)
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
     q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + \

@@ -36,7 +36,9 @@ from classification.enums import AlleleOriginBucket
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
+from snpdb.archive import DataArchivedError
 from library.genomics import parse_gnomad_coord
 from library.genomics.vcf_enums import VariantClass
 from library.utils import invert_dict, name_from_filename, first, all_equal
@@ -610,7 +612,7 @@ class HumanProteinAtlasAnnotation(models.Model):
     value = models.FloatField()
 
 
-class VariantAnnotationVersion(SubVersionPartition):
+class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     REPRESENTATIVE_TRANSCRIPT_ANNOTATION = "annotation_variantannotation"
     TRANSCRIPT_ANNOTATION = "annotation_varianttranscriptannotation"
     VARIANT_GENE_OVERLAP = "annotation_variantgeneoverlap"
@@ -1670,6 +1672,8 @@ class VariantTranscriptAnnotation(AbstractVariantAnnotation):
             Variants can overlap with multiple genes, and the VariantAnnotation (ie "pick" or representative annotation)
             may not be the one in the gene list. Thus we have to check everything that was in transcript annotation too
         """
+        if variant_annotation_version.data_archived:
+            raise DataArchivedError(variant_annotation_version)
 
         vto = VariantGeneOverlap.objects.filter(version=variant_annotation_version, gene__in=gene_ids_qs)
         # Use pk__in so we don't return multiple records per variant

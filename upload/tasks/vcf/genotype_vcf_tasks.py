@@ -172,13 +172,27 @@ class SomalierVCFTask(ImportVCFStepTask):
 class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
+        from eventlog.models import create_event
         from upload.vcf.vcf_import import create_import_success_message
 
         uploaded_vcf = upload_step.get_uploaded_vcf()
         vcf = uploaded_vcf.vcf
         logging.info("ImportVCFSuccessTask for VCF = %s", vcf)
 
+        was_archived = vcf.data_archived
+        archived_by = vcf.data_archived_by
+        archived_from = vcf.data_restorable_from
+        if was_archived:
+            vcf.data_archived_date = None
+            vcf.data_archived_by = None
+            vcf.data_archive_reason = None
+            vcf.data_restorable_from = None
+
         set_vcf_and_samples_import_status(vcf, ImportStatus.SUCCESS)
+
+        if was_archived:
+            create_event(archived_by, "vcf_restored",
+                         details=f"vcf_id={vcf.pk} name={vcf.name!r} restored_from={archived_from!r}")
 
         try:
             backend_vcf = vcf.uploadedvcf.backendvcf

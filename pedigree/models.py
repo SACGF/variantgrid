@@ -141,6 +141,10 @@ class Pedigree(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortB
     def genome_build(self):
         return self.cohort.genome_build
 
+    @property
+    def data_archived(self) -> bool:
+        return self.cohort.data_archived
+
     def get_absolute_url(self):
         return reverse('view_pedigree', kwargs={"pedigree_id": self.pk})
 

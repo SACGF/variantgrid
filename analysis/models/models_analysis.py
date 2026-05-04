@@ -161,6 +161,15 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                 self.annotation_version.validate()
         except InvalidAnnotationVersionError as ve:
             errors.append(str(ve))
+
+        if av := self.annotation_version:
+            if vav := av.variant_annotation_version:
+                if vav.data_archived:
+                    errors.append(
+                        f"Annotation data archived: VariantAnnotationVersion {vav.pk} was archived on "
+                        f"{vav.data_archived_date:%Y-%m-%d}. "
+                        "It is possible to restore this, please contact your administrator."
+                    )
         return errors
 
     def get_warnings(self) -> list[str]:
@@ -173,6 +182,13 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                                     f"for build is : {latest_av}.")
             except InvalidAnnotationVersionError as e:
                 warnings.append(str(e))
+
+            vav = self.annotation_version.variant_annotation_version
+            if vav and vav.data_archived:
+                warnings.append(
+                    f"VariantAnnotationVersion {vav.pk} archived on {vav.data_archived_date:%Y-%m-%d}. "
+                    "It is possible to restore this, please contact your administrator."
+                )
         return warnings
 
     @property

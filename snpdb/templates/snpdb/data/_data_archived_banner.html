@@ -1,0 +1,16 @@
+{% if obj.data_archived %}
+<div class="alert alert-warning" role="alert">
+    <strong>Data archived</strong> on {{ obj.data_archived_date|date:"Y-m-d" }}
+    by {{ obj.data_archived_by|default:"unknown" }}.
+    {% if obj.data_archive_reason %}<p>{{ obj.data_archive_reason }}</p>{% endif %}
+    {% if obj.data_restorable_from %}
+        <p>Restorable from: <code>{{ obj.data_restorable_from }}</code></p>
+    {% endif %}
+    {% if has_write_permission and restore_source_exists %}
+        <form method="post" action="{% url restore_url_name obj.pk %}" style="display:inline">
+            {% csrf_token %}
+            <button class="btn btn-primary" type="submit">Restore</button>
+        </form>
+    {% endif %}
+</div>
+{% endif %}
