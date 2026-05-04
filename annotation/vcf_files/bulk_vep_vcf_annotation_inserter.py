@@ -211,6 +211,7 @@ class BulkVEPVCFAnnotationInserter:
                                                                         empty_values=empty_mave_float_values)
         format_pick_highest_float = get_clean_and_pick_single_value_func(max, float)
         format_pick_highest_int = get_clean_and_pick_single_value_func(max, int)
+        format_sum_int = get_clean_and_pick_single_value_func(sum, int)
         remove_empty_multiples = get_clean_and_pick_single_value_func(join_uniq)
         # COSMIC v90 (5/9/2019) switched to COSV (build independent identifiers)
         extract_cosmic = get_extract_existing_variation("COSV")
@@ -235,6 +236,8 @@ class BulkVEPVCFAnnotationInserter:
             "cosmic_id": extract_cosmic,
             "cosmic_legacy_id": remove_empty_multiples,
             "dbsnp_rs_id": extract_dbsnp,
+            "denovo_db_case_count": format_sum_int,
+            "denovo_db_control_count": format_sum_int,
             "fathmm_pred_most_damaging": get_most_damaging_func(FATHMMPrediction),
             "gnomad2_liftover_af": format_pick_highest_float,
             "gnomad_popmax": str.upper,  # nfe -> NFE
