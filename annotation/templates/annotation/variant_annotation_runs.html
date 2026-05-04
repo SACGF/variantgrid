@@ -104,62 +104,13 @@
 
             <form method="post">
                 {% csrf_token %}
-                <div>
+                <div class="btn-toolbar">
                     <button name="annotation-scheduler" class="btn btn-danger">Run Annotation Scheduler</button>
+                    {% if any_new_vav %}
+                        <button name="run-scheduler-new" class="btn btn-secondary ml-2">Run scheduler against NEW</button>
+                    {% endif %}
                 </div>
             </form>
-
-            <div class="mt-4">
-                {% for build_name, panel in genome_build_status_panel.items %}
-                    <div class="card mt-2">
-                        <div class="card-header"><strong>{{ build_name }}</strong> annotation status</div>
-                        <div class="card-body">
-                            {% if panel.active %}
-                                <div>
-                                    <span class="badge badge-success">ACTIVE</span>
-                                    VAV pk={{ panel.active.pk }}
-                                    - {{ panel.active.annotation_date|date:"Y-m-d" }}
-                                    - VEP {{ panel.active.vep }}
-                                </div>
-                            {% else %}
-                                <div><span class="badge badge-warning">No ACTIVE VariantAnnotationVersion</span></div>
-                            {% endif %}
-
-                            {% if panel.new %}
-                                <div class="mt-2">
-                                    <span class="badge badge-primary">NEW</span>
-                                    VAV pk={{ panel.new.pk }}
-                                    — VEP {{ panel.new.vep }}
-                                    {% if panel.new_progress %}
-                                        - progress: {{ panel.new_progress.finished }}/{{ panel.new_progress.total }} runs finished
-                                    {% endif %}
-                                </div>
-                                <form method="post" class="mt-2 d-inline">
-                                    {% csrf_token %}
-                                    <button name="run-scheduler-new-{{ build_name }}" class="btn btn-secondary">
-                                        Run scheduler against NEW
-                                    </button>
-                                    <button name="promote-to-active-{{ build_name }}"
-                                            class="btn btn-success"
-                                            {% if not panel.new_populated %}disabled{% endif %}>
-                                        Promote to ACTIVE
-                                    </button>
-                                    {% if not panel.new_populated %}
-                                        <span class="text-muted ml-2">
-                                            (Promote enabled once NEW VAV's tables are populated)
-                                        </span>
-                                    {% endif %}
-                                </form>
-                            {% endif %}
-
-                            <div class="mt-2">
-                                <span class="badge badge-secondary">HISTORICAL</span>
-                                {{ panel.historical_count }} VAV{{ panel.historical_count|pluralize }}
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
 
         <div class="row equal">
             {% for build_name, vav_field_counts in genome_build_field_counts.items %}
@@ -171,24 +122,40 @@
                             <div class="card-header">{{ build_name }}</div>
                             {% ui_register_tabs tab_set=build_name %}
                             {% for vav, field_counts in vav_field_counts.items %}
-                                {% ui_register_tab_embedded tab_set=build_name label=vav.short_string %}
+                                {% ui_register_tab_embedded tab_set=build_name label=vav.short_string|add:" ["|add:vav.get_status_display|add:"]" active=vav.is_active %}
                                     <div class="card-body">
                                         <div id="build-{{ build_name }}-{{ vav.pk }}-summary-graph"></div>
                                         {% for field, count in field_counts.items %}
                                             {% labelled label=field %}{{ count }}{% endlabelled %}
                                         {% endfor %}
 
-                                        {% with vav_summary=genome_build_summary|get_item:build_name|get_item:vav.pk %}
-                                            {% if vav_summary|get_item:'Running' or vav_summary|get_item:'Queued' or vav_summary|get_item:'Error'%}
+                                        {% if vav.status == 'NEW' %}
+                                            {% with panel=genome_build_status_panel|get_item:build_name %}
+                                                {% if panel.new_progress %}
+                                                    {% labelled label="Progress" %}{{ panel.new_progress.finished }}/{{ panel.new_progress.total }} runs finished{% endlabelled %}
+                                                {% endif %}
+                                                {% if not panel.new_populated %}
+                                                    {% labelled label="Promote" %}<span class="text-muted">Promote enabled once NEW VAV's tables are populated</span>{% endlabelled %}
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endif %}
+
+                                        {% with vav_summary=genome_build_summary|get_item:build_name|get_item:vav.pk panel=genome_build_status_panel|get_item:build_name %}
                                             <div class="btn-toolbar">
                                                 {% if vav_summary|get_item:'Running' or vav_summary|get_item:'Queued' %}
                                                     <button name="set-non-finished-to-error-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger">Set non-finished runs to Error</button>
                                                 {% endif %}
                                                 {% if vav_summary|get_item:'Error' %}
-                                                    <button name="retry-annotation-runs-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger">Retry all failed runs</button>
+                                                    <button name="retry-annotation-runs-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger ml-2">Retry all failed runs</button>
                                                 {% endif  %}
+                                                {% if vav.status == 'NEW' %}
+                                                    <button name="promote-to-active-{{ build_name }}"
+                                                            class="btn btn-success ml-2"
+                                                            {% if not panel.new_populated %}disabled{% endif %}>
+                                                        Promote to ACTIVE
+                                                    </button>
+                                                {% endif %}
                                             </div>
-                                            {% endif %}
                                         {% endwith %}
                                     </div>
                                 {% end_ui_register_tab_embedded %}

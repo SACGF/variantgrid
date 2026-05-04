@@ -685,6 +685,10 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     def gnomad_major_version(self) -> int:
         return int(self.gnomad.split(".", maxsplit=1)[0])
 
+    @property
+    def is_active(self) -> bool:
+        return self.status == VariantAnnotationVersion.Status.ACTIVE
+
     @staticmethod
     def latest(genome_build, status: 'VariantAnnotationVersion.Status' = None) -> 'VariantAnnotationVersion':
         if status is None:

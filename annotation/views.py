@@ -351,11 +351,11 @@ def variant_annotation_runs(request):
         if "annotation-scheduler" in request.POST:
             annotation_scheduler.si().apply_async()
 
+        if "run-scheduler-new" in request.POST:
+            annotation_scheduler.si(status=VariantAnnotationVersion.Status.NEW).apply_async()
+            messages.add_message(request, messages.INFO, "Queued annotation scheduler against NEW")
+
         for genome_build in GenomeBuild.builds_with_annotation():
-            if f"run-scheduler-new-{genome_build.name}" in request.POST:
-                annotation_scheduler.si(status=VariantAnnotationVersion.Status.NEW).apply_async()
-                messages.add_message(request, messages.INFO,
-                                     f"{genome_build} - queued annotation scheduler against NEW")
             if f"promote-to-active-{genome_build.name}" in request.POST:
                 new_vav = VariantAnnotationVersion.latest(genome_build,
                                                          status=VariantAnnotationVersion.Status.NEW)
@@ -435,12 +435,17 @@ def variant_annotation_runs(request):
             "historical_count": historical_count,
         }
 
+    any_new_vav = VariantAnnotationVersion.objects.filter(
+        status=VariantAnnotationVersion.Status.NEW
+    ).exists()
+
     context = {
         "genome_build_summary": dict(genome_build_summary),
         "genome_build_field_counts": dict(genome_build_field_counts),
         "current_variant_annotation_versions": current_variant_annotation_versions,
         "historical_variant_annotation_versions": historical_variant_annotation_versions,
         "genome_build_status_panel": genome_build_status_panel,
+        "any_new_vav": any_new_vav,
     }
     return render(request, "annotation/variant_annotation_runs.html", context)
 
