@@ -14,6 +14,7 @@ from classification.models import ClassificationGrouping, Overlap, Classificatio
     OverlapType, OverlapContribution, OverlapContributionSkew
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapEntryCompare, OverlapGrouping
+from library.utils.django_utils import render_ajax_view
 from snpdb.models import GenomeBuild
 
 
@@ -110,9 +111,10 @@ def view_overlaps_for_classification_grouping(request: HttpRequest, classificati
     # skews = OverlapContributionSkew.objects.filter(contribution__in=overlap_contributions)
     summaries = OverlapSummary.overlap_summaries_for(cg)
 
-    return render(request, 'classification/snippets/overlaps_for_classification_grouping_detail.html', {
+    return render_ajax_view(request, 'classification/snippets/overlaps_for_classification_grouping_detail.html', {
+        "classification_grouping_id": classification_grouping_id,
         "lab": cg.lab,
         "allele": cg.allele,
         "summaries": summaries,
         "contact_subject": f"Discordance on {c_hgvs}"
-    })
+    }, menubar='classification')

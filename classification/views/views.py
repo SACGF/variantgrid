@@ -500,11 +500,13 @@ def view_classification_diff(request):
         if vc.can_write(request.user) and vc.last_published_version.id != vc.last_edited_version.id:
             records.insert(0, vc.last_edited_version)
 
+    # TODO remove this once new discordance is in place
     elif clinical_context_str := request.GET.get('clinical_context'):
         cc = ClinicalContext.objects.get(pk=clinical_context_str)
         records = cc.classification_modifications
         records.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
+    # TODO remove this once new discordance is in place
     elif discordance_report_str := request.GET.get('discordance_report'):
         dr = DiscordanceReport.objects.get(pk=discordance_report_str)
         dr.check_can_view(request.user)
@@ -522,7 +524,7 @@ def view_classification_diff(request):
     elif allele_id_str := request.GET.get('allele'):
         allele_id = int(allele_id_str)
         if request.GET.get('latest'):
-            allele_origin_grouping = ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping__allele=allele_id)
+            allele_origin_grouping = ClassificationGrouping.objects.filter(allele_origin_grouping__allele=allele_id)
             allele_origin_grouping = ClassificationGrouping.filter_for_user(user=request.user, qs=allele_origin_grouping)
             record_ids = allele_origin_grouping.values_list(
                 "latest_classification_modification", flat=True
