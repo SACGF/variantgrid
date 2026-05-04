@@ -118,8 +118,8 @@
                                 <div>
                                     <span class="badge badge-success">ACTIVE</span>
                                     VAV pk={{ panel.active.pk }}
-                                    — {{ panel.active.annotation_date|date:"Y-m-d" }}
-                                    — VEP {{ panel.active.vep }}
+                                    - {{ panel.active.annotation_date|date:"Y-m-d" }}
+                                    - VEP {{ panel.active.vep }}
                                 </div>
                             {% else %}
                                 <div><span class="badge badge-warning">No ACTIVE VariantAnnotationVersion</span></div>
@@ -131,7 +131,7 @@
                                     VAV pk={{ panel.new.pk }}
                                     — VEP {{ panel.new.vep }}
                                     {% if panel.new_progress %}
-                                        — progress: {{ panel.new_progress.finished }}/{{ panel.new_progress.total }} runs finished
+                                        - progress: {{ panel.new_progress.finished }}/{{ panel.new_progress.total }} runs finished
                                     {% endif %}
                                 </div>
                                 <form method="post" class="mt-2 d-inline">

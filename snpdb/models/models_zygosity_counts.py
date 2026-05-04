@@ -7,12 +7,13 @@ from django.db.models import F, FilteredRelation, Q, QuerySet
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
 
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from snpdb.models import Variant
 from snpdb.models.models_vcf import VCF, Sample
 
 
-class VariantZygosityCountCollection(RelatedModelsPartitionModel):
+class VariantZygosityCountCollection(DataArchiveMixin, RelatedModelsPartitionModel):
     """ We store ref/het/hom counts for each variant - in a collection (own partition) """
     RECORDS_BASE_TABLE_NAMES = ["snpdb_variantzygositycount"]
     RECORDS_FK_FIELD_TO_THIS_MODEL = "collection_id"
@@ -50,6 +51,9 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
         return f"any_call_counts_{self.pk}"
 
     def get_annotation_kwargs(self, **kwargs):
+        if self.data_archived:
+            from snpdb.archive import DataArchivedError
+            raise DataArchivedError(self)
         q_collection = Q(variantzygositycount__collection=self)
         return {self.alias: FilteredRelation('variantzygositycount', condition=q_collection),
                 self.non_ref_call_alias: F(self.het_alias) + F(self.hom_alias),

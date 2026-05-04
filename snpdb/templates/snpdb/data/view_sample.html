@@ -141,7 +141,7 @@ $(document).ready(function() {
             <form method="post" id='sample-form'>
                 {% csrf_token %}
                 {% crispy form form_helper.horizontal %}
-                {% if annotated_download_files %}
+                {% if annotated_download_files and not sample.vcf.data_archived %}
                     <div class="form-group-row row">
                         <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
                         <div class="d-flex flex-row">

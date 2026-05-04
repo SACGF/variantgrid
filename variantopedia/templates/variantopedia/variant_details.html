@@ -475,10 +475,10 @@ function applyVariantValues() {
                 <div class="collapse" id="annotation-version-detail">
                     <a class="hover-link" href="{% url 'annotation_versions' %}">{{ annotation_version }}</a>
                     {% if annotation_version != latest_annotation_version %}
-                        — latest is {{ latest_annotation_version.short_description }}
+                        - latest is {{ latest_annotation_version.short_description }}
                     {% endif %}
                     {% if num_variant_annotation_versions > 1 %}
-                        — <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_variant_annotation_versions }} historical versions</a>
+                        - <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_variant_annotation_versions }} historical versions</a>
                     {% endif %}
                 </div>
             {% endif %}

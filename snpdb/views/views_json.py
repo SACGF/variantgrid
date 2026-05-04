@@ -2,6 +2,7 @@ import json
 
 from celery.result import AsyncResult
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
@@ -48,6 +49,8 @@ def cached_generated_file_check(request, cgf_id):
 @require_POST
 def create_cohort_genotype(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
 
     status, celery_task = create_cohort_genotype_and_launch_task(cohort)
 
@@ -62,6 +65,8 @@ def create_cohort_genotype(request, cohort_id):
 @require_POST
 def create_sub_cohort(request, cohort_id):
     parent_cohort = Cohort.get_for_user(request.user, cohort_id)
+    if parent_cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
     sample_id_list_str = request.POST["sample_id_list"]
     sample_id_list = json.loads(sample_id_list_str)
     sample_list = []

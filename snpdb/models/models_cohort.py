@@ -20,6 +20,7 @@ from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 
 from library.django_utils import SortByPKMixin
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
@@ -93,8 +94,13 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     @property
     def data_archived(self) -> bool:
         """ True when underlying data is archived. Custom (multi-VCF) cohorts copy data
-            into their own CGC at build time, so they aren't gated by parent VCF archive. """
-        return bool(self.vcf and self.vcf.data_archived)
+            into their own CGC at build time, so they aren't gated by parent VCF archive.
+            Sub-cohorts inherit the archive state of their parent VCF cohort. """
+        if self.vcf and self.vcf.data_archived:
+            return True
+        if self.parent_cohort and self.parent_cohort.data_archived:
+            return True
+        return False
 
     def increment_version(self):
         # Check if any samples not in parent cohort (can no longer be a sub cohort)
@@ -198,9 +204,13 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         if cohort.vcf and cohort.vcf.data_archived:
             from snpdb.archive import DataArchivedError
             raise DataArchivedError(cohort.vcf)
-        return CohortGenotypeCollection.objects.get(cohort=cohort,
-                                                    cohort_version=cohort.version,
-                                                    collection_type=CohortGenotypeCollectionType.UNCOMMON)
+        cgc = CohortGenotypeCollection.objects.get(cohort=cohort,
+                                                   cohort_version=cohort.version,
+                                                   collection_type=CohortGenotypeCollectionType.UNCOMMON)
+        if cgc.data_archived:
+            from snpdb.archive import DataArchivedError
+            raise DataArchivedError(cgc)
+        return cgc
 
     def get_vcf(self):
         return self.get_base_cohort().vcf
@@ -377,7 +387,7 @@ class CommonVariantClassified(TimeStampedModel):
         unique_together = ('variant', 'common_filter')
 
 
-class CohortGenotypeCollection(RelatedModelsPartitionModel):
+class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
     """ A collection of Multiple-genotype records for a set of variants, for fast multi-sample zygosity queries.
         Storing genotypes individually per sample requires lots of joins when doing trios/cohorts
 

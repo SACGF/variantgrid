@@ -70,7 +70,7 @@ class SubVersionPartition(RelatedModelsPartitionModel):
         return f"v{self.pk}. ({date_str})"
 
 
-class ClinVarVersion(SubVersionPartition):
+class ClinVarVersion(DataArchiveMixin, SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = ["annotation_clinvar"]
     filename = models.TextField()
     sha256_hash = models.TextField()
@@ -524,7 +524,7 @@ class DBNSFPGeneAnnotation(PostgresPartitionedModel, TimeStampedModel):
         key = ["version_id"]
 
 
-class GeneAnnotationVersion(SubVersionPartition):
+class GeneAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = ["annotation_geneannotation"]
     gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, on_delete=CASCADE)
     ontology_version = models.ForeignKey(OntologyVersion, null=True, on_delete=PROTECT)
@@ -565,7 +565,7 @@ class GeneAnnotation(models.Model):
         pass
 
 
-class HumanProteinAtlasAnnotationVersion(SubVersionPartition):
+class HumanProteinAtlasAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = ["annotation_humanproteinatlasannotation"]
     filename = models.TextField()
     sha256_hash = models.TextField()

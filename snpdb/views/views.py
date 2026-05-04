@@ -339,6 +339,9 @@ def view_vcf(request, vcf_id):
     from snpdb.archive import vcf_can_be_archived
     can_archive = has_write_permission and vcf_can_be_archived(vcf)
     restore_source_exists = bool(vcf.data_restorable_from) and os.path.exists(vcf.data_restorable_from)
+    restore_source_kind = "uploaded"
+    if vcf.data_restorable_from and vcf.data_restorable_from.startswith(settings.PARTITION_ARCHIVE_DIR):
+        restore_source_kind = "backend"
 
     context = {
         'vcf': vcf,
@@ -356,6 +359,7 @@ def view_vcf(request, vcf_id):
         "vcf_length_stats": vcf_length_stats,
         "can_archive": can_archive,
         "restore_source_exists": restore_source_exists,
+        "restore_source_kind": restore_source_kind,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
 
@@ -1200,8 +1204,9 @@ def cohorts(request):
 
 def view_cohort_details_tab(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    has_write_permission = cohort.can_write(request.user) and not cohort.data_archived
     context = {"cohort": cohort,
-               "has_write_permission": cohort.can_write(request.user)}
+               "has_write_permission": has_write_permission}
     return render(request, 'snpdb/patients/view_cohort_details_tab.html', context)
 
 
@@ -1215,8 +1220,12 @@ def view_cohort(request, cohort_id):
     except (CohortGenotypeCollection.DoesNotExist, DataArchivedError):
         cohort_genotype_collection = None
 
+    has_write_permission = cohort.can_write(request.user) and not cohort.data_archived
+
     form = forms.CohortForm(request.POST or None, instance=cohort)
     if request.method == "POST":
+        if not has_write_permission:
+            raise PermissionDenied()
         if valid := form.is_valid():
             cohort = form.save()
         add_save_message(request, valid, "Cohort")
@@ -1228,12 +1237,14 @@ def view_cohort(request, cohort_id):
                "sample_form": sample_form,
                "cohort": cohort,
                "cohort_genotype_collection": cohort_genotype_collection,
-               "has_write_permission": cohort.can_write(request.user)}
+               "has_write_permission": has_write_permission}
     return render(request, 'snpdb/patients/view_cohort.html', context)
 
 
 def cohort_sample_edit(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
 
     if request.method == "POST":
         cohort_op = request.POST['cohort_op']
@@ -1258,6 +1269,8 @@ def cohort_sample_edit(request, cohort_id):
 
 def cohort_hotspot(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
     vav = VariantAnnotationVersion.latest(cohort.genome_build)
     form = GeneAndTranscriptForm(gene_annotation_release=vav.gene_annotation_release,
                                  has_protein_domains=True)
@@ -1279,6 +1292,8 @@ def cohort_hotspot(request, cohort_id):
 
 def cohort_gene_counts(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
 
     COHORT_CUSTOM_GENE_LIST = f"__QC_COVERAGE_CUSTOM_GENE_LIST__{request.user}"
 
@@ -1306,6 +1321,8 @@ def cohort_gene_counts(request, cohort_id):
 
 def cohort_gene_counts_matrix(request, cohort_id, gene_count_type_id, gene_list_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
     gene_count_type = GeneCountType.objects.get(pk=gene_count_type_id)
     gene_list = GeneList.get_for_user(request.user, gene_list_id)
     samples = list(cohort.get_samples())
@@ -1511,6 +1528,8 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
 def cohort_sort(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
     if request.method == "POST":
         cohort_samples_str = request.POST.get("cohort_samples")
         cohort_samples_ids = cohort_samples_str.split(',') if cohort_samples_str else []

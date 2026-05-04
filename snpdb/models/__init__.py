@@ -10,4 +10,5 @@ from .models_user_settings import *
 from .models_variant import *
 from .models_vcf import *
 from .models_cohort_stats import *
+from .models_partition_archive import *
 from .models_zygosity_counts import *

@@ -99,7 +99,9 @@ class CohortAutocompleteView(GenomeBuildAutocompleteView):
         vcf_success_if_exists = Q(vcf__isnull=True) | Q(vcf__import_status=ImportStatus.SUCCESS)
         qs = Cohort.filter_for_user(user, success_status_only=True).filter(vcf_success_if_exists)
         if self.forwarded.get('exclude_archived'):
-            qs = qs.filter(Q(vcf__isnull=True) | Q(vcf__data_archived_date__isnull=True))
+            archived_vcf = Q(vcf__data_archived_date__isnull=False)
+            archived_parent_vcf = Q(parent_cohort__vcf__data_archived_date__isnull=False)
+            qs = qs.exclude(archived_vcf | archived_parent_vcf)
         return self.filter_to_genome_build(qs, "genome_build")
 
 

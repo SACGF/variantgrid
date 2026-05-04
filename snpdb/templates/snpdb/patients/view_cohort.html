@@ -339,10 +339,29 @@ $(document).ready(function() {
 {% endblock %}
 {% load help_tags %}
 {% block submenu_page_content %}
+{% if cohort.data_archived %}
+<div class="alert alert-warning" role="alert">
+    <strong>Cohort is read-only.</strong>
+    Underlying VCF data has been archived. Restore the parent VCF to enable editing.
+</div>
+{% endif %}
+{% if not has_write_permission %}
+<script>
+$(function() {
+    $("#cohort-tabs button, #cohort-tabs input[type=submit]").prop("disabled", true).addClass("disabled");
+    $("#cohort-tabs a.cohort-button").addClass("disabled").css("pointer-events", "none").css("opacity", "0.5");
+    $("a[href='{% url 'cohort_sort' cohort.id %}']").addClass("disabled").css("pointer-events", "none").css("opacity", "0.5");
+});
+</script>
+{% endif %}
 <form id="cohort-form" method="post">
     {% csrf_token %}
     <div>
-    {{ form.name }}<button id='change-name' class="btn btn-primary">Change Name</button>
+    {% if has_write_permission %}
+        {{ form.name }}<button id='change-name' class="btn btn-primary">Change Name</button>
+    {% else %}
+        <b>Cohort:</b> {{ cohort.name }}
+    {% endif %}
     <b>Genome Build:</b> {{ cohort.genome_build }}
     {% if cohort.parent_cohort %}
         <div>
@@ -354,8 +373,8 @@ $(document).ready(function() {
     <div id="cohort-tabs">
     <ul>
         <li><a id='details-tab' href="{% url 'view_cohort_details_tab' cohort.pk %}">Details</a></li>
-        <li id="samples-tab"><a href="#samples">Add/Remove Samples</a></li>
         {% if has_write_permission %}
+        <li id="samples-tab"><a href="#samples">Add/Remove Samples</a></li>
         <li><a href="{% url 'group_permissions' 'snpdb.models.Cohort' cohort.pk %}">Sharing / Permissions</a></li>
         {% endif %}
     </ul>
@@ -366,10 +385,12 @@ $(document).ready(function() {
     		<table id="grid-container">
     		<tr><th>Available Samples ({{ cohort.genome_build }})</th><th>Cohort Samples</th> 
             <tr><td>
+                {% if has_write_permission %}
                 <div id='sample-entry-container'>
                     <b>Search Samples:</b>
                     {{ sample_form.sample }}{{ sample_form.media }}
                 </div>
+                {% endif %}
                 <td>
                     <div>
                         <div class="cohort-message multiple-samples">

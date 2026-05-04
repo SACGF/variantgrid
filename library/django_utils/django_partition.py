@@ -96,6 +96,8 @@ class RelatedModelsPartitionModel(models.Model):
     def _partition_table_op(self, op):
         for base_table_name in self.RECORDS_BASE_TABLE_NAMES:
             table_name = self.get_partition_table(base_table_name=base_table_name)
+            if op == "drop":
+                self._warn_if_no_archive(table_name)
             sql = f'{op} table "{table_name}";'
             try:
                 run_sql(sql)
@@ -103,3 +105,33 @@ class RelatedModelsPartitionModel(models.Model):
                 if getattr(settings, "LOG_PARTITION_WARNINGS", True):
                     logging.warning(sql)
                     log_traceback(level=logging.WARNING)
+
+    def _warn_if_no_archive(self, table_name: str):
+        """ Soft warning when a partition is being dropped without an
+            accompanying COMPLETE PartitionArchive row.
+
+            Legitimate-drop callers (VCF re-import, GCC restore, archived-source
+            cleanup) bypass the archive pipeline because the original source
+            file is canonical for those models -- the warning is defensive
+            telemetry only, not enforcement.
+        """
+        try:
+            from snpdb.models.models_partition_archive import PartitionArchive
+        except ImportError:
+            return
+        meta = self._meta
+        try:
+            has_archive = PartitionArchive.objects.filter(
+                source_app_label=meta.app_label,
+                source_model=meta.object_name,
+                source_pk=str(self.pk),
+                source_table_names__contains=[table_name],
+                status=PartitionArchive.Status.COMPLETE,
+            ).exists()
+        except ProgrammingError:
+            return
+        if not has_archive:
+            logging.warning(
+                "Partition drop without archive: table=%s source=%s.%s#%s",
+                table_name, meta.app_label, meta.object_name, self.pk,
+            )

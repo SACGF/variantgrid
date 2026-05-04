@@ -198,14 +198,8 @@ function addCreateProjectButtonAndForm() {
     $("select#id_project").addClass("left").after(createProjectButton);
 }
 
-function showVCFHeader() {
-    $("#show-vcf-header").hide();
-    $("#vcf-header").show();
-}
-
-function hideVCFHeader() {
-    $("#show-vcf-header").show();
-    $("#vcf-header").hide();
+function toggleVCFSection(id) {
+    $("#" + id).slideToggle();
 }
 
 function drawStatsGraphs() {
@@ -350,7 +344,6 @@ $(document).ready(function() {
 {% vcf_history_trail vcf %}
 <h1>VCF: {{ vcf.name }}</h1>
 {% include "snpdb/data/_data_archived_banner.html" with obj=vcf restore_url_name='restore_vcf' %}
-{% include "snpdb/data/_archive_action.html" with obj=vcf archive_url_name='archive_vcf' %}
 <div id="vcf-tabs">
     <ul>
         <li><a href="#details">Details</a></li>
@@ -371,16 +364,18 @@ $(document).ready(function() {
         {% csrf_token %}
         {% crispy vcf_form form_helper.horizontal %}
 
-        {% if annotated_download_files or vcf.uploadedvcf.uploaded_file.exists %}
+        {% if vcf.uploadedvcf.uploaded_file.exists or annotated_download_files and not vcf.data_archived %}
             <div class="form-group-row row">
                 <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
                 <div class="d-flex flex-row">
                     {% if vcf.uploadedvcf.uploaded_file.exists %}
                         <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
                     {% endif %}
-                    {% for file_type in annotated_download_files %}
-                        <div id="generate-{{ file_type }}-download" class="p-2"></div>
-                    {% endfor %}
+                    {% if not vcf.data_archived %}
+                        {% for file_type in annotated_download_files %}
+                            <div id="generate-{{ file_type }}-download" class="p-2"></div>
+                        {% endfor %}
+                    {% endif %}
                 </div>
             </div>
         {% endif %}
@@ -499,6 +494,7 @@ $(document).ready(function() {
                     <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.uploaded_file.uploadpipeline.pk %}">View upload processing</a></span>
                 </p>
                 {% endif %}
+                {% include "snpdb/data/_archive_action.html" with obj=vcf archive_url_name='archive_vcf' %}
                 {% if vcf.uploadedvcf.vcf_importer %}
                 <p>
                     <label>Importer Version</label>
@@ -551,6 +547,7 @@ $(document).ready(function() {
                     </table>
                 </span>
             </p>
+            {% if not vcf.data_archived %}
             <p>
                 <label>Common </label>
                 <span>
@@ -560,6 +557,7 @@ $(document).ready(function() {
 
                 </span>
             </p>
+            {% endif %}
             <p>
                 <label>Variant Zygosity Count</label>
                 <span>
@@ -594,10 +592,9 @@ $(document).ready(function() {
             <p>
                 <label>Header</label>
                 <span>
-                    <a id='show-vcf-header' href="javascript:showVCFHeader()">Show VCF header...</a>
+                    <a href="javascript:toggleVCFSection('vcf-header')">Show / hide VCF header...</a>
                 </span>
                 <div id='vcf-header' style='display: none'>
-                    <div><a href="javascript:hideVCFHeader()">Hide VCF header...</a></div>
                     <pre>{{ vcf.header }}</pre>
                 </div>
             </p>
@@ -608,55 +605,67 @@ $(document).ready(function() {
             {% if vcf.vcfinfo_set.exists %}
             <p>
                 <label>INFO</label>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Description</th>
-                    </tr>
-
-                {% for vcf_info in vcf.vcfinfo_set.all %}
-                    <tr>
-                        <td>{{ vcf_info.identifier }}</td>
-                        <td>{{ vcf_info.description }}</td>
-                    </tr>
-                {% endfor %}
-                </table>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-info-table')">Show / hide INFO...</a>
+                </span>
+                <div id='vcf-info-table' style='display: none'>
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Description</th>
+                        </tr>
+                    {% for vcf_info in vcf.vcfinfo_set.all %}
+                        <tr>
+                            <td>{{ vcf_info.identifier }}</td>
+                            <td>{{ vcf_info.description }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                </div>
             </p>
             {% endif %}
             {% if vcf.vcffilter_set.exists %}
             <p>
                 <label>FILTER</label>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Description</th>
-                    </tr>
-
-                {% for vcf_filter in vcf.vcffilter_set.all %}
-                    <tr>
-                        <td>{{ vcf_filter.filter_id }}</td>
-                        <td>{{ vcf_filter.description }}</td>
-                    </tr>
-                {% endfor %}
-                </table>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-filter-table')">Show / hide FILTER...</a>
+                </span>
+                <div id='vcf-filter-table' style='display: none'>
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Description</th>
+                        </tr>
+                    {% for vcf_filter in vcf.vcffilter_set.all %}
+                        <tr>
+                            <td>{{ vcf_filter.filter_id }}</td>
+                            <td>{{ vcf_filter.description }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                </div>
             </p>
             {% endif %}
             {% if vcf.vcfformat_set.exists %}
             <p>
                 <label>FORMAT</label>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Description</th>
-                    </tr>
-
-                {% for vcf_format in vcf.vcfformat_set.all %}
-                    <tr>
-                        <td>{{ vcf_format.identifier }}</td>
-                        <td>{{ vcf_format.description }}</td>
-                    </tr>
-                {% endfor %}
-                </table>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-format-table')">Show / hide FORMAT...</a>
+                </span>
+                <div id='vcf-format-table' style='display: none'>
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Description</th>
+                        </tr>
+                    {% for vcf_format in vcf.vcfformat_set.all %}
+                        <tr>
+                            <td>{{ vcf_format.identifier }}</td>
+                            <td>{{ vcf_format.description }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                </div>
             </p>
             {% endif %}
         </fieldset>

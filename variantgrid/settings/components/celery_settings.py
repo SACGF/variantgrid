@@ -96,6 +96,9 @@ CELERY_TASK_ROUTES = {
     'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
+
+    # Partition archive
+    'snpdb.tasks.partition_archive_tasks.perform_partition_archive': DB_WORKERS,
 }
 
 CELERY_IMPORTS = (
@@ -119,6 +122,7 @@ CELERY_IMPORTS = (
     'snpdb.tasks.clingen_tasks',
     'snpdb.tasks.cohort_genotype_tasks',
     'snpdb.tasks.graph_generation_task',
+    'snpdb.tasks.partition_archive_tasks',
     'snpdb.tasks.soft_delete_tasks',
     'snpdb.tasks.vcf_bed_file_task',
     'snpdb.tasks.vcf_zygosity_count_tasks',

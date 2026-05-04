@@ -8,6 +8,7 @@ from martor.widgets import AdminMartorWidget
 from unidecode import unidecode
 
 from snpdb import models
+from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
 from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_list_column, \
     admin_action
 from snpdb.liftover import liftover_alleles
@@ -373,7 +374,14 @@ class SiteMessagesAdmin(ModelAdminBasics):
 
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.Cohort, ModelAdminBasics)
-admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)
+
+
+@admin.register(models.CohortGenotypeCollection)
+class CohortGenotypeCollectionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "cohort", "cohort_version", "num_samples", "data_archived_date")
+    list_filter = ("data_archived_date",)
+
+
 admin.site.register(models.CohortSample, ModelAdminBasics)
 admin.site.register(models.CustomColumn, ModelAdminBasics)
 admin.site.register(models.CustomColumnsCollection, ModelAdminBasics)
@@ -396,3 +404,15 @@ class VCFAdmin(GuardedModelAdminBasics):
 admin.site.register(models.VCFSourceSettings, ModelAdminBasics)
 admin.site.register(models.VCFTag, ModelAdminBasics)
 admin.site.register(models.VariantGridColumn, ModelAdminBasics)
+
+
+@admin.register(models.VariantCollection)
+class VariantCollectionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "name", "count", "status", "data_archived_date")
+    list_filter = ("status", "data_archived_date")
+
+
+@admin.register(models.VariantZygosityCountCollection)
+class VariantZygosityCountCollectionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "name", "data_archived_date")
+    list_filter = ("data_archived_date",)

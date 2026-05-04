@@ -29,10 +29,25 @@ def get_variant_queryset_for_latest_annotation_version(genome_build: GenomeBuild
     return get_variant_queryset_for_annotation_version(annotation_version)
 
 
+def _check_annotation_version_archive(annotation_version: AnnotationVersion):
+    """ Short-circuit reads when any sub-version's underlying data is archived.
+
+        The AnnotationVersion FK-set includes VariantAnnotationVersion + GeneAnnotationVersion +
+        ClinVarVersion + HumanProteinAtlasAnnotationVersion; any of them having had their
+        partition dumped/dropped invalidates downstream querysets that join across them.
+    """
+    for sub in (
+        annotation_version.variant_annotation_version,
+        annotation_version.gene_annotation_version,
+        annotation_version.clinvar_version,
+        annotation_version.human_protein_atlas_version,
+    ):
+        if sub is not None and getattr(sub, "data_archived", False):
+            raise DataArchivedError(sub)
+
+
 def get_variant_queryset_for_annotation_version(annotation_version: AnnotationVersion) -> QuerySet[Variant]:
-    vav = annotation_version.variant_annotation_version
-    if vav.data_archived:
-        raise DataArchivedError(vav)
+    _check_annotation_version_archive(annotation_version)
     return get_queryset_for_annotation_version(Variant, annotation_version)
 
 
@@ -58,9 +73,7 @@ def get_variants_qs_for_annotation(
         pipeline_type: Optional[VariantAnnotationPipelineType] = None,
         min_variant_id: Optional[int] = None, max_variant_id: Optional[int] = None,
         annotated: bool = False):
-    vav = annotation_version.variant_annotation_version
-    if vav.data_archived:
-        raise DataArchivedError(vav)
+    _check_annotation_version_archive(annotation_version)
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
     q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + \

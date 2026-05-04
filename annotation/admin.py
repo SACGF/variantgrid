@@ -13,11 +13,35 @@ from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
 from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, ClinVar, \
     AnnotationRun, VariantAnnotation, VariantAnnotationVersion
+from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
 
 admin.site.register(models.AnnotationVersion)
 admin.site.register(models.CachedWebResource)
-admin.site.register(models.GeneAnnotationVersion)
+
+
+@admin.register(models.ClinVarVersion)
+class ClinVarVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "genome_build", "annotation_date", "filename", "data_archived_date")
+    list_filter = ("genome_build", "data_archived_date")
+    readonly_fields = ("data_archived_date", "data_archived_by",
+                       "data_archive_reason", "data_restorable_from")
+
+
+@admin.register(models.GeneAnnotationVersion)
+class GeneAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "gene_annotation_release", "annotation_date", "data_archived_date")
+    list_filter = ("data_archived_date",)
+    readonly_fields = ("data_archived_date", "data_archived_by",
+                       "data_archive_reason", "data_restorable_from")
+
+
+@admin.register(models.HumanProteinAtlasAnnotationVersion)
+class HumanProteinAtlasAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "hpa_version", "annotation_date", "filename", "data_archived_date")
+    list_filter = ("data_archived_date",)
+    readonly_fields = ("data_archived_date", "data_archived_by",
+                       "data_archive_reason", "data_restorable_from")
 
 
 _STATUS_BADGE_COLOURS = {
@@ -28,7 +52,7 @@ _STATUS_BADGE_COLOURS = {
 
 
 @admin.register(VariantAnnotationVersion)
-class VariantAnnotationVersionAdmin(ModelAdminBasics):
+class VariantAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
     list_display = ("pk", "genome_build", "annotation_consortium", "annotation_date",
                     "vep", "columns_version", "status_badge", "data_archived_date")
     list_filter = ("status", "genome_build", "annotation_consortium", "data_archived_date")
