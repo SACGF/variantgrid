@@ -130,9 +130,9 @@ Before committing, check `git status` for already-staged changes unrelated to th
 When asked to draft a prompt for an agent to implement a plan in another conversation:
 
 - The plan file is the spec. Reference it; don't restate it.
-- Do not mention decisions that were rejected during planning (e.g. "use JSON not 16 fields", "don't split into a separate table"). The plan reflects the final decision; the agent reading the plan won't see the alternatives. Including negatives only confuses or implies the plan is incomplete.
-- The only exception: an explicit "don't do X" is warranted when X is a default the agent would plausibly do *without* that nudge (e.g. "don't add `@login_required`", "no `Co-Authored-By` trailer"). Even then, prefer fixing the plan to carry that guidance.
-- Keep prompts short: read-list, "follow plan §X-§Y", constraints that override defaults, report-back format. No "pre-resolved decisions" section.
+- Phrase everything positively. Do not include "do not", "don't", "no X", or any "Constraints" section listing things to avoid — even for defaults the agent would otherwise do, and even for ideas that came up and were rejected during planning. Naming the unwanted thing plants it ("don't think of an elephant"). If a default needs to be overridden, either fix the plan to carry the positive instruction, or state the positive behaviour you want ("update all callers to use the new kwarg" rather than "don't add a backwards-compat shim").
+- The plan reflects the final decision; the agent reading it won't see the alternatives. Mentioning rejected options only confuses or implies the plan is incomplete.
+- Keep prompts short: read-list, "follow plan §X-§Y", any positive overrides, report-back format. No "pre-resolved decisions" section.
 
 ## GitHub Comments
 
