@@ -1,6 +1,8 @@
 """
 @see https://django-autocomplete-light.readthedocs.io/en/master/
 """
+import operator
+from functools import reduce
 
 from django.db.models.query_utils import Q
 from django.utils.decorators import method_decorator
@@ -46,15 +48,16 @@ class ClinicianAutocompleteView(AutocompleteView):
 class ExternalPKAutocompleteView(AutocompleteView):
     fields = ['code']
 
-    def get_user_queryset(self, user):
+    def get_user_queryset(self, _user):
+        """ This is just a PK with no identifiable info, so doesn't require
+            any per-user filtering """
         external_type = self.forwarded.get('external_type', None)
-
-        patients_qs = Patient.filter_for_user(user)
-        qs = ExternalPK.objects.filter(
-            Q(patient__in=patients_qs)
-            | Q(case__patient__in=patients_qs)
-            | Q(pathologytestorder__case__patient__in=patients_qs)
-        )
+        q_list = []
         if external_type:
-            qs = qs.filter(external_type=external_type)
+            q_list.append(Q(external_type=external_type))
+
+        qs = ExternalPK.objects.all()
+        if q_list:
+            q = reduce(operator.and_, q_list)
+            qs = qs.filter(q)
         return qs
