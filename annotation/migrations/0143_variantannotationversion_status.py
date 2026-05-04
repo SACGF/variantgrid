@@ -7,15 +7,33 @@ from django.db.models import Q
 def _migrate_active_to_status(apps, schema_editor):
     VariantAnnotationVersion = apps.get_model("annotation", "VariantAnnotationVersion")
 
-    in_progress_per_build = defaultdict(list)
-    for vav in VariantAnnotationVersion.objects.filter(active=True):
-        vav.status = "ACTIVE"
-        vav.save(update_fields=["status"])
+    active_per_build = defaultdict(list)
+    for vav in VariantAnnotationVersion.objects.filter(active=True).order_by("genome_build_id", "annotation_date"):
+        active_per_build[vav.genome_build_id].append(vav)
 
+    inactive_per_build = defaultdict(list)
     for vav in VariantAnnotationVersion.objects.filter(active=False).order_by("genome_build_id", "pk"):
-        in_progress_per_build[vav.genome_build_id].append(vav)
+        inactive_per_build[vav.genome_build_id].append(vav)
 
-    for genome_build_id, vavs in in_progress_per_build.items():
+    for genome_build_id, vavs in active_per_build.items():
+        # If multiple active rows exist for a build, the newest by annotation_date
+        # is treated as NEW (still being populated) and the next-newest as ACTIVE.
+        # Any older active rows become HISTORICAL.
+        newest = vavs[-1]
+        if len(vavs) >= 2:
+            active = vavs[-2]
+            active.status = "ACTIVE"
+            active.save(update_fields=["status"])
+            newest.status = "NEW"
+            newest.save(update_fields=["status"])
+            for vav in vavs[:-2]:
+                vav.status = "HISTORICAL"
+                vav.save(update_fields=["status"])
+        else:
+            newest.status = "ACTIVE"
+            newest.save(update_fields=["status"])
+
+    for genome_build_id, vavs in inactive_per_build.items():
         has_active = VariantAnnotationVersion.objects.filter(
             genome_build_id=genome_build_id, status="ACTIVE"
         ).exists()
