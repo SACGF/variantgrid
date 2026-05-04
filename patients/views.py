@@ -303,7 +303,7 @@ def patient_term_approvals(request, patient_id_offset=0, num_patients_per_page=2
 
     if patient_id_offset:
         filter_kwargs["pk__gt"] = patient_id_offset
-    patients_qs = Patient.objects.filter(**filter_kwargs).order_by("pk")
+    patients_qs = Patient.filter_for_user(request.user).filter(**filter_kwargs).order_by("pk")
     num_total = patients_qs.count()
 
     end = min(num_patients_per_page, num_total)
