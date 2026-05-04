@@ -5,7 +5,7 @@ import celery
 
 from analysis.tasks.mutational_signatures_task import calculate_mutational_signature
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
-from annotation.models.models import AnnotationVersion, VCFAnnotationStats
+from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VCFAnnotationStats
 from annotation.tasks.calculate_sample_stats import calculate_vcf_stats
 from library.log_utils import log_traceback
 from library.utils import full_class_name
@@ -93,7 +93,8 @@ class VCFCheckAnnotationTask(ImportVCFStepTask):
     def process_items(self, upload_step):
         uploaded_vcf = upload_step.get_uploaded_vcf()
         pending_annotation = UploadedVCFPendingAnnotation.objects.create(uploaded_vcf=uploaded_vcf)
-        annotation_version = AnnotationVersion.latest(upload_step.genome_build, active=False)
+        annotation_version = AnnotationVersion.latest(upload_step.genome_build,
+                                                      status=VariantAnnotationVersion.Status.NEW)
         variant_annotation_version = annotation_version.variant_annotation_version
         lowest_unannotated_variant_id = get_lowest_unannotated_variant_id(variant_annotation_version)
         pending_annotation.attempt_schedule_annotation_stage_steps(lowest_unannotated_variant_id)

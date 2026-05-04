@@ -119,7 +119,7 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
 
     vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
     vav_kwargs["gene_annotation_release"] = gene_annotation_release
-    vav_kwargs["active"] = True
+    vav_kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
     variant_annotation_version = VariantAnnotationVersion.objects.create(**vav_kwargs)
     create_ontology_test_data()
     ontology_version = create_test_ontology_version()

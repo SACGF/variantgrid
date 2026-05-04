@@ -6,7 +6,7 @@ from django.core.cache import cache
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
-from annotation.models import AnnotationRun, VariantAnnotationPipelineType
+from annotation.models import AnnotationRun, VariantAnnotationPipelineType, VariantAnnotationVersion
 from annotation.models.models import AnnotationVersion, AnnotationRangeLock
 from annotation.tasks.annotate_variants import annotate_variants
 from library.log_utils import log_traceback
@@ -14,8 +14,15 @@ from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF, Variant
 
 
 @celery.shared_task(queue='scheduling_single_worker')
-def annotation_scheduler(active=True):
-    """ This is run on scheduling_single_worker queue to avoid race conditions """
+def annotation_scheduler(status: str = None):
+    """ Run on scheduling_single_worker queue to avoid race conditions.
+        `status` is a VariantAnnotationVersion.Status value (default ACTIVE).
+        Never operates on HISTORICAL VAVs. """
+    if status is None:
+        status = VariantAnnotationVersion.Status.ACTIVE
+    if status == VariantAnnotationVersion.Status.HISTORICAL:
+        raise ValueError("annotation_scheduler must not be run against HISTORICAL VariantAnnotationVersions")
+
     LOCK_EXPIRE = 60 * 5  # 5 minutes
     lock_id = "annotation-scheduler-lock"
 
@@ -26,9 +33,11 @@ def annotation_scheduler(active=True):
     try:
         if acquire_lock():
             try:
-                logging.info("Got the lock for annotation scheduler")
+                logging.info("Got the lock for annotation scheduler (status=%s)", status)
                 for genome_build in GenomeBuild.builds_with_annotation():
-                    annotation_version = AnnotationVersion.latest(genome_build, active=active)
+                    annotation_version = AnnotationVersion.latest(genome_build, status=status, validate=False)
+                    if annotation_version is None:
+                        continue
                     variant_annotation_version = annotation_version.variant_annotation_version
                     while True:
                         range_lock = _handle_variant_annotation_version(variant_annotation_version)

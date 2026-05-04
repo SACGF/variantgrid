@@ -35,6 +35,8 @@ from library.utils import first
 from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyVersion
 from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
 from variantgrid.celery import app
+from variantgrid.deployment_validation.annotation_status_checks import \
+    is_variant_annotation_version_populated, get_variant_annotation_progress
 from variantgrid.deployment_validation.somalier_check import verify_somalier_config
 
 
@@ -92,7 +94,7 @@ def annotation_build_detail(request, genome_build_name):
     except Exception as e:
         annotation_details["reference_fasta_error"] = str(e)
 
-    if av := AnnotationVersion.latest(genome_build, active=False, validate=False):
+    if av := AnnotationVersion.latest(genome_build, status=VariantAnnotationVersion.Status.NEW, validate=False):
         annotation_details["latest"] = av
 
         sync_with_current_vep = False
@@ -283,7 +285,7 @@ def annotation_versions(request):
             latest = None
         qs = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date")
         has_annotation = qs.exists()
-        has_active = qs.filter(variant_annotation_version__active=True).exists()
+        has_active = qs.filter(variant_annotation_version__status=VariantAnnotationVersion.Status.ACTIVE).exists()
         vep_commands = {}
         for pt in VariantAnnotationPipelineType:
             vep_command = get_vep_command("in.vcf", "out.vcf", genome_build,
@@ -350,6 +352,27 @@ def variant_annotation_runs(request):
             annotation_scheduler.si().apply_async()
 
         for genome_build in GenomeBuild.builds_with_annotation():
+            if f"run-scheduler-new-{genome_build.name}" in request.POST:
+                annotation_scheduler.si(status=VariantAnnotationVersion.Status.NEW).apply_async()
+                messages.add_message(request, messages.INFO,
+                                     f"{genome_build} - queued annotation scheduler against NEW")
+            if f"promote-to-active-{genome_build.name}" in request.POST:
+                new_vav = VariantAnnotationVersion.latest(genome_build,
+                                                         status=VariantAnnotationVersion.Status.NEW)
+                if new_vav is None:
+                    messages.add_message(request, messages.ERROR,
+                                         f"{genome_build} - no NEW VariantAnnotationVersion to promote")
+                elif not is_variant_annotation_version_populated(new_vav):
+                    messages.add_message(request, messages.ERROR,
+                                         f"{genome_build} - NEW VAV pk={new_vav.pk} is not yet populated")
+                else:
+                    try:
+                        new_vav.promote_to_active()
+                        messages.add_message(request, messages.INFO,
+                                             f"{genome_build} - promoted VAV pk={new_vav.pk} to ACTIVE")
+                    except ValueError as e:
+                        messages.add_message(request, messages.ERROR, str(e))
+
             for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build):
                 annotation_runs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
                 message = None
@@ -390,11 +413,34 @@ def variant_annotation_runs(request):
     current_pks = current_variant_annotation_versions.values_list("pk", flat=True)
     historical_variant_annotation_versions = VariantAnnotationVersion.objects.exclude(pk__in=current_pks)
 
+    genome_build_status_panel = {}
+    for genome_build in GenomeBuild.builds_with_annotation():
+        active_vav = VariantAnnotationVersion.latest(genome_build,
+                                                    status=VariantAnnotationVersion.Status.ACTIVE)
+        new_vav = VariantAnnotationVersion.latest(genome_build,
+                                                 status=VariantAnnotationVersion.Status.NEW)
+        new_progress = None
+        new_populated = False
+        if new_vav is not None:
+            new_progress = get_variant_annotation_progress(new_vav)
+            new_populated = is_variant_annotation_version_populated(new_vav)
+        historical_count = VariantAnnotationVersion.objects.filter(
+            genome_build=genome_build, status=VariantAnnotationVersion.Status.HISTORICAL
+        ).count()
+        genome_build_status_panel[genome_build.name] = {
+            "active": active_vav,
+            "new": new_vav,
+            "new_progress": new_progress,
+            "new_populated": new_populated,
+            "historical_count": historical_count,
+        }
+
     context = {
         "genome_build_summary": dict(genome_build_summary),
         "genome_build_field_counts": dict(genome_build_field_counts),
         "current_variant_annotation_versions": current_variant_annotation_versions,
         "historical_variant_annotation_versions": historical_variant_annotation_versions,
+        "genome_build_status_panel": genome_build_status_panel,
     }
     return render(request, "annotation/variant_annotation_runs.html", context)
 

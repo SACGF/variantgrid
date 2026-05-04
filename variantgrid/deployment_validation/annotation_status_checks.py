@@ -1,7 +1,30 @@
 from django.db.models import Count
 
 from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion, AnnotationVersion
+from annotation.models.models_enums import AnnotationStatus
 from snpdb.models import GenomeBuild
+
+
+def is_variant_annotation_version_populated(vav: VariantAnnotationVersion) -> bool:
+    """ True when the VAV's annotation tables are populated:
+        - At least one AnnotationRangeLock exists.
+        - All AnnotationRuns for this VAV are FINISHED (none queued/running/errored). """
+    arl_qs = AnnotationRangeLock.objects.filter(version=vav)
+    if not arl_qs.exists():
+        return False
+    runs_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
+    if not runs_qs.exists():
+        return False
+    unfinished = runs_qs.exclude(status=AnnotationStatus.FINISHED).count()
+    return unfinished == 0
+
+
+def get_variant_annotation_progress(vav: VariantAnnotationVersion) -> dict:
+    """ Counts of annotated vs total range-lock variants for the VAV. """
+    runs_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
+    finished = runs_qs.filter(status=AnnotationStatus.FINISHED).count()
+    total = runs_qs.count()
+    return {"finished": finished, "total": total}
 
 
 def check_annotation_versions() -> dict:
@@ -42,7 +65,7 @@ def check_variant_annotation_runs_status() -> dict:
     }
 
     for genome_build in GenomeBuild.builds_with_annotation():
-        vav = VariantAnnotationVersion.latest(genome_build, active=True)
+        vav = VariantAnnotationVersion.latest(genome_build)
         num_not_success = AnnotationRun.count_not_successful_runs_for_version(vav)
         anno_data = {
             "valid": True,  # Just a warning

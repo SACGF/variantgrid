@@ -109,6 +109,58 @@
                 </div>
             </form>
 
+            <div class="mt-4">
+                {% for build_name, panel in genome_build_status_panel.items %}
+                    <div class="card mt-2">
+                        <div class="card-header"><strong>{{ build_name }}</strong> annotation status</div>
+                        <div class="card-body">
+                            {% if panel.active %}
+                                <div>
+                                    <span class="badge badge-success">ACTIVE</span>
+                                    VAV pk={{ panel.active.pk }}
+                                    — {{ panel.active.annotation_date|date:"Y-m-d" }}
+                                    — VEP {{ panel.active.vep }}
+                                </div>
+                            {% else %}
+                                <div><span class="badge badge-warning">No ACTIVE VariantAnnotationVersion</span></div>
+                            {% endif %}
+
+                            {% if panel.new %}
+                                <div class="mt-2">
+                                    <span class="badge badge-primary">NEW</span>
+                                    VAV pk={{ panel.new.pk }}
+                                    — VEP {{ panel.new.vep }}
+                                    {% if panel.new_progress %}
+                                        — progress: {{ panel.new_progress.finished }}/{{ panel.new_progress.total }} runs finished
+                                    {% endif %}
+                                </div>
+                                <form method="post" class="mt-2 d-inline">
+                                    {% csrf_token %}
+                                    <button name="run-scheduler-new-{{ build_name }}" class="btn btn-secondary">
+                                        Run scheduler against NEW
+                                    </button>
+                                    <button name="promote-to-active-{{ build_name }}"
+                                            class="btn btn-success"
+                                            {% if not panel.new_populated %}disabled{% endif %}>
+                                        Promote to ACTIVE
+                                    </button>
+                                    {% if not panel.new_populated %}
+                                        <span class="text-muted ml-2">
+                                            (Promote enabled once NEW VAV's tables are populated)
+                                        </span>
+                                    {% endif %}
+                                </form>
+                            {% endif %}
+
+                            <div class="mt-2">
+                                <span class="badge badge-secondary">HISTORICAL</span>
+                                {{ panel.historical_count }} VAV{{ panel.historical_count|pluralize }}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
         <div class="row equal">
             {% for build_name, vav_field_counts in genome_build_field_counts.items %}
                 <div class="col-xl-6">

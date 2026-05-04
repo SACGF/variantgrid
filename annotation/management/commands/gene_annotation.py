@@ -6,7 +6,7 @@ from django.core.management import BaseCommand
 from django.utils import timezone
 
 from annotation.models import GeneAnnotationVersion, OntologyTerm, GenomeBuild, AnnotationVersion, \
-    InvalidAnnotationVersionError, GeneAnnotation, DBNSFPGeneAnnotationVersion
+    InvalidAnnotationVersionError, GeneAnnotation, DBNSFPGeneAnnotationVersion, VariantAnnotationVersion
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene, Gene
 from library.django_utils.django_file_utils import get_import_processing_filename
@@ -98,7 +98,8 @@ class Command(BaseCommand):
                 raise ValueError("Only specify ontology-version when gene-annotation-release also specified")
 
             for genome_build in GenomeBuild.builds_with_annotation():
-                av = AnnotationVersion.latest(genome_build, validate=False, active=False)
+                av = AnnotationVersion.latest(genome_build, validate=False,
+                                              status=VariantAnnotationVersion.Status.NEW)
                 if not av:
                     raise InvalidAnnotationVersionError(f"No AnnotationVersion for {genome_build}")
 

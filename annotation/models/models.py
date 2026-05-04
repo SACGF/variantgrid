@@ -616,13 +616,19 @@ class VariantAnnotationVersion(SubVersionPartition):
     VARIANT_GENE_OVERLAP = "annotation_variantgeneoverlap"
     RECORDS_BASE_TABLE_NAMES = [REPRESENTATIVE_TRANSCRIPT_ANNOTATION, TRANSCRIPT_ANNOTATION, VARIANT_GENE_OVERLAP]
 
+    class Status(models.TextChoices):
+        NEW = "NEW", "New"
+        ACTIVE = "ACTIVE", "Active"
+        HISTORICAL = "HISTORICAL", "Historical"
+
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     # GeneAnnotationRelease - imported GTF we can use to get gene/transcript versions that match VEP
     gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, null=True, on_delete=CASCADE)
     last_checked_date = models.DateTimeField(null=True)
-    # Created False - admin flips True once the underlying tables are populated. @see private issue #577
-    active = models.BooleanField(default=False)
+    # Lifecycle: NEW (being populated by scheduler) → ACTIVE (current working version)
+    # → HISTORICAL (kept for old analyses). @see private issue #577
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.NEW)
 
     vep = models.IntegerField()  # code version
     vep_cache = models.IntegerField(null=True)  # May need to have diff code/cache versions eg T2T
@@ -664,27 +670,59 @@ class VariantAnnotationVersion(SubVersionPartition):
     # "dbnsfp_gene". @see annotation/refseq_ensembl_resolver.py
     transcript_resolver = models.TextField(null=True, blank=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["genome_build"],
+                condition=Q(status="ACTIVE"),
+                name="one_active_vav_per_build",
+            ),
+        ]
+
     @property
     def gnomad_major_version(self) -> int:
         return int(self.gnomad.split(".", maxsplit=1)[0])
 
     @staticmethod
-    def latest(genome_build, active=True) -> 'VariantAnnotationVersion':
-        qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, active=active)
+    def latest(genome_build, status: 'VariantAnnotationVersion.Status' = None) -> 'VariantAnnotationVersion':
+        if status is None:
+            status = VariantAnnotationVersion.Status.ACTIVE
+        qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, status=status)
         return qs.order_by("annotation_date").last()
 
     @staticmethod
-    def latest_for_all_builds(active=True) -> QuerySet:
-        # Default to latest
+    def latest_for_all_builds(status: 'VariantAnnotationVersion.Status' = None) -> QuerySet:
+        if status is None:
+            status = VariantAnnotationVersion.Status.ACTIVE
         latest_qs = VariantAnnotationVersion.objects.filter(
             genome_build=OuterRef('genome_build'),
-            active=active
+            status=status,
         ).order_by('-annotation_date')
 
         return VariantAnnotationVersion.objects.filter(
             pk__in=Subquery(latest_qs.values('pk')[:1]),
             genome_build__in=GenomeBuild.builds_with_annotation()
         )
+
+    @transaction.atomic
+    def promote_to_active(self):
+        """ Demote prior ACTIVE for this genome_build → HISTORICAL, set self → ACTIVE. """
+        if self.status == VariantAnnotationVersion.Status.ACTIVE:
+            raise ValueError(f"VariantAnnotationVersion pk={self.pk} is already ACTIVE")
+        if self.status == VariantAnnotationVersion.Status.HISTORICAL:
+            raise ValueError(f"VariantAnnotationVersion pk={self.pk} is HISTORICAL — cannot promote")
+
+        prior_qs = VariantAnnotationVersion.objects.select_for_update().filter(
+            genome_build=self.genome_build,
+            status=VariantAnnotationVersion.Status.ACTIVE,
+        ).exclude(pk=self.pk)
+        prior_pks = list(prior_qs.values_list("pk", flat=True))
+        prior_qs.update(status=VariantAnnotationVersion.Status.HISTORICAL)
+
+        self.status = VariantAnnotationVersion.Status.ACTIVE
+        self.save(update_fields=["status"])
+        logging.info("Promoted VariantAnnotationVersion pk=%s (build=%s) to ACTIVE; demoted prior ACTIVE pks=%s to HISTORICAL",
+                     self.pk, self.genome_build, prior_pks)
 
     def get_any_annotation_version(self):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """
@@ -1823,10 +1861,13 @@ class AnnotationVersion(models.Model):
                 raise InvalidAnnotationVersionError(msg)
 
     @staticmethod
-    def latest(genome_build: GenomeBuild, validate=True, active=True) -> Optional['AnnotationVersion']:
+    def latest(genome_build: GenomeBuild, validate=True,
+               status: 'VariantAnnotationVersion.Status' = None) -> Optional['AnnotationVersion']:
         av_qs = AnnotationVersion.objects.filter(genome_build=genome_build)
-        if active:
-            av_qs = av_qs.exclude(variant_annotation_version__active=False)
+        if status is not None:
+            av_qs = av_qs.filter(variant_annotation_version__status=status)
+        else:
+            av_qs = av_qs.filter(variant_annotation_version__status=VariantAnnotationVersion.Status.ACTIVE)
         av: AnnotationVersion = av_qs.order_by("annotation_date").last()
         if validate:
             if av is None:

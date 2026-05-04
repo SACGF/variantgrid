@@ -16,7 +16,7 @@ from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTem
 from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample, QuadSample, AnalysisType
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
-from annotation.models.models import AnnotationVersion
+from annotation.models.models import AnnotationVersion, VariantAnnotationVersion
 from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import NumberInput, ROFormMixin
@@ -231,8 +231,10 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
                 if f in self.fields:
                     del self.fields[f]
 
-        annotation_version_qs = AnnotationVersion.objects.filter(genome_build=self.instance.genome_build,
-                                                                 variant_annotation_version__active=True)
+        annotation_version_qs = AnnotationVersion.objects.filter(
+            genome_build=self.instance.genome_build,
+            variant_annotation_version__status=VariantAnnotationVersion.Status.ACTIVE,
+        )
         self.fields['annotation_version'].queryset = annotation_version_qs.order_by("-pk")
         self.fields['custom_columns_collection'].queryset = CustomColumnsCollection.filter_for_user(user)
 
