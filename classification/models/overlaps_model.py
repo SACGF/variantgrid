@@ -13,7 +13,7 @@ from classification.models import ClassificationGrouping, EvidenceKeyMap, Condit
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
 from library.utils import first, AuditUtils
-from library.utils.database_utils import TextFieldChoices, JSONDataclassField
+from library.utils.database_utils import TextFieldChoices, JSONDataclassField, IntegerFieldChoices
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 
@@ -178,12 +178,14 @@ class Overlap(TimeStampedModel):
     """
     Overlap is made by composition as making a separate model for each overlap type added a lot of overhead for just isolating a few fields
     """
+    history = AuditlogHistoryField()
+
     overlap_type = models.TextField(choices=OverlapType.choices)
     value_type = models.TextField(max_length=1, choices=ClassificationResultValue.choices)
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE, null=True, blank=True)  # might be blank for gene symbol wide
     testing_context_bucket = models.TextField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
-    overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_CONTRIBUTIONS.value)
+    overlap_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
 
@@ -199,10 +201,6 @@ class Overlap(TimeStampedModel):
         # unique_together = ('overlap_type', 'allele', 'value_type', 'testing_contexts', 'tumor_type_category', 'lab')
 
     @property
-    def overlap_status_obj(self) -> OverlapStatus:
-        return OverlapStatus(self.overlap_status)
-
-    @property
     def value_type_label(self):
         value_type = ClassificationResultValue(self.value_type)
         if value_type == ClassificationResultValue.ONC_PATH:
@@ -213,11 +211,11 @@ class Overlap(TimeStampedModel):
     @property
     def overlap_status_label(self):
         if self.overlap_type == OverlapType.CROSS_CONTEXT:
-            match self.overlap_status_obj:
+            match self.overlap_status:
                 case OverlapStatus.MAJOR_DIFFERENCES: return "Difference"
                 case OverlapStatus.MEDICALLY_SIGNIFICANT: return "Medically significant difference"
-                case _: return self.overlap_status_obj.label
-        return self.overlap_status_obj.label
+                case _: return self.overlap_status.label
+        return self.overlap_status.label
 
     @property
     def testing_contexts_objs(self) -> list[TestingContextBucket]:
@@ -334,3 +332,10 @@ class OverlapContributionSkew(TimeStampedModel):
 
     def __str__(self):
         return f"overlap = {self.overlap}, contribution = {self.contribution}, perspective = {self.skew_perspective}"
+
+
+class OverlapDiscordanceNotification(TimeStampedModel):
+    lab = models.ForeignKey(Lab, on_delete=CASCADE)
+    overlap = models.ForeignKey('Overlap', on_delete=CASCADE)
+    old_status = IntegerFieldChoices(OverlapStatus)
+    notification_sent_date = models.DateTimeField(null=True, blank=True)

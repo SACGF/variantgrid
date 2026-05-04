@@ -3,7 +3,7 @@
 {% load js_tags %}
 
 {% for overlap_grouping in overlap_groupings %}
-    {% if overlap_grouping.single_context_overlap.overlap_status_obj.is_attention or overlap_grouping.cross_context_overlap.overlap_status_obj.is_attention or True %}
+    {% if overlap_grouping.single_context_overlap.overlap_status.is_attention or overlap_grouping.cross_context_overlap.overlap_status.is_attention or True %}
         <table class="table contribution-table" style="table-layout: fixed; width:100%">
 
             <tbody>
@@ -12,8 +12,8 @@
                         <label style="color:#666; font-weight:bold" class="mb-1">{{ overlap_grouping.value_type.label }}</label>
                         <br/>{{ overlap_grouping.user_contribution.testing_context_bucket_obj.label }}
 
-                        <div class="my-1"><span class="{% if overlap_grouping.single_context_overlap.overlap_status_obj.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap_grouping.single_context_overlap.overlap_status_label }}</span></div>
-                        {% if overlap_grouping.single_context_overlap.overlap_status_obj.is_attention %}
+                        <div class="my-1"><span class="{% if overlap_grouping.single_context_overlap.overlap_status.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap_grouping.single_context_overlap.overlap_status_label }}</span></div>
+                        {% if overlap_grouping.single_context_overlap.overlap_status.is_attention %}
                             <br/>
                             {% if overlap_grouping.user_next_step_single_context.user_should_action %}
                             <span>{{ overlap_grouping.user_next_step_single_context.icon }}{{ overlap_grouping.user_next_step_single_context.label }}</span>
@@ -24,7 +24,7 @@
                             <br/><span class="no-value">No action required</span>
                         {% endif %}
 
-                        {% if overlap_grouping.cross_context_overlap.overlap_status_obj.is_attention %}
+                        {% if overlap_grouping.cross_context_overlap.overlap_status.is_attention %}
                             <div style="opacity:0.6">
                             <br/><br/>Cross Contexts<br/><span class="text-warning">{{ overlap_grouping.cross_context_overlap.overlap_status_label }}</span>
                             <br/><span>{{ overlap_grouping.user_next_step_cross_context.label }}</span>

@@ -12,7 +12,7 @@ from django.utils.timezone import now
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, \
-    TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType
+    TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification
 from classification.models.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig
@@ -24,7 +24,7 @@ class OverlapServices:
     @staticmethod
     def update_classification_grouping_overlap_contribution(classification_grouping: ClassificationGrouping):
         if classification_grouping.testing_context in {TestingContextBucket.OTHER, TestingContextBucket.UNKNOWN}:
-            # no conflicts for other
+            # no overlaps for other
             return
 
         value_types: list[ClassificationResultValue] = [ClassificationResultValue.ONC_PATH]
@@ -71,9 +71,6 @@ class OverlapServices:
                 overlap_contribution.refresh_from_db()
 
             # now update status of any created overlaps or existing linked overlaps
-            for skew in overlap_contribution.overlapcontributionskew_set.select_related('overlap').all():
-                OverlapServices.recalc_overlap(skew.overlap)
-
             for overlap in overlap_contribution.overlaps:
                 OverlapServices.recalc_overlap(overlap)
                 OverlapServices.update_skews(overlap)
@@ -207,9 +204,10 @@ class OverlapServices:
         overlap_status = calculator.calculate_entries(list(overlap.contributions.all()))
         old_overlap_status = overlap.overlap_status
         overlap.overlap_status = overlap_status
+        overlap_changed = False
         if overlap_status != old_overlap_status:
             overlap.overlap_status_change_timestamp = now()
-
+            overlap_changed = True
         if overlap.overlap_type == OverlapType.SINGLE_CONTEXT:
             overlap.valid = True
         elif overlap.overlap_type == OverlapType.CROSS_CONTEXT:
@@ -217,6 +215,36 @@ class OverlapServices:
             valid = len(overlap.testing_contexts_objs) > 1
             overlap.valid = valid
         overlap.save()
+        if overlap_changed:
+            OverlapServices.overlap_status_changed(overlap, old_overlap_status)
+
+    @staticmethod
+    def overlap_status_changed(overlap: Overlap, old_status: OverlapStatus):
+        # lab = models.ForeignKey(Lab, on_delete=CASCADE)
+        # overlap = models.ForeignKey('Overlap', on_delete=CASCADE)
+        # old_status = IntegerFieldChoices(OverlapStatus)
+        # notification_sent_date = models.DateTimeField(null=True, blank=True)
+
+        # see if it's worth notifying anyone
+        if not (overlap.overlap_status.is_discordant ^ old_status.is_discordant):
+            # only care if we're going from discordant to not discordant or vice versa
+            # an overlap could change from concordant to discordant back to concordant
+            # but we just check if the notification is worth sending
+            return
+
+        labs = set()
+        for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
+            if lab := contribution.lab:
+                labs.add(lab)
+
+        for lab in labs:
+            OverlapDiscordanceNotification.objects.get_or_create(
+                lab=lab,
+                overlap=overlap,
+                notification_sent_date=None,
+                defaults={"old_status": old_status}
+            )
+
 
 
 @dataclass
@@ -406,14 +434,14 @@ class OverlapGrouping:
     @cached_property
     def same_context_overlap_status(self) -> OverlapStatus:
         if single_context_overlap := self.single_context_overlap:
-            return single_context_overlap.overlap_status_obj
+            return single_context_overlap.overlap_status
         else:
             return OverlapStatus.NO_CONTRIBUTIONS
 
     @cached_property
     def cross_context_overlap_status(self) -> OverlapStatus:
         if cross_context_overlap := self.cross_context_overlap:
-            return cross_context_overlap.overlap_status_obj
+            return cross_context_overlap.overlap_status
         else:
             return OverlapStatus.NO_CONTRIBUTIONS
 

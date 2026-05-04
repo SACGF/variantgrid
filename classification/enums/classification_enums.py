@@ -51,6 +51,11 @@ class OverlapStatus(IntegerChoices):
     def is_attention(self) -> bool:
         return self >= OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES
 
+    @property
+    def is_discordant(self):
+        # TODO determine if tier 1 vs tier 2 is considered discord
+        return self >= OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES
+
 
 class TestingContextBucket(TextChoices):
     NON_CANCER = "N", "Non-Cancer Somatic"

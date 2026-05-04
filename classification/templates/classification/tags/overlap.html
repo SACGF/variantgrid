@@ -1,7 +1,7 @@
 {% load ui_utils %}
 {# Treat "Single Context" as the default overlap type, only show overlap type if it's something different#}
 {% if not overlap.valid %}INVALID - should not be rendered<br/>{% endif %}
-<span style="{% if overlap.overlap_status_obj.is_dull %}opacity:0.6{% endif %}">
+<span style="{% if overlap.overlap_status.is_dull %}opacity:0.6{% endif %}">
     {% if overlap.overlap_type == "clinvar" %}<span class="overlap-source overlap-source-clinvar">ClinVar</span>{% endif %}
 
     {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}<span class="testing-context-box testing-context-{{ testing_context.value }}">{{ testing_context.name | pretty_label:"lower" }}</span>{% endfor %}
@@ -12,7 +12,7 @@
     {% empty %}<span class="no-value">No values</span>
     {% endfor %}
 
-    | <span class="{% if overlap.overlap_status_obj.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.get_overlap_status_display }}</span>
+    | <span class="{% if overlap.overlap_status.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.get_overlap_status_display }}</span>
     {% if admin_link %}
         {% admin_link overlap %}
     {% endif %}

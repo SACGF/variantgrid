@@ -66,7 +66,7 @@ class ContributionValues:
     @property
     def overlap_status(self) -> OverlapContributionStatus:
         if skew := self.skew:
-            return skew.overlap.overlap_status_obj
+            return skew.overlap.overlap_status
         return OverlapStatus.NO_CONTRIBUTIONS
 
     @property
