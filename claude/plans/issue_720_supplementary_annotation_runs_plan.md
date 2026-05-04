@@ -56,7 +56,10 @@ Fields to **delete** from `AnnotationRun`:
 - `annotsv_error`
 - `annotsv_imported`
 
-Provenance for AnnotSV moves into the AnnotSV run's existing fields (`pipeline_command`, `pipeline_stdout`, `pipeline_stderr`, `error_exception`, `vcf_annotated_filename` — repurposed to hold the TSV path), which is symmetric with how VEP runs work.
+Field to **rename** on `AnnotationRun`:
+- `vcf_annotated_filename` → `output_filename` (one tool per run, one output per run; AnnotSV's TSV fits the same slot).
+
+Provenance for AnnotSV moves into the AnnotSV run's existing fields (`pipeline_command`, `pipeline_stdout`, `pipeline_stderr`, `error_exception`, `output_filename` — holds the TSV path), which is symmetric with how VEP runs work.
 
 ### 2. `VariantAnnotationVersion` loses `annotsv_*`
 
@@ -141,7 +144,8 @@ class AnnotationToolRunner(abc.ABC):
     def apply(self, annotation_run: AnnotationRun, output_path: str) -> int:
         """ Import results into VariantAnnotation. Returns rows affected.
             VEP runner: existing BulkVEPVCFAnnotationInserter (insert).
-            SpliceAI/AnnotSV: bulk UPDATE on existing VariantAnnotation rows. """
+            SpliceAI: same inserter in 'update specific columns' mode (ON CONFLICT DO UPDATE).
+            AnnotSV: import_annotsv_tsv (existing). """
 
 
 # annotation/runners/__init__.py
@@ -170,16 +174,21 @@ def annotate_variants(annotation_run_id):
     # ... existing task_id lock acquisition ...
 
     runner = RUNNERS[(annotation_run.variant_type, annotation_run.tool)]
-    # dump_and_run_and_apply replaces dump_and_annotate_variants + import_vcf_annotations
-    if annotation_run.vcf_annotated_filename is None:
+    if annotation_run.output_filename is None:
         vcf_in = _dump_variants_for_runner(annotation_run, runner)
-        if annotation_run.dump_count:
-            output = runner.run(annotation_run, vcf_in)
-            annotation_run.vcf_annotated_filename = output
+        if annotation_run.dump_count == 0:
+            # Short-circuit: no variants matched the runner's selection-Q for this range.
+            # Mark FINISHED without launching the tool or queuing dependents' apply.
             annotation_run.annotation_end = timezone.now()
+            annotation_run.upload_end = timezone.now()
             annotation_run.save()
-    if annotation_run.vcf_annotated_filename:
-        runner.apply(annotation_run, annotation_run.vcf_annotated_filename)
+            return
+        output = runner.run(annotation_run, vcf_in)
+        annotation_run.output_filename = output
+        annotation_run.annotation_end = timezone.now()
+        annotation_run.save()
+    if annotation_run.output_filename:
+        runner.apply(annotation_run, annotation_run.output_filename)
 ```
 
 `_dump_variants_for_runner` calls `get_variants_qs_for_annotation` and ANDs `runner.select_variants_q(...)`. For VEP runners this matches today's behaviour; for SpliceAI/AnnotSV this naturally selects only the gaps because `depends_on` already ensured VEP populated `VariantAnnotation` first.
@@ -232,18 +241,20 @@ class SpliceAIRunner(AnnotationToolRunner):
         return vcf_out
 
     def apply(self, annotation_run, output_path) -> int:
-        # Parse SpliceAI INFO field (DS_AG/DS_AL/DS_DG/DS_DL/DP_AG/...) and
-        # bulk-UPDATE the existing VariantAnnotation row for this variant in
-        # this version partition. Update spliceai_max_ds + spliceai_gene_symbol
-        # at the same time. Use VariantAnnotation.objects.bulk_update for batches.
-        ...
+        # SpliceAI emits VCF natively. Reuse the existing BulkVEPVCFAnnotationInserter
+        # in "update specific columns" mode so writes go through the same partition
+        # path as VEP (no parallel insert mechanism, no bulk_update). The inserter's
+        # existing INSERT ... ON CONFLICT DO UPDATE handling already produces row
+        # upserts; the addition is restricting the UPDATE SET clause to spliceai_*
+        # columns + spliceai_max_ds + spliceai_gene_symbol.
+        return import_vcf_annotations(annotation_run, update_columns=SPLICEAI_COLUMNS)
 ```
 
 Selection-Q rationale: `cadd_raw_rankscore IS NULL` is the canary the issue identified — every dbNSFP record has it, so its absence means dbNSFP (and the SpliceAI snv/indel cache) didn't cover this variant. We additionally require the existing SpliceAI fields are NULL so we don't overwrite cache-derived scores.
 
 ### `AnnotSVRunner`
 
-Wraps `run_annotsv` + `import_annotsv_tsv` (existing functions). `select_variants_q` is `Q()` (no extra filter — every SV gets AnnotSV). The runner sets `annotation_run.vcf_annotated_filename` to the TSV path; `apply` calls `import_annotsv_tsv(annotation_run)` (signature already takes an `AnnotationRun`).
+Wraps `run_annotsv` + `import_annotsv_tsv` (existing functions). `select_variants_q` is `Q()` (no extra filter — every SV gets AnnotSV). The runner sets `annotation_run.output_filename` to the TSV path; `apply` calls `import_annotsv_tsv(annotation_run)` (signature already takes an `AnnotationRun`).
 
 Delete:
 - `annotation/management/commands/annotsv_run.py` lines that read `annotsv_tsv_filename`/`annotsv_error` — replace with reading the AnnotSV `AnnotationRun`.
@@ -322,19 +333,13 @@ ANNOTATION_SPLICEAI_MAX_INDEL_LEN = None    # None = no cap
 
 Delete: `ANNOTATION_ANNOTSV_ENABLED` (replaced by `ANNOTATION_TOOLS_ENABLED["C"]` membership). Keep all the other `ANNOTATION_ANNOTSV_*` settings — the AnnotSV runner still uses them.
 
-A new Celery queue for tools that may run long / on GPU:
+No new Celery queue. SpliceAI and AnnotSV runs go on the existing `annotation_workers` queue:
 
 ```python
-# variantgrid/settings/components/celery_settings.py
-# Add 'supplementary_annotation_workers' to CELERY_TASK_QUEUES
+annotate_variants.apply_async((annotation_run.pk,))  # default annotation_workers, same as today
 ```
 
-`annotate_variants` routes to the right queue based on `tool`:
-
-```python
-queue = 'supplementary_annotation_workers' if annotation_run.tool != AnnotationTool.VEP else 'annotation_workers'
-annotate_variants.apply_async((annotation_run.pk,), queue=queue)
-```
+If GPU pinning becomes necessary later, that's a follow-up — the design doesn't depend on it.
 
 ---
 
@@ -346,30 +351,46 @@ Single migration — no data backfill needed beyond column adds because:
 - `annotsv_*` columns on `AnnotationRun` and `VariantAnnotationVersion` are dropped (no production AnnotSV data).
 - `unique_together` updates from `(annotation_range_lock, pipeline_type)` to `(annotation_range_lock, variant_type, tool)` — non-conflicting because all existing rows have `tool=VEP`.
 
+Migration #1 (PR #1, rename only):
+
 ```python
-# annotation/migrations/0XYZ_split_annotation_tools.py
 operations = [
     migrations.RenameField('AnnotationRun', 'pipeline_type', 'variant_type'),
+    migrations.RenameField('AnnotationRun', 'vcf_annotated_filename', 'output_filename'),
+]
+```
+
+Migration #2 (PR #2, structural additions):
+
+```python
+operations = [
     migrations.AddField('AnnotationRun', 'tool', models.CharField(max_length=1,
         choices=AnnotationTool.choices, default=AnnotationTool.VEP)),
     migrations.AddField('AnnotationRun', 'depends_on',
         models.ForeignKey('self', null=True, blank=True, on_delete=CASCADE,
                           related_name='dependents')),
+    migrations.CreateModel('SupplementaryAnnotationVersion', fields=[...]),
     migrations.AddField('AnnotationRun', 'supplementary_version',
         models.ForeignKey('SupplementaryAnnotationVersion', null=True,
                           blank=True, on_delete=PROTECT)),
+    migrations.AlterUniqueTogether('AnnotationRun',
+        unique_together={('annotation_range_lock', 'variant_type', 'tool')}),
+]
+```
+
+Migration #3 (AnnotSV split-out):
+
+```python
+operations = [
     migrations.RemoveField('AnnotationRun', 'annotsv_tsv_filename'),
     migrations.RemoveField('AnnotationRun', 'annotsv_error'),
     migrations.RemoveField('AnnotationRun', 'annotsv_imported'),
     migrations.RemoveField('VariantAnnotationVersion', 'annotsv_code'),
     migrations.RemoveField('VariantAnnotationVersion', 'annotsv_bundle'),
-    migrations.AlterUniqueTogether('AnnotationRun',
-        unique_together={('annotation_range_lock', 'variant_type', 'tool')}),
-    migrations.CreateModel('SupplementaryAnnotationVersion', fields=[...]),
 ]
 ```
 
-`ColumnVEPField.pipeline_type` (annotation/migrations/0080) — leave as-is. That field describes which VEP runs a column applies to and is still pipeline-typed in the VEP sense; it's unrelated to `AnnotationRun.variant_type`. (See open question 1.)
+`VEPColumnDef.pipeline_type` (the in-code dataclass in `annotation/vep_columns.py` that replaced the old `ColumnVEPField` model) — also rename to `variant_type`. It's the same axis (which variant scope a VEP column applies to) and is in the same sweep. The `ColumnVEPField` model itself is gone; the only remaining references are inside historical migrations (leave those alone) and stale comments (update where touched).
 
 ---
 
@@ -377,8 +398,10 @@ operations = [
 
 Single sweep replacing:
 - `AnnotationRun.pipeline_type` → `AnnotationRun.variant_type`
+- `AnnotationRun.vcf_annotated_filename` → `AnnotationRun.output_filename`
 - `get_variants_qs_for_annotation(pipeline_type=…)` → `variant_type=…`
 - `VariantAnnotationPipelineType` → `VariantType`
+- `VEPColumnDef.pipeline_type` → `VEPColumnDef.variant_type`
 - `settings.ANNOTATION_VEP_BUFFER_SIZE` keys (still keyed by `"S"`/`"C"`, just rename the comment/lookup variable)
 
 Files (from `grep -rn "pipeline_type\|VariantAnnotationPipelineType"`):
@@ -402,7 +425,7 @@ Files (from `grep -rn "pipeline_type\|VariantAnnotationPipelineType"`):
 
 Plus templates / admin display strings that show the field label.
 
-`ColumnVEPField.pipeline_type` is a separate column on a different model — leave its name alone (it's the variant scope a VEP column applies to, conceptually it should also become `variant_type`, but a wider rename — see open question 1).
+`VEPColumnDef.pipeline_type` (in-code dataclass field) is renamed to `variant_type` in the same sweep — it's the same axis. The old `ColumnVEPField` Django model no longer exists; only historical migrations reference it, and those are left untouched.
 
 ---
 
@@ -419,31 +442,83 @@ Plus templates / admin display strings that show the field label.
 
 ## Implementation order
 
-1. Add `VariantType` + `AnnotationTool` enums; rename `pipeline_type` → `variant_type` across the codebase. Migration #1. Tests should still pass.
-2. Add `tool`, `depends_on`, `supplementary_version` fields + `SupplementaryAnnotationVersion` model. Migration #2. Existing runs default to `tool=VEP`, no behavioural change.
-3. Introduce `AnnotationToolRunner` interface; refactor existing VEP path into `VEPShortRunner` / `VEPSVRunner`. Tests should still pass — pure refactor.
-4. Strip AnnotSV out of `dump_and_annotate_variants`; introduce `AnnotSVRunner`; remove `annotsv_*` fields from `AnnotationRun` and `VariantAnnotationVersion`. Migration #3. Update `annotsv_run` management command to operate on the AnnotSV `AnnotationRun`.
-5. Add scheduler dependency handling; add `_runnable_qs` walk.
-6. Add `SpliceAIRunner` + selection Q + parser/apply.
-7. Add `supplementary_annotation_workers` Celery queue.
-8. Tests as above.
+(Replaced by the "Revised implementation order" section under Decisions, below.)
 
 ---
 
-## Open questions for review
+## Decisions (was: open questions)
 
-1. **`ColumnVEPField.pipeline_type`** — same name, different model, conceptually the same axis (which variant scope this VEP column applies to). Rename it too in step 1, or leave alone? Renaming touches more migrations and the `vep_columns.py` filtering logic.
+1. **No per-variant provenance table.** Range lock + AnnotationRun is the unit of provenance — if a (range_lock, variant_type, tool) AnnotationRun exists and is FINISHED, every variant in that range under that variant_type has been handled by that tool. That's the whole point of range locks. No `SupplementaryAnnotationApplied`. (Combined with decision 6: a single output filename per AnnotationRun is enough.)
 
-2. **SpliceAI per-variant provenance table** — earlier I proposed `SupplementaryAnnotationApplied(variant, supp_version, …)` so we can answer "has SpliceAI v1.3.1 run on variant X". With the current design the answer is implied by `VariantAnnotation.spliceai_max_ds IS NOT NULL` for a given partition, plus the AnnotationRun history for the range. Is that good enough, or do you want the explicit per-variant table? It costs ~1 row per supp-annotated variant.
+2. **VAV roll copy-forward: deferred.** When a new `VariantAnnotationVersion` rolls, supplementary tools re-run against the new partition for every range — same as VEP does. The "copy SpliceAI scores forward when the supp version is unchanged" optimisation is left for a follow-up.
 
-3. **VAV roll behaviour** — when a new `VariantAnnotationVersion` is created, the new partition starts empty, so SpliceAI/AnnotSV must re-run for every range. That's symmetric with VEP. Worth a "copy forward supplementary scores when supp version unchanged" optimisation in v1, or defer? My lean: defer.
+3. **SpliceAI `apply()` reuses the existing VCF → bulk-insert path.** SpliceAI emits VCF natively, and the existing `BulkVEPVCFAnnotationInserter` already writes into the inheritance partition correctly. The SpliceAI runner produces a VCF and feeds it through that same insert path (configured to UPDATE the relevant `spliceai_*` + `spliceai_max_ds` + `spliceai_gene_symbol` columns of the existing `VariantAnnotation` row, since VEP has already created it). No bespoke `bulk_update` codepath; no parallel insert mechanism.
 
-4. **SpliceAI `apply()` bulk strategy** — `bulk_update` on potentially millions of rows is slow. Alternative: write a small VCF and use the existing `BulkVEPVCFAnnotationInserter` path with `update_or_create` semantics. Preference?
+4. **Zero-variant short-circuit: yes.** If a runner's selection-Q yields zero variants for the range (e.g. SpliceAI finds no gap variants), the AnnotationRun goes straight to FINISHED without launching the tool, dumping a VCF, or queueing follow-on Celery tasks. This is consistent with how VEP runs already short-circuit when `dump_count == 0`. Dependents see FINISHED and proceed (or in turn short-circuit).
 
-5. **`AnnotationStatus.FINISHED` when `dump_count == 0`** — today a VEP run with zero variants in scope finishes immediately. For a SpliceAI runner, "no gap variants in this range" should also short-circuit to FINISHED. Confirm this is the intended semantics (so dependents don't wait on a no-op).
+5. **No new Celery queue.** SpliceAI and AnnotSV runs go on the existing `annotation_workers` queue. Drop the `supplementary_annotation_workers` queue from the plan and from settings.
 
-6. **Celery queue name** — `supplementary_annotation_workers` OK, or prefer something like `gpu_annotation_workers` to make the GPU intent explicit? (SpliceAI benefits from GPU; AnnotSV doesn't.)
+6. **Single generic `output_filename` field on `AnnotationRun`.** There's only one tool per AnnotationRun, so one output filename per run. Repurpose `vcf_annotated_filename` → rename to `output_filename` (it's already used as "where the tool wrote its result"; AnnotSV's TSV fits the same slot). Drop `annotsv_tsv_filename` as already planned.
 
-7. **AnnotSV TSV path field** — repurpose `vcf_annotated_filename` to hold the TSV path (cheapest), or add a generic `output_filename` field and migrate? My lean: repurpose, since the field is already a generic "where did the tool write its output".
+7. **Rename PR lands first, separately.** Step 1 (the `pipeline_type` → `variant_type`, `VariantAnnotationPipelineType` → `VariantType`, `VEPColumnDef.pipeline_type` → `variant_type` rename sweep) is a self-contained PR. Stop after step 1, request human review, commit when approved, then proceed with steps 2–8 on a follow-up branch.
 
-8. **Order of step 1 vs scope of this branch** — the rename touches a lot of files. Land it as a separate PR, or include in the same branch? My lean: separate PR — pure rename, easy review.
+---
+
+## Updates to the plan from those decisions
+
+- **Drop `SupplementaryAnnotationApplied`** from the design entirely. It was never written into the model section above; this just confirms it stays out.
+
+- **Rename `vcf_annotated_filename` → `output_filename`** on `AnnotationRun`. Add to migration #1 (the rename PR) so it lands together with the other renames:
+
+  ```python
+  migrations.RenameField('AnnotationRun', 'vcf_annotated_filename', 'output_filename'),
+  ```
+
+  Update callsites — `dump_and_annotate_variants`, `import_vcf_annotations`, `annotation_run_retry`, the `annotsv_run` management command, admin/views/templates that display the filename. The AnnotSV runner (step 4) writes the TSV path here; the SpliceAI runner writes the SpliceAI-output VCF path here.
+
+- **Remove `annotsv_tsv_filename` field drop redundancy.** Already in migration #3; the new `output_filename` covers it.
+
+- **Drop the `supplementary_annotation_workers` queue.** Remove from the Settings section and from `annotate_variants.apply_async` routing. All runs queue via the standard `annotation_workers` queue:
+
+  ```python
+  annotate_variants.apply_async((annotation_run.pk,))  # default annotation_workers queue, same as today
+  ```
+
+- **Short-circuit semantics formalised.** In `annotate_variants`:
+
+  ```python
+  vcf_in = _dump_variants_for_runner(annotation_run, runner)
+  if annotation_run.dump_count == 0:
+      annotation_run.annotation_end = timezone.now()
+      annotation_run.upload_end = timezone.now()
+      annotation_run.save()  # status becomes FINISHED via get_status()
+      return
+  ```
+
+  `get_status()` already returns FINISHED when `dump_count == 0`; this just makes sure dependents don't sit waiting because `upload_end` was never set on a no-op run.
+
+- **SpliceAI apply via VCF + BulkVEPVCFAnnotationInserter.** The `SpliceAIRunner.apply` body becomes:
+
+  ```python
+  def apply(self, annotation_run, output_path) -> int:
+      # SpliceAI's output VCF carries SpliceAI INFO fields with the same field names
+      # VEP's SpliceAI plugin produces. Re-use the existing inserter, configured
+      # to UPDATE rather than INSERT (the row already exists from the VEP run).
+      return import_vcf_annotations(annotation_run, mode="update_spliceai_only")
+  ```
+
+  Implementation note: `import_vcf_annotations` / `BulkVEPVCFAnnotationInserter` need a small extension to support an "update only these columns" mode. Likely the cleanest cut is a parameter on `BulkVEPVCFAnnotationInserter` that restricts the `INSERT INTO ... ON CONFLICT (variant_id, version_id) DO UPDATE SET ...` to a column subset. Postgres `ON CONFLICT DO UPDATE` is already how the inserter handles repeats; the extension is just narrowing the SET clause.
+
+- **Range-lock + AnnotationRun = provenance.** Documenting the contract explicitly: to ask "has SpliceAI v1.3.1 covered variant X?", look up the range lock for X and check whether a FINISHED `AnnotationRun` exists for that lock with `tool=SPLICEAI` and a `supplementary_version` whose `code_version='1.3.1'`. No per-variant lookup table, no row-level provenance.
+
+---
+
+## Revised implementation order
+
+1. **PR #1 — pure rename.** `pipeline_type` → `variant_type`, `VariantAnnotationPipelineType` → `VariantType`, `VEPColumnDef.pipeline_type` → `variant_type`, `vcf_annotated_filename` → `output_filename`. Single migration. Tests still green. **Stop here, ask for human review, commit.**
+2. PR #2 — add `tool`, `depends_on`, `supplementary_version` fields + `SupplementaryAnnotationVersion` model. Migration. Existing runs default to `tool=VEP`, no behavioural change.
+3. Introduce `AnnotationToolRunner` interface; refactor existing VEP path into `VEPShortRunner` / `VEPSVRunner`. Pure refactor.
+4. Strip AnnotSV out of `dump_and_annotate_variants`; introduce `AnnotSVRunner`; remove `annotsv_*` fields from `AnnotationRun` and `VariantAnnotationVersion`. Migration. Update `annotsv_run` management command to operate on the AnnotSV `AnnotationRun`.
+5. Add scheduler dependency handling + zero-variant short-circuit + `_runnable_qs` walk.
+6. Add `SpliceAIRunner` + selection Q + VCF-based apply via extended `BulkVEPVCFAnnotationInserter`.
+7. Tests as listed in the Tests section.
