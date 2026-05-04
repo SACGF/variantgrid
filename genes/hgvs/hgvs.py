@@ -372,7 +372,7 @@ class CHGVS:
         o_tran = other.transcript_parts
         if my_tran.identifier != o_tran.identifier:
             cdiff = cdiff | CHGVSDiff.DIFF_TRANSCRIPT_ID
-        elif my_tran.version != o_tran.version:
+        elif my_tran.version and o_tran.version and my_tran.version != o_tran.version:
             cdiff = cdiff | CHGVSDiff.DIFF_TRANSCRIPT_VER
 
         if self.gene and other.gene:
