@@ -8,6 +8,7 @@
 {% load user_tag_color_tags %}
 {% load settings_tags %}
 {% load clinvar_tags %}
+{% load pathogenicity_tags %}
 {% settings_value 'ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED' as annotation_pubmed_search_terms_enabled %}
 {% settings_value 'VARIANT_DETAILS_SHOW_ANNOTATION' as show_annotation %}
 {% settings_value 'VARIANT_DETAILS_SHOW_GENE_COVERAGE' as show_gene_coverage %}
@@ -64,9 +65,10 @@ var pathogenicity_rankscore_threshold = [
     {% settings_value 'ANNOTATION_MIN_PATHOGENIC_RANKSCORE' %}
 ]
 
+var PATHOGENICITY_THRESHOLDS = {% pathogenicity_thresholds %};
+
 var CODE_THRESHOLDS = {
-    "revel_score": [0.15, 0.75],
-    "cadd_phred": [10, 20],
+    ...PATHOGENICITY_THRESHOLDS,
     "grantham": [57, 105],
     "gerp_pp_rs": [0, 3],
     //

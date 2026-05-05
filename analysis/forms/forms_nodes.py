@@ -30,6 +30,7 @@ from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from annotation.models import VariantAnnotation
+from annotation.pathogenicity_predictions import TOOLS
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_coordinate, get_hgvs_variant, HGVSException
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
@@ -342,6 +343,14 @@ class DamageNodeForm(BaseNodeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["damage_predictions_min"].widget.attrs["max"] = self.instance.num_prediction_fields
+        # Columns v4 raw-score sliders driven by the per-tool table
+        for tool in TOOLS:
+            if tool.raw_field:
+                field_name = f"{tool.raw_field}_min"
+                if field_name in self.fields:
+                    self.fields[field_name].widget = HiddenInput(attrs={
+                        "min": tool.raw_min, "max": tool.raw_max, "step": tool.raw_step,
+                    })
 
 
 class FilterNodeForm(BaseNodeForm):

@@ -80,7 +80,7 @@ class Command(BaseCommand):
         for vav in VariantAnnotationVersion.objects.filter(columns_version=2):
             print(f"Updating {vav}...")
             columns = []
-            for col in vav.get_pathogenic_prediction_funcs().keys():
+            for col in vav.get_rankscore_pathogenic_prediction_funcs().keys():
                 columns.append(Q(**{f"{col}__isnull": False}))
             q_any_non_null = reduce(operator.or_, columns)
 

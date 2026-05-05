@@ -734,7 +734,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """
         return self.annotationversion_set.last()
 
-    def get_pathogenic_prediction_funcs(self) -> dict[str, Callable]:
+    def get_rankscore_pathogenic_prediction_funcs(self) -> dict[str, Callable]:
         if self.columns_version == 1:
             return {
                 'sift': lambda d: d in SIFTPrediction.get_damage_or_greater_levels(),
@@ -743,27 +743,33 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
                 'mutation_taster_pred_most_damaging': lambda d: d in MutationTasterPrediction.get_damage_or_greater_levels(),
                 'polyphen2_hvar_pred_most_damaging': lambda d: d in Polyphen2Prediction.get_damage_or_greater_levels(),
             }
-        elif self.columns_version in (2, 3, 4):
+        if self.columns_version in (2, 3, 4):
             pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
             pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
                                              'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
             if self.columns_version >= 3:
                 pathogenic_prediction_columns.append("alphamissense_rankscore")
-
             return {c: lambda d: float(d) >= pathogenic_rankscore for c in pathogenic_prediction_columns}
-
         raise ValueError(f"Don't know fields for {self.columns_version=}")
+
+    def get_raw_score_pathogenic_prediction_funcs(self) -> dict[str, Callable]:
+        """Raw-score + pred contributions to predictions_num_pathogenic at v4. Empty pre-v4."""
+        if self.columns_version < 4:
+            return {}
+        from annotation.pathogenicity_predictions import raw_score_pathogenic_funcs, pred_pathogenic_funcs
+        return {**raw_score_pathogenic_funcs(), **pred_pathogenic_funcs()}
 
     @cached_property
     def damage_predictions_description(self) -> str:
-        pathogenic_prediction = list(self.get_pathogenic_prediction_funcs())
-        columns = ", ".join(pathogenic_prediction)
-        description = ""
         if self.columns_version == 1:
-            description = f"Count of {columns} at the most damaging level."
-        elif self.columns_version >= 2:
-            description = f"Count of {columns} that exceed {settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE}"
-        return description
+            columns = ", ".join(self.get_rankscore_pathogenic_prediction_funcs())
+            return f"Count of {columns} at the most damaging level."
+        if self.columns_version >= 4:
+            raw_columns = ", ".join(self.get_raw_score_pathogenic_prediction_funcs())
+            return (f"Count of {raw_columns} reaching their PP3-supporting threshold "
+                    "(Pejaver 2022 / Bergquist 2024 ClinGen calibration; see annotation/pathogenicity_predictions.py).")
+        rankscore_columns = ", ".join(self.get_rankscore_pathogenic_prediction_funcs())
+        return f"Count of {rankscore_columns} that exceed {settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE}"
 
     @cached_property
     def _vep_config(self) -> dict:

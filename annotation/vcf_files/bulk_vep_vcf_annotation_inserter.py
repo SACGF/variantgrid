@@ -316,7 +316,10 @@ class BulkVEPVCFAnnotationInserter:
                 self.source_field_to_columns[cvf.vep_info_field].add(vgc_id)
 
         vav = self.annotation_run.variant_annotation_version
-        self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
+        if vav.columns_version >= 4:
+            self.prediction_pathogenic_funcs = vav.get_raw_score_pathogenic_prediction_funcs()
+        else:
+            self.prediction_pathogenic_funcs = vav.get_rankscore_pathogenic_prediction_funcs()
 
     def _setup_vep_fields_and_db_columns(self, validate_columns: bool, cvf_list: tuple[VEPColumnDef, ...]):
         self._add_vep_field_handlers(cvf_list)
