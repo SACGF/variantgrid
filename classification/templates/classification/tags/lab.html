@@ -3,13 +3,12 @@
          <span style="color: #666">{{ lab.organization.shortest_name }} / </span> {{ lab.name }}
     </span>
 {% else %}
-<span style="opacity:{% if is_your_lab %}0.5{% else %}1{% endif %}">
-    {% if show_contact_link %}
-        <a data-toggle="ajax-modal" href="{% url 'lab_contact_details' lab.pk %}?subject={{ subject }}">
+    <span style="opacity:{% if is_your_lab %}0.5{% else %}1{% endif %}">
         <span style="color: #666; opacity:0.6">{{ lab.organization.shortest_name }} / </span> {{ lab.name }}
-        </a>
-    {% else %}
-        <span style="color: #666; opacity:0.6">{{ lab.organization.shortest_name }} / </span> {{ lab.name }}
-    {% endif %}
-</span>
+        {% if show_contact_link %}
+            {% if lab.contact_email %}<a class="hover-link" title="{{ lab.contact_email }}" href="mailto:{{ lab.contact_email }}?subject={{ subject }}"><i class="fa-regular fa-envelope"></i></a>{% endif %}
+            {% if lab.contact_phone %}<a href="tel:{{ lab.contact_phone }}"><i title="{% if lab.contact_name %}{{ lab.contact_name }} - {% endif %}{{ lab.contact_phone }}" class="fa-solid fa-phone"></i></a>{% endif %}
+            {% if not lab.contact_email and not lab.contact_phone and lab.url %}<i class="fa-solid fa-globe"></i>{% endif %}
+        {% endif %}
+    </span>
 {% endif %}
