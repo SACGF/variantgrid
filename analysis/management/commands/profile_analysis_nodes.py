@@ -250,8 +250,13 @@ class Command(BaseCommand):
             rerun=rerun, explain=explain, plans_dir=plans_dir))
 
         # Pattern 3 - gene list via VariantGeneOverlap (issue #1542)
+        vav_field_names = {f.name for f in VariantAnnotationVersion._meta.get_fields()}
+        if "status" in vav_field_names:
+            active_vav_filter = {"status": "ACTIVE"}
+        else:
+            active_vav_filter = {"active": True}
         vav = (VariantAnnotationVersion.objects
-               .filter(genome_build=sample.genome_build, status="ACTIVE")
+               .filter(genome_build=sample.genome_build, **active_vav_filter)
                .order_by("-pk").first())
         gene_list = (GeneList.objects
                      .filter(import_status="S")
