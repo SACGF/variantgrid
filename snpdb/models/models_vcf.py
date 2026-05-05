@@ -551,24 +551,6 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         return params
 
     @staticmethod
-    def _validate_sample_formatter_func(sample_label_template):
-        """ Throws error if invalid """
-        specimen = Specimen(reference_id='refId', description='description')
-        patient = Patient(pk=2, first_name='first_name', last_name='last_name',
-                          patient_code='patient_code')
-        sample = Sample(pk=1, name="sample", patient=patient, specimen=specimen)
-        params = sample._get_sample_formatter_params()
-        errors = []
-        for i, t in enumerate(sample_label_template.split("||")):
-            try:
-                t % params
-            except (ValueError, KeyError) as exception:
-                errors.append(f"{i+1}: '{t}: {exception=}'")
-        if errors:
-            error_msg = '\n'.join(errors)
-            raise ValueError(f"Sample formatter function failed: {error_msg}")
-
-    @staticmethod
     def _get_sample_formatter_func(sample_label_template, fallback=True):
         """ This is for rendering sample names on analysis grids """
         def _sample_formatter_func(sample):
