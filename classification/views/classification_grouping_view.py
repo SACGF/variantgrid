@@ -105,7 +105,11 @@ def view_overlaps_for_classification_grouping(request: HttpRequest, classificati
     cg = ClassificationGrouping.objects.filter(pk=classification_grouping_id).get()
 
     # TODO, select the c.HGVS that the other lab used?
-    c_hgvs = cg.latest_classification_modification.c_hgvs_best(GenomeBuild.grch38())
+    c_hgvs: str
+    if cg.latest_classification_modification:
+        c_hgvs = cg.latest_classification_modification.c_hgvs_best(GenomeBuild.grch38())
+    else:
+        c_hgvs = str(cg.allele)
 
     # overlap_contributions = OverlapContribution.objects.filter(classification_grouping=cg, contribution_status=OverlapContributionStatus.CONTRIBUTING)
     # skews = OverlapContributionSkew.objects.filter(contribution__in=overlap_contributions)
