@@ -231,7 +231,7 @@ class ChoicesMixin(Generic[TX]):
         return super().non_db_attrs + ("choices_type",)
 
     def from_db_value(self, value, expression, connection) -> Optional[TX]:
-        if value:
+        if value is not None:
             return self.choices_type(value)
         return None
 
