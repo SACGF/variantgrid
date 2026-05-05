@@ -70,7 +70,8 @@ def related_analyses_for_samples(context, samples, show_sample_info):
     pedigrees = Pedigree.objects.filter(cohort__in=cohorts).filter(cohortsamplepedfilerecord__cohort_sample__sample__in=samples).distinct()
     sample_mutational_signatures = MutationalSignature.objects.filter(sample__in=samples).distinct().select_related("sample")
 
-    update_context_with_related_analysis(context, samples, cohorts, trios, pedigrees, show_sample_info=show_sample_info)
+    update_context_with_related_analysis(context, samples, cohorts=cohorts, trios=trios, pedigrees=pedigrees,
+                                         show_sample_info=show_sample_info)
     context["samples"] = samples
     context["sample_mutational_signatures"] = sample_mutational_signatures
     return context
@@ -82,7 +83,7 @@ def related_analyses_for_cohort(context, cohort):
     trios = cohort.trio_set.all()
     cohorts = [cohort] + list(cohort.sub_cohort_set.all())
 
-    update_context_with_related_analysis(context, cohort.get_samples(), cohorts, trios, pedigrees)
+    update_context_with_related_analysis(context, cohort.get_samples(), cohorts=cohorts, trios=trios, pedigrees=pedigrees)
     context["cohort"] = cohort
     return context
 
@@ -90,7 +91,8 @@ def related_analyses_for_cohort(context, cohort):
 @register.inclusion_tag("analysis/tags/related_analyses_for_trio.html", takes_context=True)
 def related_analyses_for_trio(context, trio):
     pedigrees = trio.cohort.pedigree_set.all()
-    update_context_with_related_analysis(context, trio.get_samples(), [trio.cohort], [trio], pedigrees)
+    update_context_with_related_analysis(context, trio.get_samples(), cohorts=[trio.cohort], trios=[trio],
+                                         pedigrees=pedigrees)
     context["trio"] = trio
     return context
 
@@ -106,7 +108,8 @@ def related_analyses_for_quad(context, quad):
 @register.inclusion_tag("analysis/tags/related_analyses_for_pedigree.html", takes_context=True)
 def related_analyses_for_pedigree(context, pedigree):
     trios = pedigree.cohort.trio_set.all()
-    update_context_with_related_analysis(context, pedigree.get_samples(), [pedigree.cohort], trios, [pedigree])
+    update_context_with_related_analysis(context, pedigree.get_samples(), cohorts=[pedigree.cohort], trios=trios,
+                                         pedigrees=[pedigree])
     context["pedigree"] = pedigree
     return context
 
