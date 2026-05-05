@@ -280,39 +280,59 @@ class Command(BaseCommand):
                 "error": f"missing prerequisite: vav={vav} gene_list={gene_list}",
             })
 
-        # Pattern 4 - population gnomAD AF filter on sample variants (subquery)
-        try:
-            sample_variants_qs = sample.get_variant_qs()
-            qs_af_subq = sample_variants_qs.filter(variantannotation__gnomad_af__lte=0.01)
-            rows.append(self._profile_synthetic_pattern(
-                "population_af_subquery", sample_id, qs_af_subq,
-                f"sample={sample_id} gnomad_af<=0.01",
-                rerun=rerun, explain=explain, plans_dir=plans_dir))
-        except Exception as e:
+        # Pattern 4 - population gnomAD AF filter on sample variants (subquery, single VAV partition)
+        if vav:
+            try:
+                sample_variants_qs = sample.get_variant_qs()
+                qs_af_subq = sample_variants_qs.filter(
+                    variantannotation__version=vav,
+                    variantannotation__gnomad_af__lte=0.01,
+                )
+                rows.append(self._profile_synthetic_pattern(
+                    "population_af_subquery", sample_id, qs_af_subq,
+                    f"sample={sample_id} vav={vav.pk} gnomad_af<=0.01",
+                    rerun=rerun, explain=explain, plans_dir=plans_dir))
+            except Exception as e:
+                rows.append({
+                    "source": "synthetic", "node_type": "population_af_subquery",
+                    "analysis_id": "", "node_id": sample_id,
+                    "config_summary": f"sample={sample_id}",
+                    "error": f"build qs: {e}",
+                })
+        else:
             rows.append({
                 "source": "synthetic", "node_type": "population_af_subquery",
                 "analysis_id": "", "node_id": sample_id,
                 "config_summary": f"sample={sample_id}",
-                "error": f"build qs: {e}",
+                "error": "missing prerequisite: no active VariantAnnotationVersion",
             })
 
-        # Pattern 5 - population AF filter via materialized pk__in list (the known-fast path)
-        try:
-            variant_ids = list(sample.get_variant_qs().values_list("pk", flat=True)[:100_000])
-            qs_af_list = Variant.objects.filter(
-                pk__in=variant_ids,
-                variantannotation__gnomad_af__lte=0.01,
-            )
-            rows.append(self._profile_synthetic_pattern(
-                "population_af_pk_in_list", sample_id, qs_af_list,
-                f"sample={sample_id} gnomad_af<=0.01 list_size={len(variant_ids)}",
-                rerun=rerun, explain=explain, plans_dir=plans_dir))
-        except Exception as e:
+        # Pattern 5 - population AF filter via materialized pk__in list (single VAV partition)
+        if vav:
+            try:
+                variant_ids = list(sample.get_variant_qs().values_list("pk", flat=True))
+                qs_af_list = Variant.objects.filter(
+                    pk__in=variant_ids,
+                    variantannotation__version=vav,
+                    variantannotation__gnomad_af__lte=0.01,
+                )
+                rows.append(self._profile_synthetic_pattern(
+                    "population_af_pk_in_list", sample_id, qs_af_list,
+                    f"sample={sample_id} vav={vav.pk} gnomad_af<=0.01 list_size={len(variant_ids)}",
+                    rerun=rerun, explain=explain, plans_dir=plans_dir))
+            except Exception as e:
+                rows.append({
+                    "source": "synthetic", "node_type": "population_af_pk_in_list",
+                    "analysis_id": "", "node_id": sample_id,
+                    "config_summary": f"sample={sample_id}",
+                    "error": f"build qs: {e}",
+                })
+        else:
             rows.append({
                 "source": "synthetic", "node_type": "population_af_pk_in_list",
                 "analysis_id": "", "node_id": sample_id,
                 "config_summary": f"sample={sample_id}",
-                "error": f"build qs: {e}",
+                "error": "missing prerequisite: no active VariantAnnotationVersion",
             })
 
         for row in rows:
