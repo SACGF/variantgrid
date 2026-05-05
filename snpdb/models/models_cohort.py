@@ -527,6 +527,13 @@ class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         """ sample_zygosities = {sample : zygosities_set}
             sample_require_zygosity = {sample : True/False} - defaults to True
             exclude - invert query (not equals)
+
+        Uses regex on samples_zygosity. Benchmarking showed SUBSTRING+IN is faster for
+        small numbers of constrained samples but regex wins for larger cohorts (PG
+        planning time on substring predicates grows ~quadratically). Sample-level uses
+        substring (Sample.get_annotation_kwargs); cohort-level stays on regex. The
+        threshold-based dispatch (substring for trios, regex for wider) is tracked in
+        #1494; the structural GIN-indexed-int[] fix is #1546.
         """
         if all(not v for v in sample_zygosities.values()):
             # nothing selected

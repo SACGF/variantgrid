@@ -60,6 +60,12 @@ class Command(BaseCommand):
                             help="Analysis ID(s) — every node in each analysis is profiled")
         parser.add_argument("--sample", type=int, nargs="*", default=[],
                             help="Sample ID(s) — synthetic canonical single-node patterns are run per sample")
+        parser.add_argument("--trio", type=int, nargs="*", default=[],
+                            help="Trio ID(s) — multi-sample regex vs substr-AND comparison (de novo pattern)")
+        parser.add_argument("--cohort", type=int, nargs="*", default=[],
+                            help="Cohort ID(s) — multi-sample regex vs substr-AND comparison (random ~half carriers, plus exclude lookahead vs substr-OR)")
+        parser.add_argument("--cohort-seed", type=int, default=42,
+                            help="Seed for deterministic cohort sample-half selection (default 42)")
         parser.add_argument("--rerun", action="store_true",
                             help="Re-execute qs.count() per node and time it (in addition to cached load_seconds)")
         parser.add_argument("--explain", action="store_true",
@@ -72,8 +78,8 @@ class Command(BaseCommand):
                             help="Output directory (default ./profile_<timestamp>)")
 
     def handle(self, *args, **options):
-        if not options["analysis"] and not options["sample"]:
-            raise CommandError("Provide at least one of --analysis or --sample")
+        if not (options["analysis"] or options["sample"] or options["trio"] or options["cohort"]):
+            raise CommandError("Provide at least one of --analysis / --sample / --trio / --cohort")
 
         out_dir = options["out"] or os.path.join(
             os.getcwd(), f"profile_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
@@ -106,6 +112,25 @@ class Command(BaseCommand):
                 rerun=options["rerun"],
                 explain=options["explain"],
                 plans_dir=plans_dir,
+            ))
+
+        for trio_id in options["trio"]:
+            self.stdout.write(f"== Trio {trio_id} (synthetic) ==")
+            rows.extend(self._profile_trio_synthetic(
+                trio_id,
+                rerun=options["rerun"],
+                explain=options["explain"],
+                plans_dir=plans_dir,
+            ))
+
+        for cohort_id in options["cohort"]:
+            self.stdout.write(f"== Cohort {cohort_id} (synthetic) ==")
+            rows.extend(self._profile_cohort_synthetic(
+                cohort_id,
+                rerun=options["rerun"],
+                explain=options["explain"],
+                plans_dir=plans_dir,
+                seed=options["cohort_seed"],
             ))
 
         with open(csv_path, "w", newline="") as fh:
@@ -339,11 +364,12 @@ class Command(BaseCommand):
             self.stdout.write(self._row_summary(row))
         return rows
 
-    def _profile_synthetic_pattern(self, name, sample_id, qs, config, *, rerun, explain, plans_dir):
+    def _profile_synthetic_pattern(self, name, entity_id, qs, config, *,
+                                   rerun, explain, plans_dir, file_prefix="synthetic_s"):
         row = {
             "source": "synthetic",
             "analysis_id": "",
-            "node_id": sample_id,
+            "node_id": entity_id,
             "node_type": name,
             "node_name": "",
             "config_summary": config,
@@ -364,7 +390,7 @@ class Command(BaseCommand):
                 row["error"] = (row.get("error") or "") + f" rerun: {e}"
 
         if explain:
-            plan_file = os.path.join(plans_dir, f"synthetic_s{sample_id}_{name}.json")
+            plan_file = os.path.join(plans_dir, f"{file_prefix}{entity_id}_{name}.json")
             try:
                 planning, execution = _run_explain(sql, params, plan_file)
                 row["explain_planning_ms"] = planning
@@ -374,6 +400,156 @@ class Command(BaseCommand):
                 row["error"] = (row.get("error") or "") + f" explain: {e}"
 
         return row
+
+    # ---- Trio synthetic -------------------------------------------------
+
+    def _profile_trio_synthetic(self, trio_id, *, rerun, explain, plans_dir):
+        from snpdb.models import Variant, Trio
+        from django.db.models import F
+        from django.db.models.functions import Substr as DjSubstr
+
+        try:
+            trio = Trio.objects.get(pk=trio_id)
+        except Trio.DoesNotExist:
+            self.stderr.write(f"Trio {trio_id} not found")
+            return [{"source": "synthetic", "node_type": "trio_denovo",
+                     "analysis_id": "", "node_id": trio_id, "error": "Trio not found"}]
+
+        cohort = trio.cohort.get_base_cohort()
+        cgc = cohort.cohort_genotype_collection
+        ann_kwargs = cgc.get_annotation_kwargs()
+        cohort_alias = cgc.cohortgenotype_alias
+        zyg_field = f"{cohort_alias}__samples_zygosity"
+        n = cgc.num_samples
+
+        # Pull packed indices from the underlying CohortSamples (the trio's CohortSamples
+        # belong to its own cohort; the base cohort packing uses the same index).
+        proband_idx1 = trio.proband.cohort_genotype_packed_field_index + 1
+        mother_idx1 = trio.mother.cohort_genotype_packed_field_index + 1
+        father_idx1 = trio.father.cohort_genotype_packed_field_index + 1
+
+        # De novo: proband HET/HOM, parents REF/MISSING (treat '.' and 'R' both as not-carrier)
+        # Regex: build a length-n string with '[EO]' at proband, '[R.]' at parents, '.' elsewhere
+        regex_parts = ["."] * n
+        regex_parts[proband_idx1 - 1] = "[EO]"
+        regex_parts[mother_idx1 - 1] = "[R.]"
+        regex_parts[father_idx1 - 1] = "[R.]"
+        regex = "^" + "".join(regex_parts)
+
+        rows = []
+        qs_regex = (Variant.objects
+                    .annotate(**ann_kwargs)
+                    .filter(Q(**{f"{cohort_alias}__samples_zygosity__regex": regex})))
+        rows.append(self._profile_synthetic_pattern(
+            "trio_denovo_regex", trio_id, qs_regex,
+            f"trio={trio_id} cgc={cgc.pk} proband={proband_idx1} mother={mother_idx1} father={father_idx1}",
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_t"))
+
+        # Substr-AND: 3 independent substring conditions
+        qs_substr = (Variant.objects
+                     .annotate(**ann_kwargs)
+                     .annotate(_proband_z=DjSubstr(zyg_field, proband_idx1, 1))
+                     .annotate(_mother_z=DjSubstr(zyg_field, mother_idx1, 1))
+                     .annotate(_father_z=DjSubstr(zyg_field, father_idx1, 1))
+                     .filter(_proband_z__in=["E", "O"])
+                     .filter(_mother_z__in=["R", "."])
+                     .filter(_father_z__in=["R", "."]))
+        rows.append(self._profile_synthetic_pattern(
+            "trio_denovo_substr_and", trio_id, qs_substr,
+            f"trio={trio_id} cgc={cgc.pk} proband={proband_idx1} mother={mother_idx1} father={father_idx1}",
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_t"))
+
+        for row in rows:
+            self.stdout.write(self._row_summary(row))
+        return rows
+
+    # ---- Cohort synthetic -----------------------------------------------
+
+    def _profile_cohort_synthetic(self, cohort_id, *, rerun, explain, plans_dir, seed):
+        import random
+        from snpdb.models import Variant, Cohort
+        from django.db.models.functions import Substr as DjSubstr
+
+        try:
+            cohort = Cohort.objects.get(pk=cohort_id)
+        except Cohort.DoesNotExist:
+            self.stderr.write(f"Cohort {cohort_id} not found")
+            return [{"source": "synthetic", "node_type": "cohort",
+                     "analysis_id": "", "node_id": cohort_id, "error": "Cohort not found"}]
+
+        base = cohort.get_base_cohort()
+        cgc = base.cohort_genotype_collection
+        ann_kwargs = cgc.get_annotation_kwargs()
+        cohort_alias = cgc.cohortgenotype_alias
+        zyg_field = f"{cohort_alias}__samples_zygosity"
+        n = cgc.num_samples
+        if n < 2:
+            return [{"source": "synthetic", "node_type": "cohort",
+                     "analysis_id": "", "node_id": cohort_id,
+                     "error": f"cohort num_samples={n} is too small"}]
+
+        rng = random.Random(seed)
+        half_count = max(1, n // 2)
+        chosen = sorted(rng.sample(range(n), half_count))  # 0-based indices
+        chosen_1based = [i + 1 for i in chosen]
+
+        # Pattern A: half-carriers regex — '[EO]' at chosen positions, '.' elsewhere
+        regex_parts = ["."] * n
+        for i in chosen:
+            regex_parts[i] = "[EO]"
+        regex_pos = "^" + "".join(regex_parts)
+
+        rows = []
+        qs_regex = (Variant.objects
+                    .annotate(**ann_kwargs)
+                    .filter(Q(**{f"{cohort_alias}__samples_zygosity__regex": regex_pos})))
+        rows.append(self._profile_synthetic_pattern(
+            "cohort_half_carriers_regex", cohort_id, qs_regex,
+            f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
+
+        # Pattern B: half-carriers substr-AND — N independent substring IN ('E','O') predicates
+        qs_substr_and = Variant.objects.annotate(**ann_kwargs)
+        for k, idx1 in enumerate(chosen_1based):
+            alias = f"_zc{k}"
+            qs_substr_and = qs_substr_and.annotate(**{alias: DjSubstr(zyg_field, idx1, 1)})
+            qs_substr_and = qs_substr_and.filter(**{f"{alias}__in": ["E", "O"]})
+        rows.append(self._profile_synthetic_pattern(
+            "cohort_half_carriers_substr_and", cohort_id, qs_substr_and,
+            f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
+
+        # Pattern C: exclude lookahead — current production anti-pattern
+        # Exclude variants where ALL chosen samples are HET/HOM (i.e. a "rare in cohort" filter)
+        # Production rewrite: regex_string = f"^((?!{regex_pos[1:]}))"   (drop our '^' since it re-anchors)
+        regex_excl = f"^((?!{''.join(regex_parts)}))"
+        qs_excl_regex = (Variant.objects
+                         .annotate(**ann_kwargs)
+                         .filter(Q(**{f"{cohort_alias}__samples_zygosity__regex": regex_excl})))
+        rows.append(self._profile_synthetic_pattern(
+            "cohort_exclude_lookahead", cohort_id, qs_excl_regex,
+            f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
+
+        # Pattern D: exclude via substr-OR — equivalent positive form
+        # NOT (substring(.,i_0,1) IN E,O AND substring(.,i_1,1) IN E,O ...)
+        #   ==  substring(.,i_0,1) NOT IN E,O OR substring(.,i_1,1) NOT IN E,O ...
+        qs_excl_or = Variant.objects.annotate(**ann_kwargs)
+        for k, idx1 in enumerate(chosen_1based):
+            alias = f"_zc{k}"
+            qs_excl_or = qs_excl_or.annotate(**{alias: DjSubstr(zyg_field, idx1, 1)})
+        or_q = Q()
+        for k in range(len(chosen_1based)):
+            or_q |= ~Q(**{f"_zc{k}__in": ["E", "O"]})
+        qs_excl_or = qs_excl_or.filter(or_q)
+        rows.append(self._profile_synthetic_pattern(
+            "cohort_exclude_substr_or", cohort_id, qs_excl_or,
+            f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
+
+        for row in rows:
+            self.stdout.write(self._row_summary(row))
+        return rows
 
     # ---- Helpers --------------------------------------------------------
 

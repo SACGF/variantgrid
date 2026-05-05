@@ -453,7 +453,12 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         return f"sample_{self.pk}"
 
     def get_annotation_kwargs(self, **kwargs) -> dict:
-        """ For annotating Variant queries """
+        """ For annotating Variant queries.
+
+        SUBSTRING+IN beats regex for small numbers of constrained samples (single sample
+        here, ~6.5x faster). The cohort path keeps regex because regex wins for wider
+        cohorts — see CohortGenotypeCollection.get_zygosity_q and #1494.
+        """
         cgc = self.cohort_genotype_collection
         i = cgc.get_sql_index_for_sample_id(self.pk)
         sample_zygosity = Substr(f"{cgc.cohortgenotype_alias}__samples_zygosity", i, length=1)
