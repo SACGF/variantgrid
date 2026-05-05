@@ -29,8 +29,12 @@
                         <tr class="{% if overlap_entry.is_primary %}users-row{% endif %} {% if not overlap_entry.is_primary_context %}cross-context-row{% endif %}">
                             <td>{% testing_context overlap_entry.overlap_contribution %}</td>
                             <td>
-                                {% if overlap_entry.overlap_contribution.scv %}ClinVar Expert Panel<br/>{{ overlap_entry.overlap_contribution.scv }}{% else %}
-                                {% lab overlap_entry.overlap_contribution.lab your_lab=lab show_contact_link=True contact_subject=contact_subject %}{% endif %}
+                                {% if overlap_entry.overlap_contribution.scv %}ClinVar Expert Panel<br/><a class=hover-link" href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ overlap_entry.overlap_contribution.scv }}">{{ overlap_entry.overlap_contribution.scv }}</a>{% else %}
+                                {% lab overlap_entry.overlap_contribution.lab your_lab=lab show_contact_link=True contact_subject=contact_subject %}
+                                    {% with classification=overlap_entry.overlap_contribution.classification_grouping.latest_classification_modification.classification %}
+                                    <br/><a class="hover-link" href="{{ classification.get_absolute_url }}">{{ classification.cr_lab_id }}</a>
+                                    {% endwith %}
+                                {% endif %}
                             <td>{% clinical_significance overlap_entry.overlap_contribution.value %}
                             <div class="overlap-criteria">
                                 {% for criteria_label in overlap_entry.overlap_contribution.classification_grouping.latest_cached_summary.criteria_labels %}<span class="comma-sep">{{ criteria_label }}</span>{% endfor %}
