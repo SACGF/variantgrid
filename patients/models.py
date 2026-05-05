@@ -121,6 +121,7 @@ def patient_name_surname_first(first_name, last_name):
 
 class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, ExternallyManagedModel, PreviewModelMixin):
     family_code = models.TextField(null=True, blank=True)
+    patient_code = models.TextField(null=True, blank=True)
     first_name = models.TextField(null=True, blank=True)
     last_name = models.TextField(null=True)
     date_of_birth = models.DateField(null=True, blank=True)
@@ -162,7 +163,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             parts.append(PreviewKeyValue(value="deceased"))
 
         return self.preview_with(
-            identifier=self.external_pk or f"({self.pk})",
+            identifier=self.patient_code or self.external_pk or f"({self.pk})",
             title=self.name_last_name_first,
             summary_extra=parts
         )
@@ -172,7 +173,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
 
     @property
     def code(self):
-        return self.external_pk or f"Patient:{self.pk}"
+        return self.patient_code or self.external_pk or f"Patient:{self.pk}"
 
     @property
     def name(self):
@@ -401,8 +402,9 @@ class PatientComment(models.Model):
 
 class PatientColumns:
     PATIENT_FAMILY_CODE = 'Family Code'
+    PATIENT_CODE = 'Patient Code (de-identified)'
     PATIENT_FIRST_NAME = 'Patient First Name'
-    PATIENT_LAST_NAME = 'Patient Last Name (or code) (required)'
+    PATIENT_LAST_NAME = 'Patient Last Name (required)'
     DATE_OF_BIRTH = 'Date of Birth (DD-MM-YYYY)'
     DATE_OF_DEATH = 'Date of Death (DD-MM-YYYY)'
     DECEASED = 'Deceased (Y/N) (mutually exclusive to date of death)'
@@ -423,6 +425,7 @@ class PatientColumns:
 
     COLUMN_DETAILS = [
         (PATIENT_FAMILY_CODE, "String", "Family Code"),
+        (PATIENT_CODE, "String", "De-identified code safe to display in grids"),
         (PATIENT_FIRST_NAME, "String", "First Name to match/create a patient"),
         (PATIENT_LAST_NAME, "String", "Last Name to match/create a patient"),
         (DATE_OF_BIRTH, "Date", "Date to match/create a patient"),
@@ -448,6 +451,7 @@ class PatientColumns:
 
     SAMPLE_QUERYSET_PATH = {
         PATIENT_FAMILY_CODE: "patient__family_code",
+        PATIENT_CODE: "patient__patient_code",
         PATIENT_FIRST_NAME: "patient__first_name",
         PATIENT_LAST_NAME: "patient__last_name",
         DATE_OF_BIRTH: "patient__date_of_birth",
@@ -567,6 +571,7 @@ class PatientRecord(models.Model):
     sample_identifier = models.IntegerField(null=True)
     sample_name = models.TextField(null=True)
     patient_family_code = models.TextField(null=True)
+    patient_code = models.TextField(null=True)
     patient_first_name = models.TextField(null=True)
     patient_last_name = models.TextField()
     date_of_birth = models.DateField(null=True)

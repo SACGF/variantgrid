@@ -6,7 +6,8 @@ from snpdb.admin_utils import ModelAdminBasics
 
 @admin.register(models.Patient)
 class PatientAdmin(ModelAdminBasics):
-    pass
+    list_display = ("id", "patient_code", "family_code", "first_name", "last_name", "sex", "modified")
+    search_fields = ("patient_code", "family_code", "first_name", "last_name")
 
 
 @admin.register(models.Tissue)

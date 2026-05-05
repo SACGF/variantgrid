@@ -145,7 +145,8 @@ class VariantSampleInformation:
                                                             distinct=True, output_field=TextField())}
             samples_qs = samples_qs.annotate(**annotation_kwargs)
 
-            COPY_SAMPLE_FIELDS = ["id", "name", "patient", SAMPLE_ENRICHMENT_KIT_PATH]
+            COPY_SAMPLE_FIELDS = ["id", "name", "patient", "patient__patient_code",
+                                  SAMPLE_ENRICHMENT_KIT_PATH]
             sample_values = samples_qs.values("no_dna_control", "vcf__allele_frequency_percent",
                                               *COPY_SAMPLE_FIELDS, *list(annotation_kwargs.keys()))
 

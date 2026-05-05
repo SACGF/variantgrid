@@ -103,7 +103,7 @@ class SamplesListGrid(JqGridUserRowConfig):
               "sample_gene_list_count", "activesamplegenelist__id",
               "mutationalsignature__id", "mutationalsignature__summary",
               "somaliersampleextract__somalierancestry__predicted_ancestry",
-              "patient__first_name", "patient__last_name", "patient__sex",
+              "patient__patient_code", "patient__first_name", "patient__last_name", "patient__sex",
               "patient__date_of_birth", "patient__date_of_death",
               "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date", "vcf__id"]
     colmodel_overrides = {
@@ -132,6 +132,7 @@ class SamplesListGrid(JqGridUserRowConfig):
         'mutationalsignature__summary': {'label': 'Mutational Signature',
                                          'formatter': 'viewMutationalSignature'},
         "somaliersampleextract__somalierancestry__predicted_ancestry": {"label": "Predicted Ancestry"},
+        'patient__patient_code': {'label': 'Patient Code'},
         'patient__last_name': {'label': 'Last Name'},
         'patient__sex': {'label': 'Sex'},
         'patient__date_of_birth': {'label': 'D.O.B.'},
@@ -235,12 +236,13 @@ class SamplesListGrid(JqGridUserRowConfig):
 class CohortSampleListGrid(JqGridUserRowConfig):
     model = Sample
     caption = 'Cohort Samples'
-    fields = ["id", "name", "vcf__name", "patient__family_code",
+    fields = ["id", "name", "vcf__name", "patient__family_code", "patient__patient_code",
               "patient__first_name", "patient__first_name",
               "patient__sex", "patient__date_of_birth"]
     colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewSampleLink'},
                           'vcf__name': {'label': 'VCF'},
                           'patient__family_code': {'label': 'Family Code'},
+                          'patient__patient_code': {'label': 'Patient Code'},
                           'patient__first_name': {'label': 'First Name'},
                           'patient__last_name': {'label': 'Last Name'},
                           'patient__sex': {'label': 'Sex'},

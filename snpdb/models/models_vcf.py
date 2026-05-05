@@ -542,7 +542,7 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         }
         if patient := self.patient:
             params["patient_id"] = patient.pk
-            params["patient_code"] = patient.last_name
+            params["patient_code"] = patient.patient_code or ""
             params["patient"] = str(patient)
 
         if specimen := self.specimen:
@@ -554,7 +554,8 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
     def _validate_sample_formatter_func(sample_label_template):
         """ Throws error if invalid """
         specimen = Specimen(reference_id='refId', description='description')
-        patient = Patient(pk=2, first_name='first_name', last_name='last_name')
+        patient = Patient(pk=2, first_name='first_name', last_name='last_name',
+                          patient_code='patient_code')
         sample = Sample(pk=1, name="sample", patient=patient, specimen=specimen)
         params = sample._get_sample_formatter_params()
         errors = []

@@ -68,6 +68,7 @@
                     {{ form.first_name | as_crispy_field }}
                     {{ form.last_name | as_crispy_field }}
                     {{ form.family_code | as_crispy_field }}
+                    {{ form.patient_code | as_crispy_field }}
                     {{ form.sex | as_crispy_field }}
                     {% if has_write_permission or show_read_only_patient_dob %}
                         {{ form.date_of_birth | as_crispy_field }}

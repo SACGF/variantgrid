@@ -12,8 +12,8 @@ from django.test import TestCase
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.import_records import parse_boolean, parse_choice, process_record
 from patients.models import (
-    Clinician, Patient, PatientColumns, PatientImport, PatientModification,
-    PatientRecords, Specimen,
+    Clinician, ExternalModelManager, ExternalPK, Patient, PatientColumns,
+    PatientImport, PatientModification, PatientRecords, Specimen,
 )
 from patients.models_enums import Sex
 from snpdb.models import ImportSource
@@ -336,3 +336,35 @@ class TestPatientFormAuditTrail(TestCase):
         self.assertTrue(
             PatientModification.objects.filter(patient=patient).exists(),
             "No PatientModification created for affected False→True change")
+
+
+# ---------------------------------------------------------------------------
+# Patient.code — issue #230 de-identified display label fallthrough
+# ---------------------------------------------------------------------------
+
+class TestPatientCodeProperty(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.emm = ExternalModelManager.objects.create(name="code_test_manager")
+
+    def test_patient_code_used_when_set(self):
+        patient = Patient.objects.create(last_name="SMITH", patient_code="DEID-001")
+        self.assertEqual(patient.code, "DEID-001")
+
+    def test_external_pk_used_when_no_patient_code(self):
+        ext = ExternalPK.objects.create(code="EXT-1", external_type="t",
+                                        external_manager=self.emm)
+        patient = Patient.objects.create(last_name="SMITH", external_pk=ext)
+        self.assertEqual(patient.code, ext)
+
+    def test_patient_code_preferred_over_external_pk(self):
+        ext = ExternalPK.objects.create(code="EXT-2", external_type="t",
+                                        external_manager=self.emm)
+        patient = Patient.objects.create(last_name="SMITH", patient_code="DEID-002",
+                                         external_pk=ext)
+        self.assertEqual(patient.code, "DEID-002")
+
+    def test_falls_back_to_pk_when_neither_set(self):
+        patient = Patient.objects.create(last_name="SMITH")
+        self.assertEqual(patient.code, f"Patient:{patient.pk}")
