@@ -343,7 +343,7 @@ class Command(BaseCommand):
         gene_matcher.match_unmatched_symbols(gene_symbols)
 
         hgnc_terms = list(OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC))
-        self._warm_panel_app(hgnc_ot.name for hgnc_ot in hgnc_terms)
+        self._warm_panel_app()
 
         traverser = get_ontology_traverser(gav.ontology_version, in_memory=self.in_memory_graph,
                                            call_update_gene_relations=False)
