@@ -175,6 +175,11 @@ class Command(BaseCommand):
             if not auto_linked:
                 print("Release not linked - you will have to manually do so via Django Admin")
 
+        print(f"To create a GeneAnnotationVersion for this release, run: "
+              f"python3 manage.py gene_annotation --gene-annotation-release {release.pk}")
+        print("Or to create GeneAnnotationVersions for all latest AnnotationVersions missing one, run: "
+              "python3 manage.py gene_annotation --missing")
+
     @classmethod
     def import_cdot_data(cls, genome_build: GenomeBuild, annotation_consortium, cdot_data: dict, cdot_version):
         print(f"importing {genome_build}/{annotation_consortium}")

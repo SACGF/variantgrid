@@ -1918,7 +1918,14 @@ class AnnotationVersion(models.Model):
             if vav_gar_id := self.variant_annotation_version.gene_annotation_release_id:
                 gene_gar_id = self.gene_annotation_version.gene_annotation_release_id
                 if vav_gar_id != gene_gar_id:
-                    different_msg = f"Inconsistent GeneAnnotationRelease. Variant {vav_gar_id} vs Gene: {gene_gar_id}"
+                    vav_gar = self.variant_annotation_version.gene_annotation_release
+                    different_msg = (
+                        f"Inconsistent GeneAnnotationRelease. VariantAnnotationVersion "
+                        f"{self.variant_annotation_version.pk} uses GAR {vav_gar_id} but "
+                        f"GeneAnnotationVersion {self.gene_annotation_version.pk} uses GAR {gene_gar_id}. "
+                        f"Create a GeneAnnotationVersion for the new GAR by running: "
+                        f"python3 manage.py gene_annotation --gene-annotation-release {vav_gar.pk}"
+                    )
                     raise InvalidAnnotationVersionError(different_msg)
 
             ov_id = self.ontology_version_id
@@ -1960,10 +1967,23 @@ class AnnotationVersion(models.Model):
             builds = GenomeBuild.builds_with_annotation()
 
         for genome_build in builds:
+            vav = latest_for_build(VariantAnnotationVersion, genome_build)
+            gav_qs = GeneAnnotationVersion.objects.filter(gene_annotation_release__genome_build=genome_build)
+            if vav and vav.gene_annotation_release_id:
+                gav_qs = gav_qs.filter(gene_annotation_release_id=vav.gene_annotation_release_id)
+            gav = gav_qs.order_by('annotation_date').last()
+            if vav and vav.gene_annotation_release_id and gav is None:
+                gar = vav.gene_annotation_release
+                raise InvalidAnnotationVersionError(
+                    f"No GeneAnnotationVersion exists for GeneAnnotationRelease {gar} "
+                    f"(used by VariantAnnotationVersion {vav.pk}). Create one by running: "
+                    f"python3 manage.py gene_annotation --gene-annotation-release {gar.pk}"
+                )
+
             kwargs = {
                 "genome_build": genome_build,
-                "variant_annotation_version": latest_for_build(VariantAnnotationVersion, genome_build),
-                "gene_annotation_version": latest_for_build(GeneAnnotationVersion, genome_build, "gene_annotation_release__genome_build"),
+                "variant_annotation_version": vav,
+                "gene_annotation_version": gav,
                 "clinvar_version": latest_for_build(ClinVarVersion, genome_build),
                 "human_protein_atlas_version": latest(HumanProteinAtlasAnnotationVersion, 'annotation_date'),
                 "ontology_version": latest(OntologyVersion, 'pk'),
