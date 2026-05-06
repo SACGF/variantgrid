@@ -24,6 +24,11 @@ ABANDONED_OMIM_RE = re.compile('(?<![0-9])([0-9]{6})(?![0-9])')
 
 
 def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
+    """ Per-symbol PanelApp Australia refresh, used by the live read path.
+        Gated by settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE so web traffic
+        on hosts that rely on the GenCC cached snapshot stays off the wire. """
+    if not settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE:
+        return
     if isinstance(gene_symbol, GeneSymbol):
         gene_symbol = gene_symbol.symbol
     return _update_gene_relations(gene_symbol)
@@ -100,9 +105,6 @@ def _update_gene_relations(gene_symbol: str,
         records (or None / []). Defaults to a single per-symbol API call.
         Bulk callers can pass a dict-backed fetcher to serve all symbols
         from one paginated crawl. """
-    if not settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE:
-        return
-
     panel_app = PanelAppServer.australia_instance()
     if results_fetcher is None:
         results_fetcher = _make_api_fetcher(panel_app)
@@ -204,10 +206,10 @@ def bulk_update_gene_relations(server: Optional[PanelAppServer] = None) -> int:
         update OntologyTermRelation rows for every curated gene. Far cheaper
         than per-symbol calls when batching across all HGNC symbols.
 
-        Returns the number of distinct gene symbols updated. """
-    if not settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE:
-        return 0
+        Caller-opt-in: bypasses settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE.
+        If you call this, you want the data refreshed.
 
+        Returns the number of distinct gene symbols updated. """
     if server is None:
         server = PanelAppServer.australia_instance()
 

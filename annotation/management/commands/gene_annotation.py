@@ -1,3 +1,4 @@
+import argparse
 import os
 from collections import defaultdict, Counter
 
@@ -30,6 +31,9 @@ class Command(BaseCommand):
         parser.add_argument('--dbnsfp-gene-version', help=gar_ov_dbsnfp_help)
         parser.add_argument('--in-memory-graph', action='store_true',
                             help='Load OntologyTermRelation graph into memory once for the run')
+        parser.add_argument('--update-panel-app', action=argparse.BooleanOptionalAction, default=True,
+                            help='Refresh PanelApp Australia data via a bulk paginated crawl '
+                                 'before annotation. Default on; pass --no-update-panel-app to skip.')
 
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument('--gene-annotation-release', type=int, help=gar_ov_dbsnfp_help)
@@ -54,6 +58,7 @@ class Command(BaseCommand):
         ov_id = options["ontology_version"]
         dbnsfp_gene_version_id = options["dbnsfp_gene_version"]
         self.in_memory_graph = options["in_memory_graph"]
+        self.update_panel_app = options["update_panel_app"]
 
         missing = options["missing"]
         self._validate_has_required_data()
@@ -141,14 +146,18 @@ class Command(BaseCommand):
             raise ValueError("No ontology versions - you need to import this first (see annotation page)")
         return ontology_version
 
-    @staticmethod
-    def _warm_panel_app():
+    def _warm_panel_app(self):
         """Pre-seed PanelApp Australia data via a single paginated crawl of
         /api/v1/genes/ so the BFS read path doesn't have to trigger live
         updates per call. ~357 paginated HTTP calls cover every curated gene
         — far cheaper than per-symbol calls across all HGNC terms.
 
-        No-op when settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE is False."""
+        Forced on by default for batch annotation (overrides
+        settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE). Pass
+        --no-update-panel-app to skip."""
+        if not self.update_panel_app:
+            print("Skipping PanelApp pre-warm (--no-update-panel-app)")
+            return
         from ontology.panel_app_ontology import bulk_update_gene_relations
         print("Pre-warming PanelApp Australia data (bulk crawl)...")
         n = bulk_update_gene_relations()
