@@ -4,7 +4,6 @@ A series of models that currently stores the combination of MONDO, OMIM, HPO & H
 """
 import functools
 import logging
-import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -864,15 +863,20 @@ class OntologyVersion(TimeStampedModel):
         return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
 
     def terms_for_gene_symbol(self, gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
-                              max_depth=1, quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER) -> 'OntologySnakes':
+                              max_depth=1,
+                              quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
+                              call_update_gene_relations: bool = True) -> 'OntologySnakes':
         otr_qs = self.get_ontology_term_relations()
         return OntologySnake.terms_for_gene_symbol(gene_symbol, desired_ontology, max_depth=max_depth,
-                                                   quality_filter=quality_filter, otr_qs=otr_qs)
+                                                   quality_filter=quality_filter, otr_qs=otr_qs,
+                                                   call_update_gene_relations=call_update_gene_relations)
 
     def gene_disease_relations(self, gene_symbol: Union[str, GeneSymbol],
-                               quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER) -> list[OntologyTermRelation]:
+                               quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
+                               call_update_gene_relations: bool = True) -> list[OntologyTermRelation]:
         snake = self.terms_for_gene_symbol(gene_symbol, OntologyService.MONDO,
-                                           max_depth=0, quality_filter=quality_filter)
+                                           max_depth=0, quality_filter=quality_filter,
+                                           call_update_gene_relations=call_update_gene_relations)
         return snake.leaf_relations(ontology_relation=OntologyRelation.RELATED)
 
     def __str__(self):
@@ -1075,63 +1079,9 @@ class OntologySnake:
         if otr_qs is None:
             otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
 
-        seen: set[OntologyTerm] = set()
-        seen.add(term)
-        new_snakes: list[OntologySnake] = list([OntologySnake(source_term=term)])
-        valid_snakes: list[OntologySnake] = []
-
-        relation_q_list = [
-            # the list of relationships below is hardly complete for stopping MONDO <-> OMIM, that's done as an extra step
-            # but filter out the most common ones here (and IS_A as we don't want to go up/down the hierarchy)
-            ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM, OntologyRelation.XREF}),
-            quality_filter.filter_q
-        ]
-        q_relation = functools.reduce(operator.and_, relation_q_list)
-
-        iteration = -1
-        while new_snakes:
-            iteration += 1
-            snakes: list[OntologySnake] = list(new_snakes)
-            new_snakes: list[OntologySnake] = []
-            by_leafs: dict[OntologyTerm, OntologySnake] = {}
-            for snake in snakes:
-                if existing := by_leafs.get(snake.leaf_term):
-                    if len(snake.paths) < len(existing.paths):
-                        by_leafs[snake.leaf_term] = snake
-                else:
-                    by_leafs[snake.leaf_term] = snake
-            all_leafs = by_leafs.keys()
-
-            outgoing = otr_qs.filter(source_term__in=all_leafs).exclude(dest_term__in=seen).filter(q_relation)
-            incoming = otr_qs.filter(dest_term__in=all_leafs).exclude(source_term__in=seen).filter(q_relation)
-            if to_ontology == OntologyService.HGNC:
-                outgoing = outgoing.exclude(dest_term__ontology_service=OntologyService.HPO)
-                incoming = incoming.exclude(source_term__ontology_service=OntologyService.HPO)
-
-            all_relations = list(outgoing) + list(incoming)
-
-            for relation in all_relations:
-                snake = by_leafs.get(relation.source_term) or by_leafs.get(relation.dest_term)
-
-                if snake.leaf_term in (relation.source_term, relation.dest_term):
-                    other_term = relation.other_end(snake.leaf_term)
-
-                    ontology_services = {snake.leaf_term.ontology_service, other_term.ontology_service}
-                    # Possibly Narrow or Broad would also be valid??
-                    if OntologyService.MONDO in ontology_services and OntologyService.OMIM in ontology_services and relation.relation != OntologyRelation.EXACT:
-                        continue
-
-                    new_snake = snake.snake_step(relation)
-                    if other_term.ontology_service == to_ontology:
-                        valid_snakes.append(new_snake)
-                        continue
-                    if len(new_snake.paths) <= max_depth:
-                        new_snakes.append(new_snake)
-                    seen.add(other_term)
-
-        valid_snakes.sort()
-
-        return OntologySnakes(valid_snakes)
+        from ontology.ontology_traversal import bfs_to_ontology, _make_db_step_fn
+        step_fn = _make_db_step_fn(otr_qs, quality_filter)
+        return bfs_to_ontology(term, to_ontology, max_depth, step_fn)
 
     @staticmethod
     def direct_relationships_for_gene_symbol(
@@ -1187,12 +1137,19 @@ class OntologySnake:
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
                               max_depth=1,
                               quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
-                              otr_qs: QuerySet[OntologyTermRelation] = None) -> 'OntologySnakes':
+                              otr_qs: QuerySet[OntologyTermRelation] = None,
+                              call_update_gene_relations: bool = True) -> 'OntologySnakes':
         # FIXME, can the min_classification default to STRONG and other code can filter it out?
-        """ max_depth: How many steps in snake path to go through """
+        """ max_depth: How many steps in snake path to go through.
+
+            call_update_gene_relations: when True (default), pulls live PanelApp Australia data
+            for the gene before traversal. Batch callers that pre-warm PanelApp once up-front
+            should pass False to skip the per-call hook.
+        """
         # TODO, do this with hooks
-        from ontology.panel_app_ontology import update_gene_relations
-        update_gene_relations(gene_symbol)
+        if call_update_gene_relations:
+            from ontology.panel_app_ontology import update_gene_relations
+            update_gene_relations(gene_symbol)
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology,
                                         max_depth=max_depth, quality_filter=quality_filter,

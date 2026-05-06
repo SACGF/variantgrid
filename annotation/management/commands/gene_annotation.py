@@ -12,6 +12,7 @@ from genes.models import GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGen
 from library.django_utils.django_file_utils import get_import_processing_filename
 from ontology.models import OntologyService, GeneDiseaseClassification, OntologyTermRelation, \
     OntologyVersion, ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER
+from ontology.ontology_traversal import get_ontology_traverser
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
@@ -27,6 +28,8 @@ class Command(BaseCommand):
         parser.add_argument('--force', action="store_true", help="Force create new GeneAnnotation for same release")
         parser.add_argument('--ontology-version', type=int, help=gar_ov_dbsnfp_help)
         parser.add_argument('--dbnsfp-gene-version', help=gar_ov_dbsnfp_help)
+        parser.add_argument('--in-memory-graph', action='store_true',
+                            help='Load OntologyTermRelation graph into memory once for the run')
 
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument('--gene-annotation-release', type=int, help=gar_ov_dbsnfp_help)
@@ -50,13 +53,13 @@ class Command(BaseCommand):
         gar_id = options["gene_annotation_release"]
         ov_id = options["ontology_version"]
         dbnsfp_gene_version_id = options["dbnsfp_gene_version"]
+        self.in_memory_graph = options["in_memory_graph"]
 
         missing = options["missing"]
         self._validate_has_required_data()
 
         if options["add_new_to_existing"]:
-            ontology_version = self._get_ontology_version(ov_id)
-            self._add_new_columns_to_existing(ontology_version)
+            self._add_new_columns_to_existing()
             return
 
         dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.all().order_by("created").last()
@@ -139,6 +142,20 @@ class Command(BaseCommand):
         return ontology_version
 
     @staticmethod
+    def _warm_panel_app(gene_symbols):
+        """Pre-seed PanelApp Australia data so the BFS read path doesn't have
+        to trigger live updates per call. update_gene_relations is a no-op
+        when settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE is False, and is
+        DB-cached for PANEL_APP_CACHE_DAYS otherwise — so most calls here are
+        cheap freshness checks."""
+        from ontology.panel_app_ontology import update_gene_relations
+        symbols = list(gene_symbols)
+        print(f"Pre-warming PanelApp Australia data for {len(symbols)} gene symbols...")
+        for symbol in symbols:
+            update_gene_relations(symbol)
+        print("Pre-warm complete")
+
+    @staticmethod
     def _validate_has_required_data():
         for ontology_service in [OntologyService.OMIM, OntologyService.HPO,
                                  OntologyService.MONDO, OntologyService.HGNC]:
@@ -177,12 +194,15 @@ class Command(BaseCommand):
                 print(f"Updating {len(gene_annotation)} records....")
                 GeneAnnotation.objects.bulk_update(gene_annotation, ["dbnsfp_gene_id"], batch_size=2000)
 
-    def _add_new_columns_to_existing(self, ontology_version):
+    def _add_new_columns_to_existing(self):
         """ As we only added not changed columns, can just populate existing annotation """
         UPDATE_COLUMNS = ["mondo_terms", "gene_disease_moderate_or_above", "gene_disease_supportive_or_below"]
 
         print("Updating existing gene annotation...")
         print("Loading HGNC data...")
+
+        hgnc_terms = list(OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC))
+        self._warm_panel_app(hgnc_ot.name for hgnc_ot in hgnc_terms)
 
         # Then go through
         for ga_version in GeneAnnotationVersion.objects.all():
@@ -192,14 +212,19 @@ class Command(BaseCommand):
                 ga_by_gene_id[ga.gene_id] = ga
             print("Loaded existing gene annotation, matching to HGNC")
 
+            traverser = get_ontology_traverser(ga_version.ontology_version, in_memory=self.in_memory_graph,
+                                               call_update_gene_relations=False)
+            if self.in_memory_graph:
+                print(f"Loaded {traverser.edge_count} relations into memory for {ga_version.ontology_version}")
+
             hgnc_data = defaultdict(dict)
-            for hgnc_ot in OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC):
+            for hgnc_ot in hgnc_terms:
                 gene_symbol = hgnc_ot.name
-                snake = ga_version.ontology_version.terms_for_gene_symbol(hgnc_ot.name, OntologyService.MONDO,
-                                                                          max_depth=0)
+                snake = traverser.terms_for_gene_symbol(hgnc_ot.name, OntologyService.MONDO,
+                                                        max_depth=0)
                 uc_symbol = gene_symbol.upper()
                 hgnc_data[uc_symbol]["mondo_terms"] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
-                hgnc_data[uc_symbol]["gene_disease"] = self._get_gene_disease(ontology_version,
+                hgnc_data[uc_symbol]["gene_disease"] = self._get_gene_disease(traverser,
                                                                               gene_symbol, Command.TERM_JOIN_STRING)
 
             gene_annotation = []
@@ -243,16 +268,24 @@ class Command(BaseCommand):
                 continue  # Has OMIM already
 
             print(f"Re-calculating OMIM terms for {gav}")
+
             gene_symbol_for_gene = {}
             for rgv in gav.gene_annotation_release.releasegeneversion_set.all().select_related("gene_version"):
                 gene_symbol_for_gene[rgv.gene_version.gene_id] = rgv.gene_version.gene_symbol_id
+
+            self._warm_panel_app(set(gene_symbol_for_gene.values()))
+
+            traverser = get_ontology_traverser(gav.ontology_version, in_memory=self.in_memory_graph,
+                                               call_update_gene_relations=False)
+            if self.in_memory_graph:
+                print(f"Loaded {traverser.edge_count} relations into memory for {gav.ontology_version}")
 
             update_records = []
             skip_genes = set()
             for ga in ga_qs:
                 if gene_symbol := gene_symbol_for_gene.get(ga.gene_id):
                     try:
-                        snake = gav.ontology_version.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=1)
+                        snake = traverser.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=1)
                         if omim_terms := self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs())):
                             ga.omim_terms = omim_terms
                             update_records.append(ga)
@@ -268,14 +301,14 @@ class Command(BaseCommand):
                 GeneAnnotation.objects.bulk_update(update_records, ["omim_terms"], batch_size=1000)
 
     @staticmethod
-    def _get_gene_disease(ontology_version, gene_symbol, delimiter: str):
+    def _get_gene_disease(traverser, gene_symbol, delimiter: str):
         moderate_or_above = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.MODERATE)
         supportive_or_below = [gdc.label for gdc in reversed(GeneDiseaseClassification)
                                if gdc.label not in moderate_or_above]
 
         diseases_supportive_or_below = []
         diseases_moderate_or_above = []
-        for otr in ontology_version.gene_disease_relations(gene_symbol, quality_filter=ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER):
+        for otr in traverser.gene_disease_relations(gene_symbol, quality_filter=ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER):
             disease = otr.source_term.name
             moi_classifications = otr.get_gene_disease_moi_classifications()
             moi_supportive_or_below = otr.get_moi_summary(moi_classifications, supportive_or_below)
@@ -307,17 +340,25 @@ class Command(BaseCommand):
         gene_matcher = ReleaseGeneMatcher(gav.gene_annotation_release)
         gene_matcher.match_unmatched_symbols(gene_symbols)
 
+        hgnc_terms = list(OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC))
+        self._warm_panel_app(hgnc_ot.name for hgnc_ot in hgnc_terms)
+
+        traverser = get_ontology_traverser(gav.ontology_version, in_memory=self.in_memory_graph,
+                                           call_update_gene_relations=False)
+        if self.in_memory_graph:
+            print(f"Loaded {traverser.edge_count} relations into memory for {gav.ontology_version}")
+
         missing_genes = Counter()
         # The various annotations are for different genes, so group kwargs by gene
         annotation_by_gene = defaultdict(dict)
-        for hgnc_ot in OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC):
+        for hgnc_ot in hgnc_terms:
             service_terms = {}
             gene_symbol = hgnc_ot.name
             for ontology_service in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
-                snake = gav.ontology_version.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=1)
+                snake = traverser.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=1)
                 service_terms[ontology_service] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
 
-            gene_disease_supportive_or_below, gene_disease_moderate_or_above = self._get_gene_disease(gav.ontology_version,
+            gene_disease_supportive_or_below, gene_disease_moderate_or_above = self._get_gene_disease(traverser,
                                                                                                       gene_symbol,
                                                                                                       Command.TERM_JOIN_STRING)
             if not (any(service_terms.values()) or
