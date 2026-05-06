@@ -40,6 +40,9 @@ ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
 # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
 ANNOTATION_VEP_PICK_ORDER = None
 ANNOTATION_VEP_DISTANCE = 5000  # VEP --distance arg (default=5000) - how far up/downstream to assign to a transcript
+# Read at VAV creation only and snapshotted onto the VariantAnnotationVersion. Existing VAVs are unaffected by changes here.
+# Values: "primary" -> --gencode_primary, "basic" -> --gencode_basic, None -> full Ensembl set. Ignored for RefSeq VAVs.
+ANNOTATION_VEP_ENSEMBL_GENCODE = "primary"
 # columns version is used to drive config in vep_columns.py
 ANNOTATION_VEP_COLUMNS_VERSION = 1  # 1 = original version, 2 = May 2022
 ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE = True  # Only 'dup' for dups, false is all SVs overlap

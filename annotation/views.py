@@ -286,10 +286,15 @@ def annotation_versions(request):
         qs = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date")
         has_annotation = qs.exists()
         has_active = qs.filter(variant_annotation_version__status=VariantAnnotationVersion.Status.ACTIVE).exists()
+        latest_vav = VariantAnnotationVersion.objects.filter(
+            genome_build=genome_build,
+            status=VariantAnnotationVersion.Status.ACTIVE,
+        ).first()
         vep_commands = {}
         for pt in VariantAnnotationPipelineType:
             vep_command = get_vep_command("in.vcf", "out.vcf", genome_build,
-                                          genome_build.annotation_consortium, pt)
+                                          genome_build.annotation_consortium, pt,
+                                          variant_annotation_version=latest_vav)
             vep_command = " ".join(vep_command).replace(" -", "\n")
             vep_commands[pt.value] = vep_command
 

@@ -98,7 +98,8 @@ def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path) -> 
 
 
 def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
-                    pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True):
+                    pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True,
+                    variant_annotation_version=None):
     vc = VEPConfig(genome_build)
     vep_cmd = os.path.join(settings.ANNOTATION_VEP_CODE_DIR, "vep")
 
@@ -144,8 +145,12 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
         cmd.extend(["--pick_order", settings.ANNOTATION_VEP_PICK_ORDER])
 
-    if settings.ANNOTATION_VEP_DISTANCE is not None:
-        cmd.extend(["--distance", str(settings.ANNOTATION_VEP_DISTANCE)])
+    if variant_annotation_version is not None:
+        if variant_annotation_version.distance is not None:
+            cmd.extend(["--distance", str(variant_annotation_version.distance)])
+        if (annotation_consortium == AnnotationConsortium.ENSEMBL
+                and variant_annotation_version.gencode_subset):
+            cmd.append(f"--gencode_{variant_annotation_version.gencode_subset}")
 
     if max_sv_size := settings.ANNOTATION_VEP_SV_MAX_SIZE:
         vep_default_max_sv_size = 10_000_000
@@ -236,11 +241,13 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
 
 
 def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
-            pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True):
+            pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True,
+            variant_annotation_version=None):
     """ executes VEP command. Returns (command_line, code, stdout, stderr) """
 
     cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium, pipeline_type,
-                          compress_output=compress_output)
+                          compress_output=compress_output,
+                          variant_annotation_version=variant_annotation_version)
     return execute_cmd(cmd, shell=False)
 
 
@@ -348,6 +355,9 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     if distance is None:
         distance = 5000
     kwargs["distance"] = distance
+
+    if vep_config.annotation_consortium == AnnotationConsortium.ENSEMBL:
+        kwargs["gencode_subset"] = getattr(settings, "ANNOTATION_VEP_ENSEMBL_GENCODE", None)
 
     # Plugins are optional
     try:

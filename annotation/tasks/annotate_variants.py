@@ -133,7 +133,8 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
         vcf_annotated_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_annotated_basename)
 
         cmd = get_vep_command(vcf_dump_filename, vcf_annotated_filename, genome_build, annotation_consortium,
-                              annotation_run.pipeline_type)
+                              annotation_run.pipeline_type,
+                              variant_annotation_version=annotation_run.variant_annotation_version)
         annotation_run.annotation_start = timezone.now()
         annotation_run.pipeline_command = " ".join(cmd)
         annotation_run.save()

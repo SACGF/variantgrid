@@ -624,6 +624,10 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         ACTIVE = "ACTIVE", "Active"
         HISTORICAL = "HISTORICAL", "Historical"
 
+    class GencodeSubset(models.TextChoices):
+        BASIC = "basic", "GENCODE Basic"
+        PRIMARY = "primary", "GENCODE Primary"
+
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     # GeneAnnotationRelease - imported GTF we can use to get gene/transcript versions that match VEP
@@ -647,6 +651,9 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     assembly = models.TextField()
     dbsnp = models.IntegerField(blank=True, null=True)  # 37/38 only
     gencode = models.TextField(blank=True, null=True)  # 37/38 only
+    gencode_subset = models.TextField(
+        null=True, blank=True, choices=GencodeSubset.choices,
+    )  # None = full Ensembl set; ignored on RefSeq VAVs
     genebuild = models.TextField()
     gnomad = models.TextField(blank=True, null=True)  # 37/38 only
     refseq = models.TextField(blank=True)

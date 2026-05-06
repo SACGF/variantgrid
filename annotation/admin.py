@@ -54,9 +54,11 @@ _STATUS_BADGE_COLOURS = {
 @admin.register(VariantAnnotationVersion)
 class VariantAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
     list_display = ("pk", "genome_build", "annotation_consortium", "annotation_date",
-                    "vep", "columns_version", "status_badge", "data_archived_date")
+                    "vep", "columns_version", "gencode_subset", "distance",
+                    "status_badge", "data_archived_date")
     list_filter = ("status", "genome_build", "annotation_consortium", "data_archived_date")
-    readonly_fields = ("status", "data_archived_date", "data_archived_by",
+    readonly_fields = ("status", "gencode_subset", "distance",
+                       "data_archived_date", "data_archived_by",
                        "data_archive_reason", "data_restorable_from")
     ordering = ("genome_build", "-annotation_date")
 
