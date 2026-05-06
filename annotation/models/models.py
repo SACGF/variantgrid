@@ -1752,7 +1752,7 @@ class VariantGeneOverlap(models.Model):
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
 
     class Meta:
-        unique_together = ('version', 'variant', 'annotation_run', 'gene')
+        unique_together = ('version', 'variant', 'gene')
 
 
 class ManualVariantEntryCollection(models.Model):
