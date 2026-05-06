@@ -1,32 +1,22 @@
 from django.db import migrations
 
+from manual.operations.manual_operations import ManualOperation
 
-def _reminder(apps, schema_editor):
-    """
-    MANUAL MIGRATION REQUIRED for sites that were using Patient.last_name as a
-    de-identified code (issue #230 workaround).
 
-    The new Patient.patient_code field is the canonical de-identified display
-    label. It is intentionally NOT auto-populated from last_name, because
-    last_name may legitimately contain real surnames on some deployments and a
-    blind copy would leak PII into a field designed to be shown everywhere.
-
-    Each deployment must decide and run its own backfill, e.g.:
-
-        # If you know last_name on this deployment is always a code:
-        UPDATE patients_patient
-           SET patient_code = last_name
-         WHERE patient_code IS NULL
-           AND last_name IS NOT NULL;
-
-        # If only some labs/imports used last_name as a code, scope the UPDATE
-        # by the relevant Sample/VCF/Lab join.
-
-    Until the backfill runs, %(patient_code)s in grid_sample_label_template
-    will resolve to '' for legacy patients.
-    """
+def _has_existing_patients(apps):
+    Patient = apps.get_model("patients", "Patient")
+    return Patient.objects.exists()
 
 
 class Migration(migrations.Migration):
-    dependencies = [("patients", "0011_patient_patient_code")]
-    operations = [migrations.RunPython(_reminder, migrations.RunPython.noop)]
+    dependencies = [
+        ("patients", "0011_patient_patient_code"),
+        ("manual", "0002_deployment"),
+    ]
+
+    operations = [
+        ManualOperation.operation_other(
+            args=["Patient.patient_code added (de-identified, safe to show where names were historically hidden) - if you've been using other fields as codes, manually migrate them to patient_code. See https://github.com/SACGF/variantgrid/issues/230"],
+            test=_has_existing_patients,
+        ),
+    ]
