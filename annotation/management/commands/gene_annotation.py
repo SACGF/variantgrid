@@ -348,6 +348,13 @@ class Command(BaseCommand):
         if self.in_memory_graph:
             print(f"Loaded {traverser.edge_count} relations into memory for {gav.ontology_version}")
 
+        # Keys are uppercased so the HGNC loop's uc_symbol lookup matches the
+        # case-insensitive collation that genes_for_symbol() relies on.
+        rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=gav.gene_annotation_release)
+        symbol_to_gene_ids = defaultdict(set)
+        for gene_symbol, gene_id in rgsg_qs.values_list("release_gene_symbol__gene_symbol", "gene_id"):
+            symbol_to_gene_ids[gene_symbol.upper()].add(gene_id)
+
         missing_genes = Counter()
         # The various annotations are for different genes, so group kwargs by gene
         annotation_by_gene = defaultdict(dict)
@@ -366,9 +373,9 @@ class Command(BaseCommand):
                 continue  # Skip who cares
 
             uc_symbol = gene_symbol.upper()
-            genes_qs = gav.gene_annotation_release.genes_for_symbol(uc_symbol)
-            if genes_qs.exists():
-                for gene_id in genes_qs.values_list("identifier", flat=True):
+            gene_ids = symbol_to_gene_ids.get(uc_symbol)
+            if gene_ids:
+                for gene_id in gene_ids:
                     for ontology_service, terms in service_terms.items():
                         column = f"{str(ontology_service).lower()}_terms"
                         annotation_by_gene[gene_id][column] = terms
@@ -379,17 +386,12 @@ class Command(BaseCommand):
                 print(f"Warning: {gav.gene_annotation_release} has no match for '{uc_symbol}' ({service_terms})")
                 missing_genes["ontology"] += 1
 
-        rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=gav.gene_annotation_release)
-        symbol_to_gene_ids = defaultdict(set)
-        for gene_symbol, gene_id in rgsg_qs.values_list("release_gene_symbol__gene_symbol", "gene_id"):
-            symbol_to_gene_ids[gene_symbol].add(gene_id)
-
         # Go through and match all the
         dbnsfp_qs = gav.dbnsfp_gene_version.dbnsfpgeneannotation_set.all()
         if not dbnsfp_qs.exists():
             raise ValueError(f"{gav.dbnsfp_gene_version} has no entries!")
         for dbnsfp_gene_id, gene_symbol_id in dbnsfp_qs.values_list("pk", "gene_symbol_id"):
-            if gene_ids_for_symbol := symbol_to_gene_ids.get(gene_symbol_id):
+            if gene_ids_for_symbol := symbol_to_gene_ids.get(gene_symbol_id.upper()):
                 for gene_id in gene_ids_for_symbol:
                     annotation_by_gene[gene_id]["dbnsfp_gene_id"] = dbnsfp_gene_id
             else:
@@ -397,7 +399,7 @@ class Command(BaseCommand):
                 missing_genes["dbnsfp_gene_annotation"] += 1
 
         for gene_symbol_id, oe_lof in GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", "lof_oe"):
-            if gene_ids_for_symbol := symbol_to_gene_ids.get(gene_symbol_id):
+            if gene_ids_for_symbol := symbol_to_gene_ids.get(gene_symbol_id.upper()):
                 for gene_id in gene_ids_for_symbol:
                     annotation_by_gene[gene_id]["gnomad_oe_lof"] = oe_lof
             else:
