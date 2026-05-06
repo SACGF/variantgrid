@@ -46,6 +46,7 @@ CSV_FIELDS = [
     "explain_execution_ms",
     "explain_plan_file",
     "sql_truncated",
+    "max_af_gate",
     "error",
 ]
 
@@ -76,6 +77,10 @@ class Command(BaseCommand):
                             help="Cap nodes per analysis")
         parser.add_argument("--out", type=str, default=None,
                             help="Output directory (default ./profile_<timestamp>)")
+        parser.add_argument("--max-af-gate", choices=["on", "off", "both"], default="on",
+                            help="PopulationNode max_af gate clause (#1547): on (default, "
+                                 "with optimisation), off (legacy plan), both (run each "
+                                 "profile twice — once with, once without — for A/B comparison)")
 
     def handle(self, *args, **options):
         if not (options["analysis"] or options["sample"] or options["trio"] or options["cohort"]):
@@ -94,44 +99,60 @@ class Command(BaseCommand):
         rows = []
         node_type_filter = set(options["node_type"]) if options["node_type"] else None
 
-        for analysis_id in options["analysis"]:
-            self.stdout.write(f"== Analysis {analysis_id} ==")
-            rows.extend(self._profile_analysis(
-                analysis_id,
-                rerun=options["rerun"],
-                explain=options["explain"],
-                node_type_filter=node_type_filter,
-                limit=options["limit_per_analysis"],
-                plans_dir=plans_dir,
-            ))
+        gate_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["max_af_gate"]]
 
-        for sample_id in options["sample"]:
-            self.stdout.write(f"== Sample {sample_id} (synthetic) ==")
-            rows.extend(self._profile_sample_synthetic(
-                sample_id,
-                rerun=options["rerun"],
-                explain=options["explain"],
-                plans_dir=plans_dir,
-            ))
+        from analysis.models.nodes.filters.population_node import PopulationNode
+        original_gate = PopulationNode.MAX_AF_GATE_ENABLED
+        try:
+            for gate_mode in gate_modes:
+                PopulationNode.MAX_AF_GATE_ENABLED = (gate_mode == "on")
+                if len(gate_modes) > 1:
+                    self.stdout.write(f"### max_af_gate={gate_mode} ###")
 
-        for trio_id in options["trio"]:
-            self.stdout.write(f"== Trio {trio_id} (synthetic) ==")
-            rows.extend(self._profile_trio_synthetic(
-                trio_id,
-                rerun=options["rerun"],
-                explain=options["explain"],
-                plans_dir=plans_dir,
-            ))
+                for analysis_id in options["analysis"]:
+                    self.stdout.write(f"== Analysis {analysis_id} ==")
+                    rows.extend(self._tag_gate(self._profile_analysis(
+                        analysis_id,
+                        rerun=options["rerun"],
+                        explain=options["explain"],
+                        node_type_filter=node_type_filter,
+                        limit=options["limit_per_analysis"],
+                        plans_dir=plans_dir,
+                        gate_mode=gate_mode,
+                    ), gate_mode))
 
-        for cohort_id in options["cohort"]:
-            self.stdout.write(f"== Cohort {cohort_id} (synthetic) ==")
-            rows.extend(self._profile_cohort_synthetic(
-                cohort_id,
-                rerun=options["rerun"],
-                explain=options["explain"],
-                plans_dir=plans_dir,
-                seed=options["cohort_seed"],
-            ))
+                for sample_id in options["sample"]:
+                    self.stdout.write(f"== Sample {sample_id} (synthetic) ==")
+                    rows.extend(self._tag_gate(self._profile_sample_synthetic(
+                        sample_id,
+                        rerun=options["rerun"],
+                        explain=options["explain"],
+                        plans_dir=plans_dir,
+                        gate_mode=gate_mode,
+                    ), gate_mode))
+
+                for trio_id in options["trio"]:
+                    self.stdout.write(f"== Trio {trio_id} (synthetic) ==")
+                    rows.extend(self._tag_gate(self._profile_trio_synthetic(
+                        trio_id,
+                        rerun=options["rerun"],
+                        explain=options["explain"],
+                        plans_dir=plans_dir,
+                        gate_mode=gate_mode,
+                    ), gate_mode))
+
+                for cohort_id in options["cohort"]:
+                    self.stdout.write(f"== Cohort {cohort_id} (synthetic) ==")
+                    rows.extend(self._tag_gate(self._profile_cohort_synthetic(
+                        cohort_id,
+                        rerun=options["rerun"],
+                        explain=options["explain"],
+                        plans_dir=plans_dir,
+                        seed=options["cohort_seed"],
+                        gate_mode=gate_mode,
+                    ), gate_mode))
+        finally:
+            PopulationNode.MAX_AF_GATE_ENABLED = original_gate
 
         with open(csv_path, "w", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=CSV_FIELDS)
@@ -145,7 +166,7 @@ class Command(BaseCommand):
 
     # ---- Analysis-mode profiling ----------------------------------------
 
-    def _profile_analysis(self, analysis_id, *, rerun, explain, node_type_filter, limit, plans_dir):
+    def _profile_analysis(self, analysis_id, *, rerun, explain, node_type_filter, limit, plans_dir, gate_mode):
         from analysis.models import Analysis
         try:
             analysis = Analysis.objects.get(pk=analysis_id)
@@ -172,12 +193,13 @@ class Command(BaseCommand):
                 rerun=rerun,
                 explain=explain,
                 plans_dir=plans_dir,
+                gate_mode=gate_mode,
             )
             rows.append(row)
             self.stdout.write(self._row_summary(row))
         return rows
 
-    def _profile_node(self, node, *, source, analysis_id, rerun, explain, plans_dir):
+    def _profile_node(self, node, *, source, analysis_id, rerun, explain, plans_dir, gate_mode):
         node_type = type(node).__name__
         row = {
             "source": source,
@@ -188,6 +210,7 @@ class Command(BaseCommand):
             "config_summary": _config_summary(node),
             "count": node.count,
             "cached_load_seconds": node.load_seconds,
+            "max_af_gate": gate_mode,
         }
 
         try:
@@ -220,7 +243,7 @@ class Command(BaseCommand):
                 row["error"] = (row.get("error") or "") + f" rerun: {e}"
 
         if explain and sql is not None:
-            plan_file = os.path.join(plans_dir, f"{source}_a{analysis_id}_n{node.pk}.json")
+            plan_file = os.path.join(plans_dir, f"{source}_a{analysis_id}_n{node.pk}_gate{gate_mode}.json")
             try:
                 planning, execution = _run_explain(sql, params, plan_file)
                 row["explain_planning_ms"] = planning
@@ -233,7 +256,7 @@ class Command(BaseCommand):
 
     # ---- Synthetic-mode profiling ---------------------------------------
 
-    def _profile_sample_synthetic(self, sample_id, *, rerun, explain, plans_dir):
+    def _profile_sample_synthetic(self, sample_id, *, rerun, explain, plans_dir, gate_mode):
         from snpdb.models import Sample, Variant
         from annotation.models import VariantAnnotationVersion, VariantGeneOverlap
         from genes.models import GeneList
@@ -260,7 +283,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "sample_variant_regex", sample_id, qs_variant_regex,
             f"sample={sample_id} cgc={cgc.pk} idx={sample_idx}",
-            rerun=rerun, explain=explain, plans_dir=plans_dir))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
 
         # Pattern 2 - sample any-variant via Substr + IN
         ann_kwargs_sample = sample.get_annotation_kwargs()
@@ -272,7 +295,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "sample_variant_substr_in", sample_id, qs_variant_substr,
             f"sample={sample_id} alias={zyg_alias}",
-            rerun=rerun, explain=explain, plans_dir=plans_dir))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
 
         # Pattern 3 - gene list via VariantGeneOverlap (issue #1542)
         vav_field_names = {f.name for f in VariantAnnotationVersion._meta.get_fields()}
@@ -296,7 +319,7 @@ class Command(BaseCommand):
             rows.append(self._profile_synthetic_pattern(
                 "gene_list_via_vgo", sample_id, qs_vgo,
                 f"vav={vav.pk} gene_list={gene_list.pk} ({len(gene_ids)} genes)",
-                rerun=rerun, explain=explain, plans_dir=plans_dir))
+                rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
         else:
             rows.append({
                 "source": "synthetic", "node_type": "gene_list_via_vgo",
@@ -316,7 +339,7 @@ class Command(BaseCommand):
                 rows.append(self._profile_synthetic_pattern(
                     "population_af_subquery", sample_id, qs_af_subq,
                     f"sample={sample_id} vav={vav.pk} gnomad_af<=0.01",
-                    rerun=rerun, explain=explain, plans_dir=plans_dir))
+                    rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
             except Exception as e:
                 rows.append({
                     "source": "synthetic", "node_type": "population_af_subquery",
@@ -344,7 +367,7 @@ class Command(BaseCommand):
                 rows.append(self._profile_synthetic_pattern(
                     "population_af_pk_in_list", sample_id, qs_af_list,
                     f"sample={sample_id} vav={vav.pk} gnomad_af<=0.01 list_size={len(variant_ids)}",
-                    rerun=rerun, explain=explain, plans_dir=plans_dir))
+                    rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
             except Exception as e:
                 rows.append({
                     "source": "synthetic", "node_type": "population_af_pk_in_list",
@@ -365,7 +388,7 @@ class Command(BaseCommand):
         return rows
 
     def _profile_synthetic_pattern(self, name, entity_id, qs, config, *,
-                                   rerun, explain, plans_dir, file_prefix="synthetic_s"):
+                                   rerun, explain, plans_dir, gate_mode, file_prefix="synthetic_s"):
         row = {
             "source": "synthetic",
             "analysis_id": "",
@@ -373,6 +396,7 @@ class Command(BaseCommand):
             "node_type": name,
             "node_name": "",
             "config_summary": config,
+            "max_af_gate": gate_mode,
         }
         try:
             sql, params = _qs_sql_with_params(qs)
@@ -390,7 +414,7 @@ class Command(BaseCommand):
                 row["error"] = (row.get("error") or "") + f" rerun: {e}"
 
         if explain:
-            plan_file = os.path.join(plans_dir, f"{file_prefix}{entity_id}_{name}.json")
+            plan_file = os.path.join(plans_dir, f"{file_prefix}{entity_id}_{name}_gate{gate_mode}.json")
             try:
                 planning, execution = _run_explain(sql, params, plan_file)
                 row["explain_planning_ms"] = planning
@@ -403,7 +427,7 @@ class Command(BaseCommand):
 
     # ---- Trio synthetic -------------------------------------------------
 
-    def _profile_trio_synthetic(self, trio_id, *, rerun, explain, plans_dir):
+    def _profile_trio_synthetic(self, trio_id, *, rerun, explain, plans_dir, gate_mode):
         from snpdb.models import Variant, Trio
         from django.db.models import F
         from django.db.models.functions import Substr as DjSubstr
@@ -443,7 +467,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "trio_denovo_regex", trio_id, qs_regex,
             f"trio={trio_id} cgc={cgc.pk} proband={proband_idx1} mother={mother_idx1} father={father_idx1}",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_t"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_t"))
 
         # Substr-AND: 3 independent substring conditions
         qs_substr = (Variant.objects
@@ -457,7 +481,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "trio_denovo_substr_and", trio_id, qs_substr,
             f"trio={trio_id} cgc={cgc.pk} proband={proband_idx1} mother={mother_idx1} father={father_idx1}",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_t"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_t"))
 
         for row in rows:
             self.stdout.write(self._row_summary(row))
@@ -465,7 +489,7 @@ class Command(BaseCommand):
 
     # ---- Cohort synthetic -----------------------------------------------
 
-    def _profile_cohort_synthetic(self, cohort_id, *, rerun, explain, plans_dir, seed):
+    def _profile_cohort_synthetic(self, cohort_id, *, rerun, explain, plans_dir, seed, gate_mode):
         import random
         from snpdb.models import Variant, Cohort
         from django.db.models.functions import Substr as DjSubstr
@@ -506,7 +530,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "cohort_half_carriers_regex", cohort_id, qs_regex,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_c"))
 
         # Pattern B: half-carriers substr-AND — N independent substring IN ('E','O') predicates
         qs_substr_and = Variant.objects.annotate(**ann_kwargs)
@@ -517,7 +541,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "cohort_half_carriers_substr_and", cohort_id, qs_substr_and,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_c"))
 
         # Pattern C: exclude lookahead — current production anti-pattern
         # Exclude variants where ALL chosen samples are HET/HOM (i.e. a "rare in cohort" filter)
@@ -529,7 +553,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "cohort_exclude_lookahead", cohort_id, qs_excl_regex,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_c"))
 
         # Pattern D: exclude via substr-OR — equivalent positive form
         # NOT (substring(.,i_0,1) IN E,O AND substring(.,i_1,1) IN E,O ...)
@@ -545,13 +569,19 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "cohort_exclude_substr_or", cohort_id, qs_excl_or,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_c"))
 
         for row in rows:
             self.stdout.write(self._row_summary(row))
         return rows
 
     # ---- Helpers --------------------------------------------------------
+
+    @staticmethod
+    def _tag_gate(rows, gate_mode):
+        for row in rows:
+            row["max_af_gate"] = gate_mode
+        return rows
 
     @staticmethod
     def _row_summary(row):
@@ -561,6 +591,8 @@ class Command(BaseCommand):
             f"n{row.get('node_id') or '-'}",
             row.get("node_type", ""),
         ]
+        if row.get("max_af_gate"):
+            bits.append(f"gate={row['max_af_gate']}")
         if row.get("count") not in (None, ""):
             bits.append(f"count={row['count']}")
         if row.get("cached_load_seconds") not in (None, ""):

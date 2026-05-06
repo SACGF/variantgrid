@@ -20,6 +20,10 @@ from snpdb.models import VariantZygosityCountCollection
 
 class PopulationNode(AnalysisNode):
     EVERYTHING = 100.0  # Percent
+    # Class-level toggle for the max_af gate clause emitted by _get_node_q. Default True
+    # (the optimisation introduced in #1547). Profiling code flips this to compare plans
+    # with and without the gate; production code should not change it.
+    MAX_AF_GATE_ENABLED = True
     percent = models.FloatField(default=EVERYTHING)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
     # highest in gnomAD - for diff groups see PopulationNodeGnomADPopulation below
@@ -109,10 +113,11 @@ class PopulationNode(AnalysisNode):
 
                 and_q.append(reduce(group_operation, filters))
 
-            max_allele_frequency = self.percent / 100
-            q_max_af_isnull = Q(variantannotation__max_af__isnull=True)
-            q_max_af_lte = Q(variantannotation__max_af__lte=max_allele_frequency)
-            and_q.append(q_max_af_isnull | q_max_af_lte)
+            if self.MAX_AF_GATE_ENABLED:
+                max_allele_frequency = self.percent / 100
+                q_max_af_isnull = Q(variantannotation__max_af__isnull=True)
+                q_max_af_lte = Q(variantannotation__max_af__lte=max_allele_frequency)
+                and_q.append(q_max_af_isnull | q_max_af_lte)
 
         if self.gnomad_hom_alt_max is not None:
             q_hom_alt_lt = Q(variantannotation__gnomad_hom_alt__lte=self.gnomad_hom_alt_max)
