@@ -142,18 +142,17 @@ class Command(BaseCommand):
         return ontology_version
 
     @staticmethod
-    def _warm_panel_app(gene_symbols):
-        """Pre-seed PanelApp Australia data so the BFS read path doesn't have
-        to trigger live updates per call. update_gene_relations is a no-op
-        when settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE is False, and is
-        DB-cached for PANEL_APP_CACHE_DAYS otherwise — so most calls here are
-        cheap freshness checks."""
-        from ontology.panel_app_ontology import update_gene_relations
-        symbols = list(gene_symbols)
-        print(f"Pre-warming PanelApp Australia data for {len(symbols)} gene symbols...")
-        for symbol in symbols:
-            update_gene_relations(symbol)
-        print("Pre-warm complete")
+    def _warm_panel_app():
+        """Pre-seed PanelApp Australia data via a single paginated crawl of
+        /api/v1/genes/ so the BFS read path doesn't have to trigger live
+        updates per call. ~357 paginated HTTP calls cover every curated gene
+        — far cheaper than per-symbol calls across all HGNC terms.
+
+        No-op when settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE is False."""
+        from ontology.panel_app_ontology import bulk_update_gene_relations
+        print("Pre-warming PanelApp Australia data (bulk crawl)...")
+        n = bulk_update_gene_relations()
+        print(f"Pre-warm complete ({n} gene symbols updated)")
 
     @staticmethod
     def _validate_has_required_data():
@@ -202,7 +201,7 @@ class Command(BaseCommand):
         print("Loading HGNC data...")
 
         hgnc_terms = list(OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC))
-        self._warm_panel_app(hgnc_ot.name for hgnc_ot in hgnc_terms)
+        self._warm_panel_app()
 
         # Then go through
         for ga_version in GeneAnnotationVersion.objects.all():
@@ -262,6 +261,7 @@ class Command(BaseCommand):
             print(f"{gav.pk}: {gav}")
 
     def _add_missing_omim(self):
+        warmed = False
         for gav in GeneAnnotationVersion.objects.filter(ontology_version__omim_import__isnull=True):
             ga_qs = gav.geneannotation_set.all()
             if ga_qs.filter(omim_terms__isnull=False).exists():
@@ -273,7 +273,9 @@ class Command(BaseCommand):
             for rgv in gav.gene_annotation_release.releasegeneversion_set.all().select_related("gene_version"):
                 gene_symbol_for_gene[rgv.gene_version.gene_id] = rgv.gene_version.gene_symbol_id
 
-            self._warm_panel_app(set(gene_symbol_for_gene.values()))
+            if not warmed:
+                self._warm_panel_app()
+                warmed = True
 
             traverser = get_ontology_traverser(gav.ontology_version, in_memory=self.in_memory_graph,
                                                call_update_gene_relations=False)
