@@ -47,6 +47,8 @@ CSV_FIELDS = [
     "explain_plan_file",
     "sql_truncated",
     "max_af_gate",
+    "build_seconds",       # only set by cohort_exclude_vc_join — one-time pre-compute cost
+    "vc_record_count",     # only set by cohort_exclude_vc_join — size of the cached set
     "error",
 ]
 
@@ -102,10 +104,24 @@ class Command(BaseCommand):
         gate_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["max_af_gate"]]
 
         from analysis.models.nodes.filters.population_node import PopulationNode
-        original_gate = PopulationNode.MAX_AF_GATE_ENABLED
+        # PopulationNode.MAX_AF_GATE_ENABLED is a newer feature flag; older code branches
+        # don't define it. Use getattr/setattr so this command runs unchanged on legacy
+        # systems (e.g. for benchmarking against prod data on a pre-flag deploy). On legacy
+        # systems "off" is unavailable and we silently fall back to "on" with a warning.
+        _GATE_ATTR = "MAX_AF_GATE_ENABLED"
+        _GATE_SENTINEL = object()
+        original_gate = getattr(PopulationNode, _GATE_ATTR, _GATE_SENTINEL)
+        gate_supported = original_gate is not _GATE_SENTINEL
+        if not gate_supported:
+            if "off" in gate_modes:
+                self.stderr.write(
+                    f"PopulationNode.{_GATE_ATTR} not present on this codebase — "
+                    f"--max-af-gate=off/both not available. Forcing 'on'.")
+            gate_modes = ["on"]
         try:
             for gate_mode in gate_modes:
-                PopulationNode.MAX_AF_GATE_ENABLED = (gate_mode == "on")
+                if gate_supported:
+                    setattr(PopulationNode, _GATE_ATTR, gate_mode == "on")
                 if len(gate_modes) > 1:
                     self.stdout.write(f"### max_af_gate={gate_mode} ###")
 
@@ -152,7 +168,8 @@ class Command(BaseCommand):
                         gate_mode=gate_mode,
                     ), gate_mode))
         finally:
-            PopulationNode.MAX_AF_GATE_ENABLED = original_gate
+            if gate_supported:
+                setattr(PopulationNode, _GATE_ATTR, original_gate)
 
         with open(csv_path, "w", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=CSV_FIELDS)
@@ -571,9 +588,114 @@ class Command(BaseCommand):
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
             rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_c"))
 
+        # Pattern E: exclude via cached VariantCollection JOIN
+        # Models the "pre-compute once, join for every subsequent query" strategy: build a
+        # transient VC populated by the same regex-excl predicate, then measure ONLY the
+        # JOIN-query cost. Build cost is recorded separately as `build_seconds` so it's
+        # visible but not counted as the rerun number (it's amortised across queries).
+        # Mirrors the design of caching sub-cohort filters for the production EXCLUDE hot
+        # path (#1546 alternative to v2 GIN dispatch).
+        rows.append(self._profile_cohort_exclude_vc_join(
+            cohort_id, cgc, regex_excl, chosen,
+            f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
+            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
+
         for row in rows:
             self.stdout.write(self._row_summary(row))
         return rows
+
+    def _profile_cohort_exclude_vc_join(self, cohort_id, cgc, regex_excl, chosen, config, *,
+                                        rerun, explain, plans_dir, gate_mode):
+        """ Build a transient VariantCollection with the regex-excl result set, then profile
+        the JOIN-query cost. Cleans up the transient VC after profiling so re-runs stay
+        idempotent. """
+        from django.db import connection
+        from snpdb.models import Variant, VariantCollection, VariantCollectionRecord
+        from snpdb.models.models_enums import ProcessingStatus
+
+        partition_table = cgc.get_partition_table()
+        common_partition_table = None
+        if cgc.common_collection_id:
+            common_partition_table = cgc.common_collection.get_partition_table()
+        # Match Pattern C's regex; sub_cohort production also runs this against both the
+        # uncommon and common partitions, so include both when present.
+        partitions = [partition_table] + ([common_partition_table] if common_partition_table else [])
+
+        vc_name = f"synthetic_cohort_{cohort_id}_excl_chosen{len(chosen)}"
+        # Idempotency: drop any leftover VC from a previous synthetic run on the same cohort.
+        for stale in VariantCollection.objects.filter(name=vc_name):
+            try:
+                stale.delete_related_objects()
+            except Exception:  # pragma: no cover — partition may already be gone
+                pass
+            stale.delete()
+
+        vc = VariantCollection.objects.create(name=vc_name, status=ProcessingStatus.CREATED)
+        vc_partition_table = vc.get_partition_table()
+
+        # Build: INSERT FROM SELECT, mirrors what a production cache-build would do (one
+        # SQL statement, no row-by-row Python overhead). Time it.
+        union_sql_parts = [
+            f'SELECT DISTINCT {vc.pk} AS variant_collection_id, variant_id '
+            f'FROM "{p}" '
+            f'WHERE collection_id = ANY(%s) AND samples_zygosity ~ %s'
+            for p in partitions
+        ]
+        build_sql = (f'INSERT INTO "{vc_partition_table}" (variant_collection_id, variant_id) '
+                     f'{" UNION ".join(union_sql_parts)};')
+        coll_ids = [cgc.pk] + ([cgc.common_collection_id] if cgc.common_collection_id else [])
+        # Each partition predicate needs its own (collection_ids_array, regex) pair.
+        params = []
+        for _ in partitions:
+            params.extend([coll_ids, regex_excl])
+
+        build_seconds = None
+        try:
+            t0 = time.perf_counter()
+            with connection.cursor() as cur:
+                cur.execute(build_sql, params)
+                vc_record_count = cur.rowcount
+            build_seconds = round(time.perf_counter() - t0, 4)
+            vc.count = vc_record_count
+            vc.status = ProcessingStatus.SUCCESS
+            vc.save()
+        except Exception as e:
+            row = {
+                "source": "synthetic", "analysis_id": "", "node_id": cohort_id,
+                "node_type": "cohort_exclude_vc_join", "config_summary": config,
+                "max_af_gate": gate_mode, "error": f"vc build: {e}",
+            }
+            try:
+                vc.delete_related_objects()
+            except Exception:  # pragma: no cover
+                pass
+            vc.delete()
+            return row
+
+        # Profile the JOIN query — variant ⋈ variantcollectionrecord ⋈ cohortgenotype.
+        # cohortgenotype is still joined because production analysis nodes need its
+        # cohortgenotype_alias annotation for downstream filters (filters, AF, etc.); the
+        # change is that the EXCLUDE predicate becomes a VC membership instead of a regex.
+        ann_kwargs = cgc.get_annotation_kwargs()
+        ann_kwargs.update(vc.get_annotation_kwargs())
+        cohort_alias = cgc.cohortgenotype_alias
+        qs = (Variant.objects
+              .annotate(**ann_kwargs)
+              .filter(Q(**{f"{cohort_alias}__isnull": False}),
+                      Q(**{f"{vc.variant_collection_alias}__isnull": False})))
+        row = self._profile_synthetic_pattern(
+            "cohort_exclude_vc_join", cohort_id, qs, config,
+            rerun=rerun, explain=explain, plans_dir=plans_dir,
+            gate_mode=gate_mode, file_prefix="synthetic_c")
+        row["build_seconds"] = build_seconds
+        row["vc_record_count"] = vc.count
+
+        try:
+            vc.delete_related_objects()
+        except Exception:  # pragma: no cover
+            pass
+        vc.delete()
+        return row
 
     # ---- Helpers --------------------------------------------------------
 

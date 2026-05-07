@@ -117,6 +117,16 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                                               "gene_annotation_import": gene_annotation_import,
                                                                           })[0]
 
+    create_ontology_test_data()
+    ontology_version = create_test_ontology_version()
+
+    # GeneAnnotationVersion must exist before VariantAnnotationVersion: VAV.save() triggers
+    # AnnotationVersion.new_sub_version which raises InvalidAnnotationVersionError if VAV's
+    # gene_annotation_release has no matching GeneAnnotationVersion yet.
+    gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
+                                                                          ontology_version=ontology_version,
+                                                                          gnomad_import_date=timezone.now())[0]
+
     vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
     vav_kwargs["gene_annotation_release"] = gene_annotation_release
     vav_defaults = {k: vav_kwargs.pop(k) for k in list(vav_kwargs) if k != "genome_build"}
@@ -126,12 +136,6 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
         status=VariantAnnotationVersion.Status.ACTIVE,
         defaults=vav_defaults,
     )
-    create_ontology_test_data()
-    ontology_version = create_test_ontology_version()
-
-    gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
-                                                                          ontology_version=ontology_version,
-                                                                          gnomad_import_date=timezone.now())[0]
     clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
                                                            sha256_hash="not_a_real_hash",
                                                            genome_build=genome_build)[0]
