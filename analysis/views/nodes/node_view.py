@@ -8,6 +8,7 @@ from analysis.grids import VariantGrid
 from analysis.models import AnalysisTemplateType
 from analysis.models.nodes.node_utils import update_analysis
 from library.django_utils import set_form_read_only
+from snpdb.archive import DataArchivedError
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.utils import get_all_tags_and_user_colors
@@ -31,6 +32,9 @@ class NodeView(UpdateView):
             "node_warnings": self.object.get_warnings(),
         })
 
+        if configuration_errors := self.object._get_configuration_errors():
+            context["node_warnings"] = list(context.get("node_warnings") or []) + configuration_errors
+
         try:
             grid = VariantGrid(self.request.user, self.object, extra_filters)
             colmodels = grid.get_colmodels()
@@ -46,6 +50,11 @@ class NodeView(UpdateView):
             context["node_debug_tab"] = user_settings.node_debug_tab
         except NonFatalNodeError as ne:
             context["errors"] = [str(ne)]
+        except DataArchivedError:
+            # Configuration error already added to node_warnings above; skip the
+            # grid-dependent context so the editor form still renders and the
+            # user can fix the node (e.g. select a different cohort).
+            pass
         return context
 
     def _get_form_initial(self):

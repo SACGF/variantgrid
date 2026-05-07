@@ -68,11 +68,10 @@ class CohortMixin:
     def count_column_prefix(self):
         cohort = self._get_cohort()
         if cohort and cohort.is_sub_cohort:
-            column_prefix = f"sub_cohort_{cohort.pk}_"
-        else:
-            cgc = self.cohort_genotype_collection
-            column_prefix = f"{cgc.cohortgenotype_alias}__"
-        return column_prefix
+            return f"sub_cohort_{cohort.pk}_"
+        if cgc := self.cohort_genotype_collection:
+            return f"{cgc.cohortgenotype_alias}__"
+        return None
 
     @property
     def non_ref_call_count_annotation_arg(self):
@@ -239,17 +238,16 @@ class CohortMixin:
 
         extra_columns = []
         if self.has_filters:
-            cgc = self.cohort_genotype_collection
-            extra_columns.append(f"{cgc.cohortgenotype_alias}__filters")
+            if cgc := self.cohort_genotype_collection:
+                extra_columns.append(f"{cgc.cohortgenotype_alias}__filters")
 
         return extra_columns
 
     def _get_node_extra_colmodel_overrides(self):
         extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
-        if self.has_filters:
+        if self.has_filters and (cgc := self.cohort_genotype_collection):
             vcf = self._get_vcf()
             server_side_formatter = VCFFilter.get_formatter(vcf)
-            cgc = self.cohort_genotype_collection
             filters_column = f"{cgc.cohortgenotype_alias}__filters"
             extra_colmodel_overrides[filters_column] = {
                 'name': filters_column,

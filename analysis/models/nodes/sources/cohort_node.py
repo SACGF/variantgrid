@@ -291,14 +291,14 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
     def _get_node_extra_columns(self):
         extra_columns = super()._get_node_extra_columns()
-        if self.cohort:
+        if self.cohort and self.count_column_prefix is not None:
             extra_columns.append(self.hom_count_column)
             extra_columns.append(self.het_count_column)
         return extra_columns
 
     def _get_node_extra_colmodel_overrides(self):
         extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
-        if self.cohort:
+        if self.cohort and self.count_column_prefix is not None:
             labels = ["Cohort Hom Count", "Cohort Het Count"]
             for c, l in zip([self.hom_count_column, self.het_count_column], labels):
                 override = extra_colmodel_overrides.get(c, {})
