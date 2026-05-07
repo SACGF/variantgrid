@@ -49,6 +49,7 @@ CSV_FIELDS = [
     "max_af_gate",
     "build_seconds",       # only set by cohort_exclude_vc_join — one-time pre-compute cost
     "vc_record_count",     # only set by cohort_exclude_vc_join — size of the cached set
+    "analyze_seconds",     # only set by cohort_exclude_vc_join_postanalyze — ANALYZE cost
     "error",
 ]
 
@@ -83,6 +84,13 @@ class Command(BaseCommand):
                             help="PopulationNode max_af gate clause (#1547): on (default, "
                                  "with optimisation), off (legacy plan), both (run each "
                                  "profile twice — once with, once without — for A/B comparison)")
+
+        parser.add_argument("--planner-diagnostic", action="store_true",
+                            help="For --cohort runs only: also re-run cohort_exclude_lookahead "
+                                 "and cohort_exclude_vc_join under work_mem/random_page_cost "
+                                 "tuning variants and (for VC) post-ANALYZE — answers 'is the "
+                                 "variant-hash slowdown a planner stats issue or a RAM issue?' "
+                                 "without changing cluster-wide settings (#1546).")
 
     def handle(self, *args, **options):
         if not (options["analysis"] or options["sample"] or options["trio"] or options["cohort"]):
@@ -166,6 +174,7 @@ class Command(BaseCommand):
                         plans_dir=plans_dir,
                         seed=options["cohort_seed"],
                         gate_mode=gate_mode,
+                        planner_diagnostic=options["planner_diagnostic"],
                     ), gate_mode))
         finally:
             if gate_supported:
@@ -506,7 +515,8 @@ class Command(BaseCommand):
 
     # ---- Cohort synthetic -----------------------------------------------
 
-    def _profile_cohort_synthetic(self, cohort_id, *, rerun, explain, plans_dir, seed, gate_mode):
+    def _profile_cohort_synthetic(self, cohort_id, *, rerun, explain, plans_dir, seed, gate_mode,
+                                   planner_diagnostic=False):
         import random
         from snpdb.models import Variant, Cohort
         from django.db.models.functions import Substr as DjSubstr
@@ -599,6 +609,36 @@ class Command(BaseCommand):
             cohort_id, cgc, regex_excl, chosen,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
             rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
+
+        if planner_diagnostic:
+            # Diagnostic: re-run cohort_exclude_lookahead under tuning variants — answers
+            # "is the variant-hash bottleneck a planner / RAM issue?" without changing
+            # cluster-wide settings. SET runs at session level via the context manager;
+            # RESET in __exit__ restores defaults so other cohorts in the same invocation
+            # are not affected.
+            tuning_variants = [
+                ("wm4gb",       {"work_mem":         "'4GB'"}),
+                ("rpc11",       {"random_page_cost": "1.1"}),
+                ("wm4gb_rpc11", {"work_mem":         "'4GB'", "random_page_cost": "1.1"}),
+            ]
+            for label_suffix, pg_settings in tuning_variants:
+                with _PgSessionSettings(**pg_settings):
+                    rows.append(self._profile_synthetic_pattern(
+                        f"cohort_exclude_lookahead_{label_suffix}", cohort_id, qs_excl_regex,
+                        f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} "
+                        f"(seed={seed}) settings={'+'.join(f'{k}={v}' for k,v in pg_settings.items())}",
+                        rerun=rerun, explain=explain, plans_dir=plans_dir,
+                        gate_mode=gate_mode, file_prefix="synthetic_c"))
+
+            # VC diagnostic: build VC once, run ANALYZE on the partition, then profile under
+            # baseline + tuning variants. The post-ANALYZE row tells us whether bad stats on
+            # the freshly-INSERTed VCR partition are why the planner picked Hash(variants) on
+            # the prod EXPLAIN — see #1546 closing comment.
+            rows.extend(self._profile_cohort_exclude_vc_join_diagnostic(
+                cohort_id, cgc, regex_excl, chosen,
+                f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
+                tuning_variants=tuning_variants,
+                rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
 
         for row in rows:
             self.stdout.write(self._row_summary(row))
@@ -697,6 +737,124 @@ class Command(BaseCommand):
         vc.delete()
         return row
 
+    def _profile_cohort_exclude_vc_join_diagnostic(self, cohort_id, cgc, regex_excl, chosen,
+                                                    config, *, tuning_variants,
+                                                    rerun, explain, plans_dir, gate_mode):
+        """ Diagnostic counterpart to _profile_cohort_exclude_vc_join — builds the VC ONCE,
+        runs ANALYZE on the freshly-INSERTed VCR partition, then profiles the JOIN under
+        the baseline session settings plus each tuning variant. Tells us whether the prod
+        variant-hash slowdown (#1546 closing comment) is fixed by stats alone, or also
+        needs work_mem / random_page_cost tuning. """
+        from django.db import connection
+        from snpdb.models import Variant, VariantCollection, VariantCollectionRecord
+        from snpdb.models.models_enums import ProcessingStatus
+
+        partition_table = cgc.get_partition_table()
+        common_partition_table = None
+        if cgc.common_collection_id:
+            common_partition_table = cgc.common_collection.get_partition_table()
+        partitions = [partition_table] + ([common_partition_table] if common_partition_table else [])
+
+        vc_name = f"synthetic_cohort_{cohort_id}_excl_diag_chosen{len(chosen)}"
+        for stale in VariantCollection.objects.filter(name=vc_name):
+            try:
+                stale.delete_related_objects()
+            except Exception:  # pragma: no cover
+                pass
+            stale.delete()
+
+        vc = VariantCollection.objects.create(name=vc_name, status=ProcessingStatus.CREATED)
+        vc_partition_table = vc.get_partition_table()
+
+        union_sql_parts = [
+            f'SELECT DISTINCT {vc.pk} AS variant_collection_id, variant_id '
+            f'FROM "{p}" '
+            f'WHERE collection_id = ANY(%s) AND samples_zygosity ~ %s'
+            for p in partitions
+        ]
+        build_sql = (f'INSERT INTO "{vc_partition_table}" (variant_collection_id, variant_id) '
+                     f'{" UNION ".join(union_sql_parts)};')
+        coll_ids = [cgc.pk] + ([cgc.common_collection_id] if cgc.common_collection_id else [])
+        params = []
+        for _ in partitions:
+            params.extend([coll_ids, regex_excl])
+
+        try:
+            t0 = time.perf_counter()
+            with connection.cursor() as cur:
+                cur.execute(build_sql, params)
+                vc_record_count = cur.rowcount
+            build_seconds = round(time.perf_counter() - t0, 4)
+            vc.count = vc_record_count
+            vc.status = ProcessingStatus.SUCCESS
+            vc.save()
+        except Exception as e:
+            err_row = {
+                "source": "synthetic", "analysis_id": "", "node_id": cohort_id,
+                "node_type": "cohort_exclude_vc_join_postanalyze", "config_summary": config,
+                "max_af_gate": gate_mode, "error": f"vc build: {e}",
+            }
+            try:
+                vc.delete_related_objects()
+            except Exception:  # pragma: no cover
+                pass
+            vc.delete()
+            return [err_row]
+
+        # ANALYZE the VCR partition — gives the planner accurate row counts and value
+        # distribution for the just-INSERTed rows. Without this PG falls back to defaults
+        # and may pick Hash(snpdb_variant 40M) instead of NestedLoop+IndexScan.
+        old_autocommit = connection.get_autocommit()
+        connection.set_autocommit(True)
+        analyze_seconds = None
+        try:
+            t0 = time.perf_counter()
+            with connection.cursor() as cur:
+                cur.execute(f'ANALYZE "{vc_partition_table}";')
+            analyze_seconds = round(time.perf_counter() - t0, 4)
+        finally:
+            connection.set_autocommit(old_autocommit)
+
+        ann_kwargs = cgc.get_annotation_kwargs()
+        ann_kwargs.update(vc.get_annotation_kwargs())
+        cohort_alias = cgc.cohortgenotype_alias
+        qs = (Variant.objects
+              .annotate(**ann_kwargs)
+              .filter(Q(**{f"{cohort_alias}__isnull": False}),
+                      Q(**{f"{vc.variant_collection_alias}__isnull": False})))
+
+        rows = []
+        # Baseline post-ANALYZE: same SQL as cohort_exclude_vc_join above, but the planner
+        # now has fresh stats — usually the dominant difference vs the non-diagnostic row.
+        baseline_row = self._profile_synthetic_pattern(
+            "cohort_exclude_vc_join_postanalyze", cohort_id, qs,
+            f"{config} post_analyze",
+            rerun=rerun, explain=explain, plans_dir=plans_dir,
+            gate_mode=gate_mode, file_prefix="synthetic_c")
+        baseline_row["build_seconds"] = build_seconds
+        baseline_row["vc_record_count"] = vc.count
+        baseline_row["analyze_seconds"] = analyze_seconds
+        rows.append(baseline_row)
+
+        # Tuning variants: same query, same fresh stats, additional session settings.
+        for label_suffix, pg_settings in tuning_variants:
+            with _PgSessionSettings(**pg_settings):
+                variant_row = self._profile_synthetic_pattern(
+                    f"cohort_exclude_vc_join_postanalyze_{label_suffix}", cohort_id, qs,
+                    f"{config} post_analyze settings="
+                    f"{'+'.join(f'{k}={v}' for k,v in pg_settings.items())}",
+                    rerun=rerun, explain=explain, plans_dir=plans_dir,
+                    gate_mode=gate_mode, file_prefix="synthetic_c")
+                variant_row["vc_record_count"] = vc.count
+            rows.append(variant_row)
+
+        try:
+            vc.delete_related_objects()
+        except Exception:  # pragma: no cover
+            pass
+        vc.delete()
+        return rows
+
     # ---- Helpers --------------------------------------------------------
 
     @staticmethod
@@ -779,6 +937,30 @@ def _config_summary(node):
     if extras:
         bits.append(" ".join(extras[:8]))
     return " | ".join(b for b in bits if b)[:500]
+
+
+class _PgSessionSettings:
+    """ Context manager — SET session-level PG settings around a block, RESET on exit.
+    Used by --planner-diagnostic to test work_mem / random_page_cost variants on the
+    cohort-exclude queries without touching cluster config (#1546). """
+
+    def __init__(self, **settings):
+        self.settings = settings
+
+    def __enter__(self):
+        from django.db import connection
+        if self.settings:
+            with connection.cursor() as cur:
+                for k, v in self.settings.items():
+                    cur.execute(f"SET {k} = {v}")
+        return self
+
+    def __exit__(self, *_):
+        from django.db import connection
+        if self.settings:
+            with connection.cursor() as cur:
+                for k in self.settings:
+                    cur.execute(f"RESET {k}")
 
 
 def _qs_sql_with_params(qs):
