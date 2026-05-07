@@ -450,6 +450,7 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
             EXTRA_PROVIDED_TYPES = {
                 'snpdb.Sample': {'genes.SampleGeneList'},
                 'snpdb.Trio': {'snpdb.Sample'},
+                'snpdb.Quad': {'snpdb.Sample'},
             }
 
             if extra_types := EXTRA_PROVIDED_TYPES.get(class_name):
@@ -493,7 +494,7 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if not analysis_variables.exists():
             error = "You have not configured any analysis variables."
         else:
-            required_fields = ["pedigree", "trio", "cohort", "sample"]
+            required_fields = ["pedigree", "trio", "quad", "cohort", "sample"]
             if not analysis_variables.filter(field__in=required_fields).exists():
                 error = f"You need at at least one analysis variable of: {', '.join(required_fields)}"
 
@@ -650,8 +651,8 @@ class AnalysisTemplateRun(TimeStampedModel):
         for arg in self.analysistemplaterunargument_set.all():
             params[arg.variable.field] = arg.value
 
-        # Do trio before sample so it's used first (trio sets proband as sample)
-        for field in ["pedigree", "trio", "cohort", "sample"]:
+        # Do trio/quad before sample so it's used first (trio/quad set proband as sample)
+        for field in ["pedigree", "trio", "quad", "cohort", "sample"]:
             if field in params:
                 params["input"] = params[field]
                 break

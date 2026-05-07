@@ -11,6 +11,7 @@ class AnalysisType(models.TextChoices):
     SINGLETON = 'S', 'Singleton'
     COHORT = 'C', 'Cohort'
     TRIO = 'T', 'Trio'
+    QUAD = 'Q', 'Quad'
     PEDIGREE = 'P', 'Pedigree'
 
 
