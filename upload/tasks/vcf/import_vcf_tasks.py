@@ -7,7 +7,6 @@ import celery
 from django.conf import settings
 from django.contrib.auth.models import User
 
-from annotation.models import VariantAnnotationVersion
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
 from library.log_utils import log_traceback
 from library.utils import import_class
@@ -101,10 +100,7 @@ class CheckStartAnnotationTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         if upload_step.pipeline_inserted_unknown_variants():
-            # Schedule against ACTIVE so the new variants can be used immediately,
-            # and against NEW so they're already annotated when NEW is promoted to ACTIVE.
-            annotation_scheduler.si(status=VariantAnnotationVersion.Status.ACTIVE).apply_async()  # @UndefinedVariable
-            annotation_scheduler.si(status=VariantAnnotationVersion.Status.NEW).apply_async()  # @UndefinedVariable
+            annotation_scheduler.si().apply_async()  # @UndefinedVariable
         return 0
 
 
