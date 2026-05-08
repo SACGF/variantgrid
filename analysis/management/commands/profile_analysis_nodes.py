@@ -18,6 +18,7 @@ import csv
 import json
 import os
 import platform
+import random
 import socket
 import sys
 import time
@@ -26,9 +27,16 @@ from datetime import datetime
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
-from django.db.models import Q
+from django.db.models import F, Q
+from django.db.models.functions import Substr as DjSubstr
 
+from analysis.models import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.filters.population_node import PopulationNode
+from annotation.models import VariantAnnotationVersion, VariantGeneOverlap
+from genes.models import GeneList
+from snpdb.models import Cohort, Sample, Trio, Variant, VariantCollection
+from snpdb.models.models_enums import ProcessingStatus
 
 
 CSV_FIELDS = [
@@ -111,7 +119,6 @@ class Command(BaseCommand):
 
         gate_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["max_af_gate"]]
 
-        from analysis.models.nodes.filters.population_node import PopulationNode
         # PopulationNode.MAX_AF_GATE_ENABLED is a newer feature flag; older code branches
         # don't define it. Use getattr/setattr so this command runs unchanged on legacy
         # systems (e.g. for benchmarking against prod data on a pre-flag deploy). On legacy
@@ -193,7 +200,6 @@ class Command(BaseCommand):
     # ---- Analysis-mode profiling ----------------------------------------
 
     def _profile_analysis(self, analysis_id, *, rerun, explain, node_type_filter, limit, plans_dir, gate_mode):
-        from analysis.models import Analysis
         try:
             analysis = Analysis.objects.get(pk=analysis_id)
         except Analysis.DoesNotExist:
@@ -283,10 +289,6 @@ class Command(BaseCommand):
     # ---- Synthetic-mode profiling ---------------------------------------
 
     def _profile_sample_synthetic(self, sample_id, *, rerun, explain, plans_dir, gate_mode):
-        from snpdb.models import Sample, Variant
-        from annotation.models import VariantAnnotationVersion, VariantGeneOverlap
-        from genes.models import GeneList
-
         try:
             sample = Sample.objects.get(pk=sample_id)
         except Sample.DoesNotExist:
@@ -454,10 +456,6 @@ class Command(BaseCommand):
     # ---- Trio synthetic -------------------------------------------------
 
     def _profile_trio_synthetic(self, trio_id, *, rerun, explain, plans_dir, gate_mode):
-        from snpdb.models import Variant, Trio
-        from django.db.models import F
-        from django.db.models.functions import Substr as DjSubstr
-
         try:
             trio = Trio.objects.get(pk=trio_id)
         except Trio.DoesNotExist:
@@ -517,10 +515,6 @@ class Command(BaseCommand):
 
     def _profile_cohort_synthetic(self, cohort_id, *, rerun, explain, plans_dir, seed, gate_mode,
                                    planner_diagnostic=False):
-        import random
-        from snpdb.models import Variant, Cohort
-        from django.db.models.functions import Substr as DjSubstr
-
         try:
             cohort = Cohort.objects.get(pk=cohort_id)
         except Cohort.DoesNotExist:
@@ -649,10 +643,6 @@ class Command(BaseCommand):
         """ Build a transient VariantCollection with the regex-excl result set, then profile
         the JOIN-query cost. Cleans up the transient VC after profiling so re-runs stay
         idempotent. """
-        from django.db import connection
-        from snpdb.models import Variant, VariantCollection, VariantCollectionRecord
-        from snpdb.models.models_enums import ProcessingStatus
-
         partition_table = cgc.get_partition_table()
         common_partition_table = None
         if cgc.common_collection_id:
@@ -745,10 +735,6 @@ class Command(BaseCommand):
         the baseline session settings plus each tuning variant. Tells us whether the prod
         variant-hash slowdown (#1546 closing comment) is fixed by stats alone, or also
         needs work_mem / random_page_cost tuning. """
-        from django.db import connection
-        from snpdb.models import Variant, VariantCollection, VariantCollectionRecord
-        from snpdb.models.models_enums import ProcessingStatus
-
         partition_table = cgc.get_partition_table()
         common_partition_table = None
         if cgc.common_collection_id:
@@ -948,7 +934,6 @@ class _PgSessionSettings:
         self.settings = settings
 
     def __enter__(self):
-        from django.db import connection
         if self.settings:
             with connection.cursor() as cur:
                 for k, v in self.settings.items():
@@ -956,7 +941,6 @@ class _PgSessionSettings:
         return self
 
     def __exit__(self, *_):
-        from django.db import connection
         if self.settings:
             with connection.cursor() as cur:
                 for k in self.settings:
