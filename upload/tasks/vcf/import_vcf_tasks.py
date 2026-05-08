@@ -101,8 +101,10 @@ class CheckStartAnnotationTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         if upload_step.pipeline_inserted_unknown_variants():
-            task = annotation_scheduler.si(status=VariantAnnotationVersion.Status.NEW)
-            task.apply_async()  # @UndefinedVariable
+            # Schedule against ACTIVE so the new variants can be used immediately,
+            # and against NEW so they're already annotated when NEW is promoted to ACTIVE.
+            annotation_scheduler.si(status=VariantAnnotationVersion.Status.ACTIVE).apply_async()  # @UndefinedVariable
+            annotation_scheduler.si(status=VariantAnnotationVersion.Status.NEW).apply_async()  # @UndefinedVariable
         return 0
 
 
