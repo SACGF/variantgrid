@@ -1153,7 +1153,7 @@ class AnalysisNodeAlleleSource(AlleleSource):
                      extra_data={'node_id': self.node_id, 'allele_count': self.get_allele_qs().count()})
 
 
-class NodeVersion(models.Model):
+class NodeVersion(TimeStampedModel):
     """ This will be deleted once a node updates, so make all version specific caches cascade delete from this """
     node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
     version = models.IntegerField(null=False)
@@ -1204,7 +1204,7 @@ def post_delete_node_cache(sender, instance, **kwargs):  # pylint: disable=unuse
         pass
 
 
-class NodeCount(models.Model):
+class NodeCount(TimeStampedModel):
     node_version = models.ForeignKey(NodeVersion, on_delete=CASCADE)
     label = models.CharField(max_length=100)
     count = models.IntegerField(null=False)
