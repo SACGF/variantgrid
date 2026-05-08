@@ -25,6 +25,7 @@ import time
 import traceback
 from datetime import datetime
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from django.db.models import F, Q
@@ -100,6 +101,13 @@ class Command(BaseCommand):
                                  "variant-hash slowdown a planner stats issue or a RAM issue?' "
                                  "without changing cluster-wide settings (#1546).")
 
+        parser.add_argument("--merge-threshold-bumped", type=int, default=10000,
+                            help="For --analysis MergeNodes: per-parent survey classifies each parent's count "
+                                 "against the current ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX setting and this "
+                                 "hypothetical bumped value. Parents in (current, bumped] are the candidates "
+                                 "that would shift from path C (subquery form) to path A (literal IN list) "
+                                 "under the bump (#546). Default 10000. Survey is read-only — no SQL re-execution.")
+
     def handle(self, *args, **options):
         if not (options["analysis"] or options["sample"] or options["trio"] or options["cohort"]):
             raise CommandError("Provide at least one of --analysis / --sample / --trio / --cohort")
@@ -150,6 +158,7 @@ class Command(BaseCommand):
                         limit=options["limit_per_analysis"],
                         plans_dir=plans_dir,
                         gate_mode=gate_mode,
+                        merge_threshold_bumped=options["merge_threshold_bumped"],
                     ), gate_mode))
 
                 for sample_id in options["sample"]:
@@ -199,7 +208,8 @@ class Command(BaseCommand):
 
     # ---- Analysis-mode profiling ----------------------------------------
 
-    def _profile_analysis(self, analysis_id, *, rerun, explain, node_type_filter, limit, plans_dir, gate_mode):
+    def _profile_analysis(self, analysis_id, *, rerun, explain, node_type_filter, limit, plans_dir, gate_mode,
+                          merge_threshold_bumped):
         try:
             analysis = Analysis.objects.get(pk=analysis_id)
         except Analysis.DoesNotExist:
@@ -212,6 +222,8 @@ class Command(BaseCommand):
         nodes = list(nodes_qs)
         if limit:
             nodes = nodes[:limit]
+
+        threshold_current = getattr(settings, "ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX", 1000) or 0
 
         rows = []
         for node in nodes:
@@ -229,6 +241,68 @@ class Command(BaseCommand):
             )
             rows.append(row)
             self.stdout.write(self._row_summary(row))
+
+            if node_type == "MergeNode":
+                survey_rows = self._merge_parent_survey(
+                    node, analysis_id, threshold_current, merge_threshold_bumped, gate_mode)
+                for sr in survey_rows:
+                    rows.append(sr)
+                    self.stdout.write(self._row_summary(sr))
+        return rows
+
+    @staticmethod
+    def _merge_parent_survey(merge_node, analysis_id, threshold_current, threshold_bumped, gate_mode):
+        """Per-parent band classification for a MergeNode (#546).
+
+        Read-only walk: emits one row per non-empty parent reporting the parent's count and
+        which path-band it falls into under the current vs hypothetical bumped threshold.
+        Path A (literal IN) is taken when count <= threshold; otherwise path C (subquery form).
+        Parents in (threshold_current, threshold_bumped] are the experiment candidates.
+
+        Backwards-compat: only touches stable APIs (parent.count, get_non_empty_parents).
+        Doesn't reference get_parent_pks / cache_memoize / the substitution helper, which
+        only exist on post-#546 code.
+        """
+        rows = []
+        try:
+            parents = list(merge_node.get_non_empty_parents())
+        except Exception as e:
+            return [{
+                "source": "merge_parent",
+                "analysis_id": analysis_id,
+                "node_id": merge_node.pk,
+                "node_type": "MergeNode_parent",
+                "node_name": f"merge {merge_node.pk}",
+                "max_af_gate": gate_mode,
+                "error": f"get_non_empty_parents: {e}",
+            }]
+
+        for parent in parents:
+            count = getattr(parent, "count", None)
+            if count is None:
+                band = "unknown"
+            elif count <= threshold_current:
+                band = "A_current"
+            elif count <= threshold_bumped:
+                band = "A_bumped"
+            else:
+                band = "C"
+            parent_type = type(parent).__name__
+            parent_name = (getattr(parent, "name", "") or "").replace("\n", " ")[:40]
+            config = (f"parent_id={parent.pk} parent_type={parent_type} count={count} "
+                      f"threshold_current={threshold_current} threshold_bumped={threshold_bumped} "
+                      f"band={band}")
+            rows.append({
+                "source": "merge_parent",
+                "analysis_id": analysis_id,
+                "node_id": merge_node.pk,
+                "node_type": "MergeNode_parent",
+                "node_name": f"merge {merge_node.pk} <- parent {parent.pk} {parent_type} {parent_name}".strip(),
+                "config_summary": config,
+                "parent_input_count": count if count is not None else "",
+                "count": count if count is not None else "",
+                "max_af_gate": gate_mode,
+            })
         return rows
 
     def _profile_node(self, node, *, source, analysis_id, rerun, explain, plans_dir, gate_mode):
