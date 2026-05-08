@@ -76,6 +76,9 @@ class MergeNode(AnalysisNode):
             if non_none_keys:
                 # We don't pass in arg_q_dict (ie run all where clauses in inner query)
                 # This has worse best-case performance but better worse case performance
+                # disable_cache=True bypasses parent NodeCache substitution: a parent with a stale
+                # VariantCollection-backed cache from a prior version would collapse to Q(pk__in=vc_join)
+                # and the merge would OR stale parent results with live siblings (see #240, ad35a7fb1).
                 qs = parent.get_queryset(disable_cache=True)
                 variant_ids = qs.values_list("pk", flat=True)
                 or_list.append(Q(pk__in=variant_ids))
@@ -136,6 +139,7 @@ class MergeNode(AnalysisNode):
                 q = Q(pk__in=variant_ids)
                 arg_q_dict = {None: {q: q}}
             else:
+                # disable_cache=True: see comment in _split_common_filters above (#240, ad35a7fb1).
                 arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
             parent_arg_q_dict[parent] = arg_q_dict
         return self._get_merged_q_dict(parent_arg_q_dict)
