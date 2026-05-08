@@ -40,7 +40,7 @@ from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, An
 from analysis.models.enums import AnalysisTemplateType, SNPMatrix, MinimisationResultType, NodeStatus, TrioSample, QuadSample
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask
+from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask, NodeCount
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
 from analysis.models.nodes.node_types import get_node_types_hash
 from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
@@ -946,6 +946,54 @@ def analysis_settings_audit_log_tab(request, analysis_id):
         "log_entry_wrappers": log_entry_wrappers
     }
     return render(request, 'analysis/analysis_settings_audit_log_tab.html', context)
+
+
+@user_passes_test(is_superuser)
+def analysis_settings_benchmark_tab(request, analysis_id):
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    nodes_qs = analysis.analysisnode_set.all().select_subclasses()
+
+    node_rows = []
+    total_load_seconds = 0.0
+    nodes_with_load = 0
+    for node in nodes_qs:
+        if node.load_seconds is not None:
+            total_load_seconds += node.load_seconds
+            nodes_with_load += 1
+        node_rows.append({
+            "pk": node.pk,
+            "name": node.name or "",
+            "node_type": type(node).__name__,
+            "count": node.count,
+            "load_seconds": node.load_seconds,
+            "status": node.get_status_display(),
+            "version": node.version,
+        })
+    node_rows.sort(key=lambda r: (r["load_seconds"] is None, -(r["load_seconds"] or 0.0)))
+
+    nc_times = list(NodeCount.objects.filter(node_version__node__analysis=analysis)
+                    .values_list("created", flat=True))
+    if nc_times:
+        wall_start = min(nc_times)
+        wall_end = max(nc_times)
+        wall_seconds = (wall_end - wall_start).total_seconds()
+    else:
+        wall_start = None
+        wall_end = None
+        wall_seconds = None
+
+    context = {
+        "analysis": analysis,
+        "node_rows": node_rows,
+        "total_load_seconds": total_load_seconds,
+        "nodes_with_load": nodes_with_load,
+        "node_total": len(node_rows),
+        "wall_seconds": wall_seconds,
+        "wall_start": wall_start,
+        "wall_end": wall_end,
+        "node_count_sample_size": len(nc_times),
+    }
+    return render(request, 'analysis/analysis_settings_benchmark_tab.html', context)
 
 
 @require_POST

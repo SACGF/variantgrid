@@ -69,6 +69,9 @@
         {% if analysis.has_audit_log %}
             {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_audit_log_tab' param=analysis.pk label="Audit Log" %}
         {% endif %}
+        {% if user.is_superuser %}
+            {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_benchmark_tab' param=analysis.pk label="Benchmark" %}
+        {% endif %}
         {% with lock_history=analysis.lock_history %}
             {% if lock_history %}
                 {% ui_register_tab_embedded tab_set="analysis_tab" label="Lock History" %}

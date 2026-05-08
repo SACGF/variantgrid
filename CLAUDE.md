@@ -91,7 +91,9 @@ DRF is configured with `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`, so all 
 ## Python Style
 
 ### Imports
-Place imports at the top level of the file by default. Inline imports inside functions are acceptable only to break genuine circular import cycles — if that situation arises, flag it and ask the user whether to refactor the code instead.
+All imports go at the top of the file. Do not add inline imports inside functions, methods, or conditional blocks — not for "lazy loading", not to keep a function self-contained, not because the import is only used in one branch. The only legitimate reason to inline an import is to break a genuine circular import cycle, and even then you must stop, flag the cycle to the user, and ask whether to refactor the code instead of papering over it with an inline import.
+
+If you are about to write `from … import …` anywhere except the top of the file, that is a signal to go back and add it to the top-level import block.
 
 ## Key Patterns
 
