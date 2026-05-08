@@ -35,7 +35,7 @@ from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
-from library.constants import DAY_SECS
+from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event, log_traceback
 from library.utils import format_percent, add_exception_note
@@ -526,6 +526,17 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.node_cache:
             arg_q_dict = self.node_cache.variant_collection.get_arg_q_dict()
         return arg_q_dict
+
+    @staticmethod
+    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda p: (p.pk, p.version))
+    def get_parent_pks(parent) -> list:
+        max_size = settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX
+        if parent.count is None or parent.count > max_size:
+            raise ValueError(
+                f"get_parent_pks: refusing to cache {parent} PKs "
+                f"(count={parent.count}, max={max_size})"
+            )
+        return list(parent.get_queryset().values_list("pk", flat=True))
 
     def _get_node_q(self) -> Optional[Q]:
         return None

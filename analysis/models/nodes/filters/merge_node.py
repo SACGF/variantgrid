@@ -130,8 +130,9 @@ class MergeNode(AnalysisNode):
         parent_arg_q_dict = {}
         for parent in self.get_non_empty_parents():
             if settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX and \
+                    parent.count is not None and \
                     parent.count <= settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX:
-                variant_ids = list(parent.get_queryset().values_list("pk", flat=True))
+                variant_ids = AnalysisNode.get_parent_pks(parent)
                 q = Q(pk__in=variant_ids)
                 arg_q_dict = {None: {q: q}}
             else:
