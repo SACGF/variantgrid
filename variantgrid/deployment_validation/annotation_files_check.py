@@ -16,7 +16,7 @@ def _get_fix_instructions(filename) -> str:
     return fix_instructions
 
 
-def annotation_data_exists(flat=False) -> dict:
+def annotation_data_exists(flat=False, include_tbi_for_gz=False) -> dict:
     all_build_data = {}
     # We can sometimes use files twice, only report once
     unique_filenames = set()
@@ -54,7 +54,9 @@ def annotation_data_exists(flat=False) -> dict:
 
             unique_filenames.add(base_filename)
             files = {base_key: base_filename}
-            if ".vcf" in base_filename:
+            tbi_for_gz = (include_tbi_for_gz and base_filename.endswith(".gz")
+                          and base_filename.startswith(settings.ANNOTATION_VEP_BASE_DIR))
+            if ".vcf" in base_filename or tbi_for_gz:
                 files[f"{base_key}_tbi"] = base_filename + ".tbi"
 
             for key, filename in files.items():
