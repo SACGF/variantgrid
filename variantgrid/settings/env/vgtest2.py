@@ -76,3 +76,39 @@ USER_CREATE_ORG_MESSAGE = {
                "to properly set things up, please contact david.lawrence@"
                "sa.gov.au (using your institutional email). Thanks!",
 }
+
+NEW_VERSION = True
+if NEW_VERSION:
+    ANNOTATION_VEP_VERSION = "115"
+    ANNOTATION_VEP_COLUMNS_VERSION = 4
+    ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
+    ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
+    ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
+
+    ANNOTATION[BUILD_GRCH37]["columns_version"] = ANNOTATION_VEP_COLUMNS_VERSION
+    ANNOTATION[BUILD_GRCH38]["columns_version"] = ANNOTATION_VEP_COLUMNS_VERSION
+
+    ANNOTATION[BUILD_GRCH37]["vep_config"].update({
+        "denovo_db": "annotation_data/GRCh37/denovo-db.variants.v.1.6.1.GRCh37.vcf.gz",
+        "dbnsfp": "annotation_data/GRCh37/dbNSFP5.3.1a.grch37.stripped.gz",
+        "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.masked.snv.hg19.vcf.gz",
+        "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.masked.indel.hg19.vcf.gz",
+    })
+
+    ANNOTATION[BUILD_GRCH38]["vep_config"].update({
+        "denovo_db": "annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz",
+        "dbnsfp": "annotation_data/GRCh38/dbNSFP5.3.1a.grch38.stripped.gz",
+        "gnomad4": "annotation_data/GRCh38/gnomad4.1_GRCh38_contigs.vcf.gz",
+        "mave": "annotation_data/GRCh38/MaveDB_variants_2026-04-30.tsv.gz",
+        "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.masked.snv.hg38.vcf.gz",
+        "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.masked.indel.hg38.vcf.gz",
+    })
+
+    VCF_IMPORT_COMMON_FILTERS["GRCh38"] = {
+        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.1_GRCh38_af_greater_than_5.stripped.vcf.gz",
+        "gnomad_version": "4.0",
+        "gnomad_af_min": 0.05,
+        "clinical_significance_max": "3",
+    }
+
+    # ANNOTATION_ANNOTSV_ENABLED = True
