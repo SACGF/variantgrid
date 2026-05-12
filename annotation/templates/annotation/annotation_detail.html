@@ -164,11 +164,9 @@ ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
                     <i class="fa fa-spinner"></i> <b>Import started: </b>{{ cwr.import_date }}
                 {% else %}
                     {% if user.is_superuser %}
-                        {% if cwr.import_status != 'S' %}
+                        {% if cwr.import_status != 'S' and not cwr.disabled_url %}
                         <b>Status:</b> {{ cwr.get_import_status_display }}
-                        {% if not cwr.disabled_url %}
                         <div class='install-instructions'>Click the button below to retrieve annotations</div>
-                        {% endif %}
                         {% endif %}
                         {% if cwr.disabled_url %}
                             <span class="text-muted">Updates disabled &mdash; see <a href="{{ cwr.disabled_url }}" target="_blank">{{ cwr.disabled_url }}</a></span>
@@ -177,10 +175,12 @@ ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
                         {% endif %}
                     {% endif %}
                     <b>Imported:</b>&nbsp;{% timestamp cwr.modified time_ago=True %}.
-                    {% if cwr.import_status == 'S' or user.is_superuser %}
-                        <b>Details:</b>&nbsp;{{ cwr.description }}
-                    {% else %}
-                        <b>Status:</b> {{ cwr.get_import_status_display }}
+                    {% if not cwr.disabled_url %}
+                        {% if cwr.import_status == 'S' or user.is_superuser %}
+                            <b>Details:</b>&nbsp;{{ cwr.description }}
+                        {% else %}
+                            <b>Status:</b> {{ cwr.get_import_status_display }}
+                        {% endif %}
                     {% endif %}
                 {% endif %}
                 </div>
