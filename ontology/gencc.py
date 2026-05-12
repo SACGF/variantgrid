@@ -48,7 +48,7 @@ def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -
     ontology_builder.cache_everything()
 
     logging.info("About to load gencc")
-    gencc_df: DataFrame = df_nan_to_none(read_csv(file_or_filename, sep=","))
+    gencc_df: DataFrame = df_nan_to_none(read_csv(file_or_filename, sep=",", dtype={"submitted_as_pmids": str}))
 
     # only want strong and definitive relationships
     gencc_df = gencc_df.sort_values(by=["gene_curie", "disease_curie"])

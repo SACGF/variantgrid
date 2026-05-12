@@ -4,11 +4,13 @@ import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Optional
 
 import pandas as pd
 import pronto
 from django.core.management import BaseCommand
+from django.utils import timezone
 
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC, HGNCImport
@@ -526,14 +528,26 @@ def load_omim(filename: str, force: bool):
     ontology_builder.complete(purge_old_terms=True)
 
 
-def sync_hgnc():
+HGNC_IMPORT_STALE_AGE = timedelta(days=30)
+
+
+def sync_hgnc(force=False):
 
     latest_hgnc_import = HGNCImport.objects.order_by('-pk').first()
+    if latest_hgnc_import is None:
+        print("No HGNCImport found. Run the 'Update from web' task for HGNC on the annotation admin page first.")
+        return
+    age = timezone.now() - latest_hgnc_import.created
+    if age > HGNC_IMPORT_STALE_AGE:
+        print(f"WARNING: latest HGNCImport (pk={latest_hgnc_import.pk}) is {age.days} days old "
+              f"(created {latest_hgnc_import.created:%Y-%m-%d}). "
+              f"Consider running the 'Update from web' HGNC task on the annotation admin page for fresher data.")
     builder = OntologyBuilder(
         filename=f"hgnc_import_{latest_hgnc_import.pk}",
         context="hgnc sync",
         import_source="HGNC Sync",
         processor_version=1,
+        force_update=force,
         versioned=False
     )
     builder.ensure_hash_changed(f"{latest_hgnc_import.pk}")
@@ -572,7 +586,10 @@ class Command(BaseCommand):
 
         if options.get("hgnc_sync"):
             print("Syncing HGNC")
-            sync_hgnc()
+            try:
+                sync_hgnc(force=force)
+            except OntologyBuilderDataUpToDateException:
+                print("HGNC latest import PK is the same as last sync")
 
         if filename := options.get("gencc"):
             try:
