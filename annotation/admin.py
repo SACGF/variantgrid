@@ -62,6 +62,11 @@ class VariantAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBa
                        "data_archive_reason", "data_restorable_from")
     ordering = ("genome_build", "-annotation_date")
 
+    def is_readonly_field(self, f) -> bool:
+        if f.name == "gene_annotation_release":
+            return False
+        return super().is_readonly_field(f)
+
     @admin_list_column("Status", order_field="status")
     def status_badge(self, obj: VariantAnnotationVersion) -> SafeString:
         colour = _STATUS_BADGE_COLOURS.get(obj.status, "#6c757d")
