@@ -240,8 +240,10 @@ def annotation_detail(request):
     annotations_all_imported = all(annotations_ok)  # Any unset will show instructions header
 
     cached_web_resources = []
+    disabled_cwr = settings.DISABLED_CACHED_WEB_RESOURCES
     for cwr_name in settings.ANNOTATION_CACHED_WEB_RESOURCES:
         cwr, _ = CachedWebResource.objects.get_or_create(name=cwr_name)
+        cwr.disabled_url = disabled_cwr.get(cwr_name)
         cached_web_resources.append(cwr)
 
     context = {
