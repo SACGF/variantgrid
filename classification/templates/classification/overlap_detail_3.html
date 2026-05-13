@@ -43,7 +43,11 @@
                                 <span class="no-value">Cross-Context</span>
                             {% else %}
                                 <div id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_label=True %}</div>
-                                <a class="ml-1" href="{% url 'triage_3' overlap_entry.overlap_contribution.pk %}?mode=modal" data-toggle="ajax-modal" data-size="md">Edit</a>
+                                {% if user.is_superuser or overlap_entry.is_user_lab %}
+                                    {% if overlap_entry.overlap_contribution.classification_grouping %}
+                                        <a class="ml-1" href="{% url 'triage_3' overlap_entry.overlap_contribution.pk %}?mode=modal" data-toggle="ajax-modal" data-size="md">Edit</a>
+                                    {% endif %}
+                                {% endif %}
                             {% endif %}
                         </td>
                     </tr>
