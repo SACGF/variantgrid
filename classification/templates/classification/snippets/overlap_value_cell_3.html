@@ -1,0 +1,14 @@
+{% load js_tags %}
+{% if max_triage_status %}
+<span style="font-style:italic; color:#ccc">{{ max_triage_status.label }}</span><br/>
+{% endif %}
+
+<span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>{{ overlap.overlap_status.label }}</span>
+{% if overlap.overlap_status_change_timestamp %} - {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}{% endif %}
+{% for c_value in values.sorted %}
+    <span class="cs cs-dot cs-{{ c_value.value }}">
+    {% if c_value.your_contribution %}<b class="hover-detail" title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</b>
+    {% elif not c_value.your_context %}<span class="no-value" title="Cross Context">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>
+    {% else %}<span title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>{% endif %}
+    </span>
+{% endfor %}

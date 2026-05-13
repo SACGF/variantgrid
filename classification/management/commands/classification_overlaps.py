@@ -18,6 +18,7 @@ class Command(BaseCommand):
                             help="Migrates legacy data to new format - work in progress")
         parser.add_argument('--full_reset', required=False, action="store_true",
                             help="Deletes all Overlaps and OverlapContributions and creates them from scratch")
+        parser.add_argument("--recalc_skews", required=False, action="store_true", help="Updates what each lab's perspective of the Overlap is")
 
 
     def handle(self, *args, **options):
@@ -25,6 +26,14 @@ class Command(BaseCommand):
             self.full_reset(args, options)
         elif options["migrate"]:
             self.populate_status_change()
+        elif options["recalc_skews"]:
+            self.recalc_skews()
+        else:
+            print("Must choose full_reset or migrate")
+
+    def recalc_skews(self):
+        for overlap in Overlap.objects.all().iterator():
+            OverlapServices.update_skews(overlap)
 
     def full_reset(self, *args, **options):
         Overlap.objects.all().delete()

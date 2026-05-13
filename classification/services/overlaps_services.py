@@ -2,9 +2,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Iterable, Iterator, Any
-from auditlog.context import set_actor
+from typing import Optional, Any
 from auditlog.models import LogEntry
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.utils.timezone import now
@@ -17,6 +17,9 @@ from classification.models.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig
 import json
+
+from classification.signals import send_prepared_discordance_notifications
+from snpdb.models import Lab
 
 
 class OverlapServices:
@@ -144,7 +147,7 @@ class OverlapServices:
         non_interactive = status_buckets[TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
 
         for entry in all_interactive_skews:
-            entry.skew_perspective = TriageNextStep.PENDING_CALCULATION
+            entry.next_step = TriageNextStep.PENDING_CALCULATION
 
         had_pending_or_changing = False
 
@@ -155,47 +158,47 @@ class OverlapServices:
             partially_triaged = False
             # now while there are pending, see if there are records that aren't pending
             for not_pending in reviewed_will_discuss + reviewed_confident + reviewed_complex:
-                not_pending.skew_perspective = TriageNextStep.AWAITING_OTHER_LAB
+                not_pending.next_step = TriageNextStep.AWAITING_OTHER_LAB
                 partially_triaged = True
 
             for pend in pending:
                 if partially_triaged:
-                    pend.skew_perspective = TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED
+                    pend.next_step = TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED
                 else:
-                    pend.skew_perspective = TriageNextStep.AWAITING_YOUR_TRIAGE
+                    pend.next_step = TriageNextStep.AWAITING_YOUR_TRIAGE
 
         if reviewed_will_change:
             had_pending_or_changing = True
             for change in reviewed_will_change:
-                change.skew_perspective = TriageNextStep.AWAITING_YOUR_AMEND
+                change.next_step = TriageNextStep.AWAITING_YOUR_AMEND
             for not_pending in reviewed_will_discuss + reviewed_confident + reviewed_complex:
-                not_pending.skew_perspective = TriageNextStep.AWAITING_OTHER_LAB
+                not_pending.next_step = TriageNextStep.AWAITING_OTHER_LAB
 
         if not had_pending_or_changing:
             # below no one is pending or has an outstanding change, so it's just a matter of working out clashing statuses
             if reviewed_will_discuss:
                 # everyone has a status, and at least 1 person said reviewed will discuss, so we're all discussing it now
                 for lets_chat in reviewed_will_discuss + reviewed_confident + reviewed_complex:
-                    lets_chat.skew_perspective = TriageNextStep.TO_DISCUSS
+                    lets_chat.next_step = TriageNextStep.TO_DISCUSS
 
             elif reviewed_complex or reviewed_confident:
                 # no one said discuss, but everyone has a different opinion so time to discuss
                 for lets_chat in reviewed_complex + reviewed_confident:
-                    lets_chat.skew_perspective = TriageNextStep.TO_DISCUSS
+                    lets_chat.next_step = TriageNextStep.TO_DISCUSS
 
             elif reviewed_complex:
                 # No Reviewed Will Discuss
                 for complex in reviewed_complex:
-                    complex.skew_perspective = TriageNextStep.UNANIMOUSLY_COMPLEX
+                    complex.next_step = TriageNextStep.UNANIMOUSLY_COMPLEX
 
         # the above should have updated every skew perspective, check below
         for entry in all_interactive_skews:
-            if entry.skew_perspective == TriageNextStep.PENDING_CALCULATION:
+            if entry.next_step == TriageNextStep.PENDING_CALCULATION:
                 raise ValueError("Failed to assign each skew a status")
 
         OverlapContributionSkew.objects.bulk_update(
             objs=all_interactive_skews,
-            fields=['skew_perspective']
+            fields=['next_step']
         )
 
     @staticmethod
@@ -220,31 +223,32 @@ class OverlapServices:
 
     @staticmethod
     def overlap_status_changed(overlap: Overlap, old_status: OverlapStatus):
-        # lab = models.ForeignKey(Lab, on_delete=CASCADE)
-        # overlap = models.ForeignKey('Overlap', on_delete=CASCADE)
-        # old_status = IntegerFieldChoices(OverlapStatus)
-        # notification_sent_date = models.DateTimeField(null=True, blank=True)
+        if not settings.DISCORDANCE_ENABLED:
+            return
+
+        if overlap.overlap_type == OverlapType.CROSS_CONTEXT:
+            return  # don't notify when cross context become discordant
+
+        new_status = overlap.overlap_status
 
         # see if it's worth notifying anyone
-        if not (overlap.overlap_status.is_discordant ^ old_status.is_discordant):
+        if not (new_status.is_discordant ^ old_status.is_discordant):
             # only care if we're going from discordant to not discordant or vice versa
             # an overlap could change from concordant to discordant back to concordant
             # but we just check if the notification is worth sending
             return
 
-        labs = set()
-        for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
-            if lab := contribution.lab:
-                labs.add(lab)
+        odn, created = OverlapDiscordanceNotification.objects.get_or_create(
+            overlap=overlap,
+            notification_sent_date=None,
+            defaults={"old_status": old_status, "new_status": new_status}
+        )
+        if not created:
+            odn.new_status = new_status
+            odn.save()
 
-        for lab in labs:
-            OverlapDiscordanceNotification.objects.get_or_create(
-                lab=lab,
-                overlap=overlap,
-                notification_sent_date=None,
-                defaults={"old_status": old_status}
-            )
-
+        # this will send emails right away if we're no in an import, otherwise at the end of an import
+        send_prepared_discordance_notifications()
 
 
 @dataclass
@@ -449,3 +453,101 @@ class OverlapGrouping:
     def comparisons(self) -> list[OverlapEntryCompare]:
         compares = [OverlapEntryCompare(self.user_contribution, other_cont, self.value_type) for other_cont in self.contributions]
         return list(sorted(compares, reverse=True))
+
+
+@dataclass(frozen=True)
+class OverlapContributionPerspective:
+    overlap_contribution: OverlapContribution
+    is_cross_context: bool = False
+    is_user_lab: bool = False
+
+
+@dataclass(frozen=True)
+class OverlapGrouping3:
+    overlap: Overlap
+    user: User
+
+    @cached_property
+    def rows(self) -> list[OverlapContributionPerspective]:
+        perspectives = []
+
+        user_labs = Lab.valid_labs_qs(self.user)
+        for overlap_contribution in self.overlap.contributions:
+            lab = None
+            if cg := overlap_contribution.classification_grouping:
+                lab = cg.lab
+
+            perspectives.append(OverlapContributionPerspective(
+                overlap_contribution=overlap_contribution,
+                is_cross_context=False,
+                is_user_lab=not self.user.is_superuser and lab in user_labs
+            ))
+
+        if allele_id := self.overlap.allele_id:
+            if cross_context := Overlap.objects.filter(allele_id=allele_id, overlap_type=OverlapType.CROSS_CONTEXT, valid=True).first():
+                cross_context_contributions = set(cross_context.contributions) - set(self.overlap.contributions_list)
+                for overlap_contribution in list(sorted(cross_context_contributions)):
+                    perspectives.append(OverlapContributionPerspective(
+                        overlap_contribution=overlap_contribution,
+                        is_cross_context=True,
+                        is_user_lab=not self.user.is_superuser and lab in user_labs
+                    ))
+
+        return perspectives
+
+    @property
+    def value_type(self):
+        return self.overlap.value_type
+
+    @staticmethod
+    def tidy_change(overlap_contribution: OverlapContribution, field_name: str, value: Any):
+        # just used for the changelog
+        if value == "None":
+            return None
+        match field_name:
+            case "triage state":
+                return TriageState.from_json(json.loads(value))
+            case "effective date":
+                return EffectiveDate.from_json(json.loads(value))
+            case "comment":
+                return TriageComment.from_json(json.loads(value))
+        return value
+
+    @cached_property
+    def change_log(self) -> list[ChangeRow]:
+        all_triages = self.overlap.contributions_list
+        change_rows: list[ChangeRow] = []
+
+        for triage in all_triages:
+            triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage)
+            for entry in triage_log:
+                # FIXME, make a filter that change the str 'None' to None
+                if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
+                    continue
+                if (value_change := entry.changes_dict.get("value")) and value_change[0] == 'None':
+                    continue
+
+                comment: Optional[TriageComment] = None
+                field_changes = []
+                for key, value_list in entry.changes_display_dict.items():
+                    if key == "comment":
+                        comment = OverlapGrouping.tidy_change(triage, key, value_list[1])
+                    else:
+                        field_change = FieldChange(
+                            key,
+                            OverlapGrouping.tidy_change(triage, key, value_list[0]),
+                            OverlapGrouping.tidy_change(triage, key, value_list[1])
+                        )
+                        field_changes.append(field_change)
+
+                user: Optional[User] = entry.actor
+
+                change_row = ChangeRow(
+                    overlap_contribution=triage,
+                    user=user,
+                    changes=list(sorted(field_changes)),
+                    comment=comment,
+                    timestamp=entry.timestamp
+                )
+                change_rows.append(change_row)
+        return list(sorted(change_rows))

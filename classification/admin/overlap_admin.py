@@ -35,8 +35,8 @@ class OverlapContributionAdmin(ModelAdminBasics):
 
 @admin.register(OverlapContributionSkew)
 class OverlapContributionSkewAdmin(ModelAdminBasics):
-    list_display = ('overlap', 'contribution', 'skew_perspective', 'contribution__classification_grouping__lab')
-    list_filter = ('contribution__classification_grouping__lab', 'overlap__overlap_status', 'skew_perspective')
+    list_display = ('overlap', 'contribution', 'next_step', 'contribution__classification_grouping__lab')
+    list_filter = ('contribution__classification_grouping__lab', 'overlap__overlap_status', 'next_step')
 
 
 @admin.register(Overlap)

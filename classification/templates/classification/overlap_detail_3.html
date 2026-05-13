@@ -1,0 +1,87 @@
+{% load classification_tags %}
+{% load user_tags %}
+{% load js_tags %}
+<div class="card">
+    <div class="card-header">Classifications</div>
+    <div class="card-body">
+        <table class="table overlap-summary">
+            <thead>
+                <tr>
+                    <th class="overlap-context">Context</th>
+                    <th class="overlap-lab">Lab</th>
+                    <th class="overlap-value">Value</th>
+                    <th class="overlap-condition">Condition</th>
+                    <th class="overlap-curated">Curated</th>
+                    <th class="overlap-triage">Triage Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for overlap_entry in overlap_grouping.rows %}
+                    {% ifchanged overlap_entry.is_cross_context %}
+                        {% if overlap_entry.is_cross_context %}
+                        <tr><td colspan="6" style="text-align: center; font-weight: 600">Cross Context Records</td></tr>
+                        {% endif %}
+                    {% endifchanged %}
+                    <tr class="{% if overlap_entry.is_cross_context %}cross-context-row{% elif overlap_entry.is_user_lab %}users-row{% endif %}">
+                        <td>{% testing_context overlap_entry.overlap_contribution %}</td>
+                        <td>
+                            {% if overlap_entry.overlap_contribution.scv %}ClinVar Expert Panel<br/><a class=hover-link" href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ overlap_entry.overlap_contribution.scv }}">{{ overlap_entry.overlap_contribution.scv }}</a>{% else %}
+                            {% lab overlap_entry.overlap_contribution.lab is_your_lab=overlap_entry.is_user_lab show_contact_link=True contact_subject=contact_subject %}
+                                {% with classification=overlap_entry.overlap_contribution.classification_grouping.latest_classification_modification.classification %}
+                                <br/><a class="hover-link" href="{{ classification.get_absolute_url }}">{{ classification.cr_lab_id }}</a>
+                                {% endwith %}
+                            {% endif %}
+                        <td>{% clinical_significance overlap_entry.overlap_contribution.value %}
+                        <div class="overlap-criteria">
+                            {% for criteria_label in overlap_entry.overlap_contribution.classification_grouping.latest_cached_summary.criteria_labels %}<span class="comma-sep">{{ criteria_label }}</span>{% endfor %}
+                        </div>
+                        </td>
+                        <td>{% condition overlap_entry.overlap_contribution.conditions %}</td>
+                        <td>{% timestamp overlap_entry.overlap_contribution.effective_date.date time_ago=True %}</td>
+                        <td>
+                            {% if overlap_entry.is_cross_context %}
+                                <span class="no-value">Cross-Context</span>
+                            {% else %}
+                                <div id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_label=True %}</div>
+                                <a class="ml-1" href="{% url 'triage_3' overlap_entry.overlap_contribution.pk %}?mode=modal" data-toggle="ajax-modal" data-size="md">Edit</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if overlap_grouping.change_log %}
+    <div class="card mt-4">
+        <div class="card-header">History - oldest to newest</div>
+        <div class="card-body">
+            {% for change in overlap_grouping.change_log %}
+                {% ifchanged change.overlap_contribution %}
+                    {% if not forloop.first %}
+                        <hr/>
+                    {% endif %}
+                {% endifchanged %}
+                <div class="row my-4">
+                    <div class="col-3 text-right">
+                        {% ifchanged change.overlap_contribution change.user %}
+                            <div>{% testing_context change.overlap_contribution %}<br/>{{ change.overlap_contribution.lab }}</div>
+                            {% if change.user %}<div class="mt-1">{% user change.user size="tiny" %}</div>
+                            {% else %}<div class="mt-1 no-value">No user</div>{% endif %}
+                        {% endifchanged %}
+                        <div>{% timestamp change.timestamp time_ago=True %}</div>
+                    </div>
+                    <div class="col-9">
+                        {% for field_change in change.changes %}
+                            <div>{{ field_change.old_value }} -> {{ field_change.new_value }}</div>
+                        {% endfor %}
+                        {% if change.comment %}
+                            <div class="comment">{{ change.comment.text }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}

@@ -4,7 +4,7 @@ from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
 from django.db.models import CASCADE, QuerySet
 from django.db import models
-from django.db.models.enums import TextChoices
+from django.db.models.enums import TextChoices, IntegerChoices
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 from annotation.models import ClinVarRecord, EffectiveDate
@@ -79,7 +79,6 @@ class OverlapContribution(TimeStampedModel):
     value = models.TextField(null=True, blank=True)
     # annoying thing about contribution_status is it takes a little bit of context knowledge to work out
 
-    # TODO rename to contribution_status
     contribution_status = TextFieldChoices(choices_type=OverlapContributionStatus)    # type: OverlapContributionStatus
     testing_context_bucket = models.TextField(choices=TestingContextBucket.choices)
     tumor_type_category = models.TextField(null=True, blank=True)
@@ -159,6 +158,11 @@ class OverlapContribution(TimeStampedModel):
         else:
             return 0
 
+    def __lt__(self, other):
+        if value_sort_diff := self.value_sort_index - other.value_sort_index:
+            return value_sort_diff < 0
+        return self.lab < other.lab
+
     @staticmethod
     def pretty_value_for(value: Optional[str], value_type: ClassificationResultValue):
         if not value:
@@ -195,10 +199,22 @@ class Overlap(TimeStampedModel):
     def contributions(self) -> QuerySet[OverlapContribution]:
         return OverlapContribution.objects.filter(pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)).select_related("classification_grouping__lab__organization")
 
+    @cached_property
+    def contributions_list(self) -> list[OverlapContribution]:
+        return list(self.contributions.all())
+
     class Meta:
         indexes = [models.Index(fields=['overlap_type']), models.Index(fields=['value_type']), models.Index(fields=['allele'])]
         # TODO, we could put lab back in for ClinVar type so we can have this unique
         # unique_together = ('overlap_type', 'allele', 'value_type', 'testing_contexts', 'tumor_type_category', 'lab')
+
+    @property
+    def scope_description(self):
+        # at what scope is this overlap for, in future there could be gene symbol wide scopes
+        if allele := self.allele:
+            return str(allele)
+        else:
+            return "Unknown"
 
     @property
     def value_type_label(self):
@@ -236,6 +252,11 @@ class Overlap(TimeStampedModel):
         raise ValueError("Overlap has multiple testing contexts")
 
     @property
+    def testing_context_full(self) -> TestingContextFull:
+        # TOD
+        return TestingContextFull(testing_context_bucket=self.testing_context_bucket, tumor_type_category=self.tumor_type_category)
+
+    @property
     def priority_order(self) -> Any:
         return (
             self.allele_id,
@@ -258,13 +279,14 @@ class Overlap(TimeStampedModel):
         # if lab := self.lab:
         #     parts.append(str(lab))
         if overlap_type := self.overlap_type:
-            parts.append(OverlapType(overlap_type).name)
+            if overlap_type != OverlapType.SINGLE_CONTEXT:
+                parts.append(OverlapType(overlap_type).label)
         if value_type := self.value_type:
-            parts.append(ClassificationResultValue(value_type).name)
-        parts.append("-".join(t.name for t in self.testing_contexts_objs))
+            parts.append(ClassificationResultValue(value_type).label)
+        parts.append("-".join(t.label for t in self.testing_contexts_objs))
         if tumor_type_category := self.tumor_type_category:
             parts.append(tumor_type_category)
-        return " ".join(parts) + f" : {OverlapStatus(self.overlap_status).name}"
+        return " ".join(parts) + f" : {OverlapStatus(self.overlap_status).label}"
 
     def relevant_values(self) -> list[str]:
         relevant_values = set()
@@ -290,15 +312,15 @@ class Overlap(TimeStampedModel):
             return []
 
 
-class TriageNextStep(TextChoices):
-    PENDING_CALCULATION = "X", "Pending Calculation"
-    UNANIMOUSLY_COMPLEX = "C", "Unanimously Complex"
-    AWAITING_YOUR_TRIAGE = "T", "Awaiting Your Triage"
-    AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = "Y", "Awaiting your Triage - others have triaged"
-    AWAITING_YOUR_AMEND = "A", "Awaiting Your Amendment"
-    AWAITING_OTHER_LAB = "O", "Awaiting Other Lab"
-    TO_DISCUSS = "D", "To Discuss"
-    NOT_INVOLVED = "N", "Not Involved"
+class TriageNextStep(IntegerChoices):
+    NOT_INVOLVED = 0, "Not Involved"
+    PENDING_CALCULATION = 1, "Pending Calculation"
+    AWAITING_OTHER_LAB = 2, "Awaiting Other Lab"
+    AWAITING_YOUR_TRIAGE = 3, "Awaiting Your Triage"
+    AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = 4, "Awaiting your Triage - others have triaged"
+    AWAITING_YOUR_AMEND = 5, "Pending Your Amendment"
+    UNANIMOUSLY_COMPLEX = 6, "Unanimously Complex"
+    TO_DISCUSS = 7, "To Discuss"
 
     @property
     def user_should_action(self) -> bool:
@@ -328,14 +350,25 @@ class TriageNextStep(TextChoices):
 class OverlapContributionSkew(TimeStampedModel):
     overlap = models.ForeignKey(Overlap, on_delete=CASCADE)
     contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
-    skew_perspective = models.TextField(max_length=1, choices=TriageNextStep.choices, default=TriageNextStep.PENDING_CALCULATION)
+    # skew_perspective = models.TextField(max_length=1, choices=TriageNextStep.choices, default=TriageNextStep.PENDING_CALCULATION)
+    next_step = IntegerFieldChoices(choices_type=TriageNextStep, default=TriageNextStep.PENDING_CALCULATION)
 
     def __str__(self):
-        return f"overlap = {self.overlap}, contribution = {self.contribution}, perspective = {self.skew_perspective}"
+        return f"overlap = {self.overlap}, contribution = {self.contribution}, perspective = {self.next_step}"
 
 
 class OverlapDiscordanceNotification(TimeStampedModel):
-    lab = models.ForeignKey(Lab, on_delete=CASCADE)
     overlap = models.ForeignKey('Overlap', on_delete=CASCADE)
-    old_status = IntegerFieldChoices(OverlapStatus)
+    old_status = IntegerFieldChoices(OverlapStatus)  # type:OverlapStatus
+    new_status = IntegerFieldChoices(OverlapStatus)  # type:OverlapStatus
     notification_sent_date = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_still_relevant(self):
+        if self.old_status.is_discordant ^ self.new_status.is_discordant:
+            return True
+        # TODO is going from somewhat discordant to more discordant notification worthy?
+        return False
+
+    def __lt__(self, other):
+        return self.overlap_id < other.overlap_id

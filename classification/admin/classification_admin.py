@@ -19,7 +19,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    AlleleOriginGrouping, ClassificationGroupingSearchTerm
+    AlleleOriginGrouping, ClassificationGroupingSearchTerm, OverlapDiscordanceNotification
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -27,7 +27,6 @@ from classification.models.clinical_context_models import ClinicalContextRecalcT
 from classification.models.clinical_context_utils import update_clinical_contexts
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
-from classification.services.overlaps_services import OverlapServices
 from classification.signals import send_prepared_discordance_notifications
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.cache import timed_cache
@@ -1036,9 +1035,11 @@ class DiscordanceNotificationAdmin(ModelAdminBasics):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    @admin_action("Send Notification")
-    def send_lab_discordance_notification(self, request, queryset):
-        send_prepared_discordance_notifications(queryset)
+
+@admin.register(OverlapDiscordanceNotification)
+class OverlapDiscordanceNotificationAdmin(ModelAdminBasics):
+    list_display = ("overlap", "old_status", "new_status", "notification_sent_date")
+    list_filter = (('lab', RelatedFieldListFilter), ('notification_sent_date', DateFieldListFilter))
 
 
 @admin.register(UploadedClassificationsUnmapped)

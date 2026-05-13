@@ -1,11 +1,5 @@
 from django.core.management import BaseCommand
-
-from annotation.clinvar_fetch_request import ClinVarFetchRequest
-from annotation.models import ClinVarRecord, ClinVarRecordCollection
-from annotation.templatetags.clinvar_tags import ClinVarDetails
-from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from classification.models import Classification, ClassificationModification, ClassificationSummaryCalculator, \
-    ClassificationResultValue, EvidenceKeyMap
+from classification.models import Classification, ClassificationModification, ClassificationSummaryCalculator
 from classification.models.classification_grouping import ClassificationGrouping, AlleleOriginGrouping
 
 

@@ -634,9 +634,24 @@ class ImportedAlleleInfo(TimeStampedModel):
     @property
     def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
         if imported_c_hgvs := self.imported_c_hgvs:
-            return CHGVS(imported_c_hgvs)
+            c_hgvs = CHGVS(imported_c_hgvs)
+            if imported_genome_build := self.imported_genome_build:
+                c_hgvs.genome_build = imported_genome_build
+            return c_hgvs
         else:
             return None
+
+    def preferred_c_hgvs_obj(self, genome_build: GenomeBuild):
+        if preferred := self[genome_build]:
+            return preferred.c_hgvs_obj
+        else:
+            for genome_build in GenomeBuild.builds_with_annotation_cached():
+                if alternative := self[genome_build]:
+                    if c_hgvs_obj := alternative.c_hgvs_obj:
+                        c_hgvs_obj.is_desired_build = False
+                        c_hgvs_obj.genome_build = genome_build
+                        return c_hgvs_obj
+        return self.imported_hgvs_obj()
 
     @property
     def imported_g_hgvs_obj(self) -> Optional[CHGVS]:

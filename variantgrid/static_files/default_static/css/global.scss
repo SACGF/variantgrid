@@ -3079,13 +3079,13 @@ a.clinical-context {
 	background-color: #ddeedd;
 }
 .testing-context-S {
-	background-color: #ffd6ff;
+	background-color: #ffc6ff;
 }
 .testing-context-H {
-background-color: #ffddff;
+	background-color: #ffccff;
 }
 .testing-context-N {
-	background-color: #ffeeff;
+	background-color: #ffbbff;
 }
 td.allele-origin-G {
 	background-color: #ddffdd;
@@ -3337,6 +3337,7 @@ table.overlap-summary {
 	}
 	tr.cross-context-row {
 		opacity: 0.6;
+		background-color: #f4f4f4;
 	}
 	.overlap-criteria {
 		padding: 3px 0 3px 0;

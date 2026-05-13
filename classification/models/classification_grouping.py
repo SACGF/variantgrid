@@ -148,6 +148,7 @@ class AlleleOriginGrouping(TimeStampedModel):
         # OverlapServices().calculate_and_apply_overlaps_for_ao(self)
         # self.dirty = False
         # self.save()
+        print("Do we even need an update on AlleleOriginGrouping anymore - there's no data stored here")
         print("FIXME: AlleleOriginGrouping.Update currently doesn't do anything")
 
 

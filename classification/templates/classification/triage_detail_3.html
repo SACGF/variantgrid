@@ -1,0 +1,41 @@
+{% load ui_utils %}
+{% load user_tags %}
+{% load crispy_forms_tags %}
+{% load classification_tags %}
+<div class="card-header">TRIAGE</div>
+{% if form %}
+    <form data-toggle="ajax-form" method="POST" action="{% url 'triage_3' triage.pk %}?mode={{ mode }}">
+    <div class="card-body">
+        <div class="container">{% include "uicore/messages/messages.html" %}</div>
+        {% labelled label="Editing By" %}{% user user size="tiny" %}{% endlabelled %}
+        <div class="triage-form">
+            {% crispy form form_helper.horizontal %}
+            <script>
+                function triage_status_updated() {
+                    let value = $('input[name="triage_status"]:checked').val();
+                    let willAmend = value == "F";
+                    if (willAmend) {
+                        $('#div_id_new_value').show();
+                    } else {
+                        $('#div_id_new_value').hide();
+                    }
+                }
+                $(document).ready(() => {
+                    triage_status_updated();
+                    $('input[name="triage_status"]').change(() => {
+                        triage_status_updated();
+                    });
+                });
+            </script>
+        </div>
+    </div>
+    <div class="card-footer">
+        <input type="submit" class="btn btn-primary" />
+    </div>
+</form>
+{% else %}
+    <div class="card-body">
+        <div class="container">{% include "uicore/messages/messages.html" %}</div>
+        <div data-replace="#triage-{{ triage.pk }}-status">{% triage triage show_label=True%}</div>
+    </div>
+{% endif %}
