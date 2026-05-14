@@ -292,15 +292,14 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
 
     old_sample_sheet_combined_vcf = SampleSheetCombinedVCFFile.objects.filter(sample_sheet__in=old_sample_sheets)
     relink_samples = False
-    try:
-        combo_vcf = old_sample_sheet_combined_vcf.get()
-        logging.info("Assigning SampleSheetCombinedVCFFile to latest sample sheet")
-        combo_vcf.sample_sheet = current_sample_sheet
-        combo_vcf.save()
-
-        relink_samples = True
-    except:
-        log_traceback()
+    for combo_vcf in old_sample_sheet_combined_vcf:
+        try:
+            logging.info("Assigning SampleSheetCombinedVCFFile %s to latest sample sheet", combo_vcf)
+            combo_vcf.sample_sheet = current_sample_sheet
+            combo_vcf.save()
+            relink_samples = True
+        except:
+            log_traceback()
 
     if not relink_samples:
         missing_linked_sequencing_samples = current_sample_sheet.sequencingsample_set.filter(samplefromsequencingsample__isnull=True)

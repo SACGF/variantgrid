@@ -512,11 +512,10 @@ class SampleSheetCombinedVCFFileSerializer(serializers.ModelSerializer):
             "variant_caller": variant_caller,
         }
         validate_unique_vcf_path(SampleSheetCombinedVCFFile, path, **kwargs)
-        sscvcf, _ = SampleSheetCombinedVCFFile.objects.update_or_create(**kwargs,
-                                                                        defaults={
-                                                                            "path": validated_data["path"],
-                                                                            "data_state": DataState.COMPLETE,
-                                                                        })
+        sscvcf, _ = SampleSheetCombinedVCFFile.objects.update_or_create(
+            path=path,
+            defaults={**kwargs, "data_state": DataState.COMPLETE},
+        )
         return sscvcf
 
 

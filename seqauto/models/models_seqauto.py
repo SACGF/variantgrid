@@ -940,9 +940,24 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
     @lazy
     def vcf(self) -> Optional[VCF]:
         try:
-            VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)
+            return VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)
         except VCF.DoesNotExist:
             return None
+
+    @property
+    def sample_count(self) -> Optional[int]:
+        """ Number of samples in the imported VCF. None pre-import. """
+        if vcf := self.vcf:
+            return vcf.sample_set.count()
+        return None
+
+    @property
+    def is_full_sheet(self) -> Optional[bool]:
+        """ True if this joint call covers every sample on the sheet. None pre-import. """
+        count = self.sample_count
+        if count is None:
+            return None
+        return count == self.sample_sheet.sequencingsample_set.count()
 
     def load_from_file(self, seqauto_run, **kwargs):
         if not settings.SEQAUTO_IMPORT_COMBO_VCF:

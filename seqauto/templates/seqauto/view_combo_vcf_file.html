@@ -5,6 +5,16 @@
 {% block title %}{{ combo_vcf_file }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+<style>
+    .sample-sheet-icon {
+        width: 24px;
+        height: 24px;
+        background-size: 24px 24px;
+        background-image: url({% static 'icons/csv-file-format-extension.png' %});
+        float: left;
+        margin-right: 5px;
+    }
+</style>
 {% endblock %}
 
 {% block jsdocumentready %}
@@ -19,6 +29,20 @@
     <div>
     {% labelled label="Path" %}{{ combo_vcf_file.path }}{% endlabelled %}
     {% labelled label="Variant Caller" %}{{ combo_vcf_file.variant_caller }}{% endlabelled %}
+    </div>
+
+    <div style="clear: both; margin-top: 10px;">
+        <div class='sample-sheet-icon'></div>
+        {% if combo_vcf_file.sample_count is None %}
+            SampleSheet.csv — loading&hellip;
+        {% else %}
+            SampleSheet.csv — {{ combo_vcf_file.sample_count }} / {{ combo_vcf_file.sample_sheet.sequencingsample_set.count }} samples
+            {% if combo_vcf_file.is_full_sheet %}
+                [full sheet]
+            {% else %}
+                [subset]
+            {% endif %}
+        {% endif %}
     </div>
 
 

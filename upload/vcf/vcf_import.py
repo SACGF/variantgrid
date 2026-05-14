@@ -347,16 +347,25 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
 
         # We have unique_together on sequencing_run/variant_caller
         if backend_vcf.combo_vcf:
-            # There can only be 1 combo vcf file per run / variant caller
-            VCFFromSequencingRun.objects.update_or_create(sequencing_run=sequencing_run,
-                                                          variant_caller=backend_vcf.variant_caller,
-                                                          defaults={"vcf": vcf})
+            # Multiple joint-called combo VCFs per run are allowed (trio subsets etc).
+            # Idempotency key is the OneToOne `vcf`. variant_caller is stored as NULL so several rows
+            # can coexist under unique_together("sequencing_run", "variant_caller") (Postgres treats
+            # multiple NULLs as distinct). Real caller stays accessible via vcf.uploadedvcf.backendvcf.
+            VCFFromSequencingRun.objects.update_or_create(
+                vcf=vcf,
+                defaults={"sequencing_run": sequencing_run, "variant_caller": None},
+            )
         elif backend_vcf.vcf_file:
             # Single sample VCF - we'll enforce uniqueness by just deleting any old ones against this sequencing sample
-            # That has null variant caller
+            # That has null variant caller. Invariant: there is at most one single-sample-backed grid row per
+            # sequencing sample; joint-called rows (combo_vcf-backed) must never be swept by this branch,
+            # hence the vcf_file__isnull=False clause.
             sequencing_sample = get_single_element(samples_by_sequencing_sample)
-            existing = VCFFromSequencingRun.objects.filter(vcf__sample__in=sequencing_sample.samplefromsequencingsample_set.values_list("sample"),
-                                                           variant_caller__isnull=True)
+            existing = VCFFromSequencingRun.objects.filter(
+                vcf__sample__in=sequencing_sample.samplefromsequencingsample_set.values_list("sample"),
+                variant_caller__isnull=True,
+                vcf__uploadedvcf__backendvcf__vcf_file__isnull=False,
+            )
             if existing.exists():
                 existing_vcfs = ", ".join([str(vfsr.vcf) for vfsr in existing])
                 logging.info("Removing existing VCFs linked against run: %s / sequencing_sample=%s",
