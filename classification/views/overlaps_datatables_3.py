@@ -38,10 +38,14 @@ class ContributionValueSource:
 
     @property
     def pretty_value(self) -> str:
+        if self.value is None:
+            return "No Data"
         return self.e_key.pretty_value(self.value)
 
     @property
     def short_value(self):
+        if self.value is None:
+            return "No Data"
         return self.value.replace("_", "-")
 
     @property

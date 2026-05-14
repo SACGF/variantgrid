@@ -2,6 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
+from json import JSONDecodeError
 from typing import Optional, Any
 from auditlog.models import LogEntry
 from django.conf import settings
@@ -335,13 +336,17 @@ class OverlapGrouping:
         if value == "None":
             return None
 
-        match field_name:
-            case "triage state":
-                return TriageState.from_json(json.loads(value))
-            case "effective date":
-                return EffectiveDate.from_json(json.loads(value))
-            case "comment":
-                return TriageComment.from_json(json.loads(value))
+        try:
+            match field_name:
+                case "triage state":
+                    return TriageState.from_json(json.loads(value))
+                case "effective date":
+                    return EffectiveDate.from_json(json.loads(value))
+                case "comment":
+                    return TriageComment.from_json(json.loads(value))
+        except JSONDecodeError as jer:
+            return f"Decoding Error: {value}"
+
         return value
 
     @cached_property

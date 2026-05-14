@@ -8,7 +8,7 @@
         {% if show_contact_link %}
             {% if lab.contact_email %}<a class="hover-link" title="{{ lab.contact_email }}" href="mailto:{{ lab.contact_email }}?subject={{ subject }}"><i class="fa-regular fa-envelope"></i></a>{% endif %}
             {% if lab.contact_phone %}<a href="tel:{{ lab.contact_phone }}"><i title="{% if lab.contact_name %}{{ lab.contact_name }} - {% endif %}{{ lab.contact_phone }}" class="fa-solid fa-phone"></i></a>{% endif %}
-            {% if not lab.contact_email and not lab.contact_phone and lab.url %}<i class="fa-solid fa-globe"></i>{% endif %}
+            {% if not lab.contact_email and not lab.contact_phone and lab.url %}<a title="{{ lab.url }}" href="{{ lab.url }}"><i class="fa-solid fa-globe"></i></a>{% endif %}
         {% endif %}
     </span>
 {% endif %}

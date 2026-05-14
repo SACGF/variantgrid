@@ -5,6 +5,7 @@ from auditlog.registry import auditlog
 from django.db.models import CASCADE, QuerySet
 from django.db import models
 from django.db.models.enums import TextChoices, IntegerChoices
+from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 from annotation.models import ClinVarRecord, EffectiveDate
@@ -192,6 +193,9 @@ class Overlap(TimeStampedModel):
     overlap_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
+
+    def get_absolute_url(self):
+        return reverse('overlap_3', kwargs={"overlap_id": self.pk})
 
     # have to cache the values
     # contributions = models.ManyToManyField(OverlapContribution)

@@ -1,6 +1,25 @@
 {% load classification_tags %}
 {% load user_tags %}
 {% load js_tags %}
+{% load ui_utils %}
+
+{% if render_mode != "ajax" %}
+<h4>Overlap {{ overlap_grouping.overlap.pk }}</h4>
+    TODO - include all the information that was in the table row
+{% endif %}
+
+<div class="mt-4">
+    {% if render_mode == "ajax" %}
+    {% labelled label="Page Link" %}<a href="{{ overlap_grouping.overlap.get_absolute_url }}">Overlap {{ overlap_grouping.overlap.pk }} Page</a>{% endlabelled %}
+    {% endif %}
+    {% if overlap_grouping.overlap.allele %}
+        {% labelled label="Allele" %}<a href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{{ overlap_grouping.overlap.allele }}</a>{% endlabelled %}
+    {% endif %}
+    {% if user.is_superuser %}
+        {% labelled label="Overlap Admin" %}{% admin_link overlap_grouping.overlap %}{% endlabelled %}
+    {% endif %}
+</div>
+
 <div class="card">
     <div class="card-header">Classifications</div>
     <div class="card-body">
