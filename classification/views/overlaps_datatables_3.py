@@ -222,15 +222,15 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 name="testing_context",
                 label="Testing Context",
                 renderer=self.render_context,
-                sort_keys=['testing_context_bucket'],
-                default_sort=SortOrder.DESC
+                sort_keys=['testing_context_bucket']
             ),
 
             RichColumn(
                 name="summary",
                 label="Summary",
                 renderer=self.render_summary,
-                sort_keys=["overlap_status", "skew_status"]
+                sort_keys=["overlap_status", "skew_status"],
+                default_sort=SortOrder.DESC
             ),
 
             RichColumn(
