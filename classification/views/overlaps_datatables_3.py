@@ -111,9 +111,6 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         # currently don't surface cross context
         qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
 
-        # only look at discordant overlaps
-        qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
-
         # only ONC PATH for now
         if not OVERLAP_CLIN_SIG_ENABLED:
             qs = qs.filter(value_type=ClassificationResultValue.ONC_PATH)
@@ -122,13 +119,23 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         if not self.lab_picker.is_admin_mode:
             lab_filter_q = Q(contribution__classification_grouping__lab__in=self.lab_picker.lab_ids) & Q(contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
 
-        # filter based on overlap skew
-        qs = qs.annotate(skew_status=Subquery(
-            OverlapContributionSkew.objects.filter(lab_filter_q).filter(
-                overlap=OuterRef('pk'),
-                next_step__in=self.triage_next_step_filter
-            ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
-        ))
+        if self.get_query_param("skew_status") == "X":  # show all overlaps
+            qs = qs.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER)
+            qs = qs.annotate(skew_status=Subquery(
+                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                    overlap=OuterRef('pk')
+                ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
+            ))
+        else:
+            # only look at discordant overlaps
+            qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
+            # filter based on overlap skew
+            qs = qs.annotate(skew_status=Subquery(
+                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                    overlap=OuterRef('pk'),
+                    next_step__in=self.triage_next_step_filter
+                ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
+            ))
 
         # Make sure the skews exist
         qs = qs.filter(skew_status__isnull=False)

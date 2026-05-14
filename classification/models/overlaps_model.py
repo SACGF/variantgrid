@@ -201,7 +201,10 @@ class Overlap(TimeStampedModel):
     # contributions = models.ManyToManyField(OverlapContribution)
     @property
     def contributions(self) -> QuerySet[OverlapContribution]:
-        return OverlapContribution.objects.filter(pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)).select_related("classification_grouping__lab__organization")
+        return OverlapContribution.objects.filter(
+            contribution_status=OverlapContributionStatus.CONTRIBUTING,
+            pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)
+        ).select_related("classification_grouping__lab__organization")
 
     @cached_property
     def contributions_list(self) -> list[OverlapContribution]:
