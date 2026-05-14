@@ -90,7 +90,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
     @property
     def triage_next_step_filter(self) -> Set[TriageNextStep]:
         if triage_status_str := self.get_query_param("skew_status"):
-            if triage_status_str == "TT": # special code for meaning both awaiting and awaiting others have triaged
+            if triage_status_str == "TT":  # special code for meaning both awaiting and awaiting others have triaged
                 return {TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED}
             else:
                 return {TriageNextStep(int(triage_status_str))}
@@ -112,7 +112,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
 
         # only look at discordant overlaps
-        qs = qs.filter(overlap_status__gte=OverlapStatus.TERMINOLOGY_DIFFERENCES)
+        qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
 
         # only ONC PATH for now
         if not OVERLAP_CLIN_SIG_ENABLED:
