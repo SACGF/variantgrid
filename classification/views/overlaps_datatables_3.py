@@ -93,7 +93,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             if triage_status_str == "TT": # special code for meaning both awaiting and awaiting others have triaged
                 return {TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED}
             else:
-                return {TriageNextStep(triage_status_str)}
+                return {TriageNextStep(int(triage_status_str))}
         return TriageNextStep.all_involved_status
 
     @cached_property

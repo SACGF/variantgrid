@@ -25,29 +25,24 @@
 
     {% lab_picker data=lab_picker_data %}
 
-{##}
-{#    <ul class="nav nav-tabs">#}
-{#      <li class="nav-item">#}
-{#        <a class="nav-link active" href="#">Active</a>#}
-{#      </li>#}
-{#      <li class="nav-item">#}
-{#        <a class="nav-link" href="#">Link</a>#}
-{#      </li>#}
-{#      <li class="nav-item">#}
-{#        <a class="nav-link" href="#">Link</a>#}
-{#      </li>#}
-{#      <li class="nav-item">#}
-{#        <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Disabled</a>#}
-{#      </li>#}
-{#    </ul>#}
+    {% comment %}
+    NOT_INVOLVED = 0, "Not Involved"
+    PENDING_CALCULATION = 1, "Pending Calculation"
+    AWAITING_OTHER_LAB = 2, "Awaiting Other Lab"
+    AWAITING_YOUR_TRIAGE = 3, "Awaiting Your Triage"
+    AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = 4, "Awaiting your Triage - others have triaged"
+    AWAITING_YOUR_AMEND = 5, "Pending Your Amendment"
+    UNANIMOUSLY_COMPLEX = 6, "Unanimously Complex"
+    TO_DISCUSS = ≈, "To Discuss"
+    {% endcomment %}
 
     <div id="triage_status_filter" class="my-4">
         <div class="btn-group btn-group-toggle" data-toggle="buttons">
             <label class="btn btn-outline-danger"><input type="radio" name="triage_status_filter" id="triage_status_filter-t" value="TT" checked="checked">Awaiting Triage</label>
-            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-d" value="D">Ready to Discuss</label>
-            <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="A">Awaiting Amendment</label>
-            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="O">Waiting on Other Lab</label>
-            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="C">Complex</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-d" value="7">Ready to Discuss</label>
+            <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="5">Awaiting Amendment</label>
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="2">Waiting on Other Lab</label>
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="6">Complex</label>
         </div>
     </div>
 
