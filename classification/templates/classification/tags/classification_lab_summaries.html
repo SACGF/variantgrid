@@ -5,7 +5,7 @@
     {% for lab_summ in lab_classification_summaries %}
         <div class="w-100 row mt-2">
             <div class="col-7 py-2 text-right" style="align-self:center">
-                {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
+                {% lab lab_summ.lab is_your_lab=lab_summ.is_internal %}
                 {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
                 {% if lab_summ.embedded %}
                     <div class="mt-1">{% embed lab_summ.embedded mode="inline" read_only=read_only %}</div>
