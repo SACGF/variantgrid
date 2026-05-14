@@ -64,7 +64,7 @@ class ContributionValues:
         self._values: dict[str, ContributionValueSource] = {}
 
     def __getitem__(self, item: str) -> ContributionValueSource:
-        if hasattr(self, item):
+        if isinstance(item, str) and hasattr(self, item):
             return getattr(self, item)
         if existing := self._values.get(item):
             return existing
