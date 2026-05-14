@@ -7,6 +7,23 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 <div class="container">
+
+    <a href="#missing-features" data-toggle="collapse" class="toggle-link">Toggle Missing Features List</a>
+   <div id="missing-features" class="collapse hide">
+       <ul>
+           <li>Populate SUBJECT in email links to other labs</li>
+           <li>Show cross context values in the table view (but dulled out)</li>
+           <li>Link to other Overlaps for same allele</li>
+           <li>Mark the overall status (e.g. waiting your triage) as UPDATED once a triage is done</li>
+           <li>Live update the overlap change log after a triage</li>
+           <li>Give the Triage popup an appropriate title</li>
+           <li>Try giving criteria strengths with overrides nicer visual e.g. PP5_M PP5<span class="no-value">-</span>M</li>
+           <li>Retroactively Populate history of overlaps</li>
+           <li>Give counts in the tabs</li>
+           <li>On dedicated overlap page, put details about the overlap (c.HGVS, Testing Context, as well as summary status)</li>
+       </ul>
+   </div>
+
     <script>
         function groupingFilter(data) {
             let selectedMode = $('[name=triage_status_filter]:checked').val();
