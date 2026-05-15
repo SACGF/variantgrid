@@ -274,7 +274,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 name="summary",
                 label="Summary",
                 renderer=self.render_summary,
-                sort_keys=["overlap_status", "skew_status", "-overlap_status_change_timestamp"],
+                sort_keys=["overlap_status", "skew_status", "overlap_status_change_timestamp"],
                 default_sort=SortOrder.DESC
             ),
 
