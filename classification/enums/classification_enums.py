@@ -41,7 +41,7 @@ class OverlapStatus(IntegerChoices):
     MINOR_DIFFERENCES = 60, "Minor differences"  # e.g. VUS_A vs VUS_B, Pathogenic versus Likely Pathogenic
     TIER_1_VS_TIER_2_DIFFERENCES = 70, "Tier 1 vs Tier 2 differences"  # User group disagrees on importance of Tier 1 vs Tier 2 - can work out how to treat this later
     MAJOR_DIFFERENCES = 80, "Discordance"  # VUS vs Benign TODO work out if this is in tier 1 vs tier 3
-    MEDICALLY_SIGNIFICANT = 90, "Discordance (+)"  # VUS or lower vs Pathogenic as will require re-reporting
+    MEDICALLY_SIGNIFICANT = 90, "Medically significant discordance"  # VUS or lower vs Pathogenic as will require re-reporting
 
     @property
     def is_dull(self) -> bool:

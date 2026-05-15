@@ -3,7 +3,9 @@
 <span style="font-style:italic; color:#ccc">{{ max_triage_status.label }}</span><br/>
 {% endif %}
 
-<span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>{{ overlap.overlap_status.label }}</span>
+<span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>
+    {% if overlap.overlap_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status.label }}{% endif %}
+</span>
 {% if overlap.overlap_status_change_timestamp %} - {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}{% endif %}
 {% for c_value in values.sorted %}
     <span class="cs cs-dot cs-{{ c_value.value }}">
