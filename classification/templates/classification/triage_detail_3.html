@@ -2,10 +2,16 @@
 {% load user_tags %}
 {% load crispy_forms_tags %}
 {% load classification_tags %}
-<div class="card-header">TRIAGE</div>
+<div class="card-header">Triaging</div>
 {% if form %}
     <form data-toggle="ajax-form" method="POST" action="{% url 'triage_3' triage.pk %}?mode={{ mode }}">
     <div class="card-body">
+        {% labelled label="c.HGVS" %}
+            <a href="{{ triage.allele.get_absolute_url }}">
+            {% c_hgvs triage.classification_grouping.latest_allele_info.preferred_c_hgvs_obj %}
+            </a>
+        {% endlabelled %}
+        {% labelled label="Value" %}{{ triage.get_value_type_display }} : {{ triage.pretty_value }}{% endlabelled %}
         <div class="container">{% include "uicore/messages/messages.html" %}</div>
         {% labelled label="Editing By" %}{% user user size="tiny" %}{% endlabelled %}
         <div class="triage-form">

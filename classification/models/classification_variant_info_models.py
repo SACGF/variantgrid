@@ -20,6 +20,7 @@ from library.django_utils.django_object_managers import ObjectManagerCachingRequ
 from library.log_utils import report_exc_info
 from library.utils import pretty_label, IconWithTooltip, md5sum_str
 from library.utils.django_utils import get_cached_project_git_hash
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
 
 """
@@ -641,7 +642,10 @@ class ImportedAlleleInfo(TimeStampedModel):
         else:
             return None
 
-    def preferred_c_hgvs_obj(self, genome_build: GenomeBuild):
+    def preferred_c_hgvs_obj(self, genome_build: Optional[GenomeBuild] = None) -> CHGVS:
+        if genome_build is None:
+            genome_build = GenomeBuildManager.get_current_genome_build()
+
         if preferred := self[genome_build]:
             return preferred.c_hgvs_obj
         else:

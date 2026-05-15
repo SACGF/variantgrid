@@ -78,7 +78,6 @@ def classification_sort_order(clin_sig: str) -> int:
 #     DISCORDANCE_MEDICALLY_SIGNIFICANT = 60, "Discordance"
 
 
-
 class AlleleOriginGrouping(TimeStampedModel):
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.UNKNOWN)

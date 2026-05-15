@@ -1,7 +1,9 @@
+from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, Set
 
+from celery.utils.functional import pass1
 from django.db.models import QuerySet, Subquery, Q, OuterRef
 from django.db.models.aggregates import Max
 from django.http import HttpRequest
@@ -18,7 +20,7 @@ from genes.hgvs import CHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Organization, Lab
-from snpdb.views.datatable_view import DatatableConfig, DatatableConfigQuerySetMode, RichColumn, CellData, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, DatatableConfigQuerySetMode, RichColumn, CellData, SortOrder, DC
 
 
 @dataclass
@@ -105,10 +107,10 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             lab_picker = LabPickerData.for_user(self.user)
         return lab_picker
 
-    def get_initial_queryset(self) -> QuerySet[ClassificationGrouping]:
-        qs = Overlap.objects.all()
+    def get_initial_queryset(self) -> QuerySet[Overlap]:
+        qs = Overlap.objects.filter(valid=True)
 
-        # currently don't surface cross context
+        # only display single context overlaps, but later we merge with cross context data
         qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
 
         # only ONC PATH for now
@@ -117,7 +119,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         lab_filter_q = Q()
         if not self.lab_picker.is_admin_mode:
-            lab_filter_q = Q(contribution__classification_grouping__lab__in=self.lab_picker.lab_ids) & Q(contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
+            lab_filter_q = Q(contribution__classification_grouping__lab__in=self.lab_picker.lab_ids) & Q(
+                contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
 
         if self.get_query_param("skew_status") == "X":  # show all overlaps
             qs = qs.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER)
@@ -141,6 +144,21 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         qs = qs.filter(skew_status__isnull=False)
         return qs
 
+    def pre_render(self, qs: QuerySet[DC]):
+        # stores cross context overlaps
+        allele_ids = qs.values_list('allele_id', flat=True)
+        cross_context_qs = Overlap.objects.filter(valid=True, overlap_type=OverlapType.CROSS_CONTEXT, allele_id__in=allele_ids)
+        # only ONC PATH for now
+        if not OVERLAP_CLIN_SIG_ENABLED:
+            cross_context_qs = cross_context_qs.filter(value_type=ClassificationResultValue.ONC_PATH)
+
+        for cross_overlap in cross_context_qs.filter(overlap_type=OverlapType.CROSS_CONTEXT):
+            # need to edit when we do multiple value types
+            self.cross_cotext_allele_to_overlap[(cross_overlap.allele_id, cross_overlap.value_type)] = cross_overlap
+
+    def cross_context_overlap_for(self, overlap: Overlap) -> Optional[Overlap]:
+        return self.cross_cotext_allele_to_overlap.get((overlap.allele_id, overlap.value_type))
+
     def render_c_hgvs(self, cell: CellData[Overlap]):
         # TODO be able to sort by this
         contributions = cell.obj.contributions
@@ -155,7 +173,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                         return c_hgvs.to_json()
         return None
 
-    def render_context(self, cell: CellData[ClassificationGrouping]):
+    def render_context(self, cell: CellData[Overlap]):
 
         return render_to_string('classification/snippets/testing_context_cell.html',
                                 context={"testing_context": cell.obj.testing_context_full},
@@ -163,24 +181,29 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
     def render_orgs(self, cell: CellData[Overlap]):
         clinvar = False
-        orgs: set[Organization] = set()
+        org_count = Counter()
         for contribution in cell.obj.contributions_list:
             if cg := contribution.classification_grouping:
-                orgs.add(cg.lab.organization)
+                org_count[cg.lab.organization] += 1
             elif contribution.scv:
                 clinvar = True
 
-        result = "<br/>".join(sorted(html.escape(org.shortest_name) for org in orgs))
+        org_rows = []
+        for org, count in org_count.items():
+            if count > 1:
+                org_rows.append(html.escape(org.shortest_name) + f" x {count}")
+            else:
+                org_rows.append(html.escape(org.shortest_name))
+
+        result = "<br/>".join(sorted(org_rows))
         if clinvar:
             result += "<br/>ClinVar Expert Panel"
 
         return SafeString(result)
 
     def render_summary(self, cell: CellData[Overlap]):
-
         # FIXME - check for other valueType
         values = ContributionValues(EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH))
-        max_triage_status = TriageNextStep.PENDING_CALCULATION
 
         skew_qs = cell.obj.overlapcontributionskew_set
         if not self.lab_picker.is_admin_mode:
@@ -200,6 +223,17 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             elif contribution.scv:
                 value.clinvar = True
 
+        if cross_context := self.cross_context_overlap_for(cell.obj):
+            for cross_contribution in cross_context.contributions:
+                value = values[cross_contribution.value]
+                # only show cross context values if there was no
+                if not value.your_context:
+                    if cg := contribution.classification_grouping:
+                        lab = cg.lab
+                        value.labs.add(lab)
+                    elif cross_contribution.scv:
+                        value.clinvar = True
+
         context = {
             "values": values,
             "overlap": cell.obj,
@@ -213,6 +247,10 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
+
+        self.cross_cotext_allele_to_overlap = {}
+        # used to cache cross context
+
         self.server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('overlap_3', expected_height=108)
         self.rich_columns = [

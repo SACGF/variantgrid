@@ -2,7 +2,10 @@
 {% load static %}
 {% load user_tags %}
 <div class="d-flex">
-    <div class="flex-grow"></div>
+    {% if align == 'right' %}
+        <div class="flex-grow"></div>
+    {% endif %}
+
     <div class="avatar-frame avatar-frame-{{ user_details.size }}">
         {% avatar2 user_details.avatar size=user_details.size %}
         {% if user_details.avatar.awards %}
@@ -29,4 +32,7 @@
         {% endif %}
         {% if user_details.role == 'head' %}<i class="far fa-star ml-1" title="User is lab head" data-toggle="tooltip"></i>{% endif %}
     </div>
+    {% if align == 'left' %}
+        <div class="flex-grow"></div>
+    {% endif %}
 </div>

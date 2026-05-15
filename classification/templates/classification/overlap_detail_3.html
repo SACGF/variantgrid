@@ -10,10 +10,10 @@
 
 <div class="mt-4">
     {% if render_mode == "ajax" %}
-    {% labelled label="Page Link" %}<a href="{{ overlap_grouping.overlap.get_absolute_url }}">Overlap {{ overlap_grouping.overlap.pk }} Page</a>{% endlabelled %}
+    {% labelled label="Page Link" %}<a class="hover-link" href="{{ overlap_grouping.overlap.get_absolute_url }}">Overlap {{ overlap_grouping.overlap.pk }} Page</a>{% endlabelled %}
     {% endif %}
     {% if overlap_grouping.overlap.allele %}
-        {% labelled label="Allele" %}<a href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{{ overlap_grouping.overlap.allele }}</a>{% endlabelled %}
+        {% labelled label="Allele" %}<a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{{ overlap_grouping.overlap.allele }}</a>{% endlabelled %}
     {% endif %}
     {% if user.is_superuser %}
         {% labelled label="Overlap Admin" %}{% admin_link overlap_grouping.overlap %}{% endlabelled %}
@@ -90,7 +90,7 @@
                     <div class="col-3 text-right">
                         {% ifchanged change.overlap_contribution change.user %}
                             <div>{% testing_context change.overlap_contribution %}<br/>{{ change.overlap_contribution.lab }}</div>
-                            {% if change.user %}<div class="mt-1">{% user change.user size="tiny" %}</div>
+                            {% if change.user %}<div class="mt-1">{% user change.user size="tiny" align="right" %}</div>
                             {% else %}<div class="mt-1 no-value">No user</div>{% endif %}
                         {% endifchanged %}
                         <div>{% timestamp change.timestamp time_ago=True %}</div>

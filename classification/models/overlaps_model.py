@@ -1,5 +1,5 @@
 from functools import reduce, cached_property
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
 from django.db.models import CASCADE, QuerySet
@@ -113,6 +113,10 @@ class OverlapContribution(TimeStampedModel):
     @property
     def overlaps(self) -> QuerySet['Overlap']:
         return Overlap.objects.filter(pk__in=self.overlapcontributionskew_set.values_list('overlap_id'))
+
+    @property
+    def label(self):
+        return f"{self.allele} {self.testing_context_full} {self.value_type}"
 
     def __str__(self):
         return f"{self.pk} {self.source} {self.value}"

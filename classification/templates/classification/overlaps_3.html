@@ -6,6 +6,17 @@
 {% block title %}Overlaps{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
+<style>
+    .dt-classification {
+        width: 230px;
+    }
+    .dt-testing_context {
+        width: 100px;
+    }
+    .dt-summary {
+        width: 400px;
+    }
+</style>
 <div class="container">
 
     <a href="#missing-features" data-toggle="collapse" class="toggle-link">Toggle Missing Features List</a>
@@ -21,13 +32,13 @@
 
        Functional
        <ul>
-           <li>Add date discordance detected column</li>
+           <li>Try dedicated date discordance detected column</li>
            <li>Populate SUBJECT in email links to other labs</li>
-           <li>Show cross context values in the table view (but dulled out)</li>
+           <li style="text-decoration: line-through;">Show cross context values in the table view (but dulled out)</li>
            <li>Link to other Overlaps for same allele</li>
            <li>Mark the overall status (e.g. waiting your triage) as UPDATED once a triage is done</li>
            <li>Live update the overlap change log after a triage</li>
-           <li>Give the Triage popup an appropriate title</li>
+           <li style="text-decoration: line-through;">Give the Triage popup an appropriate title</li>
            <li>Retroactively Populate history of overlaps, including previous discordance reports, triages etc</li>
            <li>Give counts in the tabs</li>
            <li>On dedicated overlap page, put details about the overlap (c.HGVS, Testing Context, as well as summary status)</li>
@@ -37,7 +48,7 @@
        Purely Visual
        <ul>
            <li>Try giving criteria strengths with overrides nicer visual e.g. PP5_M PP5<span class="no-value">-</span>M, maybe try diff font</li>
-           <li>Stop columns from changing widths between pages</li>
+           <li style="text-decoration: line-through;">Stop columns from changing widths between pages</li>
        </ul>
    </div>
 
