@@ -724,6 +724,17 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     def gnomad_major_version(self) -> int:
         return int(self.gnomad.split(".", maxsplit=1)[0])
 
+    @property
+    def uses_raw_spliceai(self) -> bool:
+        # SpliceAI ships "raw" and "masked" precomputed score files; the masked
+        # files zero out splice-site changes Illumina's README flags as typically
+        # less pathogenic (strengthening annotated / weakening unannotated) and
+        # are the version recommended for variant interpretation. The `spliceai`
+        # VEP-pin string is set to e.g. "raw 1.3" or "masked 1.3" by
+        # `manage.py vep_install` (see annotation_pipeline_data). See
+        # SACGF/variantgrid_sapath#410.
+        return bool(self.spliceai) and self.spliceai.strip().lower().startswith("raw")
+
     def get_max_af_fields(self) -> list[str]:
         fields = ["af_1kg", "af_uk10k", "gnomad_af", "gnomad_popmax_af"]
         if self.gnomad_major_version >= 4:

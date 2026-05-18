@@ -234,6 +234,14 @@ class DamageNode(AnalysisNode):
                 "VariantAnnotationVersion. Run `manage.py fix_historical_spliceai_max_ds` to enable "
                 "the optimised path."
             )
+        if self.splice_min is not None and vav.uses_raw_spliceai:
+            warnings.append(
+                "SpliceAI scores on this VariantAnnotationVersion are from the raw precomputed file "
+                f"({vav.spliceai}). Illumina recommends the masked file for variant interpretation: "
+                "the raw file also reports strengthening of annotated splice sites and weakening of "
+                "unannotated ones, which are typically much less pathogenic. See "
+                "https://github.com/Illumina/SpliceAI"
+            )
         return warnings
 
     def _get_node_q_hash(self) -> str:
