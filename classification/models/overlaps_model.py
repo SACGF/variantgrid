@@ -166,6 +166,13 @@ class OverlapContribution(TimeStampedModel):
     def __lt__(self, other):
         if value_sort_diff := self.value_sort_index - other.value_sort_index:
             return value_sort_diff < 0
+        if self.lab is None or other.lab is None:
+            if self.lab is None and other.lab is None:
+                return False
+            if self.lab is None:
+                return True
+            else:
+                return False
         return self.lab < other.lab
 
     @staticmethod
