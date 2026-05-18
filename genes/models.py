@@ -2035,15 +2035,19 @@ class PanelAppServer(models.Model):
 
 
 class PanelAppPanel(TimeStampedModel):
-    """ Populated from PanelApp cached web resource task, updated to latest version
-        It's not clear how PanelApp removes panels, so we don't do that. """
+    """ Populated from PanelApp cached web resource task, updated to latest version.
+        Soft-deleted when PanelApp returns 404/Not found for the panel — see issue #405. """
     server = models.ForeignKey(PanelAppServer, on_delete=CASCADE)
     panel_id = models.IntegerField()
     disease_group = models.TextField()
     disease_sub_group = models.TextField()
     name = models.TextField()
+    # Mirrors PanelApp's own panel status: "public", "internal", "promoted", "retired"
     status = models.TextField()
     current_version = models.TextField()
+    # PanelApp doesn't expose a "deleted" status — once a panel is removed upstream the API
+    # just starts returning 404 (see issue #405), so we track that locally.
+    deleted = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('server', 'panel_id')
@@ -2051,6 +2055,10 @@ class PanelAppPanel(TimeStampedModel):
     @property
     def url(self) -> str:
         return f"{self.server.url}/api/v1/panels/{self.panel_id}"
+
+    @property
+    def web_url(self) -> str:
+        return f"{self.server.url}/panels/{self.panel_id}/"
 
     @property
     def cache_valid(self) -> bool:

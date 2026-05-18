@@ -19,7 +19,7 @@ class AbstractPanelAppPanelAutocompleteView(abc.ABC, AutocompleteView):
         pass
 
     def get_user_queryset(self, user):
-        qs = PanelAppPanel.objects.all()
+        qs = PanelAppPanel.objects.filter(deleted=False)
         if server := self._get_server():
             qs = qs.filter(server=server)
         return qs

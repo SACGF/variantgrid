@@ -39,14 +39,44 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
     return results
 
 
+def _mark_panel_deleted(panel_app_panel: PanelAppPanel):
+    """ Soft-delete: panel was confirmed missing on PanelApp - see issue #405 """
+    if not panel_app_panel.deleted:
+        panel_app_panel.deleted = True
+        panel_app_panel.save(update_fields=["deleted", "modified"])
+
+
 def _get_panel_app_panel_api_json(panel_app_panel):
     r = get_request(panel_app_panel.url)
-    json_data: dict = r.json()
-    # Panel App isn't very REST-ful - returns 200 for missing data, but we'll return 404
-    if detail := json_data.get("detail"):
-        if detail == "Not found.":
-            logging.warning("PanelApp couldn't find panel %s at %s", panel_app_panel.panel_id, r.url)
-            raise NotFound(detail=f"PanelApp couldn't find panel {panel_app_panel.panel_id}")
+
+    # PanelApp sometimes returns 200 with {"detail": "Not found."} and sometimes returns HTTP 404.
+    # Treat both as a soft-deletion (issue #405).
+    json_data: Optional[dict] = None
+    if r.status_code == 200:
+        try:
+            json_data = r.json()
+        except ValueError:
+            json_data = None
+
+    deleted = False
+    if r.status_code == 404:
+        deleted = True
+    elif json_data is not None:
+        if json_data.get("detail") == "Not found.":
+            deleted = True
+
+    if deleted:
+        logging.warning("PanelApp couldn't find panel %s at %s", panel_app_panel.panel_id, r.url)
+        _mark_panel_deleted(panel_app_panel)
+        raise NotFound(
+            detail=f"PanelApp panel '{panel_app_panel.name}' (id={panel_app_panel.panel_id}) "
+                   f"has been deleted from PanelApp. See {panel_app_panel.web_url}"
+        )
+
+    if json_data is None:
+        r.raise_for_status()
+        # Status was 2xx but body wasn't JSON — treat as a hard error.
+        raise ValueError(f"PanelApp returned non-JSON body for panel {panel_app_panel.panel_id}")
 
     return json_data
 
@@ -115,6 +145,7 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 
     # Now uses paging
     num_panels = 0
+    seen_panel_ids: set[int] = set()
     url = server.url + PANEL_APP_LIST_PANELS_PATH
     while url:
         logging.debug("Calling %s", url)
@@ -124,9 +155,21 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 
         for result in data["results"]:
             num_panels += 1
-            _get_or_update_panel_app_panel(server, result)
+            seen_panel_ids.add(result["id"])
+            pap = _get_or_update_panel_app_panel(server, result)
+            if pap.deleted:
+                # Resurrected: PanelApp returned it again after a previous soft-delete (issue #405)
+                pap.deleted = False
+                pap.save(update_fields=["deleted", "modified"])
 
-    cached_web_resource.description = f"{num_panels} panel app panels."
+    # Soft-delete any panels we didn't see in the full listing (issue #405).
+    missing_qs = PanelAppPanel.objects.filter(server=server, deleted=False).exclude(panel_id__in=seen_panel_ids)
+    num_deleted = missing_qs.update(deleted=True)
+
+    description = f"{num_panels} panel app panels."
+    if num_deleted:
+        description += f" Soft-deleted {num_deleted} missing panel(s)."
+    cached_web_resource.description = description
     cached_web_resource.save()
 
 
