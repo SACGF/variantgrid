@@ -47,26 +47,28 @@ class Command(BaseCommand):
         print(f"Overlap Count = {Overlap.objects.count()}")
         print(f"Overlap Contribution Count = {OverlapContribution.objects.count()}")
 
+        self.populate_status_change()
+
 
     def populate_status_change(self):
         # timestamp on overlaps
-        for overlap in Overlap.objects.filter(overlap_status_change_timestamp__isnull=True).iterator():
-            # note we're looking for the latest published date of a classification here
-            # as the upload date is when a discordance would occur
-            latest_date = None
-            for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
-                if grouping := contribution.classification_grouping:
-                    for mod in grouping.classification_modifications:
-                        latest_mod_date = mod.created
-                        if latest_date is None or latest_mod_date > latest_date:
-                            latest_date = latest_mod_date
-
-            if latest_date:
-                overlap.overlap_status_change_timestamp = latest_date
-                overlap.save(update_fields=["overlap_status_change_timestamp"])
-
-        # dates on overlap contributions
         with disable_auditlog():
+            for overlap in Overlap.objects.filter(overlap_status_change_timestamp__isnull=True).iterator():
+                # note we're looking for the latest published date of a classification here
+                # as the upload date is when a discordance would occur
+                latest_date = None
+                for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
+                    if grouping := contribution.classification_grouping:
+                        for mod in grouping.classification_modifications:
+                            latest_mod_date = mod.created
+                            if latest_date is None or latest_mod_date > latest_date:
+                                latest_date = latest_mod_date
+
+                if latest_date:
+                    overlap.overlap_status_change_timestamp = latest_date
+                    overlap.save(update_fields=["overlap_status_change_timestamp"])
+
+            # dates on overlap contributions
             for overlap_contribution in OverlapContribution.objects.filter(effective_date__date=None).iterator():
                 if grouping := overlap_contribution.classification_grouping:
                     date_check = grouping.latest_classification_modification.curated_date_check
