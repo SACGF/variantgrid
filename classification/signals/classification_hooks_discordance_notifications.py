@@ -11,6 +11,7 @@ from classification.models import DiscordanceReport, discordance_change_signal, 
     OverlapDiscordanceNotification, Overlap, OverlapContributionStatus, ClassificationImportRun
 from classification.models.clinical_context_models import DiscordanceNotification, ClinicalContextChangeData, \
     ClinicalContextRecalcTrigger
+from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from snpdb.models import Lab
 from snpdb.utils import LabNotificationBuilder
@@ -46,11 +47,7 @@ def prepare_discordance_notification(discordance_report: DiscordanceReport, caus
 
 
 def _report_url_for_id(overlap: Overlap, lab: Lab):
-    # return get_url_from_view_path(
-    #     reverse('discordance_report', kwargs={'discordance_report_id': the_id}),
-    # )
-    # FIXME make a URL for Overlaps not just OverlapContribution
-    return ""
+    return get_url_from_view_path(overlap.get_absolute_url())
 
 
 def send_prepared_discordance_notifications(outstanding_notifications: Optional[QuerySet[OverlapDiscordanceNotification]] = None):
@@ -85,12 +82,16 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
                         labs.add(lab)
                         notifications_by_lab[lab].append(notification)
 
-                sorted_lab_str = ", ".join(str(lab) for lab in sorted(labs))
+                sorted_lab_str = "\n".join(str(lab) for lab in sorted(labs))
 
                 overlap = notification.overlap
                 discordance_status_icon = ":no_good:" if notification.new_status.is_discordant else ":handshake:"
-                overlap_description = f"{overlap.scope_description} {overlap.value_type_label} : {notification.old_status.label} -> {notification.new_status.label} {discordance_status_icon}"
-                overall_admin_notification.add_markdown(f"Overlap <{_report_url_for_id(notification.overlap, None)}|OL_{notification.overlap_id}> {overlap_description}\n\n{sorted_lab_str}")
+                overlap_description = f"{overlap.scope_description} {overlap.value_type_label}"
+                overlap_change = f"{notification.old_status.label} -> {notification.new_status.label} {discordance_status_icon}"
+
+                overall_admin_notification.add_field("Overlap", f"<{_report_url_for_id(notification.overlap, None)}|Overlap_{notification.overlap_id}> {overlap_description}")
+                overall_admin_notification.add_field("Involved Labs", sorted_lab_str)
+                overall_admin_notification.add_field("Change", overlap_change)
 
         overall_admin_notification.send()
         # FIXME make an admin notification
