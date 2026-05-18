@@ -41,14 +41,47 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
     return results
 
 
+def _mark_panel_deleted(panel_app_panel: PanelAppPanel):
+    """ Soft-delete: panel was confirmed missing on PanelApp - see issue #405.
+
+        VG3 stores the sentinel in `status` because we can't add fields here; master
+        uses a dedicated boolean and has a migration that converts this row across. """
+    if not panel_app_panel.deleted:
+        panel_app_panel.status = PanelAppPanel.DELETED_STATUS
+        panel_app_panel.save(update_fields=["status", "modified"])
+
+
 def _get_panel_app_panel_url_and_json(panel_app_panel):
     url = panel_app_panel.server.url + PANEL_APP_GET_PANEL_API_BASE_PATH + str(panel_app_panel.panel_id)
     r = get_request(url)
-    json_data: Dict = r.json()
-    # Panel App isn't very REST-ful - returns 200 for missing data but we'll return 404
-    if detail := json_data.get("detail"):
-        if detail == "Not found.":
-            raise NotFound(detail=f"PanelApp couldn't find {panel_app_panel.panel_id} ({url})")
+
+    # PanelApp sometimes returns 200 with {"detail": "Not found."} and sometimes returns HTTP 404.
+    # Treat both as a soft-deletion (issue #405).
+    json_data: Optional[Dict] = None
+    if r.status_code == 200:
+        try:
+            json_data = r.json()
+        except ValueError:
+            json_data = None
+
+    deleted = False
+    if r.status_code == 404:
+        deleted = True
+    elif json_data is not None and json_data.get("detail") == "Not found.":
+        deleted = True
+
+    if deleted:
+        logging.warning("PanelApp couldn't find panel %s at %s", panel_app_panel.panel_id, url)
+        _mark_panel_deleted(panel_app_panel)
+        raise NotFound(
+            detail=f"PanelApp panel '{panel_app_panel.name}' (id={panel_app_panel.panel_id}) "
+                   f"has been deleted from PanelApp. See {panel_app_panel.web_url}"
+        )
+
+    if json_data is None:
+        r.raise_for_status()
+        # Status was 2xx but body wasn't JSON — treat as a hard error.
+        raise ValueError(f"PanelApp returned non-JSON body for panel {panel_app_panel.panel_id}")
 
     return url, json_data
 
@@ -115,6 +148,7 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 
     # Now uses paging
     num_panels = 0
+    seen_panel_ids: set = set()
     url = server.url + PANEL_APP_LIST_PANELS_PATH
     while url:
         logging.debug("Calling %s", url)
@@ -124,9 +158,20 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 
         for result in data["results"]:
             num_panels += 1
+            seen_panel_ids.add(result["id"])
+            # Resurrection (issue #405) is handled implicitly: update_or_create overwrites
+            # the "deleted" sentinel in status with PanelApp's real status value.
             _get_or_update_panel_app_panel(server, result)
 
-    cached_web_resource.description = f"{num_panels} panel app panels."
+    # Soft-delete any panels we didn't see in the full listing (issue #405).
+    missing_qs = PanelAppPanel.objects.filter(server=server).exclude(status=PanelAppPanel.DELETED_STATUS) \
+                                      .exclude(panel_id__in=seen_panel_ids)
+    num_deleted = missing_qs.update(status=PanelAppPanel.DELETED_STATUS)
+
+    description = f"{num_panels} panel app panels."
+    if num_deleted:
+        description += f" Soft-deleted {num_deleted} missing panel(s)."
+    cached_web_resource.description = description
     cached_web_resource.save()
 
 

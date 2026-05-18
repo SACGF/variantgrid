@@ -1307,8 +1307,17 @@ class PanelAppServer(models.Model):
 
 
 class PanelAppPanel(TimeStampedModel):
-    """ Populated from PanelApp cached web resource task, updated to latest version
-        It's not clear how PanelApp removes panels, so we don't do that. """
+    """ Populated from PanelApp cached web resource task, updated to latest version.
+        Soft-deleted (status == DELETED_STATUS) when PanelApp returns 404/Not found for the
+        panel — see issue #405. In master this is a dedicated boolean field; in this VG3
+        deployment we re-use the existing status TextField to avoid a schema change. """
+
+    # Sentinel value stored in `status` to mark a soft-deleted panel.
+    # PanelApp's own statuses are "public", "internal", "promoted", "retired", so
+    # "deleted" never collides with a real upstream value. Master has a migration that
+    # converts this sentinel into a real boolean field on upgrade.
+    DELETED_STATUS = "deleted"
+
     server = models.ForeignKey(PanelAppServer, on_delete=CASCADE)
     panel_id = models.IntegerField()
     disease_group = models.TextField()
@@ -1319,6 +1328,14 @@ class PanelAppPanel(TimeStampedModel):
 
     class Meta:
         unique_together = ('server', 'panel_id')
+
+    @property
+    def deleted(self) -> bool:
+        return self.status == self.DELETED_STATUS
+
+    @property
+    def web_url(self) -> str:
+        return f"{self.server.url}/panels/{self.panel_id}/"
 
     @property
     def cache_valid(self) -> bool:
