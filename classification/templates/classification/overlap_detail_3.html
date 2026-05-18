@@ -106,10 +106,10 @@
                         <div>{% timestamp change.timestamp time_ago=True %}</div>
                     </div>
                     <div class="col-9">
-                        <label>Record registered</label>
+                        <label>Record registered in {{ site_name }}</label>
                         {% if change.is_new_record %}
                             {% for field_change in change.changes %}
-                                <div>{{ field_change.new_value }}</div>
+                                <div>{% if field_change.field == "effective date" %}Effective Date: {% endif %}{{ field_change.new_value }}</div>
                             {% endfor %}
                         {% else %}
                             {% for field_change in change.changes %}
