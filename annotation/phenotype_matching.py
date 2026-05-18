@@ -1,5 +1,6 @@
 from typing import List, Optional, Iterable
 
+from django.conf import settings
 from django.db.models import Count
 import logging
 import nltk
@@ -336,6 +337,9 @@ def create_phenotype_description(text, phenotype_matcher=None):
 def bulk_patient_phenotype_matching(patients=None):
     if patients is None:
         patients = Patient.objects.filter(phenotype__isnull=False).exclude(phenotype='')
+        exclude_string = getattr(settings, "PATIENT_PHENOTYPE_EXCLUDE_STRING", None)
+        if exclude_string:
+            patients = patients.exclude(phenotype__contains=exclude_string)
 
     start = time.time()
     phenotype_matcher = PhenotypeMatcher()

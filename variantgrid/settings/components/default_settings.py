@@ -307,6 +307,11 @@ GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
 HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
+# If set, patient phenotype text containing this string is treated as unreviewed:
+# matched ontology terms will not be persisted to the DB (PatientTextPhenotype / TextPhenotypeMatch).
+# Users can still see live preview matches on the patient page along with a warning.
+# Set to None / empty to disable.
+PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 
 # @see https://github.com/SACGF/variantgrid/wiki/Liftover

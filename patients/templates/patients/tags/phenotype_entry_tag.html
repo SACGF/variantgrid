@@ -244,6 +244,38 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
 {% if show_page_help %}
     {% page_help 'patients/patient_phenotypes_help' 'Patient Phenotypes' header_tag="h4" %}
 {% endif %}
+{% if phenotype_exclude_string %}
+<div id="phenotype-exclude-warning-{{ flattened_uuid }}" class="alert alert-warning"{% if not phenotype_excluded %} style="display:none;"{% endif %}>
+    Phenotype text contains <code>{{ phenotype_exclude_string }}</code> — matched terms are shown below
+    for review but will <strong>not</strong> be saved to the database. Remove the marker after a human
+    review to persist the matches.
+</div>
+<script>
+(function() {
+    const phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
+    const excludeString = "{{ phenotype_exclude_string|escapejs }}";
+    const warning = $("#phenotype-exclude-warning-{{ flattened_uuid }}");
+
+    function refreshExcludeWarning() {
+        const input = $("#{{ form_entry_field.auto_id }}", phenotypeEditorTag);
+        const text = input.val() || "";
+        if (text.indexOf(excludeString) !== -1) {
+            warning.show();
+        } else {
+            warning.hide();
+        }
+    }
+
+    $(document).ready(function() {
+        const input = $("#{{ form_entry_field.auto_id }}", phenotypeEditorTag);
+        if (input.length) {
+            input.on("keyup change", refreshExcludeWarning);
+        }
+        refreshExcludeWarning();
+    });
+})();
+</script>
+{% endif %}
 {% if edit %}
 <div id='patient-ontology'>
     <table>
