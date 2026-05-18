@@ -3,7 +3,7 @@ import os.path
 from rest_framework import serializers
 
 from seqauto.models import Sequencer, Experiment, VariantCaller, SequencingRun, SequencerModel, SampleSheet, \
-    SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, JointCalledVCF, VCFFile, \
+    SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, JointCalledVCF, SingleSampleVCF, \
     BamFile, Fastq, Aligner, PairedEnd
 from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
 from snpdb.models import Manufacturer, DataState
@@ -366,9 +366,9 @@ class BamFileSerializer(serializers.ModelSerializer):
         return instance
 
 
-class VCFFilePathSerializer(serializers.ModelSerializer):
+class SingleSampleVCFPathSerializer(serializers.ModelSerializer):
     class Meta:
-        model = VCFFile
+        model = SingleSampleVCF
         fields = ("path", )
 
 
@@ -379,7 +379,7 @@ def validate_unique_vcf_path(klass, path, **kwargs):
         We want the API to be idempotent (can be called multiple times) so ok if the lookup is the same
         (hence exists call if passed in same class below)
     """
-    for vcf_class in [VCFFile, JointCalledVCF]:
+    for vcf_class in [SingleSampleVCF, JointCalledVCF]:
         qs = vcf_class.objects.filter(path=path)
         if klass == vcf_class:
             qs = qs.exclude(**kwargs)  # Allow for same object/lookup
@@ -400,12 +400,12 @@ def validate_unique_vcf_path(klass, path, **kwargs):
             })
 
 
-class VCFFileSerializer(serializers.ModelSerializer):
+class SingleSampleVCFSerializer(serializers.ModelSerializer):
     bam_file = BamFileSerializer(required=False)
     variant_caller = VariantCallerSerializer()
 
     class Meta:
-        model = VCFFile
+        model = SingleSampleVCF
         fields = ("path", "bam_file", "variant_caller")
 
     def create(self, validated_data):
@@ -419,19 +419,19 @@ class VCFFileSerializer(serializers.ModelSerializer):
             "bam_file": bam_file,
             "variant_caller": variant_caller,
         }
-        validate_unique_vcf_path(VCFFile, path, **kwargs)
-        vcf_file, _ = VCFFile.objects.update_or_create(**kwargs,
-                                                       defaults={
-                                                           "path": path,
-                                                           "data_state": DataState.COMPLETE
-                                                       })
-        return vcf_file
+        validate_unique_vcf_path(SingleSampleVCF, path, **kwargs)
+        single_sample_vcf, _ = SingleSampleVCF.objects.update_or_create(
+            **kwargs,
+            defaults={"path": path, "data_state": DataState.COMPLETE},
+        )
+        return single_sample_vcf
+
 
 class SequencingFilesSerializer(serializers.Serializer):
     sample_name = serializers.CharField()
     unaligned_reads = UnalignedReadsSerializer()
     bam_file = BamFileSerializer()
-    vcf_file = VCFFileSerializer()
+    vcf_file = SingleSampleVCFSerializer()
 
     def __init__(self, *args, **kwargs):
         self.sequencing_sample = kwargs.pop("sequencing_sample", None)
@@ -451,7 +451,7 @@ class SequencingFilesSerializer(serializers.Serializer):
         bam_file = BamFileSerializer().create(bam_file_data)
 
         vcf_file_data['bam_file'] = bam_file_data
-        vcf_file = VCFFileSerializer().create(vcf_file_data)
+        vcf_file = SingleSampleVCFSerializer().create(vcf_file_data)
 
         # Return the full data structure (optional depending on your needs)
         return {

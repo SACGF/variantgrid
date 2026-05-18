@@ -7,7 +7,7 @@ from django.conf import settings
 
 from library.utils.file_utils import add_permissions_to_file, mk_path_for_file
 from seqauto.job_scripts import get_job_data, create_bash_script
-from seqauto.models import VCFFile, SampleSheet, BamFile, \
+from seqauto.models import SingleSampleVCF, SampleSheet, BamFile, \
     SequencingFileType, QC, JointCalledVCF, IlluminaFlowcellQC, \
     FastQC, Flagstats, JobScript
 from seqauto.pbs.pbs_scripts import get_dependency_flags, create_pbs_script
@@ -22,7 +22,7 @@ def create_jobs_and_launch_script(seqauto_run, launch_file_types):
     fastqcs = FastQC.objects.filter(data_state__in=data_states)
     bams = BamFile.objects.filter(data_state__in=data_states)
     flagstats = Flagstats.objects.filter(data_state__in=data_states)
-    vcfs = VCFFile.objects.filter(data_state__in=data_states)
+    vcfs = SingleSampleVCF.objects.filter(data_state__in=data_states)
     combined_vcfs = JointCalledVCF.objects.filter(data_state__in=data_states)
     qc = QC.objects.filter(data_state__in=data_states)
 

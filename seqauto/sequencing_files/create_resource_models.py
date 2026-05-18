@@ -20,7 +20,7 @@ from library.utils.file_utils import name_from_filename, file_to_array
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_valid
 from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
-    UnalignedReads, BamFile, VCFFile, QC, JointCalledVCF, IlluminaFlowcellQC, FastQC, Flagstats, \
+    UnalignedReads, BamFile, SingleSampleVCF, QC, JointCalledVCF, IlluminaFlowcellQC, FastQC, Flagstats, \
     DontAutoLoadException, Experiment, SampleFromSequencingSample, QCGeneList, \
     get_samples_by_sequencing_sample, QCGeneCoverage, SeqAutoMessage, SeqAutoRecord, get_variant_caller_from_vcf_file
 from seqauto.models.models_enums import SequencingFileType
@@ -767,7 +767,7 @@ def process_flagstats(seqauto_run, existing_files, results):
 def get_expected_vcf_and_bams(bams):
     expected_vcf_and_bams = {}
     for bam in bams:
-        vcf_path = VCFFile.get_path_from_bam(bam)
+        vcf_path = SingleSampleVCF.get_path_from_bam(bam)
         expected_vcf_and_bams[vcf_path] = bam
 
     return expected_vcf_and_bams
@@ -776,7 +776,7 @@ def get_expected_vcf_and_bams(bams):
 def process_single_sample_vcfs(seqauto_run, existing_files, results):
     logging.info("Setting up single sample VCFs")
     existing_vcf_files = stripped_lines_set(existing_files)
-    existing_vcf_records = returning_existing_records_by_path(VCFFile)
+    existing_vcf_records = returning_existing_records_by_path(SingleSampleVCF)
 
     bams = results[SequencingFileType.BAM]
     expected_vcf_and_bams = get_expected_vcf_and_bams(bams)
@@ -796,11 +796,11 @@ def process_single_sample_vcfs(seqauto_run, existing_files, results):
         else:
             if DataState.should_create_new_record(data_state):
                 variant_caller = get_variant_caller_from_vcf_file(vcf_path)
-                vcf_file = VCFFile.objects.create(sequencing_run=bam_file.sequencing_run,
-                                                  bam_file=bam_file,
-                                                  path=vcf_path,
-                                                  data_state=data_state,
-                                                  variant_caller=variant_caller)
+                vcf_file = SingleSampleVCF.objects.create(sequencing_run=bam_file.sequencing_run,
+                                                          bam_file=bam_file,
+                                                          path=vcf_path,
+                                                          data_state=data_state,
+                                                          variant_caller=variant_caller)
                 load_from_file_if_complete(seqauto_run, vcf_file)
 
         if vcf_file:

@@ -100,9 +100,13 @@ class BamFile:
 
 @dataclass_json
 @dataclass
-class VCFFile:
+class SingleSampleVCF:
     path: str
     variant_caller: Optional[VariantCaller] = field(default=None, metadata=config(exclude=lambda x: x is None))
+
+
+# Backwards-compat alias (predates the SingleSampleVCF rename)
+VCFFile = SingleSampleVCF
 
 
 @dataclass_json
@@ -112,7 +116,7 @@ class SequencingFile:
     fastq_r1: str
     fastq_r2: str
     bam_file: BamFile
-    vcf_file: VCFFile
+    vcf_file: SingleSampleVCF
 
 
 @dataclass_json
@@ -128,7 +132,7 @@ class SequencingSampleLookup:
 class QC:
     sequencing_sample_lookup: SequencingSampleLookup = field(metadata=config(field_name="sequencing_sample"))
     bam_file: BamFile
-    vcf_file: VCFFile
+    vcf_file: SingleSampleVCF
 
 
 @dataclass_json
@@ -387,14 +391,14 @@ class Command(BaseCommand):
         bam_file_1 = BamFile(
             path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/1_BAM/fake_sample_1.hg38.bam",
             aligner=aligner)
-        vcf_file_1 = VCFFile(
+        vcf_file_1 = SingleSampleVCF(
             path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_1.gatk.hg38.vcf.gz",
             variant_caller=variant_caller_gatk)
 
         bam_file_2 = BamFile(
             path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/1_BAM/fake_sample_2.hg38.bam",
             aligner=aligner)
-        vcf_file_2 = VCFFile(
+        vcf_file_2 = SingleSampleVCF(
             path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_2.gatk.hg38.vcf.gz",
             variant_caller=variant_caller_gatk)
 

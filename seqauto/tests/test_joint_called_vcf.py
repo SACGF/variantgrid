@@ -17,8 +17,8 @@ from seqauto.models import (
     SequencingRunCurrentSampleSheet,
     SequencingSample,
     UnalignedReads,
+    SingleSampleVCF,
     VariantCaller,
-    VCFFile,
     VCFFromSequencingRun,
 )
 from seqauto.models.models_enums import DataGeneration, PairedEnd
@@ -165,12 +165,12 @@ class LinkSamplesJointCallPreservedTests(TestCase):
         )
         backend = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                             joint_called_vcf=joint_called_vcf,
-                                            vcf_file=None)
+                                            single_sample_vcf=None)
         return backend, samples
 
     def _make_single_sample_backend_vcf(self, path, sample_name):
         vcf, samples, uploaded_vcf = _make_vcf(self.user, sample_name, [sample_name], path)
-        # Need a BamFile to satisfy VCFFile FK. Build the chain minimally.
+        # Need a BamFile to satisfy SingleSampleVCF FK. Build the chain minimally.
         seq_sample = next(s for s in self.sequencing_samples if s.sample_name == sample_name)
         fastq = Fastq.objects.create(path=f"/d/{sample_name}.fastq.gz",
                                      sequencing_sample=seq_sample,
@@ -187,14 +187,14 @@ class LinkSamplesJointCallPreservedTests(TestCase):
                                           unaligned_reads=unaligned,
                                           aligner=aligner,
                                           data_state=DataState.COMPLETE)
-        vcf_file = VCFFile.objects.create(path=path,
-                                          sequencing_run=self.sequencing_run,
-                                          bam_file=bam_file,
-                                          variant_caller=self.caller,
-                                          data_state=DataState.COMPLETE)
+        single_sample_vcf = SingleSampleVCF.objects.create(path=path,
+                                                           sequencing_run=self.sequencing_run,
+                                                           bam_file=bam_file,
+                                                           variant_caller=self.caller,
+                                                           data_state=DataState.COMPLETE)
         backend = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                             joint_called_vcf=None,
-                                            vcf_file=vcf_file)
+                                            single_sample_vcf=single_sample_vcf)
         return backend, samples
 
     def test_joint_called_survives_single_sample_reupload(self):

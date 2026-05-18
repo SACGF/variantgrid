@@ -27,7 +27,7 @@ from seqauto.graphs.index_metrics_qc_graph import IndexMetricsQCGraph
 from seqauto.graphs.qc_exec_summary_graph import QCExecSummaryGraph
 from seqauto.graphs.sequencing_run_qc_graph import SequencingRunQCGraph
 from seqauto.illumina.run_parameters import get_run_parameters
-from seqauto.models import BamFile, SequencingRun, FastQC, Flagstats, UnalignedReads, QCType, VCFFile, QC, \
+from seqauto.models import BamFile, SequencingRun, FastQC, Flagstats, UnalignedReads, QCType, SingleSampleVCF, QC, \
     Experiment, SequencingSample, JointCalledVCF, QCExecSummary, IlluminaFlowcellQC, SeqAutoRun, \
     Library, Sequencer, Assay, Aligner, VariantCaller, VariantCallingPipeline, SoftwarePipelineNode, \
     GoldReference, GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage, QCColumn
@@ -174,7 +174,7 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
 
     vcf_types = {
         "Joint Called VCF": Q(vcf__uploadedvcf__backendvcf__joint_called_vcf__isnull=False),
-        "Single Sample VCF": Q(vcf__uploadedvcf__backendvcf__vcf_file__isnull=False),
+        "Single Sample VCF": Q(vcf__uploadedvcf__backendvcf__single_sample_vcf__isnull=False),
     }
 
     run_vcfs = defaultdict(list)
@@ -310,12 +310,14 @@ def view_bam_file(request, bam_file_id):
     return render(request, 'seqauto/view_bam_file.html', context)
 
 
+def view_single_sample_vcf(request, single_sample_vcf_id):
+    single_sample_vcf = get_object_or_404(SingleSampleVCF, pk=single_sample_vcf_id)
+    context = {"single_sample_vcf": single_sample_vcf}
+    return render(request, 'seqauto/view_single_sample_vcf.html', context)
+
+
 def view_vcf_file(request, vcf_file_id):
-    vcf_file = get_object_or_404(VCFFile, pk=vcf_file_id)
-    context = {
-        "vcf_file": vcf_file
-    }
-    return render(request, 'seqauto/view_vcf_file.html', context)
+    return view_single_sample_vcf(request, vcf_file_id)
 
 
 def view_joint_called_vcf(request, joint_called_vcf_id):

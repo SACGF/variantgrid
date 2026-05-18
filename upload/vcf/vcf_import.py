@@ -16,7 +16,7 @@ from library.genomics.vcf_enums import VCFConstant
 from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, cyvcf2_get_contig_lengths_dict
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.utils import invert_dict, get_single_element
-from seqauto.models import JointCalledVCF, VCFFile, VCFFromSequencingRun, \
+from seqauto.models import JointCalledVCF, SingleSampleVCF, VCFFromSequencingRun, \
     SampleFromSequencingSample, QCGeneList
 from seqauto.signals.signals_list import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
@@ -331,18 +331,18 @@ def create_backend_vcf_links(uploaded_vcf):
         path = uploaded_file.path
         if path:
             joint_called_vcf = None
-            vcf_file = None
+            single_sample_vcf = None
             try:
                 joint_called_vcf = JointCalledVCF.objects.get(path=path)
             except JointCalledVCF.DoesNotExist:
                 try:
-                    vcf_file = VCFFile.objects.get(path=path)
-                except VCFFile.DoesNotExist:
+                    single_sample_vcf = SingleSampleVCF.objects.get(path=path)
+                except SingleSampleVCF.DoesNotExist:
                     msg = f"Couldn't find joint-called or single VCF for path '{path}'"
                     raise ValueError(msg)
 
             defaults = {"uploaded_vcf": uploaded_vcf}
-            backend_vcf, _ = BackendVCF.objects.update_or_create(vcf_file=vcf_file,
+            backend_vcf, _ = BackendVCF.objects.update_or_create(single_sample_vcf=single_sample_vcf,
                                                                  joint_called_vcf=joint_called_vcf,
                                                                  defaults=defaults)
     return backend_vcf
@@ -369,11 +369,11 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
                 defaults={"sequencing_run": sequencing_run,
                           "variant_caller": backend_vcf.variant_caller},
             )
-        elif backend_vcf.vcf_file:
+        elif backend_vcf.single_sample_vcf:
             sequencing_sample = get_single_element(samples_by_sequencing_sample)
             existing = VCFFromSequencingRun.objects.filter(
                 vcf__sample__in=sequencing_sample.samplefromsequencingsample_set.values_list("sample"),
-                vcf__uploadedvcf__backendvcf__vcf_file__isnull=False,
+                vcf__uploadedvcf__backendvcf__single_sample_vcf__isnull=False,
             )
             if existing.exists():
                 existing_vcfs = ", ".join([str(vfsr.vcf) for vfsr in existing])

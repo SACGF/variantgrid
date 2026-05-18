@@ -8,7 +8,7 @@ from django.db.models.query_utils import Q
 
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonDataType
-from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit, \
+from seqauto.models import SequencingRun, BamFile, UnalignedReads, SingleSampleVCF, QC, Experiment, EnrichmentKit, \
     EnrichmentKitType
 from snpdb.models import UserGridConfig, DataState
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
@@ -146,9 +146,9 @@ class BamFileListGrid(JqGridUserRowConfig):
                                   'sortorder': 'desc'})
 
 
-class VCFFileListGrid(JqGridUserRowConfig):
-    model = VCFFile
-    caption = 'VCFFiles'
+class SingleSampleVCFListGrid(JqGridUserRowConfig):
+    model = SingleSampleVCF
+    caption = 'SingleSampleVCFs'
     fields = ["id", "data_state", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
               "bam_file__unaligned_reads__sequencing_sample__sample_id", "path", "variant_caller"]
     colmodel_overrides = {

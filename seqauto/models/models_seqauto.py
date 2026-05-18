@@ -878,8 +878,8 @@ class DontAutoLoadException(Exception):
     pass
 
 
-class VCFFile(SeqAutoRecord):
-    """ VCFs from the file system """
+class SingleSampleVCF(SeqAutoRecord):
+    """ Single-sample VCFs from the file system, tied to exactly one BamFile """
     bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
 
@@ -1033,7 +1033,7 @@ class QC(SeqAutoRecord):
         TODO: Make this not a SeqAutoRecord. Perhaps make this unique_together w/bam+vcf?
     """
     bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
-    vcf_file = models.ForeignKey(VCFFile, on_delete=CASCADE)
+    vcf_file = models.ForeignKey(SingleSampleVCF, on_delete=CASCADE)
 
     @property
     def genome_build(self):

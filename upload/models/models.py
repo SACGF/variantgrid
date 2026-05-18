@@ -29,7 +29,7 @@ from library.enums.log_level import LogLevel
 from library.log_utils import report_message, report_exc_info
 from library.utils import file_sha256sum
 from library.utils.file_utils import mk_path
-from seqauto.models import VCFFile, JointCalledVCF, get_samples_by_sequencing_sample, VariantCaller
+from seqauto.models import SingleSampleVCF, JointCalledVCF, get_samples_by_sequencing_sample, VariantCaller
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild, VariantCoordinate
 from snpdb.models.models_enums import ImportSource, ProcessingStatus, ImportStatus
@@ -496,20 +496,20 @@ class UploadedVCFPendingAnnotation(models.Model):
 class BackendVCF(models.Model):
     """ Link between UploadedVCF (upload) and Filesystem VCF (SeqAuto) """
     uploaded_vcf = models.OneToOneField(UploadedVCF, on_delete=CASCADE)
-    vcf_file = models.OneToOneField(VCFFile, null=True, on_delete=CASCADE)
+    single_sample_vcf = models.OneToOneField(SingleSampleVCF, null=True, on_delete=CASCADE)
     joint_called_vcf = models.OneToOneField(JointCalledVCF, null=True, on_delete=CASCADE)
 
     @property
     def filesystem_vcf(self):
-        vcfs = [self.joint_called_vcf, self.vcf_file]
+        vcfs = [self.joint_called_vcf, self.single_sample_vcf]
         if all(vcfs):
-            msg = f"{self} has both vcf_file and joint_called_vcf set"
+            msg = f"{self} has both single_sample_vcf and joint_called_vcf set"
             raise ValueError(msg)
-        if self.vcf_file:
-            return self.vcf_file
+        if self.single_sample_vcf:
+            return self.single_sample_vcf
         if self.joint_called_vcf:
             return self.joint_called_vcf
-        raise ValueError(f"{self} has neither 'vcf_file' or 'joint_called_vcf' set")
+        raise ValueError(f"{self} has neither 'single_sample_vcf' or 'joint_called_vcf' set")
 
     @property
     def sample_sheet(self):
@@ -525,14 +525,14 @@ class BackendVCF(models.Model):
 
     @property
     def variant_caller(self) -> VariantCaller:
-        record = self.vcf_file or self.joint_called_vcf
+        record = self.single_sample_vcf or self.joint_called_vcf
         return record.variant_caller
 
     def get_samples_by_sequencing_sample(self):
         return get_samples_by_sequencing_sample(self.filesystem_vcf.sample_sheet, self.vcf)
 
     def __str__(self):
-        backend = self.vcf_file or self.joint_called_vcf or 'None'
+        backend = self.single_sample_vcf or self.joint_called_vcf or 'None'
         return f"BackendVCF: backend: {backend}, uploaded_vcf: {self.uploaded_vcf}"
 
 
