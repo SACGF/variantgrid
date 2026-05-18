@@ -52,8 +52,8 @@ def create_event(request):
 
     app_name = app_name[:100]
     event_name = event_name[:200]
-    if details:
-        details = details[:10_000]
+    if details and len(details) > 10_000:
+        details = details[:10_000] + "\n[trimmed to 10000 characters]"
 
     Event.objects.create(user=request.user,
                          app_name=app_name,
