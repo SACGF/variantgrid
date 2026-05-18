@@ -1,4 +1,5 @@
 import copy
+import logging
 import re
 import uuid
 from collections import Counter, namedtuple
@@ -46,7 +47,7 @@ from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from genes.hgvs import HGVSMatcher, CHGVS
-from genes.models import Gene
+from genes.models import Gene, NoTranscript
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -2174,6 +2175,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 transcript_id = self.transcript
                 hgvs_variant = hgvs_matcher.variant_to_hgvs_variant(variant, transcript_id)
                 c_hgvs = hgvs_variant.format()
+            except NoTranscript as nt:
+                # Transcript missing/invalid in our DB — data issue, not a bug. See #1478.
+                logging.warning("Could not generate c.HGVS for variant %s (%s, transcript %s): %s",
+                                variant, genome_build.name, transcript_id, nt)
             except Exception:
                 # can't map between builds
                 report_exc_info(extra_data={
