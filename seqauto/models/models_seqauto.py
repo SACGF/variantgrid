@@ -378,7 +378,7 @@ class SequencingRun(SeqAutoRecord):
             links.append((cfg["label"], cfg["url_pattern"] % params))
         return links
 
-    def get_external_links(self) -> list[tuple[str, str]]:
+    def get_external_links(self) -> List[Tuple[str, str]]:
         kit_name = self.enrichment_kit.name if self.enrichment_kit else None
         return self.get_external_links_for(self.name, self.date, kit_name)
 
