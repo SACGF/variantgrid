@@ -3,14 +3,22 @@
 {% load js_tags %}
 {% load ui_utils %}
 
-{% if render_mode != "ajax" %}
-<h4>Overlap {{ overlap_grouping.overlap.pk }}</h4>
-    TODO - include all the information that was in the table row
-{% endif %}
-
 <div class="mt-4">
     {% if render_mode == "ajax" %}
-    {% labelled label="Page Link" %}<a class="hover-link" href="{{ overlap_grouping.overlap.get_absolute_url }}">Overlap {{ overlap_grouping.overlap.pk }} Page</a>{% endlabelled %}
+        {% labelled label="Page Link" %}<a class="hover-link" href="{{ overlap_grouping.overlap.get_absolute_url }}">Overlap {{ overlap_grouping.overlap.pk }}</a>{% endlabelled %}
+    {% else %}
+        {% with overlap=overlap_grouping.overlap %}
+            {% labelled label="Overlap Status" %}
+                <span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>
+                    {% if overlap.overlap_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status.label }}{% endif %}
+                </span>
+            {% endlabelled %}
+            {% if overlap.overlap_status_change_timestamp %}
+                {% labelled label="Status Changed as of" %}
+                 {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}
+                {% endlabelled %}
+            {% endif %}
+        {% endwith %}
     {% endif %}
     {% if overlap_grouping.overlap.allele %}
         {% labelled label="Allele" %}<a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{{ overlap_grouping.overlap.allele }}</a>{% endlabelled %}
