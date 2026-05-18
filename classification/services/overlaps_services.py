@@ -466,6 +466,13 @@ class OverlapContributionPerspective:
     is_cross_context: bool = False
     is_user_lab: bool = False
 
+    @property
+    def _sort_index(self):
+        return self.is_cross_context, self.is_user_lab, self.overlap_contribution
+
+    def __lt__(self, other):
+        return self._sort_index < other._sort_index
+
 
 @dataclass(frozen=True)
 class OverlapGrouping3:
@@ -498,10 +505,10 @@ class OverlapGrouping3:
                         is_user_lab=not self.user.is_superuser and lab in user_labs
                     ))
 
-        return perspectives
+        return list(sorted(perspectives))
 
     @property
-    def value_type(self):
+    def value_type(self) -> ClassificationResultValue:
         return self.overlap.value_type
 
     @staticmethod
