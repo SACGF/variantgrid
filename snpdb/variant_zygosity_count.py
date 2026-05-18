@@ -1,10 +1,12 @@
 #
+import logging
+import re
 from typing import Tuple, List
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max
 from django.utils import timezone
-import logging
 
 from eventlog.models import create_event
 from library.database_utils import run_sql
@@ -12,6 +14,13 @@ from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback
 from snpdb.models import VCF, VariantZygosityCountForVCF, VariantZygosityCountForSample, Sample, Variant, \
     VariantZygosityCount, VariantZygosityCountCollection
+
+
+def _sample_excluded_from_variant_zygosity_count(sample: Sample) -> bool:
+    pattern = settings.VARIANT_ZYGOSITY_COUNT_EXCLUDE_SAMPLE_NAME_REGEX
+    if not pattern:
+        return False
+    return bool(re.search(pattern, sample.vcf_sample_name))
 
 
 def create_variant_zygosity_counts():
@@ -55,6 +64,14 @@ def _get_update_sql_and_params(collection: VariantZygosityCountCollection, vcf: 
         ref_count_delta = "snpdb_cohortgenotype.ref_count"
         het_count_delta = "snpdb_cohortgenotype.het_count"
         hom_count_delta = "snpdb_cohortgenotype.hom_count"
+        for excluded_sample in vcf.sample_set.all():
+            if not _sample_excluded_from_variant_zygosity_count(excluded_sample):
+                continue
+            excluded_index = cgc.get_sql_index_for_sample_id(excluded_sample.pk)
+            excluded_zygosity = f'SUBSTRING("snpdb_cohortgenotype"."samples_zygosity", {excluded_index}, 1)'
+            ref_count_delta += f" - (case when {excluded_zygosity} = 'R' then 1 else 0 end)"
+            het_count_delta += f" - (case when {excluded_zygosity} = 'E' then 1 else 0 end)"
+            hom_count_delta += f" - (case when {excluded_zygosity} = 'O' then 1 else 0 end)"
 
     update_params = {"cohort_genotype_collection_id": cgc.pk,
                      "table_name": collection.get_partition_table(),
@@ -161,6 +178,10 @@ def update_variant_zygosity_count_for_sample(collection: VariantZygosityCountCol
     try:
         check_valid_count_ops(operation)
         logging.info("update_variant_zygosity_count_for_sample(%d, %s)", sample, operation)
+        if _sample_excluded_from_variant_zygosity_count(sample):
+            logging.info("Sample %s matches VARIANT_ZYGOSITY_COUNT_EXCLUDE_SAMPLE_NAME_REGEX - skipping",
+                         sample)
+            return
         try:
             gvzcp = VariantZygosityCountForVCF.objects.get(vcf=sample.vcf)  # throws DoesNotExist if not there
             if operation == '+':
