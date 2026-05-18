@@ -19,7 +19,8 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    AlleleOriginGrouping, ClassificationGroupingSearchTerm, OverlapDiscordanceNotification
+    AlleleOriginGrouping, ClassificationGroupingSearchTerm, OverlapDiscordanceNotification, \
+    ClassificationSummaryCalculator
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -369,6 +370,8 @@ class ClassificationAdmin(ModelAdminBasics):
         qs_count = queryset.count()
         changed_count = 0
         for vc in queryset:
+            vc.summary = ClassificationSummaryCalculator(vc.last_published_version).cache_dict()
+            vc.save(update_fields=["summary"])
             changed_group = ClassificationGrouping.assign_grouping_for_classification(vc)
             if changed_group:
                 changed_count += 1
