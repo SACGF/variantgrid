@@ -1,6 +1,7 @@
 from django.contrib.admin import TabularInline
 from django.db.models import QuerySet
 
+from classification.enums import OverlapStatus
 from classification.models import Overlap, OverlapContribution, OverlapContributionSkew
 from classification.services.overlaps_services import OverlapServices
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
@@ -39,12 +40,32 @@ class OverlapContributionSkewAdmin(ModelAdminBasics):
     list_filter = ('contribution__classification_grouping__lab', 'overlap__overlap_status', 'next_step')
 
 
+class OverlapStatusFilter(admin.SimpleListFilter):
+    title = 'Overlap Status'
+    parameter_name = 'overlap_status'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [
+            ("S", "Single lab"),
+            ("2", "2+ labs"),
+            ("D", "Discordant")
+        ]
+
+    def queryset(self, request, queryset: QuerySet[Overlap]):
+        match self.value():
+            case "S": return queryset.filter(overlap_status=OverlapStatus.SINGLE_SUBMITTER)
+            case "2": return queryset.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER)
+            case "D": return queryset.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
+        return queryset
+
+
 @admin.register(Overlap)
 class OverlapAdmin(ModelAdminBasics):
     list_display = ('overlap_status', 'valid', 'overlap_type', 'value_type', 'allele', 'testing_context_bucket', 'tumor_type_category', 'contributions_list', 'modified_detailed')
     # inlines = (OverlapContributionInline, )
     search_fields = ('pk', 'allele__id')
-    list_filter = ('overlap_status', 'valid', 'overlap_type', 'value_type')
+    list_filter = (OverlapStatusFilter, 'valid', 'overlap_type', 'value_type', 'testing_context_bucket')
 
     @admin_list_column()
     def contributions_list(self, obj: Overlap):
