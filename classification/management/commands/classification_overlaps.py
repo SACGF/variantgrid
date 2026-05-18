@@ -47,6 +47,7 @@ class Command(BaseCommand):
         print(f"Overlap Count = {Overlap.objects.count()}")
         print(f"Overlap Contribution Count = {OverlapContribution.objects.count()}")
 
+
     def populate_status_change(self):
         # timestamp on overlaps
         for overlap in Overlap.objects.filter(overlap_status_change_timestamp__isnull=True).iterator():
@@ -79,7 +80,7 @@ class Command(BaseCommand):
     def make_clinvar_expert_panel_contributions(self):
         # only check already made ClinVarRecord collections in sync
         for clinvar_record_collection in ClinVarRecordCollection.objects.filter(
-                max_stars__gte=CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE):
+                max_stars__gte=CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE, allele__isnull=False):
             if expert_panel := clinvar_record_collection.expert_panel:
 
                 value = expert_panel.clinical_significance
