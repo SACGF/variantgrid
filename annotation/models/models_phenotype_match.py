@@ -4,6 +4,7 @@ from django.db import models
 from django.db.models import QuerySet, OuterRef, Count, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 
+from annotation.phenotype_matcher import get_ambiguous_acronym_denylist
 from library.constants import DAY_SECS
 from ontology.models import OntologyTerm, OntologyVersion
 from patients.models import Patient
@@ -42,10 +43,20 @@ class PhenotypeDescription(models.Model):
 
     @cache_memoize(timeout=DAY_SECS, args_rewrite=lambda s: (s.pk, ))
     def get_ontology_term_ids(self) -> list[int]:
-        ot_qs = self.textphenotypesentence_set.filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
-        # Sort so can be cached
-        ot_qs = ot_qs.order_by("text_phenotype__textphenotypematch__ontology_term_id")
-        return ot_qs.values_list("text_phenotype__textphenotypematch__ontology_term_id", flat=True)
+        denylist = get_ambiguous_acronym_denylist()
+        ot_qs = (self.textphenotypesentence_set
+                 .filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
+                 .select_related("text_phenotype")
+                 .prefetch_related("text_phenotype__textphenotypematch_set"))
+        term_ids = set()
+        for sentence in ot_qs:
+            sentence_text = sentence.text_phenotype.text
+            for tpm in sentence.text_phenotype.textphenotypematch_set.all():
+                match_text = sentence_text[tpm.offset_start:tpm.offset_end].lower()
+                if match_text in denylist:
+                    continue  # Ambiguous acronym - refuse to feed downstream queries
+                term_ids.add(tpm.ontology_term_id)
+        return sorted(term_ids)
 
     def get_gene_symbols(self, ontology_version) -> QuerySet:
         terms = tuple(self.get_ontology_term_ids())
@@ -92,12 +103,15 @@ class TextPhenotypeSentence(models.Model):
         results = []
 
         ambiguous = set(self.text_phenotype.get_ambiguous_matches())
+        denylist = get_ambiguous_acronym_denylist()
         for tpm in self.text_phenotype.textphenotypematch_set.all():
             tpm.offset_start += self.sentence_offset
             tpm.offset_end += self.sentence_offset
             data = tpm.to_dict()
             if tpm in ambiguous:
                 data["ambiguous"] = tpm.match_text
+            if tpm.match_text.lower() in denylist:
+                data["ambiguous_alias"] = tpm.match_text
             results.append(data)
         return results
 

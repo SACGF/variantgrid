@@ -15,6 +15,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     let phenoOffsetStart = 0;
 
     let ambiguous = {};
+    let ambiguousAcronyms = new Set();
     function addToAmbiguous(key, value) {
         if (!(key in ambiguous)) {
             ambiguous[key] = new Set();
@@ -31,6 +32,9 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
             let pm = phenotypeMatches[j];
             if (pm.ambiguous) {
                 addToAmbiguous(pm.ambiguous, pm.accession)
+            }
+            if (pm.ambiguous_alias) {
+                ambiguousAcronyms.add(pm.ambiguous_alias);
             }
             if (pm.offset_start <= i) {
                 sliceEnd = j + 1;
@@ -63,7 +67,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     descriptionBox.html(phenotypeHTML);
     $(".term-match-ontology-service", descriptionBox);
 
-    if (Object.keys(ambiguous).length > 0) {
+    if (Object.keys(ambiguous).length > 0 || ambiguousAcronyms.size > 0) {
         let phenoMessages = $("<div/>").addClass("phenotype-messages");
         let messageContainer = $("<ul/>").addClass("messages");
         phenoMessages.append(messageContainer);
@@ -72,6 +76,12 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
         for (const [text, termSet] of Object.entries(ambiguous)) {
             const terms = Array.from(termSet).join(', ');
             msg = `Phenotype: ${text}' was ambiguous (matched >=2 times in the same ontology service): ${terms}. Please resolve by being more specific`;
+            let listElement = $("<li/>").addClass("warning");
+            listElement.text(msg);
+            messageContainer.append(listElement);
+        }
+        for (const acronym of ambiguousAcronyms) {
+            msg = `'${acronym}' is an ambiguous acronym (it matches multiple distinct ontology concepts) and has been excluded from gene-list matching. Please type the full term name or an HPO/OMIM/MONDO ID.`;
             let listElement = $("<li/>").addClass("warning");
             listElement.text(msg);
             messageContainer.append(listElement);
