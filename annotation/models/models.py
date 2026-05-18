@@ -345,6 +345,17 @@ class VariantAnnotationVersion(SubVersionPartition):
     dbnsfp = models.TextField()
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
+    @property
+    def uses_raw_spliceai(self) -> bool:
+        # SpliceAI ships "raw" and "masked" precomputed score files; the masked
+        # files zero out splice-site changes Illumina's README flags as typically
+        # less pathogenic (strengthening annotated / weakening unannotated) and
+        # are the version recommended for variant interpretation. vg3 has no
+        # `spliceai` version pin field on VariantAnnotationVersion, and every
+        # vg3 deployment was annotated with the raw precomputed file, so this
+        # is always True here. See SACGF/variantgrid_sapath#410.
+        return True
+
     @staticmethod
     def latest(genome_build):
         return VariantAnnotationVersion.objects.filter(genome_build=genome_build).order_by("annotation_date").last()
