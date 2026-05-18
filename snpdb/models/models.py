@@ -22,7 +22,7 @@ from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet, TextChoices
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
@@ -206,6 +206,10 @@ class Wiki(TimeStampedModel):
     @staticmethod
     def get_or_create(class_name, unique_keyword, unique_value):
         klass = Wiki.get_subclass_by_name(class_name)
+        try:
+            klass._meta.get_field(unique_keyword)
+        except FieldDoesNotExist:
+            raise PermissionDenied(f"'{unique_keyword}' is not a valid field for {class_name}")
         wiki, _ = klass.objects.get_or_create(**{unique_keyword: unique_value})
         return wiki
 
