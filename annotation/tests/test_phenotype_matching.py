@@ -1,5 +1,6 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
+from annotation.models.models_phenotype_match import PatientTextPhenotype
 from annotation.phenotype_matcher import PhenotypeMatcher
 from ontology.models import OntologyService
 from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
@@ -60,6 +61,14 @@ class TestPhenotypeMatching(TestCase):
                            "IMERSLUND-GRSBECK SYND 1": (OntologyService.OMIM, "OMIM:261100")}  # Alias
 
         self.check_expected_results_for_description(SYNDROME_ABBREV)
+
+    @override_settings(PATIENT_PHENOTYPE_EXCLUDE_STRING="----needs human review")
+    def test_exclude_string_skips_persistence(self):
+        phenotype = "Raised TSH\n----needs human review"
+        patient = Patient(phenotype=phenotype)
+        patient.save(phenotype_matcher=self.phenotype_matcher)
+        self.assertFalse(PatientTextPhenotype.objects.filter(patient=patient).exists(),
+                         "Exclude marker should prevent persisting matches")
 
     def test_commas(self):
         COMMA_OMIM = {

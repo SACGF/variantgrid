@@ -246,6 +246,11 @@ HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT = 200_000
 HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE = False  # Biocommons only - attempt to retrieve transcript sequence (slower)
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
+# If set, patient phenotype text containing this string is treated as unreviewed:
+# matched ontology terms will not be persisted to the DB (PatientTextPhenotype / TextPhenotypeMatch).
+# Users can still see live preview matches on the patient page along with a warning.
+# Set to None / empty to disable.
+PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
 
