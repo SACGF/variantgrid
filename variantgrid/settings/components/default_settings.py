@@ -185,6 +185,8 @@ VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcrip
 VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
 
 VARIANT_ZYGOSITY_GLOBAL_COLLECTION = "global"
+# Skip samples from variant zygosity counts when their vcf_sample_name matches this regex (e.g. "^VALIDATION_")
+VARIANT_ZYGOSITY_COUNT_EXCLUDE_SAMPLE_NAME_REGEX = None
 
 PREFER_ALLELE_LINKS = False
 
