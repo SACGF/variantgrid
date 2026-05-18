@@ -218,6 +218,24 @@ class DamageNode(AnalysisNode):
     def damage_predictions_description(self) -> str:
         return self.analysis.annotation_version.variant_annotation_version.damage_predictions_description
 
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        vav = self.analysis.annotation_version.variant_annotation_version
+        if self.damage_predictions_min is not None and not vav.backfilled_damage_counts:
+            warnings.append(
+                f"damage_predictions_min filter is NOT being applied on this VariantAnnotationVersion: "
+                f"predictions_num_pathogenic / predictions_num_benign aggregates have not been backfilled. "
+                f"Run `manage.py fix_columns_version{vav.columns_version}_damage_counts` to enable the filter."
+            )
+        if self.splice_min is not None and not vav.backfilled_spliceai_max_ds:
+            warnings.append(
+                "SpliceAI filter is running via the legacy per-DS-field path (correctness preserved, "
+                "but unindexed and slower) because spliceai_max_ds has not been backfilled on this "
+                "VariantAnnotationVersion. Run `manage.py fix_historical_spliceai_max_ds` to enable "
+                "the optimised path."
+            )
+        return warnings
+
     def _get_node_q_hash(self) -> str:
         return str(self._get_node_q())
 
@@ -247,9 +265,19 @@ class DamageNode(AnalysisNode):
                     Q(variantannotation__dbscsnv_rf_score__isnull=True),
                 ])
 
-            splicing_q_list.append(Q(variantannotation__spliceai_max_ds__gte=self.splice_min))
-            if self.splice_required and self.splice_allow_null:
-                splicing_q_list.append(Q(variantannotation__spliceai_max_ds__isnull=True))
+            # SpliceAI: use the optimised spliceai_max_ds column when the VAV has
+            # been backfilled, otherwise fall back to the per-DS-field loop
+            # (pre-c6f3c4e6f). See VariantAnnotationVersion.backfilled_spliceai_max_ds.
+            vav = self.analysis.annotation_version.variant_annotation_version
+            if vav.backfilled_spliceai_max_ds:
+                splicing_q_list.append(Q(variantannotation__spliceai_max_ds__gte=self.splice_min))
+                if self.splice_required and self.splice_allow_null:
+                    splicing_q_list.append(Q(variantannotation__spliceai_max_ds__isnull=True))
+            else:
+                for _, (ds, _) in VariantAnnotation.SPLICEAI_DS_DP.items():
+                    splicing_q_list.append(Q(**{f"variantannotation__{ds}__gte": self.splice_min}))
+                    if self.splice_required and self.splice_allow_null:
+                        splicing_q_list.append(Q(**{f"variantannotation__{ds}__isnull": True}))
 
             q_splicing = reduce(operator.or_, splicing_q_list)
             if self.splice_required:
@@ -339,14 +367,22 @@ class DamageNode(AnalysisNode):
                     or_filters.append(q_aloft)
 
         if self.damage_predictions_min is not None:
-            q_damage = Q(variantannotation__predictions_num_pathogenic__gte=self.damage_predictions_min)
-            if self.damage_predictions_required:
-                if self.damage_predictions_allow_null:
-                    max_benign = self.num_prediction_fields - self.damage_predictions_min
-                    q_damage = Q(variantannotation__predictions_num_benign__lte=max_benign)
-                and_filters.append(q_damage)
-            else:
-                or_filters.append(q_damage)
+            # Skip the damage_predictions_min filter on pre-backfill VAVs: the
+            # predictions_num_pathogenic / predictions_num_benign aggregates default
+            # to 0 on legacy rows, so any non-zero damage_predictions_min would
+            # silently exclude every row in the partition. See
+            # VariantAnnotationVersion.backfilled_damage_counts; get_warnings()
+            # surfaces the skip to the user.
+            vav = self.analysis.annotation_version.variant_annotation_version
+            if vav.backfilled_damage_counts:
+                q_damage = Q(variantannotation__predictions_num_pathogenic__gte=self.damage_predictions_min)
+                if self.damage_predictions_required:
+                    if self.damage_predictions_allow_null:
+                        max_benign = self.num_prediction_fields - self.damage_predictions_min
+                        q_damage = Q(variantannotation__predictions_num_benign__lte=max_benign)
+                    and_filters.append(q_damage)
+                else:
+                    or_filters.append(q_damage)
 
         if self.cosmic_count_min is not None:
             q_cosmic_count = Q(variantannotation__cosmic_count__gte=self.cosmic_count_min)

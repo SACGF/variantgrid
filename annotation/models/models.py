@@ -680,6 +680,37 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # "dbnsfp_gene". @see annotation/refseq_ensembl_resolver.py
     transcript_resolver = models.TextField(null=True, blank=True)
 
+    # --- backfill-completion flags ---------------------------------------
+    # These flags track per-VAV completion of one-off backfill management
+    # commands that populate derived columns the query layer can optimise on.
+    # New VAVs default True because the bulk VEP inserter populates the
+    # underlying columns at insert time. Historical VAVs created before the
+    # respective optimisation start False (set by the AddField migration's
+    # RunPython step) and are flipped True by the matching `fix_historical_*`
+    # management command once it finishes the partition.
+    #
+    # Once every active deployment has run the backfills and no rows remain
+    # with these set False, the field, its migration, the matching fallback
+    # branch in the consuming node, and this comment block can all be removed.
+
+    # #574 / commit c6f3c4e6f — DamageNode.spliceai filtering. Flipped by
+    # `manage.py fix_historical_spliceai_max_ds`. Backfill source:
+    # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_spliceai_max_ds
+    backfilled_spliceai_max_ds = models.BooleanField(default=True)
+
+    # #1547 — PopulationNode.max_af gate. Flipped by
+    # `manage.py fix_historical_max_af`. Backfill source: same bulk inserter.
+    backfilled_max_af = models.BooleanField(default=True)
+
+    # columns_version 2 / 4 rollouts — DamageNode.damage_predictions_min uses
+    # predictions_num_pathogenic / predictions_num_benign aggregates which
+    # default to 0 on the model, so legacy rows look "no pathogenic predictions"
+    # until backfilled. Flipped by `manage.py fix_columns_version2_damage_counts`
+    # (for columns_version=2 VAVs) and `fix_columns_version4_damage_counts`
+    # (for columns_version=4). Backfill source:
+    # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_pathogenicity_prediction_counts
+    backfilled_damage_counts = models.BooleanField(default=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

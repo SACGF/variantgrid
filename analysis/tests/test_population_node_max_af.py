@@ -45,11 +45,14 @@ class TestPopulationNodeMaxAfGate(AnalysisSetupMixin, TestCase):
         self.assertIn("variantannotation__max_af__lte", q_str)
         self.assertIn("0.05", q_str)
 
-    def test_max_af_gate_disabled_class_attribute_drops_gate(self):
-        """profile_analysis_nodes flips MAX_AF_GATE_ENABLED for A/B comparison.
-        When False the gate is dropped but per-field clauses are unaffected."""
-        original = PopulationNode.MAX_AF_GATE_ENABLED
-        PopulationNode.MAX_AF_GATE_ENABLED = False
+    def test_max_af_gate_skipped_on_unbackfilled_vav(self):
+        """Pre-backfill VAVs (backfilled_max_af=False) skip the max_af gate clause
+        but per-field clauses are unaffected. Profiling code can also flip the flag
+        temporarily for A/B comparison."""
+        vav = self.analysis.annotation_version.variant_annotation_version
+        original = vav.backfilled_max_af
+        vav.backfilled_max_af = False
+        vav.save(update_fields=["backfilled_max_af"])
         try:
             node = self._pop_node(percent=1.0)
             q_str = str(node._get_node_q())
@@ -57,4 +60,5 @@ class TestPopulationNodeMaxAfGate(AnalysisSetupMixin, TestCase):
             self.assertNotIn("variantannotation__max_af__isnull", q_str)
             self.assertIn("variantannotation__gnomad_af__lte", q_str)
         finally:
-            PopulationNode.MAX_AF_GATE_ENABLED = original
+            vav.backfilled_max_af = original
+            vav.save(update_fields=["backfilled_max_af"])

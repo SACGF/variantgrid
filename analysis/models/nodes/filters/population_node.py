@@ -20,10 +20,6 @@ from snpdb.models import VariantZygosityCountCollection
 
 class PopulationNode(AnalysisNode):
     EVERYTHING = 100.0  # Percent
-    # Class-level toggle for the max_af gate clause emitted by _get_node_q. Default True
-    # (the optimisation introduced in #1547). Profiling code flips this to compare plans
-    # with and without the gate; production code should not change it.
-    MAX_AF_GATE_ENABLED = True
     percent = models.FloatField(default=EVERYTHING)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
     # highest in gnomAD - for diff groups see PopulationNodeGnomADPopulation below
@@ -113,7 +109,11 @@ class PopulationNode(AnalysisNode):
 
                 and_q.append(reduce(group_operation, filters))
 
-            if self.MAX_AF_GATE_ENABLED:
+            # max_af gate (#1547): only emit when the VAV has been backfilled. On
+            # pre-backfill VAVs the partial index doesn't exist yet and the extra
+            # clause buys nothing. See VariantAnnotationVersion.backfilled_max_af.
+            vav = self.analysis.annotation_version.variant_annotation_version
+            if vav.backfilled_max_af:
                 max_allele_frequency = self.percent / 100
                 q_max_af_isnull = Q(variantannotation__max_af__isnull=True)
                 q_max_af_lte = Q(variantannotation__max_af__lte=max_allele_frequency)

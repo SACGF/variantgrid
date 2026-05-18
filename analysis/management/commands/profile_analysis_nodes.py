@@ -33,7 +33,6 @@ from django.db.models.functions import Substr as DjSubstr
 
 from analysis.models import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode
-from analysis.models.nodes.filters.population_node import PopulationNode
 from annotation.models import VariantAnnotationVersion, VariantGeneOverlap
 from genes.models import GeneList
 from snpdb.models import Cohort, Sample, Trio, Variant, VariantCollection
@@ -127,24 +126,31 @@ class Command(BaseCommand):
 
         gate_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["max_af_gate"]]
 
-        # PopulationNode.MAX_AF_GATE_ENABLED is a newer feature flag; older code branches
-        # don't define it. Use getattr/setattr so this command runs unchanged on legacy
-        # systems (e.g. for benchmarking against prod data on a pre-flag deploy). On legacy
-        # systems "off" is unavailable and we silently fall back to "on" with a warning.
-        _GATE_ATTR = "MAX_AF_GATE_ENABLED"
-        _GATE_SENTINEL = object()
-        original_gate = getattr(PopulationNode, _GATE_ATTR, _GATE_SENTINEL)
-        gate_supported = original_gate is not _GATE_SENTINEL
+        # PopulationNode reads the max_af gate switch from
+        # VariantAnnotationVersion.backfilled_max_af. Older code branches don't define
+        # this field (the gate lived as a class-level toggle); detect via the model
+        # meta so this command runs unchanged on legacy systems. On legacy systems
+        # "off" is unavailable and we silently fall back to "on" with a warning.
+        gate_supported = any(
+            f.name == "backfilled_max_af" for f in VariantAnnotationVersion._meta.fields
+        )
         if not gate_supported:
             if "off" in gate_modes:
                 self.stderr.write(
-                    f"PopulationNode.{_GATE_ATTR} not present on this codebase — "
-                    f"--max-af-gate=off/both not available. Forcing 'on'.")
+                    "VariantAnnotationVersion.backfilled_max_af not present on this codebase — "
+                    "--max-af-gate=off/both not available. Forcing 'on'.")
             gate_modes = ["on"]
+            original_gate_flags = {}
+        else:
+            original_gate_flags = dict(
+                VariantAnnotationVersion.objects.values_list("pk", "backfilled_max_af")
+            )
         try:
             for gate_mode in gate_modes:
                 if gate_supported:
-                    setattr(PopulationNode, _GATE_ATTR, gate_mode == "on")
+                    VariantAnnotationVersion.objects.all().update(
+                        backfilled_max_af=(gate_mode == "on")
+                    )
                 if len(gate_modes) > 1:
                     self.stdout.write(f"### max_af_gate={gate_mode} ###")
 
@@ -194,7 +200,10 @@ class Command(BaseCommand):
                     ), gate_mode))
         finally:
             if gate_supported:
-                setattr(PopulationNode, _GATE_ATTR, original_gate)
+                for vav_pk, original in original_gate_flags.items():
+                    VariantAnnotationVersion.objects.filter(pk=vav_pk).update(
+                        backfilled_max_af=original
+                    )
 
         with open(csv_path, "w", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=CSV_FIELDS)

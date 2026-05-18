@@ -90,3 +90,5 @@ class Command(BaseCommand):
                 predictions_num_pathogenic=reduce(operator.add, [F(p) for p in patho_kwargs]),
                 predictions_num_benign=reduce(operator.add, [F(b) for b in benign_kwargs]),
             )
+            vav.backfilled_damage_counts = True
+            vav.save(update_fields=["backfilled_damage_counts"])

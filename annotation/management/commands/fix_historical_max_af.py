@@ -28,6 +28,8 @@ class Command(BaseCommand):
             logging.info("VariantAnnotationVersion %s: updated %d rows", vav.pk, updated)
             if not options["skip_index"]:
                 self._create_partition_index(vav)
+            vav.backfilled_max_af = True
+            vav.save(update_fields=["backfilled_max_af"])
 
     @staticmethod
     def _create_partition_index(vav: VariantAnnotationVersion) -> None:
