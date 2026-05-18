@@ -4,13 +4,15 @@ from collections import defaultdict
 from typing import List, Dict, Tuple, Any, Optional
 
 import Levenshtein
+from cache_memoize import cache_memoize
 from django.db.models.functions import Lower
 
 from annotation.models.models_phenotype_match import PhenotypeMatchTypes
 from genes.models import GeneSymbol
+from library.constants import DAY_SECS
 from library.log_utils import log_traceback
 from library.utils import is_not_none
-from ontology.models import OntologyTerm, OntologyService
+from ontology.models import OntologyTerm, OntologyService, OntologyTermRelation, OntologyImport
 
 CodePK = Any
 CodePKLookups = Dict[CodePK, str]
@@ -22,6 +24,9 @@ OMIM_PATTERN = re.compile(r"OMIM:(\d+)$")
 
 MIN_MATCH_LENGTH = 3
 MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH = 5
+
+AMBIGUOUS_ACRONYM_MAX_LEN = 5
+AMBIGUOUS_ACRONYM_CONCEPT_RELATIONS = frozenset({"exact", "exact_synonym", "xref"})
 
 
 def load_omim_by_id(accession) -> OntologyResults:
@@ -37,6 +42,97 @@ def load_hpo_by_id(hpo_id) -> OntologyResults:
 
 class SkipAllPhenotypeMatchException(Exception):
     pass
+
+
+@cache_memoize(timeout=DAY_SECS)
+def _build_ambiguous_acronym_denylist(ontology_import_pk: int) -> frozenset:
+    """Lowercased short ontology lookup keys that match multiple distinct concept
+    clusters - building these matches would silently mean the wrong thing.
+    Cached on the latest OntologyImport so reimports invalidate automatically."""
+    _ = ontology_import_pk  # cache key only
+
+    parent: Dict[str, str] = {}
+
+    def find(x):
+        root = x
+        while parent.get(root, root) != root:
+            root = parent[root]
+        while parent.get(x, x) != root:
+            nxt = parent.get(x, x)
+            parent[x] = root
+            x = nxt
+        return root
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    rel_qs = OntologyTermRelation.objects.filter(
+        relation__in=AMBIGUOUS_ACRONYM_CONCEPT_RELATIONS
+    ).values_list("source_term_id", "dest_term_id")
+    for s, d in rel_qs.iterator():
+        if s.startswith("HGNC:") or d.startswith("HGNC:"):
+            continue  # Genes are their own concept - never merge into disease clusters
+        if s not in parent:
+            parent[s] = s
+        if d not in parent:
+            parent[d] = d
+        union(s, d)
+
+    def concept_root(term_id: str) -> str:
+        if term_id.startswith("HGNC:"):
+            return term_id
+        return find(term_id) if term_id in parent else term_id
+
+    keys: Dict[str, set] = defaultdict(set)
+    services = (OntologyService.HPO, OntologyService.MONDO, OntologyService.OMIM,
+                OntologyService.HGNC)
+    for service in services:
+        qs = OntologyTerm.objects.filter(ontology_service=service)
+        for pk, name, aliases in qs.values_list("pk", "name", "aliases"):
+            for term in filter(is_not_none, (aliases or []) + [name]):
+                k = term.lower().replace(",", "")
+                if 2 <= len(k) <= AMBIGUOUS_ACRONYM_MAX_LEN:
+                    stripped = k.replace(" ", "").replace("-", "")
+                    if stripped.isalnum() and any(c.isalpha() for c in stripped):
+                        keys[k].add(pk)
+
+    denylist = set()
+    for text, pks in keys.items():
+        if len(pks) < 2:
+            continue
+        if len({concept_root(p) for p in pks}) >= 2:
+            denylist.add(text)
+    return frozenset(denylist)
+
+
+_EXPLICIT_OVERRIDE_KEYS: Optional[frozenset] = None
+
+
+def _get_explicit_override_keys() -> frozenset:
+    """Lowercased keys with hardcoded or case-insensitive overrides defined in
+    PhenotypeMatcher._get_special_case_lookups. These win over the denylist
+    because the developer has already chosen the right disambiguation."""
+    global _EXPLICIT_OVERRIDE_KEYS
+    if _EXPLICIT_OVERRIDE_KEYS is None:
+        # The loader closures need ontology dicts, but we never CALL them - we
+        # just want the keys - so empty dicts are fine.
+        hardcoded, case_insens, _ = PhenotypeMatcher._get_special_case_lookups({}, {}, {})
+        _EXPLICIT_OVERRIDE_KEYS = frozenset(
+            {k.lower() for k in hardcoded.keys()} | set(case_insens.keys())
+        )
+    return _EXPLICIT_OVERRIDE_KEYS
+
+
+def get_ambiguous_acronym_denylist() -> frozenset:
+    """Returns the lowercased ambiguous-acronym set for the current ontology
+    import, minus keys that have explicit hardcoded overrides (those have a
+    known correct meaning). Cached in Redis via cache_memoize and rebuilt
+    only when a new OntologyImport lands."""
+    latest = OntologyImport.objects.order_by("-pk").values_list("pk", flat=True).first()
+    raw = _build_ambiguous_acronym_denylist(latest or 0)
+    return raw - _get_explicit_override_keys()
 
 
 class PhenotypeMatcher:
@@ -87,6 +183,11 @@ class PhenotypeMatcher:
         self.omim_single_words_by_length = self._get_single_words_by_length(self.omim_pks, 5)
         special_case_lookups = self._get_special_case_lookups(self.hpo_pks, self.omim_pks, self.gene_symbol_records)
         self.hardcoded_lookups, self.case_insensitive_lookups, self.disease_families = special_case_lookups
+
+        # Ambiguous-acronym denylist: short keys that match multiple distinct
+        # concept clusters. Already-disambiguated keys are removed inside
+        # get_ambiguous_acronym_denylist().
+        self.ambiguous_acronyms = get_ambiguous_acronym_denylist()
 
     def get_matches(self, words_and_spans_subset) -> Tuple[List, List, List]:
         words = [ws[0] for ws in words_and_spans_subset]
@@ -431,6 +532,7 @@ class PhenotypeMatcher:
             "FSGS": (load_hpo_by_name, "focal segmental glomerulosclerosis"),
             "FTT": (load_hpo_by_name, "Failure to thrive"),
             "GAII": (load_omim_by_name, "GLUTARIC ACIDURIA II"),
+            "GDD": DEVELOPMENTAL_DELAY,
             "GEFS": GEFS,
             "GEFS+": GEFS,
             "GSD": GLYCOGEN_STORAGE_DISEASE,

@@ -11,6 +11,12 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     
     phenotypeMatches = phenotypeMatches.sort(compareByStart);
     let overlapping_matches = [];
+    let ambiguousAcronyms = new Set();
+    for (let k = 0; k < phenotypeMatches.length; ++k) {
+        if (phenotypeMatches[k].ambiguous_alias) {
+            ambiguousAcronyms.add(phenotypeMatches[k].ambiguous_alias);
+        }
+    }
 
     const phenoLen = phenotypeText.length;
     let phenotypeHTML = '';
@@ -53,6 +59,20 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     
     descriptionBox.html(phenotypeHTML);
     $(".term-match", descriptionBox);
+
+    if (ambiguousAcronyms.size > 0) {
+        let phenoMessages = $("<div/>").addClass("phenotype-messages");
+        let messageContainer = $("<ul/>").addClass("messages");
+        phenoMessages.append(messageContainer);
+        for (const acronym of ambiguousAcronyms) {
+            let msg = `'${acronym}' is an ambiguous acronym (it matches multiple distinct ontology concepts) and has been excluded from gene-list matching. Please type the full term name or an HPO/OMIM/MONDO ID.`;
+            let listElement = $("<li/>").addClass("warning");
+            listElement.text(msg);
+            messageContainer.append(listElement);
+        }
+        let clearDiv = descriptionBox.siblings("div.clear");
+        clearDiv.after(phenoMessages);
+    }
 }
 
 

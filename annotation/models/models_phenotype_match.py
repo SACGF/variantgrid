@@ -44,8 +44,23 @@ class PhenotypeDescription(models.Model):
         return results
 
     def get_ontology_term_ids(self) -> List[OntologyTerm]:
-        ot_qs = self.textphenotypesentence_set.filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
-        return ot_qs.values_list("text_phenotype__textphenotypematch__ontology_term_id", flat=True)
+        from annotation.phenotype_matcher import get_ambiguous_acronym_denylist
+        denylist = get_ambiguous_acronym_denylist()
+        ot_qs = (self.textphenotypesentence_set
+                 .filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
+                 .select_related("text_phenotype")
+                 .prefetch_related("text_phenotype__textphenotypematch_set"))
+        term_ids = set()
+        for sentence in ot_qs:
+            sentence_text = sentence.text_phenotype.text
+            for tpm in sentence.text_phenotype.textphenotypematch_set.all():
+                if tpm.ontology_term_id is None:
+                    continue
+                match_text = sentence_text[tpm.offset_start:tpm.offset_end].lower()
+                if match_text in denylist:
+                    continue  # Ambiguous acronym - refuse to feed downstream queries
+                term_ids.add(tpm.ontology_term_id)
+        return sorted(term_ids)
 
     def get_gene_symbols(self) -> QuerySet:
         ontology_term_ids = self.get_ontology_term_ids()
@@ -76,12 +91,19 @@ class TextPhenotypeSentence(models.Model):
     sentence_offset = models.IntegerField()
 
     def get_results(self):
+        from annotation.phenotype_matcher import get_ambiguous_acronym_denylist
+        denylist = get_ambiguous_acronym_denylist()
+        sentence_text = self.text_phenotype.text
         results = []
 
         for r in self.text_phenotype.textphenotypematch_set.all():
+            match_text = sentence_text[r.offset_start:r.offset_end]
             r.offset_start += self.sentence_offset
             r.offset_end += self.sentence_offset
-            results.append(r.to_dict())
+            data = r.to_dict()
+            if match_text.lower() in denylist:
+                data["ambiguous_alias"] = match_text
+            results.append(data)
 
         return results
 
