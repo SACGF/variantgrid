@@ -343,21 +343,18 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         except SequencingRunCurrentSampleSheet.DoesNotExist:
             return False
 
-        try:
-            combo = current_sample_sheet.samplesheetcombinedvcffile_set.get()
-            if combo.needs_to_be_linked():
+        for joint_called_vcf in current_sample_sheet.jointcalledvcf_set.all():
+            if joint_called_vcf.needs_to_be_linked():
                 return True
-        except Exception:
-            pass
 
         old_sample_sheets = self.get_old_sample_sheets()
         illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet=current_sample_sheet)
         old_illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet__in=old_sample_sheets)
-        old_sample_sheet_combined_vcf = SampleSheetCombinedVCFFile.objects.filter(sample_sheet__in=old_sample_sheets)
+        old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
         old_sample_links = SampleFromSequencingSample.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
         old_unaligned_reads = UnalignedReads.get_for_old_sample_sheets(self)
         return any([not illuminate_qc.exists() and old_illuminate_qc.exists(),
-                    old_sample_sheet_combined_vcf.exists(),
+                    old_joint_called_vcfs.exists(),
                     old_unaligned_reads.exists(),
                     old_sample_links.exists()])
 
@@ -555,19 +552,8 @@ class VCFFromSequencingRun(models.Model):
     sequencing_run = models.ForeignKey(SequencingRun, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, null=True, on_delete=SET_NULL)
 
-    class Meta:
-        unique_together = ("sequencing_run", "variant_caller")
-
     def get_variant_caller(self):
-        """ Because we can't do a schema change for VG3, we need to basically always store variant_caller as None
-            for single sample VCFs """
-        if self.variant_caller:
-            return self.variant_caller
-        try:
-            return self.vcf.uploadedvcf.backendvcf.variant_caller
-        except Exception:
-            pass
-        return None
+        return self.variant_caller
 
 
 class IlluminaFlowcellQC(SeqAutoRecord):
@@ -938,7 +924,7 @@ class VCFFile(SeqAutoRecord):
         return f"VCF {self.name} ({self.get_data_state_display()})"
 
 
-class SampleSheetCombinedVCFFile(SeqAutoRecord):
+class JointCalledVCF(SeqAutoRecord):
     sample_sheet = models.ForeignKey(SampleSheet, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
 
@@ -964,6 +950,19 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
             return VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)
         except VCF.DoesNotExist:
             return None
+
+    @property
+    def sample_count(self) -> Optional[int]:
+        if vcf := self.vcf:
+            return vcf.sample_set.count()
+        return None
+
+    @property
+    def is_full_sheet(self) -> Optional[bool]:
+        count = self.sample_count
+        if count is None:
+            return None
+        return count == self.sample_sheet.sequencingsample_set.count()
 
     def load_from_file(self, seqauto_run, **kwargs):
         if not settings.SEQAUTO_IMPORT_COMBO_VCF:
@@ -1019,7 +1018,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
 
     def __str__(self):
         num_samples = self.sample_sheet.sequencingsample_set.count()
-        return f"{self.variant_caller} ComboVCF ({self.pk}) for {self.sequencing_run} ({num_samples} samples)"
+        return f"{self.variant_caller} JointCalledVCF ({self.pk}) for {self.sequencing_run} ({num_samples} samples)"
 
 
 class QC(SeqAutoRecord):

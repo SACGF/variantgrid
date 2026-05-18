@@ -72,6 +72,14 @@
             float: left;
         }
 
+        .sample-sheet-icon {
+            width: 24px;
+            height: 24px;
+            background-size: 24px 24px;
+            background-image: url({% static 'icons/csv-file-format-extension.png' %});
+            float: left;
+        }
+
         .gold-standard {
             color: gold;
         }
@@ -314,12 +322,27 @@
 
         <div id='data'>
             <h3>Made from this data</h3>
-            {% if sample_sheet.samplesheetcombinedvcffile_set.exists %}
-                <ul><b>Combined VCF files</b> 
-                {% for combo_vcf in sample_sheet.samplesheetcombinedvcffile_set.all %}
-                    <li class='seqauto-record vcf-file data-state-{{ combo_vcf.data_state }}'><a href="{% url 'view_combo_vcf_file' combo_vcf.pk %}">{{ combo_vcf }}</a>
+            {% if sample_sheet.jointcalledvcf_set.exists %}
+                <ul><b>Joint Called VCFs</b>
+                {% for joint_called_vcf in sample_sheet.jointcalledvcf_set.all %}
+                    <li class='seqauto-record vcf-file data-state-{{ joint_called_vcf.data_state }}'>
+                        <a href="{% url 'view_joint_called_vcf' joint_called_vcf.pk %}">{{ joint_called_vcf }}</a>
+                        <div class='sample-sheet-icon'></div>
+                        SampleSheet.csv —
+                        {% with sample_count=joint_called_vcf.sample_count %}
+                            {% if sample_count is None %}
+                                loading…
+                            {% else %}
+                                {{ sample_count }} / {{ joint_called_vcf.sample_sheet.sequencingsample_set.count }} samples
+                                {% if joint_called_vcf.is_full_sheet %}
+                                    [full sheet]
+                                {% else %}
+                                    [subset]
+                                {% endif %}
+                            {% endif %}
+                        {% endwith %}
                 {% endfor %}
-                </ul>        
+                </ul>
             {% endif %}
     
             <ul>        

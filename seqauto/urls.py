@@ -15,7 +15,7 @@ from seqauto.grids.sequencing_software_versions_grids import LibraryColumns, Seq
 from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCallerUpdate, \
     AlignerUpdate, VariantCallingPipelineUpdate
 from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
-    ExperimentViewSet, VariantCallerViewSet, VCFFileViewSet, SampleSheetCombinedVCFFileViewSet, FastQCViewSet, \
+    ExperimentViewSet, VariantCallerViewSet, VCFFileViewSet, JointCalledVCFViewSet, FastQCViewSet, \
     SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
     QCExecSummaryViewSet, QCGeneListBulkCreateView, SequencingFilesBulkCreateView, QCExecSummaryBulkCreateView, \
     QCGeneCoverageBulkCreateView
@@ -59,6 +59,8 @@ urlpatterns = [
 
     path('view_unaligned_reads/<int:unaligned_reads_id>', views.view_unaligned_reads, name='view_unaligned_reads'),
     path('view_bam/<int:bam_file_id>', views.view_bam_file, name='view_bam_file'),
+    path('view_joint_called_vcf/<int:joint_called_vcf_id>', views.view_joint_called_vcf, name='view_joint_called_vcf'),
+    # Backwards-compat URL alias (predates the JointCalledVCF rename)
     path('view_combo_vcf_file/<int:combo_vcf_file_id>', views.view_combo_vcf_file, name='view_combo_vcf_file'),
     path('view_vcf/<int:vcf_file_id>', views.view_vcf_file, name='view_vcf_file'),
     path('view_qc/<int:qc_id>', views.view_qc, name='view_qc'),
@@ -120,7 +122,9 @@ router.register(r'api/v1/variant_caller', VariantCallerViewSet, basename='api_va
 router.register(r'api/v1/sequencing_run', SequencingRunViewSet, basename='api_sequencing_run')
 router.register(r'api/v1/sample_sheet', SampleSheetViewSet, basename='api_sample_sheet')
 router.register(r'api/v1/vcf_file', VCFFileViewSet, basename='api_vcf_file')
-router.register(r'api/v1/sample_sheet_combined_vcf_file', SampleSheetCombinedVCFFileViewSet, basename='api_sample_sheet_combined_vcf_file')
+router.register(r'api/v1/joint_called_vcf', JointCalledVCFViewSet, basename='api_joint_called_vcf')
+# Backwards-compat API endpoint (predates the JointCalledVCF rename)
+router.register(r'api/v1/sample_sheet_combined_vcf_file', JointCalledVCFViewSet, basename='api_sample_sheet_combined_vcf_file')
 router.register(r'api/v1/fastqc', FastQCViewSet, basename='api_fastqc')
 router.register(r'api/v1/illumina_flowcell_qc', IlluminaFlowcellQCViewSet, basename='api_illumina_flowcell_qc')
 router.register(r'api/v1/qc_gene_list', QCGeneListViewSet, basename='api_qc_gene_list')

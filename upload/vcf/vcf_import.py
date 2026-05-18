@@ -16,7 +16,7 @@ from library.genomics.vcf_enums import VCFConstant
 from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, cyvcf2_get_contig_lengths_dict
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.utils import invert_dict, get_single_element
-from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, VCFFromSequencingRun, \
+from seqauto.models import JointCalledVCF, VCFFile, VCFFromSequencingRun, \
     SampleFromSequencingSample, QCGeneList
 from seqauto.signals.signals_list import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
@@ -330,22 +330,20 @@ def create_backend_vcf_links(uploaded_vcf):
     if uploaded_file.path and uploaded_file.import_source in sequencing_vcf_sources:
         path = uploaded_file.path
         if path:
-            combo_vcf = None
+            joint_called_vcf = None
             vcf_file = None
             try:
-                # Throw exception if multiple exist
-                combo_vcf = SampleSheetCombinedVCFFile.objects.get(path=path)
-            except SampleSheetCombinedVCFFile.DoesNotExist:
+                joint_called_vcf = JointCalledVCF.objects.get(path=path)
+            except JointCalledVCF.DoesNotExist:
                 try:
-                    # Throw exception if multiple exist
                     vcf_file = VCFFile.objects.get(path=path)
                 except VCFFile.DoesNotExist:
-                    msg = f"Couldn't find Combo or single VCF for path '{path}'"
+                    msg = f"Couldn't find joint-called or single VCF for path '{path}'"
                     raise ValueError(msg)
 
             defaults = {"uploaded_vcf": uploaded_vcf}
             backend_vcf, _ = BackendVCF.objects.update_or_create(vcf_file=vcf_file,
-                                                                 combo_vcf=combo_vcf,
+                                                                 joint_called_vcf=joint_called_vcf,
                                                                  defaults=defaults)
     return backend_vcf
 
@@ -365,18 +363,18 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
         if not samples_by_sequencing_sample:
             raise ValueError("Couldn't link VCF samples to sequencing samples. VCF samples must start with sample names in SampleSheet.csv")
 
-        # We have unique_together on sequencing_run/variant_caller
-        if backend_vcf.combo_vcf:
-            # There can only be 1 combo vcf file per run / variant caller
-            VCFFromSequencingRun.objects.update_or_create(sequencing_run=sequencing_run,
-                                                          variant_caller=backend_vcf.variant_caller,
-                                                          defaults={"vcf": vcf})
+        if backend_vcf.joint_called_vcf:
+            VCFFromSequencingRun.objects.update_or_create(
+                vcf=vcf,
+                defaults={"sequencing_run": sequencing_run,
+                          "variant_caller": backend_vcf.variant_caller},
+            )
         elif backend_vcf.vcf_file:
-            # Single sample VCF - we'll enforce uniqueness by just deleting any old ones against this sequencing sample
-            # That has null variant caller
             sequencing_sample = get_single_element(samples_by_sequencing_sample)
-            existing = VCFFromSequencingRun.objects.filter(vcf__sample__in=sequencing_sample.samplefromsequencingsample_set.values_list("sample"),
-                                                           variant_caller__isnull=True)
+            existing = VCFFromSequencingRun.objects.filter(
+                vcf__sample__in=sequencing_sample.samplefromsequencingsample_set.values_list("sample"),
+                vcf__uploadedvcf__backendvcf__vcf_file__isnull=False,
+            )
             if existing.exists():
                 existing_vcfs = ", ".join([str(vfsr.vcf) for vfsr in existing])
                 logging.info("Removing existing VCFs linked against run: %s / sequencing_sample=%s",
@@ -384,7 +382,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
                 existing.delete()
 
             VCFFromSequencingRun.objects.create(sequencing_run=sequencing_run,
-                                                variant_caller=None,  # this flags single sample - won't hit unique_together
+                                                variant_caller=backend_vcf.variant_caller,
                                                 vcf=vcf)
 
         for sequencing_sample, sample in samples_by_sequencing_sample.items():

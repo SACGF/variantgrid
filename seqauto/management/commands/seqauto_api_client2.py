@@ -85,7 +85,7 @@ class VariantCaller:
 
 @dataclass_json
 @dataclass
-class SampleSheetCombinedVCFFile:
+class JointCalledVCF:
     path: str
     sample_sheet_lookup: SampleSheetLookup = field(metadata=config(field_name="sample_sheet"))
     variant_caller: VariantCaller
@@ -231,10 +231,13 @@ class VariantGridAPI:
         return self._post("seqauto/api/v1/sample_sheet/",
                           json_data)
 
-    def create_sample_sheet_combined_vcf_file(self, sample_sheet_combined_vcf_file: SampleSheetCombinedVCFFile):
-        json_data = sample_sheet_combined_vcf_file.to_dict()
-        return self._post("seqauto/api/v1/sample_sheet_combined_vcf_file/",
+    def create_joint_called_vcf(self, joint_called_vcf: JointCalledVCF):
+        json_data = joint_called_vcf.to_dict()
+        return self._post("seqauto/api/v1/joint_called_vcf/",
                           json_data)
+
+    # Backwards-compat alias (predates the JointCalledVCF rename)
+    create_sample_sheet_combined_vcf_file = create_joint_called_vcf
 
     def create_sequencing_data(self, sample_sheet_lookup: SampleSheetLookup, sequencing_files: List[SequencingFile]):
         records = []
@@ -374,7 +377,7 @@ class Command(BaseCommand):
         sample_sheet_lookup = SampleSheetLookup.from_sample_sheet(sample_sheet)
 
         variant_caller_var_dict = VariantCaller(name="VarDict", version="1.8.2")
-        sample_sheet_combined_vcf_file = SampleSheetCombinedVCFFile(
+        joint_called_vcf = JointCalledVCF(
             path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/2_variants/Haem_20_999_201231_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz",
             sample_sheet_lookup=sample_sheet_lookup,
             variant_caller=variant_caller_var_dict)
@@ -472,8 +475,8 @@ class Command(BaseCommand):
             "enrichment_kit": lambda: vg_api.create_enrichment_kit(enrichment_kit),
             "sequencing_run": lambda: vg_api.create_sequencing_run(sequencing_run),
             "sample_sheet": lambda: vg_api.create_sample_sheet(sample_sheet),
-            "sample_sheet_combined_vcf_file": lambda: vg_api.create_sample_sheet_combined_vcf_file(
-                sample_sheet_combined_vcf_file),
+            "joint_called_vcf": lambda: vg_api.create_joint_called_vcf(
+                joint_called_vcf),
             "sequencing_data": lambda: vg_api.create_sequencing_data(sample_sheet_lookup, sequencing_files),
             "qc_gene_list": lambda: vg_api.create_qc_gene_list(qc_gene_lists[0]),
             "qc_gene_lists": lambda: vg_api.create_multiple_qc_gene_lists(qc_gene_lists),

@@ -3,7 +3,7 @@ import os.path
 from rest_framework import serializers
 
 from seqauto.models import Sequencer, Experiment, VariantCaller, SequencingRun, SequencerModel, SampleSheet, \
-    SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, SampleSheetCombinedVCFFile, VCFFile, \
+    SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, JointCalledVCF, VCFFile, \
     BamFile, Fastq, Aligner, PairedEnd
 from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
 from snpdb.models import Manufacturer, DataState
@@ -379,7 +379,7 @@ def validate_unique_vcf_path(klass, path, **kwargs):
         We want the API to be idempotent (can be called multiple times) so ok if the lookup is the same
         (hence exists call if passed in same class below)
     """
-    for vcf_class in [VCFFile, SampleSheetCombinedVCFFile]:
+    for vcf_class in [VCFFile, JointCalledVCF]:
         qs = vcf_class.objects.filter(path=path)
         if klass == vcf_class:
             qs = qs.exclude(**kwargs)  # Allow for same object/lookup
@@ -484,12 +484,12 @@ class SequencingFilesBulkCreateSerializer(serializers.Serializer):
         }
 
 
-class SampleSheetCombinedVCFFileSerializer(serializers.ModelSerializer):
+class JointCalledVCFSerializer(serializers.ModelSerializer):
     sample_sheet = SampleSheetLookupSerializer()
     variant_caller = VariantCallerSerializer()
 
     class Meta:
-        model = SampleSheetCombinedVCFFile
+        model = JointCalledVCF
         fields = ("path", "sample_sheet", "variant_caller")
 
     def create(self, validated_data):
@@ -501,10 +501,9 @@ class SampleSheetCombinedVCFFileSerializer(serializers.ModelSerializer):
             "sample_sheet": sample_sheet,
             "variant_caller": variant_caller,
         }
-        validate_unique_vcf_path(SampleSheetCombinedVCFFile, path, **kwargs)
-        sscvcf, _ = SampleSheetCombinedVCFFile.objects.update_or_create(**kwargs,
-                                                                        defaults={
-                                                                            "path": validated_data["path"],
-                                                                            "data_state": DataState.COMPLETE,
-                                                                        })
-        return sscvcf
+        validate_unique_vcf_path(JointCalledVCF, path, **kwargs)
+        joint_called_vcf, _ = JointCalledVCF.objects.update_or_create(
+            path=path,
+            defaults={**kwargs, "data_state": DataState.COMPLETE},
+        )
+        return joint_called_vcf
