@@ -185,6 +185,19 @@
     </tr>
     {% endif %}
 
+    {% with external_links=sequencing_run.get_external_links %}
+        {% if external_links %}
+        <tr>
+            <th>External Links:</th>
+            <td>
+                {% for label, url in external_links %}
+                    <a href="{{ url }}" target="_blank" rel="noopener">{{ label }}</a>{% if not forloop.last %} | {% endif %}
+                {% endfor %}
+            </td>
+        </tr>
+        {% endif %}
+    {% endwith %}
+
     {% for vcf_type, vcf_files in run_vcfs.items %}
         {% for variant_caller, vcf, can_view in vcf_files %}
         <tr>

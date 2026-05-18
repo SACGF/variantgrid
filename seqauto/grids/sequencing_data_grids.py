@@ -1,8 +1,10 @@
+from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import TextField
 from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
 from django.db.models.query_utils import Q
+from django.utils.html import format_html_join, mark_safe
 
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit
@@ -102,7 +104,28 @@ class SequencingRunListGrid(JqGridUserRowConfig):
         ]
         # Insert second to last
         colmodels = colmodels[:-1] + vcf_extra + colmodels[-1:]
+        if settings.SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS:
+            colmodels.append({'index': 'external_links', 'name': 'external_links',
+                              'label': 'External Links', 'sortable': False, 'width': 80})
         return colmodels
+
+    def iter_format_items(self, items):
+        items = super().iter_format_items(items)
+        if settings.SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS:
+            items = (self._add_external_links(row) for row in items)
+        return items
+
+    @staticmethod
+    def _add_external_links(row: dict) -> dict:
+        links = SequencingRun.get_external_links_for(
+            row["name"], row.get("date"), row.get("enrichment_kit__name"))
+        if links:
+            row["external_links"] = format_html_join(
+                mark_safe(" | "), '<a href="{}" target="_blank" rel="noopener">{}</a>',
+                ((url, label) for label, url in links))
+        else:
+            row["external_links"] = ""
+        return row
 
 
 class UnalignedReadsListGrid(JqGridUserRowConfig):

@@ -347,6 +347,40 @@ class SequencingRun(SeqAutoRecord):
                     old_unaligned_reads.exists(),
                     old_sample_links.exists()])
 
+    @staticmethod
+    def get_external_links_for(name: str, date: Optional[datetime.date],
+                               enrichment_kit_name: Optional[str]) -> list[tuple[str, str]]:
+        """ Returns (label, url) tuples for external systems configured in
+            SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS that apply to a run with these fields.
+            Used from both the detail page (via get_external_links) and the runs grid. """
+        links = []
+        params = None
+        for cfg in settings.SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS:
+            min_date_str = cfg.get("min_date")
+            if min_date_str:
+                min_date = datetime.strptime(min_date_str, "%Y-%m-%d").date()
+                if not date or date < min_date:
+                    continue
+            excluded = cfg.get("exclude_enrichment_kits") or []
+            if excluded and enrichment_kit_name:
+                kit_name_lower = enrichment_kit_name.lower()
+                if any(ex.lower() == kit_name_lower for ex in excluded):
+                    continue
+            if params is None:
+                original = SequencingRun.get_original_illumina_sequencing_run(name)
+                params = {
+                    "sequencing_run": name,
+                    "original_sequencing_run": original,
+                    "flowcell_id": original.split("_")[-1],
+                    "enrichment_kit": enrichment_kit_name or "",
+                }
+            links.append((cfg["label"], cfg["url_pattern"] % params))
+        return links
+
+    def get_external_links(self) -> list[tuple[str, str]]:
+        kit_name = self.enrichment_kit.name if self.enrichment_kit else None
+        return self.get_external_links_for(self.name, self.date, kit_name)
+
     def __str__(self):
         return self.name
 
