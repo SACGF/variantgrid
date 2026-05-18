@@ -13,8 +13,7 @@ from classification.enums import SpecialEKeys
 from classification.models import ClassificationResultValue, \
     EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap
 from classification.models.overlaps_enums import TriageState, TriageComment, TriageStatus
-from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
-from classification.services.overlaps_services import OverlapGrouping, OverlapServices, OverlapGrouping3
+from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
 from library.utils import empty_to_none
 from library.utils.django_utils import render_ajax_view
 from snpdb.lab_picker import LabPickerData

@@ -304,160 +304,10 @@ class ChangeRow:
     changes: list[FieldChange]
     comment: Optional[str]
     timestamp: datetime
+    is_new_record: bool
 
     def __lt__(self, other):
         return self.timestamp < other.timestamp
-
-
-@dataclass(frozen=True)
-class OverlapGrouping:
-    single_context_overlap: Optional[Overlap]
-    cross_context_overlap: Optional[Overlap]
-    value_type: ClassificationResultValue
-    user_contribution: OverlapContribution
-    contributions: set[OverlapContribution]
-
-    @property
-    def user_next_step_single_context(self) -> TriageNextStep:
-        if single_context_overlap := self.single_context_overlap:
-            if skew := single_context_overlap.overlapcontributionskew_set.filter(contribution=self.user_contribution, overlap__overlap_type=OverlapType.SINGLE_CONTEXT).first():
-                return TriageNextStep(skew.skew_perspective)
-        return TriageNextStep.PENDING_CALCULATION
-
-    @property
-    def user_next_step_cross_context(self) -> TriageNextStep:
-        if cross_context_overlap := self.cross_context_overlap:
-            if skew := cross_context_overlap.overlapcontributionskew_set.filter(contribution=self.user_contribution, overlap__overlap_type=OverlapType.CROSS_CONTEXT).first():
-                return TriageNextStep(skew.skew_perspective)
-        return TriageNextStep.PENDING_CALCULATION
-
-    @staticmethod
-    def tidy_change(overlap_contribution: OverlapContribution, field_name: str, value: Any):
-        if value == "None":
-            return None
-
-        try:
-            match field_name:
-                case "triage state":
-                    return TriageState.from_json(json.loads(value))
-                case "effective date":
-                    return EffectiveDate.from_json(json.loads(value))
-                case "comment":
-                    return TriageComment.from_json(json.loads(value))
-        except JSONDecodeError as jer:
-            return f"Decoding Error: {value}"
-
-        return value
-
-    @cached_property
-    def change_log(self) -> list[ChangeRow]:
-        all_triages = self.contributions | set([self.user_contribution])
-        change_rows: list[ChangeRow] = []
-
-        for triage in all_triages:
-            triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage)
-            for entry in triage_log:
-                # FIXME, make a filter that change the str 'None' to None
-                if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
-                    continue
-                if (value_change := entry.changes_dict.get("value")) and value_change[0] == 'None':
-                    continue
-
-                comment: Optional[TriageComment] = None
-                field_changes = []
-                for key, value_list in entry.changes_display_dict.items():
-                    if key == "comment":
-                        comment = OverlapGrouping.tidy_change(triage, key, value_list[1])
-                    else:
-                        field_change = FieldChange(
-                            key,
-                            OverlapGrouping.tidy_change(triage, key, value_list[0]),
-                            OverlapGrouping.tidy_change(triage, key, value_list[1])
-                        )
-                        field_changes.append(field_change)
-
-                user: Optional[User] = entry.actor
-
-                change_row = ChangeRow(
-                    overlap_contribution=triage,
-                    user=user,
-                    changes=list(sorted(field_changes)),
-                    comment=comment,
-                    timestamp=entry.timestamp
-                )
-                change_rows.append(change_row)
-        return list(sorted(change_rows))
-        # all_changes = LogEntry.objects.get_for_objects(all_triages)
-        # for triage in all_triages:
-        #     print(triage.history.latest().changes_dict)
-        #
-        # print(f"All changes for {all_triages}")
-        # for entry in all_changes:
-        #     print(entry)
-        # print("End changes")
-
-    @staticmethod
-    def overlap_grouping_for(classification_grouping: ClassificationGrouping, value_type: ClassificationResultValue, include_cross_context: bool) -> 'OverlapGrouping':
-        overlaps = Overlap.objects.filter(
-            overlapcontributionskew__contribution__classification_grouping=classification_grouping,
-            valid=True,
-            value_type=value_type,
-            overlap_status__gt=OverlapStatus.NO_CONTRIBUTIONS)
-        single_context_overlap = overlaps.filter(overlap_type=OverlapType.SINGLE_CONTEXT).first()
-        if not single_context_overlap:
-            return None
-
-        contributions = set()
-        contributions |= set(single_context_overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING))
-
-        user_contribution = None
-        for contribution in contributions:
-            if contribution.classification_grouping_id == classification_grouping.pk:
-                user_contribution = contribution
-                break
-
-        cross_context_overlap = None
-        if include_cross_context:
-            cross_context_overlap = overlaps.filter(overlap_type=OverlapType.CROSS_CONTEXT).first()
-            if cross_context_overlap:
-                contributions |= set(cross_context_overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING))
-
-        contributions.remove(user_contribution)
-
-        return OverlapGrouping(
-            single_context_overlap=single_context_overlap,
-            cross_context_overlap=cross_context_overlap,
-            value_type=value_type,
-            user_contribution=user_contribution,
-            contributions=contributions
-        )
-
-    @property
-    def user_triage(self) -> 'OverlapContribution':
-        return self.user_contribution
-
-    @property
-    def contribution_count(self):
-        return len(self.comparisons) + 1  # the +1 is for the user's contribution
-
-    @cached_property
-    def same_context_overlap_status(self) -> OverlapStatus:
-        if single_context_overlap := self.single_context_overlap:
-            return single_context_overlap.overlap_status
-        else:
-            return OverlapStatus.NO_CONTRIBUTIONS
-
-    @cached_property
-    def cross_context_overlap_status(self) -> OverlapStatus:
-        if cross_context_overlap := self.cross_context_overlap:
-            return cross_context_overlap.overlap_status
-        else:
-            return OverlapStatus.NO_CONTRIBUTIONS
-
-    @cached_property
-    def comparisons(self) -> list[OverlapEntryCompare]:
-        compares = [OverlapEntryCompare(self.user_contribution, other_cont, self.value_type) for other_cont in self.contributions]
-        return list(sorted(compares, reverse=True))
 
 
 @dataclass(frozen=True)
@@ -502,7 +352,7 @@ class OverlapGrouping3:
                     perspectives.append(OverlapContributionPerspective(
                         overlap_contribution=overlap_contribution,
                         is_cross_context=True,
-                        is_user_lab=not self.user.is_superuser and lab in user_labs
+                        is_user_lab=not self.user.is_superuser and overlap_contribution.lab in user_labs
                     ))
 
         return list(sorted(perspectives))
@@ -514,15 +364,27 @@ class OverlapGrouping3:
     @staticmethod
     def tidy_change(overlap_contribution: OverlapContribution, field_name: str, value: Any):
         # just used for the changelog
+
+        def to_json(thing: Any):
+            if isinstance(thing, str):
+                # sometimes json is double encoded in audit
+                thing = json.loads(thing)
+                if isinstance(thing, str):
+                    thing = json.loads(thing)
+            return thing
+
         if value == "None":
             return None
-        match field_name:
-            case "triage state":
-                return TriageState.from_json(json.loads(value))
-            case "effective date":
-                return EffectiveDate.from_json(json.loads(value))
-            case "comment":
-                return TriageComment.from_json(json.loads(value))
+        try:
+            match field_name:
+                case "triage state":
+                    return TriageState.from_dict(to_json(value))
+                case "effective date":
+                    return EffectiveDate.from_dict(to_json(value))
+                case "comment":
+                    return TriageComment.from_dict(to_json(value))
+        except JSONDecodeError as jer:
+            return f"Decoding Error: {value}"
         return value
 
     @cached_property
@@ -534,32 +396,44 @@ class OverlapGrouping3:
             triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage)
             for entry in triage_log:
                 # FIXME, make a filter that change the str 'None' to None
+                is_new_record = False
                 if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
-                    continue
-                if (value_change := entry.changes_dict.get("value")) and value_change[0] == 'None':
-                    continue
+                    is_new_record = True
+                # if (value_change := entry.changes_dict.get("value")) and value_change[0] == 'None':
+                #     continue
 
                 comment: Optional[TriageComment] = None
                 field_changes = []
                 for key, value_list in entry.changes_display_dict.items():
-                    if key == "comment":
-                        comment = OverlapGrouping.tidy_change(triage, key, value_list[1])
+
+                    if is_new_record:
+                        if key not in ("value", "effective date"):
+                            continue
                     else:
-                        field_change = FieldChange(
-                            key,
-                            OverlapGrouping.tidy_change(triage, key, value_list[0]),
-                            OverlapGrouping.tidy_change(triage, key, value_list[1])
-                        )
+                        if key in ("modified", "overlap status"):
+                            continue
+
+                    old_value = OverlapGrouping3.tidy_change(triage, key, value_list[0])
+                    new_value = OverlapGrouping3.tidy_change(triage, key, value_list[1])
+
+                    if key == "contribution status" and old_value in ("No value", "None") and new_value == "Contributing":
+                        print("Buffer ME!")
+
+                    if key == "comment":
+                        comment = new_value
+                    else:
+                        field_change = FieldChange(key, old_value, new_value)
                         field_changes.append(field_change)
 
-                user: Optional[User] = entry.actor
-
-                change_row = ChangeRow(
-                    overlap_contribution=triage,
-                    user=user,
-                    changes=list(sorted(field_changes)),
-                    comment=comment,
-                    timestamp=entry.timestamp
-                )
-                change_rows.append(change_row)
+                if field_changes:
+                    user: Optional[User] = entry.actor
+                    change_row = ChangeRow(
+                        overlap_contribution=triage,
+                        user=user,
+                        changes=list(sorted(field_changes)),
+                        comment=comment,
+                        timestamp=entry.timestamp,
+                        is_new_record=is_new_record
+                    )
+                    change_rows.append(change_row)
         return list(sorted(change_rows))

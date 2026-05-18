@@ -97,16 +97,25 @@
                 <div class="row my-4">
                     <div class="col-3 text-right">
                         {% ifchanged change.overlap_contribution change.user %}
-                            <div>{% testing_context change.overlap_contribution %}<br/>{{ change.overlap_contribution.lab }}</div>
+                            <div>{% testing_context change.overlap_contribution %}<br/>
+                                {% if change.overlap_contribution.lab %}{{ change.overlap_contribution.lab }}{% else %}ClinVar Expert Panel{% endif %}
+                            </div>
                             {% if change.user %}<div class="mt-1">{% user change.user size="tiny" align="right" %}</div>
-                            {% else %}<div class="mt-1 no-value">No user</div>{% endif %}
+                            {% else %}{% endif %}
                         {% endifchanged %}
                         <div>{% timestamp change.timestamp time_ago=True %}</div>
                     </div>
                     <div class="col-9">
-                        {% for field_change in change.changes %}
-                            <div>{{ field_change.old_value }} -> {{ field_change.new_value }}</div>
-                        {% endfor %}
+                        <label>Record registered</label>
+                        {% if change.is_new_record %}
+                            {% for field_change in change.changes %}
+                                <div>{{ field_change.new_value }}</div>
+                            {% endfor %}
+                        {% else %}
+                            {% for field_change in change.changes %}
+                                <div>{{ field_change.old_value }} -> {{ field_change.new_value }}</div>
+                            {% endfor %}
+                        {% endif %}
                         {% if change.comment %}
                             <div class="comment">{{ change.comment.text }}</div>
                         {% endif %}
