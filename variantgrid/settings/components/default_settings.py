@@ -29,6 +29,7 @@ JS_REVERSE_OUTPUT_PATH = './variantgrid/static_files/default_static/django_js_re
 UPLOAD_RELATIVE_PATH = "data/uploads"  # Needed for FileSystemStorage
 UPLOAD_DIR = os.path.join(BASE_DIR, UPLOAD_RELATIVE_PATH)
 UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg if out of disk)
+# Request body / upload size is bounded by nginx (client_max_body_size); no Django-side cap needed.
 
 # Absolute filesystem path to the directory that will hold GLOBALLY VISIBLE user-uploaded files.
 # Example: "/var/www/example.com/media/"

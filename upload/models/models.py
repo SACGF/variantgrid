@@ -84,6 +84,13 @@ class UploadedFile(TimeStampedModel):
     def get_filename(self):
         if self.import_source == ImportSource.WEB_UPLOAD:
             filename = self.uploaded_file.path
+            # WEB_UPLOAD files are written by Django via PrivateUploadStorage rooted at UPLOAD_DIR.
+            # Resolve symlinks so a poisoned DB row pointing at a symlink can't escape that root.
+            upload_root = os.path.realpath(settings.UPLOAD_DIR)
+            resolved = os.path.realpath(filename)
+            if not (resolved == upload_root or resolved.startswith(upload_root + os.sep)):
+                raise PermissionDenied(f"UploadedFile pk={self.pk} resolves outside UPLOAD_DIR")
+            filename = resolved
         else:
             filename = self.path
         return filename
