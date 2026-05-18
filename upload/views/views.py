@@ -62,7 +62,7 @@ def _get_basic_uploaded_file_context(uploaded_file) -> dict:
     if upload_data:
         try:
             data["upload_data"] = upload_data.get_upload_context()
-        except:
+        except Exception:
             pass
     return data
 
@@ -70,7 +70,7 @@ def _get_basic_uploaded_file_context(uploaded_file) -> dict:
 def uploadedfile_dict(uploaded_file) -> dict:
     try:
         size = uploaded_file.uploaded_file.size
-    except:
+    except Exception:
         size = None
 
     time_since = timesince(uploaded_file.created)
@@ -101,12 +101,12 @@ def uploadedfile_dict(uploaded_file) -> dict:
                         data['remaining_annotation_runs'] = get_remaining_annotation_runs(uploaded_vcf, upload_pipeline.genome_build)
                     except ObjectDoesNotExist:
                         pass
-        except:
+        except Exception:
             pass  # Genome build is optional
 
         status = upload_pipeline.status
         url = reverse('view_upload_pipeline', kwargs={'upload_pipeline_id': upload_pipeline.pk})
-    except:
+    except Exception:
         status = ProcessingStatus.ERROR
         url = reverse('view_uploaded_file', kwargs={'uploaded_file_id': uploaded_file.pk})
 
@@ -162,7 +162,7 @@ def jfu_upload(request):
     except Exception as e:
         logging.error(e)
         log_traceback()
-        file_dict = {"error": str(e)}
+        file_dict = {"error": "Upload failed. Please try again or contact support."}
 
     logging.debug("views.upload() END")
     return UploadResponse(request, file_dict)
