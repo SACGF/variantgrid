@@ -398,7 +398,7 @@ def severity_icon(severity: str, title: Optional[str] = None) -> str:
     title_html = ""
     if title:
         classes.append('hover-detail')
-        title_html = f' title="{title}"'
+        title_html = f' title="{escape(title)}"'
 
     def severity_for(severity_part: str) -> Optional[list[str]]:
         match severity_part:
