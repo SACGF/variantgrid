@@ -45,7 +45,7 @@ from seqauto.qc.qc_utils import meta_data_file
 from seqauto.signals import sequencing_run_sample_sheet_created_signal
 from snpdb.models import VCF, Sample, GenomeBuild, DataState, InheritanceManager, Wiki
 from snpdb.models.models_enums import ImportStatus, ImportSource
-from typing import List
+from typing import List, Tuple
 from variantgrid.celery import app
 
 
@@ -350,7 +350,7 @@ class SequencingRun(SeqAutoRecord):
 
     @staticmethod
     def get_external_links_for(name: str, date,
-                               enrichment_kit_name: Optional[str]) -> List[tuple[str, str]]:
+                               enrichment_kit_name: Optional[str]) -> List[Tuple[str, str]]:
         """ Returns (label, url) tuples for external systems configured in
             SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS that apply to a run with these fields.
             Used from both the detail page (via get_external_links) and the runs grid. """
