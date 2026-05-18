@@ -50,15 +50,17 @@ def create_event(request):
     if severity not in valid_severities:
         return HttpResponseBadRequest("Invalid severity")
 
-    app_name = app_name[:100]
-    event_name = event_name[:200]
-    if details and len(details) > 10_000:
-        details = details[:10_000] + "\n[trimmed to 10000 characters]"
+    fields = {"app_name": app_name, "event_name": event_name, "details": details}
+    max_lengths = {"app_name": 100, "event_name": 200, "details": 10_000}
+    for name, max_length in max_lengths.items():
+        value = fields[name]
+        if value and len(value) > max_length:
+            fields[name] = value[:max_length] + f"\n[trimmed to {max_length} characters]"
 
     Event.objects.create(user=request.user,
-                         app_name=app_name,
-                         name=event_name,
+                         app_name=fields["app_name"],
+                         name=fields["event_name"],
                          date=timezone.now(),
-                         details=details,
+                         details=fields["details"],
                          severity=severity)
     return HttpResponse()
