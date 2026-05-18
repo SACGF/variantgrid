@@ -36,6 +36,7 @@ from genes.annotation_consortium_api import transcript_exists
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource
 from library.django_utils import SortByPKMixin
+from library.django_utils.rollbar_middleware import RollbarIgnoreException
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.file_utils import mk_path
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
@@ -52,10 +53,11 @@ class HGNCImport(TimeStampedModel):
     pass
 
 
-class NoTranscript(ValueError):
+class NoTranscript(ValueError, RollbarIgnoreException):
     """
     Extends ValueError for backwards compatibility.
-    Indicates the transcript we are looking for is not in our database
+    Indicates the transcript we are looking for is not in our database.
+    Also inherits RollbarIgnoreException so this data issue doesn't spam Rollbar. See #1478.
     """
 
 

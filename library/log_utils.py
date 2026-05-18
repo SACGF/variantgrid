@@ -19,6 +19,7 @@ from markdown import markdown
 from rest_framework.request import Request
 
 from eventlog.models import Event
+from library.django_utils.rollbar_middleware import RollbarIgnoreException
 from library.enums.log_level import LogLevel
 from threadlocals.threadlocals import get_current_request
 
@@ -74,8 +75,13 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
 def report_exc_info(extra_data=None, request=None):
     if not request:
         request = get_current_request()
-    rollbar.report_exc_info(extra_data=extra_data, request=request)
     exc_info = sys.exc_info()
+    # Don't spam Rollbar with data-issue exceptions (see #1478)
+    if exc_info and exc_info[1] is not None and isinstance(exc_info[1], RollbarIgnoreException):
+        logging.warning("Suppressed RollbarIgnoreException %s: %s (extra_data=%s)",
+                        type(exc_info[1]).__name__, exc_info[1], extra_data)
+        return
+    rollbar.report_exc_info(extra_data=extra_data, request=request)
     if exc_info:
         print(exc_info)
 
