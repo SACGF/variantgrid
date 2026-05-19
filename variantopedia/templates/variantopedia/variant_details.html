@@ -761,6 +761,9 @@ function applyVariantValues() {
                             {% labelled id="dbscsnv_rf_score" label="dbscSNV (RF)" hint="tiny" %}{{ variant_annotation.dbscsnv_rf_score|floatformat:2 }}{% endlabelled %}
 
                             {% if variant_annotation.has_spliceai %}
+                                {% if annotation_version.variant_annotation_version.uses_raw_spliceai %}
+                                    {% include "annotation/uses_raw_spliceai_warning.html" %}
+                                {% endif %}
                                 {% labelled label="SpliceAI Acceptor Gain" hint="tiny" %}
                                     <span id="spliceai_pred_ds_ag" class="text-monospace text-right"></span>
                                     <span class="text-secondary">&nbsp;position&nbsp;</span>
