@@ -67,11 +67,13 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
         relevant_notifications: list[OverlapDiscordanceNotification] = []
         notifications_by_lab: dict[Lab, list[OverlapDiscordanceNotification]] = defaultdict(list)
 
-        overall_admin_notification = NotificationBuilder("Discordance notifications").add_markdown(":email: Sending Discordance Notifications")
         for notification in outstanding_notifications:
             if not notification.is_still_relevant:
                 notification.delete()
             else:
+                # send one notification per discordance so we don't try to send a single message too big for slack
+                overall_admin_notification = NotificationBuilder("Discordance notification").add_markdown(
+                    ":email: Sending Discordance Notification")
                 notification.notification_sent_date = current_date
                 relevant_notifications.append(notification)
                 # TODO detect which labs were once a part but then withdrew
@@ -92,8 +94,8 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
                 overall_admin_notification.add_field("Overlap", f"<{_report_url_for_id(notification.overlap, None)}|Overlap_{notification.overlap_id}> {overlap_description}")
                 overall_admin_notification.add_field("Involved Labs", sorted_lab_str)
                 overall_admin_notification.add_field("Change", overlap_change)
+                overall_admin_notification.send()
 
-        overall_admin_notification.send()
         # FIXME make an admin notification
 
         for lab, notifications in notifications_by_lab.items():
