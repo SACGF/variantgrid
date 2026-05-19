@@ -86,7 +86,7 @@
 
 {% if overlap_grouping.change_log %}
     <div class="card mt-4">
-        <div class="card-header">History - oldest to newest</div>
+        <div class="card-header">History <i style="color:#888" class="fa-solid fa-sort-down" title="Oldest to Newest"></i></div>
         <div class="card-body">
             {% for change in overlap_grouping.change_log %}
                 {% ifchanged change.overlap_contribution %}
