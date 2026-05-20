@@ -228,6 +228,17 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
             createTermGrid(gridData);
             $(".has-phenotypes-icon").show();
+        } else {
+            // The exclude string causes no match to occur, so nothing to load
+            // but we want to show the potential matches (if they remove exclude string)
+            // so force a load via doneTyping
+            {% if phenotype_exclude_string %}
+            const excludeString = "{{ phenotype_exclude_string|escapejs }}";
+            const currentText = getPhenotypeInput().val() || "";
+            if (currentText.indexOf(excludeString) !== -1) {
+                doneTyping();
+            }
+            {% endif %}
         }
 
     {% if edit %}
