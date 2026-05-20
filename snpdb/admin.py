@@ -215,7 +215,8 @@ def make_code_friendly(text: str) -> str:
 class LabAdmin(ModelAdminBasics):
     list_per_page = 200
     list_display = ('name', 'group_name', 'organization', 'state', 'country',
-                    'external', 'clinvar_key', 'upload_location', 'classification_config')
+                    'external', 'research', 'clinvar_key', 'upload_location', 'classification_config')
+    list_filter = ('external', 'research')
     search_fields = ('organization__name', 'name')
 
     fieldsets = (
@@ -224,7 +225,7 @@ class LabAdmin(ModelAdminBasics):
         ('Contact', {'fields': ('url', 'contact_name', 'contact_email', 'contact_phone')}),
         ('Notifications', {'fields': ('email', 'slack_webhook')}),
         ('Uploads', {'fields': ('upload_location', 'upload_automatic', 'upload_instructions')}),
-        ('Submissions', {'fields': ('classification_config', 'external', 'clinvar_key', 'consolidates_variant_classifications')})
+        ('Submissions', {'fields': ('classification_config', 'external', 'research', 'clinvar_key', 'consolidates_variant_classifications')})
     )
 
     def is_readonly_field(self, f) -> bool:

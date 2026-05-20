@@ -478,6 +478,7 @@ class ContactDetails:
 class Lab(models.Model, PreviewModelMixin):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, e.g. Shariant
+    research = models.BooleanField(default=False, blank=True)
     city = models.TextField()
     state = models.ForeignKey(State, null=True, on_delete=PROTECT)
     country = models.ForeignKey(Country, null=True, on_delete=PROTECT)

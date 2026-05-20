@@ -30,6 +30,7 @@ def settings_context_processor(request):
     context = {
         'form_helper': FORM_HELPER_HELPER,
         'discordance_enabled': settings.DISCORDANCE_ENABLED,
+        'research_icon': settings.RESEARCH_ICON,
         'classifications_new_grouping': settings.CLASSIFICATION_NEW_GROUPING,
         'help_url': settings.HELP_URL,
         'inbox_enabled': settings.INBOX_ENABLED,

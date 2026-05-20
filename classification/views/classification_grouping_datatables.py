@@ -55,6 +55,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "classification_count": row.get('classification_count'),
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
             "lab_name": row.get('lab__name'),
+            "research": bool(row.get('lab__research')),
+            "research_icon": settings.RESEARCH_ICON,
             "share_level": row.get('share_level'),
             "allele_origin_bucket": row.get('allele_origin_bucket'),
             "matches": matches,
@@ -344,6 +346,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'lab__organization__short_name',
                     'lab__organization__name',
                     'lab__name',
+                    'lab__research',
                     'allele_origin_bucket',
                     'share_level',
                     'dirty'

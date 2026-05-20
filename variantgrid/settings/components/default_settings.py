@@ -53,6 +53,9 @@ CONTACT_US_ENABLED = False
 ACCOUNTS_EMAIL = None
 # If you change this value you should run 'recalc' for all ClinicalContexts in admin
 DISCORDANCE_ENABLED = False
+# Only applies when DISCORDANCE_ENABLED is True. When False, classifications from
+# labs flagged as research (Lab.research) do not participate in discordance detection.
+DISCORDANCE_RESEARCH_ENABLED = True
 
 ALLELE_ORIGIN_NOT_PROVIDED_BUCKET = "U"
 # If allele origin isn't provided, what bucket do we group it in
@@ -369,6 +372,7 @@ CLASSIFICATION_GRID_SHOW_SAMPLE = True
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
 CLASSIFICATION_NEW_GROUPING = False
+RESEARCH_ICON = "🔬"  # alt: "⚗️"
 
 # Require people to click "my sample's not here" (ie encourage them to find it)
 CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE = True
