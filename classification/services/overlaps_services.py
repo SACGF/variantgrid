@@ -306,6 +306,7 @@ class ChangeRow:
     comment: Optional[str]
     timestamp: datetime
     is_new_record: bool
+    is_withdrawn: bool = False
 
     def __lt__(self, other):
         return self.timestamp < other.timestamp
@@ -390,10 +391,9 @@ class OverlapGrouping3:
 
     @cached_property
     def change_log(self) -> list[ChangeRow]:
-        all_triages = self.overlap.contributions_list
         change_rows: list[ChangeRow] = []
 
-        for triage in all_triages:
+        for triage in self.overlap.contributions_all:
             triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage).order_by('timestamp')
 
             buffer: list[LogEntry] = []
@@ -414,6 +414,7 @@ class OverlapGrouping3:
 
                     if not merge_buffer:
                         buffer.append(entry)
+                        continue
 
                 latest_values = {}
                 if buffer:
@@ -428,15 +429,29 @@ class OverlapGrouping3:
 
                 comment: Optional[TriageComment] = None
                 field_changes = []
+
+                if contribution_status_change := latest_values.get("contribution_status"):
+                    if not is_new_record and contribution_status_change[1] == OverlapContributionStatus.NO_VALUE:
+                        change_rows.append(ChangeRow(
+                            overlap_contribution=triage,
+                            user=entry.actor,
+                            changes=[],
+                            comment=None,
+                            timestamp=entry.timestamp,
+                            is_new_record=False,
+                            is_withdrawn=True
+                        ))
+                        buffer.append(entry)
+                        continue
+
                 for key, value_list in latest_values.items():
+                    old_value = OverlapGrouping3.tidy_change(triage, key, value_list[0])
+                    new_value = OverlapGrouping3.tidy_change(triage, key, value_list[1])
 
                     if key not in ("effective_date", "triage_status", "value", "triage_state"):
                         continue
                     if is_new_record and key == "triage_state":
                         continue  # triage_state should always start as pending
-
-                    old_value = OverlapGrouping3.tidy_change(triage, key, value_list[0])
-                    new_value = OverlapGrouping3.tidy_change(triage, key, value_list[1])
 
                     if key == "comment":
                         comment = new_value
@@ -445,6 +460,7 @@ class OverlapGrouping3:
                         field_changes.append(field_change)
 
                 if field_changes:
+
                     user: Optional[User] = entry.actor
                     change_row = ChangeRow(
                         overlap_contribution=triage,

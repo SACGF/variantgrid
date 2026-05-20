@@ -98,7 +98,7 @@
                     <div class="col-3 text-right">
                         {% ifchanged change.overlap_contribution change.user %}
                             <div>{% testing_context change.overlap_contribution %}<br/>
-                                {% if change.overlap_contribution.lab %}{{ change.overlap_contribution.lab }}{% else %}ClinVar Expert Panel{% endif %}
+                                {% if change.overlap_contribution.lab %}{% lab change.overlap_contribution.lab %}{% else %}ClinVar Expert Panel{% endif %}
                             </div>
                             {% if change.user %}<div class="mt-1">{% user change.user size="tiny" align="right" %}</div>
                             {% else %}{% endif %}
@@ -107,13 +107,17 @@
                     </div>
                     <div class="col-9">
                         {% if change.is_new_record %}
-                            <label>Record registered in {{ site_name }}</label>
+                            <label class="mb-2">Record registered in {{ site_name }}</label>
                         {% endif %}
-                        {% for field_change in change.changes %}
-                            <div><label>{{ field_change.field | pretty_label }}</label>: {% if not change.is_new_record %}{{ field_change.old_value }} -> {% endif %}{{ field_change.new_value }}</div>
-                        {% endfor %}
-                        {% if change.comment %}
-                            <div class="comment">{{ change.comment.text }}</div>
+                        {% if change.is_withdrawn %}
+                            <div><label class="text-danger">Record withdrawn</label></div>
+                        {% else %}
+                            {% for field_change in change.changes %}
+                                <div><label>{{ field_change.field | pretty_label }}</label>: {% if not change.is_new_record %}{{ field_change.old_value }} -> {% endif %}{{ field_change.new_value }}</div>
+                            {% endfor %}
+                            {% if change.comment %}
+                                <div class="comment">{{ change.comment.text }}</div>
+                            {% endif %}
                         {% endif %}
                     </div>
                 </div>

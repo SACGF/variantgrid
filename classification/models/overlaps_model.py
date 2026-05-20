@@ -168,6 +168,14 @@ class Overlap(TimeStampedModel):
             pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)
         ).select_related("classification_grouping__lab__organization")
 
+    @property
+    def contributions_all(self) -> QuerySet[OverlapContribution]:
+        # unlike contributions this will also return OverlapContributions that aren't currently contribution
+        # as they may have contributed in the past
+        return  OverlapContribution.objects.filter(
+            pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)
+        ).select_related("classification_grouping__lab__organization")
+
     @cached_property
     def contributions_list(self) -> list[OverlapContribution]:
         return list(self.contributions.all())
