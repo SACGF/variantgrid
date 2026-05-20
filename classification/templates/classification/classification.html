@@ -128,7 +128,7 @@
         </div>
         <div id="vc-extras">
             <div id="vcform-summary" class="card m-2">
-                <div class="card-header">{{ record.org_name }} / {{ record.lab_name }} / {{ record.cr_lab_id }}{% if vc.lab.research %} <span class="badge badge-info" title="Research lab">{{ research_icon }} Research</span>{% endif %}</div>
+                <div class="card-header">{{ record.org_name }} / {{ record.lab_name }} / {{ record.cr_lab_id }}{% if classification_distinguish_research and vc.lab.research %} <span class="badge badge-info" title="Research lab">{{ research_icon }} Research</span>{% endif %}</div>
                 <div class="card-body"></div>
             </div>
         {% if duplicate_records %}

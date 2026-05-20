@@ -372,6 +372,7 @@ CLASSIFICATION_GRID_SHOW_SAMPLE = True
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
 CLASSIFICATION_NEW_GROUPING = False
+CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where Lab.research=True
 RESEARCH_ICON = "🔬"  # alt: "⚗️"
 
 # Require people to click "my sample's not here" (ie encourage them to find it)
