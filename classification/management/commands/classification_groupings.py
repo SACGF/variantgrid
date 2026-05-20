@@ -12,16 +12,14 @@ class Command(BaseCommand):
         parser.add_argument('--refresh', required=False, action="store_true", help="Refreshes all existing groups, but not which classifications belong to them")
         parser.add_argument('--all', required=False, action="store_true", help="Refreshes which classification belongs to which group, and the groups, may take a long time")
         parser.add_argument('--dirty', required=False, action="store_true", help="Updates all records left in a dirty state")
-        parser.add_argument("--check_counts", required=False, help="After hard deleting records, check the counts")
 
     def handle(self, *args, **options):
         summary = options.get("summary")
         all = options.get("all")
         dirty = options.get("dirty")
         refresh = options.get("refresh")
-        remove_empty = options.get("remove_empt")
 
-        if not any((summary, all, dirty, refresh, remove_empty)):
+        if not any((summary, all, dirty, refresh)):
             raise ValueError("Must provide one or more of summary, all, dirty, refresh")
 
         if all or summary:
