@@ -1,6 +1,6 @@
 var TERM_CLASSES = {"H" : "hpo", "O" : "omim", "G" : "gene"};  
 
-function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches) {
+function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches, excludeString) {
     function compareByStart(a,b) {
       if (a.offset_start < b.offset_start)
         return -1;
@@ -57,6 +57,14 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
         }
     }
     
+    if (excludeString) {
+        const escapedRegex = excludeString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedText = excludeString.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const tooltip = "This string prevents the phenotype term from being officially matched and used. Remove it to signal human approval";
+        phenotypeHTML = phenotypeHTML.replace(new RegExp(escapedRegex, 'g'),
+            `<span class="phenotype-exclude-marker" title="${tooltip}">${escapedText}</span>`);
+    }
+
     descriptionBox.html(phenotypeHTML);
     $(".term-match", descriptionBox);
 

@@ -30,6 +30,15 @@ span.select2-container {
     min-width: auto !important;
 }
 
+.phenotype-exclude-marker {
+    color: #d00;
+    font-weight: bold;
+    background-color: #fff3f3;
+    padding: 0 2px;
+    border-radius: 2px;
+    cursor: help;
+}
+
 </style>
 <script src="{% static 'js/include_jqgrid.js' %}"></script>
 <script src="{% static 'js/patient_phenotype.js' %}"></script> 
@@ -66,7 +75,8 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
     let ignoreAutcompleteChangeEvent = false;
     const phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
     const downloadPhenotypeGridAsCSV = downloadPhenotypeGridAsCSV_{{ flattened_uuid }};
-    
+    const phenotypeExcludeString = {% if phenotype_exclude_string %}"{{ phenotype_exclude_string|escapejs }}"{% else %}null{% endif %};
+
     function getPhenotypeInput() {
         return $("#{{ form_entry_field.auto_id }}", phenotypeEditorTag);
     }
@@ -82,7 +92,7 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             data: data,
             url: "{% url 'phenotypes_matches' %}",
             success: function(phenotypeMatches) {
-                displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches);
+                displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches, phenotypeExcludeString);
                 const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
                 if (gridData.length) {
                     $(".has-phenotypes-icon").show();
@@ -209,7 +219,7 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         if (phenotypeMatches) {
             const descriptionBox = $("#description-highlighted", phenotypeEditorTag);
             const phenotypeText = `{{ initial_phenotype_text|escapejs }}`; // can have newlines
-            displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches);
+            displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches, phenotypeExcludeString);
             const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
             createTermGrid(gridData);
             $(".has-phenotypes-icon").show();
