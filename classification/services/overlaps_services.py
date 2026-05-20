@@ -5,6 +5,7 @@ from functools import cached_property
 from json import JSONDecodeError
 from typing import Optional, Any
 from auditlog.models import LogEntry
+from click.decorators import pass_meta_key
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -377,9 +378,9 @@ class OverlapGrouping3:
             return None
         try:
             match field_name:
-                case "triage state":
+                case "triage_state":
                     return TriageState.from_dict(to_json(value))
-                case "effective date":
+                case "effective_date":
                     return EffectiveDate.from_dict(to_json(value))
                 case "comment":
                     return TriageComment.from_dict(to_json(value))
@@ -393,31 +394,49 @@ class OverlapGrouping3:
         change_rows: list[ChangeRow] = []
 
         for triage in all_triages:
-            triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage)
+            triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage).order_by('timestamp')
+
+            buffer: list[LogEntry] = []
             for entry in triage_log:
-                # FIXME, make a filter that change the str 'None' to None
                 is_new_record = False
                 if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
                     is_new_record = True
-                # if (value_change := entry.changes_dict.get("value")) and value_change[0] == 'None':
-                #     continue
+
+                    contributing_status = entry.changes_dict.get("contribution_status")
+                    if not contributing_status or contributing_status[1] not in (OverlapContributionStatus.CONTRIBUTING, OverlapContributionStatus.NON_COMPARABLE_VALUE):
+                        buffer.append(entry)
+                        continue
+                elif buffer:
+                    merge_buffer = False
+                    if contributing_status := entry.changes_dict.get("contribution_status"):
+                        if contributing_status[1] in (OverlapContributionStatus.CONTRIBUTING, OverlapContributionStatus.NON_COMPARABLE_VALUE):
+                            merge_buffer = True
+
+                    if not merge_buffer:
+                        buffer.append(entry)
+
+                latest_values = {}
+                if buffer:
+                    is_new_record = True  # as in this is the first time we're displaying the record
+                    for buffered_entry in reversed([entry] + buffer):
+                        for key, value_list in buffered_entry.changes_dict.items():
+                            if key not in latest_values:
+                                latest_values[key] = value_list
+                    buffer.clear()
+                else:
+                    latest_values = entry.changes_dict
 
                 comment: Optional[TriageComment] = None
                 field_changes = []
-                for key, value_list in entry.changes_display_dict.items():
+                for key, value_list in latest_values.items():
 
-                    if is_new_record:
-                        if key not in ("value", "effective date"):
-                            continue
-                    else:
-                        if key in ("modified", "overlap status"):
-                            continue
+                    if key not in ("effective_date", "triage_status", "value", "triage_state"):
+                        continue
+                    if is_new_record and key == "triage_state":
+                        continue  # triage_state should always start as pending
 
                     old_value = OverlapGrouping3.tidy_change(triage, key, value_list[0])
                     new_value = OverlapGrouping3.tidy_change(triage, key, value_list[1])
-
-                    if key == "contribution status" and old_value in ("No value", "None") and new_value == "Contributing":
-                        print("Buffer ME!")
 
                     if key == "comment":
                         comment = new_value
@@ -436,4 +455,5 @@ class OverlapGrouping3:
                         is_new_record=is_new_record
                     )
                     change_rows.append(change_row)
+
         return list(sorted(change_rows))
