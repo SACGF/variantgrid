@@ -111,11 +111,11 @@ def dump_and_annotate_variants(annotation_run):
     variants_to_annotate = _unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
                                                         annotation_run.annotation_range_lock)
 
+    annotation_run.dump_end = timezone.now()
+    annotation_run.save()
+
     logging.info("Annotating %d variants", variants_to_annotate)
     if variants_to_annotate:
-        annotation_run.dump_end = timezone.now()
-        annotation_run.save()
-
         name = name_from_filename(vcf_dump_filename)
         vcf_annotated_basename = f"{name}.vep_annotated_{genome_build.name}.vcf.gz"
         vcf_annotated_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_annotated_basename)
@@ -136,6 +136,17 @@ def dump_and_annotate_variants(annotation_run):
         now = timezone.now()
         annotation_run.vcf_annotated_filename = vcf_annotated_filename
         annotation_run.annotation_end = now
+        annotation_run.save()
+    else:
+        # All variants in this range lock were filtered out (e.g. ref/alt too long for VEP).
+        # Mark the run as finished so the scheduler can advance past this range lock.
+        # See SACGF/variantgrid_sapath#412
+        now = timezone.now()
+        annotation_run.annotation_start = now
+        annotation_run.annotation_end = now
+        annotation_run.upload_start = now
+        annotation_run.upload_end = now
+        annotation_run.annotated_count = 0
         annotation_run.save()
 
 
