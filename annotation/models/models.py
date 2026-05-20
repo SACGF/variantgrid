@@ -39,6 +39,7 @@ from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
+from library.log_utils import report_message
 from snpdb.archive import DataArchivedError
 from library.genomics import parse_gnomad_coord
 from library.genomics.vcf_enums import VariantClass
@@ -1990,6 +1991,20 @@ class AnnotationVersion(models.Model):
                 raise AnnotationVersion.DoesNotExist(f"Warning: GenomeBuild {genome_build} has no annotation version!")
             av.validate()
         return av
+
+    @staticmethod
+    def latest_or_none(genome_build: GenomeBuild, context: str = None, validate: bool = True,
+                       status: 'VariantAnnotationVersion.Status' = None) -> Optional['AnnotationVersion']:
+        """ Like latest() but never raises — reports to rollbar/Slack and returns None instead.
+            Use in non-critical paths (e.g. search, preview enrichment) that should degrade
+            rather than break user-facing functionality. """
+        try:
+            return AnnotationVersion.latest(genome_build, validate=validate, status=status)
+        except Exception as e:
+            prefix = f"{context}: " if context else ""
+            report_message(f"{prefix}AnnotationVersion.latest({genome_build}) failed",
+                           level='error', extra_data={"target": str(e)})
+            return None
 
     @staticmethod
     @transaction.atomic
