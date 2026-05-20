@@ -1,3 +1,4 @@
+import functools
 import logging
 import re
 from collections import defaultdict
@@ -190,7 +191,13 @@ class PhenotypeMatcher:
         self.ambiguous_acronyms = get_ambiguous_acronym_denylist()
 
     def get_matches(self, words_and_spans_subset) -> Tuple[List, List, List]:
-        words = [ws[0] for ws in words_and_spans_subset]
+        words = tuple(ws[0] for ws in words_and_spans_subset)
+        return self._get_matches_for_words(words)
+
+    @functools.lru_cache(maxsize=10000)
+    def _get_matches_for_words(self, words: Tuple[str, ...]) -> Tuple[List, List, List]:
+        # Memoised: same joined text recurs across sentences (boilerplate phrasing)
+        # and inside the recursive parse_words walk that re-tests overlapping subsets.
         text = ' '.join(words)
         lower_text = text.lower()
 
