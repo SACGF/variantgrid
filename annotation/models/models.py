@@ -1502,6 +1502,25 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.is_standard_annotation
 
     @property
+    def has_dbnsfp(self) -> bool:
+        """ dbNSFP only annotates non-synonymous SNVs in coding regions, so for indels,
+            synonymous/intronic/intergenic/UTR variants it contributes nothing. Single check
+            on cadd_raw_rankscore would catch ~all of them, but use OR across several fields
+            to cover the rare case where dbNSFP omits CADD but emits another score. #1045 """
+        return any(v is not None for v in (
+            self.cadd_raw_rankscore,
+            self.revel_rankscore,
+            self.bayesdel_noaf_rankscore,
+            self.alphamissense_rankscore,
+            self.clinpred_rankscore,
+            self.vest4_rankscore,
+            self.metalr_rankscore,
+            self.aloft_pred,
+            self.gerp_pp_rs,
+            self.cadd_phred,
+        ))
+
+    @property
     def has_conservation(self) -> bool:
         """ Thanks to summary stats we can now do this in VEP112 """
         return self.is_standard_annotation or self.version.vep >= 112

@@ -663,7 +663,9 @@ function applyVariantValues() {
                     <div class="card-body">
                         {% labelled id='repeat_masker' label='Repeat Masker' help=annotation_description.repeat_masker hint="tiny" %}{{ variant_annotation.repeat_masker }}{% endlabelled %}
                         {% labelled id='domains' label='Domains' help=annotation_description.domains hint="tiny" %}{% endlabelled %}
-                        {% labelled id='interpro_domain' label='InterPro' help=annotation_description.interpro_domain hint="tiny" %}{% endlabelled %}
+                        {% if variant_annotation.has_dbnsfp %}
+                            {% labelled id='interpro_domain' label='InterPro' help=annotation_description.interpro_domain hint="tiny" %}{% endlabelled %}
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -673,7 +675,13 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">Pathogenicity</div>
                     <div class="card-body">
-                        {% if annotation_version.variant_annotation_version.columns_version == 1 %}
+                        {% if not variant_annotation.has_dbnsfp %}
+                            <div class="text-muted">
+                                dbNSFP pathogenicity predictions were not applied to this variant.
+                                dbNSFP covers non-synonymous SNVs in coding regions only, so indels
+                                and non-coding/synonymous variants have no scores available.
+                            </div>
+                        {% elif annotation_version.variant_annotation_version.columns_version == 1 %}
                             {% labelled id='cadd_phred' label='CADD Phred' help=annotation_description.cadd_phred hint="tiny" %}{% endlabelled %}
                             {% labelled id='grantham' label='Grantham' help=annotation_description.grantham hint="tiny" %}{% endlabelled %}
                             {% labelled id='revel_score' label='REVEL score' help=annotation_description.revel_score hint="tiny" %}{% endlabelled %}
@@ -723,7 +731,9 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">Conservation</div>
                     <div class="card-body">
-                        {% labelled id="gerp_pp_rs" label="Gerp++ (-12 - 6.8)" help=annotation_description.aloft_ensembl_transcript help=annotation_description.gerp_pp_rs hint="tiny" %}{% endlabelled %}
+                        {% if variant_annotation.has_dbnsfp %}
+                            {% labelled id="gerp_pp_rs" label="Gerp++ (-12 - 6.8)" help=annotation_description.aloft_ensembl_transcript help=annotation_description.gerp_pp_rs hint="tiny" %}{% endlabelled %}
+                        {% endif %}
                         {% labelled id="phastcons_100_way_vertebrate" label="PhastCons 100 way vertebrate (0-1)" help=annotation_description.phastcons_100_way_vertebrate hint="tiny" %}{% endlabelled %}
                         {% if annotation_version.variant_annotation_version.has_phastcons_30_way_mammalian %}
                             {% labelled id="phastcons_30_way_mammalian" label="PhastCons 30 way mammalian (0-1)" label_css="text-small" help=annotation_description.phastcons_30_way_mammalian hint="tiny" %}{% endlabelled %}
