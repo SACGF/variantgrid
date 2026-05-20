@@ -206,6 +206,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def get_initial_queryset(self) -> QuerySet[DC]:
         qs = ClassificationGrouping.filter_for_user(self.user, ClassificationGrouping.objects.all())
+        qs = qs.exclude(classification_count=0)
 
         page = self.get_query_param('page_id')
 

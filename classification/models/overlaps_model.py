@@ -2,7 +2,7 @@ from functools import reduce, cached_property
 from typing import Any, Optional, Tuple
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
-from django.db.models import CASCADE, QuerySet
+from django.db.models import CASCADE, QuerySet, SET_NULL
 from django.db import models
 from django.db.models.enums import TextChoices, IntegerChoices
 from django.urls import reverse
@@ -19,63 +19,14 @@ from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 
 
-# class OverlapEntrySource(StrEnum):
-#     """
-#     Is this entry referencing a classification within this VariantGrid system or
-#     """
-#     CLASSIFICATION = "CLASSIFICATION"
-#     CLINVAR = "CLINVAR"
-#
-#
-# @dataclass_json
-# @dataclass
-# class OverlapEntry:
-#     """
-#     Cached status of a contribution_status to the overlap.
-#     Could be a reference to a classification or clinvar record
-#     Useful to cache as the overall status is cached - so it's good to cache the working out
-#     """
-#     source: OverlapEntrySource
-#     scv: Optional[str]
-#     lab_id: Optional[int]
-#     classification_grouping_id: Optional[int]
-#     value: Optional[str]
-#     # annoying thing about contribution_status is it takes a little bit of context knowledge to work out
-#     contribution_status: OverlapContributionStatus = None #json_enum_encoder_for_text_choices(OverlapContributionStatus),
-#     testing_context_bucket: TestingContextBucket = None #json_enum_encoder_for_text_choices(TestingContextBucket),
-#     tumor_type_category: Optional[str] = None
-#     # TODO do we want to keep date type somewhere?
-#     effective_date: Optional[str] = None  # date str
-#
-#     @property
-#     def _sort_obj(self):
-#         # TODO do we need a sort order as part of value
-#         return {self.source, self.testing_context_bucket, self.contribution_status, self.value, self.lab_id or 0}
-#
-#     def __lt__(self, other):
-#         return self._sort_obj < other._sort_obj
-#
-#     @property
-#     def pretty_value(self) -> str:
-#         if self.value and self.value.startswith("tier"):
-#             return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.value)
-#         else:
-#             return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(self.value)
-#
-#     @cached_property
-#     def lab(self) -> Optional[Lab]:
-#         if lab_id := self.lab_id:
-#             return Lab.objects.get(pk=lab_id)
-#         return None
-
-
 class OverlapContribution(TimeStampedModel):
     history = AuditlogHistoryField()
 
     source = models.TextField(choices=OverlapEntrySourceTextChoices.choices)
-    scv = models.TextField(null=True, blank=True)  # could SCV change?
     allele = models.ForeignKey(Allele, null=True, blank=True, on_delete=CASCADE)
-    classification_grouping = models.ForeignKey(ClassificationGrouping, null=True, blank=True, on_delete=CASCADE)
+    classification_grouping = models.ForeignKey(ClassificationGrouping, null=True, blank=True, on_delete=SET_NULL)
+    scv = models.TextField(null=True, blank=True)  # could SCV change?
+
     value_type = models.TextField(choices=ClassificationResultValue.choices)
     value = models.TextField(null=True, blank=True)
     # annoying thing about contribution_status is it takes a little bit of context knowledge to work out

@@ -70,7 +70,7 @@ class ClassificationGroupingExportFilter:
         )
 
     def queryset(self, genome_build: Optional[GenomeBuild] = None) -> QuerySet[ClassificationGrouping]:
-        groupings = ClassificationGrouping.objects.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
+        groupings = ClassificationGrouping.objects.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, classification_count__gt=0)
         if exclude_sources := self.exclude_sources:
             if exclude_orgs := [item for item in exclude_sources if isinstance(item, Organization)]:
                 groupings = groupings.filter(lab__organization__in=exclude_orgs)
