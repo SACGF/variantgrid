@@ -385,6 +385,8 @@ class OverlapGrouping3:
                     return EffectiveDate.from_dict(to_json(value))
                 case "comment":
                     return TriageComment.from_dict(to_json(value))
+                case "value":
+                    return OverlapContribution.pretty_value_for(value, overlap_contribution.value_type)
         except JSONDecodeError as jer:
             return f"Decoding Error: {value}"
         return value
