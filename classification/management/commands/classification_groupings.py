@@ -1,4 +1,6 @@
 from django.core.management import BaseCommand
+from django.db.models import Subquery, Exists
+
 from classification.models import Classification, ClassificationModification, ClassificationSummaryCalculator
 from classification.models.classification_grouping import ClassificationGrouping, AlleleOriginGrouping
 
@@ -10,14 +12,16 @@ class Command(BaseCommand):
         parser.add_argument('--refresh', required=False, action="store_true", help="Refreshes all existing groups, but not which classifications belong to them")
         parser.add_argument('--all', required=False, action="store_true", help="Refreshes which classification belongs to which group, and the groups, may take a long time")
         parser.add_argument('--dirty', required=False, action="store_true", help="Updates all records left in a dirty state")
+        parser.add_argument("--check_counts", required=False, help="After hard deleting records, check the counts")
 
     def handle(self, *args, **options):
         summary = options.get("summary")
         all = options.get("all")
         dirty = options.get("dirty")
         refresh = options.get("refresh")
+        remove_empty = options.get("remove_empt")
 
-        if not any((summary, all, dirty, refresh)):
+        if not any((summary, all, dirty, refresh, remove_empty)):
             raise ValueError("Must provide one or more of summary, all, dirty, refresh")
 
         if all or summary:
@@ -47,10 +51,4 @@ class Command(BaseCommand):
                 if index % 1000 == 0 and index:
                     print(f"Updating {index} classification groupings")
             print(f"Updated {index+1} classification groupings")
-
-            for index, dirty in enumerate(AlleleOriginGrouping.objects.filter(dirty=True).iterator()):
-                dirty.update()
-                if index % 1000 == 0 and index:
-                    print(f"Updating {index} allele groupings")
-            print(f"Updated {index+1} allele groupings")
 

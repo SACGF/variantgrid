@@ -9,7 +9,11 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
-from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet
+from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet, Subquery, OuterRef, Count, \
+    IntegerField, F
+from django.db.models.functions import Coalesce
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
@@ -27,7 +31,6 @@ from library.utils import strip_json
 from snpdb.models import Allele, Lab
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
-classification_grouping_update_signal = django.dispatch.Signal()  # TODO is there a point for this over ClassificationGrouping
 #classification_grouping_onc_path_signal = django.dispatch.Signal()  # args: "instance", expects Classification
 #classification_grouping_clin_sig_signal = django.dispatch.Signal()  # args: "instance", expects Classification
 
@@ -131,24 +134,10 @@ class AlleleOriginGrouping(TimeStampedModel):
     class Meta:
         unique_together = ("allele", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
-    # overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_SHARED_RECORDS)
-    dirty = models.BooleanField(default=True)
-    # classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
-    # somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
-
     def __lt__(self, other: Self):
         if id_diff := self.allele.pk - other.allele.pk:
             return id_diff
         return self.allele_origin_bucket < other.allele_origin_bucket
-
-    def update(self):
-        # FIXME as overlaps now belong in
-        # from classification.services.overlaps_services import OverlapServices
-        # OverlapServices().calculate_and_apply_overlaps_for_ao(self)
-        # self.dirty = False
-        # self.save()
-        print("Do we even need an update on AlleleOriginGrouping anymore - there's no data stored here")
-        print("FIXME: AlleleOriginGrouping.Update currently doesn't do anything")
 
 
 class ClassificationGroupingPathogenicDifference(IntegerChoices):
@@ -248,10 +237,9 @@ class ClassificationGrouping(TimeStampedModel):
             return qs
 
     def dirty_up(self):
+        # this method was more useful when we also dirtied up alleleOrigin
         self.dirty = True
         self.save(update_fields=["dirty"])
-        self.allele_origin_grouping.dirty = True
-        self.allele_origin_grouping.save(update_fields=["dirty"])
 
     def __lt__(self, other):
         def _sort_value(obj: ClassificationGrouping):
@@ -277,8 +265,6 @@ class ClassificationGrouping(TimeStampedModel):
                 testing_context_bucket=classification.testing_context_bucket,
                 tumor_type_category=classification.tumor_type_category
             )
-            allele_origin_grouping.dirty = True
-            allele_origin_grouping.save(update_fields=["dirty"])
 
             grouping, is_new = ClassificationGrouping.objects.get_or_create(
                 allele_origin_grouping=allele_origin_grouping,
@@ -347,9 +333,6 @@ class ClassificationGrouping(TimeStampedModel):
 
         # FIXME there's a bunch of overlap calculation here that doesn't need to happen
         # as that is now managed by Overlaps
-
-        self.allele_origin_grouping.dirty = True
-        self.allele_origin_grouping.save(update_fields=["dirty"])
 
         if all_modifications := self.classification_modifications:
             # FIND THE MOST RECENT CLASSIFICATION
@@ -459,18 +442,30 @@ class ClassificationGrouping(TimeStampedModel):
                     all_term_stubs += [ts.to_search_term(grouping=self) for ts in term_stubs]
             ClassificationGroupingSearchTerm.objects.filter(grouping=self).delete()
             ClassificationGroupingSearchTerm.objects.bulk_create(all_term_stubs)
-
-            self.dirty = False
-            self.save()
-            classification_grouping_update_signal.send(sender=ClassificationGrouping, instance=self)
             # if primary_clin_sig_change:
             #     classification_grouping_clin_sig_signal.send(sender=ClassificationGrouping, instance=self)
             # if primary_onc_path_change:
             #     classification_grouping_onc_path_signal.send(sender=ClassificationGrouping, instance=self)
         else:
-            # there are no classifications, time to die
-            # FIXME add soft delete
-            self.delete()
+            # soft delete
+            # share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
+
+            self.classification_count = 0
+            # these differences are internal within a lab, even if it's medical significant the overall
+            self.pathogenic_difference = ClassificationGroupingPathogenicDifference.NO_DIFF
+            self.somatic_difference = ClassificationGroupingSomaticDifference.NO_DIFF
+            self.conditions = None
+            self.zygosity_values = None
+            self.latest_classification_modification = None
+            self.latest_cached_summary = {}
+            # leaving the share level and allele info alone
+            # latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
+
+            # TODO if we're never shared or if the overlap was single only, maybe hard delete?
+            # self.delete()
+        self.dirty = False
+        self.save()
+        # note the save signal will update the OverlapContribution
 
     def gene_symbols(self):
         terms = set(self.classificationgroupingsearchterm_set.filter(term_type=ClassificationGroupingSearchTermType.GENE_SYMBOL).values_list("term", flat=True))
@@ -481,8 +476,17 @@ class ClassificationGrouping(TimeStampedModel):
         # maybe move this out since it does AlleleOriginGroupings too
         for dirty in ClassificationGrouping.objects.filter(dirty=True).iterator():
             dirty.update()
-        for dirty in AlleleOriginGrouping.objects.filter(dirty=True).iterator():
-            dirty.update()
+
+    @staticmethod
+    def dirty_incorrect_counts():
+        """
+        If a classification grouping has had records deleted from it, and didn't trigger a refresh of grou
+        :return:
+        """
+        grouping_counts = ClassificationGrouping.objects.annotate(live_count=ClassificationGroupingEntry.objects.filter(
+            grouping_id=OuterRef('id')
+        ).values('grouping_id').annotate(cnt=Count('pk')).values('cnt')[:1])
+        grouping_counts.exclude(classification_count=F('live_count')).update(dirty=True)
 
 
 class ClassificationGroupingSearchTermType(TextChoices):
@@ -573,3 +577,8 @@ class ClassificationGroupingEntry(TimeStampedModel):
         if entry := ClassificationGroupingEntry.objects.filter(classification=classification).select_related("grouping").first():
             return entry.grouping
         return None
+
+
+@receiver(pre_delete, sender=ClassificationGroupingEntry)
+def removed_grouping_entry(sender, instance: ClassificationGroupingEntry, **kwargs):
+    instance.grouping.dirty_up()

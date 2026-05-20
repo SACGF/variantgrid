@@ -354,9 +354,9 @@ class ClassificationAdmin(ModelAdminBasics):
         for c in queryset:
             c.fix_permissions(fix_modifications=True)
 
-    @admin_action("Fixes: Clinical Context Germline/Somatic")
-    def fix_clinical_context(self, request, queryset: QuerySet[Classification]):
-        update_clinical_contexts(list(queryset.all()))
+    # @admin_action("Fixes: Clinical Context Germline/Somatic")
+    # def fix_clinical_context(self, request, queryset: QuerySet[Classification]):
+    #     update_clinical_contexts(list(queryset.all()))
 
     @admin_action("Fixes: Revalidate")
     def revalidate(self, request, queryset):
@@ -1368,11 +1368,28 @@ class ClassificationGroupingSearchTermAdmin(admin.TabularInline):
         return False
 
 
+class ClassificationGroupingClassificationCounts(admin.SimpleListFilter):
+    title = 'variant match status'
+    parameter_name = 'matched'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [('0', 'None'), ('1', 'Single'), ('2+', '2+'), ('5+', '5+')]
+
+    def queryset(self, request, queryset: QuerySet[ClassificationGrouping]):
+        match self.value():
+            case '0': return queryset.filter(classification_count=0)
+            case '1': return queryset.filter(classification_count=1)
+            case '2+': return queryset.filter(classification_count__gte=2)
+            case '5+': return queryset.filter(classification_count__gte=5)
+            case _: return queryset
+
+
 @admin.register(ClassificationGrouping)
 class ClassificationGroupingAdmin(ModelAdminBasics):
     inlines = (ClassificationGroupingEntryAdmin, ClassificationGroupingSearchTermAdmin)
     list_display = ("pk", "classification_count", "allele", "lab", "pathogenic_difference", "somatic_difference", "dirty")
-    list_filter = ("lab", "pathogenic_difference", "somatic_difference", "dirty")
+    list_filter = (ClassificationGroupingClassificationCounts, "pathogenic_difference", "somatic_difference", "dirty", "lab")
 
     # @admin_list_column("gene_symbols")
     # def gene_symbols(self, obj: ClassificationGrouping):
@@ -1409,28 +1426,3 @@ class ClassificationGroupingTabularAdmin(TabularInline):
 
     def has_change_permission(self, request, obj=None):
         return False
-
-
-@admin.register(AlleleOriginGrouping)
-class AlleleOriginGroupingAdmin(ModelAdminBasics):
-    list_display = ("allele", "dirty")
-    inlines = (ClassificationGroupingTabularAdmin,)
-
-    @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
-    def refresh_all(self, request):
-        AlleleOriginGrouping.objects.update(dirty=True)
-        ClassificationGrouping.update_all_dirty()
-
-
-class AlleleOriginGroupingTabularAdmin(TabularInline):
-    model = AlleleOriginGrouping
-
-    def has_add_permission(self, request, obj):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
