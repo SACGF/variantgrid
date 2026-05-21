@@ -82,10 +82,16 @@ class TestPhenotypeMatching(TestCase):
 
     def test_ambiguous_acronym_flagged_and_excluded(self):
         """A phenotype text whose lowercased form is in the denylist should:
-        - emit `ambiguous_alias` on the to_dict() payload
+        - emit `ambiguous_alias` and `ambiguous_alias_candidates` on the
+          to_dict() payload so the UI can list the conflicting concepts
         - be excluded from get_ontology_term_ids() so downstream gene-list
           computation doesn't silently use the wrong term."""
-        denylist = frozenset({"failure to thrive"})
+        denylist = {
+            "failure to thrive": (
+                ("HP:0001508", "Failure to thrive"),
+                ("OMIM:000000", "Some other thing called FTT"),
+            ),
+        }
         with mock.patch(
             "annotation.models.models_phenotype_match.get_ambiguous_acronym_denylist",
             return_value=denylist,
@@ -97,9 +103,16 @@ class TestPhenotypeMatching(TestCase):
             pd = patient.patient_text_phenotype.phenotype_description
             results = pd.get_results()
             self.assertTrue(results, "Expected at least one match for 'Failure to thrive'")
-            self.assertTrue(
-                any(r.get("ambiguous_alias") for r in results),
-                f"Expected ambiguous_alias flag on results: {results}",
+            flagged = [r for r in results if r.get("ambiguous_alias")]
+            self.assertTrue(flagged, f"Expected ambiguous_alias flag on results: {results}")
+            candidates = flagged[0].get("ambiguous_alias_candidates")
+            self.assertEqual(
+                candidates,
+                [
+                    {"accession": "HP:0001508", "name": "Failure to thrive"},
+                    {"accession": "OMIM:000000", "name": "Some other thing called FTT"},
+                ],
+                "Expected the conflicting candidates to be exposed for UI display",
             )
 
             # Cached function - bust the per-instance cache by clearing
@@ -118,9 +131,13 @@ class TestPhenotypeMatching(TestCase):
             get_ambiguous_acronym_denylist,
         )
         # Raw includes "ftt"; effective denylist should not.
+        raw = {
+            "ftt": (("HP:0001508", "Failure to thrive"),),
+            "some_truly_ambiguous_token": (("HP:0000001", "All"), ("MONDO:0000001", "disease")),
+        }
         with mock.patch(
             "annotation.phenotype_matcher._build_ambiguous_acronym_denylist",
-            return_value=frozenset({"ftt", "some_truly_ambiguous_token"}),
+            return_value=raw,
         ):
             # bust cache_memoize so our patch is used
             _build_ambiguous_acronym_denylist.invalidate(0)

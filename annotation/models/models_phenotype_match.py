@@ -110,8 +110,14 @@ class TextPhenotypeSentence(models.Model):
             data = tpm.to_dict()
             if tpm in ambiguous:
                 data["ambiguous"] = tpm.match_text
-            if tpm.match_text.lower() in denylist:
+            key = tpm.match_text.lower()
+            if key in denylist:
                 data["ambiguous_alias"] = tpm.match_text
+                candidates = denylist.get(key) or ()
+                if candidates:
+                    data["ambiguous_alias_candidates"] = [
+                        {"accession": acc, "name": name} for acc, name in candidates
+                    ]
             results.append(data)
         return results
 
