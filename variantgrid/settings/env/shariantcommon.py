@@ -127,6 +127,7 @@ ANNOTATION[BUILD_GRCH38].update({
     "annotation_consortium": "RefSeq",
 })
 
+SITE_DESCRIPTION = "Shariant - Australian Genomics Variant Curation sharing project."
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
