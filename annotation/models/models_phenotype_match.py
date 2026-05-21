@@ -117,6 +117,13 @@ class TextPhenotypeSentence(models.Model):
         )
         out = []
         for m in pattern.finditer(sentence_text):
+            # Skip matches that are the prefix of an explicit ontology accession
+            # like HP:0001631 / OMIM:607196 / MONDO:0001234 - those are resolved
+            # unambiguously by PhenotypeMatcher and must not be flagged.
+            if m.end() < len(sentence_text) and sentence_text[m.end()] == ":":
+                after_colon = sentence_text[m.end() + 1:m.end() + 2]
+                if after_colon.isdigit():
+                    continue
             match_text = m.group(0)
             key = match_text.lower()
             candidates = denylist.get(key) or ()

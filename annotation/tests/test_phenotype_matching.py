@@ -126,6 +126,37 @@ class TestPhenotypeMatching(TestCase):
                 "Ambiguous-acronym matches must be excluded from get_ontology_term_ids",
             )
 
+    def test_explicit_accession_not_flagged_as_ambiguous(self):
+        """Explicit ontology accessions like HP:0001631 / OMIM:607196 must not
+        trigger an ambiguous-acronym warning just because their prefix (HP,
+        OMIM, MONDO) happens to also appear as an ambiguous denylist key."""
+        denylist = {
+            "hp": (
+                ("HP:0000001", "Foo"),
+                ("HGNC:0000001", "Some HP gene"),
+            ),
+            "omim": (
+                ("HP:0000002", "Bar"),
+                ("HGNC:0000002", "Some OMIM gene"),
+            ),
+        }
+        with mock.patch(
+            "annotation.phenotype_matcher.get_ambiguous_acronym_denylist",
+            return_value=denylist,
+        ):
+            matcher = PhenotypeMatcher()
+            patient = Patient(phenotype="HP:0001631")
+            patient.save(phenotype_matcher=matcher)
+            patient.process_phenotype_if_changed(phenotype_matcher=matcher)
+
+            pd = patient.patient_text_phenotype.phenotype_description
+            results = pd.get_results()
+            flagged = [r for r in results if r.get("ambiguous_alias")]
+            self.assertEqual(
+                flagged, [],
+                f"Explicit HP: accession must not be flagged as ambiguous: {results}",
+            )
+
     def test_hardcoded_override_wins_over_denylist(self):
         """If a key has a hardcoded lookup (e.g. FTT), the public denylist
         accessor must filter it out so the match isn't falsely flagged."""
