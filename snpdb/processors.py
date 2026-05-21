@@ -44,6 +44,7 @@ def settings_context_processor(request):
         'site': Site.objects.get_current(),
         'site_messages': SiteMessage.get_site_messages(),
         'site_name': settings.SITE_NAME,
+        'site_description': settings.SITE_DESCRIPTION,
         'timezone': settings.TIME_ZONE,
         'top_right_search_form': SearchForm(search_allow_blank=True),
         'url_name_visible': get_visible_url_names(),

@@ -419,6 +419,7 @@ USER_SETTINGS_SHOW_GROUPS = True
 SQL_BATCH_INSERT_SIZE = 50000
 SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
+SITE_DESCRIPTION = "VariantGrid - genomic variant curation and classification platform"
 
 # TODO instead of make settings for admin and non-admin enabled searches, have a search value that can be
 # DISABLED, ADMIN_ONLY, ENABLED

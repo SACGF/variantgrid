@@ -12,6 +12,11 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 # import all the base settings #
 SITE_ID = 3  # vg.com
 
+SITE_DESCRIPTION = (
+    "VariantGrid is an open source web platform for storing, annotating, analysing and "
+    "classifying human variants."
+)
+
 WEB_HOSTNAME = 'variantgrid.com'
 WEB_IP = '3.104.38.188'
 
