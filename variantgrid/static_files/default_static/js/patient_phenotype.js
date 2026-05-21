@@ -12,12 +12,19 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     phenotypeMatches = phenotypeMatches.sort(compareByStart);
     let overlapping_matches = [];
     let ambiguousAcronymCandidates = {};  // acronym -> [{accession, name}, ...]
+    const realMatches = [];
     for (let k = 0; k < phenotypeMatches.length; ++k) {
-        const acronym = phenotypeMatches[k].ambiguous_alias;
-        if (acronym && !(acronym in ambiguousAcronymCandidates)) {
-            ambiguousAcronymCandidates[acronym] = phenotypeMatches[k].ambiguous_alias_candidates || [];
+        const pm = phenotypeMatches[k];
+        const acronym = pm.ambiguous_alias;
+        if (acronym) {
+            if (!(acronym in ambiguousAcronymCandidates)) {
+                ambiguousAcronymCandidates[acronym] = pm.ambiguous_alias_candidates || [];
+            }
+            continue;  // warning-only; not a real match - skip highlighting/grid
         }
+        realMatches.push(pm);
     }
+    phenotypeMatches = realMatches;
 
     const phenoLen = phenotypeText.length;
     let phenotypeHTML = '';

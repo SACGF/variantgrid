@@ -1,3 +1,4 @@
+import re
 from typing import List
 
 from django.contrib.auth.models import User
@@ -97,21 +98,39 @@ class TextPhenotypeSentence(models.Model):
         results = []
 
         for r in self.text_phenotype.textphenotypematch_set.all():
-            match_text = sentence_text[r.offset_start:r.offset_end]
             r.offset_start += self.sentence_offset
             r.offset_end += self.sentence_offset
-            data = r.to_dict()
-            key = match_text.lower()
-            if key in denylist:
-                data["ambiguous_alias"] = match_text
-                candidates = denylist.get(key) or ()
-                if candidates:
-                    data["ambiguous_alias_candidates"] = [
-                        {"accession": acc, "name": name} for acc, name in candidates
-                    ]
-            results.append(data)
+            results.append(r.to_dict())
 
+        # Synthesize warning-only entries by rescanning the sentence for any
+        # denylisted text. These rows are NOT persisted, so we have to look
+        # them up from the original text each time.
+        results.extend(self._ambiguous_acronym_results(sentence_text, denylist))
         return results
+
+    def _ambiguous_acronym_results(self, sentence_text, denylist):
+        if not denylist:
+            return []
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(k) for k in denylist) + r")\b",
+            re.IGNORECASE,
+        )
+        out = []
+        for m in pattern.finditer(sentence_text):
+            match_text = m.group(0)
+            key = match_text.lower()
+            candidates = denylist.get(key) or ()
+            entry = {
+                "ambiguous_alias": match_text,
+                "offset_start": m.start() + self.sentence_offset,
+                "offset_end": m.end() + self.sentence_offset,
+            }
+            if candidates:
+                entry["ambiguous_alias_candidates"] = [
+                    {"accession": acc, "name": name} for acc, name in candidates
+                ]
+            out.append(entry)
+        return out
 
 
 class PhenotypeMatchTypes(models.Model):

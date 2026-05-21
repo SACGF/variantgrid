@@ -215,6 +215,12 @@ class PhenotypeMatcher:
         if any(special_case_match):
             hpo_list, omim_list, gene_symbols = special_case_match
         else:
+            # Ambiguous acronym - bail before any DB-bound matches are constructed.
+            # Re-checked at read time so downstream queries (patient grids etc.)
+            # can't pick up the wrong concept.
+            if lower_text.replace(",", "") in self.ambiguous_acronyms:
+                return [], [], []
+
             if len(lower_text) < MIN_MATCH_LENGTH:
                 return [], [], []
 
