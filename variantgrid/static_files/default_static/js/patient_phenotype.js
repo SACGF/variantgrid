@@ -11,10 +11,11 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     
     phenotypeMatches = phenotypeMatches.sort(compareByStart);
     let overlapping_matches = [];
-    let ambiguousAcronyms = new Set();
+    let ambiguousAcronymCandidates = {};  // acronym -> [{accession, name}, ...]
     for (let k = 0; k < phenotypeMatches.length; ++k) {
-        if (phenotypeMatches[k].ambiguous_alias) {
-            ambiguousAcronyms.add(phenotypeMatches[k].ambiguous_alias);
+        const acronym = phenotypeMatches[k].ambiguous_alias;
+        if (acronym && !(acronym in ambiguousAcronymCandidates)) {
+            ambiguousAcronymCandidates[acronym] = phenotypeMatches[k].ambiguous_alias_candidates || [];
         }
     }
 
@@ -68,14 +69,24 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     descriptionBox.html(phenotypeHTML);
     $(".term-match", descriptionBox);
 
-    if (ambiguousAcronyms.size > 0) {
+    const ambiguousAcronyms = Object.keys(ambiguousAcronymCandidates);
+    if (ambiguousAcronyms.length > 0) {
         let phenoMessages = $("<div/>").addClass("phenotype-messages");
         let messageContainer = $("<ul/>").addClass("messages");
         phenoMessages.append(messageContainer);
         for (const acronym of ambiguousAcronyms) {
-            let msg = `'${acronym}' is an ambiguous acronym (it matches multiple distinct ontology concepts) and has been excluded from gene-list matching. Please type the full term name or an HPO/OMIM/MONDO ID.`;
+            const candidates = ambiguousAcronymCandidates[acronym];
             let listElement = $("<li/>").addClass("warning");
-            listElement.text(msg);
+            listElement.text(`'${acronym}' is an ambiguous acronym (it matches multiple distinct ontology concepts) and has been excluded from gene-list matching. Please type the full term name or an HPO/OMIM/MONDO ID.`);
+            if (candidates && candidates.length) {
+                let intro = $("<div/>").text("Possible matches:");
+                let candList = $("<ul/>").addClass("ambiguous-candidates");
+                for (const c of candidates) {
+                    $("<li/>").text(`${c.accession} — ${c.name}`).appendTo(candList);
+                }
+                listElement.append(intro);
+                listElement.append(candList);
+            }
             messageContainer.append(listElement);
         }
         let clearDiv = descriptionBox.siblings("div.clear");

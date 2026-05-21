@@ -2,7 +2,7 @@ import functools
 import logging
 import re
 from collections import defaultdict
-from typing import List, Dict, Tuple, Any, Optional
+from typing import List, Dict, Tuple, Any, Mapping, Optional
 
 import Levenshtein
 from cache_memoize import cache_memoize
@@ -46,9 +46,11 @@ class SkipAllPhenotypeMatchException(Exception):
 
 
 @cache_memoize(timeout=DAY_SECS)
-def _build_ambiguous_acronym_denylist(ontology_import_pk: int) -> frozenset:
+def _build_ambiguous_acronym_denylist(ontology_import_pk: int) -> Dict[str, Tuple[Tuple[str, str], ...]]:
     """Lowercased short ontology lookup keys that match multiple distinct concept
     clusters - building these matches would silently mean the wrong thing.
+    Each key maps to a tuple of (term_id, name) pairs covering every concept
+    cluster the key matched, so callers can show users what was ambiguous.
     Cached on the latest OntologyImport so reimports invalidate automatically."""
     _ = ontology_import_pk  # cache key only
 
@@ -86,7 +88,7 @@ def _build_ambiguous_acronym_denylist(ontology_import_pk: int) -> frozenset:
             return term_id
         return find(term_id) if term_id in parent else term_id
 
-    keys: Dict[str, set] = defaultdict(set)
+    keys: Dict[str, Dict[str, str]] = defaultdict(dict)  # text -> {term_id: name}
     services = (OntologyService.HPO, OntologyService.MONDO, OntologyService.OMIM,
                 OntologyService.HGNC)
     for service in services:
@@ -97,15 +99,15 @@ def _build_ambiguous_acronym_denylist(ontology_import_pk: int) -> frozenset:
                 if 2 <= len(k) <= AMBIGUOUS_ACRONYM_MAX_LEN:
                     stripped = k.replace(" ", "").replace("-", "")
                     if stripped.isalnum() and any(c.isalpha() for c in stripped):
-                        keys[k].add(pk)
+                        keys[k][pk] = name or pk
 
-    denylist = set()
-    for text, pks in keys.items():
-        if len(pks) < 2:
+    denylist: Dict[str, Tuple[Tuple[str, str], ...]] = {}
+    for text, pk_to_name in keys.items():
+        if len(pk_to_name) < 2:
             continue
-        if len({concept_root(p) for p in pks}) >= 2:
-            denylist.add(text)
-    return frozenset(denylist)
+        if len({concept_root(p) for p in pk_to_name}) >= 2:
+            denylist[text] = tuple(sorted(pk_to_name.items()))
+    return denylist
 
 
 _EXPLICIT_OVERRIDE_KEYS: Optional[frozenset] = None
@@ -126,14 +128,19 @@ def _get_explicit_override_keys() -> frozenset:
     return _EXPLICIT_OVERRIDE_KEYS
 
 
-def get_ambiguous_acronym_denylist() -> frozenset:
-    """Returns the lowercased ambiguous-acronym set for the current ontology
+def get_ambiguous_acronym_denylist() -> Mapping[str, Tuple[Tuple[str, str], ...]]:
+    """Returns the lowercased ambiguous-acronym mapping for the current ontology
     import, minus keys that have explicit hardcoded overrides (those have a
-    known correct meaning). Cached in Redis via cache_memoize and rebuilt
-    only when a new OntologyImport lands."""
+    known correct meaning). Values are tuples of (term_id, name) pairs so
+    callers can display the conflicting candidates. Cached in Redis via
+    cache_memoize and rebuilt only when a new OntologyImport lands."""
     latest = OntologyImport.objects.order_by("-pk").values_list("pk", flat=True).first()
     raw = _build_ambiguous_acronym_denylist(latest or 0)
-    return raw - _get_explicit_override_keys()
+    overrides = _get_explicit_override_keys()
+    if isinstance(raw, Mapping):
+        return {k: v for k, v in raw.items() if k not in overrides}
+    # Fallback for legacy frozenset return values (used in some test mocks)
+    return {k: () for k in raw if k not in overrides}
 
 
 class PhenotypeMatcher:

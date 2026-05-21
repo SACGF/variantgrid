@@ -101,8 +101,14 @@ class TextPhenotypeSentence(models.Model):
             r.offset_start += self.sentence_offset
             r.offset_end += self.sentence_offset
             data = r.to_dict()
-            if match_text.lower() in denylist:
+            key = match_text.lower()
+            if key in denylist:
                 data["ambiguous_alias"] = match_text
+                candidates = denylist.get(key) or ()
+                if candidates:
+                    data["ambiguous_alias_candidates"] = [
+                        {"accession": acc, "name": name} for acc, name in candidates
+                    ]
             results.append(data)
 
         return results
