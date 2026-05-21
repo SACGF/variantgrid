@@ -176,6 +176,13 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLocalCache:
     """ Gets or creates local cache of a panel app panel, so it can be used as a GeneList """
 
+    if panel_app_panel.deleted:
+        # Skip the API call — PanelApp will return Not Found and we already know it (issue #405).
+        raise NotFound(
+            detail=f"PanelApp panel '{panel_app_panel.name}' (id={panel_app_panel.panel_id}) "
+                   f"has been deleted from PanelApp. See {panel_app_panel.web_url}"
+        )
+
     # Attempt to use cache if recent and present, otherwise fall through and do a query
     try:
         existing = PanelAppPanelLocalCache.objects.get(panel_app_panel=panel_app_panel,
