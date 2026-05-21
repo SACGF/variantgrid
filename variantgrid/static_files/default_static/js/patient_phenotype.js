@@ -125,6 +125,9 @@ function phenotypeMatchesToJqGridData(phenotypeMatches) {
     const accessionSet = new Set(); // unique terms only
     for (let i=0 ; i<phenotypeMatches.length ; ++i) {
         const pm = phenotypeMatches[i];
+        if (pm.ambiguous_alias) {
+            continue;  // warning-only entry, not a real match
+        }
         if (!accessionSet.has(pm.accession)) {
             const row = {
                 'ontology_service': pm.ontology_service,
