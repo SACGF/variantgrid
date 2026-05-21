@@ -54,7 +54,11 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
             lambda: [self.custom_text_gene_list.gene_list],
             lambda: [self.sample_gene_list.gene_list] if self.sample_gene_list else [],
             lambda: [self.pathology_test_version.gene_list] if self.pathology_test_version else [],
-            lambda: [gln_pap.gene_list for gln_pap in self.genelistnodepanelapppanel_set.all()],
+            # Skip soft-deleted PanelApp panels (issue #405) — they have no cache and
+            # accessing .gene_list would re-hit PanelApp and raise NotFound, 500ing the editor view.
+            lambda: [gln_pap.gene_list for gln_pap in
+                     self.genelistnodepanelapppanel_set.exclude(
+                         panel_app_panel__status=PanelAppPanel.DELETED_STATUS)],
         ]
         getter = GENE_LISTS[self.accordion_panel]
         return [gl for gl in getter() if gl is not None]
