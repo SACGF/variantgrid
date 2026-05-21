@@ -1,3 +1,5 @@
+import re
+
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db import models
@@ -101,25 +103,45 @@ class TextPhenotypeSentence(models.Model):
 
     def get_results(self):
         results = []
-
         ambiguous = set(self.text_phenotype.get_ambiguous_matches())
         denylist = get_ambiguous_acronym_denylist()
+        sentence_text = self.text_phenotype.text
         for tpm in self.text_phenotype.textphenotypematch_set.all():
             tpm.offset_start += self.sentence_offset
             tpm.offset_end += self.sentence_offset
             data = tpm.to_dict()
             if tpm in ambiguous:
                 data["ambiguous"] = tpm.match_text
-            key = tpm.match_text.lower()
-            if key in denylist:
-                data["ambiguous_alias"] = tpm.match_text
-                candidates = denylist.get(key) or ()
-                if candidates:
-                    data["ambiguous_alias_candidates"] = [
-                        {"accession": acc, "name": name} for acc, name in candidates
-                    ]
             results.append(data)
+
+        # Ambiguous acronyms are no longer persisted as TextPhenotypeMatch rows,
+        # so synthesize warning-only entries by rescanning the sentence text.
+        results.extend(self._ambiguous_acronym_results(sentence_text, denylist))
         return results
+
+    def _ambiguous_acronym_results(self, sentence_text, denylist):
+        if not denylist:
+            return []
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(k) for k in denylist) + r")\b",
+            re.IGNORECASE,
+        )
+        out = []
+        for m in pattern.finditer(sentence_text):
+            match_text = m.group(0)
+            key = match_text.lower()
+            candidates = denylist.get(key) or ()
+            entry = {
+                "ambiguous_alias": match_text,
+                "offset_start": m.start() + self.sentence_offset,
+                "offset_end": m.end() + self.sentence_offset,
+            }
+            if candidates:
+                entry["ambiguous_alias_candidates"] = [
+                    {"accession": acc, "name": name} for acc, name in candidates
+                ]
+            out.append(entry)
+        return out
 
 
 class TextPhenotypeMatch(models.Model):

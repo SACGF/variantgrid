@@ -82,10 +82,13 @@ class TestPhenotypeMatching(TestCase):
 
     def test_ambiguous_acronym_flagged_and_excluded(self):
         """A phenotype text whose lowercased form is in the denylist should:
-        - emit `ambiguous_alias` and `ambiguous_alias_candidates` on the
-          to_dict() payload so the UI can list the conflicting concepts
-        - be excluded from get_ontology_term_ids() so downstream gene-list
-          computation doesn't silently use the wrong term."""
+        - NOT create TextPhenotypeMatch rows (so downstream Django queries
+          through PATIENT_TPM_PATH can't pick up the wrong concept)
+        - emit a synthetic `ambiguous_alias` + `ambiguous_alias_candidates`
+          entry on get_results() so the UI can list the conflicting concepts
+        - be excluded from get_ontology_term_ids()."""
+        from annotation.models.models_phenotype_match import TextPhenotypeMatch
+
         denylist = {
             "failure to thrive": (
                 ("HP:0001508", "Failure to thrive"),
@@ -96,18 +99,30 @@ class TestPhenotypeMatching(TestCase):
             "annotation.models.models_phenotype_match.get_ambiguous_acronym_denylist",
             return_value=denylist,
         ):
+            # Rebuild the matcher inside the patch so its ambiguous_acronyms
+            # picks up the patched denylist (the class-level matcher was built
+            # in setUpTestData against the real ontology test data).
+            matcher = PhenotypeMatcher()
             patient = Patient(phenotype="Failure to thrive")
-            patient.save(phenotype_matcher=self.phenotype_matcher)
-            patient.process_phenotype_if_changed(phenotype_matcher=self.phenotype_matcher)
+            patient.save(phenotype_matcher=matcher)
+            patient.process_phenotype_if_changed(phenotype_matcher=matcher)
 
             pd = patient.patient_text_phenotype.phenotype_description
+
+            saved = TextPhenotypeMatch.objects.filter(
+                text_phenotype__textphenotypesentence__phenotype_description=pd,
+            )
+            self.assertFalse(
+                saved.exists(),
+                "Ambiguous-acronym text must not produce TextPhenotypeMatch rows",
+            )
+
             results = pd.get_results()
-            self.assertTrue(results, "Expected at least one match for 'Failure to thrive'")
+            self.assertTrue(results, "Expected a synthetic warning result for 'Failure to thrive'")
             flagged = [r for r in results if r.get("ambiguous_alias")]
             self.assertTrue(flagged, f"Expected ambiguous_alias flag on results: {results}")
-            candidates = flagged[0].get("ambiguous_alias_candidates")
             self.assertEqual(
-                candidates,
+                flagged[0].get("ambiguous_alias_candidates"),
                 [
                     {"accession": "HP:0001508", "name": "Failure to thrive"},
                     {"accession": "OMIM:000000", "name": "Some other thing called FTT"},
