@@ -23,6 +23,13 @@
     {% if overlap_grouping.overlap.allele %}
         {% labelled label="Allele" %}<a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{{ overlap_grouping.overlap.allele }}</a>{% endlabelled %}
     {% endif %}
+    {% if overlap_grouping.discordance_reports %}
+        {% labelled label="Legacy Discordance Reports" %}
+            {% for discordance_report in overlap_grouping.discordance_reports %}
+                <div>{% discordance_report discordance_report %}</div>
+            {% endfor %}
+        {% endlabelled %}
+    {% endif %}
     {% if user.is_superuser %}
         {% labelled label="Overlap Admin" %}{% admin_link overlap_grouping.overlap %}{% endlabelled %}
     {% endif %}

@@ -16,7 +16,8 @@ from django.utils.timezone import now
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, \
-    TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification
+    TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
+    DiscordanceReport
 from classification.models.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig
@@ -374,6 +375,12 @@ class OverlapGrouping3:
                     ))
 
         return list(sorted(perspectives))
+
+    @cached_property
+    def discordance_reports(self) -> list[DiscordanceReport]:
+        if self.overlap.testing_context_bucket != TestingContextBucket.GERMLINE:
+            return []
+        return list(DiscordanceReport.objects.filter(clinical_context__allele=self.overlap.allele).order_by('-created'))
 
     @property
     def value_type(self) -> ClassificationResultValue:

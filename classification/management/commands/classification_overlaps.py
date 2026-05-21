@@ -127,13 +127,13 @@ class Command(BaseCommand):
                         }):
                             overlap_contribution.save()
                     else:
-                        print(f"Triage already up to date, status \"{legacy_triage.triage_status}\" vs \"{overlap_contribution.triage_state}\"- note - \"{legacy_triage.note}\"")
+                        print(f"Triage already up to date - possibly multiple discordances for same record")
 
 
     def populate_overlap_change_date(self):
         # timestamp on overlaps
         with disable_auditlog():
-            for overlap in Overlap.objects.filter(overlap_status_change_timestamp__isnull=True).iterator():
+            for overlap in Overlap.objects.all().iterator():
                 # note we're looking for the latest published date of a classification here
                 # as the upload date is when a discordance would occur
                 latest_date = None
