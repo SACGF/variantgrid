@@ -4,6 +4,8 @@ from datetime import datetime
 from functools import cached_property
 from json import JSONDecodeError
 from typing import Optional, Any
+
+from auditlog.context import set_extra_data
 from auditlog.models import LogEntry
 from click.decorators import pass_meta_key
 from django.conf import settings
@@ -27,7 +29,7 @@ from snpdb.models import Lab
 class OverlapServices:
 
     @staticmethod
-    def update_classification_grouping_overlap_contribution(classification_grouping: ClassificationGrouping):
+    def update_classification_grouping_overlap_contribution(classification_grouping: ClassificationGrouping, migration: bool = False):
         if classification_grouping.testing_context in {TestingContextBucket.OTHER, TestingContextBucket.UNKNOWN}:
             # no overlaps for other
             return
@@ -56,20 +58,34 @@ class OverlapServices:
             if lastest_modification := classification_grouping.latest_classification_modification:
                 effective_date = lastest_modification.curated_date_check.to_effective_date
 
-            overlap_contribution, created = OverlapContribution.objects.update_or_create(
-                source=OverlapEntrySourceTextChoices.CLASSIFICATION,
-                allele=classification_grouping.allele,
-                classification_grouping=classification_grouping,
-                testing_context_bucket=classification_grouping.testing_context,
-                tumor_type_category=classification_grouping.tumor_type_category,
-                value_type=value_type,
-                defaults={
-                    "value": value,
-                    "contribution_status": contribution,
-                    "effective_date": effective_date
-                    # TODO date type
-                }
-            )
+            audit_context = {}
+            if migration:
+                audit_context["migration"] = True
+                # TODO migrate the full set of historical values
+                # not just from this latest classification
+
+                # use the last publish date of the latest classification grouping
+                # not accurate, but gives us something
+                if lastest_modification := classification_grouping.latest_classification_modification:
+                    audit_context["timestamp"] = lastest_modification.created
+
+            overlap_contribution: OverlapContribution
+            created: bool
+            with set_extra_data(audit_context):
+                overlap_contribution, created = OverlapContribution.objects.update_or_create(
+                    source=OverlapEntrySourceTextChoices.CLASSIFICATION,
+                    allele=classification_grouping.allele,
+                    classification_grouping=classification_grouping,
+                    testing_context_bucket=classification_grouping.testing_context,
+                    tumor_type_category=classification_grouping.tumor_type_category,
+                    value_type=value_type,
+                    defaults={
+                        "value": value,
+                        "contribution_status": contribution,
+                        "effective_date": effective_date
+                        # TODO date type
+                    }
+                )
             if created:
                 OverlapServices.link_overlap_contribution(overlap_contribution)
                 # make sure this is added to or creates the relevant overlaps

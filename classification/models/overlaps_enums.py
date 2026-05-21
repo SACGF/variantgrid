@@ -91,7 +91,7 @@ class OverlapEntrySourceTextChoices(TextChoices):
     CLINVAR = "CLIN", "CLINVAR"
 
 
-@dataclass
+@dataclass(frozen=True)
 class TriageState(DataClassJsonMixin):
     status: TriageStatus = TriageStatus.PENDING
     amend_value: Optional[str] = None

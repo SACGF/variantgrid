@@ -19,10 +19,8 @@
 </style>
 <div class="container">
 
-    <a href="#missing-features" data-toggle="collapse" class="toggle-link">Toggle Missing Features List</a>
-   <div id="missing-features" class="collapse hide">
-       Note there is currently a lot of history of "Date Unknown -> 2020-01-10 Curated" this was due to a data migration
-       that won't affect the final version.<br/>
+    <a href="#missing-features" data-toggle="collapse" class="toggle-link">Toggle Missing Features List</a>'
+    <div id="missing-features" class="collapse hide">
         <br/>
        ClinVar Specific
        <ul>
@@ -37,11 +35,10 @@
            <li style="text-decoration: line-through;">Show cross context values in the table view (but dulled out)</li>
            <li>Link to other Overlaps for same allele</li>
            <li>Mark the overall status (e.g. waiting your triage) as UPDATED once a triage is done</li>
-           <li>Live update the overlap change log after a triage</li>
+           <li>Live update the overlap History after a triage</li>
            <li style="text-decoration: line-through;">Give the Triage popup an appropriate title</li>
-           <li>Retroactively Populate history of overlaps, including previous discordance reports, triages etc</li>
            <li>Give counts in the tabs</li>
-           <li>On dedicated overlap page, put details about the overlap (c.HGVS, Testing Context, as well as summary status)</li>
+           <li style="text-decoration: line-through;">On dedicated overlap page, put details about the overlap (c.HGVS, Testing Context, as well as summary status)</li>
            <li>Provide option for full Discordance Review again</li>
        </ul>
 
@@ -51,6 +48,12 @@
            <li style="text-decoration: line-through;">Stop columns from changing widths between pages</li>
            <li style="text-decoration: line-through;">Fix sorting order of rows within classification table</li>
        </ul>
+
+        Migrate
+        <ul>
+            <li>Migrate triage status from discordance reports</li>
+            <li>Migrate history (this might be more difficult, leaving this to later)</li>
+        </ul>
    </div>
 
     <script>
