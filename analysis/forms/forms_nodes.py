@@ -41,6 +41,7 @@ from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import GenomicInterval, Sample, VCFFilter, Tag, Lab
+from snpdb.models.models_genome import Contig
 
 # Can use this for ModelForm.exclude to only use node specific fields
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
@@ -167,6 +168,11 @@ class AnalysisOutputNodeChoiceForm(forms.Form):
 
 
 class AllVariantsNodeForm(BaseNodeForm):
+    contigs = forms.ModelMultipleChoiceField(required=False,
+                                             queryset=Contig.objects.all(),
+                                             widget=ModelSelect2Multiple(url='contig_autocomplete',
+                                                                         attrs={'data-placeholder': 'Chromosome...'}))
+
     class Meta:
         model = AllVariantsNode
         fields = ('max_variant', "gene_symbol",
@@ -187,6 +193,24 @@ class AllVariantsNodeForm(BaseNodeForm):
                    'max_het_count': WIDGET_INTEGER_MIN_1,
                    'min_hom_count': WIDGET_INTEGER_MIN_0,
                    'max_hom_count': WIDGET_INTEGER_MIN_1}
+
+    def __init__(self, *args, **kwargs):
+        genome_build = kwargs.pop("genome_build", None)
+        super().__init__(*args, **kwargs)
+        if genome_build:
+            self.fields["contigs"].widget.forward = [forward.Const(genome_build.pk, "genome_build_id")]
+
+    def save(self, commit=True):
+        node = super().save(commit=False)
+
+        contigs_set = self.instance.allvariantsnodecontig_set
+        contigs_set.all().delete()
+        for contig in self.cleaned_data["contigs"]:
+            contigs_set.create(contig=contig)
+
+        if commit:
+            node.save()
+        return node
 
 
 class VennNodeForm(BaseNodeForm):

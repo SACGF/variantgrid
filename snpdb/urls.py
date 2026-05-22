@@ -149,6 +149,7 @@ urlpatterns = [
 
     # Autocompletes
     path('autocomplete/Cohort/', views_autocomplete.CohortAutocompleteView.as_view(), name='cohort_autocomplete'),
+    path('autocomplete/Contig/', views_autocomplete.ContigAutocompleteView.as_view(), name='contig_autocomplete'),
     path('autocomplete/CustomColumn/', views_autocomplete.CustomColumnAutocompleteView.as_view(), name='custom_column_autocomplete'),
     path('autocomplete/GenomicIntervalsCollection/', views_autocomplete.GenomicIntervalsCollectionAutocompleteView.as_view(), name='genomic_intervals_collection_autocomplete'),
     path('autocomplete/Project/', views_autocomplete.ProjectAutocompleteView.as_view(), name='project_autocomplete'),

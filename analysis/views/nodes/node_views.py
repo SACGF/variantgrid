@@ -68,7 +68,13 @@ class AllVariantsNodeView(NodeView):
         # Set initial count to 1 (so it only shows variants from samples)
         if self.object.version == 0:
             form_initial["min_het_or_hom_count"] = 1
+        form_initial["contigs"] = self.object.allvariantsnodecontig_set.all().values_list("contig", flat=True)
         return form_initial
+
+    def get_form_kwargs(self):
+        form_kwargs = super().get_form_kwargs()
+        form_kwargs["genome_build"] = self.object.analysis.genome_build
+        return form_kwargs
 
 
 class AlleleFrequencyNodeView(NodeView):

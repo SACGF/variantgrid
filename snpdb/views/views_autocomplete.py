@@ -11,6 +11,7 @@ from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 from snpdb.models import VCF, Sample, Cohort, CustomColumnsCollection, CustomColumn, Tag, Trio, Quad, \
     Lab, GenomicIntervalsCollection, GenomeBuild, ImportStatus, Project
+from snpdb.models.models_genome import Contig
 
 
 class GenomeBuildAutocompleteView(AutocompleteView, ABC):
@@ -125,6 +126,21 @@ class GenomicIntervalsCollectionAutocompleteView(GenomeBuildAutocompleteView):
     def get_user_queryset(self, user):
         qs = GenomicIntervalsCollection.filter_for_user(user).filter(import_status=ImportStatus.SUCCESS)
         return self.filter_to_genome_build(qs, "genome_build")
+
+
+@method_decorator(cache_page(MINUTE_SECS), name='dispatch')
+class ContigAutocompleteView(AutocompleteView):
+    fields = ['name', 'ucsc_name', 'refseq_accession']
+
+    def get_user_queryset(self, user):
+        genome_build_id = self.forwarded.get('genome_build_id')
+        if not genome_build_id:
+            return Contig.objects.none()
+        genome_build = GenomeBuild.objects.get(pk=genome_build_id)
+        return genome_build.standard_contigs
+
+    def get_result_label(self, obj):
+        return obj.name
 
 
 @method_decorator(cache_page(5), name='dispatch')
