@@ -1,10 +1,10 @@
 from functools import reduce, cached_property
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
-from django.db.models import CASCADE, QuerySet, SET_NULL
+from django.db.models import CASCADE, QuerySet, SET_NULL, JSONField
 from django.db import models
-from django.db.models.enums import TextChoices, IntegerChoices
+from django.db.models.enums import IntegerChoices
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
@@ -14,7 +14,7 @@ from classification.models import ClassificationGrouping, EvidenceKeyMap, Condit
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
 from library.utils import first, AuditUtils
-from library.utils.database_utils import TextFieldChoices, JSONDataclassField, IntegerFieldChoices
+from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 
@@ -35,13 +35,36 @@ class OverlapContribution(TimeStampedModel):
     testing_context_bucket = models.TextField(choices=TestingContextBucket.choices)
     tumor_type_category = models.TextField(null=True, blank=True)
 
-    effective_date = JSONDataclassField(dataclass_type=EffectiveDate, null=False, blank=False, default=EffectiveDate.default_json)  # type: EffectiveDate
-    triage_state = JSONDataclassField(dataclass_type=TriageState, null=False, blank=False, default=TriageState.default_json)  # type: TriageState
-    comment = JSONDataclassField(dataclass_type=TriageComment, null=False, blank=False, default=TriageComment.default_json)  # type: TriageComment
+    effective_date = JSONField(null=False, blank=False, default=EffectiveDate.default_json)
+    triage_state = JSONField(null=False, blank=False, default=TriageState.default_json)
+    comment = JSONField(null=False, blank=False, default=TriageComment.default_json)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # self._change_comment = None
+    @property
+    def effective_date_obj(self) -> EffectiveDate:
+        try:
+            return EffectiveDate.from_dict(self.effective_date)
+        except Exception as ex:
+            return EffectiveDate(date=self.effective_date)
+
+    @effective_date_obj.setter
+    def effective_date_obj(self, value: EffectiveDate):
+        self.effective_date = value.to_dict()
+
+    @property
+    def triage_state_obj(self) -> TriageState:
+        return TriageState.from_dict(self.triage_state)
+
+    @triage_state_obj.setter
+    def triage_state_obj(self, value: TriageState):
+        self.triage_state = value.to_dict()
+
+    @property
+    def comment_obj(self) -> TriageComment:
+        return TriageComment.from_dict(self.comment)
+
+    @comment_obj.setter
+    def comment_obj(self, value: TriageComment):
+        self.comment = value.to_dict()
 
     @cached_property
     def last_comment(self):
@@ -56,7 +79,7 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def effective_value(self):
-        return self.triage_state.amend_value or self.value
+        return self.triage_state_obj.amend_value or self.value
 
     class Meta:
         unique_together = ('classification_grouping', 'value_type')
@@ -172,7 +195,7 @@ class Overlap(TimeStampedModel):
     def contributions_all(self) -> QuerySet[OverlapContribution]:
         # unlike contributions this will also return OverlapContributions that aren't currently contribution
         # as they may have contributed in the past
-        return  OverlapContribution.objects.filter(
+        return OverlapContribution.objects.filter(
             pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)
         ).select_related("classification_grouping__lab__organization")
 
@@ -314,7 +337,7 @@ class TriageNextStep(IntegerChoices):
             case TriageNextStep.AWAITING_YOUR_TRIAGE:
                 return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
             case TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED:
-                #TODO show a more impatient clock
+                # TODO show a more impatient clock
                 return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
             case TriageNextStep.AWAITING_YOUR_AMEND:
                 return mark_safe('<i class="fa-solid fa-square-pen mr-1" style="opacity:0.6"></i>')

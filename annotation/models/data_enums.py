@@ -32,7 +32,7 @@ class EffectiveDateType(TextChoices):
             case _: return EffectiveDateType.UNKNOWN
 
 
-@dataclass
+@dataclass(frozen=True)
 class EffectiveDate(DataClassJsonMixin):
     date: Optional[str] = None
     date_type: EffectiveDateType = EffectiveDateType.UNKNOWN

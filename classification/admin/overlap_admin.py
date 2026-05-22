@@ -1,3 +1,4 @@
+from auditlog.mixins import AuditlogHistoryAdminMixin
 from django.contrib.admin import TabularInline
 from django.db.models import QuerySet
 
@@ -24,14 +25,15 @@ from snpdb.models import AlleleOrigin, Allele
 #         return False
 
 @admin.register(OverlapContribution)
-class OverlapContributionAdmin(ModelAdminBasics):
+class OverlapContributionAdmin(AuditlogHistoryAdminMixin, ModelAdminBasics):
     show_auditlog_history_link = True
-    list_display = ['source', 'allele', 'classification_grouping', 'value_type', 'value', 'testing_context_bucket', 'effective_date__date', 'classification_grouping__lab']
+    search_fields = ("id", "scv", "value")
+    list_display = ['pk', 'source', 'allele', 'classification_grouping', 'value_type', 'value', 'testing_context_bucket', 'effective_date__date', 'classification_grouping__lab']
     list_filter = ('source', 'value_type', 'testing_context_bucket', 'classification_grouping__lab')
 
     @admin_list_column(short_description="Effective Date", order_field="effective_date__date")
     def effective_date__date(self, obj: OverlapContribution):
-        return obj.effective_date.date
+        return obj.effective_date_obj
 
 
 @admin.register(OverlapContributionSkew)

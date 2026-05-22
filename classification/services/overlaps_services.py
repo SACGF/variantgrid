@@ -7,7 +7,6 @@ from typing import Optional, Any
 
 from auditlog.context import set_extra_data
 from auditlog.models import LogEntry
-from click.decorators import pass_meta_key
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -83,7 +82,7 @@ class OverlapServices:
                     defaults={
                         "value": value,
                         "contribution_status": contribution,
-                        "effective_date": effective_date
+                        "effective_date": effective_date.to_dict()
                         # TODO date type
                     }
                 )
@@ -154,8 +153,8 @@ class OverlapServices:
         all_interactive_skews: list[OverlapContributionSkew] = []
         for skew in overlap.overlapcontributionskew_set.all():
             # move skews into - user has done something, user is waiting on something
-            status_buckets[skew.contribution.triage_state.status].append(skew)
-            if skew.contribution.triage_state.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
+            status_buckets[skew.contribution.triage_state_obj.status].append(skew)
+            if skew.contribution.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
                 all_interactive_skews.append(skew)
 
         pending = status_buckets[TriageStatus.PENDING]
@@ -423,6 +422,7 @@ class OverlapGrouping3:
 
             buffer: list[LogEntry] = []
             for entry in triage_log:
+
                 is_new_record = False
                 if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
                     is_new_record = True
@@ -473,18 +473,20 @@ class OverlapGrouping3:
                     old_value = OverlapGrouping3.tidy_change(triage, key, value_list[0])
                     new_value = OverlapGrouping3.tidy_change(triage, key, value_list[1])
 
-                    if key not in ("effective_date", "triage_status", "value", "triage_state"):
+                    if key == "comment":
+                        if new_value:
+                            comment = new_value
                         continue
+                    elif key not in ("effective_date", "triage_status", "value", "triage_state"):
+                        continue
+
                     if is_new_record and key == "triage_state":
                         continue  # triage_state should always start as pending
 
-                    if key == "comment":
-                        comment = new_value
-                    else:
-                        field_change = FieldChange(key, old_value, new_value)
-                        field_changes.append(field_change)
+                    field_change = FieldChange(key, old_value, new_value)
+                    field_changes.append(field_change)
 
-                if field_changes:
+                if field_changes or comment:
 
                     user: Optional[User] = entry.actor
                     change_row = ChangeRow(

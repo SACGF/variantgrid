@@ -18,6 +18,7 @@ from guardian.admin import GuardedModelAdminMixin
 
 from library.log_utils import log_admin_change
 from library.utils import delimited_row, WrappablePartial, limit_str
+from library.utils.database_utils import JSONDataClassAdminWidget
 
 
 class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
@@ -213,7 +214,7 @@ class ModelAdminBasics(admin.ModelAdmin):
     """
 
     formfield_overrides = {
-        models.JSONField: {'widget': JSONEditorWidget},
+        models.JSONField: {'widget': JSONDataClassAdminWidget},
         # sadly this doesn't work as general widget since "rel" and "admin_site" need values
         # models.ForeignKey: {'widget': ForeignKeyRawIdWidget}
     }

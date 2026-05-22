@@ -1,18 +1,13 @@
-from tokenize import Special
 from typing import Optional
-
-from auditlog.context import set_extra_data
 from django.contrib import messages
 from django import forms
 from django.http import HttpRequest, HttpResponseBase
-from django.shortcuts import render, redirect
-from django.urls import reverse
+from django.shortcuts import render
 from django.utils.safestring import mark_safe
-
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationResultValue, \
     EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap
-from classification.models.overlaps_enums import TriageState, TriageComment, TriageStatus
+from classification.models.overlaps_enums import TriageState, TriageStatus
 from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
 from library.utils import empty_to_none
 from library.utils.django_utils import render_ajax_view
@@ -48,10 +43,9 @@ class ClassificationGroupingValueTriageOncPathForm(ClassificationGroupingValueTr
     new_value = forms.ChoiceField(
         label="New Classification",
         widget=forms.Select(),
-        choices=\
+        choices=
             [("undecided", "Undecided")] +
-            [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).virtual_options]
-        ,
+            [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).virtual_options],
         help_text="New Onc/Path value if you have agreed to change"
     )
 
@@ -60,10 +54,9 @@ class ClassificationGroupingValueTriageClinSigForm(ClassificationGroupingValueTr
     new_value = forms.ChoiceField(
         label="New Clinical Significance",
         widget=forms.Select(),
-        choices=\
+        choices=
             [("undecided", "Undecided")] +
-            [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).virtual_options]
-        ,
+            [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).virtual_options],
         help_text="New Clinical Significance value if you have agreed to change"
     )
 
@@ -119,11 +112,13 @@ class TriageView3(AjaxFormView[OverlapContribution]):
             value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH)
         elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
             value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        else:
+            raise ValueError(f"Unexpected ValueType {value_type}")
 
         # if request.GET.get("edit") == "true":
         initial_data = {
-            "triage_status": triage.triage_state.status,
-            "new_value": triage.triage_state.amend_value
+            "triage_status": triage.triage_state_obj.status,
+            "new_value": triage.triage_state_obj.amend_value
         }
         if value_type == ClassificationResultValue.ONC_PATH:
             form = ClassificationGroupingValueTriageOncPathForm(
@@ -152,13 +147,13 @@ class TriageView3(AjaxFormView[OverlapContribution]):
             if new_value == 'undecided':
                 new_value = None
 
-            triage.triage_state = TriageState(
+            triage.triage_state_obj = TriageState(
                 TriageStatus(form.cleaned_data["triage_status"]),
                 new_value
             )
 
             if comment := form.cleaned_data["comment"]:
-                triage.comment = triage.comment.next_comment(comment)
+                triage.comment_obj = triage.comment_obj.next_comment(comment)
 
             triage.save()
 
@@ -180,114 +175,3 @@ def view_overlap_3(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
 
     context = {"overlap_grouping": overlap_grouping}
     return render_ajax_view(request, "classification/overlap_detail_3.html", context, menubar="classification")
-
-
-# class OverlapView3(AjaxFormView[OverlapContribution]):
-#
-#     @classmethod
-#     def lazy_render(cls, overlap: Overlap, context: Optional[dict] = None) -> LazyRender:
-#         def dynamic_context_gen(request):
-#             # FIX ME what is dynamic context vs static c
-#             return {}
-#             # if context and context.get("saved") is True:
-#             #     user = request.user
-#             #     discordance_report = obj.discordance_report
-#             #     discordance_report_row = DiscordanceReportRowData(discordance_report=discordance_report, perspective=LabPickerData.for_user(user))
-#             #     return {
-#             #         "next_step": discordance_report_row.next_step,
-#             #         "report": discordance_report
-#             #     }
-#
-#         return LazyRender(
-#             template_name="classification/overlap_detail_3.html",
-#             core_object=overlap,
-#             core_object_name="triage",
-#             static_context=context,
-#             dynamic_context=dynamic_context_gen
-#         )
-#
-#     def get(self, request, triage_id: int, *args, **kwargs):
-#         return self.handle(request, triage_id=triage_id)
-#
-#     def post(self, request, triage_id: int, *args, **kwargs):
-#         return self.handle(request, triage_id=triage_id)
-#
-#     def handle(self, request, overlap_id: int):
-#         # FIXME security checks
-#         overlap = Overlap.objects.get(pk=overlap_id)
-#         # classification_grouping = triage.classification_grouping
-#         value_type = overlap.value_type
-#
-#         # FIXME, provide a form for each OverlapContribution the user has access to
-#
-#         #
-#         # context = {}
-#         # saved = False
-#         # overlap_grouping = OverlapGrouping.overlap_grouping_for(classification_grouping, value_type, True)
-#         #
-#         # context["overlap_grouping"] = overlap_grouping
-#         #
-#         # # TODO can we sort these values on how similar the context is?
-#         # context["classification_grouping"] = classification_grouping
-#         # context["value_type"] = value_type
-#         # context["mode"] = "inline"
-#         #
-#         # value_e_key: EvidenceKey
-#         # if value_type == ClassificationResultValue.ONC_PATH:
-#         #     value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH)
-#         # elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
-#         #     value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-#         #
-#         # context["evidence_key"] = value_e_key
-#         #
-#         # # if request.GET.get("edit") == "true":
-#         # initial_data = {
-#         #     "triage_status": triage.triage_state.status,
-#         #     "new_value": triage.triage_state.amend_value
-#         # }
-#         # if value_type == ClassificationResultValue.ONC_PATH:
-#         #     form = ClassificationGroupingValueTriageOncPathForm(
-#         #         # data=request.POST or None,
-#         #         data=request.POST if request.method == "POST" else None,
-#         #         initial=initial_data
-#         #     )
-#         # else:
-#         #     if not OVERLAP_CLIN_SIG_ENABLED:
-#         #         form = None
-#         #     else:
-#         #         form = ClassificationGroupingValueTriageClinSigForm(
-#         #             # data=request.POST or None,
-#         #             data=request.POST if request.method == "POST" else None,
-#         #             initial=initial_data
-#         #         )
-#         # context["form"] = form
-#         #
-#         # if form and form.is_valid() and request.method == "POST":
-#         #
-#         #     # TODO do we even need to do this, or does dataclass_json do it automatically
-#         #
-#         #     new_value = empty_to_none(form.cleaned_data["new_value"])
-#         #     if new_value == 'undecided':
-#         #         new_value = None
-#         #
-#         #     triage.triage_state = TriageState(
-#         #         TriageStatus(form.cleaned_data["triage_status"]),
-#         #         new_value
-#         #     )
-#         #
-#         #     if comment := form.cleaned_data["comment"]:
-#         #         triage.comment = triage.comment.next_comment(comment)
-#         #
-#         #     triage.save()
-#         #
-#         #     for overlap_contribution in triage.classification_grouping.overlapcontribution_set.filter(value_type=value_type):
-#         #         for overlap in overlap_contribution.overlaps:
-#         #             OverlapServices.update_skews(overlap)
-#         #
-#         #     messages.add_message(request, level=messages.SUCCESS, message="Triage saved successfully")
-#         #     context["saved"] = True
-#         #
-#         #     return redirect(reverse('triage', kwargs={"triage_id": triage.pk}))
-#         context = {}
-#
-#         return OverlapView3.lazy_render(overlap, context).render(request, saved=False)

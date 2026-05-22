@@ -1,4 +1,5 @@
-from auditlog.context import disable_auditlog, set_actor, set_extra_data
+from auditlog.context import disable_auditlog, set_extra_data
+from auditlog.models import LogEntry
 from django.core.management import BaseCommand
 
 from annotation.models import ClinVarRecordCollection, ClinVarRecord, EffectiveDate
@@ -53,7 +54,7 @@ class Command(BaseCommand):
         self.migrate_discordance_reports(args, options)
 
     def migrate_discordance_reports(self, *args, **options):
-        for discordance_report in DiscordanceReport.objects.all().iterator():
+        for discordance_report in DiscordanceReport.objects.all().order_by('created').iterator():
             allele = discordance_report.clinical_context.allele
             overlap = Overlap.objects.filter(
                 allele=allele,
@@ -107,13 +108,14 @@ class Command(BaseCommand):
                             print(f"Did not find pending change value for triage {legacy_triage.pk}, maybe it already changed")
 
                     has_change = False
-                    if overlap_contribution.triage_state != triage_state:
-                        overlap_contribution.triage_state = triage_state
+                    if overlap_contribution.triage_state_obj != triage_state:
+                        overlap_contribution.triage_state_obj = triage_state
                         has_change = True
 
                     if note := legacy_triage.note:
-                        if note != overlap_contribution.comment.text:
-                            overlap_contribution.comment = overlap_contribution.comment.next_comment(note)
+                        if note != overlap_contribution.comment_obj.text:
+                            overlap_contribution.comment_obj = overlap_contribution.comment_obj.next_comment(note)
+                            print(f"SETTING NOTE to {overlap_contribution.comment_obj}")
                             has_change = True
 
                     if has_change:
@@ -153,11 +155,15 @@ class Command(BaseCommand):
                 if grouping := overlap_contribution.classification_grouping:
                     if latest_modification := grouping.latest_classification_modification:
                         date_check = latest_modification.curated_date_check
-                        overlap_contribution.effective_date = date_check.to_effective_date
+                        overlap_contribution.effective_date_obj = date_check.to_effective_date
+                        print(f"Setting effective date to {date_check.to_effective_date}")
+                        print(overlap_contribution.effective_date)
                         overlap_contribution.save(update_fields=["effective_date"])
                 elif scv := overlap_contribution.scv:
                     if clinvar_record := ClinVarRecord.objects.filter(record_id=scv).first():
-                        overlap_contribution.effective_date = clinvar_record.effective_date
+                        overlap_contribution.effective_date_obj = clinvar_record.effective_date
+                        print(f"Setting effective date to {date_check.to_effective_date}")
+                        print(overlap_contribution.effective_date)
                         overlap_contribution.save(update_fields=["effective_date"])
 
     def make_clinvar_expert_panel_contributions(self):
@@ -187,11 +193,11 @@ class Command(BaseCommand):
                         tumor_type_category=None,
                         defaults={
                             "value": value,
-                            "effective_date": effective_date,
+                            "effective_date": effective_date.to_dict(),
                         },
-                        triage_state=TriageState(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY)
+                        triage_state=TriageState(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
                     )
 
-                OverlapServices.link_overlap_contribution(contribution)
-                for skew in contribution.overlapcontributionskew_set.select_related('overlap').all():
-                    OverlapServices.recalc_overlap(skew.overlap)
+                    OverlapServices.link_overlap_contribution(contribution)
+                    for skew in contribution.overlapcontributionskew_set.select_related('overlap').all():
+                        OverlapServices.recalc_overlap(skew.overlap)

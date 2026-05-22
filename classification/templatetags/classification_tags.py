@@ -19,7 +19,7 @@ from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
     EvidenceMixin, ClassificationSummaryCacheDictPathogenicity, Overlap, ClassificationGroupingEntry, \
     OverlapContribution, ClassificationSummaryCacheDictSomatic, \
-    ClassificationGrouping, ClassificationResultValue, TestingContextFull
+    ClassificationGrouping, ClassificationResultValue, TestingContextFull, ConditionReference
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -625,7 +625,7 @@ def condition(condition_obj: Union[OntologyTerm, ConditionResolved, dict],
     if isinstance(condition_obj, dict):
         condition_obj = ConditionResolved.from_dict(condition_obj)
     elif isinstance(condition_obj, OntologyTerm):
-        condition_obj = ConditionResolved(terms=[condition_obj])
+        condition_obj = ConditionResolved(references=[ConditionReference(condition_obj)])
     return {"condition": condition_obj, "limit": limit, "show_link": show_link, "no_condition_message": no_condition_message}
 
 
@@ -797,8 +797,8 @@ def triage(context,
     # if show_link and isinstance(triage, ClassificationGroupingValueTriageHistory):
     #     raise ValueError("can't show_link on Triage History")
 
-    if triage.triage_state.status == TriageStatus.REVIEWED_WILL_FIX:
-        new_value = triage.triage_state.amend_value
+    if triage.triage_state_obj.status == TriageStatus.REVIEWED_WILL_FIX:
+        new_value = triage.triage_state_obj.amend_value
         value_type = triage.value_type
 
         if new_value == 'undecided':  # fixme standardise terminology

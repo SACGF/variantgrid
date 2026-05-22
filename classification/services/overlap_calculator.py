@@ -124,10 +124,10 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
                         classification_grouping_id=None,
                         defaults={
                             "value": value,
-                            "effective_date": expert_panel.effective_date,
+                            "effective_date": expert_panel.effective_date.to_dict(),
                         },
                         contribution_status=OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE,
-                        triage_state=TriageState(TriageStatus.NON_INTERACTIVE_THIRD_PARTY)
+                        triage_state=TriageState(TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
                     )
                     return oc
         return None

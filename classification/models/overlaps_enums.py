@@ -122,5 +122,5 @@ class TriageComment(DataClassJsonMixin):
     def default_json():
         return TriageComment().to_dict()
 
-    def __str__(self):
-        return self.text
+    def __bool__(self):
+        return bool(self.text)

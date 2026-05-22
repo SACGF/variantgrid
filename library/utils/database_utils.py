@@ -1,11 +1,13 @@
+from collections.abc import Callable
 from typing import Iterable, Optional, Any, TypeVar, Generic, Type
-
+import json
 import sqlparse
 from dataclasses_json import DataClassJsonMixin
 from django.db import models, connection, transaction
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
 from django.db.models.enums import TextChoices, IntegerChoices
+from django_json_widget.widgets import JSONEditorWidget
 
 from library.cache import timed_cache
 from library.constants import DAY_SECS
@@ -150,6 +152,10 @@ T1 = TypeVar('T1', bound=DataClassJsonMixin)
 
 class JSONDataclassField(models.JSONField, Generic[T1]):
     """
+    DO NOT USE - doesn't work well with auditlog which double encodes, likely a problem with serialize as well
+    """
+
+    """
     A field type that will return and expect a DataClassJsonMixin type.
     e.g.
     @dataclass
@@ -161,6 +167,7 @@ class JSONDataclassField(models.JSONField, Generic[T1]):
 
     PyCharm isn't smart enough to work out the execpted type, so just add the type hint after declaring using this in a model
     """
+
 
     def __init__(self,
                  dataclass_type: Type[T1],
@@ -185,19 +192,47 @@ class JSONDataclassField(models.JSONField, Generic[T1]):
         kwargs["illegal_value_result"] = self.illegal_value_result
         return name, path, args, kwargs
 
-    def from_db_value(self, value, expression, connection) -> Optional[T1]:
-        if json_obj := super().from_db_value(value, expression, connection):
-            try:
-                return self.dataclass_type.from_dict(json_obj)
-            except ValueError as ve:
-                # TODO raise warning
-                print(f"Found illegal value in database {ve}")
-                return self.illegal_value_result
-        return None
+    def get_fallback_value(self):
+        fallback_value = self.illegal_value_result
+        if fallback_value is None:
+            fallback_value = self.default
+        if isinstance(fallback_value, Callable):
+            fallback_value = fallback_value()
+        if isinstance(fallback_value, dict):
+            fallback_value = self.dataclass_type.from_dict(fallback_value)
+        return fallback_value
+
+    # def from_db_value(self, value, expression, connection) -> Optional[T1]:
+    #     if json_obj := super().from_db_value(value, expression, connection):
+    #         try:
+    #             return self.dataclass_type.from_dict(json_obj)
+    #         except Exception as ex:
+    #             # TODO raise warning
+    #             print(f"Found illegal value in database {value.__class__} \"{value}\"")
+    #             self.get_fallback_value()
+    #     return None
+
+    def from_db_value(self, value, expression, connection):
+        """Converts database JSON string/object to a dataclass instance."""
+        if value is None:
+            return None
+        try:
+            if isinstance(value, dict):
+                return self.dataclass_type.from_dict(value)
+            if isinstance(value, str):
+                return self.dataclass_type.from_json(value)
+        except:
+            print(f"Could not convert value from DB {value.__class__} \"{value}\" to {self.dataclass_type}")
+        return value
 
     def get_prep_value(self, value: Optional[T1]):
+        if value is None:
+            return None
         if hasattr(value, 'to_dict'):
             return value.to_dict()
+        if not isinstance(value, dict):
+            # print(f"WARNING - prep value doesn't have to_dict or isn't a dict, it's {value.__class__}")
+            raise ValueError(f"WARNING - prep value doesn't have to_dict or isn't a dict, it's {value.__class__}")
         return value
 
 
@@ -255,3 +290,16 @@ T4 = TypeVar('T4', bound=IntegerChoices)
 
 class IntegerFieldChoices(ChoicesMixin[T4], models.IntegerField):
     pass
+
+
+class JSONDataClassAdminWidget(JSONEditorWidget):
+
+    def format_value(self, value):
+        if not isinstance(value, (dict, list)):
+            value = json.loads(value)
+            if isinstance(value, str):
+                # TODO, why would these values be double escaped anyway?
+                value = json.loads(value)
+            return value
+        else:
+            return value
