@@ -248,9 +248,10 @@ class QuadNode(AbstractCohortBasedNode):
         return "No cohort selected"
 
     def get_node_name(self):
-        name_parts = [QuadInheritance(self.inheritance).label]
+        label = QuadInheritance(self.inheritance).label
         if not self.require_zygosity:
-            name_parts.append('(non strict)')
+            label += "?"
+        name_parts = [label]
         if desc := self.get_filter_description():
             name_parts.append(f"({desc})")
         return "\n".join(name_parts)
@@ -336,7 +337,8 @@ class QuadNode(AbstractCohortBasedNode):
                 }
 
             if mode == QuadInheritance.XLINKED_RECESSIVE:
-                data[mode]['note'] = 'Chr X only'
+                for member in members:
+                    data[mode]['other_filters_' + member] = 'ChrX'
 
         return data
 

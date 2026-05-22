@@ -317,9 +317,10 @@ class TrioNode(AbstractCohortBasedNode):
         return method
 
     def get_node_name(self):
-        name_parts = [TrioInheritance(self.inheritance).label]
+        label = TrioInheritance(self.inheritance).label
         if not self.require_zygosity:
-            name_parts.append(' (non strict)')
+            label += "?"
+        name_parts = [label]
 
         filter_description = self.get_filter_description()
         if filter_description:
@@ -383,7 +384,8 @@ class TrioNode(AbstractCohortBasedNode):
                 }
 
             if mode == TrioInheritance.XLINKED_RECESSIVE:
-                data[mode]['note'] = 'Chr X only'
+                for member in members:
+                    data[mode]['other_filters_' + member] = 'Variant on chr X'
 
         return data
 
