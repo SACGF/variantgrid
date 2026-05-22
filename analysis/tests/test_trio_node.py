@@ -67,6 +67,23 @@ class TestTrioNodeInheritance(TestCase):
         cls.unknown_father_v = slowly_create_test_variant("3", 5000, "A", "T", cls.grch37)
         cls._make_cg(cls.unknown_father_v, "OEU")
 
+        # X-linked with unknown mother: proband=HOM_ALT, mother=UNKNOWN, father=any
+        # Used to test XLR-branch require_zygosity in ALL_RECESSIVE.
+        cls.xlinked_unknown_mother_v = slowly_create_test_variant("X", 2000, "A", "T", cls.grch37)
+        cls._make_cg(cls.xlinked_unknown_mother_v, "OUR")
+
+        # Proband-only variant: proband=HET, mother=HOM_REF, father=HOM_REF
+        cls.proband_only_v = slowly_create_test_variant("3", 6000, "A", "T", cls.grch37)
+        cls._make_cg(cls.proband_only_v, "ERR")
+
+        # Mother-only variant: proband=HOM_REF, mother=HET, father=HOM_REF
+        cls.mother_only_v = slowly_create_test_variant("3", 6100, "A", "T", cls.grch37)
+        cls._make_cg(cls.mother_only_v, "RER")
+
+        # Father-only variant: proband=HOM_REF, mother=HOM_REF, father=HET
+        cls.father_only_v = slowly_create_test_variant("3", 6200, "A", "T", cls.grch37)
+        cls._make_cg(cls.father_only_v, "RRE")
+
     @classmethod
     def _make_cg(cls, variant, samples_zygosity):
         n = len(samples_zygosity)
@@ -208,3 +225,109 @@ class TestTrioNodeInheritance(TestCase):
         node = self._make_node(TrioInheritance.RECESSIVE)
         clone = node.save_clone()
         self.assertEqual(self._filter_variants(node), self._filter_variants(clone))
+
+    # ── ALL_RECESSIVE (AR ∪ XLR) ──────────────────────────────────────────────
+
+    def test_all_recessive_matches_autosomal_recessive_variant(self):
+        node = self._make_node(TrioInheritance.ALL_RECESSIVE)
+        self.assertIn(self.recessive_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_matches_xlinked_variant(self):
+        node = self._make_node(TrioInheritance.ALL_RECESSIVE)
+        self.assertIn(self.xlinked_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_excludes_unrelated_variants(self):
+        node = self._make_node(TrioInheritance.ALL_RECESSIVE)
+        ids = self._filter_variants(node)
+        self.assertNotIn(self.denovo_v.pk, ids)
+        self.assertNotIn(self.control_v.pk, ids)
+
+    def test_all_recessive_require_zygosity_excludes_unknown_father_on_autosome(self):
+        node = self._make_node(TrioInheritance.ALL_RECESSIVE, require_zygosity=True)
+        self.assertNotIn(self.unknown_father_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_no_require_zygosity_includes_unknown_father_on_autosome(self):
+        node = self._make_node(TrioInheritance.ALL_RECESSIVE, require_zygosity=False)
+        self.assertIn(self.unknown_father_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_require_zygosity_excludes_unknown_mother_on_xlr(self):
+        node = self._make_node(TrioInheritance.ALL_RECESSIVE, require_zygosity=True)
+        self.assertNotIn(self.xlinked_unknown_mother_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_no_require_zygosity_includes_unknown_mother_on_xlr(self):
+        node = self._make_node(TrioInheritance.ALL_RECESSIVE, require_zygosity=False)
+        self.assertIn(self.xlinked_unknown_mother_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_is_source_node(self):
+        node = self._make_node(TrioInheritance.ALL_RECESSIVE)
+        self.assertEqual(node.max_inputs, 0)
+
+    def test_zygosity_table_all_recessive_two_line_cells(self):
+        data = TrioNode.get_zygosity_table_data()
+        self.assertIn('AR:', data[TrioInheritance.ALL_RECESSIVE]['mother'])
+        self.assertIn('XLR:', data[TrioInheritance.ALL_RECESSIVE]['mother'])
+
+    def test_zygosity_table_all_recessive_other_filters_mentions_chr_x(self):
+        data = TrioNode.get_zygosity_table_data()
+        self.assertIn('Chr X', data[TrioInheritance.ALL_RECESSIVE]['other_filters_mother'])
+
+    # ── ANY_AFFECTED ──────────────────────────────────────────────────────────
+
+    def test_any_affected_includes_variant_in_proband_only(self):
+        # Trio fixture has mother_affected=True; proband is always affected.
+        node = self._make_node(TrioInheritance.ANY_AFFECTED)
+        self.assertIn(self.proband_only_v.pk, self._filter_variants(node))
+
+    def test_any_affected_includes_variant_in_affected_mother(self):
+        node = self._make_node(TrioInheritance.ANY_AFFECTED)
+        self.assertIn(self.mother_only_v.pk, self._filter_variants(node))
+
+    def test_any_affected_excludes_variant_in_unaffected_father_only(self):
+        node = self._make_node(TrioInheritance.ANY_AFFECTED)
+        self.assertNotIn(self.father_only_v.pk, self._filter_variants(node))
+
+    def test_any_affected_collapses_when_no_affected_parent(self):
+        # Flip the trio so only the proband is affected; variant in mother
+        # alone should be excluded.
+        self.trio.mother_affected = False
+        self.trio.save()
+        try:
+            node = self._make_node(TrioInheritance.ANY_AFFECTED)
+            ids = self._filter_variants(node)
+            self.assertIn(self.proband_only_v.pk, ids)
+            self.assertNotIn(self.mother_only_v.pk, ids)
+        finally:
+            self.trio.mother_affected = True
+            self.trio.save()
+
+    def test_any_affected_is_source_node(self):
+        node = self._make_node(TrioInheritance.ANY_AFFECTED)
+        self.assertEqual(node.max_inputs, 0)
+
+    def test_any_affected_always_valid_no_errors(self):
+        errors = TrioNode.get_trio_inheritance_errors(self.trio, TrioInheritance.ANY_AFFECTED)
+        self.assertEqual(errors, [])
+
+    def test_zygosity_table_any_affected_proband_has_variant(self):
+        data = TrioNode.get_zygosity_table_data()
+        proband_value = data[TrioInheritance.ANY_AFFECTED]['proband']
+        self.assertTrue(proband_value)
+
+    # ── Zygosity table "Other Filters" column ─────────────────────────────────
+
+    def test_zygosity_table_xlinked_has_chr_x_other_filter(self):
+        data = TrioNode.get_zygosity_table_data()
+        self.assertEqual(data[TrioInheritance.XLINKED_RECESSIVE]['other_filters_mother'], "Chr X only")
+
+    def test_zygosity_table_recessive_has_no_other_filter_keys(self):
+        data = TrioNode.get_zygosity_table_data()
+        keys = [k for k in data[TrioInheritance.RECESSIVE] if k.startswith('other_filters_')]
+        self.assertEqual(keys, [])
+
+    def test_zygosity_table_compound_het_has_gene_constraint_in_other_filters(self):
+        data = TrioNode.get_zygosity_table_data()
+        self.assertIn("gene", data[TrioInheritance.COMPOUND_HET]['other_filters_mother'])
+
+    def test_zygosity_table_compound_het_has_no_note_key(self):
+        data = TrioNode.get_zygosity_table_data()
+        self.assertNotIn('note', data[TrioInheritance.COMPOUND_HET])

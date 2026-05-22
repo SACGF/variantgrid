@@ -1,4 +1,6 @@
+import operator
 from abc import ABC, abstractmethod
+from functools import reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
@@ -100,6 +102,14 @@ class AbstractTrioInheritance(ABC):
         """ None means we don't know """
         return None
 
+    def get_other_filters_description(self) -> str:
+        """Variant-level filters applied in addition to per-member zygosity.
+
+        Shown in every member row of the "Other Filters" column on the
+        zygosity table. Empty string means no extra filters.
+        """
+        return ""
+
 
 class SimpleTrioInheritance(AbstractTrioInheritance):
     @abstractmethod
@@ -148,6 +158,41 @@ class XLinkedRecessive(SimpleTrioInheritance):
 
     def get_contigs(self) -> Optional[set[Contig]]:
         return set(self.node.trio.genome_build.contigs.filter(name='X'))
+
+    def get_other_filters_description(self) -> str:
+        return "Chr X only"
+
+
+class TrioAllRecessive(AbstractTrioInheritance):
+    """OR of autosomal recessive and X-linked recessive for trios.
+
+    Chr-X restriction lives inside the OR so the AR branch covers the whole
+    genome and only the XLR branch is restricted to chr X.
+    """
+
+    def _recessive_zyg(self) -> tuple[set, set, set]:
+        return Recessive(self.node)._get_mum_dad_proband_zygosities()
+
+    def _xlinked_zyg(self) -> tuple[set, set, set]:
+        return XLinkedRecessive(self.node)._get_mum_dad_proband_zygosities()
+
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+        cgc = self.node.trio.cohort.cohort_genotype_collection
+        ar_q = self._get_zyg_q(cgc, self._recessive_zyg())
+        xlr_q = self._get_zyg_q(cgc, self._xlinked_zyg()) & Q(locus__contig__name='X')
+        combined = ar_q | xlr_q
+        return {cgc.cohortgenotype_alias: {str(combined): combined}}
+
+    def get_method(self) -> str:
+        ar_mum, ar_dad, ar_prob = self._recessive_zyg()
+        x_mum, _, x_prob = self._xlinked_zyg()
+        return (
+            f"AR (Mother:{ar_mum} Father:{ar_dad} Proband:{ar_prob}) "
+            f"OR XLR (Mother:{x_mum} Father:- Proband:{x_prob} chrX only)"
+        )
+
+    def get_other_filters_description(self) -> str:
+        return "XLR branch: Chr X only"
 
 
 class CompHet(AbstractTrioInheritance):
@@ -207,14 +252,50 @@ class CompHet(AbstractTrioInheritance):
                                           transcriptversion__gene_version__gene__in=two_hit_genes)
         return set(contig_qs.distinct())
 
+    def get_other_filters_description(self) -> str:
+        return "≥2 hits in same gene, one from mother and one from father"
+
+
+class TrioAnyAffected(AbstractTrioInheritance):
+    """Variant present in any affected family member.
+
+    Permissive upstream pre-filter. No parent constraint. Unaffected members
+    are unconstrained — they may have or not have the variant. Proband is
+    always treated as affected.
+    """
+
+    def _get_affected_samples(self) -> list:
+        trio = self.node.trio
+        members = [
+            (trio.mother.sample, trio.mother_affected),
+            (trio.father.sample, trio.father_affected),
+            (trio.proband.sample, True),
+        ]
+        return [s for s, affected in members if affected]
+
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+        cgc = self.node.trio.cohort.cohort_genotype_collection
+        per_member_qs = [
+            cgc.get_zygosity_q({s: self.HAS_VARIANT}, {s: True})
+            for s in self._get_affected_samples()
+        ]
+        combined = reduce(operator.or_, per_member_qs)
+        return {cgc.cohortgenotype_alias: {str(combined): combined}}
+
+    def get_method(self) -> str:
+        names = [s.name for s in self._get_affected_samples()]
+        return f"Variant present in at least one affected family member ({', '.join(names)})"
+
 
 class TrioNode(AbstractCohortBasedNode):
     INHERITANCE_CLASSES = {
         TrioInheritance.COMPOUND_HET: CompHet,
         TrioInheritance.RECESSIVE: Recessive,
+        TrioInheritance.ALL_RECESSIVE: TrioAllRecessive,
         TrioInheritance.DOMINANT: Dominant,
         TrioInheritance.DENOVO: Denovo,
         TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive,
+        TrioInheritance.ANY_AFFECTED: TrioAnyAffected,
     }
 
     trio = models.ForeignKey(Trio, null=True, on_delete=SET_NULL)
@@ -330,7 +411,11 @@ class TrioNode(AbstractCohortBasedNode):
 
     @staticmethod
     def get_help_text() -> str:
-        return "Mother/Father/Proband - filter for recessive/dominant/denovo inheritance"
+        return (
+            "Mother/Father/Proband - filter for recessive/dominant/denovo inheritance. "
+            "'Any Affected' returns variants present in at least one affected family "
+            "member (collapsing to proband alone if no parent is affected)."
+        )
 
     @staticmethod
     def get_zygosity_table_data() -> dict:
@@ -348,6 +433,7 @@ class TrioNode(AbstractCohortBasedNode):
         # Members whose zygosity varies with affected status per mode
         affected_members = {
             TrioInheritance.DOMINANT: ['mother', 'father'],
+            TrioInheritance.ANY_AFFECTED: ['mother', 'father'],
         }
 
         data = {}
@@ -372,20 +458,38 @@ class TrioNode(AbstractCohortBasedNode):
                     handler = klass(stub_node)
                     zyg = handler._get_mum_dad_proband_zygosities()
                     data[mode] = {member: fmt(z) for member, z in zip(members, zyg)}
+            elif klass is TrioAllRecessive:
+                handler = klass(stub_node)
+                ar_zyg = handler._recessive_zyg()
+                xlr_zyg = handler._xlinked_zyg()
+                data[mode] = {
+                    'mother':  f"AR: {fmt(ar_zyg[0])}\nXLR: {fmt(xlr_zyg[0])}",
+                    'father':  f"AR: {fmt(ar_zyg[1])}\nXLR: --",
+                    'proband': f"AR: {fmt(ar_zyg[2])}\nXLR: {fmt(xlr_zyg[2])}",
+                }
+            elif klass is TrioAnyAffected:
+                handler = klass(stub_node)
+                has_variant = fmt(TrioAnyAffected.HAS_VARIANT)
+                entry = {'proband': has_variant}
+                for affected_val in (False, True):
+                    suffix = '_affected' if affected_val else '_unaffected'
+                    for member in ('mother', 'father'):
+                        entry[member + suffix] = has_variant if affected_val else '—'
+                data[mode] = entry
             else:
                 # CompHet
                 handler = klass(stub_node)
-                mum1, dad1, proband1 = handler._mum_but_not_dad()
+                _, _, proband1 = handler._mum_but_not_dad()
                 data[mode] = {
                     'mother': '',
                     'father': '',
                     'proband': fmt(proband1),
-                    'note': 'Proband HET with \u22652 hits in a gene, one from each parent',
                 }
 
-            if mode == TrioInheritance.XLINKED_RECESSIVE:
+            description = handler.get_other_filters_description()
+            if description:
                 for member in members:
-                    data[mode]['other_filters_' + member] = 'Variant on chr X'
+                    data[mode]['other_filters_' + member] = description
 
         return data
 

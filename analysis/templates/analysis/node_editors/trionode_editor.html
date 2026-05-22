@@ -35,7 +35,6 @@
         $(".other-mother").text(otherFilters('mother'));
         $(".other-father").text(otherFilters('father'));
         $(".other-proband").text(otherFilters('proband'));
-        $("#zygosity-note").text(map.note || '');
     }
 
     function displayTrioInfo(data) {
@@ -140,12 +139,11 @@
                             <tr><th>Member</th><th>Expected Zygosity</th><th>Other Filters</th></tr>
                         </thead>
                         <tbody>
-                            <tr><td>Mother</td><td class="zyg-mother"></td><td class="other-mother"></td></tr>
-                            <tr><td>Father</td><td class="zyg-father"></td><td class="other-father"></td></tr>
-                            <tr><td>Proband</td><td class="zyg-proband"></td><td class="other-proband"></td></tr>
+                            <tr><td>Mother</td><td class="zyg-mother" style="white-space: pre-line"></td><td class="other-mother"></td></tr>
+                            <tr><td>Father</td><td class="zyg-father" style="white-space: pre-line"></td><td class="other-father"></td></tr>
+                            <tr><td>Proband</td><td class="zyg-proband" style="white-space: pre-line"></td><td class="other-proband"></td></tr>
                         </tbody>
                     </table>
-                    <div id="zygosity-note" class="text-muted small"></div>
                 </div>
             </div>
             <div>
