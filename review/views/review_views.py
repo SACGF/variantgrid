@@ -131,7 +131,9 @@ def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelM
     else:
         initial = {}
         if not review.pk:
-            initial["reviewing_labs"] = {UserSettings.get_for_user(request.user).default_lab}
+            default_lab = UserSettings.get_for_user(request.user).default_lab
+            if default_lab in review.reviewing.source_object.reviewing_labs:
+                initial["reviewing_labs"] = {default_lab}
         discussion_form = ReviewForm(review=review, initial=initial)
 
     return render(request, 'review/review.html', {
@@ -144,9 +146,9 @@ def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelM
 
 def new_review(request, reviewed_object_id: int, topic_id: str):
     reviewed_object = ReviewedObject.objects.get(pk=reviewed_object_id)
-
     topic = ReviewTopic.objects.get(pk=topic_id)
     review = reviewed_object.new_review(topic=topic, user=request.user)
+    review.check_can_view(request.user)
 
     return _handle_review(request=request, review=review, reviewing=reviewed_object)
 

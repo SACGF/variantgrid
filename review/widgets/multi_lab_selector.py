@@ -1,5 +1,7 @@
 from typing import Iterable, Any
 
+from django.core.exceptions import ValidationError
+
 from snpdb.models import Lab
 from uicore.widgets.radio_other_widget import MultiChoiceFieldWithOther, CheckboxOtherWidget
 
@@ -20,5 +22,11 @@ class MultiChoiceLabField(MultiChoiceFieldWithOther):
 
     def to_python(self, value):
         if isinstance(value, (set, list, tuple)):
-            return [self.labs[int(v)] for v in value]
+            result = []
+            for v in value:
+                try:
+                    result.append(self.labs[int(v)])
+                except (KeyError, ValueError):
+                    raise ValidationError("Invalid lab selection.")
+            return result
         return []

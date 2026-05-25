@@ -23,7 +23,7 @@
 {% block content %}
     <div class="container">
         <form method="post">
-            {% csrf_token action="{{ request.path }}" %}
+            {% csrf_token %}
 
             {% if not review.pk %}<h4>Step 1 of 2</h4>{% endif %}
 
