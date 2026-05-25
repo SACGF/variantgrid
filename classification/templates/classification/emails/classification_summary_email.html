@@ -129,7 +129,7 @@ Hello Shariant User,
                                                 {% for lab_summ in discordance_report_summary.lab_significances %}
                                                     <div {% if lab_summ.clinical_significance_to == 'withdrawn' %}style="opacity:0.6"{% endif %}>
                                                         <span style="display:inline-block;margin-right:6px">
-                                                            {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
+                                                            {% lab lab_summ.lab is_your_lab=lab_summ.is_internal %}
                                                             {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
                                                         </span>
                                                         {% if lab_summ.changed %}
