@@ -57,6 +57,21 @@
             </p>
         {% end_page_help_embedded %}
 
+        <div class="p-4 m-4" style="border: 1px solid red; border-radius: 16px">
+            <h4>{{ 'W' | severity_icon }} Discordance Reports are being replaced</h4>
+            <p>
+                Discordance reports are being replaced with "Overlaps".<br/>
+                Overlaps have been designed to load faster, work in more contexts, and persist information
+                as records join and leave a discordant state.
+            </p>
+            {% if overlap %}
+            <p>
+                <div class="text-secondary">Discordance Reports are Read Only</div>
+                This discordance report has been migrated to <a style="font-weight:bold" class="hover-link" href="{{ overlap.get_absolute_url }}">This Overlap</a>
+            </p>
+            {% endif %}
+        </div>
+
          <div class="card" id="discordance-report-card">
             <div class="card-header">
                 <h5>Discordance Report (<i class="{{ data.report.preview.icon }} preview-icon"></i> DR_{{ data.report.id }}) {% admin_link data.report %}</h5>

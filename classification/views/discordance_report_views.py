@@ -13,11 +13,12 @@ from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render, redirect
 from django.urls import reverse
 
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, TestingContextBucket
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
-    ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger
+    ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger, Overlap, OverlapType, \
+    ClassificationResultValue
 from classification.models.classification_groups import ClassificationGroupUtils, ClassificationGroups
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData
@@ -131,7 +132,9 @@ class DiscordanceReportTemplateData:
 
     @property
     def is_user_editable(self):
-        return self.report.can_view(self.user) and self.latest_for_allele_if_not_this is None
+        # DISCORDANCE-DEPRECATION
+        return False
+        # return self.report.can_view(self.user) and self.latest_for_allele_if_not_this is None
 
     @property
     def clinical_context(self) -> ClinicalContext:
@@ -346,6 +349,16 @@ def discordance_report_view(request: HttpRequest, discordance_report_id: int) ->
         "data": data,
         "buckets": EvidenceKeyMap.clinical_significance_to_bucket()
     }
+
+    # migration to overlaps
+    overlap = Overlap.objects.filter(
+        overlap_type=OverlapType.SINGLE_CONTEXT,
+        value_type=ClassificationResultValue.ONC_PATH,
+        allele=data.report.clinical_context.allele,
+        testing_context_bucket=TestingContextBucket.GERMLINE
+    ).first()
+    context["overlap"] = overlap
+    #
 
     return render(request, "classification/discordance_report.html", context)
 

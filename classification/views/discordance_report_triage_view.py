@@ -51,10 +51,14 @@ class DiscordanceReportTriageView(AjaxFormView[DiscordanceReportTriage]):
                 user = request.user
                 discordance_report = obj.discordance_report
                 discordance_report_row = DiscordanceReportRowData(discordance_report=discordance_report, perspective=LabPickerData.for_user(user))
+                # DISCORDANCE-DEPRECATION
                 return {
+                    "read_only": True,
                     "next_step": discordance_report_row.next_step,
                     "report": discordance_report
                 }
+            # DISCORDANCE-DEPRECATION
+            return {"read_only": True}
 
         return LazyRender(
             template_name="classification/discordance_report_triage_detail.html",
