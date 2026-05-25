@@ -8,9 +8,9 @@ import multiprocessing as mp
 import nltk
 import time
 
-
 from annotation.models.models_phenotype_match import PhenotypeMatchTypes, \
-    TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, TextPhenotypeSentence
+    TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, TextPhenotypeSentence, \
+    filter_ambiguous_acronym_matches
 from annotation.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
 from library.utils import get_and_log_time_since, invert_dict_of_lists
 from patients.models import Patient
@@ -264,6 +264,7 @@ def process_text_phenotype(text_phenotype, phenotype_matcher):
 
     try:
         matches = parse_words(text_phenotype, words_and_spans, phenotype_matcher)
+        matches = filter_ambiguous_acronym_matches(matches)
         if matches:
             TextPhenotypeMatch.objects.bulk_create(matches)
     except SkipAllPhenotypeMatchException:

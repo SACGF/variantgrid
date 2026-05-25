@@ -16,6 +16,19 @@ PATIENT_ONTOLOGY_TERM_PATH = PATIENT_TPM_PATH + "__ontology_term"
 PATIENT_GENE_SYMBOL_PATH = PATIENT_TPM_PATH + "__gene_symbol"
 
 
+def filter_ambiguous_acronym_matches(matches: list["TextPhenotypeMatch"]) -> list["TextPhenotypeMatch"]:
+    """Drop unsaved TextPhenotypeMatch instances whose matched text is an ambiguous
+    acronym (one short string mapping to multiple distinct concept clusters). These
+    are surfaced as warning-only entries by TextPhenotypeSentence.get_results()
+    rather than persisted, so downstream ontology-term queries can't silently pick
+    the wrong concept."""
+    from annotation.phenotype_matcher import get_ambiguous_acronym_denylist
+    denylist = get_ambiguous_acronym_denylist()
+    if not denylist:
+        return matches
+    return [m for m in matches if m.match_text.lower().replace(",", "") not in denylist]
+
+
 class DescriptionProcessingStatus(models.Model):
     CREATED = 'C'
     TOKENIZED = 'T'

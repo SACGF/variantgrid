@@ -192,11 +192,6 @@ class PhenotypeMatcher:
         special_case_lookups = self._get_special_case_lookups(self.hpo_pks, self.omim_pks, self.gene_symbol_records)
         self.hardcoded_lookups, self.case_insensitive_lookups, self.disease_families = special_case_lookups
 
-        # Ambiguous-acronym denylist: short keys that match multiple distinct
-        # concept clusters. Already-disambiguated keys are removed inside
-        # get_ambiguous_acronym_denylist().
-        self.ambiguous_acronyms = get_ambiguous_acronym_denylist()
-
     def get_matches(self, words_and_spans_subset) -> Tuple[List, List, List]:
         words = tuple(ws[0] for ws in words_and_spans_subset)
         return self._get_matches_for_words(words)
@@ -215,12 +210,10 @@ class PhenotypeMatcher:
         if any(special_case_match):
             hpo_list, omim_list, gene_symbols = special_case_match
         else:
-            # Ambiguous acronym - bail before any DB-bound matches are constructed.
-            # Re-checked at read time so downstream queries (patient grids etc.)
-            # can't pick up the wrong concept.
-            if lower_text.replace(",", "") in self.ambiguous_acronyms:
-                return [], [], []
-
+            # Ambiguous acronyms (short strings matching multiple distinct concept
+            # clusters) are matched here but dropped before persistence by
+            # filter_ambiguous_acronym_matches(), and surfaced as warning-only
+            # results by TextPhenotypeSentence.get_results().
             if len(lower_text) < MIN_MATCH_LENGTH:
                 return [], [], []
 
