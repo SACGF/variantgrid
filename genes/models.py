@@ -44,6 +44,7 @@ from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from snpdb.archive import DataArchivedError
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
     add_public_group_read_permission
@@ -1733,7 +1734,7 @@ class GeneListCategory(models.Model):
         return self.name
 
 
-class GeneList(TimeStampedModel):
+class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     """ Stores a gene/transcript list (to be used as a filter) """
 
     category = models.ForeignKey(GeneListCategory, null=True, blank=True, on_delete=CASCADE)
@@ -1790,13 +1791,16 @@ class GeneList(TimeStampedModel):
             # logging.info("GeneList: assign_permission_to_user_and_groups")
             assign_permission_to_user_and_groups(self.user, self)
 
-    def can_view(self, user_or_group: Union[User, Group]) -> bool:
-        read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
-        return user_or_group.has_perm(read_perm, self)
+    # can_view() uses Guardian object-level perms (provided by GuardianPermissionsMixin).
 
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
+        # As mixin's can_write(), but a locked GeneList can't be written to by anyone
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
         return user_or_group.has_perm(write_perm, self) and not self.locked
+
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        return True  # User-created list; deletable via the group_permissions delete view
 
     def get_warnings(self, release: GeneAnnotationRelease) -> list[str]:
         counts = {"unmatched symbols": self.unmatched_gene_symbols.count(),

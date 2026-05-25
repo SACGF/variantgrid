@@ -41,6 +41,7 @@ from variantgrid.celery import app
 
 
 class UploadedFile(TimeStampedModel):
+    # Ownership-based permissions (creator + superuser); not a Guardian object-level perms model.
     path = models.TextField(null=True)
     uploaded_file = models.FileField(storage=PrivateUploadStorage(),
                                      max_length=256, null=True)
@@ -77,6 +78,12 @@ class UploadedFile(TimeStampedModel):
         if isinstance(user_or_group, User):
             return user_or_group.is_superuser or self.user == user_or_group
         return False
+
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        # The creator (or a superuser) may delete their upload via the group_permissions delete view.
+        # Defined here directly as UploadedFile is ownership-based rather than a Guardian model.
+        return True
 
     def get_file(self):
         return open(self.get_filename(), "rb")

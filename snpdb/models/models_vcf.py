@@ -22,6 +22,7 @@ from guardian.shortcuts import get_objects_for_user
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback, report_event
@@ -59,7 +60,7 @@ class Project(models.Model):
         return name
 
 
-class VCF(DataArchiveMixin, PreviewModelMixin):
+class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     name = models.TextField(null=True)
     date = models.DateTimeField()
     # genome_build will be set if imported successfully
@@ -141,14 +142,6 @@ class VCF(DataArchiveMixin, PreviewModelMixin):
         if not user.has_perm(read_perm, vcf):
             raise PermissionDenied()
         return vcf
-
-    def can_view(self, user_or_group: Union[User, Group]) -> bool:
-        read_perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
-        return user_or_group.has_perm(read_perm, self)
-
-    def can_write(self, user_or_group: Union[User, Group]) -> bool:
-        write_perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
-        return user_or_group.has_perm(write_perm, self)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -307,7 +300,7 @@ class VCFTag(models.Model):
         return f"{self.tag}:{self.vcf}"
 
 
-class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
+class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.Model):
     """ A VCF sample storing genotype information
         Sample data is stored as packed fields in CohortGenotype (via vcf.cohort.cohortgenotypecollection) """
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
@@ -383,6 +376,10 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         if not self.can_write(user_or_group):
             msg = f"You do not have permission to modify sample {self.pk} (vcf {self.vcf.pk})"
             raise PermissionDenied(msg)
+
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        return True  # User data; deletable via the group_permissions delete view
 
     def delete_internal_data(self):
         """ for reloading in place """

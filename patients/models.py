@@ -171,6 +171,11 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     def can_write(self, user) -> bool:
         return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
 
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        # Deletable via the group_permissions delete view (can_write() still blocks externally-managed ones)
+        return True
+
     @property
     def code(self):
         return self.patient_code or self.external_pk or f"Patient:{self.pk}"

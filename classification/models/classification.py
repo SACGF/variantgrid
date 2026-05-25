@@ -442,6 +442,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     Based on ACMG criteria and evidence - @see https://www.nature.com/articles/gim201530
     """
 
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        # Classifications are not hard-deleted via the generic group_permissions delete view -
+        # their lifecycle is withdrawal/flagging, and ClassificationModification keeps the history.
+        return False
+
     # TODO - remove variant and allele in favour of having that accessed via  variant_info
     variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
     """ Deprecated -  """
@@ -2224,6 +2230,11 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         It's this record (not raw Classifications) that appear on grids, so that only correctly saved/shared
         classifications are shown (ie not partially edited ones)
     """
+
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        # Immutable audit/version history - must never be deletable via the group_permissions delete view
+        return False
 
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)  # One who did last change, may not be classification.user

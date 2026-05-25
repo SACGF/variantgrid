@@ -53,6 +53,7 @@ from library import uptime_check
 from library.constants import WEEK_SECS, HOUR_SECS
 from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser, \
     get_field_counts
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
@@ -105,8 +106,27 @@ def maps(request):
     return render(request, 'maps.html')
 
 
-def get_writable_class_object(user, class_name, primary_key):
-    klass = import_class(class_name)
+def _import_permission_class(class_name):
+    """ class_name comes from the URL - resolve it to a class, tolerating anything that doesn't. """
+    try:
+        klass = import_class(class_name)
+    except (ImportError, AttributeError, ValueError):
+        klass = None
+    return klass if isinstance(klass, type) else None
+
+
+def _require_guardian_permission_class(class_name):
+    """ For the sharing views (group_permissions / bulk): only models that implement Guardian
+        object-level permissions can have their permissions viewed/edited. Without this an attacker
+        could pass an arbitrary class_name and act on models whose can_write() defaults to True
+        (e.g. collaborative Wikis). """
+    klass = _import_permission_class(class_name)
+    if not (klass and issubclass(klass, GuardianPermissionsMixin)):
+        raise PermissionDenied(f"'{class_name}' is not a permission-managed class")
+    return klass
+
+
+def _get_writable_object(user, klass, primary_key):
     name = klass.__name__
     obj = klass.objects.get(pk=primary_key)
 
@@ -118,8 +138,13 @@ def get_writable_class_object(user, class_name, primary_key):
     return obj, name
 
 
+def get_writable_class_object(user, class_name, primary_key):
+    klass = _require_guardian_permission_class(class_name)
+    return _get_writable_object(user, klass, primary_key)
+
+
 def get_writable_class_objects(user, class_name):
-    klass = import_class(class_name)
+    klass = _require_guardian_permission_class(class_name)
     name = klass.__name__
     write_perm = DjangoPermission.perm(klass, DjangoPermission.WRITE)
     qs = get_objects_for_user(user, write_perm, klass=klass, accept_global_perms=False)
@@ -168,7 +193,13 @@ def group_permissions_object_delete(request, class_name, primary_key):
     if class_name == 'snpdb.models.VCF':  # TODO: Hack? Make some class object?
         soft_delete_vcfs(request.user, primary_key)
     else:
-        obj, _ = get_writable_class_object(request.user, class_name, primary_key)
+        klass = _import_permission_class(class_name)
+        # Deletion via this generic endpoint is opt-in per class - having WRITE permission isn't
+        # enough (e.g. ClassificationModification audit records must never be deletable here).
+        allow_delete = getattr(klass, "allow_group_permission_delete", None)
+        if not (callable(allow_delete) and allow_delete()):
+            raise PermissionDenied(f"'{class_name}' does not allow deletion via group permissions")
+        obj, _ = _get_writable_object(request.user, klass, primary_key)
         try:
             obj.delete()
         except IntegrityError as ie:
@@ -714,7 +745,7 @@ def manual_variant_entry(request):
 
 
 def manual_variant_entry_collection_detail(request: HttpRequest, pk: int):
-    mvec = ManualVariantEntryCollection.objects.get(pk=pk)
+    mvec = ManualVariantEntryCollection.get_for_user(request.user, pk)
     return render(request, 'snpdb/data/manual_variant_entry_collection_detail.html', context={'mvec': mvec})
 
 
@@ -1582,9 +1613,9 @@ def wait_for_task(request, celery_task, sleep_ms, redirect_url):
 
 @require_POST
 def wiki_save(request, class_name, unique_keyword, unique_value):
-    wiki = Wiki.get_or_create(class_name, unique_keyword, unique_value)
+    # get_or_create checks write permission (throws 403) before creating the row
+    wiki = Wiki.get_or_create(class_name, unique_keyword, unique_value, user=request.user)
     markdown = request.POST["markdown"]
-    wiki.check_user_edit_permission(request.user)  # Throws 403
 
     wiki.markdown = markdown
     wiki.last_edited_by = request.user
