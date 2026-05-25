@@ -125,19 +125,22 @@ class ReviewedObject(TimeStampedModel):
     @cached_property
     def source_object(self) -> 'ReviewableModelMixin':
         """
-        The object that the FlagCollection is attached to, will be responsible for determining the user's permissions
-        in relation to the FlagCollection
+        The object that the Review is attached to, will be responsible for determining the user's permissions
+        in relation to the Review
         """
 
         # ._source_object could be set either via getting FlagInfo (via a hook)
         # or by us directly going through the
-        foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('reviews')]
+        foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('reviews') and not m.startswith("_")]
         for foreign_set in foreign_sets:
-            source_object = getattr(self, foreign_set).first()
-            if source_object:
-                return source_object
+            try:
+                source_object = getattr(self, foreign_set).first()
+                if source_object:
+                    return source_object
+            except:
+                pass
 
-        logging.warning('Could not find source object for FlagCollection %s', self.id)
+        logging.warning('Could not find source object for Review %s', self.id)
 
         raise ValueError(f"Review {self.pk} does not appear to be attached to an object")
 
