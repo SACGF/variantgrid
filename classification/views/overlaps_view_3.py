@@ -66,7 +66,10 @@ def view_overlaps_3(request: HttpRequest, lab_id=None) -> HttpResponseBase:
     if redirect_response := lab_picker.check_redirect():
         return redirect_response
 
-    return render(request, "classification/overlaps_3.html", {"lab_picker_data": lab_picker})
+    return render(request, "classification/overlaps_3.html", {
+        "lab_picker_data": lab_picker,
+        "tab": request.GET.get("tab") or "TT"
+    })
 
 
 class TriageView3(AjaxFormView[OverlapContribution]):

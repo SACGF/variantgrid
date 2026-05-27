@@ -87,12 +87,12 @@
 
     <div id="triage_status_filter" class="my-4">
         <div class="btn-group btn-group-toggle" data-toggle="buttons">
-            <label class="btn btn-outline-danger"><input type="radio" name="triage_status_filter" id="triage_status_filter-t" value="TT" checked="checked">Awaiting Triage</label>
-            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-d" value="7">Ready to Discuss</label>
-            <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="5">Awaiting Amendment</label>
-            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="2">Waiting on Other Lab</label>
-            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="6">Complex</label>
-            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="X">All Overlaps</label>
+            <label class="btn btn-outline-danger"><input type="radio" name="triage_status_filter" id="triage_status_filter-t" value="TT" {% if tab == "TT" %}checked="checked"{% endif %}>Awaiting Triage</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-d" value="7" {% if tab == "D" %}checked="checked"{% endif %}>Ready to Discuss</label>
+            <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="5" {% if tab == "AA" %}checked="checked"{% endif %}>Awaiting Amendment</label>
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="2" {% if tab == "O" %}checked="checked"{% endif %}>Waiting on Other Lab</label>
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="6" {% if tab == "C" %}checked="checked"{% endif %}>Complex</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="X" {% if tab == "A" %}checked="checked"{% endif %}>All Overlaps</label>
         </div>
     </div>
 
