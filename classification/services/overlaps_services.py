@@ -9,7 +9,8 @@ from auditlog.context import set_extra_data
 from auditlog.models import LogEntry
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q, Subquery, OuterRef
+from django.db.models.aggregates import Max
 from django.utils.timezone import now
 
 from classification.enums import TestingContextBucket, OverlapStatus
@@ -19,10 +20,11 @@ from classification.models import ClassificationGrouping, ClassificationResultVa
     DiscordanceReport
 from classification.models.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
-    OverlapCalculatorClinSig
+    OverlapCalculatorClinSig, OVERLAP_CLIN_SIG_ENABLED
 import json
 
 from classification.signals import send_prepared_discordance_notifications
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 
 
@@ -500,3 +502,73 @@ class OverlapGrouping3:
                     change_rows.append(change_row)
 
         return list(sorted(change_rows))
+
+
+@dataclass(frozen=True)
+class OverlapCount:
+    total: int = 0
+    medical: int = 0
+
+    def __bool__(self):
+        return self.total != 0
+
+
+@dataclass(frozen=True)
+class OverlapCounts:
+    overall_total: int
+    overall_medical: int
+    awaiting_triage_no_triage: int
+    awaiting_triage_others_have_triaged: int
+    ready_for_discussion: int
+
+    @property
+    def awaiting_triage_any(self):
+        return self.awaiting_triage_no_triage + self.awaiting_triage_others_have_triaged
+
+
+class OverlapsSummary:
+
+    def __init__(self, perspective: LabPickerData):
+        self.perspective = perspective
+
+    @cached_property
+    def base_qs(self):
+        qs = Overlap.objects.filter(valid=True)
+        qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
+        # only ONC PATH for now
+        if not OVERLAP_CLIN_SIG_ENABLED:
+            qs = qs.filter(value_type=ClassificationResultValue.ONC_PATH)
+        qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
+
+        lab_filter_q = Q(contribution__classification_grouping__lab__in=self.perspective.lab_ids) & Q(
+            contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
+
+        qs = qs.annotate(skew_status=Subquery(
+                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                    overlap=OuterRef('pk')
+                ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
+            ))
+        qs = qs.filter(skew_status__isnull=False)
+
+        return qs
+
+    def awaiting_triage_medical_overlaps(self) -> list[Overlap]:
+        return self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT, skew_status__in=(TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED))[0:100]
+
+    @cached_property
+    def counts(self):
+
+        overall_total = self.base_qs.count()
+        overall_medical = self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT).count()
+
+        return OverlapCounts(
+            overall_total=self.base_qs.count(),
+            overall_medical=self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT).count(),
+            awaiting_triage_no_triage = self.base_qs.filter(skew_status=TriageNextStep.AWAITING_YOUR_TRIAGE).count(),
+            awaiting_triage_others_have_triaged = self.base_qs.filter(skew_status=TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED).count(),
+            ready_for_discussion = self.base_qs.filter(skew_status=TriageNextStep.TO_DISCUSS).count()
+        )
+
+    def overlaps_awaiting_triage(self):
+        awaiting_triage_qs = self.base_qs.filter(skew_status__in=(TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED))
+        return awaiting_triage_qs.order_by('-overlap_status_change_timestamp')

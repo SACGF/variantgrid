@@ -73,7 +73,7 @@ class OverlapContribution(TimeStampedModel):
     @property
     def testing_context_full(self) -> TestingContextFull:
         return TestingContextFull(
-            testing_context_bucket=self.testing_context_bucket_obj,
+            testing_context_bucket=TestingContextBucket(self.testing_context_bucket_obj),
             tumor_type_category=self.tumor_type_category
         )
 
@@ -254,7 +254,10 @@ class Overlap(TimeStampedModel):
     @property
     def testing_context_full(self) -> TestingContextFull:
         # TOD
-        return TestingContextFull(testing_context_bucket=self.testing_context_bucket, tumor_type_category=self.tumor_type_category)
+        return TestingContextFull(
+            testing_context_bucket=TestingContextBucket(self.testing_context_bucket),
+            tumor_type_category=self.tumor_type_category
+        )
 
     @property
     def priority_order(self) -> Any:

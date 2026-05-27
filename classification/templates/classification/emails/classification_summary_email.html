@@ -12,6 +12,93 @@ Hello Shariant User,
         {% for lab_summary in data.lab_summaries %}
             <h4>{{ lab_summary.lab.organization.name }} / {{ lab_summary.lab.name }}</h4>
 
+            {% with counts=lab_summary.overlaps_summary.counts %}
+                <table cellpadding="10" style="border-collapse: collapse;">
+                    <tbody>
+                        <tr>
+                            <th style="{{ th_style }}">Last Uploaded a New Classification Record</th>
+                            <td>
+                                {% if lab_summary.last_imported_new_ago %}
+                                    {{ lab_summary.last_imported_new_ago }} ago
+                                {% else %}
+                                    <span style="color:#888">Have not yet uploaded a classification record</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th style="text-align:right; font-weight:800; color:#444; font-family: monospace">Total Discordant Overlaps</th>
+                            <td>
+                                {% if counts.overall_total %}
+                                    <a href="{% absolute_url 'overlaps_3' %}"><span style="{{ number_style }}">{{ counts.overall_total }}</span> active discordance{% plural counts.overall_total %}</a>
+                                    {% if counts.overall_medical %} <span style="color:#888">({{ counts.overall_medical }} medically significant)</span>{% endif %}
+                                {% else %}
+                                    <span style="color:#888">No active discordances</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if counts.overall_total %}
+                            <tr>
+                                <th style="text-align:right; font-weight:800; color:#444; font-family: monospace">Discordant Overlaps Awaiting Triage</th>
+                                <td>
+                                    {% if counts.awaiting_triage_any %}
+                                        <span style="{{ number_style }}">{{ counts.awaiting_triage_any }}</span> active discordance{% plural counts.awaiting_triage_any %} awaiting your triage</a>
+                                        {% if counts.awaiting_triage_others_have_triaged %} <span style="color:#B88">({{ counts.awaiting_triage_others_have_triaged }} already triaged by other labs)</span>{% endif %}
+                                    {% else %}
+                                        <span style="color:#888">No active discordances</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th style="text-align:right; font-weight:800; color:#444; font-family: monospace">Overlaps in Discordance Ready to Discuss</th>
+                                <td>
+                                    {{ counts.ready_for_discussion }} of your discordances {% plural items=counts.ready_for_discussion plural='are' singular='is' %} ready to discuss with other labs
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            {% endwith %}
+
+            {% if lab_summary.overlaps_summary.awaiting_triage_medical_overlaps.exists %}
+                <div style="padding-left: 24px; margin-top:16px">
+                    <span>Medically significant discordances awaiting triage</span>
+                    <table cellpadding="10" style="border-collapse: collapse">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #bbb;">
+                                <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">Shariant ID</th>
+                                <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">Discordance<br/>Detected</th>
+                                <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">c.HGVS</th>
+                                <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">Context</th>
+                                <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">Lab/Context</th>
+                            </tr>
+                        </thead>
+                        {% for overlap in lab_summary.overlaps_summary.awaiting_triage_medical_overlaps %}
+                            {% overlap_row_email overlap lab_summary.lab lab_summary.user %}
+                        {% endfor %}
+                    </table>
+                </div>
+            {% endif %}
+
+            {% comment %}
+            <div>{{ lab_summary.overlaps_summary.counts }}</div>
+
+            {% if lab_summary.overlaps_summary.overlaps_awaiting_triage %}
+                <table>
+                    <thead>
+                        <th>c.HGVS</th>
+                    </thead>
+                    <tbody>
+                        {% for overlap in lab_summary.overlaps_summary.overlaps_awaiting_triage %}
+                            <tr>
+                                <td>CHGVS go here</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
             {% with counts=lab_summary.discordance_report_categories.all_counts %}
                 <table cellpadding="10" style="border-collapse: collapse;">
                     <tbody>
@@ -96,6 +183,8 @@ Hello Shariant User,
                     </tbody>
                 </table>
             {% endwith %}
+            {% endcomment %}
+            {% comment %}
 
             {% with pending_triage=lab_summary.discordance_report_categories.to_triage_table %}
                 {% with pending_triage_medical=pending_triage.medically_significant_only %}
@@ -121,7 +210,7 @@ Hello Shariant User,
                                                 {% for c_hgvs_val in discordance_report_summary.c_hgvses %}
                                                 <div>{% c_hgvs c_hgvs_val show_genome_build=False %}</div>
                                                 {% endfor %}
-                                            </td> {% comment %}do inline style for c.hgvs{% endcomment %}
+                                            </td>
                                             <td>
                                                 {% if discordance_report_summary.is_pending_concordance %}
                                                     <div style="color:#6c6;font-weight:bold">Pending Concordance</div>
@@ -150,6 +239,7 @@ Hello Shariant User,
                     {% endif %}
                 {% endwith %}
             {% endwith %}
+            {% endcomment %}
         {% endfor %}
     {% endwith %}
 {% endwith %}

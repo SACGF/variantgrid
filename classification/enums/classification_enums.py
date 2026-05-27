@@ -102,6 +102,15 @@ class TestingContextFull:
         else:
             return self.testing_context_bucket.label
 
+    def inline_color_rgb(self) -> str:
+        # should only be used when we're inline in an email and can't access stylesheets
+        match self.testing_context_bucket:
+            case TestingContextBucket.GERMLINE: return "#3c3"
+            case TestingContextBucket.SOLID_TUMOR: return "#cc3"
+            case TestingContextBucket.HAEMATOLOGY: return "#cb3"
+            case TestingContextBucket.NON_CANCER: return "#ca3"
+            case _: return "#000"
+
 
 class AlleleOriginBucket(TextChoices):
     GERMLINE = "G", "Germline"

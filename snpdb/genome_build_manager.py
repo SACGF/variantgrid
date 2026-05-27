@@ -1,6 +1,7 @@
 import re
 from typing import Optional
 
+from django.contrib.auth.models import User
 from django.core.handlers.wsgi import WSGIRequest
 from threadlocals.threadlocals import get_current_user, get_request_variable, set_request_variable, get_current_request
 
@@ -13,7 +14,7 @@ GENOME_BUILD_RE = re.compile(r"(?:^|/)(GRCh3[78])(?:\?|$|/)")
 class GenomeBuildManager:
 
     @staticmethod
-    def get_current_genome_build():
+    def get_current_genome_build(user: Optional[User] = None):
         # See if we've set a request variable already with the genome build
         # after we calculate the genome build we cache it as a request variable
         genome_build: Optional[GenomeBuild] = None
@@ -40,8 +41,10 @@ class GenomeBuildManager:
                     pass
 
         if genome_build is None:
-            if user := get_current_user():
+            if user:
                 genome_build = UserSettings.get_genome_build_or_default(user)
+            elif current_user := get_current_user():
+                genome_build = UserSettings.get_genome_build_or_default(current_user)
 
         if genome_build is None:
             genome_build = GenomeBuild.builds_with_annotation()[0]

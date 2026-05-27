@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
+from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
@@ -490,13 +491,13 @@ def _to_c_hgvs(c_hgvs: Any) -> CHGVS:
 
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[CHGVS, ClassificationModification, str], show_genome_build: Optional[bool] = None):
+def c_hgvs(c_hgvs: Union[CHGVS, ClassificationModification, str], show_genome_build: Optional[bool] = None, inline: bool = False):
     c_hgvs = _to_c_hgvs(c_hgvs)
 
     if show_genome_build is None:
         show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
 
-    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None}
+    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None, "inline": inline}
 
 
 @register.inclusion_tag("classification/tags/allele.html")
@@ -819,3 +820,23 @@ def triage(context,
         "show_icon": show_icon,
         "last_comment": last_comment
     }
+
+
+# Overlap Email
+@register.inclusion_tag("classification/tags/overlap_row_email.html")
+def overlap_row_email(overlap: Overlap, lab: Lab, user: User):
+
+    date_str = f"{overlap.overlap_status_change_timestamp:%Y-%m-%d}"
+    if (timezone.now() - overlap.overlap_status_change_timestamp) <= timedelta(days=1):
+        date_str = f"{date_str} (NEW)"
+    data = {
+        "date_str": date_str,
+        "overlap": overlap
+    }
+    if lab_skew := overlap.overlapcontributionskew_set.filter(contribution__classification_grouping__lab=lab).first():
+        lab_classification_grouping = lab_skew.contribution.classification_grouping
+        genome_build = GenomeBuildManager.get_current_genome_build(user)
+        c_hgvs = lab_classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build)
+        data["c_hgvs"] = c_hgvs
+
+    return data

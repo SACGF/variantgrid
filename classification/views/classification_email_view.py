@@ -16,6 +16,7 @@ from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
     DiscordanceReportClassification, DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportCategories
+from classification.services.overlaps_services import OverlapsSummary
 from email_manager.models import EmailLog
 from flags.models import FlagCollection, Flag
 from library.log_utils import report_exc_info, report_message
@@ -45,6 +46,11 @@ class EmailLabSummaryData:
     def genome_build(self) -> GenomeBuild:
         # TODO if user setting isn't set, grab it from lab instead
         return UserSettings.get_genome_build_or_default(self.user)
+
+    @cached_property
+    def overlaps_summary(self):
+        return OverlapsSummary(perspective=LabPickerData.for_lab(self.lab))
+    # the below are all deprecated
 
     def _get_discordance_report_summaries(self):
         discordant_vcs = FlagCollection.filter_for_open_flags(

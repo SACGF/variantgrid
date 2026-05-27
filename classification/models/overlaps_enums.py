@@ -68,6 +68,10 @@ class TriageStatus(TextChoices):
     NON_INTERACTIVE_THIRD_PARTY = "Z", "Non-Interactive Party"
 
     @property
+    def is_default(self):
+        return self in {TriageStatus.PENDING, TriageStatus.NON_INTERACTIVE_THIRD_PARTY}
+
+    @property
     def icon(self):
         match self:
             case TriageStatus.PENDING:

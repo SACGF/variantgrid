@@ -204,7 +204,9 @@ class ClassificationGrouping(TimeStampedModel):
 
     @property
     def testing_context_full(self) -> TestingContextFull:
-        return TestingContextFull(testing_context_bucket=self.testing_context, tumor_type_category=self.tumor_type_category)
+        return TestingContextFull(
+            testing_context_bucket=self.testing_context,
+            tumor_type_category=self.tumor_type_category)
 
     @property
     def allele_origin_bucket(self):
