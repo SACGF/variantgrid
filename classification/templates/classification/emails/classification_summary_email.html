@@ -69,9 +69,8 @@ Hello Shariant User,
                             <tr style="border-bottom: 1px solid #bbb;">
                                 <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">Shariant ID</th>
                                 <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">Discordance<br/>Detected</th>
-                                <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">c.HGVS</th>
-                                <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">Context</th>
-                                <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">Lab/Context</th>
+                                <th style="font-weight:600; text-align:left; padding-right: 8px; vertical-align: bottom">c.HGVS ({{ lab_summary.genome_build }}) / Context</th>
+                                <th style="font-weight:600; text-align:left; padding-left: 190px; padding-right: 8px; vertical-align: bottom">Lab / Value</th>
                             </tr>
                         </thead>
                         {% for overlap in lab_summary.overlaps_summary.awaiting_triage_medical_overlaps %}
