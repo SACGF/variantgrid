@@ -105,10 +105,10 @@ class TestingContextFull:
     def inline_color_rgb(self) -> str:
         # should only be used when we're inline in an email and can't access stylesheets
         match self.testing_context_bucket:
-            case TestingContextBucket.GERMLINE: return "#3c3"
-            case TestingContextBucket.SOLID_TUMOR: return "#cc3"
-            case TestingContextBucket.HAEMATOLOGY: return "#cb3"
-            case TestingContextBucket.NON_CANCER: return "#ca3"
+            case TestingContextBucket.GERMLINE: return "#33aa33"
+            case TestingContextBucket.SOLID_TUMOR: return "#aa33aa"
+            case TestingContextBucket.HAEMATOLOGY: return "#aa3399"
+            case TestingContextBucket.NON_CANCER: return "#aa3388"
             case _: return "#000"
 
 

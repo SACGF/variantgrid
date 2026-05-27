@@ -1,12 +1,12 @@
 {% load classification_tags %}
 {% load ui_menus %}
 <tr>
-    <td><a href="{% absolute_url 'overlap_3' overlap.pk %}">Overlap-{{ overlap.pk }}</a></td>
-    <td style="font-family:monospace">{{ date_str }}</td>
-    <td>{% c_hgvs c_hgvs inline=True %}<br/>
-    <span style="color:{{overlap.testing_context_full.inline_color_rgb}}">{{ overlap.testing_context_full }}</span>
+    <td style="border-top: 1px solid #cccccc"><a href="{% absolute_url 'overlap_3' overlap.pk %}">Overlap-{{ overlap.pk }}</a></td>
+    <td style="border-top: 1px solid #cccccc; font-family:monospace">{{ date_str }}</td>
+    <td style="border-top: 1px solid #cccccc;" >{% c_hgvs c_hgvs inline=True %}<br/>
+    <span style="color:{{overlap.testing_context_full.inline_color_rgb}}; font-family: monospace">{{ overlap.testing_context_full }}</span>
     </td>
-    <td>
+    <td style="border-top: 1px solid #cccccc;">
         <table>
         {% for contribution in overlap.contributions_list %}
             <tr>

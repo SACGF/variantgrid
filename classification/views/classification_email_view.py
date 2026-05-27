@@ -51,44 +51,44 @@ class EmailLabSummaryData:
     def overlaps_summary(self):
         return OverlapsSummary(perspective=LabPickerData.for_lab(self.lab))
     # the below are all deprecated
-
-    def _get_discordance_report_summaries(self):
-        discordant_vcs = FlagCollection.filter_for_open_flags(
-            Classification.objects.filter(lab=self.lab),
-            flag_types=[classification_flag_types.discordant]
-            # if flag types was not set it will be all flag types
-        )
-
-        report_ids = DiscordanceReportClassification.objects.filter(
-            classification_original__classification__in=discordant_vcs,
-            report__resolution=DiscordanceReportResolution.ONGOING).values_list('report', flat=True)
-        dr_qs = DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
-        return dr_qs
-
-    @cached_property
-    def discordance_report_categories(self) -> DiscordanceReportCategories:
-        return DiscordanceReportCategories(perspective=LabPickerData.for_lab(self.lab))
-
-    @cached_property
-    def flagged_variants(self) -> QuerySet[Flag]:
-        return FlagCollection.filter_for_open_flags(
-            Classification.objects.filter(lab=self.lab).exclude(withdrawn=True)
-        ).order_by('-created')
-
-    @cached_property
-    def pending_changes(self) -> QuerySet[Flag]:
-        return FlagCollection.filter_for_open_flags(
-            Classification.objects.filter(lab=self.lab).exclude(withdrawn=True),
-            flag_types=[classification_flag_types.classification_pending_changes]
-        ).order_by('-created')
-
-    @property
-    def flagged_variants_count(self) -> int:
-        return self.flagged_variants.count()
-
-    @property
-    def pending_changes_count(self) -> int:
-        return self.pending_changes.count()
+    #
+    # def _get_discordance_report_summaries(self):
+    #     discordant_vcs = FlagCollection.filter_for_open_flags(
+    #         Classification.objects.filter(lab=self.lab),
+    #         flag_types=[classification_flag_types.discordant]
+    #         # if flag types was not set it will be all flag types
+    #     )
+    #
+    #     report_ids = DiscordanceReportClassification.objects.filter(
+    #         classification_original__classification__in=discordant_vcs,
+    #         report__resolution=DiscordanceReportResolution.ONGOING).values_list('report', flat=True)
+    #     dr_qs = DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
+    #     return dr_qs
+    #
+    # @cached_property
+    # def discordance_report_categories(self) -> DiscordanceReportCategories:
+    #     return DiscordanceReportCategories(perspective=LabPickerData.for_lab(self.lab))
+    #
+    # @cached_property
+    # def flagged_variants(self) -> QuerySet[Flag]:
+    #     return FlagCollection.filter_for_open_flags(
+    #         Classification.objects.filter(lab=self.lab).exclude(withdrawn=True)
+    #     ).order_by('-created')
+    #
+    # @cached_property
+    # def pending_changes(self) -> QuerySet[Flag]:
+    #     return FlagCollection.filter_for_open_flags(
+    #         Classification.objects.filter(lab=self.lab).exclude(withdrawn=True),
+    #         flag_types=[classification_flag_types.classification_pending_changes]
+    #     ).order_by('-created')
+    #
+    # @property
+    # def flagged_variants_count(self) -> int:
+    #     return self.flagged_variants.count()
+    #
+    # @property
+    # def pending_changes_count(self) -> int:
+    #     return self.pending_changes.count()
 
 
 class EmailSummaryData:

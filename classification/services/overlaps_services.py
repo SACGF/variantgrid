@@ -552,8 +552,8 @@ class OverlapsSummary:
 
         return qs
 
-    def awaiting_triage_medical_overlaps(self) -> list[Overlap]:
-        return self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT, skew_status__in=(TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED))[0:100]
+    def awaiting_triage_medical_overlaps(self) -> QuerySet[Overlap]:
+        return self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT, skew_status__in=(TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED)).order_by('-overlap_status_change_timestamp')[0:100]
 
     @cached_property
     def counts(self):
