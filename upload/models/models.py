@@ -457,7 +457,7 @@ class UploadedVCF(models.Model):
         return self.vcf
 
     def get_upload_context(self) -> dict:
-        """ Dict for displaying JFU upload widget """
+        """ Dict for displaying upload widget """
         context = {}
         if self.vcf:
             context["import_status"] = self.vcf.import_status

@@ -646,7 +646,6 @@ INSTALLED_APPS = [
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
-    'jfu',
     'leaflet',
     'martor',
     "psqlextra",

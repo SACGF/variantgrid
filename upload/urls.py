@@ -25,8 +25,8 @@ urlpatterns = [
 
     path('view_upload_stats/detail', views.view_upload_stats, name='view_upload_stats_detail'),
     path('vcf_import_info_tags/accept/<int:vcf_import_info_id>', views.accept_vcf_import_info_tag, name='accept_vcf_import_info_tag'),
-    path('jfu_upload/', views.jfu_upload, name='jfu_upload'),
-    path('jfu_delete/<int:pk>', views.jfu_upload_delete, name='jfu_delete'),
+    path('upload_file/', views.upload_file, name='upload_file'),
+    path('upload_file_delete/<int:pk>', views.upload_file_delete, name='upload_file_delete'),
     path('uploaded_file/download/<int:pk>', views.DownloadUploadedFile.as_view(), name='download_uploaded_file'),
 
     # APIs - Django REST framework

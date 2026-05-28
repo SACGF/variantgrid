@@ -161,8 +161,6 @@ django-guardian==3.3.0
     # via -r requirements.in
 django-htmlmin==0.11.0
     # via -r requirements.in
-django-jfu @ git+https://github.com/davmlaw/django-jfu@692c6b209c9db04031b0947005b3ff2878dfdfa2#egg=django-jfu
-    # via -r requirements.in
 django-js-reverse==0.10.2
     # via -r requirements.in
 django-json-widget==2.1.1

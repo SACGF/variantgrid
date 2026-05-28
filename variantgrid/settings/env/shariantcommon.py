@@ -214,8 +214,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "upload_pipeline_modified_variants_grid": False,
     "view_upload_stats_detail": False,
     "accept_vcf_import_info_tag": False,
-    "jfu_upload": False,
-    "jfu_delete": False,
+    "upload_file": False,
+    "upload_file_delete": False,
     "download_uploaded_file": False,
 
     # discordance

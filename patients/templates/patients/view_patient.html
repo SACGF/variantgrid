@@ -13,6 +13,11 @@
 {% block title %}View Patient {{ patient }}{% endblock title %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
+    <link href="{% static 'js/lib/filepond/4.32.12/filepond.min.css' %}" rel="stylesheet">
+    <link href="{% static 'js/lib/filepond/file-poster/2.5.2/filepond-plugin-file-poster.min.css' %}" rel="stylesheet">
+    <link href="{% static 'js/lib/filepond/filepond-overrides.css' %}" rel="stylesheet">
+    <script src="{% static 'js/lib/filepond/4.32.12/filepond.min.js' %}"></script>
+    <script src="{% static 'js/lib/filepond/file-poster/2.5.2/filepond-plugin-file-poster.min.js' %}"></script>
     <style>
     ul#id_population li {
         display: inline-block;
@@ -42,20 +47,6 @@
     $(document).ready(() => {
         let form = $("form#patient-form");
         $("#patient-tabs").tabs();
-
-        // Patient Attachments
-        window.fileupload_ready = function () {
-            let $form = $('#fileupload');
-            {% if existing_files %}
-                let existingFiles = {{ existing_files | jsonify }};
-                $form.fileupload('option', 'done').call($form, $.Event('done'), {result: {files: existingFiles}});
-            {% endif %}
-
-            {% if not has_write_permission %}
-                $('.ui-button', '#fileupload').button("option", "disabled", true);
-                $(".fileupload-buttonbar").remove();
-            {% endif %}
-        };
     });
 </script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
@@ -122,10 +113,66 @@
             <h4>Attachments</h4>
             {% endif %}
             <a name="upload-section"></a>
-            <div id="jfu-container">
-                    {% load jfutags %}
-                    {% jfu 'patients/patient_file_upload.html' 'patient_file_upload' patient_id=patient.pk %}
+
+            {% if has_write_permission %}
+            <button type="button" id="patient-file-browse" class="btn btn-success mb-2">Add files...</button>
+            <input type="file" id="patient-file-upload" name="filepond" multiple>
+            {% endif %}
+
+            <div id="patient-attachments-list" class="mt-2">
+                {% for fd in existing_files %}
+                    <div class="d-inline-block mr-2 mb-2" data-attachment-pk="{{ fd.pk }}">
+                        {% if fd.thumbnailUrl %}
+                            <a href="{{ fd.url }}"><img src="{{ fd.thumbnailUrl }}" class="thumbnail" alt="{{ fd.name }}" title="{{ fd.name }}" /></a>
+                        {% else %}
+                            <a href="{{ fd.url }}">{{ fd.name }}</a>
+                        {% endif %}
+                    </div>
+                {% endfor %}
             </div>
+
+            {% if has_write_permission %}
+            <script>
+                (function() {
+                    const inputElement = document.querySelector('#patient-file-upload');
+                    if (!inputElement) {
+                        return;
+                    }
+                    if (typeof FilePondPluginFilePoster !== 'undefined') {
+                        FilePond.registerPlugin(FilePondPluginFilePoster);
+                    }
+                    const csrftoken = getCookie('csrftoken');
+                    const pond = FilePond.create(inputElement, {
+                        allowMultiple: true,
+                        credits: false,
+                        server: {
+                            process: {
+                                url: "{% url 'patient_file_upload' patient_id=patient.pk %}",
+                                method: 'POST',
+                                headers: {'X-CSRFToken': csrftoken},
+                            },
+                            revert: (uniqueFileId, load, error) => {
+                                fetch("/patients/patient_file_delete/" + uniqueFileId, {
+                                    method: 'DELETE',
+                                    headers: {'X-CSRFToken': csrftoken},
+                                }).then((resp) => {
+                                    if (resp.ok) {
+                                        load();
+                                    } else {
+                                        error('Could not revert');
+                                    }
+                                }).catch(() => error('Could not revert'));
+                            },
+                        },
+                    });
+
+                    const browseButton = document.querySelector('#patient-file-browse');
+                    if (browseButton) {
+                        browseButton.addEventListener('click', () => pond.browse());
+                    }
+                })();
+            </script>
+            {% endif %}
         </div>
         {% endif %}
 
