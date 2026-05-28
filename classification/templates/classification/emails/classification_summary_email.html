@@ -78,7 +78,7 @@ Hello Shariant User,
                             </tr>
                         </thead>
                         {% for overlap in lab_summary.overlaps_summary.awaiting_triage_medical_overlaps %}
-                            {% overlap_row_email overlap lab_summary.lab lab_summary.user %}
+                            {% overlap_row_email overlap lab_summary.lab lab_summary.genome_build %}
                         {% endfor %}
                     </table>
                 </div>

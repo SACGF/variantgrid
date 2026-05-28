@@ -824,19 +824,13 @@ def triage(context,
 
 # Overlap Email
 @register.inclusion_tag("classification/tags/overlap_row_email.html")
-def overlap_row_email(overlap: Overlap, lab: Lab, user: User):
+def overlap_row_email(overlap: Overlap, lab: Lab, genome_build: GenomeBuild):
 
     date_str = f"{overlap.overlap_status_change_timestamp:%Y-%m-%d}"
     if (timezone.now() - overlap.overlap_status_change_timestamp) <= timedelta(days=1):
         date_str = f"{date_str} (NEW)"
-    data = {
+    return {
         "date_str": date_str,
-        "overlap": overlap
+        "overlap": overlap,
+        "c_hgvs": overlap.c_hgvs(lab, genome_build)
     }
-    if lab_skew := overlap.overlapcontributionskew_set.filter(contribution__classification_grouping__lab=lab).first():
-        lab_classification_grouping = lab_skew.contribution.classification_grouping
-        genome_build = GenomeBuildManager.get_current_genome_build(user)
-        c_hgvs = lab_classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build)
-        data["c_hgvs"] = c_hgvs
-
-    return data

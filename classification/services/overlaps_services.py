@@ -3,12 +3,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 from json import JSONDecodeError
-from typing import Optional, Any
+from typing import Optional, Any, Self
 
 from auditlog.context import set_extra_data
 from auditlog.models import LogEntry
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import QuerySet, Q, Subquery, OuterRef
 from django.db.models.aggregates import Max
 from django.utils.timezone import now
@@ -17,15 +18,16 @@ from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, \
     TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
-    DiscordanceReport
+    DiscordanceReport, ClassificationImportRun
 from classification.models.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig, OVERLAP_CLIN_SIG_ENABLED
 import json
-
-from classification.signals import send_prepared_discordance_notifications
+from library.django_utils import get_url_from_view_path
+from library.log_utils import NotificationBuilder
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
+from snpdb.utils import LabNotificationBuilder
 
 
 class OverlapServices:
@@ -164,7 +166,7 @@ class OverlapServices:
         reviewed_will_discuss = status_buckets[TriageStatus.REVIEWED_WILL_DISCUSS]
         reviewed_confident = status_buckets[TriageStatus.REVIEWED_SATISFACTORY]
         reviewed_complex = status_buckets[TriageStatus.COMPLEX]
-        non_interactive = status_buckets[TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
+        # non_interactive = status_buckets[TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
 
         for entry in all_interactive_skews:
             entry.next_step = TriageNextStep.PENDING_CALCULATION
@@ -255,7 +257,7 @@ class OverlapServices:
         if not (new_status.is_discordant ^ old_status.is_discordant):
             # only care if we're going from discordant to not discordant or vice versa
             # an overlap could change from concordant to discordant back to concordant
-            # but we just check if the notification is worth sending
+            # , but we just check if the notification is worth sending
             return
 
         odn, created = OverlapDiscordanceNotification.objects.get_or_create(
@@ -340,7 +342,7 @@ class OverlapContributionPerspective:
     def _sort_index(self):
         return self.is_cross_context, self.is_user_lab, self.overlap_contribution
 
-    def __lt__(self, other):
+    def __lt__(self, other: Self):
         return self._sort_index < other._sort_index
 
 
@@ -411,7 +413,7 @@ class OverlapGrouping3:
                     return TriageComment.from_dict(to_json(value))
                 case "value":
                     return OverlapContribution.pretty_value_for(value, overlap_contribution.value_type)
-        except JSONDecodeError as jer:
+        except JSONDecodeError:
             return f"Decoding Error: {value}"
         return value
 
@@ -557,10 +559,6 @@ class OverlapsSummary:
 
     @cached_property
     def counts(self):
-
-        overall_total = self.base_qs.count()
-        overall_medical = self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT).count()
-
         return OverlapCounts(
             overall_total=self.base_qs.count(),
             overall_medical=self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT).count(),
@@ -572,3 +570,97 @@ class OverlapsSummary:
     def overlaps_awaiting_triage(self):
         awaiting_triage_qs = self.base_qs.filter(skew_status__in=(TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED))
         return awaiting_triage_qs.order_by('-overlap_status_change_timestamp')
+
+
+def _report_url_for_id(overlap: Overlap):
+    return get_url_from_view_path(overlap.get_absolute_url())
+
+
+def send_prepared_discordance_notifications(
+        outstanding_notifications: Optional[QuerySet[OverlapDiscordanceNotification]] = None) -> bool:
+    if ClassificationImportRun.ongoing_imports():
+        # don't send notifications while an import is ongoing
+        print("There's an ongoing import, wont send notifications")
+        return False
+
+    if outstanding_notifications is None:
+        outstanding_notifications = OverlapDiscordanceNotification.objects.filter(
+            notification_sent_date__isnull=True).order_by('pk')
+
+    if not outstanding_notifications.exists():
+        return False
+
+    outstanding_notifications = outstanding_notifications.select_related("overlap")
+    with transaction.atomic():
+        outstanding_notifications = outstanding_notifications.select_for_update()
+
+        current_date = now()
+        relevant_notifications: list[OverlapDiscordanceNotification] = []
+        notifications_by_lab: dict[Lab, list[OverlapDiscordanceNotification]] = defaultdict(list)
+
+        for notification in outstanding_notifications:
+            if not notification.is_still_relevant:
+                notification.delete()
+            else:
+                # send one notification per discordance so we don't try to send a single message too big for slack
+                overall_admin_notification = NotificationBuilder("Discordance notification").add_markdown(
+                    ":email: Sending Discordance Notification")
+                notification.notification_sent_date = current_date
+                relevant_notifications.append(notification)
+                # TODO detect which labs were once a part but then withdrew
+                # though currently not possible to tell if they were part of the allele from years back or from minutes ago and just withdrew
+                labs: set[Lab] = set()
+                for contribution in notification.overlap.contributions.filter(
+                        contribution_status=OverlapContributionStatus.CONTRIBUTING):
+                    if lab := contribution.lab:
+                        labs.add(lab)
+                        notifications_by_lab[lab].append(notification)
+
+                sorted_lab_str = "\n".join(str(lab) for lab in sorted(labs))
+
+                overlap = notification.overlap
+                discordance_status_icon = ":no_good:" if notification.new_status.is_discordant else ":handshake:"
+                overlap_description = f"{overlap.scope_description} {overlap.value_type_label}"
+                overlap_change = f"{notification.old_status.label} -> {notification.new_status.label} {discordance_status_icon}"
+
+                overall_admin_notification.add_field("Overlap",
+                                                     f"<{_report_url_for_id(notification.overlap)}|Overlap_{notification.overlap_id}> {overlap_description}")
+                overall_admin_notification.add_field("Involved Labs", sorted_lab_str)
+                overall_admin_notification.add_field("Change", overlap_change)
+                overall_admin_notification.send()
+
+        for lab, notifications in notifications_by_lab.items():
+            notifications_list = list(sorted(notifications))
+            notification_count = len(notifications)
+            if notification_count > 6:
+                subject = f"Discordance Update for {notification_count} Discordances"
+            else:
+                subject = "Discordance Update for (" + ", ".join(
+                    [f"Overlap_{notification.overlap_id}" for notification in notifications_list]) + ")"
+
+            lab_notification = LabNotificationBuilder(lab=lab, message=subject)
+
+            for index, notification in enumerate(notifications):
+                if not index == 0:
+                    lab_notification.add_divider()
+
+                overlap = notification.overlap
+
+                report_url = _report_url_for_id(notification.overlap)
+                # report_summary = DiscordanceReportRowData(discordance_report=dr, perspective=user_perspective)
+                lab_notification.add_markdown(f"The below overlap is now marked as *{notification.new_status.label}*")
+                # notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
+
+                lab_notification.add_field(label="Overlap", value=f"<{report_url}|Overlap_{notification.overlap_id}>")
+                # can't say when discordance detected on as overlap_status_change_timestamp would have been updated
+                lab_notification.add_field(label="c.HGVS", value=str(overlap.c_hgvs(lab)))
+
+                # now each lab's contribution
+                for contribution in overlap.contributions_list:
+                    # TODO, manually listing ClinVar Expert Panel whenever there's not a Lab is sloppy
+                    # make a method that returns a Lab or a str etc
+                    lab_notification.add_field(label=str(contribution.lab) if contribution.lab else "ClinVar Expert Panel", value=contribution.pretty_value)
+
+            lab_notification.send()
+        OverlapDiscordanceNotification.objects.bulk_update(relevant_notifications, fields=['notification_sent_date'])
+    return True

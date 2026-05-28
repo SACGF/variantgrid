@@ -2,6 +2,7 @@ from functools import reduce, cached_property
 from typing import Any, Optional
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
+from django.contrib.auth.models import User
 from django.db.models import CASCADE, QuerySet, SET_NULL, JSONField
 from django.db import models
 from django.db.models.enums import IntegerChoices
@@ -13,10 +14,12 @@ from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKe
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
+from genes.hgvs import CHGVS
 from library.utils import first, AuditUtils
 from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
-from snpdb.models import Allele, Lab
+from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.models import Allele, Lab, GenomeBuild
 
 
 class OverlapContribution(TimeStampedModel):
@@ -182,6 +185,21 @@ class Overlap(TimeStampedModel):
     def get_absolute_url(self):
         return reverse('overlap_3', kwargs={"overlap_id": self.pk})
 
+    def c_hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> CHGVS:
+        # if no genome_build provided, use the imported value
+        # TODO, if there are multiple contributions from the same lab, should we get multiple c.HGVSs?
+        lab_classification_grouping = self.contributions.filter(classification_grouping__lab=lab).first()
+        if not lab_classification_grouping:
+            # the lab doesn't actually have a horse in this game
+            lab_classification_grouping = self.contributions.filter(classification_grouping__isnull=False).first()
+        if not lab_classification_grouping:
+            return CHGVS()  # got nothing to work with in this overlap
+        if genome_build:
+            return lab_classification_grouping.classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build)
+        else:
+            return lab_classification_grouping.classification_grouping.latest_allele_info.imported_c_hgvs_obj
+
+
     # have to cache the values
     # contributions = models.ManyToManyField(OverlapContribution)
     @property
@@ -201,7 +219,7 @@ class Overlap(TimeStampedModel):
 
     @cached_property
     def contributions_list(self) -> list[OverlapContribution]:
-        return list(self.contributions.all())
+        return list(sorted(self.contributions.all()))
 
     class Meta:
         indexes = [models.Index(fields=['overlap_type']), models.Index(fields=['value_type']), models.Index(fields=['allele'])]
