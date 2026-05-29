@@ -1,7 +1,6 @@
-import logging
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Any, TypedDict, Literal
+from typing import Optional, Any, TypedDict, Literal, Tuple
 
 import django.dispatch
 from django.conf import settings
@@ -194,7 +193,9 @@ class ResolvedVariantInfo(TimeStampedModel):
         variant = self.variant
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        hgvs_matcher = HGVSMatcher(genome_build=genome_build) #
+        # hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
+        # version = hgvs_matcher.hgvs_converter.get_version()
 
         result = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
         c_hgvs = result.hgvs_variant.format()
@@ -210,7 +211,7 @@ class ResolvedVariantInfo(TimeStampedModel):
                                                           used_converter_type=result.converter_info.used_converter_type)
         return CHGVSResolution(
                 c_hgvs=c_hgvs,
-                c_hgvs_compatible=result.hgvs_variant.format(use_delins_for_inv=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
+                c_hgvs_compatible=result.hgvs_variant.format(use_compat=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
                 c_hgvs_converter_version=c_hgvs_converter_version,
                 c_hgvs_converter_data_version=data_version,
                 transcript_version=transcript_version,
@@ -522,7 +523,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return {GenomeBuild.grch37(), GenomeBuild.grch38()}
 
     @staticmethod
-    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'):
+    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'): #
         build_str: str
         if genome_build.is_equivalent(GenomeBuild.grch37()):
             build_str = 'grch37'
@@ -543,11 +544,11 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         return imported_vc, resolved_vc
 
-    def save(self, *args, **kwargs):
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None, **kwargs):
         if not self.imported_md5_hash:
             self.imported_md5_hash = md5sum_str(self.imported_c_hgvs or self.imported_g_hgvs)
 
-        super().save(*args, **kwargs)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields, **kwargs)
 
     def _calculate_validation(self) -> ImportedAlleleInfoValidationTags:
 
@@ -634,6 +635,24 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @property
     def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
+        if self.imported_c_hgvs:
+            return CHGVS(self.imported_c_hgvs)
+
+    @property
+    def imported_g_hgvs_obj(self) -> Optional[CHGVS]:
+        if self.imported_g_hgvs:
+            return CHGVS(self.imported_g_hgvs)
+
+    def imported_hgvs_obj(self) -> Optional[CHGVS]:
+        if c_hgvs := self.imported_c_hgvs_obj:
+            return c_hgvs
+        if g_hgvs := self.imported_g_hgvs_obj:
+            return g_hgvs
+        return None
+
+    @property
+    def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
+        # TODO - deprecate this in favour of imported hgvs (which handles g.HGVS imports)
         if imported_c_hgvs := self.imported_c_hgvs:
             c_hgvs = CHGVS(imported_c_hgvs)
             if imported_genome_build := self.imported_genome_build:
@@ -656,18 +675,6 @@ class ImportedAlleleInfo(TimeStampedModel):
                         c_hgvs_obj.genome_build = genome_build
                         return c_hgvs_obj
         return self.imported_hgvs_obj()
-
-    @property
-    def imported_g_hgvs_obj(self) -> Optional[CHGVS]:
-        if self.imported_g_hgvs:
-            return CHGVS(self.imported_g_hgvs)
-
-    def imported_hgvs_obj(self) -> Optional[CHGVS]:
-        if c_hgvs := self.imported_c_hgvs_obj:
-            return c_hgvs
-        if g_hgvs := self.imported_g_hgvs_obj:
-            return g_hgvs
-        return None
 
     @staticmethod
     def all_chgvs(allele: Allele) -> list[CHGVS]:
@@ -891,7 +898,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         if self.dirty_message != new_dirty_message:
             self.dirty_message = new_dirty_message
-            logging.info("Found %s", new_dirty_message)
+            print(f"Found {new_dirty_message}")
             self.save()
 
     def update_status(self):

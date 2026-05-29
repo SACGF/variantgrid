@@ -19,6 +19,7 @@ from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.timezone import now
+from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
@@ -47,6 +48,7 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
+from classification.services.public_summary_data import ClassificationPublicSummaryData
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import ClassificationExportFormatterCSV, ClassificationExportFormatterRedCap
@@ -985,4 +987,13 @@ def view_classification_grouping_records_detail(request, classification_grouping
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_records_detail.html', {
         "classification_grouping": grouping
+    })
+
+
+@login_not_required
+@cache_page(60 * 60)
+def view_public_info(request):
+    return render(request, 'classification/public_summary_data.html', {
+        "data": ClassificationPublicSummaryData(),
+        "contributors": request.GET.get("contributors") != "False"
     })
