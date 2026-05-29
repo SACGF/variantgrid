@@ -185,6 +185,14 @@ class Overlap(TimeStampedModel):
     def get_absolute_url(self):
         return reverse('overlap_3', kwargs={"overlap_id": self.pk})
 
+    @cached_property
+    def c_hgvses(self):
+        c_hgvses = set()
+        for entry in self.contributions_list:
+            if cg := entry.classification_grouping:
+                c_hgvses.add(cg.latest_allele_info.preferred_c_hgvs_obj())
+        return list(sorted(c_hgvses))
+
     def c_hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> CHGVS:
         # if no genome_build provided, use the imported value
         # TODO, if there are multiple contributions from the same lab, should we get multiple c.HGVSs?

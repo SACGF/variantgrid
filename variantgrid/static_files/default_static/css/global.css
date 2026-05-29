@@ -2687,8 +2687,18 @@ a.clinical-context {
   font-weight: bold;
 }
 
-.testing-context-text-N, .testing-context-text-H, .testing-context-text-S {
-  color: #cc44cc;
+.testing-context-text-S {
+  color: #aa33aa;
+  font-weight: bold;
+}
+
+.testing-context-text-H {
+  color: #aa3399;
+  font-weight: bold;
+}
+
+.testing-context-text-N {
+  color: #aa3388;
   font-weight: bold;
 }
 

@@ -176,5 +176,7 @@ def view_overlap_3(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
     overlap = Overlap.objects.filter(pk=overlap_id).get()
     overlap_grouping = OverlapGrouping3(overlap=overlap, user=request.user)
 
-    context = {"overlap_grouping": overlap_grouping}
+    context = {
+        "overlap_grouping": overlap_grouping
+    }
     return render_ajax_view(request, "classification/overlap_detail_3.html", context, menubar="classification")

@@ -294,13 +294,14 @@ def clinical_significance_inline(value):
     }
 
 @register.inclusion_tag("classification/tags/lab.html")
-def lab(lab: Lab, is_your_lab: Optional[bool] = None, show_contact_link: bool = False, contact_subject: Optional[str] = None, contact_body: Optional[str] = None):
+def lab(lab: Lab, is_your_lab: Optional[bool] = None, lab_css: Optional[str] = None, show_contact_link: bool = False, contact_subject: Optional[str] = None, contact_body: Optional[str] = None):
     return {
         "lab": lab,
         "is_your_lab": is_your_lab,
         "show_contact_link": show_contact_link and not is_your_lab,
         "subject": contact_subject or "",
-        "body": contact_body
+        "body": contact_body,
+        "lab_css": lab_css
     }
 
 
@@ -780,10 +781,11 @@ def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompar
 
 
 @register.inclusion_tag("classification/tags/testing_context.html")
-def testing_context(obj: Union[OverlapContribution, TestingContextFull]):
+def testing_context(obj: Union[OverlapContribution, TestingContextFull], style: str = "normal"):
     return {
         "testing_context_bucket": TestingContextBucket(obj.testing_context_bucket),
-        "tumor_type_category": obj.tumor_type_category
+        "tumor_type_category": obj.tumor_type_category,
+        "style": style
     }
 
 

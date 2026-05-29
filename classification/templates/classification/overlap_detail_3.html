@@ -18,6 +18,11 @@
                  {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}
                 {% endlabelled %}
             {% endif %}
+            {% labelled label="c.HGVS" %}
+                {% for c_hgvs in overlap.c_hgvses %}
+                    <div>{% c_hgvs c_hgvs %}</div>
+                {% endfor %}
+            {% endlabelled %}
         {% endwith %}
     {% endif %}
     {% if overlap_grouping.overlap.allele %}
@@ -104,11 +109,9 @@
                 <div class="row my-4">
                     <div class="col-3 text-right">
                         {% ifchanged change.overlap_contribution change.user %}
-                            <div>{% testing_context change.overlap_contribution %}<br/>
-                                {% if change.overlap_contribution.lab %}{% lab change.overlap_contribution.lab %}{% else %}ClinVar Expert Panel{% endif %}
-                            </div>
-                            {% if change.user %}<div class="mt-1">{% user change.user size="tiny" align="right" %}</div>
-                            {% else %}{% endif %}
+                            <div>{% if change.overlap_contribution.lab %}{% lab change.overlap_contribution.lab lab_css="font-weight:600" %}{% else %}ClinVar Expert Panel{% endif %}</div>
+                            <div class="mb-1">{% testing_context change.overlap_contribution style="subtle" %}</div>
+                            {% if change.user %}<div class="mt-1">{% user change.user size="tiny" align="right" %}</div>{% else %}{% endif %}
                         {% endifchanged %}
                         <div>{% timestamp change.timestamp time_ago=True %}</div>
                     </div>
