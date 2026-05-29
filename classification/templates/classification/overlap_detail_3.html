@@ -60,7 +60,7 @@
                         <td>{% testing_context overlap_entry.overlap_contribution %}</td>
                         <td>
                             {% if overlap_entry.overlap_contribution.scv %}ClinVar Expert Panel<br/><a class=hover-link" href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ overlap_entry.overlap_contribution.scv }}">{{ overlap_entry.overlap_contribution.scv }}</a>{% else %}
-                            {% lab overlap_entry.overlap_contribution.lab is_your_lab=overlap_entry.is_user_lab show_contact_link=True contact_subject=contact_subject %}
+                            {% lab overlap_entry.overlap_contribution.lab is_your_lab=overlap_entry.is_user_lab show_contact_link=True contact_subject=overlap_entry.email_subject %}
                                 {% with classification=overlap_entry.overlap_contribution.classification_grouping.latest_classification_modification.classification %}
                                 <br/><a class="hover-link" href="{{ classification.get_absolute_url }}">{{ classification.cr_lab_id }}</a>
                                 {% endwith %}

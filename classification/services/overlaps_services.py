@@ -334,9 +334,14 @@ class ChangeRow:
 
 @dataclass(frozen=True)
 class OverlapContributionPerspective:
+    overlap: Overlap
     overlap_contribution: OverlapContribution
     is_cross_context: bool = False
     is_user_lab: bool = False
+
+    @cached_property
+    def email_subject(self):
+        return f"{settings.SITE_NAME} overlap for {self.overlap.c_hgvs(lab=self.overlap_contribution.lab)}"
 
     @property
     def _sort_index(self):
@@ -362,6 +367,7 @@ class OverlapGrouping3:
                 lab = cg.lab
 
             perspectives.append(OverlapContributionPerspective(
+                overlap=self.overlap,
                 overlap_contribution=overlap_contribution,
                 is_cross_context=False,
                 is_user_lab=not self.user.is_superuser and lab in user_labs
@@ -372,6 +378,7 @@ class OverlapGrouping3:
                 cross_context_contributions = set(cross_context.contributions) - set(self.overlap.contributions_list)
                 for overlap_contribution in list(sorted(cross_context_contributions)):
                     perspectives.append(OverlapContributionPerspective(
+                        overlap=self.overlap,
                         overlap_contribution=overlap_contribution,
                         is_cross_context=True,
                         is_user_lab=not self.user.is_superuser and overlap_contribution.lab in user_labs
