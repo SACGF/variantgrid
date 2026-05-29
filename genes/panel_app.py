@@ -210,7 +210,7 @@ def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
     for api_record in genes:
         gene_symbol = api_record["gene_data"]["gene_symbol"]
         if gene_symbol.upper() not in existing_uc_symbols:
-            new_symbols.append(gene_symbol)
+            new_symbols.append(GeneSymbol(symbol=gene_symbol))
         record = PanelAppPanelLocalCacheGeneSymbol(panel_app_local_cache=pap_lc,
                                                    gene_symbol_id=gene_symbol,
                                                    data=api_record)
