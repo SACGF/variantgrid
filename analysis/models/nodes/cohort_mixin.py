@@ -28,12 +28,19 @@ class CohortMixin:
         return vcf
 
     def _get_cache_key(self) -> str:
-        """ Use cohort genotype in the key, as that can change if a VCF is reloaded """
+        """ Use cohort genotype in the key, as that can change if a VCF is reloaded.
+            Also include the sub-cohort any-sample-called VariantCollection pk so the cache invalidates
+            when a VC build completes (or is dropped) under the same CGC. @see issue #1551 """
         cache_key = super()._get_cache_key()
         cgc_id = 0
+        vc_id = 0
         if cgc := self.cohort_genotype_collection:
             cgc_id = cgc.pk
-        return "_".join((cache_key, str(cgc_id)))
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort:
+            if vc := cohort.get_any_sample_called_variant_collection():
+                vc_id = vc.pk
+        return "_".join((cache_key, str(cgc_id), str(vc_id)))
 
     @property
     def cohort_genotype_collection(self):
@@ -53,6 +60,12 @@ class CohortMixin:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if cgc := self.cohort_genotype_collection:
             annotation_kwargs.update(cgc.get_annotation_kwargs(**kwargs))
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort:
+            # Register the pre-computed any-sample-called VC alias so get_cohort_and_arg_q_dict can join
+            # to it instead of running the EXCLUDE regex. @see issue #1551
+            if vc := cohort.get_any_sample_called_variant_collection():
+                annotation_kwargs.update(vc.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
     def _get_cohorts_and_sample_visibility(self):
@@ -141,10 +154,17 @@ class CohortMixin:
             cgc = self.cohort_genotype_collection
             q_and = []
             if cohort.is_sub_cohort:
-                missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
-                sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
-                q_sub = cgc.get_zygosity_q(sample_zygosities_dict, exclude=True)
-                q_and.append(q_sub)
+                if vc := cohort.get_any_sample_called_variant_collection():
+                    # Pre-computed any-sample-called set => hash join instead of regex seq-scan (#1551).
+                    # Keyed under the VC alias (registered in _get_annotation_kwargs_for_node) so it's
+                    # filtered after its own annotate, not the cohortgenotype one.
+                    q_vc = Q(**{f"{vc.variant_collection_alias}__isnull": False})
+                    arg_q_dict[vc.variant_collection_alias] = {str(q_vc): q_vc}
+                else:
+                    missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
+                    sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
+                    q_sub = cgc.get_zygosity_q(sample_zygosities_dict, exclude=True)
+                    q_and.append(q_sub)
             q_and.extend(self._get_q_and_list())
             if q_and:
                 q = reduce(operator.and_, q_and)

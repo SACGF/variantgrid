@@ -15,6 +15,7 @@ from patients.models_enums import Zygosity
 from snpdb.common_variants import get_common_filter
 from snpdb.models import Cohort, ImportStatus, CohortGenotypeCommonFilterVersion, Variant, CommonVariantClassified, \
     CohortGenotypeCollection, CohortGenotype, CohortGenotypeTaskVersion, CohortGenotypeCollectionType
+from snpdb.tasks.sub_cohort_tasks import enqueue_sub_cohort_any_sample_called_vc
 
 
 def create_cohort_genotype_and_launch_task(cohort, run_async=True):
@@ -34,6 +35,8 @@ def create_cohort_genotype_and_launch_task(cohort, run_async=True):
         cohort.parent_cohort = containing_cohort
         cohort.import_status = containing_cohort.import_status
         cohort.save()
+        # Now a sub-cohort - pre-compute its any-sample-called VariantCollection (issue #1551)
+        enqueue_sub_cohort_any_sample_called_vc(cohort)
         status = "SUCCESS"
     else:
         launch_task = False

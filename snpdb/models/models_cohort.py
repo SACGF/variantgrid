@@ -1,6 +1,6 @@
 import logging
 from functools import cached_property
-from typing import Union
+from typing import Union, Optional
 
 import celery
 from django.contrib.auth.models import User, Group
@@ -28,9 +28,9 @@ from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
-from snpdb.models.models_enums import ImportStatus, CohortGenotypeCollectionType
+from snpdb.models.models_enums import ImportStatus, CohortGenotypeCollectionType, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_variant import Variant
+from snpdb.models.models_variant import Variant, VariantCollection
 from snpdb.models.models_vcf import VCF, Sample
 
 
@@ -54,6 +54,13 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     # Deal with parent_cohort delete in snpdb.signals.signal_handlers.pre_delete_cohort
     parent_cohort = models.ForeignKey("self", null=True, related_name="sub_cohort_set", on_delete=DO_NOTHING)
     sample_count = models.IntegerField(null=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Version-keyed caches (eg sub-cohort any-sample-called VariantCollection) FK to CohortVersion
+        # with on_delete=CASCADE - ensure a row exists for the current version. increment_version()
+        # calls save() so version bumps create new rows here too. @see issue #1551
+        CohortVersion.objects.get_or_create(cohort=self, version=self.version)
 
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
         """ Also uses VCF permission """
@@ -212,6 +219,29 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             raise DataArchivedError(cgc)
         return cgc
 
+    def get_any_sample_called_variant_collection(self) -> Optional[VariantCollection]:
+        """ Pre-computed VariantCollection of variants where at least one sub-cohort sample is
+            called (non-missing), used to turn the analysis EXCLUDE filter into a hash join instead of a
+            regex seq-scan against samples_zygosity. Returns the SUCCESS-status collection built
+            for the current (cohort version, parent CGC); else None so callers fall back to the
+            runtime regex. @see snpdb build_sub_cohort_any_sample_called_vc_task / issue #1551 """
+        from snpdb.archive import DataArchivedError  # Inline: snpdb.archive imports snpdb.models
+
+        if not self.is_sub_cohort:
+            return None
+        try:
+            cgc = self.cohort_genotype_collection
+        except (CohortGenotypeCollection.DoesNotExist, DataArchivedError):
+            return None
+        link = (SubCohortVariantCollection.objects
+                .filter(cohort_version__cohort=self,
+                        cohort_version__version=self.version,
+                        parent_cohort_genotype_collection=cgc,
+                        variant_collection__status=ProcessingStatus.SUCCESS)
+                .select_related("variant_collection")
+                .first())
+        return link.variant_collection if link else None
+
     def get_vcf(self):
         return self.get_base_cohort().vcf
 
@@ -240,6 +270,10 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             field_index = sample_index[sample]
             CohortSample.objects.create(cohort=sub_cohort, sample=sample,
                                         cohort_genotype_packed_field_index=field_index, sort_order=i)
+        # One-shot finalisation - pre-compute the any-sample-called VariantCollection (issue #1551).
+        # Inline import breaks the models <-> snpdb.tasks circular dependency.
+        from snpdb.tasks.sub_cohort_tasks import enqueue_sub_cohort_any_sample_called_vc
+        enqueue_sub_cohort_any_sample_called_vc(sub_cohort)
         return sub_cohort
 
     @classmethod
@@ -579,6 +613,54 @@ def cohort_genotype_collection_post_delete_handler(sender, instance, **kwargs): 
         if instance.common_collection:
             instance.common_collection.delete()
     except CohortGenotypeCollection.DoesNotExist:
+        pass
+
+
+class CohortVersion(TimeStampedModel):
+    """ One row per (cohort, version). Version-specific caches FK here with on_delete=CASCADE, so
+        cleanup happens by deleting stale version rows (delete_old_cohort_versions), not by matching
+        tuples at query time. Mirrors analysis.models.NodeVersion. @see issue #1551 """
+    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
+    version = models.IntegerField(null=False)
+
+    class Meta:
+        unique_together = ("cohort", "version")
+
+    @staticmethod
+    def get(cohort: 'Cohort') -> 'CohortVersion':
+        return CohortVersion.objects.get(cohort=cohort, version=cohort.version)
+
+    def __str__(self):
+        return f"CohortVersion({self.cohort_id} v{self.version})"
+
+
+class SubCohortVariantCollection(models.Model):
+    """ Cached any-sample-called VariantCollection for a sub-cohort.
+
+        Two staleness axes, each handled by CASCADE:
+          - cohort_version: deletes when the sub-cohort version row is GC'd (increment_version()
+            creates a new CohortVersion; delete_old_cohort_versions drops superseded rows).
+          - parent_cohort_genotype_collection: deletes when the parent CGC is dropped (parent VCF
+            re-import / parent cohort delete).
+        @see issue #1551 """
+    cohort_version = models.OneToOneField(CohortVersion, on_delete=CASCADE,
+                                          related_name="sub_cohort_variant_collection")
+    parent_cohort_genotype_collection = models.ForeignKey(CohortGenotypeCollection, on_delete=CASCADE)
+    variant_collection = models.OneToOneField(VariantCollection, on_delete=CASCADE)
+
+    def __str__(self):
+        return f"SubCohortVariantCollection({self.cohort_version}: {self.variant_collection})"
+
+
+@receiver(post_delete, sender=SubCohortVariantCollection)
+def post_delete_sub_cohort_variant_collection(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    """ Drop the orphaned VariantCollection partition when a link row is removed (directly or via
+        CASCADE from either staleness axis). Mirrors analysis.models.post_delete_node_cache. """
+    try:
+        if instance.variant_collection:
+            instance.variant_collection.delete_related_objects()
+            instance.variant_collection.delete()
+    except VariantCollection.DoesNotExist:
         pass
 
 

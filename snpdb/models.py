@@ -5,7 +5,8 @@ from snpdb.models.models import Tag, CachedGeneratedFile, Company, Manufacturer,
     LabProject, SiteMessage
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_cohort import Cohort, CohortSample, CohortGenotypeTaskVersion, \
-    CohortGenotypeCommonFilterVersion, CommonVariantClassified, CohortGenotypeCollection, CohortGenotype, Trio
+    CohortGenotypeCommonFilterVersion, CommonVariantClassified, CohortGenotypeCollection, CohortGenotype, Trio, \
+    CohortVersion, SubCohortVariantCollection
 from snpdb.models.models_columns import VariantGridColumn, ColumnVCFInfo, CustomColumnsCollection, CustomColumn
 from snpdb.models.models_dbsnp import DbSNP
 from snpdb.models.models_genome import GenomeBuild, GenomeBuildPatchVersion, Contig, GenomeBuildContig, GenomeFasta, \

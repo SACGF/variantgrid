@@ -99,6 +99,7 @@ CELERY_TASK_ROUTES = {
 
     # Partition archive
     'snpdb.tasks.partition_archive_tasks.perform_partition_archive': DB_WORKERS,
+    "snpdb.tasks.sub_cohort_tasks.build_sub_cohort_any_sample_called_vc_task": DB_WORKERS,
 }
 
 CELERY_IMPORTS = (
@@ -121,6 +122,7 @@ CELERY_IMPORTS = (
     'snpdb.models',
     'snpdb.tasks.clingen_tasks',
     'snpdb.tasks.cohort_genotype_tasks',
+    'snpdb.tasks.sub_cohort_tasks',
     'snpdb.tasks.graph_generation_task',
     'snpdb.tasks.partition_archive_tasks',
     'snpdb.tasks.soft_delete_tasks',
