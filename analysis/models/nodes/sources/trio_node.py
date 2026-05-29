@@ -348,6 +348,12 @@ class TrioNode(AbstractCohortBasedNode):
     def _get_cached_label_count(self, label):
         if self.trio is None:
             return None
+        # Compound het is the only trio mode that takes a parent (max_inputs=1), and its queryset
+        # is intersected with that parent (uses_parent_queryset). The cohort-wide stats cache below
+        # can't represent the parent restriction, so it would over-count (tripping the single-parent
+        # check in node_counts()). Fall back to a real DB count of the parent-intersected queryset.
+        if self.has_input():
+            return None
         if self._has_filters_that_affect_label_counts():
             return None
         filter_code = self.get_filter_code()

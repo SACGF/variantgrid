@@ -1,10 +1,12 @@
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, TrioNode
 from analysis.models.enums import TrioInheritance
 from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.models import GenomeBuild, Variant
+from snpdb.models import GenomeBuild, Variant, BuiltInFilters
 from snpdb.models.models_cohort import CohortGenotype, CohortGenotypeCollection
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -331,3 +333,25 @@ class TestTrioNodeInheritance(TestCase):
     def test_zygosity_table_compound_het_has_no_note_key(self):
         data = TrioNode.get_zygosity_table_data()
         self.assertNotIn('note', data[TrioInheritance.COMPOUND_HET])
+
+    # ── Cached label counts vs parent restriction ──────────────────────────────
+
+    def test_only_compound_het_takes_a_parent(self):
+        """Compound het is the only inheritance mode with an input; the rest are source nodes
+        whose cohort-wide cached counts are valid (no parent restriction)."""
+        self.assertTrue(self._make_node(TrioInheritance.COMPOUND_HET).has_input())
+        for mode in (TrioInheritance.RECESSIVE, TrioInheritance.DENOVO, TrioInheritance.DOMINANT,
+                     TrioInheritance.XLINKED_RECESSIVE, TrioInheritance.ALL_RECESSIVE,
+                     TrioInheritance.ANY_AFFECTED):
+            self.assertFalse(self._make_node(mode).has_input(), f"{mode} should be a source node")
+
+    def test_compound_het_does_not_use_cohort_label_cache(self):
+        """Compound het intersects its parent's queryset, so the cohort-wide stats cache (which
+        ignores the parent) must NOT be consulted - otherwise it over-counts and trips the
+        single-parent check in node_counts(). Regression for comp-het count > parent count."""
+        node = self._make_node(TrioInheritance.COMPOUND_HET)
+        with mock.patch(
+                "analysis.models.nodes.sources.trio_node.get_cached_label_count_for_cohort",
+                return_value=999999) as m:
+            self.assertIsNone(node._get_cached_label_count(BuiltInFilters.TOTAL))
+            m.assert_not_called()

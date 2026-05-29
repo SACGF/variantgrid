@@ -708,7 +708,7 @@ def node_load(request, analysis_id, node_id):
 @require_POST
 def node_cancel_load(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
-    if node_task := NodeTask.objects.filter(node=node, version=node.version).first():
+    if node_task := NodeTask.objects.filter(node_version__node=node, node_version__version=node.version).first():
         if node_task.celery_task:
             logging.debug("TODO: Cancelling task %s", node_task.celery_task)
             app.control.revoke(node_task.celery_task, terminate=True)  # @UndefinedVariable

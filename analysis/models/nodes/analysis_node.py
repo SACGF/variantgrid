@@ -262,10 +262,10 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             node_cache, created = NodeCache.get_or_create_for_node(self)
             if created:
                 task_args_set.add((self.NODE_CACHE_TASK, (self.pk, self.version)))
-            else:
-                # Cache has been launched already, we just need to make sure it's ready, so launch a task
-                # waiting on it, to be used as a dependency
-                task_args_set.add((self.WAIT_FOR_CACHE_TASK, (node_cache.pk, )))
+            # else: cache is already being built by another node - do NOT add WAIT_FOR_CACHE_TASK.
+            #       The scheduler's dependency gate (_node_ready_to_lease) holds this node back while
+            #       that cache is actively building (PROCESSING); node_cache_task re-triggers the
+            #       dispatcher on completion (issue #346).
         return task_args_set
 
     def get_parent_subclasses_and_errors(self):
@@ -1055,7 +1055,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         db_pid = cursor.db.connection.get_backend_pid()
         self.update(status=status)
 
-        NodeTask.objects.filter(node=self, version=self.version).update(celery_task=celery_task, db_pid=db_pid)
+        NodeTask.objects.filter(node_version__node=self, node_version__version=self.version) \
+            .update(celery_task=celery_task, db_pid=db_pid)
 
     def adjust_cloned_parents(self, old_new_map):
         """ If you need to do something with old/new parents """
@@ -1137,19 +1138,28 @@ class AnalysisEdge(NodeAuditLogMixin, edge_factory(AnalysisNode, concrete=False)
 
 
 class NodeTask(TimeStampedModel):
-    """ Used to track/lock celery update tasks for nodes (uses DB constraints to ensure 1 per node/version) """
+    """ Tracks/locks the celery update task for a single node-version, and acts as the lease
+        record for the state-driven scheduler (issue #346, mocha-style): the row is claimed by a
+        dispatcher (lease_ready_nodes), stamped with a lease_expires, and reclaimed if the owning
+        worker dies.
 
-    node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
-    version = models.IntegerField(null=False)
+        OneToOne against NodeVersion so it shares that row's lifecycle - the (node, version)
+        identity comes from the NodeVersion, and stale tasks are cleaned up automatically when old
+        versions are deleted (delete_analysis_old_node_versions cascades). """
+
+    node_version = models.OneToOneField("NodeVersion", on_delete=CASCADE)
     analysis_update_uuid = models.UUIDField()
     celery_task = models.CharField(max_length=36, null=True)
     db_pid = models.IntegerField(null=True)
-
-    class Meta:
-        unique_together = ("node", "version")
+    # Lease + backoff fields (mocha lease record):
+    leased_by = models.CharField(max_length=64, null=True)
+    lease_expires = models.DateTimeField(null=True)
+    attempt_count = models.IntegerField(default=0)
+    last_attempt = models.DateTimeField(null=True)
+    run_after = models.DateTimeField(null=True)  # backoff gate: not leasable before this
 
     def __str__(self):
-        return f"NodeTask: {self.analysis_update_uuid} - {self.node.pk}/{self.version}"
+        return f"NodeTask: {self.analysis_update_uuid} - {self.node_version}"
 
 
 class NodeWiki(Wiki):

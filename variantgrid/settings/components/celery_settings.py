@@ -62,6 +62,13 @@ CELERY_TASK_ROUTES = {
     "analysis.tasks.node_update_tasks.wait_for_cache_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.delete_analysis_old_node_versions": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_node": ANALYSIS_WORKERS,
+    # Periodic safety-net sweep (issue #346). Deliberately NOT on ANALYSIS_WORKERS: it exists to
+    # recover stuck/dead node-load workers, so it must not queue behind the very backlog it's meant
+    # to rescue - it would be starved exactly when needed. It's also not node work: it only runs a
+    # discovery query and enqueues create_and_launch_analysis_tasks (which lands on the single
+    # worker, where the actual reclaim/lease happens). DB_WORKERS is a separate pool that keeps
+    # ticking when analysis_workers are saturated.
+    "analysis.tasks.node_update_tasks.reschedule_stalled_analyses": DB_WORKERS,
     # Annotation
     "annotation.tasks.annotate_variants.delete_annotation_run": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.delete_annotation_run_uploaded_data": ANNOTATION_WORKERS,
