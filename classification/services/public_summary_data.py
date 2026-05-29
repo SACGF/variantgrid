@@ -65,4 +65,6 @@ class ClassificationPublicSummaryData:
 
     @cached_property
     def clinvar_export_count(self) -> int:
-        return ClinVarExport.objects.filter(status__in={ClinVarExportStatus.UP_TO_DATE, ClinVarExportStatus.CHANGES_PENDING}).count()
+        return ClinVarExport.objects.filter(clinvarexportsubmission__status="S").values_list("scv").distinct().count()
+        # old way is below, but didn't count records uploaded but now marked in error (maybe due to discordance)
+        # return ClinVarExport.objects.filter(status__in={ClinVarExportStatus.UP_TO_DATE, ClinVarExportStatus.CHANGES_PENDING}).count()
