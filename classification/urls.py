@@ -184,10 +184,9 @@ urlpatterns = [
 
     path('overlaps3/triage/<int:triage_id>', TriageView3.as_view(), name='triage_3'),
     path('overlaps3/overlap/<int:overlap_id>', view_overlap_3, name='overlap_3'),
+    path('overlaps3/datatables', DatabaseTableView.as_view(column_class=OverlapColumns), name='overlaps_3_datatables'),
     path('overlaps3/<str:lab_id>', view_overlaps_3, name='overlaps_3'),
     path('overlaps3', view_overlaps_3, name='overlaps_3'),
-    path('overlaps3/datatables/<str:lab_id>', DatabaseTableView.as_view(column_class=OverlapColumns),
-         name='overlaps_3_datatables'),
 
     path('vus', view_overlaps_vus, name='vus'),
     path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),
