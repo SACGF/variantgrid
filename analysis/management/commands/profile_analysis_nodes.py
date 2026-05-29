@@ -9,6 +9,13 @@ Usage:
         --rerun --explain \\
         --out /tmp/prof_$(date +%Y%m%d_%H%M%S)
 
+    # A/B the issue #546 explicit-PK substitution on a real analysis:
+    python3 manage.py profile_analysis_nodes \\
+        --analysis 12345 --rerun --explain --pk-substitution both \\
+        --out /tmp/prof_546_$(date +%Y%m%d_%H%M%S)
+    # then compare rerun_count_seconds / explain_execution_ms between the
+    # pk_substitution=on and pk_substitution=off rows.
+
 Output bundle:
     nodes.csv                           single index row per profiled node/pattern
     explain_plans/<source>_<id>.json    full EXPLAIN ANALYZE plans (when --explain)
@@ -55,6 +62,7 @@ CSV_FIELDS = [
     "explain_plan_file",
     "sql_truncated",
     "max_af_gate",
+    "pk_substitution",     # #546 explicit-PK substitution mode this row was profiled under (on/off)
     "build_seconds",       # only set by cohort_exclude_vc_join — one-time pre-compute cost
     "vc_record_count",     # only set by cohort_exclude_vc_join — size of the cached set
     "analyze_seconds",     # only set by cohort_exclude_vc_join_postanalyze — ANALYZE cost
@@ -93,6 +101,14 @@ class Command(BaseCommand):
                                  "with optimisation), off (legacy plan), both (run each "
                                  "profile twice — once with, once without — for A/B comparison)")
 
+        parser.add_argument("--pk-substitution", choices=["on", "off", "both"], default="on",
+                            help="Issue #546 explicit-PK substitution: on (default — small parents "
+                                 "collapse to a literal Q(pk__in=[...]) via "
+                                 "ANALYSIS_NODE_STORE_ID_SIZE_MAX), off (threshold forced to 0, "
+                                 "parents always run as a full subquery), both (run each profile twice "
+                                 "for A/B comparison). Only affects --analysis real nodes; the synthetic "
+                                 "patterns build querysets directly and never use the substitution.")
+
         parser.add_argument("--planner-diagnostic", action="store_true",
                             help="For --cohort runs only: also re-run cohort_exclude_lookahead "
                                  "and cohort_exclude_vc_join under work_mem/random_page_cost "
@@ -102,7 +118,7 @@ class Command(BaseCommand):
 
         parser.add_argument("--merge-threshold-bumped", type=int, default=10000,
                             help="For --analysis MergeNodes: per-parent survey classifies each parent's count "
-                                 "against the current ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX setting and this "
+                                 "against the current ANALYSIS_NODE_STORE_ID_SIZE_MAX setting and this "
                                  "hypothetical bumped value. Parents in (current, bumped] are the candidates "
                                  "that would shift from path C (subquery form) to path A (literal IN list) "
                                  "under the bump (#546). Default 10000. Survey is read-only — no SQL re-execution.")
@@ -125,6 +141,14 @@ class Command(BaseCommand):
         node_type_filter = set(options["node_type"]) if options["node_type"] else None
 
         gate_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["max_af_gate"]]
+        subst_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["pk_substitution"]]
+
+        # Issue #546 explicit-PK substitution is gated on ANALYSIS_NODE_STORE_ID_SIZE_MAX
+        # (read live by AnalysisNode.get_small_parent_arg_q_dict). "on" uses the configured
+        # threshold (falling back to 1000 if it's unset/0 so "on" is genuinely enabled); "off"
+        # forces it to 0 so every parent runs as a full subquery.
+        original_threshold = getattr(settings, "ANALYSIS_NODE_STORE_ID_SIZE_MAX", 1000)
+        subst_threshold = {"on": original_threshold or 1000, "off": 0}
 
         # PopulationNode reads the max_af gate switch from
         # VariantAnnotationVersion.backfilled_max_af. Older code branches don't define
@@ -146,59 +170,71 @@ class Command(BaseCommand):
                 VariantAnnotationVersion.objects.values_list("pk", "backfilled_max_af")
             )
         try:
-            for gate_mode in gate_modes:
-                if gate_supported:
-                    VariantAnnotationVersion.objects.all().update(
-                        backfilled_max_af=(gate_mode == "on")
-                    )
-                if len(gate_modes) > 1:
-                    self.stdout.write(f"### max_af_gate={gate_mode} ###")
+            for subst_mode in subst_modes:
+                settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX = subst_threshold[subst_mode]
+                self._pk_substitution_mode = subst_mode
+                if len(subst_modes) > 1:
+                    self.stdout.write(
+                        f"##### pk_substitution={subst_mode} "
+                        f"(ANALYSIS_NODE_STORE_ID_SIZE_MAX={subst_threshold[subst_mode]}) #####")
 
-                for analysis_id in options["analysis"]:
-                    self.stdout.write(f"== Analysis {analysis_id} ==")
-                    rows.extend(self._tag_gate(self._profile_analysis(
-                        analysis_id,
-                        rerun=options["rerun"],
-                        explain=options["explain"],
-                        node_type_filter=node_type_filter,
-                        limit=options["limit_per_analysis"],
-                        plans_dir=plans_dir,
-                        gate_mode=gate_mode,
-                        merge_threshold_bumped=options["merge_threshold_bumped"],
-                    ), gate_mode))
+                for gate_mode in gate_modes:
+                    if gate_supported:
+                        VariantAnnotationVersion.objects.all().update(
+                            backfilled_max_af=(gate_mode == "on")
+                        )
+                    if len(gate_modes) > 1:
+                        self.stdout.write(f"### max_af_gate={gate_mode} ###")
 
-                for sample_id in options["sample"]:
-                    self.stdout.write(f"== Sample {sample_id} (synthetic) ==")
-                    rows.extend(self._tag_gate(self._profile_sample_synthetic(
-                        sample_id,
-                        rerun=options["rerun"],
-                        explain=options["explain"],
-                        plans_dir=plans_dir,
-                        gate_mode=gate_mode,
-                    ), gate_mode))
+                    def tag(profiled_rows, gate_mode=gate_mode, subst_mode=subst_mode):
+                        return self._tag_subst(self._tag_gate(profiled_rows, gate_mode), subst_mode)
 
-                for trio_id in options["trio"]:
-                    self.stdout.write(f"== Trio {trio_id} (synthetic) ==")
-                    rows.extend(self._tag_gate(self._profile_trio_synthetic(
-                        trio_id,
-                        rerun=options["rerun"],
-                        explain=options["explain"],
-                        plans_dir=plans_dir,
-                        gate_mode=gate_mode,
-                    ), gate_mode))
+                    for analysis_id in options["analysis"]:
+                        self.stdout.write(f"== Analysis {analysis_id} ==")
+                        rows.extend(tag(self._profile_analysis(
+                            analysis_id,
+                            rerun=options["rerun"],
+                            explain=options["explain"],
+                            node_type_filter=node_type_filter,
+                            limit=options["limit_per_analysis"],
+                            plans_dir=plans_dir,
+                            gate_mode=gate_mode,
+                            merge_threshold_bumped=options["merge_threshold_bumped"],
+                        )))
 
-                for cohort_id in options["cohort"]:
-                    self.stdout.write(f"== Cohort {cohort_id} (synthetic) ==")
-                    rows.extend(self._tag_gate(self._profile_cohort_synthetic(
-                        cohort_id,
-                        rerun=options["rerun"],
-                        explain=options["explain"],
-                        plans_dir=plans_dir,
-                        seed=options["cohort_seed"],
-                        gate_mode=gate_mode,
-                        planner_diagnostic=options["planner_diagnostic"],
-                    ), gate_mode))
+                    for sample_id in options["sample"]:
+                        self.stdout.write(f"== Sample {sample_id} (synthetic) ==")
+                        rows.extend(tag(self._profile_sample_synthetic(
+                            sample_id,
+                            rerun=options["rerun"],
+                            explain=options["explain"],
+                            plans_dir=plans_dir,
+                            gate_mode=gate_mode,
+                        )))
+
+                    for trio_id in options["trio"]:
+                        self.stdout.write(f"== Trio {trio_id} (synthetic) ==")
+                        rows.extend(tag(self._profile_trio_synthetic(
+                            trio_id,
+                            rerun=options["rerun"],
+                            explain=options["explain"],
+                            plans_dir=plans_dir,
+                            gate_mode=gate_mode,
+                        )))
+
+                    for cohort_id in options["cohort"]:
+                        self.stdout.write(f"== Cohort {cohort_id} (synthetic) ==")
+                        rows.extend(tag(self._profile_cohort_synthetic(
+                            cohort_id,
+                            rerun=options["rerun"],
+                            explain=options["explain"],
+                            plans_dir=plans_dir,
+                            seed=options["cohort_seed"],
+                            gate_mode=gate_mode,
+                            planner_diagnostic=options["planner_diagnostic"],
+                        )))
         finally:
+            settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX = original_threshold
             if gate_supported:
                 for vav_pk, original in original_gate_flags.items():
                     VariantAnnotationVersion.objects.filter(pk=vav_pk).update(
@@ -232,7 +268,7 @@ class Command(BaseCommand):
         if limit:
             nodes = nodes[:limit]
 
-        threshold_current = getattr(settings, "ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX", 1000) or 0
+        threshold_current = getattr(settings, "ANALYSIS_NODE_STORE_ID_SIZE_MAX", 1000) or 0
 
         rows = []
         for node in nodes:
@@ -326,6 +362,7 @@ class Command(BaseCommand):
             "count": node.count,
             "cached_load_seconds": node.load_seconds,
             "max_af_gate": gate_mode,
+            "pk_substitution": getattr(self, "_pk_substitution_mode", ""),
         }
 
         try:
@@ -333,6 +370,11 @@ class Command(BaseCommand):
         except Exception as e:
             row["parent_input_count"] = ""
             row["error"] = f"parent_count: {e}"
+
+        # Regenerate the arg_q_dict fresh rather than reading a (possibly production-warmed)
+        # cached one keyed only on node version - otherwise toggling the #546 threshold between
+        # passes wouldn't change the emitted SQL.
+        node._cache_node_q = False
 
         try:
             qs = node.get_queryset()
@@ -358,7 +400,9 @@ class Command(BaseCommand):
                 row["error"] = (row.get("error") or "") + f" rerun: {e}"
 
         if explain and sql is not None:
-            plan_file = os.path.join(plans_dir, f"{source}_a{analysis_id}_n{node.pk}_gate{gate_mode}.json")
+            subst_mode = getattr(self, "_pk_substitution_mode", "on")
+            plan_file = os.path.join(
+                plans_dir, f"{source}_a{analysis_id}_n{node.pk}_gate{gate_mode}_subst{subst_mode}.json")
             try:
                 planning, execution = _run_explain(sql, params, plan_file)
                 row["explain_planning_ms"] = planning
@@ -508,6 +552,7 @@ class Command(BaseCommand):
             "node_name": "",
             "config_summary": config,
             "max_af_gate": gate_mode,
+            "pk_substitution": getattr(self, "_pk_substitution_mode", ""),
         }
         try:
             sql, params = _qs_sql_with_params(qs)
@@ -525,7 +570,9 @@ class Command(BaseCommand):
                 row["error"] = (row.get("error") or "") + f" rerun: {e}"
 
         if explain:
-            plan_file = os.path.join(plans_dir, f"{file_prefix}{entity_id}_{name}_gate{gate_mode}.json")
+            subst_mode = getattr(self, "_pk_substitution_mode", "on")
+            plan_file = os.path.join(
+                plans_dir, f"{file_prefix}{entity_id}_{name}_gate{gate_mode}_subst{subst_mode}.json")
             try:
                 planning, execution = _run_explain(sql, params, plan_file)
                 row["explain_planning_ms"] = planning
@@ -933,6 +980,12 @@ class Command(BaseCommand):
         return rows
 
     @staticmethod
+    def _tag_subst(rows, subst_mode):
+        for row in rows:
+            row["pk_substitution"] = subst_mode
+        return rows
+
+    @staticmethod
     def _row_summary(row):
         bits = [
             row.get("source", ""),
@@ -942,6 +995,8 @@ class Command(BaseCommand):
         ]
         if row.get("max_af_gate"):
             bits.append(f"gate={row['max_af_gate']}")
+        if row.get("pk_substitution"):
+            bits.append(f"subst={row['pk_substitution']}")
         if row.get("count") not in (None, ""):
             bits.append(f"count={row['count']}")
         if row.get("cached_load_seconds") not in (None, ""):

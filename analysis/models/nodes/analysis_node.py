@@ -333,6 +333,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             if parent.count == 0:
                 q_none = self.q_none()
                 arg_q_dict[None] = {str(q_none): q_none}
+            elif (small_arg_q_dict := AnalysisNode.get_small_parent_arg_q_dict(parent)) is not None:
+                arg_q_dict = small_arg_q_dict
             else:
                 arg_q_dict = parent.get_arg_q_dict()
         else:
@@ -530,13 +532,29 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     @staticmethod
     @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda p: (p.pk, p.version))
     def get_parent_pks(parent) -> list:
-        max_size = settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX
+        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
         if parent.count is None or parent.count > max_size:
             raise ValueError(
                 f"get_parent_pks: refusing to cache {parent} PKs "
                 f"(count={parent.count}, max={max_size})"
             )
         return list(parent.get_queryset().values_list("pk", flat=True))
+
+    @staticmethod
+    def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
+        """ Issue #546 explicit-PK substitution. When the parent holds only a small number of
+            variants, materialise its PKs once (cached) and substitute its contribution with a
+            literal Q(pk__in=[...]) so Postgres plans a tight bitmap-or over the variant PK index
+            instead of re-running the parent's full filter chain wrapped in pk IN (subquery).
+
+            Returns None when the parent is not eligible (count unknown or above the ceiling), in
+            which case callers fall back to parent.get_arg_q_dict(). """
+        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
+        if max_size and parent.count is not None and parent.count <= max_size:
+            variant_ids = AnalysisNode.get_parent_pks(parent)
+            q = Q(pk__in=variant_ids)
+            return {None: {q: q}}
+        return None
 
     def _get_node_q(self) -> Optional[Q]:
         return None

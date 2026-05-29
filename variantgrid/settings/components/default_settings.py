@@ -341,7 +341,10 @@ ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True
-ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
+# #546: when a parent node's count is <= this, substitute its contribution to a child/sibling's
+# query with a literal Q(pk__in=[...]) instead of re-running its full filter chain. Applies to all
+# single-parent nodes and MergeNode inputs. 0 disables the substitution.
+ANALYSIS_NODE_STORE_ID_SIZE_MAX = 1000
 ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit

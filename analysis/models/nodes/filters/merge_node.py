@@ -7,7 +7,6 @@ from auditlog.registry import auditlog
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from variantgrid import settings
 
 
 class MergeNode(AnalysisNode):
@@ -132,12 +131,8 @@ class MergeNode(AnalysisNode):
     def _get_arg_q_dict_from_parents_and_node(self):
         parent_arg_q_dict = {}
         for parent in self.get_non_empty_parents():
-            if settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX and \
-                    parent.count is not None and \
-                    parent.count <= settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX:
-                variant_ids = AnalysisNode.get_parent_pks(parent)
-                q = Q(pk__in=variant_ids)
-                arg_q_dict = {None: {q: q}}
+            if (small_arg_q_dict := AnalysisNode.get_small_parent_arg_q_dict(parent)) is not None:
+                arg_q_dict = small_arg_q_dict
             else:
                 # disable_cache=True: see comment in _split_common_filters above (#240, ad35a7fb1).
                 arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
