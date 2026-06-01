@@ -1637,21 +1637,39 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return None
 
     @classmethod
-    def backfill_spliceai_max_ds(cls, version: 'VariantAnnotationVersion') -> int:
+    def backfill_spliceai_max_ds(cls, version: 'VariantAnnotationVersion',
+                                 chunk_size: int = 10_000) -> int:
         any_ds_set = (
             Q(spliceai_pred_ds_ag__isnull=False)
             | Q(spliceai_pred_ds_al__isnull=False)
             | Q(spliceai_pred_ds_dg__isnull=False)
             | Q(spliceai_pred_ds_dl__isnull=False)
         )
-        return cls.objects.filter(version=version).filter(any_ds_set).update(
-            spliceai_max_ds=Greatest(
-                Coalesce(F("spliceai_pred_ds_ag"), 0.0),
-                Coalesce(F("spliceai_pred_ds_al"), 0.0),
-                Coalesce(F("spliceai_pred_ds_dg"), 0.0),
-                Coalesce(F("spliceai_pred_ds_dl"), 0.0),
-            ),
-        )
+        base_qs = cls.objects.filter(version=version, spliceai_max_ds__isnull=True).filter(any_ds_set)
+        bounds = base_qs.aggregate(lo=Min("pk"), hi=Max("pk"))
+        lo, hi = bounds["lo"], bounds["hi"]
+        if lo is None:
+            return 0
+
+        total = 0
+        cursor = lo
+        while cursor <= hi:
+            nxt = cursor + chunk_size
+            updated = (cls.objects
+                       .filter(version=version, spliceai_max_ds__isnull=True,
+                               pk__gte=cursor, pk__lt=nxt)
+                       .filter(any_ds_set)
+                       .update(spliceai_max_ds=Greatest(
+                           Coalesce(F("spliceai_pred_ds_ag"), 0.0),
+                           Coalesce(F("spliceai_pred_ds_al"), 0.0),
+                           Coalesce(F("spliceai_pred_ds_dg"), 0.0),
+                           Coalesce(F("spliceai_pred_ds_dl"), 0.0),
+                       )))
+            total += updated
+            logging.info("backfill_spliceai_max_ds vav=%s chunk pk=[%s,%s) updated=%s",
+                         version.pk, cursor, nxt, updated)
+            cursor = nxt
+        return total
 
     @classmethod
     def backfill_max_af(cls, version: 'VariantAnnotationVersion',
@@ -1670,12 +1688,11 @@ class VariantAnnotation(AbstractVariantAnnotation):
         cursor = lo
         while cursor <= hi:
             nxt = cursor + chunk_size
-            with transaction.atomic():
-                updated = (cls.objects
-                           .filter(version=version, max_af__isnull=True,
-                                   pk__gte=cursor, pk__lt=nxt)
-                           .filter(all_set_q)
-                           .update(max_af=Greatest(*[F(f) for f in fields])))
+            updated = (cls.objects
+                       .filter(version=version, max_af__isnull=True,
+                               pk__gte=cursor, pk__lt=nxt)
+                       .filter(all_set_q)
+                       .update(max_af=Greatest(*[F(f) for f in fields])))
             total += updated
             logging.info("backfill_max_af vav=%s chunk pk=[%s,%s) updated=%s",
                          version.pk, cursor, nxt, updated)
