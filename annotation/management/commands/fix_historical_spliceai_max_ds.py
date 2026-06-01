@@ -14,14 +14,17 @@ class Command(BaseCommand):
                             help="Only process this VariantAnnotationVersion (default: all)")
         parser.add_argument("--skip-index", action="store_true",
                             help="Skip CREATE INDEX CONCURRENTLY step")
+        parser.add_argument("--chunk-size", type=int, default=10_000,
+                            help="pk-range chunk size for the per-partition UPDATE loop")
 
     def handle(self, *args, **options):
         qs = VariantAnnotationVersion.objects.all().order_by("pk")
         if vav_id := options.get("vav_id"):
             qs = qs.filter(pk=vav_id)
 
+        chunk_size = options["chunk_size"]
         for vav in qs:
-            updated = VariantAnnotation.backfill_spliceai_max_ds(vav)
+            updated = VariantAnnotation.backfill_spliceai_max_ds(vav, chunk_size=chunk_size)
             logging.info("VariantAnnotationVersion %s: updated %d rows", vav.pk, updated)
             if not options["skip_index"]:
                 self._create_partition_index(vav)
