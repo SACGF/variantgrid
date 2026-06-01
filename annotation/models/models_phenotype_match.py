@@ -16,7 +16,7 @@ PATIENT_ONTOLOGY_TERM_PATH = PATIENT_TPM_PATH + "__ontology_term"
 PATIENT_GENE_SYMBOL_PATH = PATIENT_TPM_PATH + "__gene_symbol"
 
 
-def filter_ambiguous_acronym_matches(matches: list["TextPhenotypeMatch"]) -> list["TextPhenotypeMatch"]:
+def filter_ambiguous_acronym_matches(matches: List["TextPhenotypeMatch"]) -> List["TextPhenotypeMatch"]:
     """Drop unsaved TextPhenotypeMatch instances whose matched text is an ambiguous
     acronym (one short string mapping to multiple distinct concept clusters). These
     are surfaced as warning-only entries by TextPhenotypeSentence.get_results()
