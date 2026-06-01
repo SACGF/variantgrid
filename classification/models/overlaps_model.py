@@ -19,7 +19,7 @@ from library.utils import first, AuditUtils
 from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Allele, Lab, GenomeBuild
+from snpdb.models import Allele, Lab, GenomeBuild, LabLike, CLINVAR_EXPERT_PANEL_LAB
 
 
 class OverlapContribution(TimeStampedModel):
@@ -41,6 +41,15 @@ class OverlapContribution(TimeStampedModel):
     effective_date = JSONField(null=False, blank=False, default=EffectiveDate.default_json)
     triage_state = JSONField(null=False, blank=False, default=TriageState.default_json)
     comment = JSONField(null=False, blank=False, default=TriageComment.default_json)
+
+    @property
+    def lab_like(self) -> LabLike:
+        if cg := self.classification_grouping:
+            return cg.lab
+        elif self.scv:
+            return CLINVAR_EXPERT_PANEL_LAB
+        else:
+            raise ValueError("Cannot determine LabLike")
 
     @property
     def effective_date_obj(self) -> EffectiveDate:
@@ -104,6 +113,7 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def lab(self) -> Optional[Lab]:
+        # DEPRECATED, use lab_like
         if classification_grouping := self.classification_grouping:
             return classification_grouping.lab
         return None

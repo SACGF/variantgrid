@@ -28,6 +28,11 @@
     {% if overlap_grouping.overlap.allele %}
         {% labelled label="Allele" %}<a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{{ overlap_grouping.overlap.allele }}</a>{% endlabelled %}
     {% endif %}
+    {% labelled label="Involved Labs" %}
+        {% for lab_contact in overlap_grouping.involved_labs %}
+            <div>{% lab lab_contact.lab show_contact_link=True contact_subject=lab_contact.email_subject %}</div>
+        {% endfor %}
+    {% endlabelled %}
     {% if overlap_grouping.discordance_reports %}
         {% labelled label="Legacy Discordance Reports" %}
             {% for discordance_report in overlap_grouping.discordance_reports %}
@@ -46,12 +51,11 @@
         <table class="table overlap-summary">
             <thead>
                 <tr>
-                    <th class="overlap-context">Context</th>
                     <th class="overlap-lab">Lab</th>
+                    <th>Latest Record</th>
                     <th class="overlap-value">Value</th>
                     <th class="overlap-condition">Condition</th>
                     <th class="overlap-curated">Curated</th>
-                    <th class="overlap-triage">Triage Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -62,14 +66,19 @@
                         {% endif %}
                     {% endifchanged %}
                     <tr class="{% if overlap_entry.is_cross_context %}cross-context-row{% elif overlap_entry.is_user_lab %}users-row{% endif %}">
-                        <td>{% testing_context overlap_entry.overlap_contribution %}</td>
                         <td>
-                            {% if overlap_entry.overlap_contribution.scv %}ClinVar Expert Panel<br/><a class=hover-link" href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ overlap_entry.overlap_contribution.scv }}">{{ overlap_entry.overlap_contribution.scv }}</a>{% else %}
-                            {% lab overlap_entry.overlap_contribution.lab is_your_lab=overlap_entry.is_user_lab show_contact_link=True contact_subject=overlap_entry.email_subject %}
+                            {% lab overlap_entry.overlap_contribution.lab_like is_your_lab=overlap_entry.is_user_lab lab_css="font-weight:500" %}
+                            <div>{% testing_context overlap_entry.overlap_contribution style="subtle" %}</div>
+                        </td>
+                        <td>
+                            {% if overlap_entry.overlap_contribution.scv %}
+                                <a class=hover-link" href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ overlap_entry.overlap_contribution.scv }}">{{ overlap_entry.overlap_contribution.scv }}</a>
+                            {% else %}
                                 {% with classification=overlap_entry.overlap_contribution.classification_grouping.latest_classification_modification.classification %}
-                                <br/><a class="hover-link" href="{{ classification.get_absolute_url }}">{{ classification.cr_lab_id }}</a>
+                                    <a class="hover-link" href="{{ classification.get_absolute_url }}">{{ classification.cr_lab_id }}</a>
                                 {% endwith %}
                             {% endif %}
+                        </td>
                         <td>{% clinical_significance overlap_entry.overlap_contribution.value %}
                         <div class="overlap-criteria">
                             {% for criteria_label in overlap_entry.overlap_contribution.classification_grouping.latest_cached_summary.criteria_labels %}<span class="comma-sep">{{ criteria_label }}</span>{% endfor %}
@@ -77,19 +86,14 @@
                         </td>
                         <td>{% condition overlap_entry.overlap_contribution.conditions %}</td>
                         <td>{% timestamp overlap_entry.overlap_contribution.effective_date_obj.date time_ago=True %}</td>
-                        <td>
-                            {% if overlap_entry.is_cross_context %}
-                                <span class="no-value">Cross-Context</span>
-                            {% else %}
-                                <div id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_label=True %}</div>
-                                {% if user.is_superuser or overlap_entry.is_user_lab %}
-                                    {% if overlap_entry.overlap_contribution.classification_grouping %}
-                                        <a href="{% url 'triage_3' overlap_entry.overlap_contribution.pk %}?mode=modal" data-toggle="ajax-modal" data-size="md">Edit</a>
-                                    {% endif %}
-                                {% endif %}
-                            {% endif %}
+                    </tr>
+                    {% if not overlap_entry.is_cross_context %}
+                    <tr>
+                        <td colspan="5" style="border-top:none">
+                            <div style="display:inline-block" id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_icon=True show_label=True show_link=overlap_entry.is_editable style="long" %}</div>
                         </td>
                     </tr>
+                    {% endif %}
                 {% endfor %}
             </tbody>
         </table>
@@ -109,7 +113,7 @@
                 <div class="row my-4">
                     <div class="col-3 text-right">
                         {% ifchanged change.overlap_contribution change.user %}
-                            <div>{% if change.overlap_contribution.lab %}{% lab change.overlap_contribution.lab lab_css="font-weight:600" %}{% else %}ClinVar Expert Panel{% endif %}</div>
+                            <div>{% if change.overlap_contribution.lab %}{% lab change.overlap_contribution.lab lab_css="font-weight:500" %}{% else %}ClinVar Expert Panel{% endif %}</div>
                             <div class="mb-1">{% testing_context change.overlap_contribution style="subtle" %}</div>
                             {% if change.user %}<div class="mt-1">{% user change.user size="tiny" align="right" %}</div>{% else %}{% endif %}
                         {% endifchanged %}

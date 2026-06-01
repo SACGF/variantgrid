@@ -38,7 +38,7 @@ from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Lab
+from snpdb.models import Lab, LabLike
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant
@@ -294,7 +294,7 @@ def clinical_significance_inline(value):
     }
 
 @register.inclusion_tag("classification/tags/lab.html")
-def lab(lab: Lab, is_your_lab: Optional[bool] = None, lab_css: Optional[str] = None, show_contact_link: bool = False, contact_subject: Optional[str] = None, contact_body: Optional[str] = None):
+def lab(lab: LabLike, is_your_lab: Optional[bool] = None, lab_css: Optional[str] = None, show_contact_link: bool = False, contact_subject: Optional[str] = None, contact_body: Optional[str] = None):
     return {
         "lab": lab,
         "is_your_lab": is_your_lab,
@@ -794,7 +794,8 @@ def triage(context,
            triage: OverlapContribution,
            show_label: bool = False,
            show_link: bool = False,
-           show_icon: bool = False
+           show_icon: bool = False,
+           style: str = "compact"
            ):
     new_value = None
     # if show_link and isinstance(triage, ClassificationGroupingValueTriageHistory):
@@ -820,6 +821,7 @@ def triage(context,
         "show_label": show_label,
         "show_link": show_link,
         "show_icon": show_icon,
+        "style": style,
         "last_comment": last_comment
     }
 

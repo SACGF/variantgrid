@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import uuid
+from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property, total_ordering
@@ -471,7 +472,41 @@ class ContactDetails:
         return bool(self.website) or bool(self.phone) or bool(self.email)
 
 
-class Lab(models.Model, PreviewModelMixin):
+class LabLike:
+
+    @property
+    def name(self) -> str:
+        return ""
+
+    @property
+    def organization(self) -> Optional[Organization]:
+        return None
+
+    def __lt__(self, other):
+        if self.organization != other.organization:
+            if self.organization and not other.organization:
+                return False
+            if other.organization and not self.organization:
+                return True
+            return self.organization < other.organization
+
+        return self.name < other.name
+
+
+class SpecialLab(LabLike):
+
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+
+CLINVAR_EXPERT_PANEL_LAB = SpecialLab(name="ClinVar Expert Panel")
+
+
+class Lab(models.Model, PreviewModelMixin, LabLike):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, e.g. Shariant
     city = models.TextField()
@@ -508,11 +543,6 @@ class Lab(models.Model, PreviewModelMixin):
 
     email = models.TextField(blank=True)
     slack_webhook = models.TextField(blank=True)
-
-    def __lt__(self, other):
-        if self.organization != other.organization:
-            return self.organization < other.organization
-        return self.name < other.name
 
     objects = ObjectManagerCachingRequest()
 

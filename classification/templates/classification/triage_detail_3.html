@@ -14,6 +14,7 @@
         {% labelled label="Value" %}{{ triage.get_value_type_display }} : {{ triage.pretty_value }}{% endlabelled %}
         <div class="container">{% include "uicore/messages/messages.html" %}</div>
         {% labelled label="Editing By" %}{% user user size="tiny" %}{% endlabelled %}
+        {% labelled label="For Lab" %}{% lab triage.lab_like %}{% endlabelled %}
         <div class="triage-form">
             {% crispy form form_helper.horizontal %}
             <script>

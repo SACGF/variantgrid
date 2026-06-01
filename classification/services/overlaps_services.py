@@ -26,7 +26,7 @@ import json
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab
+from snpdb.models import Lab, LabLike
 from snpdb.utils import LabNotificationBuilder
 
 
@@ -338,6 +338,7 @@ class OverlapContributionPerspective:
     overlap_contribution: OverlapContribution
     is_cross_context: bool = False
     is_user_lab: bool = False
+    is_admin: bool = False
 
     @cached_property
     def email_subject(self):
@@ -347,14 +348,40 @@ class OverlapContributionPerspective:
     def _sort_index(self):
         return self.is_cross_context, self.is_user_lab, self.overlap_contribution
 
+    @property
+    def is_editable(self):
+        return self.is_user_lab or self.is_admin
+
     def __lt__(self, other: Self):
         return self._sort_index < other._sort_index
+
+
+@dataclass
+class LabContext:
+    lab: LabLike
+    contact_subject: Optional[str]
 
 
 @dataclass(frozen=True)
 class OverlapGrouping3:
     overlap: Overlap
     user: User
+
+    @cached_property
+    def involved_labs(self) -> list[LabContext]:
+        labs: set[LabLike] = []
+        for overlap_contribution in self.overlap.contributions:
+            subject = None
+            if lab := overlap_contribution.lab:
+                # TODO get lab's preferred genome build
+                subject = self.overlap.c_hgvs(lab=lab)
+            labs.append(
+                LabContext(
+                    overlap_contribution.lab_like,
+                    subject
+                )
+            )
+        return list(sorted(labs, key=lambda x: x.lab))
 
     @cached_property
     def rows(self) -> list[OverlapContributionPerspective]:
@@ -370,7 +397,8 @@ class OverlapGrouping3:
                 overlap=self.overlap,
                 overlap_contribution=overlap_contribution,
                 is_cross_context=False,
-                is_user_lab=not self.user.is_superuser and lab in user_labs
+                is_user_lab=not self.user.is_superuser and lab in user_labs,
+                is_admin=self.user.is_superuser
             ))
 
         if allele_id := self.overlap.allele_id:
@@ -381,7 +409,8 @@ class OverlapGrouping3:
                         overlap=self.overlap,
                         overlap_contribution=overlap_contribution,
                         is_cross_context=True,
-                        is_user_lab=not self.user.is_superuser and overlap_contribution.lab in user_labs
+                        is_user_lab=not self.user.is_superuser and overlap_contribution.lab in user_labs,
+                        is_admin=self.user.is_superuser
                     ))
 
         return list(sorted(perspectives))
