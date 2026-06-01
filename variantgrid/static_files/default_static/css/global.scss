@@ -3338,8 +3338,20 @@ a .c-hgvs-body {
 }
 
 table.overlap-summary {
+	th.overlap-lab {
+		width: 250px;
+	}
+	th.overlap-value {
+		width: 200px;
+	}
 	th.overlap-condition {
 		width: 200px;
+	}
+	th.overlap-curated {
+		width: 100px;
+	}
+	th.overlap-triage {
+		width: 300px;
 	}
 	tr.users-row {
 		background-color: #eeeeee;

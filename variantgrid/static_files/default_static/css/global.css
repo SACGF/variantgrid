@@ -2915,8 +2915,20 @@ a .c-hgvs-body .c-hgvs-nomen {
   padding-right: 8px;
 }
 
+table.overlap-summary th.overlap-lab {
+  width: 250px;
+}
+table.overlap-summary th.overlap-value {
+  width: 200px;
+}
 table.overlap-summary th.overlap-condition {
   width: 200px;
+}
+table.overlap-summary th.overlap-curated {
+  width: 100px;
+}
+table.overlap-summary th.overlap-triage {
+  width: 300px;
 }
 table.overlap-summary tr.users-row {
   background-color: #eeeeee;

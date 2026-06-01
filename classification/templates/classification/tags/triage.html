@@ -1,5 +1,5 @@
 {% load user_tags %}
-<span {% if style == "compact" %}{% if last_comment.value.text %}title="{{ last_comment.value.text }} - {{ last_comment.user.username }}"{% endif %}{% endif %}>
+<div {% if style == "compact" %}{% if last_comment.value.text %}title="{{ last_comment.value.text }} - {{ last_comment.user.username }}"{% endif %}{% endif %}>
 
 {% if show_icon %}{{ triage.triage_state_obj.status.icon }}{% endif %}
 {% if show_link %}
@@ -11,15 +11,10 @@
     {% if style == "compact "%}
         <i class="ml-1 fa-solid fa-message" style="opacity:0.5"></i>
     {% else %}
-        <div>
-            <div style="display: inline-block"><i class="fa-solid fa-message" style="opacity:0.5"></i></div>
-            <div style="display: inline-block">
-                <span style="color:#446">{{ last_comment.value.text }}</span> -
-            </div>
-            <div style="display: inline-block; margin-left: 6px; position: relative; top: 4px">
-                {% user last_comment.user size="tiny" %}
-            </div>
+        <div class="mt-2">
+            <div style="display:inline-block; margin-right: 6px"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i><span style="color:#446">{{ last_comment.value.text }}</span></div>
+            <div style="margin-top:6px; position:relative; right: 1px;">{% user last_comment.user size="tiny" %}</div>
         </div>
     {% endif %}
 {% endif %}
-</span>
+</div>

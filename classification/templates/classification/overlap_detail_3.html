@@ -51,11 +51,11 @@
         <table class="table overlap-summary">
             <thead>
                 <tr>
-                    <th class="overlap-lab">Lab</th>
-                    <th>Latest Record</th>
-                    <th class="overlap-value">Value</th>
-                    <th class="overlap-condition">Condition</th>
-                    <th class="overlap-curated">Curated</th>
+                    <th class="overlap-lab" style="border-top:none">Lab</th>
+                    <th class="overlap-value" style="border-top:none">Value</th>
+                    <th class="overlap-condition" style="border-top:none">Condition</th>
+                    <th class="overlap-curated" style="border-top:none">Curated</th>
+                    <th class="overlap-triage" style="border-top:none">Triage Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -69,8 +69,7 @@
                         <td>
                             {% lab overlap_entry.overlap_contribution.lab_like is_your_lab=overlap_entry.is_user_lab lab_css="font-weight:500" %}
                             <div>{% testing_context overlap_entry.overlap_contribution style="subtle" %}</div>
-                        </td>
-                        <td>
+
                             {% if overlap_entry.overlap_contribution.scv %}
                                 <a class=hover-link" href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ overlap_entry.overlap_contribution.scv }}">{{ overlap_entry.overlap_contribution.scv }}</a>
                             {% else %}
@@ -86,14 +85,15 @@
                         </td>
                         <td>{% condition overlap_entry.overlap_contribution.conditions %}</td>
                         <td>{% timestamp overlap_entry.overlap_contribution.effective_date_obj.date time_ago=True %}</td>
-                    </tr>
-                    {% if not overlap_entry.is_cross_context %}
-                    <tr>
-                        <td colspan="5" style="border-top:none">
-                            <div style="display:inline-block" id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_icon=True show_label=True show_link=overlap_entry.is_editable style="long" %}</div>
+
+                        <td>
+                            {% if not overlap_entry.is_cross_context %}
+                                <div style="display:inline-block; width:100%" id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_icon=True show_label=True show_link=overlap_entry.is_editable style="long" %}</div>
+                            {% else %}
+                                <div class="no-value">Cross Context</div>
+                            {% endif %}
                         </td>
                     </tr>
-                    {% endif %}
                 {% endfor %}
             </tbody>
         </table>
