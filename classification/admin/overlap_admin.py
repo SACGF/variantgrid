@@ -62,12 +62,25 @@ class OverlapStatusFilter(admin.SimpleListFilter):
         return queryset
 
 
+class OverlapContributionSkewsAdmin(admin.TabularInline):
+    readonly_fields = ('modified',)
+    # fields = ('last_edited_by', 'parent', 'gene_symbol', 'mode_of_inheritance', 'classification', 'condition_xrefs', 'modified')
+    model = OverlapContributionSkew
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Overlap)
 class OverlapAdmin(ModelAdminBasics):
     list_display = ('overlap_status', 'valid', 'overlap_type', 'value_type', 'allele', 'testing_context_bucket', 'tumor_type_category', 'contributions_list', 'modified_detailed')
     # inlines = (OverlapContributionInline, )
     search_fields = ('pk', 'allele__id')
     list_filter = (OverlapStatusFilter, 'valid', 'overlap_type', 'value_type', 'testing_context_bucket')
+    inlines = (OverlapContributionSkewsAdmin,)
 
     @admin_list_column()
     def contributions_list(self, obj: Overlap):
