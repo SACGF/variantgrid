@@ -17,7 +17,7 @@ from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
-    VariantAnnotationVersionDiff, Citation
+    VariantAnnotationVersionDiff, Citation, InvalidAnnotationVersionError
 from annotation import vep_columns
 from annotation.models.models import CachedWebResource, HumanProteinAtlasAnnotationVersion, \
     HumanProteinAtlasAnnotation, DBNSFPGeneAnnotationVersion
@@ -377,7 +377,7 @@ def variant_annotation_runs(request):
                         new_vav.promote_to_active()
                         messages.add_message(request, messages.INFO,
                                              f"{genome_build} - promoted VAV pk={new_vav.pk} to ACTIVE")
-                    except ValueError as e:
+                    except (ValueError, InvalidAnnotationVersionError) as e:
                         messages.add_message(request, messages.ERROR, str(e))
 
             for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build):
@@ -428,9 +428,11 @@ def variant_annotation_runs(request):
                                                  status=VariantAnnotationVersion.Status.NEW)
         new_progress = None
         new_populated = False
+        new_gene_annotation_blocker = None
         if new_vav is not None:
             new_progress = get_variant_annotation_progress(new_vav)
             new_populated = is_variant_annotation_version_populated(new_vav)
+            new_gene_annotation_blocker = new_vav.get_gene_annotation_promote_blocker()
         historical_count = VariantAnnotationVersion.objects.filter(
             genome_build=genome_build, status=VariantAnnotationVersion.Status.HISTORICAL
         ).count()
@@ -439,6 +441,7 @@ def variant_annotation_runs(request):
             "new": new_vav,
             "new_progress": new_progress,
             "new_populated": new_populated,
+            "new_gene_annotation_blocker": new_gene_annotation_blocker,
             "historical_count": historical_count,
         }
 

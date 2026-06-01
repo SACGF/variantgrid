@@ -767,6 +767,26 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             genome_build__in=GenomeBuild.builds_with_annotation()
         )
 
+    def get_gene_annotation_promote_blocker(self) -> Optional[str]:
+        """ Reason gene annotation prevents promoting this VAV to ACTIVE, or None if OK. Activating a VAV whose
+            AnnotationVersion is inconsistent (most commonly: gene annotation not run for the current OntologyVersion,
+            e.g. ontology was re-imported after this VAV was created) breaks variant pages. The annotation page uses
+            this to disable the Promote button and explain why; promote_to_active() enforces it. """
+        if not (settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED and self.gene_annotation_release_id):
+            return None
+        av = self.annotationversion_set.order_by("annotation_date").last()
+        if av is None:
+            return None
+        remediation = "Run 'python3 manage.py gene_annotation --latest-releases'."
+        if av.gene_annotation_version_id is None:
+            return (f"No gene annotation has been created for this GeneAnnotationRelease / current "
+                    f"OntologyVersion. {remediation}")
+        try:
+            av.validate_gene_annotation()
+        except InvalidAnnotationVersionError as e:
+            return f"{e} {remediation}"
+        return None
+
     @transaction.atomic
     def promote_to_active(self):
         """ Demote prior ACTIVE for this genome_build → HISTORICAL, set self → ACTIVE. """
@@ -774,6 +794,10 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             raise ValueError(f"VariantAnnotationVersion pk={self.pk} is already ACTIVE")
         if self.status == VariantAnnotationVersion.Status.HISTORICAL:
             raise ValueError(f"VariantAnnotationVersion pk={self.pk} is HISTORICAL — cannot promote")
+
+        if blocker := self.get_gene_annotation_promote_blocker():
+            raise InvalidAnnotationVersionError(
+                f"Cannot promote VariantAnnotationVersion pk={self.pk} to ACTIVE - {blocker}")
 
         prior_qs = VariantAnnotationVersion.objects.select_for_update().filter(
             genome_build=self.genome_build,
@@ -1976,25 +2000,33 @@ class AnnotationVersion(models.Model):
             missing = ", ".join([str(s) for s in missing_sub_annotations])
             raise InvalidAnnotationVersionError(f"AnnotationVersion: {self} missing sub annotations: {missing}")
 
-        if self.gene_annotation_version:
-            if vav_gar_id := self.variant_annotation_version.gene_annotation_release_id:
-                gene_gar_id = self.gene_annotation_version.gene_annotation_release_id
-                if vav_gar_id != gene_gar_id:
-                    vav_gar = self.variant_annotation_version.gene_annotation_release
-                    different_msg = (
-                        f"Inconsistent GeneAnnotationRelease. VariantAnnotationVersion "
-                        f"{self.variant_annotation_version.pk} uses GAR {vav_gar_id} but "
-                        f"GeneAnnotationVersion {self.gene_annotation_version.pk} uses GAR {gene_gar_id}. "
-                        f"Create a GeneAnnotationVersion for the new GAR by running: "
-                        f"python3 manage.py gene_annotation --gene-annotation-release {vav_gar.pk}"
-                    )
-                    raise InvalidAnnotationVersionError(different_msg)
+        self.validate_gene_annotation()
 
-            ov_id = self.ontology_version_id
-            gav_ov_id = self.gene_annotation_version.ontology_version_id
-            if (ov_id and gav_ov_id) and (ov_id != gav_ov_id):
-                msg = f"OntologyVersion {ov_id} != GeneAnnotationVersion OntologyVersion {gav_ov_id}"
-                raise InvalidAnnotationVersionError(msg)
+    def validate_gene_annotation(self):
+        """ The GeneAnnotationVersion must be consistent with this AnnotationVersion's VariantAnnotationVersion
+            (GeneAnnotationRelease) and OntologyVersion. Raises InvalidAnnotationVersionError - the same error that
+            breaks variant pages if an inconsistent version goes live. """
+        if not self.gene_annotation_version_id:
+            return
+
+        if vav_gar_id := self.variant_annotation_version.gene_annotation_release_id:
+            gene_gar_id = self.gene_annotation_version.gene_annotation_release_id
+            if vav_gar_id != gene_gar_id:
+                vav_gar = self.variant_annotation_version.gene_annotation_release
+                different_msg = (
+                    f"Inconsistent GeneAnnotationRelease. VariantAnnotationVersion "
+                    f"{self.variant_annotation_version.pk} uses GAR {vav_gar_id} but "
+                    f"GeneAnnotationVersion {self.gene_annotation_version.pk} uses GAR {gene_gar_id}. "
+                    f"Create a GeneAnnotationVersion for the new GAR by running: "
+                    f"python3 manage.py gene_annotation --gene-annotation-release {vav_gar.pk}"
+                )
+                raise InvalidAnnotationVersionError(different_msg)
+
+        ov_id = self.ontology_version_id
+        gav_ov_id = self.gene_annotation_version.ontology_version_id
+        if (ov_id and gav_ov_id) and (ov_id != gav_ov_id):
+            msg = f"OntologyVersion {ov_id} != GeneAnnotationVersion OntologyVersion {gav_ov_id}"
+            raise InvalidAnnotationVersionError(msg)
 
     @staticmethod
     def latest(genome_build: GenomeBuild, validate=True,

@@ -177,6 +177,8 @@ class Command(BaseCommand):
 
         print(f"To create a GeneAnnotationVersion for this release, run: "
               f"python3 manage.py gene_annotation --gene-annotation-release {release.pk}")
+        print("Or to create GeneAnnotationVersions for the latest release of every build, run: "
+              "python3 manage.py gene_annotation --latest-releases")
         print("Or to create GeneAnnotationVersions for all latest AnnotationVersions missing one, run: "
               "python3 manage.py gene_annotation --missing")
 

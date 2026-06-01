@@ -39,6 +39,10 @@ class Command(BaseCommand):
         group.add_argument('--gene-annotation-release', type=int, help=gar_ov_dbsnfp_help)
         group.add_argument('--missing', action="store_true",
                            help="Automatically create for latest AnnotationVersions for each build if missing")
+        group.add_argument('--latest-releases', action="store_true",
+                           help="Create a GeneAnnotationVersion (using the latest OntologyVersion) for the "
+                                "GeneAnnotationRelease used by the latest VariantAnnotationVersion of each build. "
+                                "Skips builds that already have a matching version (use --force to recreate)")
         group.add_argument('--add-new-to-existing', action="store_true",
                            help="Add new columns gene/disease and MONDO terms to existing gene annotation")
         group.add_argument('--add-dbnsfp-gene', action="store_true",
@@ -61,6 +65,7 @@ class Command(BaseCommand):
         self.update_panel_app = options["update_panel_app"]
 
         missing = options["missing"]
+        latest_releases = options["latest_releases"]
         self._validate_has_required_data()
 
         if options["add_new_to_existing"]:
@@ -130,6 +135,39 @@ class Command(BaseCommand):
 
                 gav = self._create_gene_annotation_version(gar, av.ontology_version, dbnsfp_gene_version)
                 self._populate_gene_annotation_version(gav, gene_symbols)
+        elif latest_releases:
+            ontology_version = self._get_latest_ontology_version(ov_id)
+            if dbnsfp_gene_version_id:
+                dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
+
+            releases = GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()
+            if not releases:
+                print("No GeneAnnotationReleases linked to the latest VariantAnnotationVersions - nothing to do")
+            for gene_annotation_release in releases:
+                print(f"=== {gene_annotation_release.genome_build}: {gene_annotation_release} ===")
+                self._create_if_missing(gene_annotation_release, ontology_version, dbnsfp_gene_version,
+                                        gene_symbols, force)
+
+    def _create_if_missing(self, gene_annotation_release, ontology_version, dbnsfp_gene_version, gene_symbols, force):
+        existing = GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release,
+                                                        ontology_version=ontology_version,
+                                                        dbnsfp_gene_version=dbnsfp_gene_version).first()
+        if existing and not force:
+            num_gene_annotations = existing.geneannotation_set.count()
+            print(f"GeneAnnotationVersion already exists for {gene_annotation_release} / {ontology_version} "
+                  f"(records={num_gene_annotations}, created={existing.created}) - skipping. Use --force to recreate.")
+            return
+        gav = self._create_gene_annotation_version(gene_annotation_release, ontology_version, dbnsfp_gene_version)
+        self._populate_gene_annotation_version(gav, gene_symbols)
+
+    @staticmethod
+    def _get_latest_ontology_version(ov_id):
+        if ov_id:
+            return OntologyVersion.objects.get(pk=ov_id)
+        ontology_version = OntologyVersion.objects.order_by("pk").last()
+        if ontology_version is None:
+            raise ValueError("No ontology versions - you need to import this first (see annotation page)")
+        return ontology_version
 
     @staticmethod
     def _get_ontology_version(ov_id):

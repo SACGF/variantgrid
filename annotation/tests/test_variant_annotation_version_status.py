@@ -10,11 +10,12 @@ from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,
     AnnotationVersion,
+    InvalidAnnotationVersionError,
     VariantAnnotationVersion,
 )
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
-from genes.models import GeneAnnotationRelease
+from genes.models import GeneAnnotationImport, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
@@ -70,6 +71,25 @@ class VariantAnnotationVersionStatusTests(TestCase):
         historical_vav = _make_vav(self.grch37, status=VariantAnnotationVersion.Status.HISTORICAL)
         with self.assertRaises(ValueError):
             historical_vav.promote_to_active()
+
+    def test_promote_to_active_blocked_when_gene_annotation_missing(self):
+        """ A staged VAV with a GeneAnnotationRelease but no GeneAnnotationVersion (gene annotation not run for the
+            current ontology) must not be promotable - that would make a broken AnnotationVersion live. """
+        gene_annotation_import = GeneAnnotationImport.objects.create(
+            annotation_consortium=AnnotationConsortium.ENSEMBL, genome_build=self.grch37, url="http://fake/gtf")
+        gar = GeneAnnotationRelease.objects.create(
+            version="test", annotation_consortium=AnnotationConsortium.ENSEMBL,
+            genome_build=self.grch37, gene_annotation_import=gene_annotation_import)
+
+        new_vav = _make_vav(self.grch37, status=VariantAnnotationVersion.Status.NEW)
+        # Assign the release after creation - creating with it set while no GeneAnnotationVersion exists raises earlier
+        new_vav.gene_annotation_release = gar
+        new_vav.save(update_fields=["gene_annotation_release"])
+
+        with self.assertRaises(InvalidAnnotationVersionError):
+            new_vav.promote_to_active()
+        new_vav.refresh_from_db()
+        self.assertEqual(new_vav.status, VariantAnnotationVersion.Status.NEW)
 
     def test_latest_default_returns_active_only(self):
         _make_vav(self.grch37, status=VariantAnnotationVersion.Status.NEW)
