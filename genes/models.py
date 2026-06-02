@@ -1765,7 +1765,10 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
 
     def get_genes(self, release: GeneAnnotationRelease):
         """ Get Genes (from a release) for symbols in this gene list """
-        rgs_qs = ReleaseGeneSymbol.objects.filter(release=release, gene_symbol__genelistgenesymbol__gene_list=self)
+        # Route symbols through a subquery rather than joining GeneListGeneSymbol via GeneSymbol, so Postgres
+        # uses the ReleaseGeneSymbol (release_id, gene_symbol_id) unique index instead of scanning the release.
+        symbols_qs = self.genelistgenesymbol_set.values_list("gene_symbol_id", flat=True)
+        rgs_qs = ReleaseGeneSymbol.objects.filter(release=release, gene_symbol__in=symbols_qs)
         return Gene.objects.filter(releasegenesymbolgene__release_gene_symbol__in=rgs_qs)
 
     def get_gene_names(self):
