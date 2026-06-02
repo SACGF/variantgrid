@@ -81,7 +81,7 @@ class TriageStatus(TextChoices):
             case TriageStatus.REVIEWED_WILL_DISCUSS:
                 return mark_safe('<i class="fa-regular fa-comments" title="For Joint Discussion" style="opacity:0.6"></i>')
             case TriageStatus.REVIEWED_SATISFACTORY:
-                return mark_safe('<i class="fa-solid fa-clipboard-check" title="Confident in Classification" style="opacity:0.6"></i>')
+                return mark_safe('<i class="fa-solid fa-clipboard-check" title="Confident in Value" style="opacity:0.6"></i>')
             case TriageStatus.COMPLEX:
                 return mark_safe('<i class="fa-solid fa-clipboard-question" title="Complex Reasons for Discordance" style="opacity:0.6"></i>')
             case TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
