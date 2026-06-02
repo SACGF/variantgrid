@@ -105,7 +105,7 @@ class OverlapContribution(TimeStampedModel):
         return f"{self.allele} {self.testing_context_full} {self.value_type}"
 
     def __str__(self):
-        return f"{self.pk} {self.source} {self.value}"
+        return f"{self.pk} {self.source} {self.lab_like} {self.value}"
 
     @property
     def testing_context_bucket_obj(self) -> TestingContextBucket:
@@ -393,7 +393,7 @@ class OverlapContributionSkew(TimeStampedModel):
     next_step = IntegerFieldChoices(choices_type=TriageNextStep, default=TriageNextStep.PENDING_CALCULATION)
 
     def __str__(self):
-        return f"overlap = {self.overlap}, contribution = {self.contribution}, perspective = {self.next_step}"
+        return f"{self.contribution} ({self.next_step.name})"
 
 
 class OverlapDiscordanceNotification(TimeStampedModel):
