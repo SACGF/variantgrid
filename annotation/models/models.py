@@ -1647,6 +1647,27 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 mmid3_mastermind_urls[mmid3] = f"https://mastermind.genomenon.com/detail?mutation={mmid3}"
         return mmid3_mastermind_urls
 
+    @property
+    def denovo_db_records(self) -> list[dict]:
+        """ Parse the '&'-separated parallel arrays (one element per contributing
+            denovo-db record) into one dict per record.
+            See https://denovo-db.gs.washington.edu/ """
+        records = []
+        if self.denovo_db_studies:
+            studies = self.denovo_db_studies.split("&")
+            pubmed_ids = (self.denovo_db_pubmed_ids or "").split("&")
+            phenotypes = (self.denovo_db_primary_phenotypes or "").split("&")
+            for i, study in enumerate(studies):
+                pubmed_id = pubmed_ids[i] if i < len(pubmed_ids) else ""
+                pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{pubmed_id}/" if pubmed_id else ""
+                records.append({
+                    "study": study,
+                    "pubmed_id": pubmed_id,
+                    "pubmed_url": pubmed_url,
+                    "primary_phenotype": phenotypes[i] if i < len(phenotypes) else "",
+                })
+        return records
+
     def has_spliceai(self):
         return any((self.spliceai_pred_ds_ag, self.spliceai_pred_ds_al,
                     self.spliceai_pred_ds_dg, self.spliceai_pred_ds_dl))
