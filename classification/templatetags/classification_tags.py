@@ -251,7 +251,7 @@ def clinical_significance_values(vcm: ClassificationModification):
 
 
 @register.inclusion_tag("classification/tags/clinical_significance.html")
-def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True):
+def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True, extra_css: str = ""):
     if isinstance(value, EvidenceMixin):
         value = value.get(evidence_key)
     if value is None and not show_if_none:
@@ -268,7 +268,7 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
     #prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"
     prefix = "cs"
     css_value = value.lower() if value else "none"
-    css_class = f"{prefix} {prefix}-{css_value}"
+    css_class = f"{prefix} {prefix}-{css_value} {extra_css}"
 
     return {
         "css_class": css_class,

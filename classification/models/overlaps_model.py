@@ -189,6 +189,7 @@ class Overlap(TimeStampedModel):
     testing_context_bucket = models.TextField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
     overlap_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
+    overlap_pending_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
 
@@ -202,6 +203,10 @@ class Overlap(TimeStampedModel):
             if cg := entry.classification_grouping:
                 c_hgvses.add(cg.latest_allele_info.preferred_c_hgvs_obj())
         return list(sorted(c_hgvses))
+
+    @property
+    def has_pending_status(self):
+        return self.overlap_status != self.overlap_pending_status
 
     def c_hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> CHGVS:
         # if no genome_build provided, use the imported value

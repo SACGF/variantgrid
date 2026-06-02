@@ -227,22 +227,28 @@ class OverlapServices:
     @staticmethod
     def recalc_overlap(overlap: Overlap):
         calculator = calculator_for_value_type(overlap.value_type)
-        overlap_status = calculator.calculate_entries(list(overlap.contributions.all()))
+        overlap_status_calculation = calculator.calculate_entries(list(overlap.contributions.all()))
+
         old_overlap_status = overlap.overlap_status
-        overlap.overlap_status = overlap_status
+        old_pending_status = overlap.overlap_pending_status
+
         overlap_changed = False
-        if overlap_status != old_overlap_status:
+        if (overlap_status_calculation.current_value, overlap_status_calculation.pending_value) != (old_overlap_status, old_pending_status):
+            overlap.overlap_status = overlap_status_calculation.current_value
+            overlap.overlap_pending_status = overlap_status_calculation.override_pending_value
             overlap.overlap_status_change_timestamp = now()
             overlap_changed = True
+
         if overlap.overlap_type == OverlapType.SINGLE_CONTEXT:
             overlap.valid = True
         elif overlap.overlap_type == OverlapType.CROSS_CONTEXT:
             # cross contexts need at least 2 different contexts to be considered valid
             valid = len(overlap.testing_contexts_objs) > 1
             overlap.valid = valid
+
         overlap.save()
         if overlap_changed:
-            OverlapServices.overlap_status_changed(overlap, old_overlap_status)
+            OverlapServices.overlap_status_changed(overlap, old_pending_status)
 
     @staticmethod
     def overlap_status_changed(overlap: Overlap, old_status: OverlapStatus):
@@ -252,7 +258,7 @@ class OverlapServices:
         if overlap.overlap_type == OverlapType.CROSS_CONTEXT:
             return  # don't notify when cross context become discordant
 
-        new_status = overlap.overlap_status
+        new_status = overlap.overlap_pending_status
 
         # see if it's worth notifying anyone
         if not (new_status.is_discordant ^ old_status.is_discordant):

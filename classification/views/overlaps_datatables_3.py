@@ -123,7 +123,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
 
         if self.get_query_param("skew_status") == "X":  # show all overlaps
-            qs = qs.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER)
+            qs = qs.filter(overlap_pending_status__gt=OverlapStatus.SINGLE_SUBMITTER)
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionSkew.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk')
@@ -131,7 +131,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             ))
         else:
             # only look at discordant overlaps
-            qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
+            qs = qs.filter(overlap_pending_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
             # filter based on overlap skew
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionSkew.objects.filter(lab_filter_q).filter(
@@ -274,7 +274,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 name="summary",
                 label="Summary",
                 renderer=self.render_summary,
-                sort_keys=["overlap_status", "skew_status", "overlap_status_change_timestamp"],
+                sort_keys=["overlap_pending_status", "skew_status", "overlap_status_change_timestamp"],
                 default_sort=SortOrder.DESC
             ),
 

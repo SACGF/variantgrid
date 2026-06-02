@@ -9,8 +9,16 @@
     {% else %}
         {% with overlap=overlap_grouping.overlap %}
             {% labelled label="Overlap Status" %}
+                <span style="{% if overlap.has_pending_status %}opacity:0.6{% endif %}">
                 <span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>
                     {% if overlap.overlap_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status.label }}{% endif %}
+                </span>
+                {% if overlap.has_pending_status  %}
+                    <br/>Pending :
+                    <span {% if overlap.overlap_pending_status.is_attention %}class="text-danger"{% endif %}>
+                    {% if overlap.overlap_pending_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_pending_status.label }}{% endif %}
+                </span>
+                {% endif %}
                 </span>
             {% endlabelled %}
             {% if overlap.overlap_status_change_timestamp %}
@@ -85,7 +93,13 @@
                                 {% endwith %}
                             {% endif %}
                         </td>
-                        <td>{% clinical_significance overlap_entry.overlap_contribution.value %}
+                        <td>
+                            {% if overlap_entry.overlap_contribution.effective_value != overlap_entry.overlap_contribution.value %}
+                                <div>{% clinical_significance overlap_entry.overlap_contribution.value extra_css="strike"%}</div>
+                                <div>{% clinical_significance overlap_entry.overlap_contribution.effective_value %}</div>
+                            {% else %}
+                                <div>{% clinical_significance overlap_entry.overlap_contribution.value %}</div>
+                            {% endif %}
                         <div class="overlap-criteria">
                             {% for criteria_label in overlap_entry.overlap_contribution.classification_grouping.latest_cached_summary.criteria_labels %}<span class="comma-sep">{{ criteria_label }}</span>{% endfor %}
                         </div>

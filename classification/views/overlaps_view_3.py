@@ -163,6 +163,7 @@ class TriageView3(AjaxFormView[OverlapContribution]):
             for overlap_contribution in triage.classification_grouping.overlapcontribution_set.filter(value_type=value_type):
                 for overlap in overlap_contribution.overlaps:
                     OverlapServices.update_skews(overlap)
+                    OverlapServices.recalc_overlap(overlap)
 
             messages.add_message(request, level=messages.SUCCESS, message="Triage saved successfully")
             context["saved"] = True
