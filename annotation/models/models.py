@@ -1650,23 +1650,34 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @property
     def denovo_db_records(self) -> list[dict]:
         """ Parse the '&'-separated parallel arrays (one element per contributing
-            denovo-db record) into one dict per record.
+            denovo-db record) and collapse identical (study, phenotype, PubMed)
+            entries into a single row with an occurrence 'count'.
             See https://denovo-db.gs.washington.edu/ """
-        records = []
-        if self.denovo_db_studies:
-            studies = self.denovo_db_studies.split("&")
-            pubmed_ids = (self.denovo_db_pubmed_ids or "").split("&")
-            phenotypes = (self.denovo_db_primary_phenotypes or "").split("&")
-            for i, study in enumerate(studies):
-                pubmed_id = pubmed_ids[i] if i < len(pubmed_ids) else ""
+        if not self.denovo_db_studies:
+            return []
+
+        studies = self.denovo_db_studies.split("&")
+        pubmed_ids = (self.denovo_db_pubmed_ids or "").split("&")
+        phenotypes = (self.denovo_db_primary_phenotypes or "").split("&")
+
+        records = {}  # keyed by (study, phenotype, pubmed_id), insertion-ordered
+        for i, study in enumerate(studies):
+            pubmed_id = pubmed_ids[i] if i < len(pubmed_ids) else ""
+            phenotype = phenotypes[i] if i < len(phenotypes) else ""
+            key = (study, phenotype, pubmed_id)
+            record = records.get(key)
+            if record is None:
                 pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{pubmed_id}/" if pubmed_id else ""
-                records.append({
+                records[key] = {
                     "study": study,
                     "pubmed_id": pubmed_id,
                     "pubmed_url": pubmed_url,
-                    "primary_phenotype": phenotypes[i] if i < len(phenotypes) else "",
-                })
-        return records
+                    "primary_phenotype": phenotype,
+                    "count": 1,
+                }
+            else:
+                record["count"] += 1
+        return list(records.values())
 
     def has_spliceai(self):
         return any((self.spliceai_pred_ds_ag, self.spliceai_pred_ds_al,

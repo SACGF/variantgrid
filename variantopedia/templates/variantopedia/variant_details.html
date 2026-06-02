@@ -1078,7 +1078,7 @@ function applyVariantValues() {
                             <div id="denovo-db-records" class="collapse">
                                 <table class="table table-sm mt-2">
                                     <thead>
-                                        <tr><th>Study</th><th>Primary Phenotype</th><th>PubMed</th></tr>
+                                        <tr><th>Study</th><th>Primary Phenotype</th><th>PubMed</th><th class="text-right">Count</th></tr>
                                     </thead>
                                     <tbody>
                                     {% for record in denovo_db_records %}
@@ -1090,6 +1090,7 @@ function applyVariantValues() {
                                                     <a target="_blank" class='hover-link' href="{{ record.pubmed_url }}">{{ record.pubmed_id }}</a>
                                                 {% endif %}
                                             </td>
+                                            <td class="text-right">{{ record.count }}</td>
                                         </tr>
                                     {% endfor %}
                                     </tbody>
