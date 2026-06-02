@@ -1,5 +1,6 @@
 from django import forms
 from django.http.response import JsonResponse
+from django.utils.safestring import mark_safe
 from django.views.generic.edit import UpdateView
 
 from analysis.exceptions import NonFatalNodeError
@@ -114,6 +115,6 @@ class NodeView(UpdateView):
 </button>
 {html}
 </span>"""
-            return html
+            return mark_safe(html)
 
         widget.render = render.__get__(widget, forms.Widget)
