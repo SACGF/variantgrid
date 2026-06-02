@@ -718,8 +718,10 @@ class BulkVEPVCFAnnotationInserter:
 
         svlen = v.INFO.get("SVLEN")
         variant_coordinate = VariantCoordinate(chrom=v.CHROM, position=v.POS, ref=v.REF, alt=v.ALT[0], svlen=svlen)
-        # Do now so we only retrieve sequences once
-        variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
+        # Do now so we only retrieve sequences once. <CNV>/<INS> can't be expanded to explicit
+        # ref/alt - leave them symbolic (downstream HGVS/SV-overlap handle the symbolic form)
+        if variant_coordinate.can_be_made_explicit:
+            variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
 
         try:
             variant_id = v.INFO["variant_id"]

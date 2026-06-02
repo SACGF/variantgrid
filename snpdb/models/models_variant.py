@@ -342,6 +342,15 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
 
+    @property
+    def can_be_made_explicit(self) -> bool:
+        """ <CNV> (copy-number-variable region) and <INS> have no unambiguous explicit ref/alt
+            expansion (cf. Variant.can_make_g_hgvs), so as_external_explicit() will raise for them.
+            Their external VCF representation stays symbolic. """
+        if not self.is_symbolic:
+            return True
+        return self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
+
     def calculated_reference(self, genome_build) -> str:
         contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
         # reference sequence is 0-based
@@ -435,7 +444,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         vc_symbolic = self.as_internal_symbolic(genome_build)
         if vc_symbolic.svlen and abs(vc_symbolic.svlen) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
             vc = vc_symbolic
-        elif self.is_symbolic:
+        elif self.is_symbolic and self.can_be_made_explicit:
             vc = self.as_external_explicit(genome_build)
         else:
             vc = self
