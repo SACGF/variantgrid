@@ -25,6 +25,7 @@ from classification.services.overlap_calculator import calculator_for_value_type
 import json
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
+from review.models import Review
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, LabLike
 from snpdb.utils import LabNotificationBuilder
@@ -420,6 +421,13 @@ class OverlapGrouping3:
         if self.overlap.testing_context_bucket != TestingContextBucket.GERMLINE:
             return []
         return list(DiscordanceReport.objects.filter(clinical_context__allele=self.overlap.allele).order_by('-created'))
+
+    @cached_property
+    def reviews(self) -> list[Review]:
+        reviews = []
+        for dr in self.discordance_reports:
+            reviews.extend(list(dr.reviews_all()))
+        return reviews
 
     @property
     def value_type(self) -> ClassificationResultValue:

@@ -40,6 +40,13 @@
             {% endfor %}
         {% endlabelled %}
     {% endif %}
+    {% if overlap_grouping.reviews %}
+        {% labelled label="Legacy Discordance Reports" %}
+            {% for review in overlap_grouping.reviews %}
+                <div><a href="{{ review.get_absolute_url }}" class="hover-link">Review on {{ review.review_date }}</a></div>
+            {% endfor %}
+        {% endlabelled %}
+    {% endif %}
     {% if user.is_superuser %}
         {% labelled label="Overlap Admin" %}{% admin_link overlap_grouping.overlap %}{% endlabelled %}
     {% endif %}
