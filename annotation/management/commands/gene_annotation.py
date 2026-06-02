@@ -1,6 +1,7 @@
 import argparse
 import os
 from collections import defaultdict, Counter
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.management import BaseCommand
@@ -14,6 +15,7 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from ontology.models import OntologyService, GeneDiseaseClassification, OntologyTermRelation, \
     OntologyVersion, ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER
 from ontology.ontology_traversal import get_ontology_traverser
+from ontology.panel_app_ontology import bulk_update_gene_relations, panel_app_bulk_data_age
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
@@ -33,7 +35,9 @@ class Command(BaseCommand):
                             help='Load OntologyTermRelation graph into memory once for the run')
         parser.add_argument('--update-panel-app', action=argparse.BooleanOptionalAction, default=True,
                             help='Refresh PanelApp Australia data via a bulk paginated crawl '
-                                 'before annotation. Default on; pass --no-update-panel-app to skip.')
+                                 'before annotation, unless it was already refreshed within '
+                                 'PANEL_APP_CACHE_DAYS (so a multi-build run only crawls once). '
+                                 'Default on; pass --no-update-panel-app to skip entirely.')
 
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument('--gene-annotation-release', type=int, help=gar_ov_dbsnfp_help)
@@ -192,11 +196,23 @@ class Command(BaseCommand):
 
         Forced on by default for batch annotation (overrides
         settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE). Pass
-        --no-update-panel-app to skip."""
+        --no-update-panel-app to skip.
+
+        Skips the crawl when the data was last refreshed within
+        settings.PANEL_APP_CACHE_DAYS - so building gene annotation for
+        multiple genome builds in one run only crawls once (the first build
+        leaves the data fresh for the rest)."""
         if not self.update_panel_app:
             print("Skipping PanelApp bulk fetch (--no-update-panel-app)")
             return
-        from ontology.panel_app_ontology import bulk_update_gene_relations
+
+        max_age = timedelta(days=settings.PANEL_APP_CACHE_DAYS)
+        age = panel_app_bulk_data_age()
+        if age is not None and age < max_age:
+            print(f"Skipping PanelApp bulk fetch - data refreshed {age.days}d ago "
+                  f"(within cache window of {settings.PANEL_APP_CACHE_DAYS}d)")
+            return
+
         print("Bulk fetching PanelApp Australia data...")
         n = bulk_update_gene_relations()
         print(f"Bulk fetch complete ({n} gene symbols updated)")

@@ -6,13 +6,14 @@ from typing import Callable, Union, Optional, Any
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from genes.models import GeneSymbol, PanelAppServer
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json, get_request, PANEL_APP_SEARCH_BY_GENES_BASE_PATH
 from library.cache import timed_cache
 from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str
-from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, OntologyTermRelation, \
+from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, OntologyImport, OntologyTermRelation, \
     OntologyTermStatus, OntologyIdNormalized, PanelAppClassification
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
@@ -199,6 +200,26 @@ def _update_gene_relations(gene_symbol: str,
             pass
     except ValueError:
         report_exc_info()
+
+
+def panel_app_bulk_data_age(processor_version: int = PANEL_APP_API_PROCESSOR_VERSION) -> Optional[timedelta]:
+    """ How long ago PanelApp Australia gene relations were last refreshed
+        (most recent completed import using the current processor version), or
+        None if they've never been imported (or only under an older processor
+        version, whose data we no longer trust).
+
+        Lets batch callers skip a redundant bulk crawl while the data is still
+        within settings.PANEL_APP_CACHE_DAYS - e.g. annotating multiple genome
+        builds in one run, where the crawl done for the first build leaves the
+        data fresh for the rest. """
+    last_processed = OntologyImport.objects.filter(
+        import_source=OntologyImportSource.PANEL_APP_AU,
+        processor_version=processor_version,
+        completed=True,
+    ).order_by("-processed_date").values_list("processed_date", flat=True).first()
+    if last_processed is None:
+        return None
+    return timezone.now() - last_processed
 
 
 def bulk_update_gene_relations(server: Optional[PanelAppServer] = None) -> int:
