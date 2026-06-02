@@ -62,7 +62,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
             # Skip soft-deleted PanelApp panels (issue #405) — they have no cache and
             # accessing .gene_list would re-hit PanelApp and raise NotFound, 500ing the editor view.
             lambda: [gln_pap.gene_list for gln_pap in
-                     self.genelistnodepanelapppanel_set.filter(deleted=False)],
+                     self.genelistnodepanelapppanel_set.filter(panel_app_panel__deleted=False)],
         ]
         getter = GENE_LISTS[int(self.accordion_panel)]
         return [gl for gl in getter() if gl is not None]
