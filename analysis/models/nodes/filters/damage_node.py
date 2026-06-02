@@ -227,13 +227,6 @@ class DamageNode(AnalysisNode):
                 f"predictions_num_pathogenic / predictions_num_benign aggregates have not been backfilled. "
                 f"Run `manage.py fix_columns_version{vav.columns_version}_damage_counts` to enable the filter."
             )
-        if self.splice_min is not None and not vav.backfilled_spliceai_max_ds:
-            warnings.append(
-                "SpliceAI filter is running via the legacy per-DS-field path (correctness preserved, "
-                "but unindexed and slower) because spliceai_max_ds has not been backfilled on this "
-                "VariantAnnotationVersion. Run `manage.py fix_historical_spliceai_max_ds` to enable "
-                "the optimised path."
-            )
         if self.splice_min is not None and vav.uses_raw_spliceai:
             warnings.append(
                 "SpliceAI scores on this VariantAnnotationVersion are from the raw precomputed file "
