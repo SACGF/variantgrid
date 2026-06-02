@@ -72,10 +72,9 @@ class AuditUtils:
     def last_change_for(model_instance: Model, field: str, is_json: bool = False, parser: Optional[Callable[[Union[str, dict]], T]] = None) -> AuditSingleChange[T]:
         from auditlog.models import LogEntry
 
-        order_by = '-timestamp'
-        if field == 'comment':
-            # because we've done some wonky things with timestamp, use the more objective count index for getting the most recent comment
-            order_by = '-changes__comment__1__count'
+        # order_by = '-timestamp'
+        # because we've done some wonky things with timestamp, use the more objective count index for getting the most recent comment
+        order_by = '-pk'
 
         if log_entry := LogEntry.objects.get_for_object(model_instance).filter(**{f"changes__{field}__isnull": False}).order_by(order_by).first():
             value = log_entry.changes.get(field)[1]
