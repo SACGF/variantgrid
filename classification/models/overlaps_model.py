@@ -15,7 +15,7 @@ from classification.models import ClassificationGrouping, EvidenceKeyMap, Condit
 from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
 from genes.hgvs import CHGVS
-from library.utils import first, AuditUtils
+from library.utils import first, AuditUtils, AuditSingleChange
 from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -79,7 +79,7 @@ class OverlapContribution(TimeStampedModel):
         self.comment = value.to_dict()
 
     @cached_property
-    def last_comment(self):
+    def last_comment(self) -> AuditSingleChange[TriageComment]:
         return AuditUtils.last_change_for(self, "comment", is_json=True, parser=lambda x: TriageComment.from_dict(x))
 
     @property

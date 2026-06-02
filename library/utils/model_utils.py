@@ -71,10 +71,16 @@ class AuditUtils:
     @staticmethod
     def last_change_for(model_instance: Model, field: str, is_json: bool = False, parser: Optional[Callable[[Union[str, dict]], T]] = None) -> AuditSingleChange[T]:
         from auditlog.models import LogEntry
+
+        order_by = '-timestamp'
+        if field == 'comment':
+            # because we've done some wonky things with timestamp, use the more objective count index for getting the most recent comment
+            order_by = '-changes__comment__1__count'
+
         if log_entry := (LogEntry.objects.get_for_object(model_instance)
                 .filter(**{f"changes__{field}__isnull": False})
                 .exclude(**{f"changes__{field}__1": "None"})  # the changes are stored very stringified, to the point where None is saved as "None"
-                .order_by('-timestamp').first()):
+                .order_by(order_by).first()):
             value = log_entry.changes.get(field)[1]
             if isinstance(value, str) and is_json:
                 try:
@@ -91,4 +97,4 @@ class AuditUtils:
                     raise ex
                     # raise ValueError(f"Couldn't parse {field} \"{value_str}\"")
             return AuditSingleChange(value, log_entry)
-        return None, None
+        return None
