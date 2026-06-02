@@ -1756,7 +1756,11 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: list['GeneList']):
         """ For GeneList node, we need to get query for multiple lists - and it's much faster to build the merged
             query here, than via joining separate queryset """
-        rgs_qs = ReleaseGeneSymbol.objects.filter(release=release, gene_symbol__genelistgenesymbol__gene_list__in=gene_lists)
+        # Route the gene-list symbols through a subquery rather than joining GeneListGeneSymbol via GeneSymbol.
+        # The join-through-GeneSymbol path makes Postgres scan every ReleaseGeneSymbol for the release (~47k rows)
+        # and hash-join; the subquery lets it use the (release_id, gene_symbol_id) unique index instead.
+        symbols_qs = GeneListGeneSymbol.objects.filter(gene_list__in=gene_lists).values_list("gene_symbol_id", flat=True)
+        rgs_qs = ReleaseGeneSymbol.objects.filter(release=release, gene_symbol__in=symbols_qs)
         return rgs_qs.values_list("releasegenesymbolgene__gene", flat=True)
 
     def get_genes(self, release: GeneAnnotationRelease):
