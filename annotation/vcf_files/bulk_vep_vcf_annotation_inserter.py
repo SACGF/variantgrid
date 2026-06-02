@@ -320,7 +320,6 @@ class BulkVEPVCFAnnotationInserter:
             self.prediction_pathogenic_funcs = vav.get_raw_score_pathogenic_prediction_funcs()
         else:
             self.prediction_pathogenic_funcs = vav.get_rankscore_pathogenic_prediction_funcs()
-        self._max_af_field_set = vav.get_max_af_fields()
 
     def _setup_vep_fields_and_db_columns(self, validate_columns: bool, cvf_list: tuple[VEPColumnDef, ...]):
         self._add_vep_field_handlers(cvf_list)
@@ -582,7 +581,6 @@ class BulkVEPVCFAnnotationInserter:
         self._add_hgvs_g(variant_coordinate, transcript_data)
         self._add_calculated_num_predictions(transcript_data)
         self._add_spliceai_max_ds(transcript_data)
-        self._add_max_af(transcript_data)
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             self._calculate_gnomad_sv_overlap_percentage(variant_coordinate, transcript_data)
 
@@ -596,16 +594,6 @@ class BulkVEPVCFAnnotationInserter:
                 ds_values.append(float(v))
         if ds_values:
             transcript_data["spliceai_max_ds"] = max(ds_values)
-
-    def _add_max_af(self, transcript_data: TranscriptData):
-        values = []
-        for key in self._max_af_field_set:
-            v = transcript_data.get(key)
-            if v is None:
-                return
-            values.append(float(v))
-        if values:
-            transcript_data["max_af"] = max(values)
 
     def _add_calculated_num_predictions(self, transcript_data):
         num_pathogenic = 0

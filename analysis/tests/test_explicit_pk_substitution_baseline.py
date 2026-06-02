@@ -287,12 +287,12 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
         # UNCOMMON (rare) variant: HET, gnomAD AF below the 1% cutoff -> kept by rare PopulationNode.
         cls.v_rare = slowly_create_test_variant("1", 1000, "A", "T", cls.grch37)
         cls._add_genotype(cls.uncommon_cgc, cls.v_rare, "E..")
-        cls._add_annotation(cls.v_rare, gnomad_af=0.001, af_1kg=0.001, af_uk10k=0.001, max_af=0.001)
+        cls._add_annotation(cls.v_rare, gnomad_af=0.001, af_1kg=0.001, af_uk10k=0.001)
 
         # COMMON variant: HET, gnomAD AF well above the cutoff -> removed by rare PopulationNode.
         cls.v_common = slowly_create_test_variant("1", 4000, "A", "T", cls.grch37)
         cls._add_genotype(cls.common_cgc, cls.v_common, "E..")
-        cls._add_annotation(cls.v_common, gnomad_af=0.20, af_1kg=0.20, af_uk10k=0.20, max_af=0.20)
+        cls._add_annotation(cls.v_common, gnomad_af=0.20, af_1kg=0.20, af_uk10k=0.20)
 
     @classmethod
     def _add_genotype(cls, cgc, variant, samples_zygosity):
@@ -317,7 +317,7 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
             CohortGenotype._meta.db_table = old_db_table
 
     @classmethod
-    def _add_annotation(cls, variant, gnomad_af, af_1kg, af_uk10k, max_af):
+    def _add_annotation(cls, variant, gnomad_af, af_1kg, af_uk10k):
         """ Insert into the version's VariantAnnotation partition table directly (INHERITS
             partitioning doesn't route base-table inserts), so the annotation_version SQL
             transformer that rewrites the query to that partition can see the row. """
@@ -328,7 +328,7 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
             VariantAnnotation._meta.db_table = partition_table
             VariantAnnotation.objects.create(
                 version=cls.vav, variant=variant, annotation_run=cls.annotation_run,
-                gnomad_af=gnomad_af, af_1kg=af_1kg, af_uk10k=af_uk10k, max_af=max_af,
+                gnomad_af=gnomad_af, af_1kg=af_1kg, af_uk10k=af_uk10k,
                 predictions_num_pathogenic=0, predictions_num_benign=0)
         finally:
             VariantAnnotation._meta.db_table = old_db_table

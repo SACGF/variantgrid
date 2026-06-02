@@ -61,7 +61,6 @@ CSV_FIELDS = [
     "explain_execution_ms",
     "explain_plan_file",
     "sql_truncated",
-    "max_af_gate",
     "pk_substitution",     # #546 explicit-PK substitution mode this row was profiled under (on/off)
     "build_seconds",       # only set by cohort_exclude_vc_join — one-time pre-compute cost
     "vc_record_count",     # only set by cohort_exclude_vc_join — size of the cached set
@@ -96,11 +95,6 @@ class Command(BaseCommand):
                             help="Cap nodes per analysis")
         parser.add_argument("--out", type=str, default=None,
                             help="Output directory (default ./profile_<timestamp>)")
-        parser.add_argument("--max-af-gate", choices=["on", "off", "both"], default="on",
-                            help="PopulationNode max_af gate clause (#1547): on (default, "
-                                 "with optimisation), off (legacy plan), both (run each "
-                                 "profile twice — once with, once without — for A/B comparison)")
-
         parser.add_argument("--pk-substitution", choices=["on", "off", "both"], default="on",
                             help="Issue #546 explicit-PK substitution: on (default — small parents "
                                  "collapse to a literal Q(pk__in=[...]) via "
@@ -140,7 +134,6 @@ class Command(BaseCommand):
         rows = []
         node_type_filter = set(options["node_type"]) if options["node_type"] else None
 
-        gate_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["max_af_gate"]]
         subst_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["pk_substitution"]]
 
         # Issue #546 explicit-PK substitution is gated on ANALYSIS_NODE_STORE_ID_SIZE_MAX
@@ -150,25 +143,6 @@ class Command(BaseCommand):
         original_threshold = getattr(settings, "ANALYSIS_NODE_STORE_ID_SIZE_MAX", 1000)
         subst_threshold = {"on": original_threshold or 1000, "off": 0}
 
-        # PopulationNode reads the max_af gate switch from
-        # VariantAnnotationVersion.backfilled_max_af. Older code branches don't define
-        # this field (the gate lived as a class-level toggle); detect via the model
-        # meta so this command runs unchanged on legacy systems. On legacy systems
-        # "off" is unavailable and we silently fall back to "on" with a warning.
-        gate_supported = any(
-            f.name == "backfilled_max_af" for f in VariantAnnotationVersion._meta.fields
-        )
-        if not gate_supported:
-            if "off" in gate_modes:
-                self.stderr.write(
-                    "VariantAnnotationVersion.backfilled_max_af not present on this codebase — "
-                    "--max-af-gate=off/both not available. Forcing 'on'.")
-            gate_modes = ["on"]
-            original_gate_flags = {}
-        else:
-            original_gate_flags = dict(
-                VariantAnnotationVersion.objects.values_list("pk", "backfilled_max_af")
-            )
         try:
             for subst_mode in subst_modes:
                 settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX = subst_threshold[subst_mode]
@@ -178,68 +152,51 @@ class Command(BaseCommand):
                         f"##### pk_substitution={subst_mode} "
                         f"(ANALYSIS_NODE_STORE_ID_SIZE_MAX={subst_threshold[subst_mode]}) #####")
 
-                for gate_mode in gate_modes:
-                    if gate_supported:
-                        VariantAnnotationVersion.objects.all().update(
-                            backfilled_max_af=(gate_mode == "on")
-                        )
-                    if len(gate_modes) > 1:
-                        self.stdout.write(f"### max_af_gate={gate_mode} ###")
+                def tag(profiled_rows, subst_mode=subst_mode):
+                    return self._tag_subst(profiled_rows, subst_mode)
 
-                    def tag(profiled_rows, gate_mode=gate_mode, subst_mode=subst_mode):
-                        return self._tag_subst(self._tag_gate(profiled_rows, gate_mode), subst_mode)
+                for analysis_id in options["analysis"]:
+                    self.stdout.write(f"== Analysis {analysis_id} ==")
+                    rows.extend(tag(self._profile_analysis(
+                        analysis_id,
+                        rerun=options["rerun"],
+                        explain=options["explain"],
+                        node_type_filter=node_type_filter,
+                        limit=options["limit_per_analysis"],
+                        plans_dir=plans_dir,
+                        merge_threshold_bumped=options["merge_threshold_bumped"],
+                    )))
 
-                    for analysis_id in options["analysis"]:
-                        self.stdout.write(f"== Analysis {analysis_id} ==")
-                        rows.extend(tag(self._profile_analysis(
-                            analysis_id,
-                            rerun=options["rerun"],
-                            explain=options["explain"],
-                            node_type_filter=node_type_filter,
-                            limit=options["limit_per_analysis"],
-                            plans_dir=plans_dir,
-                            gate_mode=gate_mode,
-                            merge_threshold_bumped=options["merge_threshold_bumped"],
-                        )))
+                for sample_id in options["sample"]:
+                    self.stdout.write(f"== Sample {sample_id} (synthetic) ==")
+                    rows.extend(tag(self._profile_sample_synthetic(
+                        sample_id,
+                        rerun=options["rerun"],
+                        explain=options["explain"],
+                        plans_dir=plans_dir,
+                    )))
 
-                    for sample_id in options["sample"]:
-                        self.stdout.write(f"== Sample {sample_id} (synthetic) ==")
-                        rows.extend(tag(self._profile_sample_synthetic(
-                            sample_id,
-                            rerun=options["rerun"],
-                            explain=options["explain"],
-                            plans_dir=plans_dir,
-                            gate_mode=gate_mode,
-                        )))
+                for trio_id in options["trio"]:
+                    self.stdout.write(f"== Trio {trio_id} (synthetic) ==")
+                    rows.extend(tag(self._profile_trio_synthetic(
+                        trio_id,
+                        rerun=options["rerun"],
+                        explain=options["explain"],
+                        plans_dir=plans_dir,
+                    )))
 
-                    for trio_id in options["trio"]:
-                        self.stdout.write(f"== Trio {trio_id} (synthetic) ==")
-                        rows.extend(tag(self._profile_trio_synthetic(
-                            trio_id,
-                            rerun=options["rerun"],
-                            explain=options["explain"],
-                            plans_dir=plans_dir,
-                            gate_mode=gate_mode,
-                        )))
-
-                    for cohort_id in options["cohort"]:
-                        self.stdout.write(f"== Cohort {cohort_id} (synthetic) ==")
-                        rows.extend(tag(self._profile_cohort_synthetic(
-                            cohort_id,
-                            rerun=options["rerun"],
-                            explain=options["explain"],
-                            plans_dir=plans_dir,
-                            seed=options["cohort_seed"],
-                            gate_mode=gate_mode,
-                            planner_diagnostic=options["planner_diagnostic"],
-                        )))
+                for cohort_id in options["cohort"]:
+                    self.stdout.write(f"== Cohort {cohort_id} (synthetic) ==")
+                    rows.extend(tag(self._profile_cohort_synthetic(
+                        cohort_id,
+                        rerun=options["rerun"],
+                        explain=options["explain"],
+                        plans_dir=plans_dir,
+                        seed=options["cohort_seed"],
+                        planner_diagnostic=options["planner_diagnostic"],
+                    )))
         finally:
             settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX = original_threshold
-            if gate_supported:
-                for vav_pk, original in original_gate_flags.items():
-                    VariantAnnotationVersion.objects.filter(pk=vav_pk).update(
-                        backfilled_max_af=original
-                    )
 
         with open(csv_path, "w", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=CSV_FIELDS)
@@ -253,7 +210,7 @@ class Command(BaseCommand):
 
     # ---- Analysis-mode profiling ----------------------------------------
 
-    def _profile_analysis(self, analysis_id, *, rerun, explain, node_type_filter, limit, plans_dir, gate_mode,
+    def _profile_analysis(self, analysis_id, *, rerun, explain, node_type_filter, limit, plans_dir,
                           merge_threshold_bumped):
         try:
             analysis = Analysis.objects.get(pk=analysis_id)
@@ -282,21 +239,20 @@ class Command(BaseCommand):
                 rerun=rerun,
                 explain=explain,
                 plans_dir=plans_dir,
-                gate_mode=gate_mode,
             )
             rows.append(row)
             self.stdout.write(self._row_summary(row))
 
             if node_type == "MergeNode":
                 survey_rows = self._merge_parent_survey(
-                    node, analysis_id, threshold_current, merge_threshold_bumped, gate_mode)
+                    node, analysis_id, threshold_current, merge_threshold_bumped)
                 for sr in survey_rows:
                     rows.append(sr)
                     self.stdout.write(self._row_summary(sr))
         return rows
 
     @staticmethod
-    def _merge_parent_survey(merge_node, analysis_id, threshold_current, threshold_bumped, gate_mode):
+    def _merge_parent_survey(merge_node, analysis_id, threshold_current, threshold_bumped):
         """Per-parent band classification for a MergeNode (#546).
 
         Read-only walk: emits one row per non-empty parent reporting the parent's count and
@@ -318,7 +274,6 @@ class Command(BaseCommand):
                 "node_id": merge_node.pk,
                 "node_type": "MergeNode_parent",
                 "node_name": f"merge {merge_node.pk}",
-                "max_af_gate": gate_mode,
                 "error": f"get_non_empty_parents: {e}",
             }]
 
@@ -346,11 +301,10 @@ class Command(BaseCommand):
                 "config_summary": config,
                 "parent_input_count": count if count is not None else "",
                 "count": count if count is not None else "",
-                "max_af_gate": gate_mode,
             })
         return rows
 
-    def _profile_node(self, node, *, source, analysis_id, rerun, explain, plans_dir, gate_mode):
+    def _profile_node(self, node, *, source, analysis_id, rerun, explain, plans_dir):
         node_type = type(node).__name__
         row = {
             "source": source,
@@ -361,7 +315,6 @@ class Command(BaseCommand):
             "config_summary": _config_summary(node),
             "count": node.count,
             "cached_load_seconds": node.load_seconds,
-            "max_af_gate": gate_mode,
             "pk_substitution": getattr(self, "_pk_substitution_mode", ""),
         }
 
@@ -402,7 +355,7 @@ class Command(BaseCommand):
         if explain and sql is not None:
             subst_mode = getattr(self, "_pk_substitution_mode", "on")
             plan_file = os.path.join(
-                plans_dir, f"{source}_a{analysis_id}_n{node.pk}_gate{gate_mode}_subst{subst_mode}.json")
+                plans_dir, f"{source}_a{analysis_id}_n{node.pk}_subst{subst_mode}.json")
             try:
                 planning, execution = _run_explain(sql, params, plan_file)
                 row["explain_planning_ms"] = planning
@@ -415,7 +368,7 @@ class Command(BaseCommand):
 
     # ---- Synthetic-mode profiling ---------------------------------------
 
-    def _profile_sample_synthetic(self, sample_id, *, rerun, explain, plans_dir, gate_mode):
+    def _profile_sample_synthetic(self, sample_id, *, rerun, explain, plans_dir):
         try:
             sample = Sample.objects.get(pk=sample_id)
         except Sample.DoesNotExist:
@@ -438,7 +391,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "sample_variant_regex", sample_id, qs_variant_regex,
             f"sample={sample_id} cgc={cgc.pk} idx={sample_idx}",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
+            rerun=rerun, explain=explain, plans_dir=plans_dir))
 
         # Pattern 2 - sample any-variant via Substr + IN
         ann_kwargs_sample = sample.get_annotation_kwargs()
@@ -450,7 +403,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "sample_variant_substr_in", sample_id, qs_variant_substr,
             f"sample={sample_id} alias={zyg_alias}",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
+            rerun=rerun, explain=explain, plans_dir=plans_dir))
 
         # Pattern 3 - gene list via VariantGeneOverlap (issue #1542)
         vav_field_names = {f.name for f in VariantAnnotationVersion._meta.get_fields()}
@@ -474,7 +427,7 @@ class Command(BaseCommand):
             rows.append(self._profile_synthetic_pattern(
                 "gene_list_via_vgo", sample_id, qs_vgo,
                 f"vav={vav.pk} gene_list={gene_list.pk} ({len(gene_ids)} genes)",
-                rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
+                rerun=rerun, explain=explain, plans_dir=plans_dir))
         else:
             rows.append({
                 "source": "synthetic", "node_type": "gene_list_via_vgo",
@@ -494,7 +447,7 @@ class Command(BaseCommand):
                 rows.append(self._profile_synthetic_pattern(
                     "population_af_subquery", sample_id, qs_af_subq,
                     f"sample={sample_id} vav={vav.pk} gnomad_af<=0.01",
-                    rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
+                    rerun=rerun, explain=explain, plans_dir=plans_dir))
             except Exception as e:
                 rows.append({
                     "source": "synthetic", "node_type": "population_af_subquery",
@@ -522,7 +475,7 @@ class Command(BaseCommand):
                 rows.append(self._profile_synthetic_pattern(
                     "population_af_pk_in_list", sample_id, qs_af_list,
                     f"sample={sample_id} vav={vav.pk} gnomad_af<=0.01 list_size={len(variant_ids)}",
-                    rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
+                    rerun=rerun, explain=explain, plans_dir=plans_dir))
             except Exception as e:
                 rows.append({
                     "source": "synthetic", "node_type": "population_af_pk_in_list",
@@ -543,7 +496,7 @@ class Command(BaseCommand):
         return rows
 
     def _profile_synthetic_pattern(self, name, entity_id, qs, config, *,
-                                   rerun, explain, plans_dir, gate_mode, file_prefix="synthetic_s"):
+                                   rerun, explain, plans_dir, file_prefix="synthetic_s"):
         row = {
             "source": "synthetic",
             "analysis_id": "",
@@ -551,7 +504,6 @@ class Command(BaseCommand):
             "node_type": name,
             "node_name": "",
             "config_summary": config,
-            "max_af_gate": gate_mode,
             "pk_substitution": getattr(self, "_pk_substitution_mode", ""),
         }
         try:
@@ -572,7 +524,7 @@ class Command(BaseCommand):
         if explain:
             subst_mode = getattr(self, "_pk_substitution_mode", "on")
             plan_file = os.path.join(
-                plans_dir, f"{file_prefix}{entity_id}_{name}_gate{gate_mode}_subst{subst_mode}.json")
+                plans_dir, f"{file_prefix}{entity_id}_{name}_subst{subst_mode}.json")
             try:
                 planning, execution = _run_explain(sql, params, plan_file)
                 row["explain_planning_ms"] = planning
@@ -585,7 +537,7 @@ class Command(BaseCommand):
 
     # ---- Trio synthetic -------------------------------------------------
 
-    def _profile_trio_synthetic(self, trio_id, *, rerun, explain, plans_dir, gate_mode):
+    def _profile_trio_synthetic(self, trio_id, *, rerun, explain, plans_dir):
         try:
             trio = Trio.objects.get(pk=trio_id)
         except Trio.DoesNotExist:
@@ -621,7 +573,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "trio_denovo_regex", trio_id, qs_regex,
             f"trio={trio_id} cgc={cgc.pk} proband={proband_idx1} mother={mother_idx1} father={father_idx1}",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_t"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_t"))
 
         # Substr-AND: 3 independent substring conditions
         qs_substr = (Variant.objects
@@ -635,7 +587,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "trio_denovo_substr_and", trio_id, qs_substr,
             f"trio={trio_id} cgc={cgc.pk} proband={proband_idx1} mother={mother_idx1} father={father_idx1}",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_t"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_t"))
 
         for row in rows:
             self.stdout.write(self._row_summary(row))
@@ -643,7 +595,7 @@ class Command(BaseCommand):
 
     # ---- Cohort synthetic -----------------------------------------------
 
-    def _profile_cohort_synthetic(self, cohort_id, *, rerun, explain, plans_dir, seed, gate_mode,
+    def _profile_cohort_synthetic(self, cohort_id, *, rerun, explain, plans_dir, seed,
                                    planner_diagnostic=False):
         try:
             cohort = Cohort.objects.get(pk=cohort_id)
@@ -681,7 +633,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "cohort_half_carriers_regex", cohort_id, qs_regex,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_c"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
 
         # Pattern B: half-carriers substr-AND — N independent substring IN ('E','O') predicates
         qs_substr_and = Variant.objects.annotate(**ann_kwargs)
@@ -692,7 +644,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "cohort_half_carriers_substr_and", cohort_id, qs_substr_and,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_c"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
 
         # Pattern C: exclude lookahead — current production anti-pattern
         # Exclude variants where ALL chosen samples are HET/HOM (i.e. a "rare in cohort" filter)
@@ -704,7 +656,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "cohort_exclude_lookahead", cohort_id, qs_excl_regex,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_c"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
 
         # Pattern D: exclude via substr-OR — equivalent positive form
         # NOT (substring(.,i_0,1) IN E,O AND substring(.,i_1,1) IN E,O ...)
@@ -720,7 +672,7 @@ class Command(BaseCommand):
         rows.append(self._profile_synthetic_pattern(
             "cohort_exclude_substr_or", cohort_id, qs_excl_or,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode, file_prefix="synthetic_c"))
+            rerun=rerun, explain=explain, plans_dir=plans_dir, file_prefix="synthetic_c"))
 
         # Pattern E: exclude via cached VariantCollection JOIN
         # Models the "pre-compute once, join for every subsequent query" strategy: build a
@@ -732,7 +684,7 @@ class Command(BaseCommand):
         rows.append(self._profile_cohort_exclude_vc_join(
             cohort_id, cgc, regex_excl, chosen,
             f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
-            rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
+            rerun=rerun, explain=explain, plans_dir=plans_dir))
 
         if planner_diagnostic:
             # Diagnostic: re-run cohort_exclude_lookahead under tuning variants — answers
@@ -752,7 +704,7 @@ class Command(BaseCommand):
                         f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} "
                         f"(seed={seed}) settings={'+'.join(f'{k}={v}' for k,v in pg_settings.items())}",
                         rerun=rerun, explain=explain, plans_dir=plans_dir,
-                        gate_mode=gate_mode, file_prefix="synthetic_c"))
+                        file_prefix="synthetic_c"))
 
             # VC diagnostic: build VC once, run ANALYZE on the partition, then profile under
             # baseline + tuning variants. The post-ANALYZE row tells us whether bad stats on
@@ -762,14 +714,14 @@ class Command(BaseCommand):
                 cohort_id, cgc, regex_excl, chosen,
                 f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} (seed={seed})",
                 tuning_variants=tuning_variants,
-                rerun=rerun, explain=explain, plans_dir=plans_dir, gate_mode=gate_mode))
+                rerun=rerun, explain=explain, plans_dir=plans_dir))
 
         for row in rows:
             self.stdout.write(self._row_summary(row))
         return rows
 
     def _profile_cohort_exclude_vc_join(self, cohort_id, cgc, regex_excl, chosen, config, *,
-                                        rerun, explain, plans_dir, gate_mode):
+                                        rerun, explain, plans_dir):
         """ Build a transient VariantCollection with the regex-excl result set, then profile
         the JOIN-query cost. Cleans up the transient VC after profiling so re-runs stay
         idempotent. """
@@ -823,7 +775,7 @@ class Command(BaseCommand):
             row = {
                 "source": "synthetic", "analysis_id": "", "node_id": cohort_id,
                 "node_type": "cohort_exclude_vc_join", "config_summary": config,
-                "max_af_gate": gate_mode, "error": f"vc build: {e}",
+                "error": f"vc build: {e}",
             }
             try:
                 vc.delete_related_objects()
@@ -846,7 +798,7 @@ class Command(BaseCommand):
         row = self._profile_synthetic_pattern(
             "cohort_exclude_vc_join", cohort_id, qs, config,
             rerun=rerun, explain=explain, plans_dir=plans_dir,
-            gate_mode=gate_mode, file_prefix="synthetic_c")
+            file_prefix="synthetic_c")
         row["build_seconds"] = build_seconds
         row["vc_record_count"] = vc.count
 
@@ -859,7 +811,7 @@ class Command(BaseCommand):
 
     def _profile_cohort_exclude_vc_join_diagnostic(self, cohort_id, cgc, regex_excl, chosen,
                                                     config, *, tuning_variants,
-                                                    rerun, explain, plans_dir, gate_mode):
+                                                    rerun, explain, plans_dir):
         """ Diagnostic counterpart to _profile_cohort_exclude_vc_join — builds the VC ONCE,
         runs ANALYZE on the freshly-INSERTed VCR partition, then profiles the JOIN under
         the baseline session settings plus each tuning variant. Tells us whether the prod
@@ -908,7 +860,7 @@ class Command(BaseCommand):
             err_row = {
                 "source": "synthetic", "analysis_id": "", "node_id": cohort_id,
                 "node_type": "cohort_exclude_vc_join_postanalyze", "config_summary": config,
-                "max_af_gate": gate_mode, "error": f"vc build: {e}",
+                "error": f"vc build: {e}",
             }
             try:
                 vc.delete_related_objects()
@@ -946,7 +898,7 @@ class Command(BaseCommand):
             "cohort_exclude_vc_join_postanalyze", cohort_id, qs,
             f"{config} post_analyze",
             rerun=rerun, explain=explain, plans_dir=plans_dir,
-            gate_mode=gate_mode, file_prefix="synthetic_c")
+            file_prefix="synthetic_c")
         baseline_row["build_seconds"] = build_seconds
         baseline_row["vc_record_count"] = vc.count
         baseline_row["analyze_seconds"] = analyze_seconds
@@ -960,7 +912,7 @@ class Command(BaseCommand):
                     f"{config} post_analyze settings="
                     f"{'+'.join(f'{k}={v}' for k,v in pg_settings.items())}",
                     rerun=rerun, explain=explain, plans_dir=plans_dir,
-                    gate_mode=gate_mode, file_prefix="synthetic_c")
+                    file_prefix="synthetic_c")
                 variant_row["vc_record_count"] = vc.count
             rows.append(variant_row)
 
@@ -972,12 +924,6 @@ class Command(BaseCommand):
         return rows
 
     # ---- Helpers --------------------------------------------------------
-
-    @staticmethod
-    def _tag_gate(rows, gate_mode):
-        for row in rows:
-            row["max_af_gate"] = gate_mode
-        return rows
 
     @staticmethod
     def _tag_subst(rows, subst_mode):
@@ -993,8 +939,6 @@ class Command(BaseCommand):
             f"n{row.get('node_id') or '-'}",
             row.get("node_type", ""),
         ]
-        if row.get("max_af_gate"):
-            bits.append(f"gate={row['max_af_gate']}")
         if row.get("pk_substitution"):
             bits.append(f"subst={row['pk_substitution']}")
         if row.get("count") not in (None, ""):

@@ -1,10 +1,9 @@
 import logging
-import operator
 import os
 import re
 from collections import defaultdict
 from datetime import datetime
-from functools import cached_property, reduce
+from functools import cached_property
 from typing import Optional, Callable, Iterable
 
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -699,10 +698,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_spliceai_max_ds
     backfilled_spliceai_max_ds = models.BooleanField(default=True)
 
-    # #1547 — PopulationNode.max_af gate. Flipped by
-    # `manage.py fix_historical_max_af`. Backfill source: same bulk inserter.
-    backfilled_max_af = models.BooleanField(default=True)
-
     # columns_version 2 / 4 rollouts — DamageNode.damage_predictions_min uses
     # predictions_num_pathogenic / predictions_num_benign aggregates which
     # default to 0 on the model, so legacy rows look "no pathogenic predictions"
@@ -735,12 +730,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         # `manage.py vep_install` (see annotation_pipeline_data). See
         # SACGF/variantgrid_sapath#410.
         return bool(self.spliceai) and self.spliceai.strip().lower().startswith("raw")
-
-    def get_max_af_fields(self) -> list[str]:
-        fields = ["af_1kg", "af_uk10k", "gnomad_af", "gnomad_popmax_af"]
-        if self.gnomad_major_version >= 4:
-            fields.append("gnomad_fafmax_faf95_max")
-        return fields
 
     @property
     def is_active(self) -> bool:
@@ -1301,9 +1290,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_xy_an = models.IntegerField(null=True, blank=True)
     gnomad_hemi_count = models.IntegerField(null=True, blank=True)  # This is set from gnomad_xy_ac if gnomad_non_par
     gnomad_popmax_af = models.FloatField(null=True, blank=True)
-    # max_af = max of (af_1kg, af_uk10k, gnomad_af, gnomad_popmax_af, [gnomad_fafmax_faf95_max for v4+]).
-    # Populated only when every contributing AF is non-NULL; otherwise stays NULL (#1547).
-    max_af = models.FloatField(null=True, blank=True)
     gnomad_popmax_ac = models.IntegerField(null=True, blank=True)
     gnomad_popmax_an = models.IntegerField(null=True, blank=True)
     gnomad_popmax_hom_alt = models.IntegerField(null=True, blank=True)
@@ -1727,34 +1713,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
             cursor = nxt
         return total
 
-    @classmethod
-    def backfill_max_af(cls, version: 'VariantAnnotationVersion',
-                        chunk_size: int = 100_000) -> int:
-        fields = version.get_max_af_fields()
-        all_set_q = reduce(operator.and_,
-                           (Q(**{f"{f}__isnull": False}) for f in fields))
-
-        base_qs = cls.objects.filter(version=version, max_af__isnull=True).filter(all_set_q)
-        bounds = base_qs.aggregate(lo=Min("pk"), hi=Max("pk"))
-        lo, hi = bounds["lo"], bounds["hi"]
-        if lo is None:
-            return 0
-
-        total = 0
-        cursor = lo
-        while cursor <= hi:
-            nxt = cursor + chunk_size
-            updated = (cls.objects
-                       .filter(version=version, max_af__isnull=True,
-                               pk__gte=cursor, pk__lt=nxt)
-                       .filter(all_set_q)
-                       .update(max_af=Greatest(*[F(f) for f in fields])))
-            total += updated
-            logging.info("backfill_max_af vav=%s chunk pk=[%s,%s) updated=%s",
-                         version.pk, cursor, nxt, updated)
-            cursor = nxt
-        return total
-
     @staticmethod
     def get_gnomad_population_field(population):
         return VariantAnnotation.GNOMAD_FIELDS.get(population)
@@ -1849,13 +1807,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     class Meta:
         unique_together = ("version", "variant")
-        indexes = [
-            models.Index(
-                fields=["max_af"],
-                name="va_max_af_low_idx",
-                condition=Q(max_af__lte=0.05),
-            ),
-        ]
 
 
 class VariantTranscriptAnnotation(AbstractVariantAnnotation):

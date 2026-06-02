@@ -176,10 +176,6 @@ class TestPopulationNodeGroupOperationQ(AnalysisSetupMixin, TestCase):
     def _pop_node_q(self, group_operation):
         """Create a saved node using gnomad_af + af_1kg + af_uk10k at 1% and return _get_node_q().
         Must be saved so that self.populationnodegnomadpopulation_set.all() can run.
-
-        Disables the VAV's backfilled_max_af flag (#1547) so the returned Q is just the
-        per-db group; otherwise the optimisation wraps everything in an outer AND with a
-        max_af gate and obscures the connector this test is asserting on.
         """
         node = PopulationNode.objects.create(
             analysis=self.analysis,
@@ -191,15 +187,7 @@ class TestPopulationNodeGroupOperationQ(AnalysisSetupMixin, TestCase):
             af_uk10k=True,
             topmed_af=False,
         )
-        vav = self.analysis.annotation_version.variant_annotation_version
-        original = vav.backfilled_max_af
-        vav.backfilled_max_af = False
-        vav.save(update_fields=["backfilled_max_af"])
-        try:
-            return node._get_node_q()
-        finally:
-            vav.backfilled_max_af = original
-            vav.save(update_fields=["backfilled_max_af"])
+        return node._get_node_q()
 
     def test_any_group_operation_combines_with_and(self):
         """GroupOperation.ANY → AND of per-db filters (all must pass → strict)."""

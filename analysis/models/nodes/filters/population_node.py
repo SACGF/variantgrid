@@ -29,8 +29,8 @@ class PopulationNode(AnalysisNode):
     gnomad_fafmax_faf99_max = models.BooleanField(default=False)
     gnomad_hom_alt_max = models.IntegerField(null=True, blank=True)
     show_gnomad_filtered = models.BooleanField(default=True)
-    af_1kg = models.BooleanField(default=True)
-    af_uk10k = models.BooleanField(default=True)
+    af_1kg = models.BooleanField(default=False)
+    af_uk10k = models.BooleanField(default=False)
     topmed_af = models.BooleanField(default=False)
     zygosity = models.CharField(max_length=1, choices=SimpleZygosity.choices, default=SimpleZygosity.NON_REF_CALL)
     use_internal_counts = models.BooleanField(default=False)
@@ -108,16 +108,6 @@ class PopulationNode(AnalysisNode):
                     filters.append(q_isnull | q_max_value)
 
                 and_q.append(reduce(group_operation, filters))
-
-            # max_af gate (#1547): only emit when the VAV has been backfilled. On
-            # pre-backfill VAVs the partial index doesn't exist yet and the extra
-            # clause buys nothing. See VariantAnnotationVersion.backfilled_max_af.
-            vav = self.analysis.annotation_version.variant_annotation_version
-            if vav.backfilled_max_af:
-                max_allele_frequency = self.percent / 100
-                q_max_af_isnull = Q(variantannotation__max_af__isnull=True)
-                q_max_af_lte = Q(variantannotation__max_af__lte=max_allele_frequency)
-                and_q.append(q_max_af_isnull | q_max_af_lte)
 
         if self.gnomad_hom_alt_max is not None:
             q_hom_alt_lt = Q(variantannotation__gnomad_hom_alt__lte=self.gnomad_hom_alt_max)

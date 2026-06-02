@@ -1,14 +1,13 @@
 """
 Coverage for the per-VAV backfill-completion flags that gate optimised query
-branches in DamageNode and PopulationNode. The flags live on
-VariantAnnotationVersion (backfilled_spliceai_max_ds, backfilled_max_af,
-backfilled_damage_counts) and are flipped True by the matching `fix_*`
-management commands once a partition's derived columns are populated.
+branches in DamageNode. The flags live on VariantAnnotationVersion
+(backfilled_spliceai_max_ds, backfilled_damage_counts) and are flipped True by
+the matching `fix_*` management commands once a partition's derived columns are
+populated.
 """
 from django.test import TestCase, override_settings
 
 from analysis.models.nodes.filters.damage_node import DamageNode
-from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.tests.utils import AnalysisSetupMixin
 
 
@@ -106,38 +105,6 @@ class TestDamageNodeDamageCountsBackfillFlag(_BackfillFlagMixin, TestCase):
         q_str = str(q) if q is not None else ""
         self.assertNotIn("predictions_num_pathogenic", q_str)
         self.assertNotIn("predictions_num_benign", q_str)
-
-
-@override_settings(ANALYSIS_NODE_CACHE_Q=False)
-class TestPopulationNodeBackfillFlag(_BackfillFlagMixin, TestCase):
-
-    def _pop_node(self, **kwargs):
-        defaults = dict(
-            percent=1.0,
-            gnomad_af=True,
-            gnomad_popmax_af=False,
-            af_1kg=True,
-            af_uk10k=True,
-            topmed_af=False,
-        )
-        defaults.update(kwargs)
-        return PopulationNode.objects.create(analysis=self.analysis, **defaults)
-
-    def test_backfilled_emits_max_af_gate(self):
-        self._set_vav_flag(backfilled_max_af=True)
-        node = self._pop_node()
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__max_af__lte", q_str)
-        self.assertIn("variantannotation__max_af__isnull", q_str)
-
-    def test_unbackfilled_omits_max_af_gate(self):
-        self._set_vav_flag(backfilled_max_af=False)
-        node = self._pop_node()
-        q_str = str(node._get_node_q())
-        self.assertNotIn("variantannotation__max_af__lte", q_str)
-        self.assertNotIn("variantannotation__max_af__isnull", q_str)
-        # per-field clauses unaffected
-        self.assertIn("variantannotation__gnomad_af__lte", q_str)
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
