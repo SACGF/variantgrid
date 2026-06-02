@@ -372,7 +372,8 @@ def analysis_template_settings(request, pk):
     has_write_permission = analysis_template.can_write(request.user)
 
     at_form = _get_form(request, AnalysisTemplateForm, 'at-pre', instance=analysis_template)
-    formset = AutoLaunchFormSet(request.POST or None, instance=analysis_template)
+    formset_data = request.POST if 'auto-launch' in request.POST else None
+    formset = AutoLaunchFormSet(formset_data, prefix='auto-launch', instance=analysis_template)
     atv_form = None
     if atv := analysis_template.active:
         atv_form = _get_form(request, AnalysisTemplateVersionForm, 'atv-pre', instance=atv)
@@ -388,11 +389,16 @@ def analysis_template_settings(request, pk):
             raise PermissionDenied(f"Don't have permission to modify {analysis_template}")
 
         if at_form and at_form.is_bound:
-            valid = at_form.is_valid() and formset.is_valid()
+            valid = at_form.is_valid()
             if valid:
                 at_form.save()
-                formset.save()
             add_save_message(request, valid, "Analysis Template")
+
+        if formset.is_bound:
+            valid = formset.is_valid()
+            if valid:
+                formset.save()
+            add_save_message(request, valid, "Auto Launch Config")
 
         if atv_form and atv_form.is_bound:
             valid = atv_form.is_valid()
