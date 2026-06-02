@@ -1,12 +1,25 @@
 import logging
 import os
+import shutil
 import subprocess
+import sys
 from tempfile import NamedTemporaryFile
 
 from django.conf import settings
 
 from library.utils import sha256sum_str
 from pedigree.models import PedFile
+
+
+def get_ped_parser_command() -> list[str]:
+    """ ped_parser installs a plain script (not a console_scripts entry point or a runnable
+        module), so we invoke it with the current interpreter. This avoids relying on the venv's
+        bin dir being on PATH, which fails for local installs (e.g. UV) when Django runs as a
+        service - see https://github.com/SACGF/variantgrid/issues/1572 """
+    ped_parser = os.path.join(os.path.dirname(sys.executable), "ped_parser")
+    if not os.path.exists(ped_parser):
+        ped_parser = shutil.which("ped_parser") or ped_parser
+    return [sys.executable, ped_parser]
 
 
 class PedigreeChart:
@@ -45,7 +58,7 @@ class PedigreeChart:
 
         # Need to convert to Madeline input file
         convert_command = [
-            "ped_parser",
+            *get_ped_parser_command(),
             ped_filename,
             "--to_madeline",
             "-o",
