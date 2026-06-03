@@ -116,7 +116,6 @@ function enhanceAndMonitor() {
         }},
 
         {test: 'form[data-toggle="ajax-form"]', func: (node) => {
-            console.log("FOUND AJAX FORM");
             let $node = $(node);
             if ($node.attr('ajaxed')) {
                 return;
@@ -617,16 +616,19 @@ function loadAjaxModal(linkDom, size) {
     let body = modalContent.find('.modal-body');
     modalContent.find('.modal-footer').remove();
     let content = $('<div>').appendTo(body);
-    let modalDialog = modalContent.modal({focus:true, show:false});
 
     loadAjaxBlock(content, url).then(() => {
         if (content.find('.modalable').length == 1) {
             modalContentDiv.children().detach();
             content.appendTo(modalContentDiv);
             cardToModal(modalContentDiv);
+
+            const dialogShownEvent = new CustomEvent('modalDialogShown');
+            window.dispatchEvent(dialogShownEvent);
         }
     });
 
+    let modalDialog = modalContent.modal({focus:true, show:false});
     modalContent.on('hidden.bs.modal', function() {
         modalContent.modal('dispose');
         modalContent.remove();
@@ -1152,7 +1154,7 @@ function highlightTextAsDom(value, full_text) {
 // Dialogs
 function createModalShell(id, title, size="xl") {
     let modalShell = $(`
-        <div class="modal fade" id="${id}" tabindex="-1" role="dialog" aria-labelledby="${id}Label" aria-hidden="true">
+        <div class="modal fade modal-wrapper" id="${id}" tabindex="-1" role="dialog" aria-labelledby="${id}Label" aria-hidden="true">
             <div class="modal-dialog modal-${size}" role="document">
                 <div class="modal-content">
                     <div class="modal-header">

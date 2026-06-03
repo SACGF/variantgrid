@@ -18,6 +18,7 @@
         <div class="triage-form">
             {% crispy form form_helper.horizontal %}
             <script>
+
                 function triage_status_updated() {
                     let value = $('input[name="triage_status"]:checked').val();
                     let willAmend = value == "F";
@@ -27,14 +28,14 @@
                         $('#div_id_new_value').hide();
                     }
                 }
-                $(document).ready(() => {
-                    $('input[name="triage_status"]').change(() => {
-                        triage_status_updated();
-                    });
-                    window.setTimeout(() => {
-                        triage_status_updated();
-                    }, 1);
-                });
+
+                // document.ready() isn't reliable for dialogs, doing it here instead
+                function handleDialogShown(event) {
+                    triage_status_updated();
+                    window.removeEventListener('modalDialogShown', handleDialogShown)
+                }
+                window.addEventListener('modalDialogShown', handleDialogShown);
+
             </script>
         </div>
     </div>
