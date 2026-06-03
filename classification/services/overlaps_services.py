@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
 from json import JSONDecodeError
-from typing import Optional, Any, Self
+from typing import Optional, Any, Self, Union
 
 from auditlog.context import set_extra_data
 from auditlog.models import LogEntry
@@ -470,20 +470,21 @@ class OverlapGrouping3:
 
     @cached_property
     def change_log(self) -> list[ChangeRow]:
+        """
+        Code is a bit of a mess, but converts a list of LogEntry into ChangeRows
+        Complexity comes from:
+            If a record is new, merge all the changes from before it was shared (so we just see everything at the state when it was first shared)/
+            Otherwise if 2+ (non-conflicting) changes happen within a very small time window, merge them together
+        """
+
         change_rows: list[ChangeRow] = []
 
         for triage in self.overlap.contributions_all:
             triage_log: list[LogEntry] = list(LogEntry.objects.get_for_object(triage).order_by('timestamp').all())
 
-            pre_shared_buffer: list[LogEntry] = []
+            buffer: list[LogEntry] = []
+            time_buffer = False
             for index, entry in enumerate(triage_log):
-
-                if index + 1 < len(triage_log):
-                    next_log = triage_log[index + 1]
-                    if next_log.timestamp - entry.timestamp < timedelta(seconds=1):
-                        pass
-                        # buffer.append(entry)
-                        # continue
 
                 is_new_record = False
                 if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
@@ -491,27 +492,51 @@ class OverlapGrouping3:
 
                     contributing_status = entry.changes_dict.get("contribution_status")
                     if not contributing_status or contributing_status[1] not in (OverlapContributionStatus.CONTRIBUTING, OverlapContributionStatus.NON_COMPARABLE_VALUE):
-                        pre_shared_buffer.append(entry)
+                        buffer.append(entry)
                         continue
 
-                elif pre_shared_buffer:
+                elif buffer and not time_buffer:
                     merge_buffer = False
                     if contributing_status := entry.changes_dict.get("contribution_status"):
                         if contributing_status[1] in (OverlapContributionStatus.CONTRIBUTING, OverlapContributionStatus.NON_COMPARABLE_VALUE):
                             merge_buffer = True
 
                     if not merge_buffer:
-                        pre_shared_buffer.append(entry)
+                        buffer.append(entry)
                         continue
 
+                if time_buffer or not buffer:
+                    if index + 1 < len(triage_log):
+                        next_log = triage_log[index + 1]
+                        use_timestamp = buffer[0] if buffer else entry
+                        # buffer events that happen within 1 seconds - catches knock on effects
+                        if next_log.timestamp - use_timestamp.timestamp < timedelta(seconds=1):
+                            has_clash = False
+                            for key in "effective_date", "triage_status", "value", "triage_state", "comment":
+                                if key in entry.changes_dict:
+                                    for buffered in buffer:
+                                        if key in buffered.changes_dict:
+                                            has_clash = True
+                                            break
+                                if has_clash:
+                                    break
+                            if not has_clash:
+                                time_buffer = True
+                                buffer.append(entry)
+                                continue
+
                 latest_values = {}
-                if pre_shared_buffer:
-                    is_new_record = True  # as in this is the first time we're displaying the record
-                    for buffered_entry in reversed([entry] + pre_shared_buffer):
+                if buffer:
+                    if time_buffer:
+                        time_buffer = False
+                    else:
+                        is_new_record = True  # as in this is the first time we're displaying the record
+
+                    for buffered_entry in reversed([entry] + buffer):
                         for key, value_list in buffered_entry.changes_dict.items():
                             if key not in latest_values:
                                 latest_values[key] = value_list
-                    pre_shared_buffer.clear()
+                    buffer.clear()
                 else:
                     latest_values = entry.changes_dict
 
@@ -529,7 +554,7 @@ class OverlapGrouping3:
                             is_new_record=False,
                             is_withdrawn=True
                         ))
-                        pre_shared_buffer.append(entry)
+                        buffer.append(entry)
                         continue
 
                 for key, value_list in latest_values.items():
