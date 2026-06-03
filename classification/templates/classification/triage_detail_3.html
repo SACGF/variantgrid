@@ -28,10 +28,12 @@
                     }
                 }
                 $(document).ready(() => {
-                    triage_status_updated();
                     $('input[name="triage_status"]').change(() => {
                         triage_status_updated();
                     });
+                    window.setTimeout(() => {
+                        triage_status_updated();
+                    }, 1);
                 });
             </script>
         </div>
