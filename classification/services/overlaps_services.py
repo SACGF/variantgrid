@@ -205,7 +205,7 @@ class OverlapServices:
                 for lets_chat in reviewed_will_discuss + reviewed_confident + reviewed_complex:
                     lets_chat.next_step = TriageNextStep.TO_DISCUSS
 
-            elif reviewed_complex or reviewed_confident:
+            elif reviewed_confident:
                 # no one said discuss, but everyone has a different opinion so time to discuss
                 for lets_chat in reviewed_complex + reviewed_confident:
                     lets_chat.next_step = TriageNextStep.TO_DISCUSS
