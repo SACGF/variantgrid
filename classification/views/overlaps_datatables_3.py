@@ -245,8 +245,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             request=self.request,
         )
 
-    def __init__(self, request: HttpRequest):
-        super().__init__(request)
+    def __init__(self, request: HttpRequest, hardcoded_params: Optional[dict] = None):
+        super().__init__(request, hardcoded_params=hardcoded_params)
 
         self.cross_cotext_allele_to_overlap = {}
         # used to cache cross context

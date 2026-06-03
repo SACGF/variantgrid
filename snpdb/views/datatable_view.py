@@ -274,9 +274,10 @@ class DatatableConfig(Generic[DC]):
             column_names += row_columns
         return list(set(column_names))
 
-    def __init__(self, request: HttpRequest):
+    def __init__(self, request: HttpRequest, hardcoded_params: Optional[dict] = None):
         self.request: HttpRequest = request
         self.user: User = request.user
+        self.hardcoded_params = hardcoded_params
 
     @cached_property
     def default_sort_order_column(self) -> RichColumn:
@@ -333,10 +334,14 @@ class DatatableConfig(Generic[DC]):
 
     def get_query_param(self, param: str) -> Optional[str]:
         """
-        Returns a param value from the GET or POST
+        Returns a param value from the GET or POST or URL or hardcoded param values
         :param param: the key of the param
         :return: the value of the param
         """
+        if hardcoded_params := self.hardcoded_params:
+            if param in hardcoded_params:
+                return hardcoded_params.get(param)
+
         if param in self.request.resolver_match.kwargs:
             return self.request.resolver_match.kwargs[param]
 

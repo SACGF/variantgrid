@@ -6,9 +6,10 @@ from django.shortcuts import render
 from django.utils.safestring import mark_safe
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationResultValue, \
-    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap
+    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep
 from classification.enums.overlaps_enums import TriageState, TriageStatus
 from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
+from classification.views.overlaps_datatables_3 import OverlapColumns
 from library.utils import empty_to_none
 from library.utils.django_utils import render_ajax_view
 from snpdb.lab_picker import LabPickerData
@@ -68,7 +69,14 @@ def view_overlaps_3(request: HttpRequest, lab_id=None) -> HttpResponseBase:
 
     return render(request, "classification/overlaps_3.html", {
         "lab_picker_data": lab_picker,
-        "tab": request.GET.get("tab") or "TT"
+        "tab": request.GET.get("tab") or "TT",
+        "counts": {
+            "TT": OverlapColumns(request, {"skew_status": "TT"}).get_initial_queryset().count(),
+            TriageNextStep.TO_DISCUSS: OverlapColumns(request, {"skew_status": str(TriageNextStep.TO_DISCUSS.value)}).get_initial_queryset().count(),
+            TriageNextStep.AWAITING_OTHER_LAB: OverlapColumns(request, {"skew_status": str(TriageNextStep.AWAITING_OTHER_LAB.value)}).get_initial_queryset().count(),
+            TriageNextStep.UNANIMOUSLY_COMPLEX: OverlapColumns(request, {"skew_status": str(TriageNextStep.UNANIMOUSLY_COMPLEX.value)}).get_initial_queryset().count(),
+            TriageNextStep.AWAITING_YOUR_AMEND: OverlapColumns(request, {"skew_status": str(TriageNextStep.AWAITING_YOUR_AMEND.value)}).get_initial_queryset().count(),
+        }
     })
 
 
