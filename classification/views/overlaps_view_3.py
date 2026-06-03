@@ -67,16 +67,14 @@ def view_overlaps_3(request: HttpRequest, lab_id=None) -> HttpResponseBase:
     if redirect_response := lab_picker.check_redirect():
         return redirect_response
 
+    counts = {}
+    for skew_status in ["TT", TriageNextStep.TO_DISCUSS, TriageNextStep.AWAITING_OTHER_LAB, TriageNextStep.UNANIMOUSLY_COMPLEX, TriageNextStep.AWAITING_YOUR_AMEND]:
+        counts[skew_status] = OverlapColumns(request, {"skew_status": str(skew_status), "lab_selection": lab_id}).get_initial_queryset().count()
+
     return render(request, "classification/overlaps_3.html", {
         "lab_picker_data": lab_picker,
         "tab": request.GET.get("tab") or "TT",
-        "counts": {
-            "TT": OverlapColumns(request, {"skew_status": "TT"}).get_initial_queryset().count(),
-            TriageNextStep.TO_DISCUSS: OverlapColumns(request, {"skew_status": str(TriageNextStep.TO_DISCUSS.value)}).get_initial_queryset().count(),
-            TriageNextStep.AWAITING_OTHER_LAB: OverlapColumns(request, {"skew_status": str(TriageNextStep.AWAITING_OTHER_LAB.value)}).get_initial_queryset().count(),
-            TriageNextStep.UNANIMOUSLY_COMPLEX: OverlapColumns(request, {"skew_status": str(TriageNextStep.UNANIMOUSLY_COMPLEX.value)}).get_initial_queryset().count(),
-            TriageNextStep.AWAITING_YOUR_AMEND: OverlapColumns(request, {"skew_status": str(TriageNextStep.AWAITING_YOUR_AMEND.value)}).get_initial_queryset().count(),
-        }
+        "counts": counts
     })
 
 
