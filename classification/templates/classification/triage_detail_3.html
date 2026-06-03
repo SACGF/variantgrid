@@ -28,6 +28,9 @@
                         $('#div_id_new_value').hide();
                     }
                 }
+                $('input[name="triage_status"]').change(() => {
+                    triage_status_updated();
+                });
 
                 // document.ready() isn't reliable for dialogs, doing it here instead
                 function handleDialogShown(event) {
