@@ -8,31 +8,26 @@ import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
-from django.db import models, transaction
-from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet, Subquery, OuterRef, Count, \
-    IntegerField, F
-from django.db.models.functions import Coalesce
+from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet, OuterRef, Count, \
+    F
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket, TestingContextFull
+from classification.enums import TestingContextBucket, TestingContextFull
 from django.db import models, transaction
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved, ConditionReference
-from classification.models.overlaps_enums import ClassificationResultValue
-from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
-    ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
+    ConditionResolved, ConditionReference, ClassificationSummaryCacheObj
+from classification.enums.overlaps_enums import ClassificationResultValue
 from genes.models import GeneSymbol
 from library.utils import strip_json
 from snpdb.models import Allele, Lab
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
-#classification_grouping_onc_path_signal = django.dispatch.Signal()  # args: "instance", expects Classification
-#classification_grouping_clin_sig_signal = django.dispatch.Signal()  # args: "instance", expects Classification
+classification_grouping_summary_signal = django.dispatch.Signal()  # args: "instance", expects ClassificationGrouping, old_summary, new_summary
 
 # TODO this needs to be moved to Classification
 # class ClassificationQualityLevel(TextChoices):
@@ -167,6 +162,10 @@ class ClassificationGrouping(TimeStampedModel):
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
     latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
+
+    @property
+    def latest_cached_summary_obj(self):
+        return ClassificationSummaryCacheObj.from_dict_safe(self.latest_cached_summary)
 
     def contribution_for(self, value_type: ClassificationResultValue) -> 'OverlapContribution':
         from classification.models import OverlapContribution
@@ -340,18 +339,12 @@ class ClassificationGrouping(TimeStampedModel):
             # FIND THE MOST RECENT CLASSIFICATION
             best_classification = last(all_modifications)
 
-            primary_onc_path_change = False
-            primary_clin_sig_change = False
-            previous_summary: ClassificationSummaryCacheDict
-            if previous_summary := self.latest_cached_summary:
-                new_summary: ClassificationSummaryCacheDict = best_classification.classification.summary
-                if previous_summary.get("pathogenicity", {}).get("classification") != new_summary.get("pathogenicity", {}).get("classification"):
-                    primary_onc_path_change = True
-                if previous_summary.get("somatic", {}).get("clinical_significance", {}) != new_summary.get("somatic", {}).get("clinical_significance"):
-                    primary_clin_sig_change = True
+            # store these summary dicts, so we can compare them (after the save) and see if any extra actions need to be
+            # taken, e.g. updating triages
+            previous_summary = self.latest_cached_summary_obj
+            new_summary = best_classification.classification.summary_obj
 
             self.latest_classification_modification = best_classification
-            # TODO now see if there's a change in overall classification / clinical significance - for the grouping
             self.latest_cached_summary = best_classification.classification.summary
             self.latest_allele_info = best_classification.classification.allele_info
 
@@ -387,18 +380,15 @@ class ClassificationGrouping(TimeStampedModel):
                 # only store valid terms as quick links to the classification
                 # all_terms = {term for term in all_terms if term.is_valid_for_condition}
                 # self._update_conditions(all_terms)
-                summary_dict: ClassificationSummaryCacheDict = modification.classification.summary
+                summary_obj = modification.classification.summary_obj
 
-                pathogenicity_dict: ClassificationSummaryCacheDictPathogenicity = summary_dict.get("pathogenicity", {})
-                somatic_dict: ClassificationSummaryCacheDictSomatic = summary_dict.get("somatic", {})
-
-                if bucket := pathogenicity_dict.get("bucket"):
+                if bucket := summary_obj.pathogenicity.bucket:
                     all_buckets.add(bucket)
-                if path_val := pathogenicity_dict.get("classification"):
+                if path_val := summary_obj.pathogenicity.classification:
                     all_pathogenic_values.add(path_val)
-                if tier := somatic_dict.get("clinical_significance"):
+                if tier := summary_obj.somatic.clinical_significance:
                     all_tiers.add(tier)
-                if level := somatic_dict.get("amp_level"):
+                if level := summary_obj.somatic.amp_level:
                     all_levels.add(level)
 
             evidence_map = EvidenceKeyMap.instance()
@@ -444,10 +434,9 @@ class ClassificationGrouping(TimeStampedModel):
                     all_term_stubs += [ts.to_search_term(grouping=self) for ts in term_stubs]
             ClassificationGroupingSearchTerm.objects.filter(grouping=self).delete()
             ClassificationGroupingSearchTerm.objects.bulk_create(all_term_stubs)
-            # if primary_clin_sig_change:
-            #     classification_grouping_clin_sig_signal.send(sender=ClassificationGrouping, instance=self)
-            # if primary_onc_path_change:
-            #     classification_grouping_onc_path_signal.send(sender=ClassificationGrouping, instance=self)
+
+            if previous_summary and previous_summary != new_summary:
+                classification_grouping_summary_signal.send(sender=ClassificationGrouping, instance=self, old_summary=previous_summary, new_summary=new_summary)
         else:
             # soft delete
             # share_level = models.CharField(max_length=16, choices=ShareLevel.choices())

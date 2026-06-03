@@ -1,13 +1,8 @@
 from dataclasses import dataclass
-from datetime import datetime, date
-from typing import Optional, Union
-
+from typing import Optional
 from dataclasses_json import DataClassJsonMixin
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe
-
-from classification.models import CuratedDate
-
 
 
 class OverlapType(TextChoices):
@@ -62,6 +57,7 @@ class OverlapContributionStatus(TextChoices):
 class TriageStatus(TextChoices):
     PENDING = "P", "Pending Triage"
     REVIEWED_WILL_FIX = "F", "Will Amend"
+    AMENDED = "A", "Amended"
     REVIEWED_WILL_DISCUSS = "D", "For Joint Discussion"
     REVIEWED_SATISFACTORY = "R", "Confident in Value"
     COMPLEX = "X", "Low Penetrance/Risk Allele etc"
@@ -78,6 +74,8 @@ class TriageStatus(TextChoices):
                 return mark_safe('<i class="fa-regular fa-clock"  title="Pending" style="opacity:0.6"></i>')
             case TriageStatus.REVIEWED_WILL_FIX:
                 return mark_safe('<i class="fa-solid fa-strikethrough" title="Will Amend" style="opacity:0.6"></i>')
+            case TriageStatus.AMENDED:
+                return mark_safe('<i class="fa-solid fa-strikethrough" title="Have Amended" style="opacity:0.6"></i>')
             case TriageStatus.REVIEWED_WILL_DISCUSS:
                 return mark_safe('<i class="fa-regular fa-comments" title="For Joint Discussion" style="opacity:0.6"></i>')
             case TriageStatus.REVIEWED_SATISFACTORY:

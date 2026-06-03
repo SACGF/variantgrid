@@ -2,7 +2,6 @@ from functools import reduce, cached_property
 from typing import Any, Optional
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
-from django.contrib.auth.models import User
 from django.db.models import CASCADE, QuerySet, SET_NULL, JSONField
 from django.db import models
 from django.db.models.enums import IntegerChoices
@@ -12,13 +11,12 @@ from django_extensions.db.models import TimeStampedModel
 from annotation.models import ClinVarRecord, EffectiveDate
 from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
-from classification.models.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
+from classification.enums.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
 from genes.hgvs import CHGVS
 from library.utils import first, AuditUtils, AuditSingleChange
 from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
-from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, Lab, GenomeBuild, LabLike, CLINVAR_EXPERT_PANEL_LAB
 
 

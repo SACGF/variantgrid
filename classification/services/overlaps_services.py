@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import cached_property
 from json import JSONDecodeError
 from typing import Optional, Any, Self
@@ -19,7 +19,7 @@ from classification.models import ClassificationGrouping, ClassificationResultVa
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, \
     TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
     DiscordanceReport, ClassificationImportRun
-from classification.models.overlaps_enums import TriageStatus
+from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig, OVERLAP_CLIN_SIG_ENABLED
 import json
@@ -165,7 +165,8 @@ class OverlapServices:
         pending = status_buckets[TriageStatus.PENDING]
         reviewed_will_change = status_buckets[TriageStatus.REVIEWED_WILL_FIX]
         reviewed_will_discuss = status_buckets[TriageStatus.REVIEWED_WILL_DISCUSS]
-        reviewed_confident = status_buckets[TriageStatus.REVIEWED_SATISFACTORY]
+        # treat amended the same as confident (as the value has changed to something you're confidnet in in theory)
+        reviewed_confident = status_buckets[TriageStatus.REVIEWED_SATISFACTORY] + status_buckets[TriageStatus.AMENDED]
         reviewed_complex = status_buckets[TriageStatus.COMPLEX]
         # non_interactive = status_buckets[TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
 
@@ -235,7 +236,7 @@ class OverlapServices:
         overlap_changed = False
         if (overlap_status_calculation.current_value, overlap_status_calculation.pending_value) != (old_overlap_status, old_pending_status):
             overlap.overlap_status = overlap_status_calculation.current_value
-            overlap.overlap_pending_status = overlap_status_calculation.override_pending_value
+            overlap.overlap_pending_status = overlap_status_calculation.pending_value
             overlap.overlap_status_change_timestamp = now()
             overlap_changed = True
 
@@ -357,7 +358,7 @@ class OverlapContributionPerspective:
 
     @property
     def is_editable(self):
-        return self.is_user_lab or self.is_admin
+        return self.overlap_contribution.classification_grouping is not None and (self.is_user_lab or self.is_admin)
 
     def __lt__(self, other: Self):
         return self._sort_index < other._sort_index
@@ -472,10 +473,17 @@ class OverlapGrouping3:
         change_rows: list[ChangeRow] = []
 
         for triage in self.overlap.contributions_all:
-            triage_log: QuerySet[LogEntry] = LogEntry.objects.get_for_object(triage).order_by('timestamp')
+            triage_log: list[LogEntry] = list(LogEntry.objects.get_for_object(triage).order_by('timestamp').all())
 
-            buffer: list[LogEntry] = []
-            for entry in triage_log:
+            pre_shared_buffer: list[LogEntry] = []
+            for index, entry in enumerate(triage_log):
+
+                if index + 1 < len(triage_log):
+                    next_log = triage_log[index + 1]
+                    if next_log.timestamp - entry.timestamp < timedelta(seconds=1):
+                        pass
+                        # buffer.append(entry)
+                        # continue
 
                 is_new_record = False
                 if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
@@ -483,26 +491,27 @@ class OverlapGrouping3:
 
                     contributing_status = entry.changes_dict.get("contribution_status")
                     if not contributing_status or contributing_status[1] not in (OverlapContributionStatus.CONTRIBUTING, OverlapContributionStatus.NON_COMPARABLE_VALUE):
-                        buffer.append(entry)
+                        pre_shared_buffer.append(entry)
                         continue
-                elif buffer:
+
+                elif pre_shared_buffer:
                     merge_buffer = False
                     if contributing_status := entry.changes_dict.get("contribution_status"):
                         if contributing_status[1] in (OverlapContributionStatus.CONTRIBUTING, OverlapContributionStatus.NON_COMPARABLE_VALUE):
                             merge_buffer = True
 
                     if not merge_buffer:
-                        buffer.append(entry)
+                        pre_shared_buffer.append(entry)
                         continue
 
                 latest_values = {}
-                if buffer:
+                if pre_shared_buffer:
                     is_new_record = True  # as in this is the first time we're displaying the record
-                    for buffered_entry in reversed([entry] + buffer):
+                    for buffered_entry in reversed([entry] + pre_shared_buffer):
                         for key, value_list in buffered_entry.changes_dict.items():
                             if key not in latest_values:
                                 latest_values[key] = value_list
-                    buffer.clear()
+                    pre_shared_buffer.clear()
                 else:
                     latest_values = entry.changes_dict
 
@@ -520,7 +529,7 @@ class OverlapGrouping3:
                             is_new_record=False,
                             is_withdrawn=True
                         ))
-                        buffer.append(entry)
+                        pre_shared_buffer.append(entry)
                         continue
 
                 for key, value_list in latest_values.items():

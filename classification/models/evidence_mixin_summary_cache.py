@@ -2,8 +2,10 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TypedDict, Optional, Self
 
+from dataclasses_json import DataClassJsonMixin
+
 from classification.criteria_strengths import CriteriaStrength
-from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation, TestingContextBucket
+from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation, TestingContextBucket, ClassificationResultValue
 from library.utils import strip_json
 
 """
@@ -56,6 +58,58 @@ class ClassificationSummaryCacheDict(TypedDict):
 
 
 @dataclass(frozen=True)
+class ClassificationSummaryCacheObjDate(DataClassJsonMixin):
+    # TODO, deprecate in favour of EffectiveDate
+    date: str  # in format of yyyy-mm-dd
+    type: Optional[str]
+
+
+@dataclass(frozen=True)
+class ClassificationSummaryCacheObjSomatic(DataClassJsonMixin):
+    testing_context_bucket: Optional[str]
+    tumor_type_category: Optional[str]  # condition grouping if testing_contest is solid-tumor
+    clinical_significance: Optional[str]
+    amp_level: Optional[str]
+    sort: Optional[int]
+
+
+@dataclass(frozen=True)
+class ClassificationSummaryCacheObjPathogenicity(DataClassJsonMixin):
+    classification: Optional[str]
+    sort: Optional[int]
+
+    @property
+    def bucket(self):
+        from classification.models import EvidenceKeyMap
+        return EvidenceKeyMap.onc_path_to_bucket().get(self.classification)
+
+
+@dataclass(frozen=True)
+class ClassificationSummaryCacheObj(DataClassJsonMixin):
+    criteria_labels: list[str]
+    pathogenicity: ClassificationSummaryCacheObjPathogenicity
+    somatic: ClassificationSummaryCacheObjSomatic
+    allele_origin_bucket: str
+    date: ClassificationSummaryCacheObjDate
+
+    def value_for_value_type(self, value_type: ClassificationResultValue):
+        match value_type:
+            case ClassificationResultValue.ONC_PATH: return self.pathogenicity.classification
+            case ClassificationResultValue.CLINICAL_SIGNIFICANCE: return self.somatic.clinical_significance
+            case _: raise ValueError(f"Unexpected value type {value_type}")
+
+    @staticmethod
+    def from_dict_safe(data: dict):
+        # is there a way we can do this with schema?
+        # the problem is we don't want to subsitute with None, but empty objects
+        data_copy = dict(data)
+        for man_sub_field in ["pathogenicity", "somatic", "date"]:
+            if man_sub_field not in data_copy:
+                data_copy[man_sub_field] = {}
+        return ClassificationSummaryCacheObj.from_dict(data_copy, infer_missing=True)
+
+
+@dataclass(frozen=True)
 class SomaticClinicalSignificanceValue:
     tier_level: str
     amp_level: Optional[str] = None
@@ -97,34 +151,26 @@ class ClassificationSummaryCalculator:
         from classification.models import CuratedDate
         curated_date = CuratedDate(self.cm).relevant_date
 
-        pathogenicity: ClassificationSummaryCacheDictPathogenicity = {
-            "classification": self.classification_value,
-            "sort": self.classification_sort,
-            # "bucket": self.germline_bucket,
-            # "pending": self.pending_classification_value
-        }
-        somatic: ClassificationSummaryCacheDictSomatic = {
-            "testing_context_bucket": self.testing_context_bucket,
-            "tumor_type_category": self.tumor_type_category,
-            "clinical_significance": self.somatic_clinical_significance,
-            "amp_level": self.somatic_amp_level,
-            "sort": self.somatic_sort
-        }
-        date_json: ClassificationSummaryCachedDictDate = {
-            "value": curated_date.date_str,
-            "type": curated_date.name,
-        }
-
-        full_json: ClassificationSummaryCacheDict = {
-            "criteria_labels": self.criteria_labels,
-            "pathogenicity": pathogenicity,
-            "allele_origin_bucket": self.allele_origin_bucket,
-            "somatic": somatic,
-            "date": date_json
-        }
-
-        # strip out None values as that makes sorting work more naturally
-        return strip_json(full_json)
+        full_obj = ClassificationSummaryCacheObj(
+            criteria_labels=self.criteria_labels,
+            pathogenicity=ClassificationSummaryCacheObjPathogenicity(
+                classification=self.classification_value,
+                sort=self.classification_sort
+            ),
+            somatic=ClassificationSummaryCacheObjSomatic(
+                testing_context_bucket=self.testing_context_bucket,
+                tumor_type_category=self.tumor_type_category,
+                clinical_significance=self.somatic_clinical_significance,
+                amp_level=self.somatic_amp_level,
+                sort=self.somatic_sort
+            ),
+            allele_origin_bucket=self.allele_origin_bucket,
+            date=ClassificationSummaryCacheObjDate(
+                date=curated_date.date_str,
+                type=curated_date.name
+            )
+        )
+        return strip_json(full_obj.to_dict())
 
     # @cached_property
     # def pending_classification_value(self) -> Optional[str]:

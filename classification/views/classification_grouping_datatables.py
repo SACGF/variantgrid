@@ -1,18 +1,15 @@
 import operator
-from collections import defaultdict
 from functools import cached_property, reduce
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
-from classification.enums import AlleleOriginBucket, EvidenceCategory, ShareLevel, TestingContextBucket, \
-    OverlapStatus
+from classification.enums import AlleleOriginBucket, EvidenceCategory, ShareLevel, TestingContextBucket
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
     Classification, DiscordanceReport, ClassificationResultValue
-from classification.models.overlaps_enums import OverlapContributionStatus
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType

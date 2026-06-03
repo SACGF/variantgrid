@@ -18,9 +18,8 @@ from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
 from classification.enums import SpecialEKeys, TestingContextBucket
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
-    EvidenceMixin, ClassificationSummaryCacheDictPathogenicity, Overlap, ClassificationGroupingEntry, \
-    OverlapContribution, ClassificationSummaryCacheDictSomatic, \
-    ClassificationGrouping, ClassificationResultValue, TestingContextFull, ConditionReference
+    EvidenceMixin, Overlap, ClassificationGroupingEntry, \
+    OverlapContribution, ClassificationGrouping, ClassificationResultValue, TestingContextFull, ConditionReference
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -30,7 +29,7 @@ from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
-from classification.models.overlaps_enums import TriageStatus
+from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlaps_services import OverlapEntryCompare
 from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS
@@ -217,15 +216,16 @@ def clinical_significance_values(vcm: ClassificationModification):
     classification = vcm.classification
     always_show_somatic = vcm.classification.allele_origin_bucket != "G"
 
-    pathogenicity: ClassificationSummaryCacheDictPathogenicity = classification.summary_typed.get("pathogenicity")
-    somatic_dict: ClassificationSummaryCacheDictSomatic = classification.summary_typed.get("somatic")
+    summary_obj = classification.summary_obj
+    # pathogenicity: ClassificationSummaryCacheDictPathogenicity = classification.summary_typed.get("pathogenicity")
+    # somatic_dict: ClassificationSummaryCacheDictSomatic = classification.summary_typed.get("somatic")
 
     germline_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     pending_from = None
-    value = pathogenicity.get("classification")
-    if pending_classification_value := pathogenicity.get("pending"):  # FIXME pending values will be in OverlapContribution now not "pending"
-        pending_from = germline_key.pretty_value(value, value) or "No Data"
-        value = pending_classification_value
+    value = summary_obj.pathogenicity.classification
+    # if pending_classification_value := pathogenicity.get("pending"):  # FIXME pending values will be in OverlapContribution now not "pending"
+    #     pending_from = germline_key.pretty_value(value, value) or "No Data"
+    #     value = pending_classification_value
     value_list = [{
         "title": germline_key.pretty_label,
         "pending_from": pending_from,
@@ -233,11 +233,11 @@ def clinical_significance_values(vcm: ClassificationModification):
         "css_class": "cs cs-" + (value.lower() if value else "none")
     }]
 
-    if always_show_somatic or somatic_dict and somatic_dict.get("clinical_significance"):
+    if always_show_somatic or summary_obj.somatic.clinical_significance:
         somatic_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-        value = somatic_dict.get("clinical_significance")
+        value = summary_obj.somatic.clinical_significance
         label = somatic_key.pretty_value(value, value) or "No Data"
-        if amp_level := somatic_dict.get("amp_level"):
+        if amp_level := summary_obj.somatic.amp_level:
             label += amp_level
 
         somatic = {

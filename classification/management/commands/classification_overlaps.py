@@ -1,5 +1,4 @@
 from auditlog.context import disable_auditlog, set_extra_data
-from auditlog.models import LogEntry
 from django.core.management import BaseCommand
 
 from annotation.models import ClinVarRecordCollection, ClinVarRecord, EffectiveDate
@@ -8,7 +7,7 @@ from classification.enums import TestingContextBucket
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
     EvidenceKeyMap, EffectiveDateType, DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \
     ClassificationFlagTypes
-from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices, TriageState, \
+from classification.enums.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices, TriageState, \
     TriageStatus
 from classification.services.overlaps_services import OverlapServices
 

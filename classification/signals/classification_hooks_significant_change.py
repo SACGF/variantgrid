@@ -2,14 +2,20 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
 
+from auditlog.context import set_extra_data
 from django.dispatch import receiver
 from django.urls import reverse
 from django_messages.admin import User
 
 from classification.enums import ShareLevel, SpecialEKeys, ClinicalSignificance
 from classification.models import classification_post_publish_signal, Classification, classification_flag_types, \
-    EvidenceKey, ClassificationFlagTypes, ClassificationModification, EvidenceKeyMap
+    EvidenceKey, ClassificationFlagTypes, ClassificationModification, EvidenceKeyMap, OverlapContribution, \
+    classification_grouping_summary_signal, ClassificationSummaryCacheObj, ClassificationResultValue, TriageState, \
+    ClassificationGrouping
+from classification.enums.overlaps_enums import TriageStatus
+from classification.services.overlaps_services import OverlapServices
 from library.django_utils import get_url_from_view_path
+from library.guardian_utils import admin_bot
 from library.log_utils import NotificationBuilder
 from library.utils import get_timer
 
@@ -26,6 +32,31 @@ def turn_off_unsubmitted_edits(sender, classification, previously_published, new
         resolution='closed'
     )
 
+
+@receiver(classification_grouping_summary_signal, sender=ClassificationGrouping)
+def summary_changed(sender, instance: ClassificationGrouping, old_summary: ClassificationSummaryCacheObj, new_summary: ClassificationSummaryCacheObj, **kwargs):
+
+    for value_type in (ClassificationResultValue.ONC_PATH, ClassificationResultValue.CLINICAL_SIGNIFICANCE):
+        if old_summary.value_for_value_type(value_type) != new_summary.value_for_value_type(value_type):
+            if oc := OverlapContribution.objects.filter(classification_grouping=instance, value_type=ClassificationResultValue.ONC_PATH).first():
+                if oc.triage_state_obj.status == TriageStatus.REVIEWED_WILL_FIX:
+                    # Note any value change will cause AMENDED, even if it wasn't on the agreed upon value
+                    with set_extra_data({
+                        "actor": admin_bot(),
+                        "remote_addr": None,
+                        "remote_port": None,
+                    }):
+                        oc.triage_state_obj = TriageState(status=TriageStatus.AMENDED)
+                        oc.save()
+
+                    for overlap in oc.overlaps:
+                        OverlapServices.recalc_overlap(overlap)
+                        # now need to recalc the overlap
+
+
+# THE BELOW ARE FOR SINGLE CLASSIFICATION FLAGS
+# these flags will be removed in future, either replaced with a notification on the grouping that the value has changed
+# or with nothing at all
 
 @dataclass
 class _SignificanceChange:

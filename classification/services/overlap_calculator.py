@@ -7,7 +7,7 @@ from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.enums import TestingContextBucket, OverlapStatus
 from classification.models import ClassificationResultValue, ClassificationSummaryCacheDict, \
     EvidenceKeyMap, OverlapContribution
-from classification.models.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices, TriageState, \
+from classification.enums.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices, TriageState, \
     TriageStatus
 from library.utils import first
 from snpdb.models import Allele

@@ -212,7 +212,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         max_triage_status = TriageNextStep(skew_qs.aggregate(max_status=Max('next_step'))["max_status"])
 
         for contribution in cell.obj.contributions:
-            value = values[contribution.value]
+            value = values[contribution.effective_value]
             value.your_context = True  # need to check cross context overlap for other values
             if cg := contribution.classification_grouping:
                 lab = cg.lab
@@ -225,7 +225,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         if cross_context := self.cross_context_overlap_for(cell.obj):
             for cross_contribution in cross_context.contributions:
-                value = values[cross_contribution.value]
+                value = values[cross_contribution.effective_value]
                 # only show cross context values if there was no
                 if not value.your_context:
                     if cg := contribution.classification_grouping:

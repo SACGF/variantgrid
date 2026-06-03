@@ -43,7 +43,7 @@ from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell, EvidenceKeyOverrides
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCalculator, \
-    ClassificationSummaryCacheDict
+    ClassificationSummaryCacheDict, ClassificationSummaryCacheObj
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
@@ -673,7 +673,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def summary_typed(self) -> ClassificationSummaryCacheDict:
+        # DEPRECATED - use summary_obj instead
         return self.summary
+
+    @property
+    def summary_obj(self) -> ClassificationSummaryCacheObj:
+        return ClassificationSummaryCacheObj.from_dict_safe(self.summary)
 
     last_source_id = models.TextField(blank=True, null=True)
     last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)
