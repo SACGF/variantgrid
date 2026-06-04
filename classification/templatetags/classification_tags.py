@@ -15,7 +15,7 @@ from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
 from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
-from classification.enums import SpecialEKeys, TestingContextBucket
+from classification.enums import SpecialEKeys, TestingContextBucket, TriageComment
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
     EvidenceMixin, Overlap, ClassificationGroupingEntry, \
@@ -813,8 +813,9 @@ def triage(context,
             new_value = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(new_value)
 
     last_comment = triage.last_comment
+    if last_comment and triage.triage_state_obj.status == TriageStatus.AMENDED:
+        last_comment = None  # TODO, would be good to see the date of the amend
 
-    # TODO rename new_value
     return {
         "triage": triage,
         "new_value": new_value,

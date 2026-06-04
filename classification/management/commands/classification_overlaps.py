@@ -1,15 +1,17 @@
 from auditlog.context import disable_auditlog, set_extra_data
 from django.core.management import BaseCommand
+from django.db.models import F
 
 from annotation.models import ClinVarRecordCollection, ClinVarRecord, EffectiveDate
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from classification.enums import TestingContextBucket
+from classification.enums import TestingContextBucket, OverlapStatus, OverlapType
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
     EvidenceKeyMap, EffectiveDateType, DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \
     ClassificationFlagTypes
 from classification.enums.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices, TriageState, \
     TriageStatus
 from classification.services.overlaps_services import OverlapServices
+from snpdb.models import Allele
 
 
 class Command(BaseCommand):
@@ -20,6 +22,8 @@ class Command(BaseCommand):
         parser.add_argument('--full_reset', required=False, action="store_true",
                             help="Deletes all Overlaps and OverlapContributions and creates them from scratch")
         parser.add_argument("--recalc_skews", required=False, action="store_true", help="Updates what each lab's perspective of the Overlap is")
+        parser.add_argument("--max_status", required=False, action="store_true",
+                            help="Populates max status (not entirely accurate) but should distinguish between records that have had a discordance reports to the ones that haven't")
 
 
     def handle(self, *args, **options):
@@ -27,9 +31,11 @@ class Command(BaseCommand):
             self.full_reset(args, options)
         elif options["migrate"]:
             self.populate_overlap_change_date()
-            self.migrate_discordance_reports()
+            self.migrate_discordance_reports(args, options)
         elif options["recalc_skews"]:
             self.recalc_skews()
+        elif options["max_status"]:
+            self.populate_max_status(args, options)
         else:
             print("Must choose full_reset or migrate")
 
@@ -51,6 +57,25 @@ class Command(BaseCommand):
 
         self.populate_overlap_change_date()
         self.migrate_discordance_reports(args, options)
+        self.populate_max_status()
+
+    def populate_max_status(self, *args, **options):
+        alleles_with_discordance_reports: dict[Allele, OverlapStatus] = {}
+        for dr in DiscordanceReport.objects.filter(clinical_context__allele__isnull=False).select_related('clinical_context__allele').order_by('-created').iterator():
+            allele = dr.clinical_context.allele
+            if alleles_with_discordance_reports.get(allele) == OverlapStatus.MEDICALLY_SIGNIFICANT:
+                continue
+
+            if dr.is_medically_significant:
+                alleles_with_discordance_reports[allele] = OverlapStatus.MEDICALLY_SIGNIFICANT
+            elif dr.clinical_context.allele not in alleles_with_discordance_reports:
+                alleles_with_discordance_reports[allele] = OverlapStatus.MAJOR_DIFFERENCES
+
+        for allele, value in alleles_with_discordance_reports.items():
+            Overlap.objects.filter(overlap_type=OverlapType.SINGLE_CONTEXT, value_type=ClassificationResultValue.ONC_PATH, allele=allele).update(overlap_max_ever_status=value)
+
+        Overlap.objects.filter(overlap_max_ever_status__lt=F('overlap_status')).update(overlap_max_ever_status=F('overlap_status'))
+
 
     def migrate_discordance_reports(self, *args, **options):
         for discordance_report in DiscordanceReport.objects.all().order_by('created').iterator():

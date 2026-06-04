@@ -82,17 +82,6 @@
 
     {% lab_picker data=lab_picker_data %}
 
-    {% comment %}
-    NOT_INVOLVED = 0, "Not Involved"
-    PENDING_CALCULATION = 1, "Pending Calculation"
-    AWAITING_OTHER_LAB = 2, "Awaiting Other Lab"
-    AWAITING_YOUR_TRIAGE = 3, "Awaiting Your Triage"
-    AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = 4, "Awaiting your Triage - others have triaged"
-    AWAITING_YOUR_AMEND = 5, "Pending Your Amendment"
-    UNANIMOUSLY_COMPLEX = 6, "Unanimously Complex"
-    TO_DISCUSS = ≈, "To Discuss"
-    {% endcomment %}
-
     <div id="triage_status_filter" class="my-4">
         <div class="btn-group btn-group-toggle" data-toggle="buttons">
             <label class="btn btn-outline-danger"><input type="radio" name="triage_status_filter" id="triage_status_filter-t" value="TT" {% if tab == "TT" %}checked="checked"{% endif %}>Awaiting Triage {{ counts.TT | badge }}</label>
@@ -100,6 +89,7 @@
             <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="5" {% if tab == "AA" %}checked="checked"{% endif %}>Awaiting Amendment {{ counts.5 | badge }}</label>
             <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="2" {% if tab == "O" %}checked="checked"{% endif %}>Waiting on Other Lab {{ counts.2 | badge }}</label>
             <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="6" {% if tab == "C" %}checked="checked"{% endif %}>Complex {{ counts.6 | badge }}</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="S" {% if tab == "S" %}checked="checked"{% endif %}>Solved {{ counts.S | badge }}</label>
             <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="X" {% if tab == "A" %}checked="checked"{% endif %}>All Overlaps</label>
         </div>
     </div>

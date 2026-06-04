@@ -1,4 +1,5 @@
 {% load user_tags %}
+{% load js_tags %}
 <div {% if style == "compact" %}{% if last_comment.value.text %}title="{{ last_comment.value.text }} - {{ last_comment.user.username }}"{% endif %}{% endif %}>
 
 {% if show_icon %}{{ triage.triage_state_obj.status.icon }}{% endif %}
@@ -13,8 +14,13 @@
     {% else %}
         <div class="mt-2">
             <div style="display:inline-block; margin-right: 6px"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i><span style="color:#446">{{ last_comment.value.text }}</span></div>
-            <div style="margin-top:6px; position:relative; right: 1px;">{% user last_comment.user size="tiny" %}</div>
+            <div style="margin-top:6px; position:relative; right: 1px; display:flex">{% user last_comment.user size="tiny" %} <div style="top:2px; position:relative; color: #666">&nbsp;- {% timestamp last_comment.timestamp time_ago=True %}</div></div>
         </div>
     {% endif %}
+{% elif last_comment %}
+    <div class="mt-2">
+        <div style="display:inline-block; margin-right: 6px"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i><span class="no-value">No comment provided</span></div>
+        <div style="margin-top:6px; position:relative; right: 1px; display:flex">{% user last_comment.user size="tiny" %} <div style="top:2px; position:relative; color: #666">&nbsp;- {% timestamp last_comment.timestamp time_ago=True %}</div></div>
+    </div>
 {% endif %}
 </div>

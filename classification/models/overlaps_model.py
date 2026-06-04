@@ -78,7 +78,13 @@ class OverlapContribution(TimeStampedModel):
 
     @cached_property
     def last_comment(self) -> AuditSingleChange[TriageComment]:
-        return AuditUtils.last_change_for(self, "comment", is_json=True, parser=lambda x: TriageComment.from_dict(x))
+        if last_comment := AuditUtils.last_change_for(self, "comment", is_json=True, parser=lambda x: TriageComment.from_dict(x)):
+            if last_comment.value.count != 0:
+                return last_comment
+        if not self.triage_state_obj.status.is_default:
+            if last_triage_change := AuditUtils.last_change_for(self, "triage_state", parser=lambda x: None):
+                return last_triage_change
+        return None
 
     @property
     def testing_context_full(self) -> TestingContextFull:
@@ -188,6 +194,7 @@ class Overlap(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
     overlap_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     overlap_pending_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
+    overlap_max_ever_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
 

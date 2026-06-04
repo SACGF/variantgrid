@@ -92,11 +92,20 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
     @property
     def triage_next_step_filter(self) -> Set[TriageNextStep]:
         if triage_status_str := self.get_query_param("skew_status"):
+            if triage_status_str == "S":
+                return None # shouldn't be checking status for solved overlaps
             if triage_status_str == "TT":  # special code for meaning both awaiting and awaiting others have triaged
                 return {TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED}
             else:
                 return {TriageNextStep(int(triage_status_str))}
-        return TriageNextStep.all_involved_status
+        return {
+            TriageNextStep.AWAITING_OTHER_LAB,
+            TriageNextStep.AWAITING_YOUR_TRIAGE,
+            TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED,
+            TriageNextStep.AWAITING_YOUR_AMEND,
+            TriageNextStep.UNANIMOUSLY_COMPLEX,
+            TriageNextStep.TO_DISCUSS
+        }
 
     @cached_property
     def lab_picker(self):
@@ -106,6 +115,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         else:
             lab_picker = LabPickerData.for_user(self.user)
         return lab_picker
+
 
     def get_initial_queryset(self) -> QuerySet[Overlap]:
         qs = Overlap.objects.filter(valid=True)
@@ -122,7 +132,14 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             lab_filter_q = Q(contribution__classification_grouping__lab__in=self.lab_picker.lab_ids) & Q(
                 contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
 
-        if self.get_query_param("skew_status") == "X":  # show all overlaps
+        if self.get_query_param("skew_status") == "S":  # solved overlaps
+            qs = qs.filter(overlap_max_ever_status__gte=OverlapStatus.MAJOR_DIFFERENCES, overlap_status__lt=OverlapStatus.MAJOR_DIFFERENCES)
+            qs = qs.annotate(skew_status=Subquery(
+                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                    overlap=OuterRef('pk')
+                ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
+            ))
+        elif self.get_query_param("skew_status") == "X":  # show all overlaps
             qs = qs.filter(overlap_pending_status__gt=OverlapStatus.SINGLE_SUBMITTER)
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionSkew.objects.filter(lab_filter_q).filter(
