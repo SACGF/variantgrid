@@ -25,7 +25,6 @@ class Command(BaseCommand):
         parser.add_argument("--max_status", required=False, action="store_true",
                             help="Populates max status (not entirely accurate) but should distinguish between records that have had a discordance reports to the ones that haven't")
 
-
     def handle(self, *args, **options):
         if options["full_reset"]:
             self.full_reset(args, options)
@@ -75,7 +74,6 @@ class Command(BaseCommand):
             Overlap.objects.filter(overlap_type=OverlapType.SINGLE_CONTEXT, value_type=ClassificationResultValue.ONC_PATH, allele=allele).update(overlap_max_ever_status=value)
 
         Overlap.objects.filter(overlap_max_ever_status__lt=F('overlap_status')).update(overlap_max_ever_status=F('overlap_status'))
-
 
     def migrate_discordance_reports(self, *args, **options):
         for discordance_report in DiscordanceReport.objects.all().order_by('created').iterator():
