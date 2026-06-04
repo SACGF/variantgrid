@@ -237,8 +237,8 @@ class OverlapServices:
         if (overlap_status_calculation.current_value, overlap_status_calculation.pending_value) != (old_overlap_status, old_pending_status):
             overlap.overlap_status = overlap_status_calculation.current_value
             overlap.overlap_pending_status = overlap_status_calculation.pending_value
-            overlap.overlap_max_ever_status = max(overlap.overlap_mex_ever_status, overlap_status_calculation.current_value)
-            
+            overlap.overlap_max_ever_status = max(overlap.overlap_max_ever_status, overlap_status_calculation.current_value)
+
             overlap.overlap_status_change_timestamp = now()
             overlap_changed = True
 

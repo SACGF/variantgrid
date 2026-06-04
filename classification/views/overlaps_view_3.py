@@ -154,7 +154,7 @@ class TriageView3(AjaxFormView[OverlapContribution]):
 
             new_value = empty_to_none(form.cleaned_data["new_value"])
             triage_status = TriageStatus(form.cleaned_data["triage_status"])
-            if triage_status != TriageStatus.PENDING or new_value == 'undecided':
+            if triage_status != TriageStatus.REVIEWED_WILL_FIX or new_value == 'undecided':
                 new_value = None
 
             triage.triage_state_obj = TriageState(
