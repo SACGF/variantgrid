@@ -3,11 +3,10 @@
 <div {% if style == "compact" %}{% if last_comment.value.text %}title="{{ last_comment.value.text }} - {{ last_comment.user.username }}"{% endif %}{% endif %}>
 
 {% if show_icon %}{{ triage.triage_state_obj.status.icon }}{% endif %}
-{% if show_link %}
-    <a class="mr-1" href="{% url 'triage_3' triage.pk %}?mode=modal" data-toggle="ajax-modal" data-size="md">
-{% endif %}
 {% if show_label %} <span style="{% if triage.triage_state_obj.status.is_default %}color:#888{% endif %}">{{ triage.triage_state_obj.status.label }}</span>{% endif %}{% if new_value %} <i>(<span style="color:#888">{{ new_value }}</span>)</i>{% endif %}
-{% if show_link %} : Edit</a>{% endif %}
+{% if show_link %}
+    : <a class="mr-1" href="{% url 'triage_3' triage.pk %}?mode=modal" data-toggle="ajax-modal" data-size="md">Edit</a>
+{% endif %}
 {% if last_comment.value.text %}
     {% if style == "compact "%}
         <i class="ml-1 fa-solid fa-message" style="opacity:0.5"></i>
