@@ -49,5 +49,13 @@
     <div class="card-body">
         <div class="container">{% include "uicore/messages/messages.html" %}</div>
         <div data-replace="#triage-{{ triage.pk }}-status">{% triage triage show_label=True%}</div>
+        <div data-replace="#triage-{{ triage.pk }}-value">
+            {% if triage.effective_value != triage.value %}
+                <div>{% clinical_significance triage.value extra_css="strike"%}</div>
+                <div>{% clinical_significance triage.effective_value %}</div>
+            {% else %}
+                <div>{% clinical_significance triage.value %}</div>
+            {% endif %}
+        </div>
     </div>
 {% endif %}

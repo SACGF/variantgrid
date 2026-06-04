@@ -94,15 +94,17 @@
                             {% endif %}
                         </td>
                         <td>
+                            <div id="triage-{{ overlap_entry.overlap_contribution.pk }}-value">
                             {% if overlap_entry.overlap_contribution.effective_value != overlap_entry.overlap_contribution.value %}
                                 <div>{% clinical_significance overlap_entry.overlap_contribution.value extra_css="strike"%}</div>
                                 <div>{% clinical_significance overlap_entry.overlap_contribution.effective_value %}</div>
                             {% else %}
                                 <div>{% clinical_significance overlap_entry.overlap_contribution.value %}</div>
                             {% endif %}
-                        <div class="overlap-criteria">
-                            {% for criteria_label in overlap_entry.overlap_contribution.classification_grouping.latest_cached_summary.criteria_labels %}<span class="comma-sep">{{ criteria_label }}</span>{% endfor %}
-                        </div>
+                            </div>
+                            <div class="overlap-criteria">
+                                {% for criteria_label in overlap_entry.overlap_contribution.classification_grouping.latest_cached_summary.criteria_labels %}<span class="comma-sep">{{ criteria_label }}</span>{% endfor %}
+                            </div>
                         </td>
                         <td>{% condition overlap_entry.overlap_contribution.conditions %}</td>
                         <td>{% timestamp overlap_entry.overlap_contribution.effective_date_obj.date time_ago=True %}</td>
