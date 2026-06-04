@@ -1119,6 +1119,17 @@ h3.admin:before {
   font-weight: bold;
 }
 
+.tiny-pill {
+  font-size: 0.8rem;
+  padding: 2px 4px 0px 4px;
+  background-color: #fefefe;
+  border: 1px solid #aaccaa;
+  border-radius: 8px;
+  display: inline-block;
+  color: #448844;
+  text-decoration: none;
+}
+
 .chunk {
   margin-top: 12px;
   padding: 2px;

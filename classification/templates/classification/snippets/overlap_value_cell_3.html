@@ -1,6 +1,6 @@
 {% load js_tags %}
 {% if max_triage_status %}
-<span style="font-style:italic; color:#ccc">{{ max_triage_status.label }}</span><br/>
+    <div style="font-style:italic; color:#ccc">{{ max_triage_status.label }}</div>
 {% endif %}
 
 {% if overlap.has_pending_status %}Pending : {% endif %}
@@ -15,3 +15,4 @@
     {% else %}<span title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>{% endif %}
     </span>
 {% endfor %}
+<div id="overlap-{{ overlap.pk }}-updated"></div>
