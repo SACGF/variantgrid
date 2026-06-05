@@ -231,6 +231,7 @@
                 setupDamageNodeSlider($("#id_mpc_score_min"), $("#mpc_score-slider"), $("input#enable-mpc_score"));
                 setupDamageNodeSlider($("#id_mutpred2_score_min"), $("#mutpred2_score-slider"), $("input#enable-mutpred2_score"));
                 setupDamageNodeSlider($("#id_primateai_score_min"), $("#primateai_score-slider"), $("input#enable-primateai_score"));
+                setupDamageNodeSlider($("#id_revel_score_min"), $("#revel_score-slider"), $("input#enable-revel_score"));
                 setupDamageNodeSlider($("#id_varity_er_score_min"), $("#varity_er_score-slider"), $("input#enable-varity_er_score"));
                 setupDamageNodeSlider($("#id_varity_r_score_min"), $("#varity_r_score-slider"), $("input#enable-varity_r_score"));
                 setupDamageNodeSlider($("#id_vest4_score_min"), $("#vest4_score-slider"), $("input#enable-vest4_score"));
@@ -450,7 +451,7 @@
                 <tr class="individual-pathogenic-prediction rankscore-prediction">
                     <th>{{ form.metalr_rankscore_min.label }}</th>
                     <td>{{ form.metalr_rankscore_min.errors }}
-                        <input id="enable-metalr-rankscore"  title="Enable MetaLR slider" class="enable-slider" type="checkbox" />
+                        <input id="enable-metalr_rankscore"  title="Enable MetaLR slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
                                 <div id="metalr_rankscore-slider" class='slider'></div>
@@ -645,6 +646,24 @@
                         </td>
                         <td class="collapse filter-required">{{ form.primateai_score_required }}</td>
                         <td class="collapse filter-required">{{ form.primateai_score_allow_null }}</td>
+                    </tr>
+                    <tr class="individual-pathogenic-prediction">
+                        <th>{{ form.revel_score_min.label }}</th>
+                        <td>{{ form.revel_score_min.errors }}
+                            <input id="enable-revel_score" title="Enable REVEL raw slider" class="enable-slider" type="checkbox" />
+                            <span class='slider-container'>
+                                <div class="display-flex">
+                                    <div id="revel_score-slider" class='slider'></div>
+                                    <div class='label slider-value'></div>
+                                </div>
+                                <div class='slider-labels'>
+                                    <span class='label min-value left'></span>
+                                    <span class='label max-value right'></span>
+                                </div>
+                            </span>
+                        </td>
+                        <td class="collapse filter-required">{{ form.revel_score_required }}</td>
+                        <td class="collapse filter-required">{{ form.revel_score_allow_null }}</td>
                     </tr>
                     <tr class="individual-pathogenic-prediction">
                         <th>{{ form.varity_er_score_min.label }}</th>
