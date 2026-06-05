@@ -661,7 +661,7 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">Sequence and Domain</div>
                     <div class="card-body">
-                        {% labelled id='repeat_masker' label='Repeat Masker' help=annotation_description.repeat_masker hint="tiny" %}{{ variant_annotation.repeat_masker }}{% endlabelled %}
+                        {% labelled id='repeat_masker' label='Repeat Masker' help=annotation_description.repeat_masker hint="tiny" %}{% with rm=variant_annotation.repeat_masker_summary %}{% if rm.is_multiple %}{% for class_name, count in rm.class_counts %}<span class="badge badge-secondary mr-1">{{ class_name }}&nbsp;&times;{{ count }}</span>{% endfor %}<a class='toggle-link ml-1' data-toggle="collapse" href='#repeat-masker-full'>Show all {{ rm.total }}</a><div id="repeat-masker-full" class="collapse mt-1 small" style="word-break:break-word;">{{ rm.items|join:" & " }}</div>{% else %}{{ variant_annotation.repeat_masker|default_if_none:"" }}{% endif %}{% endwith %}{% endlabelled %}
                         {% labelled id='domains' label='Domains' help=annotation_description.domains hint="tiny" %}{% endlabelled %}
                         {% if variant_annotation.has_dbnsfp %}
                             {% labelled id='interpro_domain' label='InterPro' help=annotation_description.interpro_domain hint="tiny" %}{% endlabelled %}

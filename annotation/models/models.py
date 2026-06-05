@@ -27,6 +27,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction, \
     AlphaMissensePrediction, ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
+from annotation.models.repeat_masker import RepeatMaskerSummary
 from annotation.models.models_enums import AnnotationStatus, \
     ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
@@ -1506,6 +1507,11 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @cached_property
     def is_standard_annotation(self) -> bool:
         return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD
+
+    @cached_property
+    def repeat_masker_summary(self) -> RepeatMaskerSummary:
+        """ Group the (possibly '&'-joined) RepeatMasker value by repeat class - see #1580 """
+        return RepeatMaskerSummary.from_value(self.repeat_masker)
 
     @property
     def has_pathogenicity(self) -> bool:
