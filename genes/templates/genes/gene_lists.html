@@ -18,6 +18,14 @@
 
             let options = {
                 target: '#new-gene-list-form-container',
+                beforeSerialize: function($form) {
+                    // Gene symbol matching is synchronous and can take a while - put the form into a
+                    // read-only state with a loading overlay so it doesn't look like it's hanging, and
+                    // to stop the user submitting it multiple times.
+                    $(":input", $form).prop("readonly", true);
+                    $(":submit", $form).prop("disabled", true);
+                    $form.LoadingOverlay('show', {fade: false});
+                },
                 success: function(data) {
                     let geneListId = data['gene_list_id'];
                     window.location = Urls.view_gene_list(geneListId);

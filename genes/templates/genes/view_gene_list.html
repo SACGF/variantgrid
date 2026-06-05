@@ -78,6 +78,15 @@
 
     {% page_help page_id='genes/gene_list_gene_matching_help' title="Gene List Gene Matching" show_title=False %}
 
+    <p>
+        <a class="hover-link" data-toggle="collapse" href="#gene-list-text" role="button" aria-expanded="false" aria-controls="gene-list-text">
+            <i class="fas fa-clipboard-list"></i> Show genes as text ({{ num_gene_symbols }})
+        </a>
+    </p>
+    <div id="gene-list-text" class="collapse">
+        <textarea class="form-control" rows="10" readonly onclick="this.select()">{{ gene_symbols_text }}</textarea>
+    </div>
+
     <table id="gene-lists-genes-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_list_genes_datatable' gene_list_id=gene_list.pk %}"></table>
 
 {% endblock submenu_page_content %}

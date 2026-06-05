@@ -632,8 +632,11 @@ def view_gene_list(request, gene_list_id):
 
     add_gene_list_unmatched_genes_message(request, gene_list)
 
+    gene_symbols = sorted(gene_list.get_gene_names())
     context = {'gene_list': gene_list,
                'gene_list_form': gl_form,
+               'gene_symbols_text': "\n".join(gene_symbols),
+               'num_gene_symbols': len(gene_symbols),
                'has_write_permission': gene_list.can_write(request.user)}
     return render(request, 'genes/view_gene_list.html', context)
 
