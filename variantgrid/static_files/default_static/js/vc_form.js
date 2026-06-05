@@ -2529,35 +2529,39 @@ VCTable.classification = (data, type, row) => {
         value = {"classification": data};
     }
 
+    console.log(value);
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
     let csVal = value["classification"] || value[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+    let pendingVal = value["pending"]
 
+    let domParts = [];
     let dom;
+
     if (!csVal || !csVal.length) {
-        dom = $('<span>', {class: 'c-pill cs-none no-value', html: 'No Data'});
+        dom = $('<div>', {class: 'c-pill cs-none no-value', html: 'No Data'});
     } else {
-        dom = $('<span>', {class: `cs c-pill cs-${csVal.toLowerCase()}`, html: csKey.prettyValue(csVal).val});
+        let pendingClass = '';
+        if (pendingVal) {
+            pendingClass = 'strike'
+        }
+        dom = $('<div>', {class: `cs c-pill cs-${csVal.toLowerCase()} ${pendingClass}`, html: csKey.prettyValue(csVal).val});
     }
+    domParts.push(dom);
     if (value["diff"]) {
         dom.append(' <i class="fa-solid fa-asterisk ml-1" title="Multiple values have been recorded - showing latest"></i>');
     }
-    let pendingHtml = "";
+    if (pendingVal) {
+        domParts.push($('<div>', {class: `cs c-pill cs-${pendingVal.toLowerCase()}`, html: csKey.prettyValue(pendingVal).val}));
+    }
+
     // if (is_pending) {
     //     pendingHtml = ' <i class="fa-solid fa-clock" title="Some or all of these classifications have been marked as having pending changes to classification to the value shown"></i>';
     // }
-    if (value.overlaps) {
-        dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab"></i>');
-    }
-
-    // if (value.conflict_status) {
-    //     if (value.conflict_status == "F") {
-    //         dom.addClass("strike");
-    //         dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab but has been marked as pending a change"></i>');
-    //     } else {
-    //         dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab"></i>');
-    //     }
+    // if (value.overlaps) {
+    //     dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab"></i>');
     // }
-    return dom;
+
+    return $('<div>', {html: domParts});
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {

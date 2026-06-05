@@ -6,10 +6,11 @@ from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
-from classification.enums import AlleleOriginBucket, EvidenceCategory, ShareLevel, TestingContextBucket
+from classification.enums import AlleleOriginBucket, EvidenceCategory, ShareLevel, TestingContextBucket, TriageStatus, \
+    TriageState
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
-    Classification, DiscordanceReport, ClassificationResultValue
+    Classification, DiscordanceReport, ClassificationResultValue, OverlapContribution
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
@@ -122,6 +123,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         result_dict["classification_grouping_id"] = row.get("pk")
         result_dict["triage"] = True
 
+        if triage_status := self.overlap_pending.get(row["pk"]):
+            result_dict["pending"] = triage_status.amend_value
+
         # if ShareLevel(row["share_level"]).is_discordant_level:
         #     if discordance_status := self.pending_conflict_labs_onc_path.get((row["pk"], row["lab_id"])):
         #         result_dict["conflict_status"] = discordance_status
@@ -183,6 +187,12 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def pre_render(self, qs: QuerySet[DC]):
         super().pre_render(qs)
+
+        overlap_pending: dict[int, TriageState] = {}
+        for overlap in OverlapContribution.objects.filter(classification_grouping__in=qs, triage_state__status=TriageStatus.REVIEWED_WILL_FIX).only('triage_state', 'classification_grouping_id'):
+            overlap_pending[overlap.classification_grouping_id] = overlap.triage_state_obj
+        self.overlap_pending = overlap_pending
+
         # grouping_value_type_overlaps = defaultdict(lambda: defaultdict(list))
         # for contribution in ClassificationGroupingOverlapContribution.objects.filter(classification_grouping__in=qs).select_related("overlap")\
         #         .exclude(contribution_status=OverlapContributionStatus.NOT_SHARED)\
@@ -386,6 +396,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
+        self.overlap_pending: dict[int, TriageState] = {}
 
         genome_build_preferred = first(self.genome_build_prefs)
 
