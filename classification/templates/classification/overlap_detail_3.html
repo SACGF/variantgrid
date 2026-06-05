@@ -41,6 +41,7 @@
         {% for lab_contact in overlap_grouping.involved_labs %}
             <div>{% lab lab_contact.lab show_contact_link=True contact_subject=lab_contact.email_subject %}</div>
         {% endfor %}
+        {% comment %}Add a warning if ClinVar is in the list of labs, they wont be diffed{% endcomment %}
     {% endlabelled %}
     {% if overlap_grouping.discordance_reports %}
         {% labelled label="Legacy Discordance Reports" %}
@@ -59,6 +60,10 @@
     {% if user.is_superuser %}
         {% labelled label="Overlap Admin" %}{% admin_link overlap_grouping.overlap %}{% endlabelled %}
     {% endif %}
+    {% labelled label="Compare" %}
+        <div><a class="hover-link" href="{% url 'classification_diff' %}?overlap={{ overlap_grouping.overlap.pk }}">Show Diffs</a>
+            {% if overlap_grouping.overlap.has_clinvar_expert_panel %} <span class="text-muted"> {{ 'i' | severity_icon }}ClinVar records won't appear in the diff{% endif %}</div>
+    {% endlabelled %}
 </div>
 
 <div class="card">

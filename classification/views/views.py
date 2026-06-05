@@ -548,6 +548,10 @@ def view_classification_diff(request):
         )
         records = ClassificationModification.objects.filter(pk__in=record_ids)
 
+    elif overlap_str := request.GET.get("overlap"):
+        overlap = Overlap.objects.get(pk=int(overlap_str))
+        records = [oc.classification_grouping.latest_classification_modification for oc in overlap.contributions.filter(classification_grouping__isnull=False).select_related('classification_grouping')]
+
     elif cids := request.GET.get('cids'):
         records = [ClassificationModification.latest_for_user(user=request.user, classification=cid, published=True).first() for cid in [cid.strip() for cid in cids.split(',')]]
 

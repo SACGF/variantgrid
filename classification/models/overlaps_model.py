@@ -238,6 +238,10 @@ class Overlap(TimeStampedModel):
         ).select_related("classification_grouping__lab__organization")
 
     @property
+    def has_clinvar_expert_panel(self) -> bool:
+        return self.contributions.filter(scv__isnull=False).exists()
+
+    @property
     def contributions_all(self) -> QuerySet[OverlapContribution]:
         # unlike contributions this will also return OverlapContributions that aren't currently contribution
         # as they may have contributed in the past
