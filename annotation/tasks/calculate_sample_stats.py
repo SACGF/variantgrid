@@ -6,6 +6,7 @@ from typing import Optional
 import celery
 import numpy as np
 from django.conf import settings
+from django.db import transaction
 from django.db.models.query_utils import Q
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -20,7 +21,7 @@ from library.genomics.vcf_enums import VariantClass, VCFSymbolicAllele
 from library.git import Git
 from library.log_utils import get_traceback
 from library.utils.json_utils import canonical_filter_key
-from snpdb.models import Cohort, CohortGenotypeStats, ImportStatus, VCF, Variant, \
+from snpdb.models import Cohort, CohortGenotypeCollection, CohortGenotypeStats, ImportStatus, VCF, Variant, \
     SampleStatsCodeVersion, Sequence, VCFLengthStatsCollection, VCFLengthStats
 from snpdb.models import Zygosity
 from snpdb.models.models_genome import GenomeBuild
@@ -56,6 +57,28 @@ def _get_sample_stats_code_version() -> SampleStatsCodeVersion:
                                                                 version=3,
                                                                 code_git_hash=Git(settings.BASE_DIR).hash)
     return code_version
+
+
+def _cohort_stats_are_fresh(cgc, annotation_version, code_version) -> bool:
+    """ True when this CGC already has a genotype-level per-sample row at the current
+        code_version plus matching variant/gene/clinvar annotation-version rows, i.e.
+        a recompute would reproduce what is already stored. """
+    vav = annotation_version.variant_annotation_version
+    gav = annotation_version.gene_annotation_version
+    cv = annotation_version.clinvar_version
+    return (
+        CohortGenotypeStats.objects.filter(
+            cohort_genotype_collection=cgc, code_version=code_version).exists()
+        and CohortGenotypeVariantAnnotationStats.objects.filter(
+            cohort_genotype_collection=cgc, code_version=code_version,
+            variant_annotation_version=vav).exists()
+        and CohortGenotypeGeneAnnotationStats.objects.filter(
+            cohort_genotype_collection=cgc, code_version=code_version,
+            gene_annotation_version=gav).exists()
+        and CohortGenotypeClinVarAnnotationStats.objects.filter(
+            cohort_genotype_collection=cgc, code_version=code_version,
+            clinvar_version=cv).exists()
+    )
 
 
 def _compute_vcf_specific_stats(vcf: VCF, annotation_version: AnnotationVersion):
@@ -221,11 +244,32 @@ def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion
             returned by get_filter_keys_to_precompute_for_cohort(cohort)
         All rows are FK'd to cohort.cohort_genotype_collection (the current CGC).
         Idempotent: any existing rows for this CGC + the four annotation versions
-        are deleted and rewritten. """
+        are deleted and rewritten.
+
+        Serialized per CGC: the CohortGenotypeCollection row is locked with
+        select_for_update() inside a transaction so two concurrent recomputes for
+        the same CGC can't race the delete/bulk_create (issue #1576). A task that
+        acquires the lock after another has just finished early-exits via
+        _cohort_stats_are_fresh instead of redoing the work. Unrelated cohorts
+        lock different rows and still run concurrently. """
+    code_version = _get_sample_stats_code_version()
+    with transaction.atomic():
+        cgc = CohortGenotypeCollection.objects.select_for_update().get(
+            pk=cohort.cohort_genotype_collection.pk)
+        if _cohort_stats_are_fresh(cgc, annotation_version, code_version):
+            logging.info("Cohort stats already fresh for %s; skipping recompute", cgc)
+            return
+        _compute_and_persist_cohort_stats(cohort, cgc, annotation_version, code_version)
+
+
+def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection,
+                                      annotation_version: AnnotationVersion,
+                                      code_version: SampleStatsCodeVersion):
+    """ Accumulate the four CohortGenotype*Stats families for the cohort and persist
+        them via _persist_cohort_stats. Must run inside the per-CGC locked
+        transaction opened by calculate_cohort_stats, using the locked cgc. """
     from analysis.models.nodes.sources._stats_cache import get_filter_keys_to_precompute_for_cohort
 
-    cgc = cohort.cohort_genotype_collection
-    code_version = _get_sample_stats_code_version()
     cohort_samples = list(cohort.get_cohort_samples())
     sample_index_pairs = [(cs.sample, cs.cohort_genotype_packed_field_index) for cs in cohort_samples]
     has_filters = bool(_cohort_has_filters(cohort))

@@ -8,6 +8,8 @@
       - SampleNode (per-sample) and CohortNode (aggregate) cache hits use
         the right row keys
 """
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 
@@ -18,10 +20,16 @@ from analysis.models.nodes.sources._stats_cache import (
     UNCACHEABLE,
     get_filter_keys_to_precompute_for_cohort,
 )
+from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import (
     CohortGenotypeClinVarAnnotationStats,
     CohortGenotypeGeneAnnotationStats,
     CohortGenotypeVariantAnnotationStats,
+)
+from annotation.tasks.calculate_sample_stats import (
+    _cohort_stats_are_fresh,
+    _get_sample_stats_code_version,
+    calculate_cohort_stats,
 )
 from library.utils.json_utils import canonical_filter_key
 from snpdb.models import (
@@ -155,3 +163,80 @@ class TestPrecomputeKeysForCohort(TestCase):
         cohort = create_fake_cohort(self.user, self.grch37)
         keys = get_filter_keys_to_precompute_for_cohort(cohort)
         self.assertEqual(keys, [None])
+
+
+class TestCohortStatsRecomputeLock(TestCase):
+    """ Issue #1576: calculate_cohort_stats must serialize per-CGC recomputes and
+        early-exit when the CGC's stats are already fresh, so concurrent lazy
+        recomputes can't race the delete/bulk_create (which raised IntegrityError
+        on the per-sample unique constraints). These tests patch the compute/persist
+        step so they exercise the lock + freshness decision without needing the
+        annotated variants the fake fixtures don't provide. """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username="recompute_lock_user")[0]
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.annotation_version = get_fake_annotation_version(cls.grch37)
+        cls.cohort = create_fake_cohort(cls.user, cls.grch37)
+        cls.cgc = cls.cohort.cohort_genotype_collection
+        cls.code_version = _get_sample_stats_code_version()
+
+    def _create_fresh_stats(self, cgc, code_version):
+        """ Pre-create one of each of the four stat families for cgc at the given
+            code_version + the test annotation versions, enough to satisfy
+            _cohort_stats_are_fresh. """
+        av = self.annotation_version
+        CohortGenotypeStats.objects.create(
+            cohort_genotype_collection=cgc, sample=None, filter_key=None,
+            passing_filter=False, code_version=code_version,
+            import_status=ImportStatus.SUCCESS)
+        CohortGenotypeVariantAnnotationStats.objects.create(
+            cohort_genotype_collection=cgc, sample=None, filter_key=None,
+            passing_filter=False, code_version=code_version,
+            variant_annotation_version=av.variant_annotation_version)
+        CohortGenotypeGeneAnnotationStats.objects.create(
+            cohort_genotype_collection=cgc, sample=None, filter_key=None,
+            passing_filter=False, code_version=code_version,
+            gene_annotation_version=av.gene_annotation_version)
+        CohortGenotypeClinVarAnnotationStats.objects.create(
+            cohort_genotype_collection=cgc, sample=None, filter_key=None,
+            passing_filter=False, code_version=code_version,
+            clinvar_version=av.clinvar_version)
+
+    def test_cohort_stats_are_fresh_true_when_all_present(self):
+        self.assertFalse(
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+        self._create_fresh_stats(self.cgc, self.code_version)
+        self.assertTrue(
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+
+    def test_cohort_stats_are_fresh_false_on_code_version_mismatch(self):
+        # Rows present but at a different code_version → a bump must force recompute.
+        other_code_version = SampleStatsCodeVersion.objects.create(
+            name="test_other", version=98, code_git_hash="stale")
+        self._create_fresh_stats(self.cgc, other_code_version)
+        self.assertFalse(
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+
+    def test_cohort_stats_are_fresh_false_when_partial(self):
+        # Only the genotype-level row present; annotation-version rows missing.
+        CohortGenotypeStats.objects.create(
+            cohort_genotype_collection=self.cgc, sample=None, filter_key=None,
+            passing_filter=False, code_version=self.code_version,
+            import_status=ImportStatus.SUCCESS)
+        self.assertFalse(
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+
+    def test_early_exit_when_fresh_skips_recompute(self):
+        self._create_fresh_stats(self.cgc, self.code_version)
+        with patch("annotation.tasks.calculate_sample_stats._compute_and_persist_cohort_stats") as mock_compute:
+            calculate_cohort_stats(self.cohort, self.annotation_version)
+            mock_compute.assert_not_called()
+
+    def test_stale_recompute_proceeds(self):
+        # No stats rows present → not fresh → recompute (compute/persist) runs.
+        with patch("annotation.tasks.calculate_sample_stats._compute_and_persist_cohort_stats") as mock_compute:
+            calculate_cohort_stats(self.cohort, self.annotation_version)
+            mock_compute.assert_called_once()
