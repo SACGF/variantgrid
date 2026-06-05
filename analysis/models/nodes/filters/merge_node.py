@@ -79,7 +79,10 @@ class MergeNode(AnalysisNode):
                 # VariantCollection-backed cache from a prior version would collapse to Q(pk__in=vc_join)
                 # and the merge would OR stale parent results with live siblings (see #240, ad35a7fb1).
                 qs = parent.get_queryset(disable_cache=True)
-                variant_ids = qs.values_list("pk", flat=True)
+                # Materialise to an explicit PK list (issue #546): merge parents are small, and a
+                # lazy TransformerQuerySet embedded in the Q makes arg_q_dict unpicklable (the q-cache
+                # cache.set in get_arg_q_dict then fails) as well as forcing a pk IN (subquery).
+                variant_ids = list(qs.values_list("pk", flat=True))
                 or_list.append(Q(pk__in=variant_ids))
             else:
                 if remaining_q_dict := arg_q_dict.get(None):
