@@ -19,6 +19,7 @@ from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
     VariantAnnotationVersionDiff, Citation, InvalidAnnotationVersionError
 from annotation import vep_columns
+from annotation.pathogenicity_predictions import TOOLS
 from annotation.models.models import CachedWebResource, HumanProteinAtlasAnnotationVersion, \
     HumanProteinAtlasAnnotation, DBNSFPGeneAnnotationVersion
 from annotation.models.models_citations import CitationFetchRequest
@@ -549,6 +550,21 @@ def view_annotation_descriptions(request, genome_build_name=None):
         "columns_and_vep_by_annotation_level": columns_and_vep_by_annotation_level
     }
     return render(request, "annotation/view_annotation_descriptions.html", context)
+
+
+def view_pathogenicity_thresholds(request):
+    """ Reference page for the ClinGen-calibrated PP3/BP4 raw-score cutoffs used by DamageNode and
+    the variant details page - driven by the TOOLS registry so it stays in sync with the filters. """
+    tools = [t for t in TOOLS if t.raw_field]
+    references = {}  # source_detail -> source_url, first-seen order, for the citations section
+    for t in tools:
+        if t.source_detail and t.source_detail not in references:
+            references[t.source_detail] = t.source_url
+    context = {
+        "tools": tools,
+        "references": references,
+    }
+    return render(request, "annotation/view_pathogenicity_thresholds.html", context)
 
 
 @cache_page(WEEK_SECS)

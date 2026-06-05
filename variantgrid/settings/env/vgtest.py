@@ -8,6 +8,9 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 WEB_HOSTNAME = 'test.variantgrid.com'
 WEB_IP = '129.127.16.255'
 
+# This deployment used dbNSFP rankscores before raw scores - keep them visible (see annotation_settings.py)
+ANNOTATION_SHOW_LEGACY_RANKSCORES = True
+
 ALLOWED_HOSTS = ["localhost", WEB_HOSTNAME, WEB_IP]
 
 # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')

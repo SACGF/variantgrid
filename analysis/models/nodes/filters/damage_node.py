@@ -4,6 +4,7 @@ from functools import reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
+from django.conf import settings
 from django.db import models
 from django.db.models.query_utils import Q
 
@@ -221,6 +222,14 @@ class DamageNode(AnalysisNode):
                             self.clinpred_rankscore_min, self.metalr_rankscore_min, self.revel_rankscore_min,
                             self.vest4_rankscore_min, self.alphamissense_rankscore_min]
         return any(rankscore_fields)
+
+    def show_rankscore_sliders(self) -> bool:
+        """ v2/v3 only have rankscores so always show them. v4 onward they're legacy: only offered when
+        the deployment allows legacy rankscores, or this node already has one set (so saved filters stay
+        visible/editable - the filter is applied regardless). """
+        if self.columns_version < 4:
+            return True
+        return settings.ANNOTATION_SHOW_LEGACY_RANKSCORES or self.has_rankscore_predictions()
 
     def damage_predictions_description(self) -> str:
         return self.analysis.annotation_version.variant_annotation_version.damage_predictions_description

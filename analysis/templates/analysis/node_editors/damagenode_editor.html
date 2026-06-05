@@ -327,7 +327,7 @@
                 <td></td>
                 <td></td>
             </tr>
-            {% if node.columns_version >= 4 %}
+            {% if node.columns_version >= 4 and node.show_rankscore_sliders %}
                 <tr id="show-rankscore-prediction">
                     <td colspan="2">
                         <a class="hover-link" href="javascript:showRankscores()">Show rankscores (legacy)</a>
@@ -374,6 +374,7 @@
                     <td class="collapse filter-required">{{ form.revel_score_allow_null }}</td>
                 </tr>
             {% elif node.columns_version >= 2 %}
+                {% if node.show_rankscore_sliders %}
                 {% if node.columns_version >= 3 %}
                     <tr class="individual-pathogenic-prediction rankscore-prediction">
                         <th>{{ form.alphamissense_rankscore_min.label }}</th>
@@ -502,6 +503,7 @@
                     <td class="collapse filter-required">{{ form.vest4_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.vest4_rankscore_allow_null }}</td>
                 </tr>
+                {% endif %}{# show_rankscore_sliders #}
                 {% if node.columns_version >= 4 %}
                     <tr class="individual-pathogenic-prediction">
                         <th>{{ form.alphamissense_score_min.label }}</th>
@@ -812,6 +814,7 @@
         <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
             See help for details.
         </a>
+        <a target="_blank" href="{% url 'pathogenicity_thresholds' %}">See pathogenicity thresholds &amp; sources.</a>
     </div>
 
 </div>

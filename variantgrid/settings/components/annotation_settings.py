@@ -53,6 +53,12 @@ ANNOTATION_VEP_SV_MAX_SIZE = 10_000_000  # VEP default = 10M
 ANNOTATION_MAX_BENIGN_RANKSCORE = 0.15
 ANNOTATION_MIN_PATHOGENIC_RANKSCORE = 0.85
 
+# dbNSFP rankscores are legacy (replaced by raw scores at columns_version >= 4). New deployments hide
+# them so nobody filters/views by them going forward. Deployments that previously used rankscores set
+# this True (see env/vgaws.py, env/vgtest.py). A value that was already set is always shown/applied
+# regardless of this flag.
+ANNOTATION_SHOW_LEGACY_RANKSCORES = False
+
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
 BUILD_GRCH37 = "GRCh37"
