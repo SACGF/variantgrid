@@ -128,43 +128,5 @@
         </table>
     </div>
 </div>
-
-{% if overlap_grouping.change_log %}
-    <div class="card mt-4">
-        <div class="card-header">History <i style="color:#888" class="fa-solid fa-sort-down" title="Oldest to Newest"></i></div>
-        <div class="card-body">
-            {% for change in overlap_grouping.change_log %}
-                {% ifchanged change.overlap_contribution %}
-                    {% if not forloop.first %}
-                        <hr/>
-                    {% endif %}
-                {% endifchanged %}
-                <div class="row my-4">
-                    <div class="col-3 text-right">
-                        {% ifchanged change.overlap_contribution change.user %}
-                            <div>{% if change.overlap_contribution.lab %}{% lab change.overlap_contribution.lab lab_css="font-weight:500" %}{% else %}ClinVar Expert Panel{% endif %}</div>
-                            <div class="mb-1">{% testing_context change.overlap_contribution style="subtle" %}</div>
-                            {% if change.user %}<div class="mt-1">{% user change.user size="tiny" align="right" %}</div>{% else %}{% endif %}
-                        {% endifchanged %}
-                        <div>{% timestamp change.timestamp time_ago=True %}</div>
-                    </div>
-                    <div class="col-9">
-                        {% if change.is_new_record %}
-                            <label class="mb-2">Record registered in {{ site_name }}</label>
-                        {% endif %}
-                        {% if change.is_withdrawn %}
-                            <div><label class="text-danger">Record withdrawn</label></div>
-                        {% else %}
-                            {% for field_change in change.changes %}
-                                <div><label>{{ field_change.field | pretty_label }}</label>: {% if not change.is_new_record %}{{ field_change.old_value }} -> {% endif %}{{ field_change.new_value }}</div>
-                            {% endfor %}
-                            {% if change.comment %}
-                                <div class="comment">{{ change.comment.text }}</div>
-                            {% endif %}
-                        {% endif %}
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
-{% endif %}
+<br/>
+<a data-toggle="ajax-collapse" href="{% url 'overlap_history' overlap_grouping.overlap.pk %}" title="Overlap History"></a>

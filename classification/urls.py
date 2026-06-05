@@ -32,7 +32,7 @@ from classification.views.exports_grouping.classification_grouping_export_view i
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
 from classification.views.overlaps_datatables_3 import OverlapColumns
-from classification.views.overlaps_view_3 import view_overlaps_3, view_overlap_3, TriageView3
+from classification.views.overlaps_view_3 import view_overlaps_3, view_overlap_3, TriageView3, view_overlap_history
 from classification.views.views import classification_import_tool, AutopopulateView
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
@@ -183,6 +183,7 @@ urlpatterns = [
     path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
 
     path('overlaps3/triage/<int:triage_id>', TriageView3.as_view(), name='triage_3'),
+    path('overlaps3/overlap/<int:overlap_id>/history', view_overlap_history, name='overlap_history'),
     path('overlaps3/overlap/<int:overlap_id>', view_overlap_3, name='overlap_3'),
     path('overlaps3/datatables', DatabaseTableView.as_view(column_class=OverlapColumns), name='overlaps_3_datatables'),
     path('overlaps3/<str:lab_id>', view_overlaps_3, name='overlaps_3'),
