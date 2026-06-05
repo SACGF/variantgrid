@@ -14,16 +14,17 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from analysis.models import AllVariantsNode, NodeTask
-from analysis.models.enums import NodeStatus
+from analysis.models.enums import NodeStatus, SetOperations
 from analysis.models.nodes.analysis_node import NodeCache
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
+from analysis.models.nodes.filters.venn_node import VennNode, VennNodeCache, venn_cache_count
 from analysis.tasks import analysis_update_tasks
 from analysis.tasks.analysis_update_tasks import lease_ready_nodes, _node_launch_signature, \
     _node_ready_to_lease, create_and_launch_analysis_tasks
 from analysis.tasks.node_update_tasks import next_backoff, _backoff_node, reschedule_stalled_analyses, \
     update_node_task, node_cache_task, MAX_NODE_ATTEMPTS
 from analysis.tests.utils import AnalysisSetupMixin
-from snpdb.models import ProcessingStatus
+from snpdb.models import ProcessingStatus, VariantCollection
 
 
 class TestNodeStatusCoverage(TestCase):
@@ -371,6 +372,125 @@ class TestDeadWorkerReclamation(AnalysisSetupMixin, TestCase):
         with mock.patch.object(Signature, "apply_async") as m:
             reschedule_stalled_analyses()
         self.assertTrue(m.called, "stalled analysis should kick the dispatcher")
+
+
+VENN_CACHE_COUNT_TASK = "analysis.models.nodes.filters.venn_node.venn_cache_count"
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestVennCacheScheduling(AnalysisSetupMixin, TestCase):
+    """ VennNode builds its result in a VennNodeCache (separate from the regular NodeCache the
+        dispatcher's gate understands). Under the issue #346 per-node launch model the cache count
+        is chained ahead of the Venn's own update; these tests lock in that the chaining and the
+        cache bookkeeping are idempotent across re-leases and shared parents, so a Venn update can
+        never run against a half-built / CREATED cache. """
+
+    def _force_status(self, node, status):
+        type(node).objects.filter(pk=node.pk).update(status=status)
+        node.refresh_from_db()
+
+    def _make_venn(self, set_operation=SetOperations.INTERSECTION):
+        a = AllVariantsNode.objects.create(analysis=self.analysis)
+        b = AllVariantsNode.objects.create(analysis=self.analysis)
+        venn = VennNode.objects.create(analysis=self.analysis, set_operation=set_operation)
+        venn.add_parent(a, side=VennNode.LEFT_PARENT)
+        venn.add_parent(b, side=VennNode.RIGHT_PARENT)
+        venn.save()
+        for n in (a, b):
+            self._force_status(n, NodeStatus.READY)
+        # Reload fresh so cached parents / ordered_parents reflect the committed edges + FKs
+        venn = VennNode.objects.get(pk=venn.pk)
+        self.assertTrue(venn.is_valid, f"Venn test node not valid: {venn.get_errors()}")
+        return venn
+
+    def _caches(self, venn):
+        a, b = venn.ordered_parents
+        return VennNodeCache.objects.filter(parent_a_node_version=a.node_version,
+                                            parent_b_node_version=b.node_version)
+
+    # --- launch signature: cache count is chained BEFORE the node's own update ---
+
+    def test_launch_signature_chains_cache_before_update(self):
+        venn = self._make_venn()
+        names = _signature_task_names(_node_launch_signature(venn.pk, venn.version))
+        self.assertIn(VENN_CACHE_COUNT_TASK, names)
+        self.assertIn(venn.UPDATE_TASK, names)
+        self.assertLess(names.index(VENN_CACHE_COUNT_TASK), names.index(venn.UPDATE_TASK),
+                        "venn_cache_count must run before the Venn node's update")
+
+    # --- idempotency of get_cache_task_args_set ---
+
+    def test_relaunch_keeps_in_flight_cache(self):
+        """ A re-lease (eg lease expiry) must NOT delete the CREATED collection an already-queued
+            venn_cache_count is about to build - that destroy/recreate churn was what left a Venn
+            update reading a 'Created' cache. """
+        venn = self._make_venn()
+        venn.get_cache_task_args_set()
+        collection_pks = set(self._caches(venn).values_list("variant_collection_id", flat=True))
+        self.assertTrue(all(collection_pks))
+
+        task_args = venn.get_cache_task_args_set()  # simulate re-lease
+        self.assertEqual(set(self._caches(venn).values_list("variant_collection_id", flat=True)),
+                         collection_pks, "in-flight (CREATED) collection was replaced on re-lease")
+        self.assertTrue(any(t for (t, _) in task_args),
+                        "venn_cache_count must still be re-emitted while the cache is not SUCCESS")
+
+    def test_success_cache_reused_emits_no_task(self):
+        venn = self._make_venn()
+        venn.get_cache_task_args_set()
+        VariantCollection.objects.filter(
+            pk__in=self._caches(venn).values_list("variant_collection_id", flat=True)
+        ).update(status=ProcessingStatus.SUCCESS)
+
+        task_args = venn.get_cache_task_args_set()
+        self.assertTrue(all(t is None for (t, _) in task_args),
+                        "A SUCCESS cache must be reused without re-emitting venn_cache_count")
+
+    def test_error_cache_regenerated(self):
+        venn = self._make_venn()
+        venn.get_cache_task_args_set()
+        old_pks = set(self._caches(venn).values_list("variant_collection_id", flat=True))
+        VariantCollection.objects.filter(pk__in=old_pks).update(status=ProcessingStatus.ERROR)
+
+        task_args = venn.get_cache_task_args_set()
+        new_pks = set(self._caches(venn).values_list("variant_collection_id", flat=True))
+        self.assertFalse(new_pks & old_pks, "ERROR collection should be discarded and replaced")
+        self.assertTrue(any(t for (t, _) in task_args), "regenerated cache must re-emit venn_cache_count")
+
+    # --- idempotency of the venn_cache_count task itself ---
+
+    def test_venn_cache_count_skips_success(self):
+        """ A sibling Venn sharing the same parents can schedule a second count for an
+            already-built cache; the task must no-op rather than rebuild (which would duplicate
+            records). Uses an obsolete parent node_version so any real build would blow up. """
+        vc = VariantCollection.objects.create(name="venn-test", status=ProcessingStatus.SUCCESS)
+        venn = self._make_venn()
+        a, b = venn.ordered_parents
+        cache = VennNodeCache.objects.create(parent_a_node_version=a.node_version,
+                                             parent_b_node_version=b.node_version,
+                                             intersection_type=VennNodeCache.INTERSECTION,
+                                             variant_collection=vc)
+        venn_cache_count(cache.pk)  # must return immediately, no rebuild
+        vc.refresh_from_db()
+        self.assertEqual(vc.status, ProcessingStatus.SUCCESS)
+
+    def test_venn_cache_count_handles_missing_collection(self):
+        venn = self._make_venn()
+        a, b = venn.ordered_parents
+        cache = VennNodeCache.objects.create(parent_a_node_version=a.node_version,
+                                             parent_b_node_version=b.node_version,
+                                             intersection_type=VennNodeCache.INTERSECTION,
+                                             variant_collection=None)
+        venn_cache_count(cache.pk)  # collection is None - must return without error
+
+    def test_venn_cache_count_obsolete_cache_id(self):
+        venn_cache_count(-1)  # missing VennNodeCache - must return without error
+
+    def test_venn_cache_count_routed_to_analysis_workers(self):
+        from django.conf import settings
+        route = settings.CELERY_TASK_ROUTES.get(VENN_CACHE_COUNT_TASK)
+        self.assertEqual(route, {"queue": "analysis_workers", "routing_key": "analysis_workers"},
+                         "venn_cache_count must run on the analysis pool, not default db_workers")
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
