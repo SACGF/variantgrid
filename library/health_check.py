@@ -203,7 +203,7 @@ class HealthCheckTotalAmount(HealthCheckStat):
 
     def as_html(self):
         if self.amount:
-            amount_html = format_html("<span class='health-value'>{:,}</span>", self.amount)
+            amount_html = format_html("<span class='health-value'>{}</span>", f"{self.amount:,}")
         else:
             amount_html = format_html("{}", self.amount)
         result = format_html("{} {}", amount_html, self.name)
