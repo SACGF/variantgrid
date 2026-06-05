@@ -367,14 +367,18 @@ class DamageNodeForm(BaseNodeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["damage_predictions_min"].widget.attrs["max"] = self.instance.num_prediction_fields
-        # Columns v4 raw-score sliders driven by the per-tool table
+        # Columns v4 raw-score sliders driven by the per-tool table. data-* threshold attrs drive the
+        # calibrated ClinGen colour bands and value colouring in damagenode_editor.html (omitted when None).
         for tool in TOOLS:
             if tool.raw_field:
                 field_name = f"{tool.raw_field}_min"
                 if field_name in self.fields:
-                    self.fields[field_name].widget = HiddenInput(attrs={
-                        "min": tool.raw_min, "max": tool.raw_max, "step": tool.raw_step,
-                    })
+                    attrs = {"min": tool.raw_min, "max": tool.raw_max, "step": tool.raw_step}
+                    if tool.raw_pathogenic_threshold is not None:
+                        attrs["data-pathogenic-min"] = tool.raw_pathogenic_threshold
+                    if tool.raw_max_benign_threshold is not None:
+                        attrs["data-benign-max"] = tool.raw_max_benign_threshold
+                    self.fields[field_name].widget = HiddenInput(attrs=attrs)
 
 
 class FilterNodeForm(BaseNodeForm):

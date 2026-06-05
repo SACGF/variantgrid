@@ -215,6 +215,13 @@ class DamageNode(AnalysisNode):
         pathogenic_predictions = _COLUMNS_VERSION.get(self.columns_version, [])
         return any(pathogenic_predictions)
 
+    def has_rankscore_predictions(self) -> bool:
+        """ v4 hides rankscore sliders by default - used to auto-reveal them when one is still set. """
+        rankscore_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min,
+                            self.clinpred_rankscore_min, self.metalr_rankscore_min, self.revel_rankscore_min,
+                            self.vest4_rankscore_min, self.alphamissense_rankscore_min]
+        return any(rankscore_fields)
+
     def damage_predictions_description(self) -> str:
         return self.analysis.annotation_version.variant_annotation_version.damage_predictions_description
 

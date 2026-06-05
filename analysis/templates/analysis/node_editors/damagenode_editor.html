@@ -37,10 +37,39 @@
 	.individual-pathogenic-prediction {
 	    display: none;
 	}
+
+	/* Calibrated ClinGen PP3/BP4 cutoff bands drawn behind the raw-score slider track */
+	.cutoff-band {
+	    position: absolute;
+	    top: 0;
+	    height: 100%;
+	    z-index: 0;
+	    opacity: 0.35;
+	    pointer-events: none;
+	}
+	.cutoff-band-benign {
+	    background-color: #2c7fb8;
+	}
+	.cutoff-band-pathogenic {
+	    background-color: #d7301f;
+	}
+
+	/* Colour the chosen threshold value by which calibrated band it falls in */
+	.slider-value.in-benign {
+	    color: #2c7fb8;
+	}
+	.slider-value.in-pathogenic {
+	    color: #d7301f;
+	}
+	.slider-value.in-intermediate {
+	    color: #888;
+	}
 </style>
 <script>
+    var columnsVersion = {{ node.columns_version | jsonify }};
     var showRequiredFilter = {{ node.has_required | jsonify }};
     var hasIndividualPathogenicPredictions = {{ node.has_individual_pathogenic_predictions | jsonify }};
+    var hasRankscorePredictions = {{ node.has_rankscore_predictions | jsonify }};
 
     function toggleRequiredFilter() {
         showRequiredFilter = !showRequiredFilter;
@@ -55,13 +84,83 @@
     }
 
     function showIndividualPathogenicPredictions() {
-        $(".individual-pathogenic-prediction").show();
+        // From v4 the rankscores share this class but are split into their own legacy group, so the
+        // main toggle reveals only the non-rankscore (raw-score) rows; rankscores use showRankscores().
+        let rows = $(".individual-pathogenic-prediction");
+        if (columnsVersion >= 4) {
+            rows = rows.not(".rankscore-prediction");
+        }
+        rows.show();
         $("#show-individual-pathogenic-prediction").hide();
+    }
+
+    function showRankscores() {
+        $(".rankscore-prediction").show();
+        $("#show-rankscore-prediction").hide();
+    }
+
+    // Draw the calibrated PP3/BP4 cutoff bands behind a raw-score slider track. The thresholds come
+    // from data-pathogenic-min / data-benign-max (set in DamageNodeForm from the per-tool TOOLS table);
+    // sliders without them (rankscores, splice, cosmic) get no bands.
+    function addCutoffBands(inputSelector, sliderSelector) {
+        let sliderMin = Number(inputSelector.attr("min"));
+        let sliderMax = Number(inputSelector.attr("max"));
+        let range = sliderMax - sliderMin;
+        if (!range) {
+            return;
+        }
+        let benignMax = inputSelector.attr("data-benign-max");
+        if (typeof benignMax !== 'undefined') {
+            let pct = (Number(benignMax) - sliderMin) / range * 100;
+            $('<div class="cutoff-band cutoff-band-benign"></div>')
+                .css({left: 0, width: pct + "%"})
+                .attr("title", "BP4-supporting (benign) ≤ " + benignMax)
+                .prependTo(sliderSelector);
+        }
+        let pathMin = inputSelector.attr("data-pathogenic-min");
+        if (typeof pathMin !== 'undefined') {
+            let pct = (Number(pathMin) - sliderMin) / range * 100;
+            $('<div class="cutoff-band cutoff-band-pathogenic"></div>')
+                .css({left: pct + "%", width: (100 - pct) + "%"})
+                .attr("title", "PP3-supporting (pathogenic) ≥ " + pathMin)
+                .prependTo(sliderSelector);
+        }
+    }
+
+    // Colour the chosen threshold readout by which calibrated band it falls in. No-op for sliders
+    // that have no calibrated thresholds, so splice/cosmic/rankscore values keep their default colour.
+    function colourSliderValue(inputSelector, sliderSelector) {
+        let container = sliderSelector.parents(".slider-container");
+        let sliderValue = $(".slider-value", container);
+        sliderValue.removeClass("in-benign in-intermediate in-pathogenic");
+        let benignMax = inputSelector.attr("data-benign-max");
+        let pathMin = inputSelector.attr("data-pathogenic-min");
+        if (typeof benignMax === 'undefined' && typeof pathMin === 'undefined') {
+            return;
+        }
+        let value = inputSelector.val();
+        if (value === '') {
+            return;
+        }
+        let v = Number(value);
+        if (typeof pathMin !== 'undefined' && v >= Number(pathMin)) {
+            sliderValue.addClass("in-pathogenic");
+        } else if (typeof benignMax !== 'undefined' && v <= Number(benignMax)) {
+            sliderValue.addClass("in-benign");
+        } else {
+            sliderValue.addClass("in-intermediate");
+        }
     }
 
 
     function setupDamageNodeSlider(inputSelector, sliderSelector, enableInput) {
         setupSlider(inputSelector, sliderSelector);
+        addCutoffBands(inputSelector, sliderSelector);
+        colourSliderValue(inputSelector, sliderSelector);
+        // setupSlider's own slide handler updates inputSelector.val() first, so recolour from it here
+        sliderSelector.on("slide", function () {
+            colourSliderValue(inputSelector, sliderSelector);
+        });
         let sliderVal = inputSelector.val();
 
         if (enableInput) {
@@ -73,11 +172,13 @@
                 if ($(this).is(":checked")) {
                     sliderSelector.slider("enable");
                     frInputs.prop("disabled", false);
+                    colourSliderValue(inputSelector, sliderSelector);
                 } else {
                     setVisibleSliderValue(inputSelector, sliderSelector, "");
                     sliderSelector.slider({value: 0})
                     sliderSelector.slider("disable");
                     inputSelector.val("");
+                    colourSliderValue(inputSelector, sliderSelector);
                     frInputs.prop("disabled", true);
                 }
             });
@@ -141,6 +242,9 @@
         }
         if (hasIndividualPathogenicPredictions) {
             showIndividualPathogenicPredictions();
+        }
+        if (hasRankscorePredictions) {
+            showRankscores();
         }
     });
 </script>
@@ -222,6 +326,15 @@
                 <td></td>
                 <td></td>
             </tr>
+            {% if node.columns_version >= 4 %}
+                <tr id="show-rankscore-prediction">
+                    <td colspan="2">
+                        <a class="hover-link" href="javascript:showRankscores()">Show rankscores (legacy)</a>
+                    </td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            {% endif %}
             {% if node.columns_version == 1 %}
                 <tr class="individual-pathogenic-prediction">
                     <th>{{ form.cadd_score_min.label }}</th>
@@ -261,7 +374,7 @@
                 </tr>
             {% elif node.columns_version >= 2 %}
                 {% if node.columns_version >= 3 %}
-                    <tr class="individual-pathogenic-prediction">
+                    <tr class="individual-pathogenic-prediction rankscore-prediction">
                         <th>{{ form.alphamissense_rankscore_min.label }}</th>
                         <td>{{ form.alphamissense_rankscore_min.errors }}
                             <input id="enable-alphamissense_rankscore"  title="Enable AlphaMissense slider" class="enable-slider" type="checkbox" />
@@ -280,7 +393,7 @@
                         <td class="collapse filter-required">{{ form.alphamissense_rankscore_allow_null }}</td>
                     </tr>
                 {% endif %}
-                <tr class="individual-pathogenic-prediction">
+                <tr class="individual-pathogenic-prediction rankscore-prediction">
                     <th>{{ form.bayesdel_noaf_rankscore_min.label }}</th>
                     <td>{{ form.bayesdel_noaf_rankscore_min.errors }}
                         <input id="enable-bayesdel_noaf_rankscore"  title="Enable BayesDel slider" class="enable-slider" type="checkbox" />
@@ -298,7 +411,7 @@
                     <td class="collapse filter-required">{{ form.bayesdel_noaf_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.bayesdel_noaf_rankscore_allow_null }}</td>
                 </tr>
-                <tr class="individual-pathogenic-prediction">
+                <tr class="individual-pathogenic-prediction rankscore-prediction">
                     <th>{{ form.cadd_raw_rankscore_min.label }}</th>
                     <td>{{ form.cadd_raw_rankscore_min.errors }}
                         <input id="enable-cadd_raw_rankscore"  title="Enable CADD slider" class="enable-slider" type="checkbox" />
@@ -316,7 +429,7 @@
                     <td class="collapse filter-required">{{ form.cadd_raw_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.cadd_raw_rankscore_allow_null }}</td>
                 </tr>
-                <tr class="individual-pathogenic-prediction">
+                <tr class="individual-pathogenic-prediction rankscore-prediction">
                     <th>{{ form.clinpred_rankscore_min.label }}</th>
                     <td>{{ form.clinpred_rankscore_min.errors }}
                         <input id="enable-clinpred_rankscore"  title="Enable ClinPRed slider" class="enable-slider" type="checkbox" />
@@ -334,7 +447,7 @@
                     <td class="collapse filter-required">{{ form.clinpred_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.clinpred_rankscore_allow_null }}</td>
                 </tr>
-                <tr class="individual-pathogenic-prediction">
+                <tr class="individual-pathogenic-prediction rankscore-prediction">
                     <th>{{ form.metalr_rankscore_min.label }}</th>
                     <td>{{ form.metalr_rankscore_min.errors }}
                         <input id="enable-metalr-rankscore"  title="Enable MetaLR slider" class="enable-slider" type="checkbox" />
@@ -352,7 +465,7 @@
                     <td class="collapse filter-required">{{ form.metalr_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.metalr_rankscore_allow_null }}</td>
                 </tr>
-                <tr class="individual-pathogenic-prediction">
+                <tr class="individual-pathogenic-prediction rankscore-prediction">
                     <th>{{ form.revel_rankscore_min.label }}</th>
                     <td>{{ form.revel_rankscore_min.errors }}
                         <input id="enable-revel_rankscore"  title="Enable Revel Rankscore slider" class="enable-slider" type="checkbox" />
@@ -370,7 +483,7 @@
                     <td class="collapse filter-required">{{ form.revel_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.revel_rankscore_allow_null }}</td>
                 </tr>
-                <tr class="individual-pathogenic-prediction">
+                <tr class="individual-pathogenic-prediction rankscore-prediction">
                     <th>{{ form.vest4_rankscore_min.label }}</th>
                     <td>{{ form.vest4_rankscore_min.errors }}
                         <input id="enable-vest4_rankscore"  title="Enable VEST4 Rankscore slider" class="enable-slider" type="checkbox" />
