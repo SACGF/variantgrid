@@ -37,8 +37,16 @@
                             <tr>
                                 <th>{{ t.name }}</th>
                                 <td class="text-monospace">{{ t.raw_min }} &ndash; {{ t.raw_max }}</td>
-                                <td class="text-monospace">{{ t.raw_max_benign_threshold|default_if_none:"—" }}</td>
-                                <td class="text-monospace">{{ t.raw_pathogenic_threshold|default_if_none:"—" }}</td>
+                                <td class="text-monospace">
+                                    {% if t.raw_max_benign_threshold is not None %}
+                                        <span class="threshold threshold-low">{{ t.raw_max_benign_threshold }}</span>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td class="text-monospace">
+                                    {% if t.raw_pathogenic_threshold is not None %}
+                                        <span class="threshold threshold-high">{{ t.raw_pathogenic_threshold }}</span>
+                                    {% else %}—{% endif %}
+                                </td>
                                 <td>
                                     {% if t.source_url %}
                                         <a class="hover-link" href="{{ t.source_url }}" target="_blank" title="{{ t.source_detail }}">{{ t.source }}</a>
