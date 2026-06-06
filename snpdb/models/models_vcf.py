@@ -87,10 +87,18 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     allele_frequency_percent = models.BooleanField(default=False)  # Legacy data used AF as percent
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
+    # Set when an async archive (snpdb.tasks.vcf_archive_tasks) is queued/running but not yet
+    # finished. Cleared if the archive fails, and superseded by data_archived_date once done.
+    data_archive_started_date = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'VCF'
         verbose_name_plural = 'VCFs'
+
+    @property
+    def data_archive_in_progress(self) -> bool:
+        """ True between queueing the archive task and it completing (or failing). """
+        return self.data_archive_started_date is not None and not self.data_archived
 
     @classmethod
     def preview_icon(cls) -> str:

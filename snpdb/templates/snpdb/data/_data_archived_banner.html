@@ -1,3 +1,9 @@
+{% if obj.data_archive_in_progress %}
+<div class="alert alert-info" role="alert">
+    <strong>Archiving in progress</strong> started {{ obj.data_archive_started_date|date:"Y-m-d H:i" }}.
+    The underlying data is being dropped in the background; this may take a while.
+</div>
+{% endif %}
 {% if obj.data_archived %}
 <div class="alert alert-warning" role="alert">
     <strong>Data archived</strong> on {{ obj.data_archived_date|date:"Y-m-d" }}

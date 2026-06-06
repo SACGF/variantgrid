@@ -54,10 +54,17 @@ def _resolve_vcf_upload_path(vcf: VCF) -> Optional[str]:
 
 def vcf_can_be_archived(vcf: VCF) -> bool:
     """ True if the uploaded source file still exists on disk. """
-    if vcf.data_archived:
+    if vcf.data_archived or vcf.data_archive_in_progress:
         return False
     path = _resolve_vcf_upload_path(vcf)
     return bool(path) and os.path.exists(path)
+
+
+def mark_vcf_archive_started(vcf: VCF) -> None:
+    """ Stamp the VCF as archive-in-progress before queueing the Celery task, so an
+        immediate page reload reflects it and won't offer Archive/Restore again. """
+    vcf.data_archive_started_date = timezone.now()
+    vcf.save(update_fields=["data_archive_started_date"])
 
 
 def check_vcf_archive_precondition(vcf: VCF, force: bool = False) -> Optional[str]:

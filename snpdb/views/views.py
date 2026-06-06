@@ -62,7 +62,8 @@ from patients.forms import PatientForm
 from patients.models import Patient, Clinician
 from patients.views import get_patient_upload_csv
 from snpdb import forms
-from snpdb.archive import DataArchivedError, ArchivePreconditionError, check_vcf_archive_precondition
+from snpdb.archive import DataArchivedError, ArchivePreconditionError, check_vcf_archive_precondition, \
+    mark_vcf_archive_started
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
     UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
     OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
@@ -408,6 +409,9 @@ def archive_vcf_view(request, vcf_id):
     if vcf.data_archived:
         messages.add_message(request, messages.INFO, "VCF data is already archived.")
         return HttpResponseRedirect(vcf.get_absolute_url())
+    if vcf.data_archive_in_progress:
+        messages.add_message(request, messages.INFO, "VCF data archiving is already in progress.")
+        return HttpResponseRedirect(vcf.get_absolute_url())
     try:
         # Validate synchronously so the user gets immediate feedback, then queue the
         # slow work (zygosity walk + dropping partition data) to avoid request timeout.
@@ -416,6 +420,8 @@ def archive_vcf_view(request, vcf_id):
         messages.add_message(request, messages.ERROR, str(e))
         return HttpResponseRedirect(vcf.get_absolute_url())
 
+    # Mark in-progress (committed now) so a reload won't offer Archive again, then queue.
+    mark_vcf_archive_started(vcf)
     archive_vcf_task.delay(vcf.pk, request.user.pk, reason=reason, force=force)
     if force:
         messages.add_message(request, messages.SUCCESS,

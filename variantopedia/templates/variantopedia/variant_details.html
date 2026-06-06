@@ -946,7 +946,7 @@ function applyVariantValues() {
                                                 {% with collapse_id="annotsv-p-overlap-"|add:event %}
                                                     {% labelled label="Pathogenic"|add:" "|add:event hint="tiny" value_css="text-monospace" %}
                                                         {% if fields.source %}<strong>{{ fields.source }}</strong>{% endif %}
-                                                        {% if fields.coord %} &mdash; {{ fields.coord }}{% endif %}
+                                                        {% if fields.coord %} - {{ fields.coord }}{% endif %}
                                                         <a class='toggle-link ml-2' data-toggle="collapse" href='#{{ collapse_id }}'>Details</a>
                                                         <div id="{{ collapse_id }}" class="collapse mt-1">
                                                             <dl class="row mb-0">

@@ -2,7 +2,9 @@
     <p>
         <label>Archive data</label>
         <span>
-        {% if can_archive %}
+        {% if obj.data_archive_in_progress %}
+            <em>Archiving in progress&hellip; this runs in the background and may take a while.</em>
+        {% elif can_archive %}
             <script>
             function openArchive() { $("#archive-confirm-box").slideDown(); }
             $(document).ready(function() {
@@ -32,7 +34,7 @@
                 $("button#no-force-archive").click(function() { $("#force-archive-confirm-box").slideUp(); });
             });
             </script>
-            <em>Uploaded file doesn't exist &mdash; cannot archive normally (the data could not be re-imported).</em>
+            <em>Uploaded file doesn't exist. Cannot archive normally (the data could not be re-imported).</em>
             <br>
             <a href="javascript:openForceArchive()">Archive anyway (non-recoverable)...</a>
             <div id="force-archive-confirm-box" style="display: none">

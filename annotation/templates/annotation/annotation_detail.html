@@ -169,7 +169,7 @@ ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
                         <div class='install-instructions'>Click the button below to retrieve annotations</div>
                         {% endif %}
                         {% if cwr.disabled_url %}
-                            <span class="text-muted">Updates disabled &mdash; see <a href="{{ cwr.disabled_url }}" target="_blank">{{ cwr.disabled_url }}</a></span>
+                            <span class="text-muted">Updates disabled - see <a href="{{ cwr.disabled_url }}" target="_blank">{{ cwr.disabled_url }}</a></span>
                         {% else %}
                             <button class='load-cached-web-resource btn btn-primary mr-2' cached-web-resource='{{ cwr.name }}' >Update from web</button>
                         {% endif %}
