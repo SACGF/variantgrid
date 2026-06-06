@@ -10,10 +10,10 @@ from typing import Optional
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.utils import timezone
 
 from eventlog.models import create_event
-from library.log_utils import log_traceback
 from snpdb.models import VCF
 from snpdb.models.models_enums import ImportStatus
 from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf
@@ -60,6 +60,24 @@ def vcf_can_be_archived(vcf: VCF) -> bool:
     return bool(path) and os.path.exists(path)
 
 
+def check_vcf_archive_precondition(vcf: VCF, force: bool = False) -> Optional[str]:
+    """ Validate that the VCF can be archived (cheap - safe to call synchronously
+        from a web request before queueing the slow work).
+
+        Returns the resolved upload path if the data will be restorable, else None
+        (non-recoverable force archive). Raises ArchivePreconditionError if the
+        uploaded source file is missing and force was not requested.
+    """
+    upload_path = _resolve_vcf_upload_path(vcf)
+    restorable = bool(upload_path) and os.path.exists(upload_path)
+    if not restorable and not force:
+        raise ArchivePreconditionError(
+            "Uploaded file doesn't exist — cannot archive. "
+            "If you want to free up space you can permanently delete this VCF."
+        )
+    return upload_path if restorable else None
+
+
 def archive_vcf(vcf: VCF, user: User, reason: str = "", force: bool = False) -> None:
     """ Drop CohortGenotype data, decrement zygosity counts, stamp the mixin.
 
@@ -70,31 +88,34 @@ def archive_vcf(vcf: VCF, user: User, reason: str = "", force: bool = False) -> 
         data is dropped with no recorded restore source, so it cannot be
         restored later (non-recoverable). Used to free space for VCFs whose
         underlying files have already been deleted.
+
+        This drops partition data and walks zygosity counts, which can take a long
+        time - run it from a Celery task (see snpdb.tasks.vcf_archive_tasks) rather
+        than inside a web request.
     """
     if vcf.data_archived:
         return
-    upload_path = _resolve_vcf_upload_path(vcf)
-    restorable = bool(upload_path) and os.path.exists(upload_path)
-    if not restorable and not force:
-        raise ArchivePreconditionError(
-            "Uploaded file doesn't exist — cannot archive. "
-            "If you want to free up space you can permanently delete this VCF."
-        )
+    upload_path = check_vcf_archive_precondition(vcf, force=force)
+    restorable = upload_path is not None
 
-    try:
+    # Single transaction: if anything fails mid-flight, the whole thing rolls back to a
+    # clean un-archived state rather than leaving data partially dropped but unstamped.
+    # The "archived" stamp commits atomically with the data drop. The zygosity subtraction
+    # is intentionally inside the transaction (and not swallowed): if a later step fails,
+    # the subtraction rolls back too, so a retry can't decrement the global counts twice.
+    with transaction.atomic():
         update_all_variant_zygosity_counts_for_vcf(vcf, '-')
-    except Exception:
-        log_traceback()
 
-    logging.info("archive_vcf: dropping internal data for VCF %s (restorable=%s)", vcf.pk, restorable)
-    vcf.delete_internal_data(recreate_partitions=False)
+        logging.info("archive_vcf: dropping internal data for VCF %s (restorable=%s)", vcf.pk, restorable)
+        vcf.delete_internal_data(recreate_partitions=False)
 
-    vcf.data_archived_date = timezone.now()
-    vcf.data_archived_by = user
-    vcf.data_archive_reason = reason
-    vcf.data_restorable_from = upload_path if restorable else None
-    vcf.save()
+        vcf.data_archived_date = timezone.now()
+        vcf.data_archived_by = user
+        vcf.data_archive_reason = reason
+        vcf.data_restorable_from = upload_path if restorable else None
+        vcf.save()
 
+    # Only runs if the archive committed.
     # Refresh existing analyses so cached q-objects/node statuses reflect the archive.
     # reload_analysis_nodes (called per-analysis inside) bumps node.version → invalidates
     # the cache key and re-evaluates errors (which now include archive checks).

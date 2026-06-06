@@ -62,7 +62,7 @@ from patients.forms import PatientForm
 from patients.models import Patient, Clinician
 from patients.views import get_patient_upload_csv
 from snpdb import forms
-from snpdb.archive import DataArchivedError
+from snpdb.archive import DataArchivedError, ArchivePreconditionError, check_vcf_archive_precondition
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
     UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
     OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
@@ -84,6 +84,7 @@ from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFil
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.liftover_tasks import liftover_alleles
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
+from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from snpdb.utils import LabNotificationBuilder, get_tag_styles_and_colors
 from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
@@ -397,7 +398,6 @@ def view_vcf(request, vcf_id):
 
 
 def archive_vcf_view(request, vcf_id):
-    from snpdb.archive import archive_vcf, ArchivePreconditionError
     vcf = VCF.get_for_user(request.user, vcf_id)
     if not vcf.can_write(request.user):
         raise PermissionDenied("You do not have write permission for this VCF")
@@ -405,15 +405,23 @@ def archive_vcf_view(request, vcf_id):
         return HttpResponseRedirect(vcf.get_absolute_url())
     reason = request.POST.get("reason", "")
     force = request.POST.get("force") == "1"
+    if vcf.data_archived:
+        messages.add_message(request, messages.INFO, "VCF data is already archived.")
+        return HttpResponseRedirect(vcf.get_absolute_url())
     try:
-        archive_vcf(vcf, request.user, reason=reason, force=force)
-        if force:
-            messages.add_message(request, messages.SUCCESS,
-                                 "VCF data archived (non-recoverable — no source file to restore from).")
-        else:
-            messages.add_message(request, messages.SUCCESS, "VCF data archived.")
+        # Validate synchronously so the user gets immediate feedback, then queue the
+        # slow work (zygosity walk + dropping partition data) to avoid request timeout.
+        check_vcf_archive_precondition(vcf, force=force)
     except ArchivePreconditionError as e:
         messages.add_message(request, messages.ERROR, str(e))
+        return HttpResponseRedirect(vcf.get_absolute_url())
+
+    archive_vcf_task.delay(vcf.pk, request.user.pk, reason=reason, force=force)
+    if force:
+        messages.add_message(request, messages.SUCCESS,
+                             "VCF data archiving has been queued (non-recoverable — no source file to restore from).")
+    else:
+        messages.add_message(request, messages.SUCCESS, "VCF data archiving has been queued.")
     return HttpResponseRedirect(vcf.get_absolute_url())
 
 
