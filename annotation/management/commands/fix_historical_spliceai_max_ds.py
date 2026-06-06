@@ -7,11 +7,17 @@ from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
 
 
 class Command(BaseCommand):
-    help = "Backfill VariantAnnotation.spliceai_max_ds for every VariantAnnotationVersion partition. Idempotent."
+    help = ("Backfill VariantAnnotation.spliceai_max_ds. Idempotent. "
+            "By default only processes ACTIVE (latest/current) versions per genome build - "
+            "historical versions are archived or use the slower DamageNode fallback. "
+            "Use --all to process every partition.")
 
     def add_arguments(self, parser):
-        parser.add_argument("--vav-id", type=int,
-                            help="Only process this VariantAnnotationVersion (default: all)")
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument("--vav-id", type=int,
+                           help="Only process this VariantAnnotationVersion")
+        group.add_argument("--all", action="store_true",
+                           help="Process all versions (default: only ACTIVE/latest per genome build)")
         parser.add_argument("--skip-index", action="store_true",
                             help="Skip CREATE INDEX CONCURRENTLY step")
         parser.add_argument("--chunk-size", type=int, default=10_000,
@@ -21,6 +27,8 @@ class Command(BaseCommand):
         qs = VariantAnnotationVersion.objects.all().order_by("pk")
         if vav_id := options.get("vav_id"):
             qs = qs.filter(pk=vav_id)
+        elif not options["all"]:
+            qs = qs.filter(status=VariantAnnotationVersion.Status.ACTIVE)
 
         chunk_size = options["chunk_size"]
         for vav in qs:
