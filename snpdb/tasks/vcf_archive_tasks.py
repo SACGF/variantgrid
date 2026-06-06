@@ -24,8 +24,12 @@ def archive_vcf_task(vcf_id: int, user_id: int, reason: str = "", force: bool = 
     logging.info("archive_vcf_task: archiving VCF %s (force=%s)", vcf_id, force)
     try:
         archive_vcf(vcf, user, reason=reason, force=force)
-    except Exception:
-        # archive_vcf rolled back its transaction; clear the in-progress marker (set
-        # before queueing) so the VCF can be archived again.
-        VCF.objects.filter(pk=vcf_id).update(data_archive_started_date=None)
+    except Exception as e:
+        # archive_vcf rolled back its transaction. Clear the in-progress marker (set before
+        # queueing) and record the error so the VCF page shows the failure instead of
+        # silently reverting to looking un-archived. The VCF can be archived again (which
+        # clears the error - see mark_vcf_archive_started).
+        logging.exception("archive_vcf_task: archiving VCF %s failed", vcf_id)
+        VCF.objects.filter(pk=vcf_id).update(data_archive_started_date=None,
+                                             data_archive_error=str(e) or repr(e))
         raise

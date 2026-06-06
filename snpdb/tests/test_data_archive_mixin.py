@@ -12,8 +12,10 @@ from django.utils import timezone
 
 from annotation.models import VariantAnnotationVersion
 from genes.models import GeneCoverageCollection
-from snpdb.archive import archive_vcf, ArchivePreconditionError, DataArchivedError
+from snpdb.archive import archive_vcf, ArchivePreconditionError, DataArchivedError, mark_vcf_archive_started
 from snpdb.models import GenomeBuild, VCF
+from snpdb.models.models_zygosity_counts import VariantZygosityCountCollection, VariantZygosityCountForVCF
+from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
 
@@ -100,6 +102,55 @@ class ArchiveVCFHelperTests(TestCase):
         self.vcf.refresh_from_db()
         self.assertTrue(self.vcf.data_archived)
         self.assertIsNone(self.vcf.data_restorable_from)
+
+    def test_archive_skips_incomplete_zygosity_count(self):
+        """ An incomplete zygosity count (count_complete is None) must not abort the archive -
+            there's nothing safe to subtract, so it's skipped. """
+        collection = VariantZygosityCountCollection.objects.first()
+        self.assertIsNotNone(collection, "Expected a VariantZygosityCountCollection in test setup")
+        # count_complete=None => check_can_delete() would normally raise
+        VariantZygosityCountForVCF.objects.create(collection=collection, vcf=self.vcf, count_complete=None)
+        with patch.object(VCF, "delete_internal_data") as mock_delete:
+            archive_vcf(self.vcf, self.user, reason="incomplete count", force=True)
+        mock_delete.assert_called_once()
+        self.vcf.refresh_from_db()
+        self.assertTrue(self.vcf.data_archived)
+
+    def test_mark_archive_started_sets_in_progress_and_clears_error(self):
+        self.vcf.data_archive_error = "previous failure"
+        self.vcf.save()
+        mark_vcf_archive_started(self.vcf)
+        self.vcf.refresh_from_db()
+        self.assertTrue(self.vcf.data_archive_in_progress)
+        self.assertFalse(self.vcf.data_archive_failed)
+        self.assertIsNone(self.vcf.data_archive_error)
+
+    def test_archive_task_failure_records_error(self):
+        """ A failing archive clears the in-progress marker but records the error so the
+            VCF page surfaces the failure instead of looking un-archived. """
+        mark_vcf_archive_started(self.vcf)
+        with patch("snpdb.tasks.vcf_archive_tasks.archive_vcf", side_effect=RuntimeError("boom")):
+            with self.assertRaises(RuntimeError):
+                archive_vcf_task(self.vcf.pk, self.user.pk)
+        self.vcf.refresh_from_db()
+        self.assertFalse(self.vcf.data_archived)
+        self.assertFalse(self.vcf.data_archive_in_progress)
+        self.assertTrue(self.vcf.data_archive_failed)
+        self.assertIn("boom", self.vcf.data_archive_error)
+
+    def test_successful_archive_clears_in_progress_marker(self):
+        """ Completing the archive clears started_date so a later restore (which clears
+            data_archived_date) doesn't falsely report 'in progress'. """
+        mark_vcf_archive_started(self.vcf)
+        with patch.object(VCF, "delete_internal_data"):
+            archive_vcf(self.vcf, self.user, reason="done", force=True)
+        self.vcf.refresh_from_db()
+        self.assertTrue(self.vcf.data_archived)
+        self.assertIsNone(self.vcf.data_archive_started_date)
+        self.assertFalse(self.vcf.data_archive_in_progress)
+        # Simulate restore clearing the archived stamp
+        self.vcf.data_archived_date = None
+        self.assertFalse(self.vcf.data_archive_in_progress)
 
     def test_filter_for_user_include_archived_default(self):
         """ Default include_archived=True keeps archived VCFs visible. """

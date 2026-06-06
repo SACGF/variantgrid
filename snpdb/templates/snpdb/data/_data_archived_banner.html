@@ -4,6 +4,13 @@
     The underlying data is being dropped in the background; this may take a while.
 </div>
 {% endif %}
+{% if obj.data_archive_failed %}
+<div class="alert alert-danger" role="alert">
+    <strong>Archiving failed.</strong> The data was not archived (the operation rolled back).
+    {% if has_write_permission %}You can try again using the Archive action below.{% endif %}
+    <pre class="mb-0 mt-2">{{ obj.data_archive_error }}</pre>
+</div>
+{% endif %}
 {% if obj.data_archived %}
 <div class="alert alert-warning" role="alert">
     <strong>Data archived</strong> on {{ obj.data_archived_date|date:"Y-m-d" }}

@@ -95,15 +95,20 @@ def _get_update_sql_and_params(collection: VariantZygosityCountCollection, vcf: 
     return sql, []
 
 
-def update_all_variant_zygosity_counts_for_vcf(vcf: VCF, operation):
-    """ This should run only once - as it could cause deadlocks if running simultaneously """
+def update_all_variant_zygosity_counts_for_vcf(vcf: VCF, operation, skip_if_cannot_delete=False):
+    """ This should run only once - as it could cause deadlocks if running simultaneously
+
+        skip_if_cannot_delete: for a '-' operation, skip (with a warning) instead of raising
+        when the count can't be subtracted (never completed, or already deleted). Used by the
+        archive flow so an incomplete/old count doesn't abort the whole archive. """
 
     for collection in VariantZygosityCountCollection.objects.all():
-        update_variant_zygosity_count_for_vcf(collection, vcf, operation)
+        update_variant_zygosity_count_for_vcf(collection, vcf, operation,
+                                              skip_if_cannot_delete=skip_if_cannot_delete)
 
 
 def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollection, vcf: VCF, operation,
-                                          manual_override=False):
+                                          manual_override=False, skip_if_cannot_delete=False):
     UPDATE_VARIANT_ZYG_COUNT_EVENT = 'update_variant_zygosity_count_for_vcf'
 
     try:
@@ -139,7 +144,15 @@ def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollec
                                 vcf.pk, vcf.get_import_status_display())
                 return  # no need to do anything
 
-            vzcv.check_can_delete()
+            if skip_if_cannot_delete:
+                try:
+                    vzcv.check_can_delete()
+                except ValueError as e:
+                    logging.warning("VCF pk=%d collection=%s: skipping zygosity count subtraction: %s",
+                                    vcf.pk, collection.name, e)
+                    return
+            else:
+                vzcv.check_can_delete()
 
         use_cohort_genotype_collection = vzcv and not vzcv.is_split_to_sample_counts
         if use_cohort_genotype_collection:

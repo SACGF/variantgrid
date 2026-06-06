@@ -87,9 +87,14 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     allele_frequency_percent = models.BooleanField(default=False)  # Legacy data used AF as percent
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
-    # Set when an async archive (snpdb.tasks.vcf_archive_tasks) is queued/running but not yet
-    # finished. Cleared if the archive fails, and superseded by data_archived_date once done.
+    # Set when an async archive (snpdb.tasks.vcf_archive_tasks) is queued/running. Cleared
+    # in both terminal states: on success data_archived_date is stamped, on failure
+    # data_archive_error is stamped (so a failed archive stays visible instead of the page
+    # silently reverting to looking un-archived).
     data_archive_started_date = models.DateTimeField(null=True, blank=True)
+    # Set if the async archive task raised; holds the error message. Cleared when a fresh
+    # archive is queued (mark_vcf_archive_started) or once successfully archived.
+    data_archive_error = models.TextField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'VCF'
@@ -97,8 +102,13 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
 
     @property
     def data_archive_in_progress(self) -> bool:
-        """ True between queueing the archive task and it completing (or failing). """
+        """ True between queueing the archive task and it reaching a terminal state. """
         return self.data_archive_started_date is not None and not self.data_archived
+
+    @property
+    def data_archive_failed(self) -> bool:
+        """ True when the last archive attempt errored and the VCF is still un-archived. """
+        return bool(self.data_archive_error) and not self.data_archived
 
     @classmethod
     def preview_icon(cls) -> str:

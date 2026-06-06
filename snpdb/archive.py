@@ -62,9 +62,11 @@ def vcf_can_be_archived(vcf: VCF) -> bool:
 
 def mark_vcf_archive_started(vcf: VCF) -> None:
     """ Stamp the VCF as archive-in-progress before queueing the Celery task, so an
-        immediate page reload reflects it and won't offer Archive/Restore again. """
+        immediate page reload reflects it and won't offer Archive/Restore again. Clears
+        any error from a previous failed attempt (this is a fresh try). """
     vcf.data_archive_started_date = timezone.now()
-    vcf.save(update_fields=["data_archive_started_date"])
+    vcf.data_archive_error = None
+    vcf.save(update_fields=["data_archive_started_date", "data_archive_error"])
 
 
 def check_vcf_archive_precondition(vcf: VCF, force: bool = False) -> Optional[str]:
@@ -111,7 +113,10 @@ def archive_vcf(vcf: VCF, user: User, reason: str = "", force: bool = False) -> 
     # is intentionally inside the transaction (and not swallowed): if a later step fails,
     # the subtraction rolls back too, so a retry can't decrement the global counts twice.
     with transaction.atomic():
-        update_all_variant_zygosity_counts_for_vcf(vcf, '-')
+        # skip_if_cannot_delete: an old/incomplete VCF may have a zygosity count that never
+        # completed (count_complete is None) or was already subtracted - there's nothing safe
+        # to subtract, so skip it with a warning rather than aborting the whole archive.
+        update_all_variant_zygosity_counts_for_vcf(vcf, '-', skip_if_cannot_delete=True)
 
         logging.info("archive_vcf: dropping internal data for VCF %s (restorable=%s)", vcf.pk, restorable)
         vcf.delete_internal_data(recreate_partitions=False)
@@ -120,6 +125,11 @@ def archive_vcf(vcf: VCF, user: User, reason: str = "", force: bool = False) -> 
         vcf.data_archived_by = user
         vcf.data_archive_reason = reason
         vcf.data_restorable_from = upload_path if restorable else None
+        # Clear the in-progress marker now we've reached a terminal state - data_archived_date
+        # is the source of truth. Also avoids a stale started_date making a later restore
+        # (which clears data_archived_date) look like an archive is in progress.
+        vcf.data_archive_started_date = None
+        vcf.data_archive_error = None
         vcf.save()
 
     # Only runs if the archive committed.
