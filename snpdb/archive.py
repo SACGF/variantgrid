@@ -60,16 +60,22 @@ def vcf_can_be_archived(vcf: VCF) -> bool:
     return bool(path) and os.path.exists(path)
 
 
-def archive_vcf(vcf: VCF, user: User, reason: str = "") -> None:
+def archive_vcf(vcf: VCF, user: User, reason: str = "", force: bool = False) -> None:
     """ Drop CohortGenotype data, decrement zygosity counts, stamp the mixin.
 
         Keeps the VCF row, samples, and cohort intact. Sub-cohorts of this VCF
         will see DataArchivedError next time they hit cohort_genotype_collection.
+
+        force=True archives even when the uploaded source file is missing. The
+        data is dropped with no recorded restore source, so it cannot be
+        restored later (non-recoverable). Used to free space for VCFs whose
+        underlying files have already been deleted.
     """
     if vcf.data_archived:
         return
     upload_path = _resolve_vcf_upload_path(vcf)
-    if not upload_path or not os.path.exists(upload_path):
+    restorable = bool(upload_path) and os.path.exists(upload_path)
+    if not restorable and not force:
         raise ArchivePreconditionError(
             "Uploaded file doesn't exist — cannot archive. "
             "If you want to free up space you can permanently delete this VCF."
@@ -80,13 +86,13 @@ def archive_vcf(vcf: VCF, user: User, reason: str = "") -> None:
     except Exception:
         log_traceback()
 
-    logging.info("archive_vcf: dropping internal data for VCF %s", vcf.pk)
+    logging.info("archive_vcf: dropping internal data for VCF %s (restorable=%s)", vcf.pk, restorable)
     vcf.delete_internal_data(recreate_partitions=False)
 
     vcf.data_archived_date = timezone.now()
     vcf.data_archived_by = user
     vcf.data_archive_reason = reason
-    vcf.data_restorable_from = upload_path
+    vcf.data_restorable_from = upload_path if restorable else None
     vcf.save()
 
     # Refresh existing analyses so cached q-objects/node statuses reflect the archive.
@@ -96,7 +102,7 @@ def archive_vcf(vcf: VCF, user: User, reason: str = "") -> None:
     reload_auto_analyses_for_vcf.delay(vcf.pk)
 
     create_event(user, "vcf_archived",
-                 details=f"vcf_id={vcf.pk} name={vcf.name!r} restorable_from={upload_path!r} reason={reason!r}")
+                 details=f"vcf_id={vcf.pk} name={vcf.name!r} restorable_from={vcf.data_restorable_from!r} reason={reason!r}")
 
 
 def restore_vcf(vcf: VCF, user: User):

@@ -92,6 +92,15 @@ class ArchiveVCFHelperTests(TestCase):
         with self.assertRaises(ArchivePreconditionError):
             archive_vcf(self.vcf, self.user, reason="no source")
 
+    def test_force_archive_when_uploaded_file_missing(self):
+        """ force=True archives non-recoverably (drops data, records no restore source). """
+        with patch.object(VCF, "delete_internal_data") as mock_delete:
+            archive_vcf(self.vcf, self.user, reason="files already deleted", force=True)
+        mock_delete.assert_called_once()
+        self.vcf.refresh_from_db()
+        self.assertTrue(self.vcf.data_archived)
+        self.assertIsNone(self.vcf.data_restorable_from)
+
     def test_filter_for_user_include_archived_default(self):
         """ Default include_archived=True keeps archived VCFs visible. """
         self.vcf.data_archived_date = timezone.now()

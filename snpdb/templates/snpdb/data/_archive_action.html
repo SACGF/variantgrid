@@ -26,8 +26,34 @@
                 </form>
             </div>
         {% else %}
-            <em>Uploaded file doesn't exist &mdash; cannot archive.
-            If you want to free up space you can permanently delete this object via the existing delete flow.</em>
+            <script>
+            function openForceArchive() { $("#force-archive-confirm-box").slideDown(); }
+            $(document).ready(function() {
+                $("button#no-force-archive").click(function() { $("#force-archive-confirm-box").slideUp(); });
+            });
+            </script>
+            <em>Uploaded file doesn't exist &mdash; cannot archive normally (the data could not be re-imported).</em>
+            <br>
+            <a href="javascript:openForceArchive()">Archive anyway (non-recoverable)...</a>
+            <div id="force-archive-confirm-box" style="display: none">
+                <form method="post" action="{% url archive_url_name obj.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="force" value="1">
+                    <div class="alert alert-danger mt-2">
+                        <strong>Warning:</strong> the uploaded source file no longer exists, so the underlying data
+                        <strong>cannot be restored</strong> after this. This permanently drops the data and keeps only
+                        the VCF metadata. If you'd rather remove the VCF entirely, use the existing delete flow instead.
+                    </div>
+                    <div class="form-group">
+                        <label for="force-archive-reason">Reason</label>
+                        <textarea id="force-archive-reason" name="reason" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="btn-toolbar">
+                        <button type="submit" class="btn btn-danger">Archive data (non-recoverable)</button>
+                        <button id="no-force-archive" type="button" class="btn btn-secondary">Cancel</button>
+                    </div>
+                </form>
+            </div>
         {% endif %}
         </span>
     </p>

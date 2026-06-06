@@ -404,9 +404,14 @@ def archive_vcf_view(request, vcf_id):
     if request.method != "POST":
         return HttpResponseRedirect(vcf.get_absolute_url())
     reason = request.POST.get("reason", "")
+    force = request.POST.get("force") == "1"
     try:
-        archive_vcf(vcf, request.user, reason=reason)
-        messages.add_message(request, messages.SUCCESS, "VCF data archived.")
+        archive_vcf(vcf, request.user, reason=reason, force=force)
+        if force:
+            messages.add_message(request, messages.SUCCESS,
+                                 "VCF data archived (non-recoverable — no source file to restore from).")
+        else:
+            messages.add_message(request, messages.SUCCESS, "VCF data archived.")
     except ArchivePreconditionError as e:
         messages.add_message(request, messages.ERROR, str(e))
     return HttpResponseRedirect(vcf.get_absolute_url())
