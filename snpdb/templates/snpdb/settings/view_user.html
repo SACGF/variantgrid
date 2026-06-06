@@ -1,5 +1,6 @@
 {% extends menu_settings_base %}
 {% load ui_utils %}
+{% load js_tags %}
 {% load user_tags %}
 {% block title %}{{ other_user }} user page.{% endblock %}
 
@@ -11,6 +12,7 @@
                 {% labelled label="User" %}{% user other_user %}{% endlabelled %}
                 {% labelled label="Email" %}{{ other_user.email }}{% endlabelled %}
                 {% labelled label="Phone: #" %}{{ user_contact.phone_number }}{% endlabelled %}
+                {% labelled label="Last Login" admin_only=True %}{% if other_user.last_login %}{% timestamp other_user.last_login time_ago=True %}{% else %}Never logged in{% endif %}{% endlabelled %}
             </div>
             <div class="card-footer link-toolbar">
                 {% if inbox_enabled %}
