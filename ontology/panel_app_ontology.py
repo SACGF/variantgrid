@@ -1,4 +1,5 @@
 import re
+import urllib.parse
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
@@ -113,7 +114,8 @@ def _update_gene_relations(gene_symbol: str,
     # note that we only check PanelApp here, as other imports are done by file
     try:
         hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
-        filename = panel_app.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + gene_symbol
+        panel_app = PanelAppServer.australia_instance()
+        filename = panel_app.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + urllib.parse.quote(gene_symbol, safe="")
         ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol),
                                            import_source=OntologyImportSource.PANEL_APP_AU,
                                            processor_version=PANEL_APP_API_PROCESSOR_VERSION,
