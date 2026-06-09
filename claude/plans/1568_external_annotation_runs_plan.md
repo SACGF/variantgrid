@@ -50,7 +50,7 @@ Issue checklist, restated:
 
 **Decided (this plan):** run identity keys on **variant coordinates + annotation-version
 identity** (genome build, VEP version, columns_version, consortium, gene-annotation release), and the
-hard guarantee comes from the §6a per-record variant-id-alignment check.
+hard guarantee comes from the §6a min/max endpoint variant-id-alignment check.
 
 ---
 
@@ -89,14 +89,27 @@ identical PKs, so for runs the operator chooses (those predating any divergence)
    header encodes these and `vep_check_annotated_file_version_match()` already enforces it; the sidecar
    meta records them too.
 2. **Run/range** — match the file to a local `AnnotationRun` of the right `pipeline_type` in
-   `EXTERNAL_DUMP_COMPLETED`. On a clone the meta's `annotation_run_pk` is the primary handle; the
-   variant-coordinate range of `min_variant`/`max_variant` (string repr, build-relative) is the
-   cross-check.
+   `EXTERNAL_DUMP_COMPLETED` by an **exact** match on the `min_variant`/`max_variant` coordinate strings
+   (build-relative string repr). `annotation_run_pk` is **not** a cross-DB handle — it is created
+   independently on each DB during its own upgrade (`_handle_range_lock` `get_or_create` at scheduling
+   time) and may differ between a DB and its clone (e.g. if VEP-115 GRCh37/GRCh38 versions were created
+   in a different order on each machine). It is retained in the sidecar only for human/debug and the
+   same-DB convenience path.
 
-Neither of those *proves* the variant ids line up — divergence (new variants imported, range-lock
-subdivision after a crash; `annotation_scheduler_task.py`) can break alignment without changing the
-version. That guarantee is the job of the **§6a per-record variant-id-alignment check**, which is the
-real safety net and is always run before import.
+   Exact-boundary matching is sound because range locks are **deterministic**:
+   `get_annotation_range_lock_and_unannotated_count` (`annotation_versions.py:84`) walks variants
+   strictly in ascending `Variant.pk` order, sized by `ANNOTATION_VEP_BATCH_MIN/MAX`. Given identical
+   variant ids (true up to the split point on a clone) **and identical batch settings**, both DBs
+   produce byte-identical `[min,max]` boundaries. Past the split they diverge; those files match no
+   local run (or fail §6a) and are rejected. **Consequence:** the external dump must use the target's
+   `ANNOTATION_VEP_BATCH_MIN/MAX` — external compute parallelism comes from forks/concurrency across
+   runs, never from larger range locks (which would shift every boundary and break matching). The batch
+   min/max in force at dump time are recorded in the sidecar meta (§4.1) as a cross-check.
+
+Neither identity nor boundary match *proves* the variant ids line up — divergence (new variants
+imported, range-lock subdivision after a crash; `annotation_scheduler_task.py`) can break alignment
+without changing the version. That guarantee is the job of the **§6a min/max endpoint variant-id-alignment
+check**, which is the real safety net and is always run before import.
 
 ---
 
@@ -136,6 +149,10 @@ the dump at dump time (`dump_{stem}.meta.json`):
     "max_variant": "22:998877 T>C",
     "count": 24000
   },
+  "batch": {
+    "annotation_vep_batch_min": 1000,
+    "annotation_vep_batch_max": 50000
+  },
   "dump_count": 24000
 }
 ```
@@ -143,7 +160,8 @@ the dump at dump time (`dump_{stem}.meta.json`):
 The `variant_annotation_version` block is the existing version-identity fields (reuse the same
 kwargs that `vep_dict_to_variant_annotation_version_kwargs()` builds). The `range` strings are the
 `Variant` string repr — this is the issue's requested "variant string representation … as a sanity
-check."
+check." The `batch` block records the `ANNOTATION_VEP_BATCH_MIN/MAX` in force at dump time; import
+warns loudly if the target's batch settings differ (boundaries would not line up — see §3).
 
 Add helpers on `AnnotationRun`: `get_dump_metadata() -> dict`, `write_dump_metadata()`, and a
 classmethod `parse_dump_metadata(path)`.
@@ -158,10 +176,22 @@ manage.py annotation_external --dump   --genome-build GRCh38 [--pipeline-type S]
 manage.py annotation_external --import --genome-build GRCh38 --input-dir DIR [--dry-run]
 ```
 
+**Runs against a `NEW` (not yet `ACTIVE`) `VariantAnnotationVersion`.** This is how the scheduler race
+is avoided without a global flag: the normal `annotation_scheduler` only ever operates on the latest
+`ACTIVE` version (`AnnotationVersion.latest(..., status=ACTIVE)`, `annotation_scheduler_task.py:38`), so
+it will not touch a `NEW` version's range locks. The operator creates the new version in `NEW`, runs
+the external dump/import against it, and only promotes it to `ACTIVE` once finished. (`AnnotationRun.external`
+in §4.2 is still set as a belt-and-braces guard, but the `NEW`-status separation is the primary
+mechanism.)
+
 **`--dump` mode:**
-- Selects the `AnnotationRun`s to externally annotate for the given build/version/pipeline_type
-  (those not yet finished; create range locks + runs the same way the scheduler does if they don't
-  exist yet — reuse `annotation_scheduler_task` helpers).
+- **Creates and dumps everything** for the chosen `NEW` build/version: walks the whole unannotated set
+  creating all range locks + `AnnotationRun`s up front (reuse `annotation_scheduler_task` /
+  `get_annotation_range_lock_and_unannotated_count` helpers, with the target's
+  `ANNOTATION_VEP_BATCH_MIN/MAX` — §3), rather than waiting for the scheduler to drip them out.
+- **v1 scope: `STANDARD` (small variant) `pipeline_type` only.** Structural-variant runs are left to
+  the normal in-VM pipeline — there are few SV variants so they annotate quickly and don't need external
+  compute. `--pipeline-type` defaults to `S`; AnnotSV/SV Snakemake (§4.3, §7-Q2) is deferred.
 - For each run: write the dump VCF (reuse `_unannotated_variants_to_vcf()` / `write_qs_to_vcf()`),
   write the sidecar `.meta.json` (§4.1), set `external=True` and **stop before VEP** → status
   `EXTERNAL_DUMP_COMPLETED`.
@@ -192,8 +222,9 @@ The `--dump` run also writes, into `--output-dir` (the operator copies this whol
   the dump dir, output dir, fork count, buffer sizes,
 - a `Snakefile` whose rule body is the real VEP command, built from `get_vep_command()` with
   `{input}`/`{output}` substituted and every server path read from `config.yaml` (so the compute box
-  can have different VEP install paths than the VM). One rule per `pipeline_type`; SV runs also need
-  the AnnotSV step (`run_annotsv`, `annotsv_annotation.py:36`) — second rule, or VEP-only first (§7).
+  can have different VEP install paths than the VM). **v1: a single VEP rule for `STANDARD` runs only.**
+  SV/AnnotSV (`run_annotsv`, `annotsv_annotation.py:36`) is out of scope for v1 — SV variants are few
+  and annotate quickly in the normal in-VM pipeline (§7-Q2).
 
 The Snakefile discovers work by globbing `*.meta.json` so it is self-contained on the compute box.
 Reusing `get_vep_command()` verbatim keeps the external run byte-identical to the in-VM run (and the
@@ -210,10 +241,12 @@ For each annotated VCF:
 2. **Match to a local `AnnotationRun`** (this DB) — clone, so ids should align:
    - Find the local `VariantAnnotationVersion` whose identity equals the meta's
      (build/consortium/vep/columns_version/gene_annotation_release/data versions).
-   - Find the local `AnnotationRun`(s) of the right `pipeline_type`, in `EXTERNAL_DUMP_COMPLETED`,
-     whose range matches the file (the meta's `annotation_run_pk` is the primary key on a clone; the
-     coordinate range is the cross-check).
-3. **Run the §6a variant-id-alignment check (always on).** Abort the whole import on any mismatch.
+   - Find the local `AnnotationRun` of the right `pipeline_type` in `EXTERNAL_DUMP_COMPLETED` whose
+     `min_variant`/`max_variant` coordinate strings **exactly equal** the meta's range (§3). This is
+     the matching key — **not** `annotation_run_pk`, which differs between DBs. Warn if the meta's
+     `batch` block differs from the local `ANNOTATION_VEP_BATCH_MIN/MAX` (boundaries would not line up).
+3. **Run the §6a min/max endpoint check (always on).** On mismatch, mark **only that run** `ERROR` and
+   continue with the next file (per-run failure, not whole-import abort — §6a).
 4. For each verified run: set `vcf_annotated_filename` (copy/symlink into `ANNOTATION_VCF_DUMP_DIR`) and
    call the existing **upload-only** path (`annotation_run_retry(upload_only=True)` /
    `import_vcf_annotations()`), which already runs `vep_check_annotated_file_version_match()` and sets
@@ -264,68 +297,65 @@ origin-DB `variant_id` safe.
 
 ---
 
-## 6a. Variant-ID alignment safety check (the hard fail)
+## 6a. Variant-ID alignment safety check (min/max endpoints)
 
 **Operator strategy (decided):** the `variant_id` baked into a dump's INFO is the *origin* DB's
-`Variant.id`. Rather than re-resolving variants by coordinate, the operator will **manually copy
-back only the annotated files whose ID range predates the test/prod divergence (the "split")**, where
-origin PKs still line up 1:1 with the target DB. The job of VariantGrid is to **fail loudly and
-automatically if the operator gets this wrong** — never silently import misaligned annotation.
+`Variant.id`. The operator **manually copies back only the annotated files whose ID range predates the
+test/prod divergence (the "split")**, where origin PKs still line up 1:1 with the target DB. VG's job is
+to **detect and fail any run where the operator got this wrong** — never silently import misaligned
+annotation.
 
-This is cheap and bulletproof because every annotated VCF record already carries *both* identifiers:
+**Check (decided): min/max endpoints, not every record.** A run's range lock is a contiguous block of
+`Variant.pk` (`min_variant_id`..`max_variant_id`), and range locks are deterministic in PK order + batch
+size (§3). So if both endpoints align, the interior does too — a full per-record stream is unnecessary.
+For the matched local `AnnotationRun`, verify that the **local** `Variant` at the range lock's
+`min_variant_id` and `max_variant_id` has a coordinate equal to the meta's recorded `range.min_variant` /
+`range.max_variant` coordinate strings. A local `Variant` exposes its coordinate via `Variant.coordinate`
+(`snpdb/models/models_variant.py:660`). On a pre-split clone both endpoints resolve to the recorded
+coordinates → pass. A post-split file (or a file from the wrong DB) shifts at least one endpoint PK to a
+different/missing coordinate → that run fails.
 
-- `variant_id = v.INFO["variant_id"]` — the origin DB's `Variant.id`
-  (`bulk_vep_vcf_annotation_inserter.py:715`)
-- the true coordinate `CHROM/POS/REF/ALT(/SVLEN)` of that record (`:708`)
+**Per-run failure, not whole-import abort.** When the endpoint check (or matching) fails for a run, mark
+**only that run** failed (`ERROR`, with an actionable message) and **continue importing the rest**. The
+expectation is almost everything imports cleanly; if one is wrong it dies on its own and the operator
+re-runs that single annotation normally. No `--allow-id-mismatch` escape hatch — a failed run just falls
+back to a normal VEP run.
 
-and a local `Variant` exposes its coordinate via `Variant.coordinate`
-(`snpdb/models/models_variant.py:660`).
-
-**Check:** for every record, the **local** `Variant` whose `pk == variant_id` must have a coordinate
-equal to the record's coordinate. On a pre-split clone all PKs align → every row matches → pass. If a
-post-split file (or a file from the wrong DB) is supplied, at least one PK maps to a different (or
-missing) local variant → **fail before any rows are inserted**.
-
-**Implementation — `verify_annotated_vcf_variant_ids(annotation_run)`** (new, in
+**Implementation — `verify_annotated_vcf_variant_ids(annotation_run, meta)`** (new, in
 `annotation/external_annotation.py`), run as a **pre-flight in the import command before
-`import_vcf_annotations()`**:
+`import_vcf_annotations()`** for each matched run:
 
-1. Stream the annotated VCF with cyvcf2, reading only `INFO["variant_id"]` and raw
-   `CHROM/POS/REF/ALT/SVLEN` (skip CSQ/HGVS work — fast).
-2. In batches (`SQL_BATCH_INSERT_SIZE`): `Variant.objects.filter(pk__in=ids).values("id",
-   "locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "svlen")` → compare each
-   to the file's raw coordinate.
-3. Fail on the **first** mismatch or missing id with an actionable message, e.g.:
-   `"AnnotationRun N: variant_id 12345 in <file> is 1:999 G>A but local variant 12345 is 7:42 T>C —
-   this annotated VCF was produced against a different/diverged database (id past the split?). Aborting,
-   no data imported."`
-4. Count must also reconcile (rows verified == expected non-skipped count) so a truncated file is caught.
+1. Look up the local `Variant` at `annotation_run.annotation_range_lock.min_variant_id` and
+   `max_variant_id`; compute each coordinate string the same way the dump/meta wrote it.
+2. Compare to the meta's `range.min_variant` / `range.max_variant` strings.
+3. On mismatch (or missing variant): mark this run `ERROR` with an actionable message, e.g.
+   `"AnnotationRun N: range max local variant 12345 is 7:42 T>C but annotated file recorded 1:999 G>A —
+   produced against a different/diverged database (id past the split?). Skipping this run; re-run it
+   normally."`, and move on to the next file.
 
 Notes:
-- Compare on **raw** stored fields (pre-`as_external_explicit`) so the check matches exactly how the
-  dump wrote them; prove exact round-trip on a same-DB dump in tests first, including the reference-alt
-  special value and symbolic/SV representation.
+- Compute the coordinate string with the **same** repr the dump/meta used (the `Variant` string repr per
+  §4.1), so the endpoint comparison is exact; prove this round-trips on a same-DB dump in tests first.
 - This stacks with the existing `vep_check_annotated_file_version_match()` (which guards *version*
-  identity from the `##VEP=` header) — together they reject both "wrong version" and "wrong/diverged DB".
-- Pre-flight (separate read pass) is preferred over inline-during-insert so we fail **before** writing
-  any partial data; it's an extra cheap read (no HGVS/insert work) vs. a per-batch PK-IN query.
-- Always on for the external-import command (not opt-in). Offer `--allow-id-mismatch` only as an
-  explicit, loudly-logged escape hatch if ever needed; default is hard fail.
+  identity from the `##VEP=` header) — together they reject "wrong version" and "wrong/diverged DB".
+- Pre-flight (before `import_vcf_annotations()`) so a bad run is skipped before any rows are inserted.
 
 ---
 
 ## 7. Open questions / risks (resolve before coding)
 
-1. **Range non-alignment under subdivision.** A test file's `[min,max]` may partially overlap a
-   prod run's range. Decide: only reuse on full containment (skip partial → normal VEP), or support
-   splitting an annotated file across runs. v1: full-containment only, log skips loudly
-   ("no silent caps"). The §6a per-row id-alignment check makes this safe regardless — a partially
-   overlapping file imported by mistake fails on the first divergent id.
-2. **SV pipeline / AnnotSV** in the external workflow — include in v1 or document as VEP-only first?
-3. **Security/trust** — importing externally-produced VCFs runs the existing version checks plus the
-   §6a id-alignment check; confirm that is sufficient (validates VEP/data versions + variant identity,
-   not human provenance).
-4. **Cleanup** — kept annotated VCFs accumulate; add retention guidance / a prune command later.
+1. **Range non-alignment — RESOLVED.** Matching is an **exact** `min_variant`/`max_variant` coordinate
+   equality (§3), not containment. Range locks are deterministic in `Variant.pk` order + batch size, so
+   a clone produces identical boundaries up to the split; a file that does not exactly match any local
+   `EXTERNAL_DUMP_COMPLETED` run is skipped (logged loudly, falls back to normal VEP). No partial-overlap
+   / file-splitting logic in v1. The §6a min/max endpoint check backs this up regardless.
+2. **SV pipeline / AnnotSV — RESOLVED.** v1 is `STANDARD` (small variant) only; SV stays on the normal
+   in-VM pipeline (few variants, fast). AnnotSV Snakemake rule deferred to a later iteration.
+3. **Security/trust — RESOLVED.** Whoever runs the management command is trusted; the version + §6a
+   endpoint checks guard against wrong-version/diverged-DB mistakes, which is sufficient. No provenance
+   verification needed.
+4. **Cleanup — RESOLVED (out of scope).** The operator manages the kept annotated VCFs manually; no
+   retention policy or prune command in VG.
 
 ---
 
@@ -335,9 +365,10 @@ Notes:
 2. `EXTERNAL_DUMP_COMPLETED` state + `AnnotationRun.external` field + scheduler/`annotate_variants` skip
    external runs (+ migration).
 3. `annotation_external --dump`: select runs, write VCF + meta, park in `EXTERNAL_DUMP_COMPLETED`.
-4. **`verify_annotated_vcf_variant_ids()` id-alignment check (§6a) + tests** — the safety net the whole
-   manual-copy workflow relies on. Prove it passes on a same-DB dump and fails on a deliberately
-   misaligned one.
-5. `annotation_external --import`: same-DB round-trip — §6a pre-flight → existing upload-only path.
+4. **`verify_annotated_vcf_variant_ids()` min/max endpoint check (§6a) + tests** — the safety net the
+   manual-copy workflow relies on. Prove it passes on a same-DB dump (endpoints round-trip) and fails on
+   a deliberately misaligned one, marking only that run `ERROR`.
+5. `annotation_external --import`: same-DB round-trip — §6a pre-flight → existing upload-only path;
+   per-run failure leaves other runs unaffected.
 6. Snakemake bundle emission inside `--dump`.
 7. Clone-reuse (prod) scenario end-to-end, with the §6a check guarding every import.
