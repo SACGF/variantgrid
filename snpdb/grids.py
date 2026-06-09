@@ -4,7 +4,7 @@ from typing import Optional, Any
 
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import F, QuerySet, Value, Func
+from django.db.models import F, IntegerField, OuterRef, QuerySet, Subquery, Value, Func
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import CharField, TextField
 from django.db.models.query_utils import Q
@@ -21,7 +21,7 @@ from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age, JsonDataType
 from ontology.models import OntologyService
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
-from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
+from snpdb.models import VCF, Cohort, CohortGenotypeStats, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, Quad, UserGridConfig, GenomeBuild, ClinGenAllele, \
     VariantZygosityCountCollection, TagColorsCollection, LiftoverRun, AlleleConversionTool, AlleleLiftover, \
     ProcessingStatus, Allele
@@ -34,7 +34,8 @@ from uicore.templatetags.js_tags import jsonify_for_js
 class VCFListGrid(JqGridUserRowConfig):
     model = VCF
     caption = 'VCFs'
-    fields = ["id", "name", "vcf_url", "date", "import_status", "genome_build__name", "user__username", "source",
+    fields = ["id", "name", "vcf_url", "date", "import_status", "data_archived_date", "genome_build__name",
+              "user__username", "source",
               "uploadedvcf__uploaded_file__import_source", "genotype_samples", "project__name", "cohort__import_status",
               "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
     colmodel_overrides = {
@@ -46,6 +47,7 @@ class VCFListGrid(JqGridUserRowConfig):
                                       "url_object_column": "id"}},
         "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},
         'import_status': {'formatter': 'viewImportStatus'},
+        'data_archived_date': {'label': 'Archived'},
         "genome_build__name": {"label": "Genome Build"},
         'user__username': {'label': 'Uploaded by', 'width': 60},
         'source': {'label': 'VCF source'},
@@ -101,7 +103,7 @@ class SamplesListGrid(JqGridUserRowConfig):
               "sample_gene_list_count", "activesamplegenelist__id",
               "mutationalsignature__id", "mutationalsignature__summary",
               "somaliersampleextract__somalierancestry__predicted_ancestry",
-              "patient__first_name", "patient__last_name", "patient__sex",
+              "patient__patient_code", "patient__first_name", "patient__last_name", "patient__sex",
               "patient__date_of_birth", "patient__date_of_death",
               "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date", "vcf__id"]
     colmodel_overrides = {
@@ -130,6 +132,7 @@ class SamplesListGrid(JqGridUserRowConfig):
         'mutationalsignature__summary': {'label': 'Mutational Signature',
                                          'formatter': 'viewMutationalSignature'},
         "somaliersampleextract__somalierancestry__predicted_ancestry": {"label": "Predicted Ancestry"},
+        'patient__patient_code': {'label': 'Patient Code'},
         'patient__last_name': {'label': 'Last Name'},
         'patient__sex': {'label': 'Sex'},
         'patient__date_of_birth': {'label': 'D.O.B.'},
@@ -191,9 +194,16 @@ class SamplesListGrid(JqGridUserRowConfig):
         view_sample_url_prefix = get_url_from_view_path(view_sample_url)
         view_vcf_url_prefix = get_url_from_view_path(view_vcf_url)
 
+        # het_hom_count comes from the per-sample CohortGenotypeStats row
+        # (sample IS NOT NULL, filter_key NULL, passing_filter=False).
+        cgs_subquery = (CohortGenotypeStats.objects
+                        .filter(sample=OuterRef("pk"),
+                                filter_key__isnull=True, passing_filter=False)
+                        .annotate(het_plus_hom=F("het_count") + F("hom_count"))
+                        .values("het_plus_hom")[:1])
         annotation_kwargs = {
             "sample_gene_list_count": Count("samplegenelist", distinct=True),
-            "het_hom_count": F("samplestats__het_count") + F("samplestats__hom_count"),
+            "het_hom_count": Subquery(cgs_subquery, output_field=IntegerField()),
             "sample_url": Func(
                 Value(view_sample_url_prefix),
                 F("pk"),
@@ -226,12 +236,13 @@ class SamplesListGrid(JqGridUserRowConfig):
 class CohortSampleListGrid(JqGridUserRowConfig):
     model = Sample
     caption = 'Cohort Samples'
-    fields = ["id", "name", "vcf__name", "patient__family_code",
+    fields = ["id", "name", "vcf__name", "patient__family_code", "patient__patient_code",
               "patient__first_name", "patient__first_name",
               "patient__sex", "patient__date_of_birth"]
     colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewSampleLink'},
                           'vcf__name': {'label': 'VCF'},
                           'patient__family_code': {'label': 'Family Code'},
+                          'patient__patient_code': {'label': 'Patient Code'},
                           'patient__first_name': {'label': 'First Name'},
                           'patient__last_name': {'label': 'Last Name'},
                           'patient__sex': {'label': 'Sex'},

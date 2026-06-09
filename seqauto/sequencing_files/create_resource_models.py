@@ -20,7 +20,7 @@ from library.utils.file_utils import name_from_filename, file_to_array
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_valid
 from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
-    UnalignedReads, BamFile, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
+    UnalignedReads, BamFile, SingleSampleVCF, QC, JointCalledVCF, IlluminaFlowcellQC, FastQC, Flagstats, \
     DontAutoLoadException, Experiment, SampleFromSequencingSample, QCGeneList, \
     get_samples_by_sequencing_sample, QCGeneCoverage, SeqAutoMessage, SeqAutoRecord, get_variant_caller_from_vcf_file
 from seqauto.models.models_enums import SequencingFileType
@@ -224,8 +224,8 @@ def current_sample_sheet_changed(seqauto_run, sequencing_run_current_sample_shee
     if not meaningfully_changed:
         # Can go through and update models etc...
         # Update samples from sequencing sample
-        for combo_vcf in SampleSheetCombinedVCFFile.objects.filter(sequencing_run=sequencing_run):
-            if vcf := combo_vcf.vcf:
+        for joint_called_vcf in JointCalledVCF.objects.filter(sequencing_run=sequencing_run):
+            if vcf := joint_called_vcf.vcf:
                 # TODO: Raise some kind of manual task here to fix things???
 
                 def _get_samples_by_sequencing_sample_id(sample_sheet):
@@ -291,27 +291,26 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
         except:
             pass
 
-    old_sample_sheet_combined_vcf = SampleSheetCombinedVCFFile.objects.filter(sample_sheet__in=old_sample_sheets)
+    old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
     relink_samples = False
-    try:
-        combo_vcf = old_sample_sheet_combined_vcf.get()
-        logging.info("Assigning SampleSheetCombinedVCFFile to latest sample sheet")
-        combo_vcf.sample_sheet = current_sample_sheet
-        combo_vcf.save()
-
-        relink_samples = True
-    except:
-        log_traceback()
+    for joint_called_vcf in old_joint_called_vcfs:
+        try:
+            logging.info("Assigning JointCalledVCF %s to latest sample sheet", joint_called_vcf)
+            joint_called_vcf.sample_sheet = current_sample_sheet
+            joint_called_vcf.save()
+            relink_samples = True
+        except Exception:
+            log_traceback()
 
     if not relink_samples:
         missing_linked_sequencing_samples = current_sample_sheet.sequencingsample_set.filter(samplefromsequencingsample__isnull=True)
         relink_samples = missing_linked_sequencing_samples.exists()
 
     try:
-        for combo_vcf in current_sample_sheet.samplesheetcombinedvcffile_set.all():
-            backend_vcf = combo_vcf.backendvcf
+        for joint_called_vcf in current_sample_sheet.jointcalledvcf_set.all():
+            backend_vcf = joint_called_vcf.backendvcf
 
-            if relink_samples or combo_vcf.needs_to_be_linked():
+            if relink_samples or joint_called_vcf.needs_to_be_linked():
                 link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=True)
     except BackendVCF.DoesNotExist:
         pass
@@ -768,7 +767,7 @@ def process_flagstats(seqauto_run, existing_files, results):
 def get_expected_vcf_and_bams(bams):
     expected_vcf_and_bams = {}
     for bam in bams:
-        vcf_path = VCFFile.get_path_from_bam(bam)
+        vcf_path = SingleSampleVCF.get_path_from_bam(bam)
         expected_vcf_and_bams[vcf_path] = bam
 
     return expected_vcf_and_bams
@@ -777,7 +776,7 @@ def get_expected_vcf_and_bams(bams):
 def process_single_sample_vcfs(seqauto_run, existing_files, results):
     logging.info("Setting up single sample VCFs")
     existing_vcf_files = stripped_lines_set(existing_files)
-    existing_vcf_records = returning_existing_records_by_path(VCFFile)
+    existing_vcf_records = returning_existing_records_by_path(SingleSampleVCF)
 
     bams = results[SequencingFileType.BAM]
     expected_vcf_and_bams = get_expected_vcf_and_bams(bams)
@@ -797,11 +796,11 @@ def process_single_sample_vcfs(seqauto_run, existing_files, results):
         else:
             if DataState.should_create_new_record(data_state):
                 variant_caller = get_variant_caller_from_vcf_file(vcf_path)
-                vcf_file = VCFFile.objects.create(sequencing_run=bam_file.sequencing_run,
-                                                  bam_file=bam_file,
-                                                  path=vcf_path,
-                                                  data_state=data_state,
-                                                  variant_caller=variant_caller)
+                vcf_file = SingleSampleVCF.objects.create(sequencing_run=bam_file.sequencing_run,
+                                                          bam_file=bam_file,
+                                                          path=vcf_path,
+                                                          data_state=data_state,
+                                                          variant_caller=variant_caller)
                 load_from_file_if_complete(seqauto_run, vcf_file)
 
         if vcf_file:
@@ -810,60 +809,60 @@ def process_single_sample_vcfs(seqauto_run, existing_files, results):
     return vcf_files
 
 
-def process_combo_vcfs(seqauto_run, existing_files, results):
-    logging.info("Setting up combo VCFs")
-    existing_combo_vcf_files = stripped_lines_set(existing_files)
-    existing_combo_vcf_records = returning_existing_records_by_path(SampleSheetCombinedVCFFile)
+def process_joint_called_vcfs(seqauto_run, existing_files, results):
+    logging.info("Setting up joint-called VCFs")
+    existing_joint_called_vcf_files = stripped_lines_set(existing_files)
+    existing_joint_called_vcf_records = returning_existing_records_by_path(JointCalledVCF)
 
-    combined_vcf_files = set()
+    joint_called_vcf_files = set()
     sequencing_runs = results[SequencingFileType.SAMPLE_SHEET]
-    logging.info("Looping through combo VCFs")
+    logging.info("Looping through joint-called VCFs")
     for sequencing_run in sequencing_runs.values():
         try:
             sample_sheet = sequencing_run.get_current_sample_sheet()
         except:
             continue
 
-        for vcf_path in SampleSheetCombinedVCFFile.get_paths_from_sample_sheet(sample_sheet):
-            exists = vcf_path in existing_combo_vcf_files
+        for vcf_path in JointCalledVCF.get_paths_from_sample_sheet(sample_sheet):
+            exists = vcf_path in existing_joint_called_vcf_files
             data_state = get_data_state(sequencing_run.data_state, exists)
-            combined_vcf_file = existing_combo_vcf_records.get(vcf_path)
+            joint_called_vcf_file = existing_joint_called_vcf_records.get(vcf_path)
 
-            if combined_vcf_file:
+            if joint_called_vcf_file:
                 require_save = False
-                if sample_sheet != combined_vcf_file.sample_sheet:
-                    logging.info("Combo VCF %s on disk set for old sample_sheet, setting to latest", combined_vcf_file)
-                    combined_vcf_file.sample_sheet = sample_sheet
+                if sample_sheet != joint_called_vcf_file.sample_sheet:
+                    logging.info("JointCalledVCF %s on disk set for old sample_sheet, setting to latest", joint_called_vcf_file)
+                    joint_called_vcf_file.sample_sheet = sample_sheet
                     require_save = True
 
-                if combined_vcf_file.data_state != data_state:
-                    logging.info("combined_vcf_file %s data state changed from %s->%s", combined_vcf_file,
-                                 combined_vcf_file.data_state, data_state)
-                    combined_vcf_file.data_state = data_state
+                if joint_called_vcf_file.data_state != data_state:
+                    logging.info("joint_called_vcf_file %s data state changed from %s->%s", joint_called_vcf_file,
+                                 joint_called_vcf_file.data_state, data_state)
+                    joint_called_vcf_file.data_state = data_state
                     require_save = True
 
                 if require_save:
-                    combined_vcf_file.save()
+                    joint_called_vcf_file.save()
             else:
                 if DataState.should_create_new_record(data_state):
                     variant_caller = get_variant_caller_from_vcf_file(vcf_path)
-                    combined_vcf_file = SampleSheetCombinedVCFFile.objects.create(sequencing_run=sequencing_run,
-                                                                                  sample_sheet=sample_sheet,
-                                                                                  path=vcf_path,
-                                                                                  data_state=data_state,
-                                                                                  variant_caller=variant_caller)
-            if combined_vcf_file:
-                combined_vcf_files.add(combined_vcf_file)
+                    joint_called_vcf_file = JointCalledVCF.objects.create(sequencing_run=sequencing_run,
+                                                                          sample_sheet=sample_sheet,
+                                                                          path=vcf_path,
+                                                                          data_state=data_state,
+                                                                          variant_caller=variant_caller)
+            if joint_called_vcf_file:
+                joint_called_vcf_files.add(joint_called_vcf_file)
                 try:
-                    combined_vcf_file.backendvcf  # If there, VCF is already loaded
+                    joint_called_vcf_file.backendvcf  # If there, VCF is already loaded
                 except:
-                    load_from_file_if_complete(seqauto_run, combined_vcf_file)
-    return combined_vcf_files
+                    load_from_file_if_complete(seqauto_run, joint_called_vcf_file)
+    return joint_called_vcf_files
 
 
 def process_vcf(seqauto_run, existing_files, results):
     return {"vcf": process_single_sample_vcfs(seqauto_run, existing_files, results),
-            "combined_vcf": process_combo_vcfs(seqauto_run, existing_files, results)}
+            "combined_vcf": process_joint_called_vcfs(seqauto_run, existing_files, results)}
 
 
 def get_expected_qc_and_vcfs(vcfs):

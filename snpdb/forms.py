@@ -24,6 +24,7 @@ from snpdb import models
 from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
     ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
     OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath
+from patients.models import Patient, Specimen
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal, FormHelperHelper
@@ -56,6 +57,9 @@ class BaseModelForm(forms.ModelForm):
 
 class GenomeBuildAutocompleteForwardMixin:
     genome_build_fields = []
+    # Subclasses set exclude_archived=True to forward exclude_archived to the
+    # underlying autocomplete view, dropping rows whose source data is archived.
+    exclude_archived = False
 
     def __init__(self, *args, **kwargs):
         genome_build = kwargs.pop("genome_build", None)
@@ -64,6 +68,8 @@ class GenomeBuildAutocompleteForwardMixin:
             widget_forward = []
             if genome_build:
                 widget_forward.append(forward.Const(genome_build.pk, "genome_build_id"))
+            if self.exclude_archived:
+                widget_forward.append(forward.Const(True, "exclude_archived"))
             self.fields[f].widget.forward = widget_forward
 
 
@@ -145,7 +151,7 @@ class LabForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = Lab
         # fields = '__all__'
-        exclude = ("classification_config", "css_class")
+        exclude = ("classification_config", "css_class", "research")
         read_only = ("name", "external", "group_name", "organization", "upload_location", "upload_automatic", "upload_instructions", "clinvar_key")
         widgets = {
             "name": TextInput(),
@@ -490,10 +496,28 @@ class SettingsOverrideForm(BaseModelForm):
         data = self.cleaned_data["grid_sample_label_template"]
         if data:
             try:
-                Sample._validate_sample_formatter_func(data)
+                self._validate_sample_formatter_func(data)
             except (ValueError, KeyError) as e:
                 raise ValidationError(e) from e
         return data
+
+    @staticmethod
+    def _validate_sample_formatter_func(sample_label_template):
+        """ Throws error if invalid """
+        specimen = Specimen(reference_id='refId', description='description')
+        patient = Patient(pk=2, first_name='first_name', last_name='last_name',
+                          patient_code='patient_code')
+        sample = Sample(pk=1, name="sample", patient=patient, specimen=specimen)
+        params = sample._get_sample_formatter_params()
+        errors = []
+        for i, t in enumerate(sample_label_template.split("||")):
+            try:
+                t % params
+            except (ValueError, KeyError) as exception:
+                errors.append(f"{i+1}: '{t}: {exception=}'")
+        if errors:
+            error_msg = '\n'.join(errors)
+            raise ValueError(f"Sample formatter function failed: {error_msg}")
 
     def _hide_unused_fields(self):
         settings_config = get_settings_form_features()

@@ -1,3 +1,4 @@
+import importlib
 import inspect
 from abc import ABC, abstractmethod
 from typing import Iterable, Type
@@ -41,7 +42,7 @@ class ImportTaskFactory(ABC):
 def get_import_task_factories() -> list[ImportTaskFactory]:
     # Import all factory scripts into scope  so __subclasses__ works
     for i in settings.IMPORT_TASK_FACTORY_IMPORTS:
-        exec(f"import {i}")
+        importlib.import_module(i)
 
     factories = []
     for itf_class in get_all_subclasses(ImportTaskFactory):

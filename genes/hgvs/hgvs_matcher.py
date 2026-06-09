@@ -70,16 +70,15 @@ class VariantCoordinateAndDetails:
 class ClinGenHGVSConverter(BioCommonsHGVSConverter):
     @classmethod
     def build_supported(cls, genome_build) -> bool:
-        return genome_build in cls.supported_builds
+        return genome_build in cls.supported_builds()
 
     @classmethod
-    @property
     def supported_builds(cls) -> list[GenomeBuild]:
         return [GenomeBuild.grch37(), GenomeBuild.grch38()]
 
     def __init__(self, genome_build, local_resolution=False, clingen_resolution=True):
         if not self.build_supported(genome_build):
-            supported_builds = ", ".join([str(gb) for gb in self.supported_builds])
+            supported_builds = ", ".join([str(gb) for gb in self.supported_builds()])
             raise ValueError(f"ClinGen: unsupported {genome_build=}, {supported_builds=}")
 
         super().__init__(genome_build,

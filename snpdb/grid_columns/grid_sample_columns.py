@@ -35,7 +35,8 @@ def get_available_format_columns(cohorts):
     return available_format_columns
 
 
-def get_variantgrid_zygosity_annotation_kwargs(cohorts: Iterable[Cohort], common_variants: bool):
+def get_variantgrid_zygosity_annotation_kwargs(cohorts: Iterable[Cohort], common_variants: bool,
+                                               annotation_gnomad_version=None):
     available_format_columns = get_available_format_columns(cohorts)
     annotation_kwargs = {}
 
@@ -44,7 +45,8 @@ def get_variantgrid_zygosity_annotation_kwargs(cohorts: Iterable[Cohort], common
         # How did this ever work with multiple cohorts - did it overwrite??
         # TODO: After we've done this - try and optimise to only doing rare if we can
         cgc = cohort.cohort_genotype_collection
-        annotation_kwargs.update(cgc.get_annotation_kwargs(common_variants=common_variants))
+        annotation_kwargs.update(cgc.get_annotation_kwargs(common_variants=common_variants,
+                                                           annotation_gnomad_version=annotation_gnomad_version))
 
         for column, (is_array, empty_value) in CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE.items():
             if not available_format_columns[column]:

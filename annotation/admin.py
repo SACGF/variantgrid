@@ -12,13 +12,78 @@ from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
 from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, ClinVar, \
-    AnnotationRun, VariantAnnotation
+    AnnotationRun, VariantAnnotation, VariantAnnotationVersion
+from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
 
 admin.site.register(models.AnnotationVersion)
 admin.site.register(models.CachedWebResource)
-admin.site.register(models.GeneAnnotationVersion)
-admin.site.register(models.VariantAnnotationVersion)
+
+
+@admin.register(models.ClinVarVersion)
+class ClinVarVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "genome_build", "annotation_date", "filename", "data_archived_date")
+    list_filter = ("genome_build", "data_archived_date")
+    readonly_fields = ("data_archived_date", "data_archived_by",
+                       "data_archive_reason", "data_restorable_from")
+
+
+@admin.register(models.GeneAnnotationVersion)
+class GeneAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "gene_annotation_release", "annotation_date", "data_archived_date")
+    list_filter = ("data_archived_date",)
+    readonly_fields = ("data_archived_date", "data_archived_by",
+                       "data_archive_reason", "data_restorable_from")
+
+
+@admin.register(models.HumanProteinAtlasAnnotationVersion)
+class HumanProteinAtlasAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "hpa_version", "annotation_date", "filename", "data_archived_date")
+    list_filter = ("data_archived_date",)
+    readonly_fields = ("data_archived_date", "data_archived_by",
+                       "data_archive_reason", "data_restorable_from")
+
+
+_STATUS_BADGE_COLOURS = {
+    VariantAnnotationVersion.Status.NEW: "#0d6efd",
+    VariantAnnotationVersion.Status.ACTIVE: "#198754",
+    VariantAnnotationVersion.Status.HISTORICAL: "#6c757d",
+}
+
+
+@admin.register(VariantAnnotationVersion)
+class VariantAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "genome_build", "annotation_consortium", "annotation_date",
+                    "vep", "columns_version", "gencode_subset", "distance",
+                    "status_badge", "data_archived_date")
+    list_filter = ("status", "genome_build", "annotation_consortium", "data_archived_date")
+    readonly_fields = ("status", "gencode_subset", "distance",
+                       "data_archived_date", "data_archived_by",
+                       "data_archive_reason", "data_restorable_from")
+    ordering = ("genome_build", "-annotation_date")
+
+    def is_readonly_field(self, f) -> bool:
+        if f.name == "gene_annotation_release":
+            return False
+        return super().is_readonly_field(f)
+
+    @admin_list_column("Status", order_field="status")
+    def status_badge(self, obj: VariantAnnotationVersion) -> SafeString:
+        colour = _STATUS_BADGE_COLOURS.get(obj.status, "#6c757d")
+        label = obj.get_status_display()
+        return SafeString(
+            f'<span style="background:{colour};color:#fff;padding:2px 8px;'
+            f'border-radius:10px;font-weight:bold;">{label}</span>'
+        )
+
+    @admin_action("Promote to ACTIVE")
+    def promote_to_active(self, request, queryset: QuerySet[VariantAnnotationVersion]):
+        for vav in queryset:
+            try:
+                vav.promote_to_active()
+                messages.info(request, f"Promoted VAV pk={vav.pk} ({vav.genome_build}) to ACTIVE")
+            except ValueError as e:
+                messages.error(request, str(e))
 
 
 @admin.register(VariantAnnotation)

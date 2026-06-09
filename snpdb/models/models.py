@@ -22,7 +22,7 @@ from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet, TextChoices
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
@@ -204,8 +204,15 @@ class Wiki(TimeStampedModel):
         return klass
 
     @staticmethod
-    def get_or_create(class_name, unique_keyword, unique_value):
+    def get_or_create(class_name, unique_keyword, unique_value, user=None):
         klass = Wiki.get_subclass_by_name(class_name)
+        try:
+            klass._meta.get_field(unique_keyword)
+        except FieldDoesNotExist:
+            raise PermissionDenied(f"'{unique_keyword}' is not a valid field for {class_name}")
+        if user is not None:
+            # Check permission on an unsaved instance before creating the row (throws 403)
+            klass(**{unique_keyword: unique_value}).check_user_edit_permission(user)
         wiki, _ = klass.objects.get_or_create(**{unique_keyword: unique_value})
         return wiki
 
@@ -474,6 +481,7 @@ class ContactDetails:
 class Lab(models.Model, PreviewModelMixin):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, e.g. Shariant
+    research = models.BooleanField(default=False, blank=True)
     city = models.TextField()
     state = models.ForeignKey(State, null=True, on_delete=PROTECT)
     country = models.ForeignKey(Country, null=True, on_delete=PROTECT)

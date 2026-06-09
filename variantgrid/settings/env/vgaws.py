@@ -12,12 +12,20 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 # import all the base settings #
 SITE_ID = 3  # vg.com
 
+SITE_DESCRIPTION = (
+    "VariantGrid is an open source web platform for storing, annotating, analysing and "
+    "classifying human variants."
+)
+
 WEB_HOSTNAME = 'variantgrid.com'
 WEB_IP = '3.104.38.188'
 
 DEBUG = False
 
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
+
+# This deployment used dbNSFP rankscores before raw scores - keep them visible (see annotation_settings.py)
+ANNOTATION_SHOW_LEGACY_RANKSCORES = True
 
 _BIG_DISK_BASE_DIR = "/data"
 ANNOTATION_REFERENCE_BASE_DIR = os.path.join(_BIG_DISK_BASE_DIR, "annotation")

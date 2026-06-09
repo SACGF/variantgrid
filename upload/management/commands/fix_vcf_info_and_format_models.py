@@ -3,11 +3,13 @@ import os
 from tempfile import NamedTemporaryFile
 
 from cyvcf2 import Reader
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 
 from library.genomics.vcf_utils import cyvcf2_header_types
+from library.utils.file_utils import mk_path
 from snpdb.models import VCF
 from upload.vcf.vcf_import import create_vcf_info, create_vcf_format
 
@@ -54,7 +56,7 @@ class Command(BaseCommand):
                                             uploadedvcf__vcf_importer__name=self.importer_name,
                                             uploadedvcf__vcf_importer__version__lt=self.v_info_format_min)
         if num_vcfs_need_reload := qs_need_reload.count():
-            print(f"VCFs with INFO/FORMAT header that need to be reloaded {num_vcfs_need_reload}")
+            logging.info("VCFs with INFO/FORMAT header that need to be reloaded %d", num_vcfs_need_reload)
 
     @staticmethod
     def get_header_types(vcf):
@@ -62,8 +64,9 @@ class Command(BaseCommand):
         if os.path.isfile(filename):
             reader = Reader(filename)
         else:
-            # Make a temp file?
-            with NamedTemporaryFile(mode='w+', delete=True) as temp_file:
+            # Write VCF header to a private dir under PRIVATE_DATA_ROOT rather than world-readable /tmp.
+            mk_path(settings.IMPORT_PROCESSING_DIR)
+            with NamedTemporaryFile(mode='w+', delete=True, dir=settings.IMPORT_PROCESSING_DIR) as temp_file:
                 temp_file.write(vcf.header)
                 temp_file.flush()  # Ensure the data is written to disk
                 temp_file.seek(0)  # Move the pointer back to the start of the file

@@ -25,11 +25,18 @@
             return val;
         }
 
+        function otherFilters(key) {
+            return map['other_filters_' + key] || '';
+        }
+
         $(".zyg-mother").text(memberZyg('mother', motherAffected));
         $(".zyg-father").text(memberZyg('father', fatherAffected));
         $(".zyg-proband").text(memberZyg('proband', false));
         $(".zyg-sibling").text(memberZyg('sibling', siblingAffected));
-        $("#zygosity-note").text(map.note || '');
+        $(".other-mother").text(otherFilters('mother'));
+        $(".other-father").text(otherFilters('father'));
+        $(".other-proband").text(otherFilters('proband'));
+        $(".other-sibling").text(otherFilters('sibling'));
     }
 
     function displayQuadInfo(data) {
@@ -129,23 +136,22 @@
             <div>
                 <a data-toggle="collapse" data-target="#zygosity-table-collapse"
                    aria-expanded="{{ initially_show_zygosity_table|yesno:'true,false' }}"
-                   aria-controls="zygosity-table-collapse" href="#">
+                   aria-controls="zygosity-table-collapse" href="#zygosity-table-collapse">
                     Zygosity Requirements...
                 </a>
                 <div class="collapse {% if initially_show_zygosity_table %}show{% endif %}"
                      id="zygosity-table-collapse">
                     <table class="table table-sm table-bordered mt-1" id="zygosity-table">
                         <thead>
-                            <tr><th>Member</th><th>Expected Zygosity</th></tr>
+                            <tr><th>Member</th><th>Expected Zygosity</th><th>Other Filters</th></tr>
                         </thead>
                         <tbody>
-                            <tr><td>Mother</td><td class="zyg-mother"></td></tr>
-                            <tr><td>Father</td><td class="zyg-father"></td></tr>
-                            <tr><td>Proband</td><td class="zyg-proband"></td></tr>
-                            <tr><td>Sibling</td><td class="zyg-sibling"></td></tr>
+                            <tr><td>Mother</td><td class="zyg-mother" style="white-space: pre-line"></td><td class="other-mother"></td></tr>
+                            <tr><td>Father</td><td class="zyg-father" style="white-space: pre-line"></td><td class="other-father"></td></tr>
+                            <tr><td>Proband</td><td class="zyg-proband" style="white-space: pre-line"></td><td class="other-proband"></td></tr>
+                            <tr><td>Sibling</td><td class="zyg-sibling" style="white-space: pre-line"></td><td class="other-sibling"></td></tr>
                         </tbody>
                     </table>
-                    <div id="zygosity-note" class="text-muted small"></div>
                 </div>
             </div>
             <div>

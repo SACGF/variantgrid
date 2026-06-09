@@ -2630,6 +2630,8 @@ VCTable.groupIdentifier = (data, type, row) => {
     let dirty = data.dirty;
     let org_name = data.org_name;
     let lab_name = data.lab_name;
+    let research = data.research;
+    let research_icon = data.research_icon;
     let shareLevel = data.share_level;
     let allele_origin_bucket = data.allele_origin_bucket;
 
@@ -2640,10 +2642,14 @@ VCTable.groupIdentifier = (data, type, row) => {
 
     let classification_count = data.classification_count;
 
-    let dom = $('<div>', {html: [
+    let labLine = [
         icon,
         $('<span>', {text: `${org_name} / ${lab_name}`})
-    ]});
+    ];
+    if (research) {
+        labLine.push($('<span>', {class: 'badge badge-info ml-1', title: 'Research lab', text: `${research_icon} Research`}));
+    }
+    let dom = $('<div>', {html: labLine});
 
     if (dirty) {
         dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"))

@@ -1,0 +1,100 @@
+{% load tz %}
+<div id='analysis-settings-benchmark-tab'>
+    <style>
+        #benchmark-summary table.summary {
+            margin-bottom: 1em;
+        }
+        #benchmark-summary table.summary th {
+            text-align: left;
+            padding-right: 1em;
+            white-space: nowrap;
+        }
+        table.benchmark-nodes {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        table.benchmark-nodes th, table.benchmark-nodes td {
+            border: 1px solid #ddd;
+            padding: 4px 8px;
+        }
+        table.benchmark-nodes th {
+            background-color: #f5f5f5;
+            text-align: left;
+        }
+        table.benchmark-nodes td.numeric {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .benchmark-note {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 1em;
+        }
+    </style>
+
+    <div id="benchmark-summary">
+        <p class="benchmark-note">
+            Wall time is computed from the spread of <code>NodeCount.created</code> timestamps for this
+            analysis (oldest to newest). Total CPU is the sum of each node's stored
+            <code>load_seconds</code>. Numbers reflect the current node versions; click "Force Reload Nodes"
+            to refresh.
+        </p>
+
+        <table class="summary">
+            <tr>
+                <th>Wall time</th>
+                <td>
+                    {% if wall_seconds is not None %}
+                        {{ wall_seconds|floatformat:2 }} s
+                        ({{ wall_start|localtime }} &rarr; {{ wall_end|localtime }},
+                        {{ node_count_sample_size }} NodeCount rows)
+                    {% else %}
+                        <em>No NodeCount rows yet - reload the analysis</em>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>Total node CPU</th>
+                <td>
+                    {{ total_load_seconds|floatformat:2 }} s
+                    (across {{ nodes_with_load }} of {{ node_total }} nodes)
+                </td>
+            </tr>
+            {% if wall_seconds and total_load_seconds %}
+                <tr>
+                    <th>Effective parallelism</th>
+                    <td>{{ total_load_seconds|floatformat:2 }} / {{ wall_seconds|floatformat:2 }}
+                        = {% widthratio total_load_seconds wall_seconds 1 %}x</td>
+                </tr>
+            {% endif %}
+        </table>
+    </div>
+
+    <h5>Per-node breakdown</h5>
+    <table class="benchmark-nodes">
+        <thead>
+            <tr>
+                <th>Node</th>
+                <th>Type</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th class="numeric">Count</th>
+                <th class="numeric">Load (s)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in node_rows %}
+                <tr>
+                    <td>{{ row.pk }}</td>
+                    <td>{{ row.node_type }}</td>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.status }}</td>
+                    <td class="numeric">{% if row.count is not None %}{{ row.count }}{% else %}&mdash;{% endif %}</td>
+                    <td class="numeric">{% if row.load_seconds is not None %}{{ row.load_seconds|floatformat:3 }}{% else %}&mdash;{% endif %}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6"><em>No nodes in this analysis.</em></td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

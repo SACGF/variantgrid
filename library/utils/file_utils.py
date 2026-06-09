@@ -144,7 +144,7 @@ def add_permissions_to_file(filename: str, add_stat: int):
     try:
         os.chmod(filename, st.st_mode | add_stat)
     except Exception as e:
-        logging.error("Path '%s' stat is %s", filename, st)
+        logging.debug("Path '%s' stat is %s", filename, st)
         raise e
 
 

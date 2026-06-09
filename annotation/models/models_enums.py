@@ -32,6 +32,9 @@ class AnnotationStatus(models.TextChoices):
     DELETING = 'x', "Deleting"
     DUMP_STARTED = 'd', "Dump Started"
     DUMP_COMPLETED = 'D', "Dump Completed"
+    # External annotation (#1568): dump written, parked waiting for the operator to run VEP off-VM
+    # and re-import the annotated VCF. NOT a completed state - genuinely waiting on the operator.
+    EXTERNAL_DUMP_COMPLETED = 'e', "Awaiting external annotation"
     ANNOTATION_STARTED = 'a', "Annotation Started"
     ANNOTATION_COMPLETED = 'A', "Annotation Completed"
     UPLOAD_STARTED = 'U', "Upload Started"
@@ -48,6 +51,7 @@ class AnnotationStatus(models.TextChoices):
     @classmethod
     def get_summary_state(cls, annotation_status):
         SUMMARY_STATES = {cls.CREATED: "Queued",
+                          cls.EXTERNAL_DUMP_COMPLETED: "Awaiting external annotation",
                           cls.FINISHED: "Finished",
                           cls.ERROR: "Error"}
         return SUMMARY_STATES.get(annotation_status, "Running")
@@ -126,6 +130,7 @@ class VEPCustom(models.TextChoices):
     TOPMED = 't', 'TopMed'
     UK10K = 'u', 'UK10k'
     COSMIC = 'c', 'COSMIC'
+    DENOVO_DB = 'D', 'denovo_db'
 
 
 class VEPSkippedReason(models.TextChoices):

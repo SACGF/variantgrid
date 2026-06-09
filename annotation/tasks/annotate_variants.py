@@ -9,6 +9,7 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
+from annotation.annotsv_annotation import run_annotsv, annotsv_check_command_line_version_match
 from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals.manual_signals import annotation_run_complete_signal
@@ -51,6 +52,12 @@ def assign_range_lock_to_annotation_run(annotation_run_id, annotation_range_lock
 def annotate_variants(annotation_run_id):
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
     logging.info("annotate_variants: %s", annotation_run)
+
+    # External annotation (#1568): VEP for these runs is managed off-VM via the annotation_external
+    # command. Never auto-run VEP here while waiting for the operator to import an annotated VCF.
+    if annotation_run.external and annotation_run.vcf_annotated_filename is None:
+        logging.info("Skipping external AnnotationRun %s (awaiting external annotation)", annotation_run.pk)
+        return
 
     # task_id used as Celery lock
     num_modified = AnnotationRun.objects.filter(pk=annotation_run.pk,
@@ -101,18 +108,16 @@ def annotate_variants(annotation_run_id):
         annotation_run.save()
 
 
-def dump_and_annotate_variants(annotation_run, vep_version_check=True):
-    if vep_version_check:
-        # Do a check before we annotate
-        vep_check_command_line_version_match(annotation_run.variant_annotation_version)
-
-    vcf_dump_filename = annotation_run.get_dump_filename()
+def dump_variants(annotation_run, dump_dir=None) -> int:
+    """ Write the unannotated variants in range to the dump VCF and set dump_* fields; returns dump count.
+        Factored out of dump_and_annotate_variants so the annotation_external --dump command (#1568) can
+        dump (into --output-dir) and stop before VEP. """
+    vcf_dump_filename = annotation_run.get_dump_filename(dump_dir=dump_dir)
     annotation_run.dump_start = timezone.now()
     annotation_run.vcf_dump_filename = vcf_dump_filename
     annotation_run.save()
 
     genome_build = annotation_run.genome_build
-    annotation_consortium = annotation_run.annotation_consortium
     vcf_dump_count = _unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
                                                   annotation_run.annotation_range_lock,
                                                   annotation_run.pipeline_type)
@@ -120,6 +125,23 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
     annotation_run.dump_count = vcf_dump_count
     annotation_run.dump_end = timezone.now()
     annotation_run.save()
+    return vcf_dump_count
+
+
+def dump_and_annotate_variants(annotation_run, vep_version_check=True):
+    if vep_version_check:
+        # Do a check before we annotate
+        vep_check_command_line_version_match(annotation_run.variant_annotation_version)
+        # Counterpart for AnnotSV - skipped entirely when not enabled
+        if (settings.ANNOTATION_ANNOTSV_ENABLED
+                and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
+            annotsv_check_command_line_version_match(annotation_run.variant_annotation_version)
+
+    vcf_dump_count = dump_variants(annotation_run)
+    vcf_dump_filename = annotation_run.vcf_dump_filename
+
+    genome_build = annotation_run.genome_build
+    annotation_consortium = annotation_run.annotation_consortium
 
     logging.info("Annotating %d variants", vcf_dump_count)
     if vcf_dump_count:
@@ -128,13 +150,16 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
         vcf_annotated_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_annotated_basename)
 
         cmd = get_vep_command(vcf_dump_filename, vcf_annotated_filename, genome_build, annotation_consortium,
-                              annotation_run.pipeline_type)
+                              annotation_run.pipeline_type,
+                              variant_annotation_version=annotation_run.variant_annotation_version)
         annotation_run.annotation_start = timezone.now()
         annotation_run.pipeline_command = " ".join(cmd)
         annotation_run.save()
         return_code, std_out, std_err = execute_cmd(cmd)
-        annotation_run.pipeline_stdout = std_out
-        annotation_run.pipeline_stderr = std_err
+        # VEP can produce enormous output (>1GB) for large batches - PostgreSQL has a 1GB field limit
+        max_output = 1_000_000
+        annotation_run.pipeline_stdout = std_out[:max_output] if std_out else std_out
+        annotation_run.pipeline_stderr = std_err[:max_output] if std_err else std_err
         logging.info(f"VEP returned code: {return_code}")
 
         if return_code != 0:
@@ -143,6 +168,29 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
 
         annotation_run.vcf_annotated_filename = vcf_annotated_filename
         annotation_run.annotation_end = timezone.now()
+
+        if (settings.ANNOTATION_ANNOTSV_ENABLED
+                and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
+            annotsv_dir = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR,
+                                       f"annotsv_{annotation_run.pk}")
+            tsv, rc, stdout, stderr = run_annotsv(vcf_dump_filename, annotsv_dir,
+                                                  genome_build, annotation_consortium)
+            if rc == 0 and os.path.exists(tsv):
+                annotation_run.annotsv_tsv_filename = tsv
+                annotation_run.annotsv_error = None
+            else:
+                tsv_missing = "" if os.path.exists(tsv) else f" (expected TSV not found: {tsv})"
+                error_blob = (
+                    f"rc={rc}{tsv_missing}\n"
+                    f"--- stderr ---\n{stderr or ''}\n"
+                    f"--- stdout ---\n{stdout or ''}"
+                )
+                annotation_run.annotsv_error = error_blob[:100_000]
+                logging.warning(
+                    "AnnotSV stage failed for AnnotationRun %s: rc=%s%s\nstderr:\n%s\nstdout:\n%s",
+                    annotation_run.pk, rc, tsv_missing,
+                    (stderr or "")[-4000:], (stdout or "")[-4000:],
+                )
     else:
         # Now we have standard/CNV type pipelines, it's possible some can be empty
         annotation_run.annotated_count = 0

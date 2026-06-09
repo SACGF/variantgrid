@@ -1,21 +1,26 @@
 import logging
 import operator
 import shutil
+import time
 from collections import defaultdict, Counter
 from functools import cached_property
 from typing import Optional, Iterable, TypeAlias
 
+import intervaltree
 from django.conf import settings
-from django.db.models import QuerySet
 
+from annotation import vep_columns as vep_columns_registry
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
-    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
-from annotation.models.models import ColumnVEPField, VariantAnnotation, \
+    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction, \
+    MetaRNNPrediction, PrimateAIPrediction
+from annotation.models.models import VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
 from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
+from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
+from annotation.vep_columns import VEPColumnDef
 from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
@@ -79,6 +84,7 @@ class BulkVEPVCFAnnotationInserter:
         "overlapping_symbols",
         "gnomad_hemi_count",
         "hgvs_g",
+        "spliceai_max_ds",
     ]
     DB_IGNORED_COLUMNS = ["id", "transcript", "MaveDB_nt", "MaveDB_pro"]
     VEP_NOT_COPIED_FIELDS = [
@@ -108,6 +114,21 @@ class BulkVEPVCFAnnotationInserter:
     ALOFT_COLUMNS = ['aloft_prob_tolerant', 'aloft_prob_recessive', 'aloft_prob_dominant',
                      'aloft_pred', 'aloft_high_confidence', 'aloft_ensembl_transcript']
 
+    # dbNSFP source fields that come as &-separated arrays parallel to Ensembl_transcriptid
+    # (columns_version >= 4 only — earlier versions only consumed dbNSFP variant-level fields).
+    # _pick_dbnsfp_per_transcript_values rewrites these to the single value matching the picked
+    # VEP transcript when the resolver finds a mapping; otherwise their formatters collapse
+    # the array to a representative value.
+    DBNSFP_PER_TRANSCRIPT_SOURCE_FIELDS = (
+        "AlphaMissense_pred", "AlphaMissense_score",
+        "MPC_score",
+        "MetaRNN_pred", "MetaRNN_score",
+        "MutPred2_score", "MutPred2_top5_mechanisms",
+        "REVEL_score",
+        "VARITY_ER_score", "VARITY_R_score",
+        "VEST4_score",
+    )
+
     def __init__(self,
                  annotation_run: AnnotationRun,
                  infos: Optional[dict] = None,
@@ -129,21 +150,36 @@ class BulkVEPVCFAnnotationInserter:
         self.aloft_columns = False
         logging.info("CSQ: %s", self.vep_columns)
 
-        cvf_qs = ColumnVEPField.filter(self.genome_build,
-                                       self.vep_config.vep_version,
-                                       self.vep_config.columns_version,
-                                       self.annotation_run.pipeline_type)
+        cvf_list = vep_columns_registry.filter_for(
+            vep_config=self.vep_config,
+            pipeline_type=self.annotation_run.pipeline_type,
+        )
 
-        self._setup_vep_fields_and_db_columns(validate_columns, cvf_qs)
+        self._setup_vep_fields_and_db_columns(validate_columns, cvf_list)
         self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build,
                                         # We only want exact transcript version for annotation
                                         allow_alternative_transcript_version=False)
 
         sv_overlap_processor = None
+        sv_gene_overlap_resolver = None
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
-            sv_overlap_processor = SVOverlapProcessor(cvf_qs)
+            sv_overlap_processor = SVOverlapProcessor(cvf_list)
+            sv_gene_overlap_resolver = SVGeneOverlapResolver(self.annotation_run.variant_annotation_version)
         self.sv_overlap_processor = sv_overlap_processor
+        self.sv_gene_overlap_resolver = sv_gene_overlap_resolver
         self._generated_hgvs_c = Counter()
+
+        # Resolver for picking per-transcript dbNSFP values (RefSeq <-> Ensembl translation).
+        # Only relevant for columns_version >= 4 (which introduced per-transcript dbNSFP
+        # score fields). Persist the resolver name on the VAV so we have provenance for
+        # which strategy populated the scores.
+        self.transcript_resolver = None
+        if self.vep_config.columns_version >= 4:
+            self.transcript_resolver = DBNSFPGeneResolver()
+            vav = self.annotation_run.variant_annotation_version
+            if vav.transcript_resolver != self.transcript_resolver.name:
+                vav.transcript_resolver = self.transcript_resolver.name
+                vav.save(update_fields=["transcript_resolver"])
 
     @property
     def description(self) -> str:
@@ -168,13 +204,14 @@ class BulkVEPVCFAnnotationInserter:
             columns = columns_str.split("|")
         return columns
 
-    def _add_vep_field_handlers(self, cvf_qs):
+    def _add_vep_field_handlers(self, cvf_list):
         # TOPMED and 1k genomes can return multiple values - take highest
         empty_mave_float_values = EMPTY_VALUES | {"NA"}
         format_pick_lowest_float = get_clean_and_pick_single_value_func(min, float,
                                                                         empty_values=empty_mave_float_values)
         format_pick_highest_float = get_clean_and_pick_single_value_func(max, float)
         format_pick_highest_int = get_clean_and_pick_single_value_func(max, int)
+        format_sum_int = get_clean_and_pick_single_value_func(sum, int)
         remove_empty_multiples = get_clean_and_pick_single_value_func(join_uniq)
         # COSMIC v90 (5/9/2019) switched to COSV (build independent identifiers)
         extract_cosmic = get_extract_existing_variation("COSV")
@@ -199,6 +236,8 @@ class BulkVEPVCFAnnotationInserter:
             "cosmic_id": extract_cosmic,
             "cosmic_legacy_id": remove_empty_multiples,
             "dbsnp_rs_id": extract_dbsnp,
+            "denovo_db_case_count": format_sum_int,
+            "denovo_db_control_count": format_sum_int,
             "fathmm_pred_most_damaging": get_most_damaging_func(FATHMMPrediction),
             "gnomad2_liftover_af": format_pick_highest_float,
             "gnomad_popmax": str.upper,  # nfe -> NFE
@@ -229,34 +268,61 @@ class BulkVEPVCFAnnotationInserter:
         }
 
         # gnomad3 wasn't combined using gnomad_data.py so just uses FILTER
-        # while combined exome/genomes use "gnomad_filtered=1" (which should auto-convert bool)
-        if self.genome_build == GenomeBuild.grch38() and self.vep_config.columns_version <= 2:
+        # while combined exome/genomes use "gnomad_filtered=1" (which should auto-convert bool).
+        # gnomAD 4.1 is joint-called by gnomAD with the filter signal in the VCF FILTER column.
+        needs_filter_text_parse = (
+            self.genome_build == GenomeBuild.grch38() and self.vep_config.columns_version <= 2
+        ) or self.vep_config.gnomad4_minor_version == "4.1"
+        if needs_filter_text_parse:
             self.field_formatters["gnomad_filtered"] = gnomad_filtered_func
+
+        # columns_version >= 4 adds dbNSFP score / pred fields beyond the existing rankscores.
+        # Some are per-transcript (parallel to Ensembl_transcriptid: AlphaMissense_*, REVEL_score,
+        # VEST4_score, VARITY_*, MetaRNN_*, MutPred2_*, MPC_score) — those are picked upstream by
+        # _pick_dbnsfp_per_transcript_values; the formatters here handle either the single picked
+        # value, OR the residual &-array if the resolver couldn't find a match.
+        # Others (BayesDel_noAF_score, CADD_phred, CADD_raw, ClinPred_score, PrimateAI_*) are
+        # variant-level so usually single values, but dbNSFP can still emit &-joined values when
+        # a variant matches multiple dbNSFP rows — formatters here keep parsing safe (no-op on
+        # single values). AlphaMissense_pred additionally needs B/LB/A/LP/P -> code mapping.
+        if self.vep_config.columns_version >= 4:
+            self.field_formatters.update({
+                "alphamissense_pred": format_alphamissense_pred,
+                "alphamissense_score": format_pick_highest_float,
+                "bayesdel_noaf_score": format_pick_highest_float,
+                "cadd_phred": format_pick_highest_float,
+                "cadd_raw": format_pick_highest_float,
+                "clinpred_score": format_pick_highest_float,
+                "metarnn_pred": get_most_damaging_func(MetaRNNPrediction),
+                "metarnn_score": format_pick_highest_float,
+                "mpc_score": format_pick_highest_float,
+                "mutpred2_score": format_pick_highest_float,
+                "mutpred2_top5_mechanisms": remove_empty_multiples,
+                "primateai_pred": get_most_damaging_func(PrimateAIPrediction),
+                "primateai_score": format_pick_highest_float,
+                "revel_score": format_pick_highest_float,
+                "varity_er_score": format_pick_highest_float,
+                "varity_r_score": format_pick_highest_float,
+                "vest4_score": format_pick_highest_float,
+            })
 
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
-        # Sort to have consistent VCF headers
-        for cvf in cvf_qs.order_by("source_field"):
-            try:
-                if cvf.vep_custom:  # May not be configured
-                    prefix = cvf.get_vep_custom_display()
-                    setting_key = prefix.lower()
-                    _ = self.vep_config[setting_key]  # May throw exception if not setup
-                    # VEP custom often adds a column of just the prefix which we often don't use
-                    # if cvf.source_field_has_custom_prefix:
-                    #     self.ignored_vep_fields.append(prefix)
-
-                self.source_field_to_columns[cvf.vep_info_field].add(cvf.variant_grid_column_id)
-                # logging.info("Handling column %s => %s", cvf.vep_info_field, cvf.variant_grid_column_id)
-            except:
-                logging.warning("Skipping custom %s due to missing settings", cvf.vep_info_field)
+        # cvf_list is already filtered through vep_config so unconfigured customs are dropped.
+        # Sort to have consistent VCF headers (case-insensitive to match postgres `ORDER BY source_field`)
+        for cvf in sorted(cvf_list, key=lambda c: (c.source_field or "").lower()):
+            for vgc_id in cvf.variant_grid_columns:
+                self.source_field_to_columns[cvf.vep_info_field].add(vgc_id)
 
         vav = self.annotation_run.variant_annotation_version
-        self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
+        if vav.columns_version >= 4:
+            self.prediction_pathogenic_funcs = vav.get_raw_score_pathogenic_prediction_funcs()
+        else:
+            self.prediction_pathogenic_funcs = vav.get_rankscore_pathogenic_prediction_funcs()
 
-    def _setup_vep_fields_and_db_columns(self, validate_columns: bool, cvf_qs: QuerySet[ColumnVEPField]):
-        self._add_vep_field_handlers(cvf_qs)
+    def _setup_vep_fields_and_db_columns(self, validate_columns: bool, cvf_list: tuple[VEPColumnDef, ...]):
+        self._add_vep_field_handlers(cvf_list)
 
         ignore_columns = set(self.DB_FIXED_COLUMNS +
                              self.DB_MANUALLY_POPULATED_COLUMNS +
@@ -265,9 +331,9 @@ class BulkVEPVCFAnnotationInserter:
             ignore_columns.update(self.VEP_NOT_COPIED_REFSEQ_ONLY)
 
         # Find the ones that don't apply to this version, and exclude them
-        other_cvf_qs = ColumnVEPField.objects.all().difference(cvf_qs)
-        vep_fields_not_this_version = set(other_cvf_qs.values_list("variant_grid_column_id", flat=True))
-        ignore_columns.update(vep_fields_not_this_version)
+        in_scope = {vgc for c in cvf_list for vgc in c.variant_grid_columns}
+        all_known = vep_columns_registry.all_variant_grid_column_ids()
+        ignore_columns.update(all_known - in_scope)
 
         for c in list(ignore_columns):
             # FIXME, why do we convery ignore_clumns to a list here? it's a set which would work fine
@@ -334,11 +400,16 @@ class BulkVEPVCFAnnotationInserter:
             columns = self.transcript_columns
         else:
             raise ValueError(f"Unknown VariantAnnotationVersion base_table_name: '{base_table_name}'")
-        return self.DB_FIXED_COLUMNS + manual_columns + list(sorted(columns))
+        # Manual columns are emitted first; remove any overlap so the COPY header has no duplicates.
+        columns = set(columns) - set(manual_columns)
+        return self.DB_FIXED_COLUMNS + manual_columns + sorted(columns)
 
     def vep_to_db_dict(self, vep_transcript_data: TranscriptData, model_columns: Iterable[str]) -> dict:
         # logging.debug("vep_to_db_dict:")
         # logging.debug(vep_transcript_data)
+
+        if self.transcript_resolver is not None:
+            self._pick_dbnsfp_per_transcript_values(vep_transcript_data)
 
         raw_db_data = {}
 
@@ -368,6 +439,49 @@ class BulkVEPVCFAnnotationInserter:
             db_data[c] = value
 
         return db_data
+
+    def _pick_dbnsfp_per_transcript_values(self, vep_transcript_data: TranscriptData):
+        """ dbNSFP returns several score/pred fields as &-separated arrays parallel to
+            Ensembl_transcriptid. Look up the Ensembl id matching the current VEP transcript
+            via self.transcript_resolver, find its index in the array, and rewrite the
+            per-transcript fields to that single value. Leaves arrays untouched if no
+            mapping is available — the field formatters will then collapse them to a
+            representative value (max float / most-damaging pred).
+
+            Note: dbNSFP's Ensembl_transcriptid column is unversioned (e.g. ENST00000262340),
+            so we strip the .N suffix from the VEP Feature on both sides. """
+        ensembl_ids_raw = vep_transcript_data.get("Ensembl_transcriptid")
+        if not ensembl_ids_raw or VEP_SEPARATOR not in ensembl_ids_raw:
+            return  # Single value (or absent) — no array to pick from
+
+        feature = vep_transcript_data.get("Feature")
+        if not feature:
+            return
+        feature_unversioned = feature.split(".", 1)[0]
+
+        if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
+            symbol = vep_transcript_data.get("SYMBOL")
+            if not symbol:
+                return
+            target_ensembl = self.transcript_resolver.refseq_to_ensembl(symbol, feature_unversioned)
+        else:
+            target_ensembl = feature_unversioned  # Ensembl pipeline: VEP Feature is already ENST
+
+        if not target_ensembl:
+            return
+
+        ensembl_ids = ensembl_ids_raw.split(VEP_SEPARATOR)
+        try:
+            idx = ensembl_ids.index(target_ensembl)
+        except ValueError:
+            return  # Target ENST not in the array — fall through to formatter collapse
+
+        for source_field in self.DBNSFP_PER_TRANSCRIPT_SOURCE_FIELDS:
+            value = vep_transcript_data.get(source_field)
+            if value and VEP_SEPARATOR in value:
+                parts = value.split(VEP_SEPARATOR)
+                if idx < len(parts):
+                    vep_transcript_data[source_field] = parts[idx]
 
     @staticmethod
     def _pick_aloft_values(raw_db_data: dict):
@@ -466,8 +580,20 @@ class BulkVEPVCFAnnotationInserter:
         self._add_hemi_count(transcript_data)
         self._add_hgvs_g(variant_coordinate, transcript_data)
         self._add_calculated_num_predictions(transcript_data)
+        self._add_spliceai_max_ds(transcript_data)
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             self._calculate_gnomad_sv_overlap_percentage(variant_coordinate, transcript_data)
+
+    @staticmethod
+    def _add_spliceai_max_ds(transcript_data: TranscriptData):
+        ds_values = []
+        for key in ("spliceai_pred_ds_ag", "spliceai_pred_ds_al",
+                    "spliceai_pred_ds_dg", "spliceai_pred_ds_dl"):
+            v = transcript_data.get(key)
+            if v is not None:
+                ds_values.append(float(v))
+        if ds_values:
+            transcript_data["spliceai_max_ds"] = max(ds_values)
 
     def _add_calculated_num_predictions(self, transcript_data):
         num_pathogenic = 0
@@ -580,8 +706,10 @@ class BulkVEPVCFAnnotationInserter:
 
         svlen = v.INFO.get("SVLEN")
         variant_coordinate = VariantCoordinate(chrom=v.CHROM, position=v.POS, ref=v.REF, alt=v.ALT[0], svlen=svlen)
-        # Do now so we only retrieve sequences once
-        variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
+        # Do now so we only retrieve sequences once. <CNV>/<INS> can't be expanded to explicit
+        # ref/alt - leave them symbolic (downstream HGVS/SV-overlap handle the symbolic form)
+        if variant_coordinate.can_be_made_explicit:
+            variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
 
         try:
             variant_id = v.INFO["variant_id"]
@@ -645,6 +773,21 @@ class BulkVEPVCFAnnotationInserter:
             log_traceback()
             logging.error("Problem parsing variant: '%s'", v)
             raise e
+
+    def add_sv_gene_overlaps(self, variant_id: int, variant_coordinate: VariantCoordinate, variant_data: dict):
+        """ For long SVs that VEP skipped (TOO_LONG): resolve gene overlaps locally
+            from the gene_annotation_release transcripts and populate
+            overlapping_symbols + queue VariantGeneOverlap rows.
+            Leaves gene_id/transcript_id on the variant row null (a long SV may overlap many genes). """
+        if self.sv_gene_overlap_resolver is None:
+            return
+        symbols, gene_ids = self.sv_gene_overlap_resolver.get_overlaps(variant_coordinate)
+        if symbols:
+            variant_data["overlapping_symbols"] = ",".join(sorted(symbols))
+        for gene_id in gene_ids:
+            overlap = {"variant_id": variant_id, "gene_id": gene_id}
+            overlap.update(self.constant_data)
+            self.variant_gene_overlap_list.append(overlap)
 
     def finish(self):
         self.bulk_insert()
@@ -840,15 +983,45 @@ def format_canonical(value) -> bool:
     return value == "YES"
 
 
+# dbNSFP 5.3.1a (columns_version >= 4) emits AlphaMissense_pred as 'B'/'LB'/'A'/'LP'/'P',
+# optionally as &-separated arrays parallel to Ensembl_transcriptid. Map to the
+# AlphaMissensePrediction code and pick the most-pathogenic value across the array.
+_ALPHAMISSENSE_PRED_MAP = {
+    "B": AlphaMissensePrediction.BENIGN,
+    "LB": AlphaMissensePrediction.LIKELY_BENIGN,
+    "A": AlphaMissensePrediction.AMBIGUOUS,
+    "LP": AlphaMissensePrediction.LIKELY_PATHOGENIC,
+    "P": AlphaMissensePrediction.PATHOGENIC,
+}
+_ALPHAMISSENSE_PRED_ORDER = [
+    AlphaMissensePrediction.PATHOGENIC,
+    AlphaMissensePrediction.LIKELY_PATHOGENIC,
+    AlphaMissensePrediction.AMBIGUOUS,
+    AlphaMissensePrediction.LIKELY_BENIGN,
+    AlphaMissensePrediction.BENIGN,
+]
+
+
+def format_alphamissense_pred(raw_value):
+    seen = {_ALPHAMISSENSE_PRED_MAP[v] for v in raw_value.split(VEP_SEPARATOR) if v in _ALPHAMISSENSE_PRED_MAP}
+    for code in _ALPHAMISSENSE_PRED_ORDER:
+        if code in seen:
+            return code
+    return None
+
+
 class SVOverlapProcessor:
     """
         We use --custom (twice) rather than StructuralVariantOverlap
         due to some issues: https://github.com/Ensembl/VEP_plugins/issues/710
         This requires a bit of post-processing
     """
-    def __init__(self, cvf_qs: QuerySet[ColumnVEPField]):
-        cvf_qs = cvf_qs.filter(vep_custom__in=[VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME])
-        self.sv_fields = set(cvf_qs.values_list("variant_grid_column_id", flat=True))
+    def __init__(self, cvf_list: tuple[VEPColumnDef, ...]):
+        sv_customs = {VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME}
+        self.sv_fields = {
+            vgc for c in cvf_list if c.vep_custom in sv_customs
+            for vgc in c.variant_grid_columns
+        }
 
     @staticmethod
     def _get_required_substrings(variant_class: str) -> list[str]:
@@ -919,3 +1092,68 @@ class SVOverlapProcessor:
             raise ValueError(f"Unknown value for {settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD=}")
 
         return chosen_record
+
+
+class SVGeneOverlapResolver:
+    """ Resolves gene overlaps for long SVs that VEP skipped due to TOO_LONG.
+
+        Builds an in-memory per-contig IntervalTree of TranscriptVersions in the
+        VariantAnnotationVersion's gene_annotation_release. For each variant, returns
+        the set of overlapping (symbol, gene_id) pairs.
+    """
+
+    def __init__(self, variant_annotation_version: VariantAnnotationVersion):
+        self.variant_annotation_version = variant_annotation_version
+        gene_annotation_release = variant_annotation_version.gene_annotation_release
+        self._trees: dict[str, intervaltree.IntervalTree] = defaultdict(intervaltree.IntervalTree)
+
+        if gene_annotation_release is None:
+            logging.warning("SVGeneOverlapResolver: no gene_annotation_release on %s", variant_annotation_version)
+            return
+
+        start_time = time.monotonic()
+        tv_qs = TranscriptVersion.objects.filter(
+            releasetranscriptversion__release=gene_annotation_release,
+        ).select_related("gene_version__gene_symbol", "contig")
+
+        count = 0
+        for tv in tv_qs:
+            try:
+                start = tv.start
+                end = tv.end
+            except (KeyError, IndexError):
+                continue
+            if end <= start:
+                # intervaltree treats zero-length intervals as empty
+                end = start + 1
+            symbol = tv.gene_version.gene_symbol_id
+            gene_id = tv.gene_version.gene_id
+            self._trees[tv.contig.name].addi(start, end, (gene_id, symbol))
+            count += 1
+
+        elapsed = time.monotonic() - start_time
+        logging.info(
+            "SVGeneOverlapResolver: built %d intervals across %d contigs for %s in %.2fs",
+            count, len(self._trees), variant_annotation_version, elapsed,
+        )
+
+    def get_overlaps(self, variant_coordinate: VariantCoordinate) -> tuple[set[str], set[str]]:
+        """ Returns (overlapping_symbols, overlapping_gene_ids) for the given variant. """
+        symbols: set[str] = set()
+        gene_ids: set[str] = set()
+        tree = self._trees.get(variant_coordinate.chrom)
+        if tree is None:
+            return symbols, gene_ids
+
+        start = variant_coordinate.position
+        end = variant_coordinate.end
+        if end <= start:
+            end = start + 1
+
+        for interval in tree.overlap(start, end):
+            gene_id, symbol = interval.data
+            if gene_id is not None:
+                gene_ids.add(gene_id)
+            if symbol is not None:
+                symbols.add(symbol)
+        return symbols, gene_ids

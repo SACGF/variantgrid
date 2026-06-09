@@ -127,6 +127,7 @@ ANNOTATION[BUILD_GRCH38].update({
     "annotation_consortium": "RefSeq",
 })
 
+SITE_DESCRIPTION = "Shariant - Australian Genomics Variant Curation sharing project."
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
@@ -213,8 +214,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "upload_pipeline_modified_variants_grid": False,
     "view_upload_stats_detail": False,
     "accept_vcf_import_info_tag": False,
-    "jfu_upload": False,
-    "jfu_delete": False,
+    "upload_file": False,
+    "upload_file_delete": False,
     "download_uploaded_file": False,
 
     # discordance

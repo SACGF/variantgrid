@@ -14,7 +14,7 @@ from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
 from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff, HGVSConverterType, chgvs_diff_description
-from genes.models import TranscriptVersion, GeneSymbol, Transcript
+from genes.models import TranscriptVersion, GeneSymbol, Transcript, NoTranscript
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
@@ -178,6 +178,11 @@ class ResolvedVariantInfo(TimeStampedModel):
             self.transcript_version = c_hgvs_resolution.transcript_version
             self.gene_symbol = c_hgvs_resolution.gene_symbol
             self.c_hgvs_converter_data_version = c_hgvs_resolution.c_hgvs_converter_data_version
+        except NoTranscript as nt:
+            # Transcript missing/invalid in our DB — data issue, not a bug. See #1478.
+            self.error = str(nt)
+            logging.warning("Could not resolve c.HGVS for variant %s (%s, transcript %s): %s",
+                            variant, self.genome_build.name, self.allele_info.get_transcript, nt)
         except Exception as exception:
             self.error = str(exception)
             report_exc_info(extra_data={
@@ -514,7 +519,6 @@ class ImportedAlleleInfo(TimeStampedModel):
         return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
 
     @classmethod
-    @property
     def supported_genome_builds(cls) -> set:
         """ While we have hardcoded genome builds, we can only use these. Eventually can remove this and/or
             just return all annotated builds here """

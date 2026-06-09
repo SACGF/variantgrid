@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""
+External annotation runs (#1568): single entry point for off-VM annotation.
+
+The same command both dumps (write VCFs + metadata, park runs awaiting external annotation) and imports
+(re-import annotated VCFs), selected by --dump / --import. Run against a NEW (not yet ACTIVE)
+VariantAnnotationVersion: the normal scheduler only operates on the latest ACTIVE version, so it will not
+touch a NEW version's range locks.
+
+See claude/plans/1568_external_annotation_runs_plan.md.
+"""
+from django.core.management.base import BaseCommand, CommandError
+
+from annotation.external_annotation import dump_external_annotation_runs
+from annotation.models.models import VariantAnnotationVersion
+from annotation.models.models_enums import VariantAnnotationPipelineType
+from snpdb.models.models_genome import GenomeBuild
+
+
+class Command(BaseCommand):
+    help = "Dump/import external annotation runs (#1568)"
+
+    def add_arguments(self, parser):
+        mode = parser.add_mutually_exclusive_group(required=True)
+        mode.add_argument("--dump", action="store_true",
+                          help="Create + dump all runs for the NEW version, parking them awaiting external annotation")
+        mode.add_argument("--import", action="store_true", dest="import_mode",
+                          help="Re-import annotated VCFs, matching them back to local runs")
+
+        parser.add_argument("--genome-build", required=True)
+        parser.add_argument("--pipeline-type", default=VariantAnnotationPipelineType.STANDARD,
+                            choices=[VariantAnnotationPipelineType.STANDARD],
+                            help="v1 supports STANDARD (small variant) only; SV stays on the in-VM pipeline")
+        parser.add_argument("--output-dir", help="--dump: directory to write VCFs + metadata + Snakemake bundle")
+        parser.add_argument("--input-dir", help="--import: directory of annotated VCFs + sidecar metadata")
+        parser.add_argument("--dry-run", action="store_true",
+                            help="--import: list matches/unmatched without importing")
+
+    def handle(self, *args, **options):
+        genome_build = GenomeBuild.get_name_or_alias(options["genome_build"])
+        if options["dump"]:
+            self._run_dump(genome_build, options)
+        else:
+            self._run_import(genome_build, options)
+
+    def _run_dump(self, genome_build, options):
+        output_dir = options.get("output_dir")
+        if not output_dir:
+            raise CommandError("--dump requires --output-dir")
+
+        pipeline_type = options["pipeline_type"]
+        variant_annotation_version = VariantAnnotationVersion.latest(
+            genome_build, status=VariantAnnotationVersion.Status.NEW)
+        if variant_annotation_version is None:
+            raise CommandError(
+                f"No NEW VariantAnnotationVersion for {genome_build} - create one with "
+                f"create_new_variant_annotation_version and leave it NEW until external annotation completes")
+
+        annotation_runs = dump_external_annotation_runs(variant_annotation_version, output_dir,
+                                                        pipeline_type=pipeline_type)
+        self.stdout.write(
+            f"Dumped {len(annotation_runs)} external annotation run(s) for {variant_annotation_version} "
+            f"into {output_dir}")
+
+    def _run_import(self, genome_build, options):
+        raise CommandError("--import is implemented in a later build step (#1568)")

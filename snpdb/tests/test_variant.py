@@ -145,6 +145,24 @@ class VariantTestCase(TestCase):
         vc_from_explicit = vc_explicit.as_internal_canonical_form(self.grch37)
         self.assertEqual(vc_from_symbolic, vc_from_explicit)
 
+    def test_cnv_cannot_be_made_explicit(self):
+        """ <CNV> is a copy-number-variable region with no unambiguous explicit ref/alt expansion -
+            as_external_explicit() must keep its contract and raise rather than return symbolic """
+        vc_cnv = VariantCoordinate(chrom='1', position=1000000, ref='T', alt=VCFSymbolicAllele.CNV, svlen=5000)
+        self.assertFalse(vc_cnv.can_be_made_explicit)
+        with self.assertRaises(ValueError):
+            vc_cnv.as_external_explicit(self.grch37)
+
+        vc_dup = VariantCoordinate(chrom='1', position=1000000, ref='T', alt=VCFSymbolicAllele.DUP, svlen=999)
+        self.assertTrue(vc_dup.can_be_made_explicit)
+
+    def test_cnv_canonical_form_stays_symbolic(self):
+        """ Even a small <CNV> (below VARIANT_SYMBOLIC_ALT_SIZE) has no explicit form, so the
+            canonical form must stay symbolic rather than raising """
+        vc_cnv = VariantCoordinate(chrom='1', position=1000000, ref='T', alt=VCFSymbolicAllele.CNV, svlen=10)
+        vc_canonical = vc_cnv.as_internal_canonical_form(self.grch37)
+        self.assertEqual(vc_canonical.alt, VCFSymbolicAllele.CNV)
+
     def test_is_deletion(self):
         """ Issue #1449 BUG 1 - len(self.locus.ref) was missing .seq, causing TypeError """
         self.assertTrue(self.deletion_variant.is_deletion)

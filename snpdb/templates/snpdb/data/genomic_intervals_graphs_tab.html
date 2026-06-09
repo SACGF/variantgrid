@@ -1,0 +1,26 @@
+{% load static %}
+<style>
+    #genomic-intervals-graph, #genomic-intervals-graph img {
+        width: 640px;
+        height: 480px;
+        text-align: center;
+    }
+</style>
+<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+
+<script>
+$(document).ready(function() {
+    var graph_selector = $('#genomic-intervals-graph');
+    {% if gic.import_status == 'S' %}
+        var poll_url = "{% url 'genomic_intervals_graph' gic.id %}";
+        var delete_url = "{% url 'cached_generated_file_delete' %}";
+        poll_graph_status(graph_selector, poll_url, delete_url);
+    {% else %}
+        graph_selector.removeAttr('id');
+        graph_selector.removeClass();
+        graph_selector.html("Genomic Intervals have not finished importing.");
+    {% endif %}
+});
+</script>
+
+<div id='genomic-intervals-graph' class='generated-graph graph-loading'></div>

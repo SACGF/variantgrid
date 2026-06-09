@@ -91,6 +91,9 @@ class NodeGridHandler(NodeJSONViewMixin):
         return ret
 
     def _get_data(self, request, node, **kwargs):
+        # Don't build queryset if invalid (stale q-dict cache)
+        if errors := node.get_errors(flat=True):
+            return {"errors": errors, "rows": [], "records": 0, "page": 1, "total": 0}
         grid = _variant_grid_from_request(request, node)
         return grid.get_data(request)
 

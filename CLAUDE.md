@@ -84,9 +84,19 @@ There are per-app research documents generated in claude/research
 ## Security
 
 ### Authentication
-The project uses `global_login_required.GlobalLoginRequiredMiddleware`, which enforces login on **all** views globally. Individual views do **not** need `@login_required` decorators — their absence is intentional, not a security gap. Do not flag missing `@login_required` as a security issue during audits.
+The project enforces two protections via global middleware, so individual views do **not** need per-view decorators for either — their absence is intentional, not a security gap, and must not be flagged during audits:
+
+- **Login:** `global_login_required.GlobalLoginRequiredMiddleware` enforces login on **all** views globally, so no view needs `@login_required`.
+- **CSRF:** Django's `CsrfViewMiddleware` is active globally, so all state-changing views (POST/PUT/DELETE), including jQGrid and DataTables handlers, are CSRF-protected without `@csrf_protect`.
 
 DRF is configured with `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`, so all REST API endpoints require authentication by default. Individual API views do not need explicit `permission_classes` — their absence is intentional, not a security gap.
+
+## Python Style
+
+### Imports
+All imports go at the top of the file. Do not add inline imports inside functions, methods, or conditional blocks — not for "lazy loading", not to keep a function self-contained, not because the import is only used in one branch. The only legitimate reason to inline an import is to break a genuine circular import cycle, and even then you must stop, flag the cycle to the user, and ask whether to refactor the code instead of papering over it with an inline import.
+
+If you are about to write `from … import …` anywhere except the top of the file, that is a signal to go back and add it to the top-level import block.
 
 ## Key Patterns
 
@@ -112,11 +122,22 @@ Several apps have `__<app>_readme.md` files documenting architecture (e.g., `snp
 
 ## Git Commits
 
+Do NOT commit unless the user explicitly asks you to commit. Instructions like "apply the fix", "make the change", or "implement X" mean edit the code only — not commit.
+
 Do NOT add "Co-Authored-By: Claude" or any similar co-author trailer to commit messages.
 
 Reference GitHub issues in commit messages (e.g., `#1400`) but do NOT use keywords that auto-close issues (e.g., "fix", "close", "resolve"). Issues must go through a testing pipeline before being closed manually.
 
 Before committing, check `git status` for already-staged changes unrelated to the current task. If any exist, stop and confirm with the user before proceeding — do not include them in the commit.
+
+## Implementation Prompts
+
+When asked to draft a prompt for an agent to implement a plan in another conversation:
+
+- The plan file is the spec. Reference it; don't restate it.
+- Phrase everything positively. Do not include "do not", "don't", "no X", or any "Constraints" section listing things to avoid — even for defaults the agent would otherwise do, and even for ideas that came up and were rejected during planning. Naming the unwanted thing plants it ("don't think of an elephant"). If a default needs to be overridden, either fix the plan to carry the positive instruction, or state the positive behaviour you want ("update all callers to use the new kwarg" rather than "don't add a backwards-compat shim").
+- The plan reflects the final decision; the agent reading it won't see the alternatives. Mentioning rejected options only confuses or implies the plan is incomplete.
+- Keep prompts short: read-list, "follow plan §X-§Y", any positive overrides, report-back format. No "pre-resolved decisions" section.
 
 ## GitHub Comments
 

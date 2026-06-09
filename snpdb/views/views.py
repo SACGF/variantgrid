@@ -1,6 +1,7 @@
 import itertools
 import json
 import logging
+import os
 from collections import OrderedDict, defaultdict
 from typing import Iterable
 
@@ -13,6 +14,7 @@ from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured, ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
+from django.utils.html import escape
 from django.forms.widgets import TextInput
 from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseRedirect, HttpResponseServerError, JsonResponse
@@ -32,9 +34,8 @@ from analysis.models import AnalysisTemplate
 from analysis.tasks.analysis_grid_export_tasks import get_annotated_download_files_cgf
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import create_manual_variants, can_create_variants
-from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
-    SampleClinVarAnnotationStats, SampleVariantAnnotationStatsPassingFilter, SampleGeneAnnotationStatsPassingFilter, \
-    SampleClinVarAnnotationStatsPassingFilter
+from annotation.models import AnnotationVersion, CohortGenotypeVariantAnnotationStats, \
+    CohortGenotypeGeneAnnotationStats, CohortGenotypeClinVarAnnotationStats
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
@@ -52,6 +53,7 @@ from library import uptime_check
 from library.constants import WEEK_SECS, HOUR_SECS
 from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser, \
     get_field_counts
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
@@ -60,6 +62,8 @@ from patients.forms import PatientForm
 from patients.models import Patient, Clinician
 from patients.views import get_patient_upload_csv
 from snpdb import forms
+from snpdb.archive import DataArchivedError, ArchivePreconditionError, check_vcf_archive_precondition, \
+    mark_vcf_archive_started
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
     UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
     OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
@@ -75,12 +79,13 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, Quad, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, \
     Lab, LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
+    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, \
+    CohortGenotypeStats, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, AlleleConversionTool
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.liftover_tasks import liftover_alleles
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
+from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from snpdb.utils import LabNotificationBuilder, get_tag_styles_and_colors
 from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
@@ -103,8 +108,27 @@ def maps(request):
     return render(request, 'maps.html')
 
 
-def get_writable_class_object(user, class_name, primary_key):
-    klass = import_class(class_name)
+def _import_permission_class(class_name):
+    """ class_name comes from the URL - resolve it to a class, tolerating anything that doesn't. """
+    try:
+        klass = import_class(class_name)
+    except (ImportError, AttributeError, ValueError):
+        klass = None
+    return klass if isinstance(klass, type) else None
+
+
+def _require_guardian_permission_class(class_name):
+    """ For the sharing views (group_permissions / bulk): only models that implement Guardian
+        object-level permissions can have their permissions viewed/edited. Without this an attacker
+        could pass an arbitrary class_name and act on models whose can_write() defaults to True
+        (e.g. collaborative Wikis). """
+    klass = _import_permission_class(class_name)
+    if not (klass and issubclass(klass, GuardianPermissionsMixin)):
+        raise PermissionDenied(f"'{class_name}' is not a permission-managed class")
+    return klass
+
+
+def _get_writable_object(user, klass, primary_key):
     name = klass.__name__
     obj = klass.objects.get(pk=primary_key)
 
@@ -116,8 +140,13 @@ def get_writable_class_object(user, class_name, primary_key):
     return obj, name
 
 
+def get_writable_class_object(user, class_name, primary_key):
+    klass = _require_guardian_permission_class(class_name)
+    return _get_writable_object(user, klass, primary_key)
+
+
 def get_writable_class_objects(user, class_name):
-    klass = import_class(class_name)
+    klass = _require_guardian_permission_class(class_name)
     name = klass.__name__
     write_perm = DjangoPermission.perm(klass, DjangoPermission.WRITE)
     qs = get_objects_for_user(user, write_perm, klass=klass, accept_global_perms=False)
@@ -166,7 +195,13 @@ def group_permissions_object_delete(request, class_name, primary_key):
     if class_name == 'snpdb.models.VCF':  # TODO: Hack? Make some class object?
         soft_delete_vcfs(request.user, primary_key)
     else:
-        obj, _ = get_writable_class_object(request.user, class_name, primary_key)
+        klass = _import_permission_class(class_name)
+        # Deletion via this generic endpoint is opt-in per class - having WRITE permission isn't
+        # enough (e.g. ClassificationModification audit records must never be deletable here).
+        allow_delete = getattr(klass, "allow_group_permission_delete", None)
+        if not (callable(allow_delete) and allow_delete()):
+            raise PermissionDenied(f"'{class_name}' does not allow deletion via group permissions")
+        obj, _ = _get_writable_object(request.user, klass, primary_key)
         try:
             obj.delete()
         except IntegrityError as ie:
@@ -202,10 +237,21 @@ def bulk_group_permissions(request, class_name):
     return render(request, 'snpdb/data/bulk_group_permissions.html', context)
 
 
-def _get_vcf_sample_stats(vcf, klass):
-    """ Count is het + hom """
-    ss_fields = ("sample_id", "sample__name", "variant_count", "ref_count", "het_count", "hom_count", "unk_count")
-    ss_values_qs = klass.objects.filter(sample__vcf=vcf).order_by("sample").values(*ss_fields)
+def _get_vcf_sample_stats(vcf, passing_filter: bool):
+    """ Count is het + hom. Reads CohortGenotypeStats per-sample rows
+        (sample IS NOT NULL, filter_key NULL) for the VCF's cohort. """
+    try:
+        cgc = vcf.cohort.cohort_genotype_collection
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
+        return {}, [], ()
+
+    ss_fields = ("sample_id", "sample__name", "variant_count", "ref_count",
+                 "het_count", "hom_count", "unk_count")
+    ss_values_qs = (CohortGenotypeStats.objects
+                    .filter(cohort_genotype_collection=cgc, sample__vcf=vcf,
+                            filter_key__isnull=True, passing_filter=passing_filter)
+                    .order_by("sample")
+                    .values(*ss_fields))
 
     sample_stats_het_hom_count = {}
     sample_names = []
@@ -251,8 +297,8 @@ def view_vcf(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
 
-    sample_stats_het_hom_count, sample_names, sample_zygosities = _get_vcf_sample_stats(vcf, SampleStats)
-    sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, SampleStatsPassingFilter)
+    sample_stats_het_hom_count, sample_names, sample_zygosities = _get_vcf_sample_stats(vcf, passing_filter=False)
+    sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, passing_filter=True)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
                                              fields=["vcf_sample_name", "name", "patient", "specimen"],
@@ -283,6 +329,9 @@ def view_vcf(request, vcf_id):
         _ = vcf.cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
         messages.add_message(request, messages.ERROR, "This legacy VCF is missing data and needs to be reloaded.")
+    except DataArchivedError:
+        # Banner from _data_archived_banner.html shows the message; cohort_id stays set if available.
+        pass
 
     if reload_vcf:
         set_vcf_and_samples_import_status(vcf, ImportStatus.IMPORTING)
@@ -321,6 +370,13 @@ def view_vcf(request, vcf_id):
 
     vcf_length_stats = _get_vcf_length_stats(vcf)
 
+    from snpdb.archive import vcf_can_be_archived
+    can_archive = has_write_permission and vcf_can_be_archived(vcf)
+    restore_source_exists = bool(vcf.data_restorable_from) and os.path.exists(vcf.data_restorable_from)
+    restore_source_kind = "uploaded"
+    if vcf.data_restorable_from and vcf.data_restorable_from.startswith(settings.PARTITION_ARCHIVE_DIR):
+        restore_source_kind = "backend"
+
     context = {
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
@@ -335,8 +391,59 @@ def view_vcf(request, vcf_id):
         'annotated_download_files': annotated_download_files,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
         "vcf_length_stats": vcf_length_stats,
+        "can_archive": can_archive,
+        "restore_source_exists": restore_source_exists,
+        "restore_source_kind": restore_source_kind,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
+
+
+def archive_vcf_view(request, vcf_id):
+    vcf = VCF.get_for_user(request.user, vcf_id)
+    if not vcf.can_write(request.user):
+        raise PermissionDenied("You do not have write permission for this VCF")
+    if request.method != "POST":
+        return HttpResponseRedirect(vcf.get_absolute_url())
+    reason = request.POST.get("reason", "")
+    force = request.POST.get("force") == "1"
+    if vcf.data_archived:
+        messages.add_message(request, messages.INFO, "VCF data is already archived.")
+        return HttpResponseRedirect(vcf.get_absolute_url())
+    if vcf.data_archive_in_progress:
+        messages.add_message(request, messages.INFO, "VCF data archiving is already in progress.")
+        return HttpResponseRedirect(vcf.get_absolute_url())
+    try:
+        # Validate synchronously so the user gets immediate feedback, then queue the
+        # slow work (zygosity walk + dropping partition data) to avoid request timeout.
+        check_vcf_archive_precondition(vcf, force=force)
+    except ArchivePreconditionError as e:
+        messages.add_message(request, messages.ERROR, str(e))
+        return HttpResponseRedirect(vcf.get_absolute_url())
+
+    # Mark in-progress (committed now) so a reload won't offer Archive again, then queue.
+    mark_vcf_archive_started(vcf)
+    archive_vcf_task.delay(vcf.pk, request.user.pk, reason=reason, force=force)
+    if force:
+        messages.add_message(request, messages.SUCCESS,
+                             "VCF data archiving has been queued (non-recoverable — no source file to restore from).")
+    else:
+        messages.add_message(request, messages.SUCCESS, "VCF data archiving has been queued.")
+    return HttpResponseRedirect(vcf.get_absolute_url())
+
+
+def restore_vcf_view(request, vcf_id):
+    from snpdb.archive import restore_vcf
+    vcf = VCF.get_for_user(request.user, vcf_id)
+    if not vcf.can_write(request.user):
+        raise PermissionDenied("You do not have write permission for this VCF")
+    if request.method != "POST":
+        return HttpResponseRedirect(vcf.get_absolute_url())
+    try:
+        restore_vcf(vcf, request.user)
+        messages.add_message(request, messages.SUCCESS, "VCF restore started — re-importing data.")
+    except ValueError as e:
+        messages.add_message(request, messages.ERROR, str(e))
+    return HttpResponseRedirect(vcf.get_absolute_url())
 
 
 def get_patient_upload_csv_for_vcf(request, pk):
@@ -348,11 +455,16 @@ def get_patient_upload_csv_for_vcf(request, pk):
 
 def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
     annotation_version = AnnotationVersion.latest(sample.genome_build)
+    try:
+        cgc = sample.vcf.cohort.cohort_genotype_collection
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
+        return pd.DataFrame(), pd.DataFrame()
+
     STATS = {
-        "Total": (SampleStats, SampleStatsPassingFilter, set()),
-        "dbSNP": (SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter, {"variant_annotation_version"}),
-        "OMIM pheno": (SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter, {"gene_annotation_version"}),
-        "ClinVar LP/P": (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, {"clinvar_version"})
+        "Total": (CohortGenotypeStats, set()),
+        "dbSNP": (CohortGenotypeVariantAnnotationStats, {"variant_annotation_version"}),
+        "OMIM pheno": (CohortGenotypeGeneAnnotationStats, {"gene_annotation_version"}),
+        "ClinVar LP/P": (CohortGenotypeClinVarAnnotationStats, {"clinvar_version"}),
     }
 
     VARIANT_CLASS = ["variant", "snp", "insertions", "deletions"]
@@ -360,19 +472,23 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     variant_class_data = {}
     zygosity_data = {}
-    for name, (stats_klass, stats_passing_filters_klass, shared_fields) in STATS.items():
-        kwargs = {"sample": sample}
+    for name, (stats_klass, shared_fields) in STATS.items():
+        base_kwargs = {
+            "cohort_genotype_collection": cgc,
+            "sample": sample,
+            "filter_key__isnull": True,
+        }
         for sf in shared_fields:
-            kwargs[sf] = getattr(annotation_version, sf)
+            base_kwargs[sf] = getattr(annotation_version, sf)
 
         objs = {}
         try:
-            objs[name] = stats_klass.objects.get(**kwargs)
+            objs[name] = stats_klass.objects.get(passing_filter=False, **base_kwargs)
         except ObjectDoesNotExist:
             pass
 
         try:
-            objs[f"{name} PASS filters"] = stats_passing_filters_klass.objects.get(**kwargs)
+            objs[f"{name} PASS filters"] = stats_klass.objects.get(passing_filter=True, **base_kwargs)
         except ObjectDoesNotExist:
             pass
 
@@ -404,6 +520,22 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
     return sample_stats_variant_class_df, sample_stats_zygosity_df
 
 
+def _get_sample_genotype_stats(sample):
+    """ Resolve the per-sample CohortGenotypeStats row (passing_filter=False,
+        filter_key NULL) for the template, replacing the old `sample.samplestats`
+        reverse accessor. Returns None if missing (e.g. legacy data). """
+    try:
+        cgc = sample.vcf.cohort.cohort_genotype_collection
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
+        return None
+    try:
+        return CohortGenotypeStats.objects.get(
+            cohort_genotype_collection=cgc, sample=sample,
+            filter_key__isnull=True, passing_filter=False)
+    except ObjectDoesNotExist:
+        return None
+
+
 def view_sample(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     has_write_permission = sample.can_write(request.user)
@@ -433,6 +565,7 @@ def view_sample(request, sample_id):
         related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
     sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
+    sample_genotype_stats = _get_sample_genotype_stats(sample)
     annotated_download_files = {}
     if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
         if sample.import_status == ImportStatus.SUCCESS:
@@ -451,6 +584,7 @@ def view_sample(request, sample_id):
         "bam_list": sample.get_bam_files(),
         "sample_stats_variant_class_df": sample_stats_variant_class_df,
         "sample_stats_zygosity_df": sample_stats_zygosity_df,
+        "sample_genotype_stats": sample_genotype_stats,
         "related_samples": related_samples
     }
     return render(request, 'snpdb/data/view_sample.html', context)
@@ -550,6 +684,14 @@ def view_genomic_intervals(request, genomic_intervals_collection_id):
     return render(request, 'snpdb/data/view_genomic_intervals.html', context)
 
 
+def genomic_intervals_graphs_tab(request, genomic_intervals_collection_id):
+    gic = get_object_or_404(GenomicIntervalsCollection, pk=genomic_intervals_collection_id)
+    if not request.user.has_perm('view_genomicintervalscollection', gic):
+        raise PermissionDenied()
+    context = {'gic': gic}
+    return render(request, 'snpdb/data/genomic_intervals_graphs_tab.html', context)
+
+
 @require_POST
 def cached_generated_file_delete(request):
     cgf_id = request.POST["cgf_id"]
@@ -622,7 +764,7 @@ def manual_variant_entry(request):
 
 
 def manual_variant_entry_collection_detail(request: HttpRequest, pk: int):
-    mvec = ManualVariantEntryCollection.objects.get(pk=pk)
+    mvec = ManualVariantEntryCollection.get_for_user(request.user, pk)
     return render(request, 'snpdb/data/manual_variant_entry_collection_detail.html', context={'mvec': mvec})
 
 
@@ -1113,8 +1255,9 @@ def cohorts(request):
 
 def view_cohort_details_tab(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    has_write_permission = cohort.can_write(request.user) and not cohort.data_archived
     context = {"cohort": cohort,
-               "has_write_permission": cohort.can_write(request.user)}
+               "has_write_permission": has_write_permission}
     return render(request, 'snpdb/patients/view_cohort_details_tab.html', context)
 
 
@@ -1125,11 +1268,15 @@ def view_cohort(request, cohort_id):
 
     try:
         cohort_genotype_collection = cohort.cohort_genotype_collection
-    except CohortGenotypeCollection.DoesNotExist:
+    except (CohortGenotypeCollection.DoesNotExist, DataArchivedError):
         cohort_genotype_collection = None
+
+    has_write_permission = cohort.can_write(request.user) and not cohort.data_archived
 
     form = forms.CohortForm(request.POST or None, instance=cohort)
     if request.method == "POST":
+        if not has_write_permission:
+            raise PermissionDenied()
         if valid := form.is_valid():
             cohort = form.save()
         add_save_message(request, valid, "Cohort")
@@ -1141,12 +1288,14 @@ def view_cohort(request, cohort_id):
                "sample_form": sample_form,
                "cohort": cohort,
                "cohort_genotype_collection": cohort_genotype_collection,
-               "has_write_permission": cohort.can_write(request.user)}
+               "has_write_permission": has_write_permission}
     return render(request, 'snpdb/patients/view_cohort.html', context)
 
 
 def cohort_sample_edit(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
 
     if request.method == "POST":
         cohort_op = request.POST['cohort_op']
@@ -1171,6 +1320,8 @@ def cohort_sample_edit(request, cohort_id):
 
 def cohort_hotspot(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
     vav = VariantAnnotationVersion.latest(cohort.genome_build)
     form = GeneAndTranscriptForm(gene_annotation_release=vav.gene_annotation_release,
                                  has_protein_domains=True)
@@ -1192,6 +1343,8 @@ def cohort_hotspot(request, cohort_id):
 
 def cohort_gene_counts(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
 
     COHORT_CUSTOM_GENE_LIST = f"__QC_COVERAGE_CUSTOM_GENE_LIST__{request.user}"
 
@@ -1219,6 +1372,8 @@ def cohort_gene_counts(request, cohort_id):
 
 def cohort_gene_counts_matrix(request, cohort_id, gene_count_type_id, gene_list_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
     gene_count_type = GeneCountType.objects.get(pk=gene_count_type_id)
     gene_list = GeneList.get_for_user(request.user, gene_list_id)
     samples = list(cohort.get_samples())
@@ -1353,11 +1508,11 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
             sample_code = "%03d" % i
             if can_access:
                 view_sample_url = reverse('view_sample', kwargs={'sample_id': sample.pk})
-
-                sample_link = f'<a href="{view_sample_url}">{sample.name}</a>'
+                safe_name = escape(sample.name)
+                sample_link = f'<a href="{view_sample_url}">{safe_name}</a>'
                 if sample_link in used_sample_names:
-                    uniq_sample_name = sample.name + "_" + sample_code
-                    sample_link = f'<a href="{view_sample_url}">{uniq_sample_name}</a>'
+                    safe_uniq_name = escape(sample.name + "_" + sample_code)
+                    sample_link = f'<a href="{view_sample_url}">{safe_uniq_name}</a>'
 
                 sample_name = sample_link
             else:
@@ -1424,6 +1579,8 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
 def cohort_sort(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
     if request.method == "POST":
         cohort_samples_str = request.POST.get("cohort_samples")
         cohort_samples_ids = cohort_samples_str.split(',') if cohort_samples_str else []
@@ -1475,9 +1632,9 @@ def wait_for_task(request, celery_task, sleep_ms, redirect_url):
 
 @require_POST
 def wiki_save(request, class_name, unique_keyword, unique_value):
-    wiki = Wiki.get_or_create(class_name, unique_keyword, unique_value)
+    # get_or_create checks write permission (throws 403) before creating the row
+    wiki = Wiki.get_or_create(class_name, unique_keyword, unique_value, user=request.user)
     markdown = request.POST["markdown"]
-    wiki.check_user_edit_permission(request.user)  # Throws 403
 
     wiki.markdown = markdown
     wiki.last_edited_by = request.user

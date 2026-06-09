@@ -1,171 +1,213 @@
-import itertools
 import logging
-import operator
 import uuid
 from collections import defaultdict
-from functools import reduce
+from datetime import timedelta
+from typing import Optional
 
 import celery
-import networkx as nx
+from auditlog.context import disable_auditlog
 from celery.canvas import Signature, chain
-from django.db.models import Q
+from django.db import transaction
+from django.utils import timezone
 
-from analysis.models import Analysis, AnalysisEdge, NodeStatus, NodeTask, AnalysisNode
-from analysis.models.nodes.node_utils import get_nodes_by_id, get_toposorted_nodes_from_parent_value_data
-from analysis.tasks.node_update_tasks import wait_for_node
+from analysis.models import AnalysisEdge, NodeStatus, NodeColors, NodeTask, AnalysisNode
+from analysis.models.nodes.analysis_node import NodeCache, NodeVersion
+from analysis.models.nodes.node_utils import get_nodes_by_id
+from analysis.tasks.node_update_tasks import MAX_NODE_ATTEMPTS
+from library.constants import MINUTE_SECS
 from library.log_utils import log_traceback
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
+from snpdb.models import ProcessingStatus
+
+# A node load that exceeds this is already a problem; reclaiming it (risking duplicate work)
+# is acceptable. There is no heartbeat - the lease is a flat window.
+LEASE_SECONDS = MINUTE_SECS * 10
 
 
 @celery.shared_task
 def create_and_launch_analysis_tasks(analysis_id, run_async=True):
-    """ This is run in a single worker queue so that we avoid race conditions"""
+    """ Routed to scheduling_single_worker (the only caller of lease_ready_nodes).
+
+        mocha dispatch_pending_actions(): lease every node that is ready right now, then fan
+        out one task per leased node so analysis_workers pick them up in parallel. A node
+        finishing re-triggers this dispatcher, which leases whatever just became ready. """
     try:
-        tasks = _get_analysis_update_tasks(analysis_id)
-    except:
+        worker_id = f"dispatch:{create_and_launch_analysis_tasks.request.id or 'sync'}"
+        leased = lease_ready_nodes(analysis_id, worker_id)
+    except Exception:
         log_traceback()
         raise
 
-    for t in tasks:
+    logging.info("create_and_launch_analysis_tasks(%s): leased %d node(s): %s",
+                 analysis_id, len(leased), leased)
+    for node_id, version in leased:
+        try:
+            sig = _node_launch_signature(node_id, version)
+        except AnalysisNode.DoesNotExist:
+            # Version bumped (user edit) or node deleted between leasing and dispatch. The new
+            # version is DIRTY and will be re-dispatched; skip so the other leased nodes still launch.
+            continue
         if run_async:
-            t.apply_async()
+            sig.apply_async()
         else:
-            result = t.apply()
+            result = sig.apply()
             if not result.successful():
                 raise Exception(result.result)
 
 
-def _get_analysis_update_tasks(analysis_id) -> list:
-    """ Runs update tasks on nodes that have status=DIRTY """
-
-    tasks = []
-
-    analysis = Analysis.objects.get(pk=analysis_id)
-    nodes_by_id = get_nodes_by_id(analysis.analysisnode_set.all().select_subclasses())
-    edges = AnalysisEdge.objects.filter(parent__analysis=analysis).values_list("parent", "child")
-
-    all_nodes_graph = nx.DiGraph()
-    all_nodes_graph.add_nodes_from(nodes_by_id)
-    all_nodes_graph.add_edges_from(edges)
-
-    logging.info("-" * 60)
-    for connected_components in nx.weakly_connected_components(all_nodes_graph):
-        sub_graph = all_nodes_graph.subgraph(connected_components)
-        sub_graph_node_ids = list(sub_graph)
-
-        # We need a way to lock/claim the nodes - so someone else calling get_analysis_update_task()
-        # doesn’t also launch update tasks for them.
-        analysis_update_uuid = uuid.uuid4()
-        node_task_records = []
-        logging.info("Dirty nodes:")
-        for node_id in sub_graph_node_ids:
-            node = nodes_by_id[node_id]
-            if node.status == NodeStatus.DIRTY:
-                node_task = NodeTask(node_id=node_id, version=node.version, analysis_update_uuid=analysis_update_uuid)
-                logging.info(node_task)
-                node_task_records.append(node_task)
-
-        if not node_task_records:
-            continue
-
-        NodeTask.objects.bulk_create(node_task_records, ignore_conflicts=True)
-
-        # Return the ones we got the lock for
-        node_tasks = NodeTask.objects.filter(analysis_update_uuid=analysis_update_uuid)
-        node_versions_to_update = dict(node_tasks.values_list("node_id", "version"))
-        logging.info(f"Got lock for: {node_versions_to_update}")
-
-        groups = []
-        if node_versions_to_update:
-            # Build parent→child mapping here — available for toposort, dependencies,
-            # and will also be used by _can_schedule_node once issue #346 is implemented
-            parent_value_data = defaultdict(set)
-            for parent, child_list in nx.to_dict_of_lists(sub_graph).items():
-                for child_node_id in child_list:
-                    parent_value_data[child_node_id].add(parent)
-
-            dependencies = _get_node_dependencies(nodes_by_id, parent_value_data)
-            topo_sorted = get_toposorted_nodes_from_parent_value_data(nodes_by_id, parent_value_data)
-
-            # Ensure cache loading tasks are only triggered once. Cache can come from different toposort level/groups
-            # e.g. MergeNode asks parent Venn to cache (which is was already doing)
-            all_cache_jobs = set()
-            for grp in topo_sorted:
-                group_cache_jobs = _add_jobs_for_group(node_versions_to_update, dependencies, grp, groups, all_cache_jobs)
-                all_cache_jobs.update(group_cache_jobs)
-
-            # Need to only set where version matches what we got lock for (as it may have updated)
-            node_version_q_list = []
-            for node_id, version in node_versions_to_update.items():
-                node_version_q_list.append(Q(pk=node_id) & Q(version=version))
-            q_node_version = reduce(operator.or_, node_version_q_list)
-            analysis.analysisnode_set.filter(q_node_version).update(status=NodeStatus.QUEUED)
-
-        if groups:
-            t = _get_celery_workflow_task(groups)
-            tasks.append(t)
-
-    return tasks
+def _load_graph(analysis_id):
+    """ Returns (nodes_by_id, parents_by_child):
+        - nodes_by_id: subclass instances keyed by pk (current statuses + cache-aware methods)
+        - parents_by_child: {child_id: {parent_id, ...}} from AnalysisEdge """
+    nodes_qs = AnalysisNode.objects.filter(analysis_id=analysis_id).select_subclasses()
+    nodes_by_id = get_nodes_by_id(nodes_qs)
+    parents_by_child = defaultdict(set)
+    edges = AnalysisEdge.objects.filter(parent__analysis_id=analysis_id).values_list("parent_id", "child_id")
+    for parent_id, child_id in edges:
+        parents_by_child[child_id].add(parent_id)
+    return nodes_by_id, parents_by_child
 
 
-def _get_celery_workflow_task(groups):
-    # So I used to use a Celery chord to be able to execute things at the same level (group) in parallel
-    # however, it ended up being 3x slower doing it the 'clever' way due to fighting for DB I/O resources
-    # The celery messages could be enormous crashing out RabbitMQ and there would be celery chord jobs
-    # left orphaned and executed every few seconds forever. So - just doing it the dumb way.
-    task = chain(itertools.chain(*groups))
-    return task
+def _node_cache_target(node, force_cache=False) -> Optional[tuple]:
+    """ The (node_id, version) of the NodeVersion whose NodeCache this node depends on, or
+        None if the node uses no cache. Mirrors get_cache_task_args_set's target resolution
+        WITHOUT creating anything. """
+    if not (node.is_valid and (force_cache or node.use_cache)):
+        return None
+    if parent := node.get_unmodified_single_parent_node():
+        return _node_cache_target(parent, force_cache=force_cache)
+    return node.pk, node.version
 
 
-def _add_jobs_for_group(nodes_to_update, dependencies, grp, groups, existing_cache_jobs) -> set:
-    cache_jobs = set()
-    after_jobs = []
-    jobs = []
+def _node_cache_ready(node) -> bool:
+    """ Hold a node back only while a shared NodeCache it depends on is actively being built by
+        ANOTHER node (ProcessingStatus.PROCESSING); the builder's node_cache_task re-triggers the
+        dispatcher on completion.
 
-    for node in grp:
-        if node.pk in nodes_to_update:
-            update_job = node.get_update_task()
+        A node that builds its own cache is never gated here - node_cache_task is chained ahead of
+        its update task by _node_launch_signature, so gating it would deadlock a reclaimed builder.
+        A cache that merely exists as CREATED (not yet, or no longer, being built) also does not
+        block: the node falls back to a live query rather than hanging if the builder was lost. """
+    target = _node_cache_target(node)
+    if target is None or target == (node.pk, node.version):
+        return True  # no cache dependency, or this node builds its own (chained, not gated)
+    target_node_id, target_version = target
+    node_cache = NodeCache.objects.filter(node_version__node_id=target_node_id,
+                                          node_version__version=target_version) \
+        .select_related("variant_collection").first()
+    if node_cache is None:
+        return True  # not created yet - this node (or a same-round sibling) will build it
+    return node_cache.variant_collection.status != ProcessingStatus.PROCESSING
 
-            # Cache jobs are separated, and put in a set to remove dupes such as when >=2 venn's have the same parents
-            task_args_objs_set = node.get_cache_task_args_set()
-            new_cache_jobs = task_args_objs_set - existing_cache_jobs
-            if new_cache_jobs:
-                cache_jobs.update(new_cache_jobs)
-                after_jobs.append(update_job)
-            else:
-                jobs.append(update_job)
-        elif node.pk in dependencies:
-            # Sometimes nodes may be already loading from another update - need to keep dependencies on existing task
-            # and wait on loading parent tasks
-            if NodeStatus.is_loading(node.status):
-                jobs.append(wait_for_node.si(node.pk))  # @UndefinedVariable
 
+def _node_ready_to_lease(node, parents_by_child, nodes_by_id) -> bool:
+    """ mocha dependencies_satisfied() equivalent.
+
+        All parents must be settled (in READY_STATUSES - READY or any error), i.e. none still
+        loading. ERROR parents count as 'ready' so the child runs and fails fast with
+        ERROR_WITH_PARENT (matches issue comment). A required NodeCache being built by another
+        node must also have finished. """
+    for parent_id in parents_by_child.get(node.id, ()):
+        parent = nodes_by_id.get(parent_id)
+        if parent is None or NodeStatus.is_loading(parent.status):
+            return False
+    return _node_cache_ready(node)
+
+
+def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS):
+    """ mocha lease_action() + dispatch, batched per analysis. SINGLE-WORKER ONLY (called only
+        from create_and_launch_analysis_tasks on scheduling_single_worker).
+
+        Claims fresh work, reclaims expired leases, and gives up (terminal fail) past
+        MAX_NODE_ATTEMPTS. Returns the (node_id, version) tuples now owned by this run. """
+    now = timezone.now()
+    leased = []
+    leased_cache_targets = set()
+    with transaction.atomic():
+        # Coarse base-table filter (no select_subclasses - keeps select_for_update simple).
+        # Candidates are nodes that are not yet settled (DIRTY/QUEUED/LOADING_CACHE/LOADING).
+        # skip_locked => a racing dispatcher simply skips rows we hold.
+        # select_related(None) clears the manager's nullable LEFT JOINs (annotation_version etc.)
+        # which Postgres refuses to lock ("FOR UPDATE cannot be applied to the nullable side...").
+        candidates = list(
+            AnalysisNode.objects
+            .select_related(None)
+            .select_for_update(skip_locked=True)
+            .filter(analysis_id=analysis_id, status__in=NodeStatus.LOADING_STATUSES)
+            .order_by("pk")
+        )
+        nodes_by_id, parents_by_child = _load_graph(analysis_id)
+        tasks_by_node = {}  # current-version lease rows only
+        for nt in NodeTask.objects.filter(node_version__node__analysis_id=analysis_id).select_related("node_version"):
+            node = nodes_by_id.get(nt.node_version.node_id)
+            if node and node.version == nt.node_version.version:
+                tasks_by_node[nt.node_version.node_id] = nt
+
+        for candidate in candidates:
+            node = nodes_by_id.get(candidate.pk)
+            if node is None:
+                continue
+            node_task = tasks_by_node.get(node.pk)
+            lease_live = bool(node_task and node_task.lease_expires and node_task.lease_expires >= now)
+            if node.status != NodeStatus.DIRTY and lease_live:
+                continue  # someone is actively working it, lease still valid -> leave alone
+
+            attempts = node_task.attempt_count if node_task else 0
+            if attempts >= MAX_NODE_ATTEMPTS:
+                # Burned all attempts (transient errors and/or dead-worker reclaims) -> give up.
+                _fail_node(node, "Node task did not complete (worker lost); marked failed.")
+                continue
+            if node_task and node_task.run_after and node_task.run_after > now:
+                continue  # backing off - not leasable yet
+            if not _node_ready_to_lease(node, parents_by_child, nodes_by_id):
+                continue  # parents still loading / required cache still building
+
+            cache_target = _node_cache_target(node)
+            is_own_cache = cache_target == (node.pk, node.version)
+            if cache_target is not None and not is_own_cache and cache_target in leased_cache_targets:
+                continue  # a node leased this round is building the shared cache - wait for it
+
+            node_version, _ = NodeVersion.objects.get_or_create(node_id=node.pk, version=node.version)
+            NodeTask.objects.update_or_create(
+                node_version=node_version,
+                defaults={
+                    "analysis_update_uuid": uuid.uuid4(),
+                    "leased_by": worker_id,
+                    "lease_expires": now + timedelta(seconds=lease_seconds),
+                    "last_attempt": now,
+                    "attempt_count": (attempts + 1),
+                    "run_after": None,
+                    "celery_task": None,
+                },
+            )
+            AnalysisNode.objects.filter(pk=node.pk, version=node.version).update(status=NodeStatus.QUEUED)
+            leased.append((node.pk, node.version))
+            if cache_target is not None:
+                leased_cache_targets.add(cache_target)
+    return leased
+
+
+def _fail_node(node, message):
+    with disable_auditlog():
+        AnalysisNode.objects.filter(pk=node.pk, version=node.version).update(
+            status=NodeStatus.ERROR, shadow_color=NodeColors.ERROR, errors=message)
+    NodeTask.objects.filter(node_version__node_id=node.pk, node_version__version=node.version) \
+        .update(lease_expires=None, leased_by=None)
+
+
+def _node_launch_signature(node_id, version):
+    """ Per-node replacement for the old group/chord building. For an ordinary node returns its
+        update task; for a node that must build its OWN cache first returns the two-task chain
+        [node_cache_task, update_node_task] (a single-node chain - no cross-node dependency, so
+        no deadlock risk). Shared caches are deduped by NodeCache.get_or_create_for_node + the
+        in-flight-cache dependency gate, not by a wait task. """
+    node = AnalysisNode.objects.get_subclass(pk=node_id, version=version)
+    update_job = node.get_update_task()
+    cache_jobs = [Signature(t, args=a, immutable=True)
+                  for (t, a) in node.get_cache_task_args_set() if t]
     if cache_jobs:
-        for task, args in cache_jobs:
-            if task:
-                jobs.append(Signature(task, args=args, immutable=True))
-
-    groups.append(jobs)
-    groups.append(after_jobs)
-    return cache_jobs
-
-
-def _get_ancestor_set(node_id, parent_value_data):
-    ancestor_set = set()
-    for parent_id in parent_value_data[node_id]:
-        ancestor_set.add(parent_id)
-        ancestor_set.update(_get_ancestor_set(parent_id, parent_value_data))
-
-    return ancestor_set
-
-
-def _get_node_dependencies(nodes_by_id, parent_value_data):
-    node_dependencies = set()
-    for node_id in nodes_by_id:
-        ancestors = _get_ancestor_set(node_id, parent_value_data)
-        node_dependencies.update(ancestors)
-
-    return node_dependencies
+        return chain(*cache_jobs, update_job)  # same node: cache then update
+    return update_job
 
 
 @celery.shared_task

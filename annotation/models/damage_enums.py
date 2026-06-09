@@ -157,7 +157,47 @@ class ALoFTPrediction(models.TextChoices):
 
 
 class AlphaMissensePrediction(models.TextChoices):
-    """ @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html#alphamissense """
+    """ @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html#alphamissense
+        dbNSFP 5.3.1a (columns_version >= 4) emits raw 'B'/'P' alongside the 'LB'/'A'/'LP'
+        bucket the VEP plugin uses; we keep both so we don't lose information. """
+    BENIGN = 'B', 'benign'
     LIKELY_BENIGN = 'b', 'likely_benign'
     AMBIGUOUS = "a", 'ambiguous'
     LIKELY_PATHOGENIC = "p", 'likely_pathogenic'
+    PATHOGENIC = 'P', 'pathogenic'
+
+
+class ClinPredPrediction(AbstractPathogenicity):
+    TOLERATED = 'T'
+    DAMAGING = 'D'
+
+    CHOICES = [
+        (TOLERATED, "Tolerated"),
+        (DAMAGING, "Damaging"),
+    ]
+    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+    VARIANT_PATH = "variantannotation__clinpred_pred"
+
+
+class MetaRNNPrediction(AbstractPathogenicity):
+    TOLERATED = 'T'
+    DAMAGING = 'D'
+
+    CHOICES = [
+        (TOLERATED, "Tolerated"),
+        (DAMAGING, "Damaging"),
+    ]
+    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+    VARIANT_PATH = "variantannotation__metarnn_pred"
+
+
+class PrimateAIPrediction(AbstractPathogenicity):
+    TOLERATED = 'T'
+    DAMAGING = 'D'
+
+    CHOICES = [
+        (TOLERATED, "Tolerated"),
+        (DAMAGING, "Damaging"),
+    ]
+    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+    VARIANT_PATH = "variantannotation__primateai_pred"

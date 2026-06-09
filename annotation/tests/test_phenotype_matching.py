@@ -1,5 +1,8 @@
-from django.test import TestCase
+from unittest import mock
 
+from django.test import TestCase, override_settings
+
+from annotation.models.models_phenotype_match import PatientTextPhenotype
 from annotation.phenotype_matcher import PhenotypeMatcher
 from ontology.models import OntologyService
 from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
@@ -61,6 +64,14 @@ class TestPhenotypeMatching(TestCase):
 
         self.check_expected_results_for_description(SYNDROME_ABBREV)
 
+    @override_settings(PATIENT_PHENOTYPE_EXCLUDE_STRING="----needs human review")
+    def test_exclude_string_skips_persistence(self):
+        phenotype = "Raised TSH\n----needs human review"
+        patient = Patient(phenotype=phenotype)
+        patient.save(phenotype_matcher=self.phenotype_matcher)
+        self.assertFalse(PatientTextPhenotype.objects.filter(patient=patient).exists(),
+                         "Exclude marker should prevent persisting matches")
+
     def test_commas(self):
         COMMA_OMIM = {
             "PLATELET DISORDER, FAMILIAL, WITH ASSOCIATED MYELOID MALIGNANCY": (OntologyService.OMIM, "OMIM:601399"),
@@ -68,3 +79,83 @@ class TestPhenotypeMatching(TestCase):
         }
 
         self.check_expected_results_for_description(COMMA_OMIM)
+
+    def test_ambiguous_acronym_flagged_and_excluded(self):
+        """A phenotype text whose lowercased form is in the denylist should:
+        - NOT create TextPhenotypeMatch rows (so downstream Django queries
+          through PATIENT_TPM_PATH can't pick up the wrong concept)
+        - emit a synthetic `ambiguous_alias` + `ambiguous_alias_candidates`
+          entry on get_results() so the UI can list the conflicting concepts
+        - be excluded from get_ontology_term_ids()."""
+        from annotation.models.models_phenotype_match import TextPhenotypeMatch
+
+        denylist = {
+            "failure to thrive": (
+                ("HP:0001508", "Failure to thrive"),
+                ("OMIM:000000", "Some other thing called FTT"),
+            ),
+        }
+        with mock.patch(
+            "annotation.models.models_phenotype_match.get_ambiguous_acronym_denylist",
+            return_value=denylist,
+        ):
+            # Rebuild the matcher inside the patch so its ambiguous_acronyms
+            # picks up the patched denylist (the class-level matcher was built
+            # in setUpTestData against the real ontology test data).
+            matcher = PhenotypeMatcher()
+            patient = Patient(phenotype="Failure to thrive")
+            patient.save(phenotype_matcher=matcher)
+            patient.process_phenotype_if_changed(phenotype_matcher=matcher)
+
+            pd = patient.patient_text_phenotype.phenotype_description
+
+            saved = TextPhenotypeMatch.objects.filter(
+                text_phenotype__textphenotypesentence__phenotype_description=pd,
+            )
+            self.assertFalse(
+                saved.exists(),
+                "Ambiguous-acronym text must not produce TextPhenotypeMatch rows",
+            )
+
+            results = pd.get_results()
+            self.assertTrue(results, "Expected a synthetic warning result for 'Failure to thrive'")
+            flagged = [r for r in results if r.get("ambiguous_alias")]
+            self.assertTrue(flagged, f"Expected ambiguous_alias flag on results: {results}")
+            self.assertEqual(
+                flagged[0].get("ambiguous_alias_candidates"),
+                [
+                    {"accession": "HP:0001508", "name": "Failure to thrive"},
+                    {"accession": "OMIM:000000", "name": "Some other thing called FTT"},
+                ],
+                "Expected the conflicting candidates to be exposed for UI display",
+            )
+
+            # Cached function - bust the per-instance cache by clearing
+            pd.get_ontology_term_ids.invalidate(pd)
+            term_ids = list(pd.get_ontology_term_ids())
+            self.assertEqual(
+                term_ids, [],
+                "Ambiguous-acronym matches must be excluded from get_ontology_term_ids",
+            )
+
+    def test_hardcoded_override_wins_over_denylist(self):
+        """If a key has a hardcoded lookup (e.g. FTT), the public denylist
+        accessor must filter it out so the match isn't falsely flagged."""
+        from annotation.phenotype_matcher import (
+            _build_ambiguous_acronym_denylist,
+            get_ambiguous_acronym_denylist,
+        )
+        # Raw includes "ftt"; effective denylist should not.
+        raw = {
+            "ftt": (("HP:0001508", "Failure to thrive"),),
+            "some_truly_ambiguous_token": (("HP:0000001", "All"), ("MONDO:0000001", "disease")),
+        }
+        with mock.patch(
+            "annotation.phenotype_matcher._build_ambiguous_acronym_denylist",
+            return_value=raw,
+        ):
+            # bust cache_memoize so our patch is used
+            _build_ambiguous_acronym_denylist.invalidate(0)
+            effective = get_ambiguous_acronym_denylist()
+            self.assertNotIn("ftt", effective, "FTT has a HARDCODED_LOOKUP - must not be flagged")
+            self.assertIn("some_truly_ambiguous_token", effective)

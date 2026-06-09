@@ -1,4 +1,5 @@
 import json
+import logging
 from collections import defaultdict
 
 from django.http.response import Http404
@@ -13,18 +14,19 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
-from genes.gene_matching import GeneSymbolMatcher, ReleaseGeneMatcher
+from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneInfo, GeneList, GeneAnnotationRelease, \
     ReleaseGeneSymbolGene, PanelAppServer, SampleGeneList, ActiveSampleGeneList, create_fake_gene_list
 from genes.panel_app import get_panel_app_panel_as_gene_list_json
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json
 from genes.serializers import GeneInfoSerializer, GeneListGeneSymbolSerializer, GeneListSerializer, \
     GeneAnnotationReleaseSerializer, SampleGeneListSerializer
-from library.constants import WEEK_SECS
+from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils.django_rest_utils import MultipleFieldLookupMixin
 from library.guardian_utils import DjangoPermission
-from library.log_utils import get_traceback
 from snpdb.models.models_enums import ImportStatus
+
+log = logging.getLogger(__name__)
 
 
 def is_owner_or_has_permission_factory(django_permission):
@@ -46,6 +48,7 @@ WriteGeneListPermission = is_owner_or_has_permission_factory(DjangoPermission.WR
 class PanelAppGeneListView(APIView):
     """ Tunnels through to panel app (can't make cross site requests) """
 
+    @method_decorator(cache_page(HOUR_SECS))
     def get(self, request, *args, **kwargs):
         panel_app_id = self.kwargs['pk']
         data = get_panel_app_panel_as_gene_list_json(panel_app_id)
@@ -124,7 +127,8 @@ class CreateGeneListView(APIView):
             gene_matcher.create_gene_list_gene_symbols(gene_list, gene_symbols, modification_info)
             import_status = ImportStatus.SUCCESS
         except Exception:
-            gene_list.error_message = get_traceback()
+            log.exception("Error creating gene list %d for user %s", gene_list.pk, request.user)
+            gene_list.error_message = "An error occurred while importing the gene list."
             import_status = ImportStatus.ERROR
 
         gene_list.import_status = import_status
@@ -200,9 +204,6 @@ class BatchGeneIdentifierForReleaseView(APIView):
         gene_annotation_release = get_object_or_404(GeneAnnotationRelease, pk=release_id)
         gene_symbols_json = request.data["gene_symbols_json"]
         gene_symbols = json.loads(gene_symbols_json)
-
-        gm = ReleaseGeneMatcher(gene_annotation_release)
-        gm.match_unmatched_symbols(gene_symbols)
 
         qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=gene_annotation_release,
                                                   release_gene_symbol__gene_symbol__in=gene_symbols)

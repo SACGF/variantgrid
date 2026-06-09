@@ -1,0 +1,87 @@
+tip,app,url
+You can create an analysis template from any existing analysis. Go to Analysis Settings → Template tab → Create Template. Templates can then be launched for new samples with one click.,analysis,analysis_templates
+Analysis templates can be configured to auto-launch when a VCF is uploaded based on the enrichment kit or sample name. Set this up in the template settings under 'Auto Launch Config'.,analysis,analysis_templates_auto_launch
+Press the DELETE key to remove selected nodes in the analysis editor (when you're not focused in a text field).,analysis,analysis
+"Tick the checkbox for variants in the analysis grid, then use 'Create Selected Child' to instantly create a new node filtered to just those rows.",analysis,analysis
+Each analysis node has a built-in help page. Click the book icon on any node to see documentation for what it does and how to configure it.,analysis,analysis
+You can clone an existing analysis to use as a starting point. There's a 'Clone' button in Analysis Settings.,analysis,clone_analysis
+Analysis settings let you lock an analysis to prevent accidental changes. Useful once you've finalised a workflow or closed a patient case to archive it,analysis,analysis
+The analysis editor keeps an audit log of every node change. Check Analysis Settings → Audit Log tab if you want to see who changed what and when.,analysis,analysis
+The Trio Wizard lets you quickly set up a trio analysis (mother/father/proband) with a guided step-by-step interface. Find it from the VCF/cohort page.,analysis,trio_wizard
+The Quad Wizard extends trio analysis to include a sibling. Handy for recessive inheritance filtering with internal controls.,analysis,quad_wizard
+"In the analysis grid, you can filter to any column by using the FilterNode. Filters are case-insensitive and support AND/OR logic across columns.",analysis,analysis
+The node counts that appear below nodes are customisable via Settings → Node Counts tab,snpdb,view_user_settings
+The MOI (Mode of Inheritance) node uses zygosity and GenCC gene/disease associations to filter variants by inheritance pattern. No manual gene list required.,analysis,analysis
+"The Phenotype node accepts HPO, OMIM, and MONDO terms to filter variants to genes associated with specific diseases or phenotypes.",analysis,analysis
+The Conservation node lets you filter variants by evolutionary conservation scores. Combine it with Effect for tighter pathogenicity filtering.,analysis,analysis
+"You can filter variants by whether they're tagged. The Tag node can show only tagged, only untagged, or tagged with specific tags",analysis,analysis
+The Classifications node lets you search for variants that have existing classifications in your lab or visible shared labs.,analysis,analysis
+The Gene List node supports PanelApp UK + Australia panels. Search for a panel by name and it automatically loads the gene list.,analysis,analysis
+"The Venn node lets you combine (union), intersect, or subtract variant sets from two parent nodes. Great for comparing sample groups.",analysis,analysis
+"You can create a sub-cohort from any cohort. Useful for splitting a large study group into smaller, more specific cohorts for analysis.",snpdb,cohorts
+The Cohort node can show per-sample het/hom counts in the grid. Use this to quickly see zygosity across all cohort members for each variant.,analysis,analysis
+Download an annotated CSV or VCF directly from any VCF or sample page. The file is generated in the background so downloads are fast.,snpdb,view_vcf
+You can customise the sample name shown in the analysis grid. Set it to display the patient name for easier identification (Sample page → edit sample label).,snpdb,view_sample
+Sample pages show a graph of chromosomal variant distribution. Useful for spotting sample-level quality issues or unusual patterns.,snpdb,sample_graphs_tab
+The Somalier integration can calculate relatedness between samples. Check for unexpected duplicates or verifying family relationships from the sample page.,snpdb,view_sample
+You can link samples to patients and specimens for traceability. Do this from the Sample settings tab.,snpdb,view_sample
+BED files can be uploaded and used in the Intersection node to filter variants to genomic intervals you care about. Like custom capture regions.,snpdb,bed_files
+Create a custom column definition to add calculated or formatted fields to any analysis grid. Go to Settings → Custom Columns.,snpdb,custom_columns
+"You can search for a variant by genomic position, HGVS notation, dbSNP rsID, gene symbol, or COSMIC ID. The search bar handles all of these.",variantopedia,search
+Use the prefix 'an' followed by a number in search to jump directly to an analysis by ID (e.g. 'an42').,variantopedia,search
+Searching for a contig or chromosome name like 'chrX' takes you to a dedicated genome build/contig page.,variantopedia,search
+You can manually enter a novel variant through Search → and create + annotate it if it doesn't exist in the database yet,snpdb,manual_variant_entry
+Variant tags are lifted over between genome builds. A tag you apply in GRCh37 analysis will show up in GRCh38 views of the same allele.,variantopedia,variant_tags
+You can view all of your variant tags across every analysis in one place from the Variant Tags grid.,variantopedia,variant_tags
+Tag colour schemes can be shared across your lab. Create a colour collection in Settings → Tags and share it with your group.,snpdb,tag_settings
+The Variant Details page shows 'Nearby Variants' with tag and classification counts. Great for spotting if a neighbouring variant has already been classified.,variantopedia,view_variant
+Variant Details shows all other samples in your database that carry the same variant. Filterable by zygosity.,variantopedia,variant_sample_information
+The Gene Symbol page has a hotspot graph showing where classifications cluster across the transcript. Click through to see the underlying records.,genes,view_gene_symbol
+Gene Symbol pages show GenCC gene/disease relationships with evidence levels. Click to expand the full list including MOI and source.,genes,view_gene_symbol
+You can download all classifications for a gene as a CSV from the Gene Symbol page → Classifications tab.,genes,view_gene_symbol_classifications_download
+The Gene Wiki lets you add lab-wide notes to any gene. These notes appear across all analysis grids and variant pages for that gene.,genes,gene_wiki
+The Variant Wiki works the same way as Gene Wiki but is specific to a single variant. Useful for documenting known artefacts or interpretations.,variantopedia,variant_wiki
+You can search for Ensembl Gene versions like 'ENSG00000243646.11'. It takes you straight to the gene page.,variantopedia,search
+The annotation descriptions page documents every column available in the grids and what it means. Find it under Annotation → Descriptions.,annotation,view_annotation_descriptions
+MANE transcripts are indicated and selected as the default on variant detail pages and during classification. Look for the MANE badge on transcripts.,variantopedia,view_variant
+"On the variant details page, you can toggle between genome builds if the variant exists in multiple builds. The switcher only shows builds where it's actually present.",variantopedia,view_variant
+Intergenic variants are supported. You can still see limited annotation for variants that fall outside gene boundaries.,variantopedia,view_variant
+"The Classification Dashboard shows pathogenicity distribution, discordance summaries, and per-gene classification counts for your lab.",classification,classification_dashboard
+Discordance Reports highlight variants where your lab and another lab have conflicting pathogenicity calls. Review and triage them from the Discordance Reports page.,classification,discordance_reports
+The Activity feed shows a timeline of recent classification changes across your lab. Great for staying up to date with team activity.,classification,activity
+You can create a classification directly from an HGVS string. Useful when you want to classify a variant you haven't uploaded yet.,classification,create_classification_from_hgvs
+"Condition text in classifications is automatically matched to MONDO, OMIM, and HPO terms. Check the Condition Matchings page to review and fix any unresolved terms.",classification,condition_matchings
+"Classifications support file attachments. Upload PDFs, images, or supporting documents directly to a classification record.",classification,classification_file_upload
+The Candidate Search feature can find existing classifications across your database that might be relevant to a sample you're currently analysing.,classification,classification_candidate_search
+You can bulk import classifications from a CSV or Excel file. Go to Classifications → Import Upload to check the expected format and upload.,classification,classification_upload_unmapped
+Export your classifications as a REDCap-compatible CSV for research database integration.,classification,export_classifications_grid_redcap
+"ClinVar export is managed per-lab. Once configured, you can prepare, review, and submit ClinVar batches directly from the ClinVar Export Summary page.",classification,clinvar_key_summary
+The Classifications Groupings page organises records by allele or gene. Useful for getting a high-level picture of what's been classified.,classification,classification_groupings
+Ontology term pages show all classifications and patients linked to that term. Useful for finding relevant prior work when classifying a phenotype-associated variant.,ontology,ontology_term
+Patients can have HPO/OMIM/MONDO phenotype terms attached. These are used by the Phenotype node to filter variants in linked analyses.,patients,view_patient
+"You can bulk import patient records from CSV. Download the template first and include phenotype terms, DOB, sex, and specimen info.",patients,patient_imports
+The QC Coverage page shows gene-level coverage statistics across sequenced samples. Useful for checking if a gene of interest is well covered in your cohort.,genes,qc_coverage
+Somalier ancestry analysis is shown on sample pages. It classifies predicted ancestry based on variant patterns across the genome.,snpdb,view_sample
+Mutational signature analysis shows SNP transition/transversion patterns for a sample. Accessible from the sample page.,snpdb,view_sample
+The Classification report generates a formatted summary of a classification record that can be shared or printed. Find it in the classification actions menu.,classification,view_template_report
+Hover over any annotation column header in a grid for a tooltip explaining what that column means. No need to look it up separately.,variantopedia,view_variant
+User settings let you set a default genome build. So every page defaults to your preferred build without having to switch each time.,snpdb,view_user_settings
+Initial group permissions in User Settings control how your newly uploaded data is shared by default. Set read access for your lab so colleagues can see your samples immediately.,snpdb,view_user_settings
+IGV integration lets you configure path replacements so that BAM files can be opened in your local IGV directly from the variant page.,snpdb,igv_integration
+You can view the full analysis audit log to see every node configuration change. Great for reproducing an analysis or tracking down when a filter was changed.,analysis,analysis
+"The Annotation Versions page shows exactly which version of gnomAD, ClinVar, VEP etc. was used for each annotation run.",annotation,annotation_versions
+"The Gene Grid combines gene annotation from multiple sources (GenCC, PanelApp, OMIM, gnomAD constraint) into one comparative view.",genes,gene_grid
+"You can filter the Samples list by variant type (SNV, indel, SV) to quickly find samples containing specific variant categories.",snpdb,samples
+The Upload page shows VCF processing status in real time. You can monitor annotation progress after uploading a file.,upload,upload
+The Analysis grid export includes the date and node version in the filename so you can easily track which version of your analysis produced each download.,analysis,analysis
+The variant annotation history tab shows how annotation values for a variant have changed between annotation runs over time.,variantopedia,view_variant_annotation_history
+"You can view the Allele page (prefix 'a' + allele ID) to see a variant unified across genome builds, with liftover coordinates and all associated classifications.",variantopedia,view_allele
+The Karyomapping view lets you visually map inherited chromosomal regions in complex family scenarios.,analysis,analysis
+Sample pages show the full upload and annotation history trail. Useful for understanding if a sample was re-annotated or re-imported.,snpdb,view_sample
+The Cohort Hotspot page shows which genes are most frequently variant in your cohort. Great for spotting systematic issues or shared disease genes.,snpdb,cohort_hotspot
+You can group samples into a Pedigree and use the Pedigree node in analysis to filter by inheritance across a multi-generation family.,snpdb,view_cohort
+"Structural variant annotation includes gnomAD SV frequencies and RepeatMasker overlap. Check the variant details page for SVs like DEL, DUP, and INV.",variantopedia,view_variant
+The 'Nearby Classifications' section on the variant page looks across genome builds. So a GRCh37 classification will show up when viewing the GRCh38 equivalent.,variantopedia,view_variant
+Variant tags can be added or removed directly from the variant detail page. You don't have to be in an analysis to tag a variant.,variantopedia,view_variant
+"The server status page shows system health, database statistics, and activity details. Useful for admins checking annotation pipeline status.",variantopedia,server_status
+You can search for EnrichmentKit names in the global search. Takes you straight to the kit's page showing associated samples.,variantopedia,search

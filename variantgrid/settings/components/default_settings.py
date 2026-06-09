@@ -29,6 +29,7 @@ JS_REVERSE_OUTPUT_PATH = './variantgrid/static_files/default_static/django_js_re
 UPLOAD_RELATIVE_PATH = "data/uploads"  # Needed for FileSystemStorage
 UPLOAD_DIR = os.path.join(BASE_DIR, UPLOAD_RELATIVE_PATH)
 UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg if out of disk)
+# Request body / upload size is bounded by nginx (client_max_body_size); no Django-side cap needed.
 
 # Absolute filesystem path to the directory that will hold GLOBALLY VISIBLE user-uploaded files.
 # Example: "/var/www/example.com/media/"
@@ -52,6 +53,9 @@ CONTACT_US_ENABLED = False
 ACCOUNTS_EMAIL = None
 # If you change this value you should run 'recalc' for all ClinicalContexts in admin
 DISCORDANCE_ENABLED = False
+# Only applies when DISCORDANCE_ENABLED is True. When False, classifications from
+# labs flagged as research (Lab.research) do not participate in discordance detection.
+DISCORDANCE_RESEARCH_ENABLED = True
 
 ALLELE_ORIGIN_NOT_PROVIDED_BUCKET = "U"
 # If allele origin isn't provided, what bucket do we group it in
@@ -97,7 +101,7 @@ DATABASES = {
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 39  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 42  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -184,6 +188,8 @@ VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcrip
 VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
 
 VARIANT_ZYGOSITY_GLOBAL_COLLECTION = "global"
+# Skip samples from variant zygosity counts when their vcf_sample_name matches this regex (e.g. "^VALIDATION_")
+VARIANT_ZYGOSITY_COUNT_EXCLUDE_SAMPLE_NAME_REGEX = None
 
 PREFER_ALLELE_LINKS = False
 
@@ -245,8 +251,17 @@ HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT = 200_000
 HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE = False  # Biocommons only - attempt to retrieve transcript sequence (slower)
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
+# If set, patient phenotype text containing this string is treated as unreviewed:
+# matched ontology terms will not be persisted to the DB (PatientTextPhenotype / TextPhenotypeMatch).
+# Users can still see live preview matches on the patient page along with a warning.
+# Set to None / empty to disable.
+PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
+
+# Where partition dump files are written when an archivable model (VAV, ClinVarVersion, CohortGenotypeCollection, ...)
+# is archived via the pre-drop archival pipeline (#1537).
+PARTITION_ARCHIVE_DIR = "/data/database/partition_dumps/"
 
 # @see https://github.com/SACGF/variantgrid/wiki/Liftover
 LIFTOVER_CLASSIFICATIONS = True
@@ -326,7 +341,10 @@ ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True
-ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
+# #546: when a parent node's count is <= this, substitute its contribution to a child/sibling's
+# query with a literal Q(pk__in=[...]) instead of re-running its full filter chain. Applies to all
+# single-parent nodes and MergeNode inputs. 0 disables the substitution.
+ANALYSIS_NODE_STORE_ID_SIZE_MAX = 1000
 ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
@@ -357,6 +375,8 @@ CLASSIFICATION_GRID_SHOW_SAMPLE = True
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
 CLASSIFICATION_NEW_GROUPING = False
+CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where Lab.research=True
+RESEARCH_ICON = "🔬"  # alt: "⚗️"
 
 # Require people to click "my sample's not here" (ie encourage them to find it)
 CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE = True
@@ -402,6 +422,7 @@ USER_SETTINGS_SHOW_GROUPS = True
 SQL_BATCH_INSERT_SIZE = 50000
 SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
+SITE_DESCRIPTION = "VariantGrid - genomic variant curation and classification platform"
 
 # TODO instead of make settings for admin and non-admin enabled searches, have a search value that can be
 # DISABLED, ADMIN_ONLY, ENABLED
@@ -415,6 +436,9 @@ SEARCH_USER_ADMIN_ONLY = False
 SEARCH_COSMIC_ENABLED = True
 SEARCH_COSMIC_TRANSCRIPT_MESSAGES = False
 SEARCH_CONTIG_GENOME_BUILD_ADMIN_ONLY = False
+
+# Max length used when reflecting user-supplied strings (e.g. search terms) back in page content
+MAX_STRING_DISPLAY_LENGTH = 1000
 
 SILENCED_SYSTEM_CHECKS = [
     'models.E006',  # 'captcha.recaptcha_test_key_error'
@@ -628,7 +652,6 @@ INSTALLED_APPS = [
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
-    'jfu',
     'leaflet',
     'martor',
     "psqlextra",

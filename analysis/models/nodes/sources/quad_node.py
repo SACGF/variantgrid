@@ -1,4 +1,6 @@
+import operator
 from abc import ABC, abstractmethod
+from functools import reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
@@ -50,6 +52,14 @@ class AbstractQuadInheritance(ABC):
 
     def get_contigs(self) -> Optional[set[Contig]]:
         return None
+
+    def get_other_filters_description(self) -> str:
+        """Variant-level filters applied in addition to per-member zygosity.
+
+        Shown in every member row of the "Other Filters" column on the
+        zygosity table. Empty string means no extra filters.
+        """
+        return ""
 
 
 class SimpleQuadInheritance(AbstractQuadInheritance):
@@ -110,6 +120,42 @@ class QuadXLinkedRecessive(SimpleQuadInheritance):
 
     def get_contigs(self) -> Optional[set[Contig]]:
         return set(self.node.quad.genome_build.contigs.filter(name='X'))
+
+    def get_other_filters_description(self) -> str:
+        return "Chr X only"
+
+
+class QuadAllRecessive(AbstractQuadInheritance):
+    """OR of autosomal recessive and X-linked recessive.
+
+    Reuses zygosity logic from QuadRecessive / QuadXLinkedRecessive so the
+    modes stay in lockstep. Chr-X restriction is applied inside the OR so the
+    AR branch covers the whole genome.
+    """
+
+    def _recessive_zyg(self) -> tuple[set, set, set, set]:
+        return QuadRecessive(self.node)._get_mum_dad_proband_sibling_zygosities()
+
+    def _xlinked_zyg(self) -> tuple[set, set, set, set]:
+        return QuadXLinkedRecessive(self.node)._get_mum_dad_proband_sibling_zygosities()
+
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+        cgc = self.node.quad.cohort.cohort_genotype_collection
+        ar_q = self._get_zyg_q(cgc, self._recessive_zyg())
+        xlr_q = self._get_zyg_q(cgc, self._xlinked_zyg()) & Q(locus__contig__name='X')
+        combined = ar_q | xlr_q
+        return {cgc.cohortgenotype_alias: {str(combined): combined}}
+
+    def get_method(self) -> str:
+        ar_mum, ar_dad, ar_prob, ar_sib = self._recessive_zyg()
+        x_mum, _, x_prob, x_sib = self._xlinked_zyg()
+        return (
+            f"AR (Mother:{ar_mum} Father:{ar_dad} Proband:{ar_prob} Sibling:{ar_sib}) "
+            f"OR XLR (Mother:{x_mum} Father:- Proband:{x_prob} Sibling:{x_sib} chrX only)"
+        )
+
+    def get_other_filters_description(self) -> str:
+        return "XLR branch: Chr X only"
 
 
 class QuadCompHet(AbstractQuadInheritance):
@@ -172,14 +218,51 @@ class QuadCompHet(AbstractQuadInheritance):
         )
         return set(contig_qs.distinct())
 
+    def get_other_filters_description(self) -> str:
+        return "≥2 hits in same gene, one from mother and one from father"
+
+
+class QuadAnyAffected(AbstractQuadInheritance):
+    """Variant present in any affected family member.
+
+    Permissive upstream pre-filter. No parent constraint. Unaffected members
+    are unconstrained — they may have or not have the variant. Proband is
+    always treated as affected.
+    """
+
+    def _get_affected_samples(self) -> list:
+        quad = self.node.quad
+        members = [
+            (quad.mother.sample,  quad.mother_affected),
+            (quad.father.sample,  quad.father_affected),
+            (quad.proband.sample, True),
+            (quad.sibling.sample, quad.sibling_affected),
+        ]
+        return [s for s, affected in members if affected]
+
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+        cgc = self.node.quad.cohort.cohort_genotype_collection
+        per_member_qs = [
+            cgc.get_zygosity_q({s: self.HAS_VARIANT}, {s: True})
+            for s in self._get_affected_samples()
+        ]
+        combined = reduce(operator.or_, per_member_qs)
+        return {cgc.cohortgenotype_alias: {str(combined): combined}}
+
+    def get_method(self) -> str:
+        names = [s.name for s in self._get_affected_samples()]
+        return f"Variant present in at least one affected family member ({', '.join(names)})"
+
 
 class QuadNode(AbstractCohortBasedNode):
     INHERITANCE_CLASSES = {
         QuadInheritance.COMPOUND_HET:      QuadCompHet,
         QuadInheritance.RECESSIVE:         QuadRecessive,
+        QuadInheritance.ALL_RECESSIVE:     QuadAllRecessive,
         QuadInheritance.DOMINANT:          QuadDominant,
         QuadInheritance.DENOVO:            QuadDenovo,
         QuadInheritance.XLINKED_RECESSIVE: QuadXLinkedRecessive,
+        QuadInheritance.ANY_AFFECTED:      QuadAnyAffected,
     }
 
     quad = models.ForeignKey(Quad, null=True, on_delete=SET_NULL)
@@ -248,9 +331,10 @@ class QuadNode(AbstractCohortBasedNode):
         return "No cohort selected"
 
     def get_node_name(self):
-        name_parts = [QuadInheritance(self.inheritance).label]
+        label = QuadInheritance(self.inheritance).label
         if not self.require_zygosity:
-            name_parts.append('(non strict)')
+            label += "?"
+        name_parts = [label]
         if desc := self.get_filter_description():
             name_parts.append(f"({desc})")
         return "\n".join(name_parts)
@@ -272,7 +356,11 @@ class QuadNode(AbstractCohortBasedNode):
 
     @staticmethod
     def get_help_text() -> str:
-        return "Mother/Father/Proband/Sibling - filter for recessive/dominant/denovo inheritance"
+        return (
+            "Mother/Father/Proband/Sibling - filter for recessive/dominant/denovo inheritance. "
+            "'Any Affected' returns variants present in at least one affected family "
+            "member (collapsing to proband alone if no other member is affected)."
+        )
 
     @staticmethod
     def get_zygosity_table_data() -> dict:
@@ -292,6 +380,7 @@ class QuadNode(AbstractCohortBasedNode):
             QuadInheritance.DOMINANT: ['mother', 'father', 'sibling'],
             QuadInheritance.RECESSIVE: ['sibling'],
             QuadInheritance.XLINKED_RECESSIVE: ['sibling'],
+            QuadInheritance.ANY_AFFECTED: ['mother', 'father', 'sibling'],
         }
 
         data = {}
@@ -323,20 +412,43 @@ class QuadNode(AbstractCohortBasedNode):
                     handler = klass(stub_node)
                     zyg = handler._get_mum_dad_proband_sibling_zygosities()
                     data[mode] = {member: fmt(z) for member, z in zip(members, zyg)}
+            elif klass is QuadAllRecessive:
+                stub_node.quad.mother_affected = False
+                stub_node.quad.father_affected = False
+                stub_node.quad.sibling_affected = False
+                handler = klass(stub_node)
+                ar_zyg = handler._recessive_zyg()
+                xlr_zyg = handler._xlinked_zyg()
+                data[mode] = {
+                    'mother':  f"AR: {fmt(ar_zyg[0])}\nXLR: {fmt(xlr_zyg[0])}",
+                    'father':  f"AR: {fmt(ar_zyg[1])}\nXLR: --",
+                    'proband': f"AR: {fmt(ar_zyg[2])}\nXLR: {fmt(xlr_zyg[2])}",
+                    'sibling': f"AR: {fmt(ar_zyg[3])}\nXLR: {fmt(xlr_zyg[3])}",
+                }
+            elif klass is QuadAnyAffected:
+                handler = klass(stub_node)
+                has_variant = fmt(QuadAnyAffected.HAS_VARIANT)
+                entry = {'proband': has_variant}
+                for affected_val in (False, True):
+                    suffix = '_affected' if affected_val else '_unaffected'
+                    for member in ('mother', 'father', 'sibling'):
+                        entry[member + suffix] = has_variant if affected_val else '—'
+                data[mode] = entry
             else:
                 # CompHet — use _mum_but_not_dad / _dad_but_not_mum
                 handler = klass(stub_node)
-                mum1, dad1, proband1, sibling1 = handler._mum_but_not_dad()
+                _, _, proband1, sibling1 = handler._mum_but_not_dad()
                 data[mode] = {
                     'mother': '',
                     'father': '',
                     'proband': fmt(proband1),
                     'sibling': fmt(sibling1),
-                    'note': 'Proband HET with \u22652 hits in a gene, one from each parent; sibling HET for each hit',
                 }
 
-            if mode == QuadInheritance.XLINKED_RECESSIVE:
-                data[mode]['note'] = 'Chr X only'
+            description = handler.get_other_filters_description()
+            if description:
+                for member in members:
+                    data[mode]['other_filters_' + member] = description
 
         return data
 

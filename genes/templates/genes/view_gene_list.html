@@ -6,6 +6,10 @@
 {% load wiki_tags %}
 {% block title %}{{ site_name }} GeneList: {{ gene_list.name }}{% endblock title %}
 
+{% block head %}
+    <script src="{% static 'js/cached_generated_files.js' %}"></script>
+{% endblock head %}
+
 {% block jsdocumentready %}
     $("#gene-list-tabs").tabs();
 {% endblock jsdocumentready %}
@@ -17,6 +21,9 @@
         <ul>
             <li><a href="#details">Details</a></li>
             <li><a href="#wiki">Wiki{% if gene_list.genelistwiki %}*{% endif %}</a></li>
+            {% if gene_list.import_status == 'S' %}
+            <li><a href="{% url 'gene_list_graphs_tab' gene_list.pk %}">Graphs</a></li>
+            {% endif %}
             {% if has_write_permission %}
             <li><a href="{% url 'group_permissions' 'genes.models.GeneList' gene_list.pk %}">Sharing / Permissions</a></li>
             {% endif %}
@@ -70,6 +77,15 @@
     {% endif %}
 
     {% page_help page_id='genes/gene_list_gene_matching_help' title="Gene List Gene Matching" show_title=False %}
+
+    <p>
+        <a class="hover-link" data-toggle="collapse" href="#gene-list-text" role="button" aria-expanded="false" aria-controls="gene-list-text">
+            <i class="fas fa-clipboard-list"></i> Show genes as text ({{ num_gene_symbols }})
+        </a>
+    </p>
+    <div id="gene-list-text" class="collapse">
+        <textarea class="form-control" rows="10" readonly onclick="this.select()">{{ gene_symbols_text }}</textarea>
+    </div>
 
     <table id="gene-lists-genes-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_list_genes_datatable' gene_list_id=gene_list.pk %}"></table>
 

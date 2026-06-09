@@ -7,8 +7,12 @@ from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
 from annotation.models import AnnotationRun, re, VEPSkippedReason
+from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.vcf_files.bulk_annotsv_tsv_inserter import import_annotsv_tsv
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vep_annotation import vep_check_annotated_file_version_match
+from library.log_utils import log_traceback
+from snpdb.models import VariantCoordinate
 
 
 def import_vcf_annotations(
@@ -44,6 +48,16 @@ def import_vcf_annotations(
 
         if delete_temp_files:
             bulk_inserter.remove_processing_files()
+
+        if annotation_run.annotsv_tsv_filename:
+            try:
+                import_annotsv_tsv(annotation_run)
+            except Exception as e:
+                # Best-effort: AnnotSV import errors must not fail the whole run.
+                log_traceback()
+                annotation_run.annotsv_error = (str(e) or "")[:100_000]
+                annotation_run.annotsv_imported = False
+                annotation_run.save()
 
         annotation_run.upload_end = timezone.now()
         annotation_run.save()
@@ -102,6 +116,14 @@ def handle_vep_skipped(annotation_run: AnnotationRun, bulk_inserter):
             va = {"version_id": version.pk, "variant_id": v.pk,
                   "annotation_run_id": annotation_run.pk, "vep_skipped_reason": reason,
                   "predictions_num_pathogenic": 0, "predictions_num_benign": 0}
+            if (annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+                    and reason == VEPSkippedReason.TOO_LONG):
+                variant_coordinate = VariantCoordinate(chrom=v.locus.contig.name,
+                                                       position=v.locus.position,
+                                                       ref=v.locus.ref.seq,
+                                                       alt=v.alt.seq,
+                                                       svlen=v.svlen)
+                bulk_inserter.add_sv_gene_overlaps(v.pk, variant_coordinate, va)
             bulk_inserter.variant_annotation_list.append(va)
 
         # Only insert the columns we care about

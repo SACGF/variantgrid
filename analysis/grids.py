@@ -117,7 +117,12 @@ class VariantGrid(AbstractVariantGrid):
         annotation_kwargs = get_variantgrid_extra_annotate(self.user, exclude_analysis=self.node.analysis)
         cohorts, _visibility = self.node.get_cohorts_and_sample_visibility()
         common_variants = self.node._has_common_variants()
-        annotation_kwargs.update(get_variantgrid_zygosity_annotation_kwargs(cohorts, common_variants))
+        try:
+            annotation_gnomad_version = self.node.analysis.annotation_version.variant_annotation_version.gnomad
+        except AttributeError:
+            annotation_gnomad_version = None
+        annotation_kwargs.update(get_variantgrid_zygosity_annotation_kwargs(cohorts, common_variants,
+                                                                            annotation_gnomad_version=annotation_gnomad_version))
         return annotation_kwargs
 
     def get_count(self, request):  # pylint: disable=unused-argument

@@ -5,6 +5,12 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _has_error_citations(apps):
+    # Nothing to reload if no citations are currently in error - none on a fresh install
+    Citation = apps.get_model("annotation", "Citation")
+    return Citation.objects.filter(error__isnull=False).exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -12,5 +18,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["citations", "--reload"]))
+        ManualOperation(task_id=ManualOperation.task_id_manage(["citations", "--reload"]),
+                        test=_has_error_citations)
     ]

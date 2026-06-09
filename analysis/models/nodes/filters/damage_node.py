@@ -4,12 +4,17 @@ from functools import reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
+from django.conf import settings
 from django.db import models
 from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction
+from annotation.models.damage_enums import (
+    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction,
+    ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction,
+)
 from annotation.models.models import VariantAnnotation
+from annotation.pathogenicity_predictions import TOOLS, TOOLS_BY_PRED_FIELD
 
 
 class ALoFTPredictionOptions(models.TextChoices):
@@ -79,12 +84,88 @@ class DamageNode(AnalysisNode):
     vest4_rankscore_required = models.BooleanField(default=False)
     vest4_rankscore_allow_null = models.BooleanField(default=True)
 
+    # Raw scores added in columns v4 (#1543)
+    alphamissense_score_min = models.FloatField(null=True, blank=True)
+    alphamissense_score_required = models.BooleanField(default=False)
+    alphamissense_score_allow_null = models.BooleanField(default=True)
+
+    bayesdel_noaf_score_min = models.FloatField(null=True, blank=True)
+    bayesdel_noaf_score_required = models.BooleanField(default=False)
+    bayesdel_noaf_score_allow_null = models.BooleanField(default=True)
+
+    # cadd_phred_min reuses the user-facing CADD scale; cadd_raw is not exposed.
+    cadd_phred_min = models.FloatField(null=True, blank=True)
+    cadd_phred_required = models.BooleanField(default=False)
+    cadd_phred_allow_null = models.BooleanField(default=True)
+
+    clinpred_score_min = models.FloatField(null=True, blank=True)
+    clinpred_score_required = models.BooleanField(default=False)
+    clinpred_score_allow_null = models.BooleanField(default=True)
+
+    metarnn_score_min = models.FloatField(null=True, blank=True)
+    metarnn_score_required = models.BooleanField(default=False)
+    metarnn_score_allow_null = models.BooleanField(default=True)
+
+    mpc_score_min = models.FloatField(null=True, blank=True)
+    mpc_score_required = models.BooleanField(default=False)
+    mpc_score_allow_null = models.BooleanField(default=True)
+
+    mutpred2_score_min = models.FloatField(null=True, blank=True)
+    mutpred2_score_required = models.BooleanField(default=False)
+    mutpred2_score_allow_null = models.BooleanField(default=True)
+
+    primateai_score_min = models.FloatField(null=True, blank=True)
+    primateai_score_required = models.BooleanField(default=False)
+    primateai_score_allow_null = models.BooleanField(default=True)
+
+    varity_er_score_min = models.FloatField(null=True, blank=True)
+    varity_er_score_required = models.BooleanField(default=False)
+    varity_er_score_allow_null = models.BooleanField(default=True)
+
+    varity_r_score_min = models.FloatField(null=True, blank=True)
+    varity_r_score_required = models.BooleanField(default=False)
+    varity_r_score_allow_null = models.BooleanField(default=True)
+
+    vest4_score_min = models.FloatField(null=True, blank=True)
+    vest4_score_required = models.BooleanField(default=False)
+    vest4_score_allow_null = models.BooleanField(default=True)
+
+    alphamissense_pred = models.CharField(max_length=1, choices=AlphaMissensePrediction.choices, null=True, blank=True)
+    alphamissense_pred_required = models.BooleanField(default=False)
+    alphamissense_pred_allow_null = models.BooleanField(default=True)
+
+    clinpred_pred = models.CharField(max_length=1, choices=ClinPredPrediction.CHOICES, null=True, blank=True)
+    clinpred_pred_required = models.BooleanField(default=False)
+    clinpred_pred_allow_null = models.BooleanField(default=True)
+
+    metarnn_pred = models.CharField(max_length=1, choices=MetaRNNPrediction.CHOICES, null=True, blank=True)
+    metarnn_pred_required = models.BooleanField(default=False)
+    metarnn_pred_allow_null = models.BooleanField(default=True)
+
+    primateai_pred = models.CharField(max_length=1, choices=PrimateAIPrediction.CHOICES, null=True, blank=True)
+    primateai_pred_required = models.BooleanField(default=False)
+    primateai_pred_allow_null = models.BooleanField(default=True)
+
     nmd_escaping_variant = models.BooleanField(default=False)
     nmd_escaping_variant_required = models.BooleanField(default=False)
 
     aloft = models.CharField(max_length=1, choices=ALoFTPredictionOptions.choices, null=True, blank=True)
     aloft_required = models.BooleanField(default=False)
     aloft_allow_null = models.BooleanField(default=True)
+
+    def _v4_score_min_fields(self) -> list:
+        # REVEL is in TOOLS but uses revel_rankscore_min (v2/v3 field), not revel_score_min;
+        # safe getattr keeps the helper robust to TOOLS-vs-model field divergence.
+        return [getattr(self, f"{t.raw_field}_min", None) for t in TOOLS if t.raw_field]
+
+    def _v4_pred_fields(self) -> list:
+        return [getattr(self, t.pred_field) for t in TOOLS if t.pred_field]
+
+    def _v4_score_required_fields(self) -> list:
+        return [getattr(self, f"{t.raw_field}_required", False) for t in TOOLS if t.raw_field]
+
+    def _v4_pred_required_fields(self) -> list:
+        return [getattr(self, f"{t.pred_field}_required") for t in TOOLS if t.pred_field]
 
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
@@ -93,11 +174,13 @@ class DamageNode(AnalysisNode):
                 self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min,
                 self.nmd_escaping_variant, self.aloft]
         v3_fields = v2_fields + [self.alphamissense_rankscore_min]
+        v4_fields = v3_fields + self._v4_score_min_fields() + self._v4_pred_fields()
 
         _COLUMNS_VERSION = {
             1: [self.cadd_score_min, self.revel_score_min],
             2: v2_fields,
             3: v3_fields,
+            4: v4_fields,
         }
         modifiers = all_versions + _COLUMNS_VERSION.get(self.columns_version, [])
         return any(modifiers)
@@ -109,10 +192,12 @@ class DamageNode(AnalysisNode):
                 self.clinpred_rankscore_required, self.metalr_rankscore_required, self.revel_rankscore_required,
                 self.vest4_rankscore_required, self.nmd_escaping_variant_required, self.aloft_required]
         v3_fields = v2_fields + [self.alphamissense_rankscore_required]
+        v4_fields = v3_fields + self._v4_score_required_fields() + self._v4_pred_required_fields()
         _COLUMNS_VERSION = {
             1: [self.cadd_score_required, self.revel_score_required],
             2: v2_fields,
             3: v3_fields,
+            4: v4_fields,
         }
         required = all_versions + _COLUMNS_VERSION.get(self.columns_version, [])
         return any(required)
@@ -121,16 +206,52 @@ class DamageNode(AnalysisNode):
         v2_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
                 self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min]
         v3_fields = v2_fields + [self.alphamissense_rankscore_min]
+        v4_fields = v3_fields + self._v4_score_min_fields() + self._v4_pred_fields()
         _COLUMNS_VERSION = {
             1: [self.cadd_score_min, self.revel_score_min],
             2: v2_fields,
             3: v3_fields,
+            4: v4_fields,
         }
         pathogenic_predictions = _COLUMNS_VERSION.get(self.columns_version, [])
         return any(pathogenic_predictions)
 
+    def has_rankscore_predictions(self) -> bool:
+        """ v4 hides rankscore sliders by default - used to auto-reveal them when one is still set. """
+        rankscore_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min,
+                            self.clinpred_rankscore_min, self.metalr_rankscore_min, self.revel_rankscore_min,
+                            self.vest4_rankscore_min, self.alphamissense_rankscore_min]
+        return any(rankscore_fields)
+
+    def show_rankscore_sliders(self) -> bool:
+        """ v2/v3 only have rankscores so always show them. v4 onward they're legacy: only offered when
+        the deployment allows legacy rankscores, or this node already has one set (so saved filters stay
+        visible/editable - the filter is applied regardless). """
+        if self.columns_version < 4:
+            return True
+        return settings.ANNOTATION_SHOW_LEGACY_RANKSCORES or self.has_rankscore_predictions()
+
     def damage_predictions_description(self) -> str:
         return self.analysis.annotation_version.variant_annotation_version.damage_predictions_description
+
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        vav = self.analysis.annotation_version.variant_annotation_version
+        if self.damage_predictions_min is not None and not vav.backfilled_damage_counts:
+            warnings.append(
+                f"damage_predictions_min filter is NOT being applied on this VariantAnnotationVersion: "
+                f"predictions_num_pathogenic / predictions_num_benign aggregates have not been backfilled. "
+                f"Run `manage.py fix_columns_version{vav.columns_version}_damage_counts` to enable the filter."
+            )
+        if self.splice_min is not None and vav.uses_raw_spliceai:
+            warnings.append(
+                "SpliceAI scores on this VariantAnnotationVersion are from the raw precomputed file "
+                f"({vav.spliceai}). Illumina recommends the masked file for variant interpretation: "
+                "the raw file also reports strengthening of annotated splice sites and weakening of "
+                "unannotated ones, which are typically much less pathogenic. See "
+                "https://github.com/Illumina/SpliceAI"
+            )
+        return warnings
 
     def _get_node_q_hash(self) -> str:
         return str(self._get_node_q())
@@ -161,12 +282,19 @@ class DamageNode(AnalysisNode):
                     Q(variantannotation__dbscsnv_rf_score__isnull=True),
                 ])
 
-            for _, (ds, _) in VariantAnnotation.SPLICEAI_DS_DP.items():
-                q_spliceai = Q(**{f"variantannotation__{ds}__gte": self.splice_min})
-                splicing_q_list.append(q_spliceai)
+            # SpliceAI: use the optimised spliceai_max_ds column when the VAV has
+            # been backfilled, otherwise fall back to the per-DS-field loop
+            # (pre-c6f3c4e6f). See VariantAnnotationVersion.backfilled_spliceai_max_ds.
+            vav = self.analysis.annotation_version.variant_annotation_version
+            if vav.backfilled_spliceai_max_ds:
+                splicing_q_list.append(Q(variantannotation__spliceai_max_ds__gte=self.splice_min))
                 if self.splice_required and self.splice_allow_null:
-                    q_spliceai_null = Q(**{f"variantannotation__{ds}__isnull": True})
-                    splicing_q_list.append(q_spliceai_null)
+                    splicing_q_list.append(Q(variantannotation__spliceai_max_ds__isnull=True))
+            else:
+                for _, (ds, _) in VariantAnnotation.SPLICEAI_DS_DP.items():
+                    splicing_q_list.append(Q(**{f"variantannotation__{ds}__gte": self.splice_min}))
+                    if self.splice_required and self.splice_allow_null:
+                        splicing_q_list.append(Q(**{f"variantannotation__{ds}__isnull": True}))
 
             q_splicing = reduce(operator.or_, splicing_q_list)
             if self.splice_required:
@@ -195,7 +323,7 @@ class DamageNode(AnalysisNode):
         elif self.columns_version >= 2:
             # Rank score path predictors
             vav = self.analysis.annotation_version.variant_annotation_version
-            for path_prediction in vav.get_pathogenic_prediction_funcs():
+            for path_prediction in vav.get_rankscore_pathogenic_prediction_funcs():
                 path_prediction_min = f"{path_prediction}_min"
                 if score_min := getattr(self, path_prediction_min):
                     q_path = Q(**{f"variantannotation__{path_prediction}__gte": score_min})
@@ -205,6 +333,35 @@ class DamageNode(AnalysisNode):
                         and_filters.append(q_path)
                     else:
                         or_filters.append(q_path)
+
+            # Raw-score filters (v4 onward) — driven by TOOLS so VARITY_ER (no
+            # ClinGen calibration, slider-only) is included alongside calibrated tools.
+            if self.columns_version >= 4:
+                for tool in TOOLS:
+                    raw_field = tool.raw_field
+                    if not raw_field:
+                        continue
+                    raw_field_min = f"{raw_field}_min"
+                    if score_min := getattr(self, raw_field_min, None):
+                        q_raw = Q(**{f"variantannotation__{raw_field}__gte": score_min})
+                        if getattr(self, f"{raw_field}_required", False):
+                            if getattr(self, f"{raw_field}_allow_null", False):
+                                q_raw |= Q(**{f"variantannotation__{raw_field}__isnull": True})
+                            and_filters.append(q_raw)
+                        else:
+                            or_filters.append(q_raw)
+
+                # Categorical pred-field filters
+                for pred_field in TOOLS_BY_PRED_FIELD:
+                    pred_value = getattr(self, pred_field)
+                    if pred_value:
+                        q_pred = Q(**{f"variantannotation__{pred_field}": pred_value})
+                        if getattr(self, f"{pred_field}_required"):
+                            if getattr(self, f"{pred_field}_allow_null"):
+                                q_pred |= Q(**{f"variantannotation__{pred_field}__isnull": True})
+                            and_filters.append(q_pred)
+                        else:
+                            or_filters.append(q_pred)
 
             if self.nmd_escaping_variant:
                 q_nmd = Q(variantannotation__nmd_escaping_variant=self.nmd_escaping_variant)
@@ -227,14 +384,22 @@ class DamageNode(AnalysisNode):
                     or_filters.append(q_aloft)
 
         if self.damage_predictions_min is not None:
-            q_damage = Q(variantannotation__predictions_num_pathogenic__gte=self.damage_predictions_min)
-            if self.damage_predictions_required:
-                if self.damage_predictions_allow_null:
-                    max_benign = self.num_prediction_fields - self.damage_predictions_min
-                    q_damage = Q(variantannotation__predictions_num_benign__lte=max_benign)
-                and_filters.append(q_damage)
-            else:
-                or_filters.append(q_damage)
+            # Skip the damage_predictions_min filter on pre-backfill VAVs: the
+            # predictions_num_pathogenic / predictions_num_benign aggregates default
+            # to 0 on legacy rows, so any non-zero damage_predictions_min would
+            # silently exclude every row in the partition. See
+            # VariantAnnotationVersion.backfilled_damage_counts; get_warnings()
+            # surfaces the skip to the user.
+            vav = self.analysis.annotation_version.variant_annotation_version
+            if vav.backfilled_damage_counts:
+                q_damage = Q(variantannotation__predictions_num_pathogenic__gte=self.damage_predictions_min)
+                if self.damage_predictions_required:
+                    if self.damage_predictions_allow_null:
+                        max_benign = self.num_prediction_fields - self.damage_predictions_min
+                        q_damage = Q(variantannotation__predictions_num_benign__lte=max_benign)
+                    and_filters.append(q_damage)
+                else:
+                    or_filters.append(q_damage)
 
         if self.cosmic_count_min is not None:
             q_cosmic_count = Q(variantannotation__cosmic_count__gte=self.cosmic_count_min)
@@ -279,7 +444,9 @@ class DamageNode(AnalysisNode):
     @property
     def num_prediction_fields(self) -> int:
         vav = self.analysis.annotation_version.variant_annotation_version
-        return len(vav.get_pathogenic_prediction_funcs())
+        if vav.columns_version >= 4:
+            return len(vav.get_raw_score_pathogenic_prediction_funcs())
+        return len(vav.get_rankscore_pathogenic_prediction_funcs())
 
     def _get_method_summary(self):
         if self.modifies_parents():

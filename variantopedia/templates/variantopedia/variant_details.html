@@ -8,6 +8,7 @@
 {% load user_tag_color_tags %}
 {% load settings_tags %}
 {% load clinvar_tags %}
+{% load pathogenicity_tags %}
 {% settings_value 'ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED' as annotation_pubmed_search_terms_enabled %}
 {% settings_value 'VARIANT_DETAILS_SHOW_ANNOTATION' as show_annotation %}
 {% settings_value 'VARIANT_DETAILS_SHOW_GENE_COVERAGE' as show_gene_coverage %}
@@ -64,9 +65,10 @@ var pathogenicity_rankscore_threshold = [
     {% settings_value 'ANNOTATION_MIN_PATHOGENIC_RANKSCORE' %}
 ]
 
+var PATHOGENICITY_THRESHOLDS = {% pathogenicity_thresholds %};
+
 var CODE_THRESHOLDS = {
-    "revel_score": [0.15, 0.75],
-    "cadd_phred": [10, 20],
+    ...PATHOGENICITY_THRESHOLDS,
     "grantham": [57, 105],
     "gerp_pp_rs": [0, 3],
     //
@@ -428,13 +430,29 @@ $(document).ready(function() {
 function applyVariantValues() {
     // Render variant annotation values this way so it's colored correctly etc as it
     // goes through the same formatting as transcript JavaScript values if done through here
-    applyValue("alphamissense_rankscore", {{ variant_annotation.bayesdel_noaf_rankscore | jsonify}});
+    applyValue("alphamissense_rankscore", {{ variant_annotation.alphamissense_rankscore | jsonify}});
     applyValue("bayesdel_noaf_rankscore", {{ variant_annotation.bayesdel_noaf_rankscore | jsonify}});
     applyValue("cadd_raw_rankscore", {{ variant_annotation.cadd_raw_rankscore | jsonify}});
     applyValue("clinpred_rankscore", {{ variant_annotation.clinpred_rankscore | jsonify}});
     applyValue("metalr_rankscore", {{ variant_annotation.metalr_rankscore | jsonify}});
     applyValue("revel_rankscore", {{ variant_annotation.revel_rankscore | jsonify}});
     applyValue("vest4_rankscore", {{ variant_annotation.vest4_rankscore | jsonify}});
+
+    {% if annotation_version.variant_annotation_version.columns_version >= 4 %}
+    // v4 raw pathogenicity scores - coloured via CODE_THRESHOLDS (raw_field bands from PATHOGENICITY_THRESHOLDS)
+    applyValue("alphamissense_score", {{ variant_annotation.alphamissense_score | jsonify}});
+    applyValue("bayesdel_noaf_score", {{ variant_annotation.bayesdel_noaf_score | jsonify}});
+    applyValue("cadd_phred", {{ variant_annotation.cadd_phred | jsonify}});
+    applyValue("clinpred_score", {{ variant_annotation.clinpred_score | jsonify}});
+    applyValue("metarnn_score", {{ variant_annotation.metarnn_score | jsonify}});
+    applyValue("mpc_score", {{ variant_annotation.mpc_score | jsonify}});
+    applyValue("mutpred2_score", {{ variant_annotation.mutpred2_score | jsonify}});
+    applyValue("primateai_score", {{ variant_annotation.primateai_score | jsonify}});
+    applyValue("revel_score", {{ variant_annotation.revel_score | jsonify}});
+    applyValue("varity_er_score", {{ variant_annotation.varity_er_score | jsonify}});
+    applyValue("varity_r_score", {{ variant_annotation.varity_r_score | jsonify}});
+    applyValue("vest4_score", {{ variant_annotation.vest4_score | jsonify}});
+    {% endif %}
 
     applyValue("aloft_pred", {{ variant_annotation.get_aloft_pred_display | jsonify}});
 
@@ -475,10 +493,10 @@ function applyVariantValues() {
                 <div class="collapse" id="annotation-version-detail">
                     <a class="hover-link" href="{% url 'annotation_versions' %}">{{ annotation_version }}</a>
                     {% if annotation_version != latest_annotation_version %}
-                        — latest is {{ latest_annotation_version.short_description }}
+                        - latest is {{ latest_annotation_version.short_description }}
                     {% endif %}
                     {% if num_variant_annotation_versions > 1 %}
-                        — <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_variant_annotation_versions }} historical versions</a>
+                        - <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_variant_annotation_versions }} historical versions</a>
                     {% endif %}
                 </div>
             {% endif %}
@@ -659,9 +677,11 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">Sequence and Domain</div>
                     <div class="card-body">
-                        {% labelled id='repeat_masker' label='Repeat Masker' help=annotation_description.repeat_masker hint="tiny" %}{{ variant_annotation.repeat_masker }}{% endlabelled %}
+                        {% labelled id='repeat_masker' label='Repeat Masker' help=annotation_description.repeat_masker hint="tiny" %}{% with rm=variant_annotation.repeat_masker_summary %}{% if rm.is_multiple %}{% for class_name, count in rm.class_counts %}<span class="badge badge-secondary mr-1">{{ class_name }}&nbsp;&times;{{ count }}</span>{% endfor %}<a class='toggle-link ml-1' data-toggle="collapse" href='#repeat-masker-full'>Show all {{ rm.total }}</a><div id="repeat-masker-full" class="collapse mt-1 small" style="word-break:break-word;">{{ rm.items|join:" & " }}</div>{% else %}{{ variant_annotation.repeat_masker|default_if_none:"" }}{% endif %}{% endwith %}{% endlabelled %}
                         {% labelled id='domains' label='Domains' help=annotation_description.domains hint="tiny" %}{% endlabelled %}
-                        {% labelled id='interpro_domain' label='InterPro' help=annotation_description.interpro_domain hint="tiny" %}{% endlabelled %}
+                        {% if variant_annotation.has_dbnsfp %}
+                            {% labelled id='interpro_domain' label='InterPro' help=annotation_description.interpro_domain hint="tiny" %}{% endlabelled %}
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -671,7 +691,13 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">Pathogenicity</div>
                     <div class="card-body">
-                        {% if annotation_version.variant_annotation_version.columns_version == 1 %}
+                        {% if not variant_annotation.has_dbnsfp %}
+                            <div class="text-muted">
+                                dbNSFP pathogenicity predictions were not applied to this variant.
+                                dbNSFP covers non-synonymous SNVs in coding regions only, so indels
+                                and non-coding/synonymous variants have no scores available.
+                            </div>
+                        {% elif annotation_version.variant_annotation_version.columns_version == 1 %}
                             {% labelled id='cadd_phred' label='CADD Phred' help=annotation_description.cadd_phred hint="tiny" %}{% endlabelled %}
                             {% labelled id='grantham' label='Grantham' help=annotation_description.grantham hint="tiny" %}{% endlabelled %}
                             {% labelled id='revel_score' label='REVEL score' help=annotation_description.revel_score hint="tiny" %}{% endlabelled %}
@@ -687,6 +713,45 @@ function applyVariantValues() {
                             <div id="other-predictions" class="collapse">
                                 {% labelled id='mutation_taster_pred_most_damaging' label='Mutation Taster' help=annotation_description.mutation_taster_pred_most_damaging hint="tiny" %}{% endlabelled %}
                             </div>
+                        {% elif annotation_version.variant_annotation_version.columns_version >= 4 %}
+                            {% labelled id='alphamissense_score' label='AlphaMissense' help=annotation_description.alphamissense_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.alphamissense_score }}{% endlabelled %}
+                            {% labelled id='bayesdel_noaf_score' label='BayesDel (No AF)' help=annotation_description.bayesdel_noaf_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_score }}{% endlabelled %}
+                            {% labelled id='cadd_phred' label='CADD (phred)' help=annotation_description.cadd_phred hint="tiny" value_css="text-monospace" %}{{ variant_annotation.cadd_phred }}{% endlabelled %}
+                            {% labelled id='clinpred_score' label='ClinPred' help=annotation_description.clinpred_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.clinpred_score }}{% endlabelled %}
+                            {% labelled id='metarnn_score' label='MetaRNN' help=annotation_description.metarnn_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.metarnn_score }}{% endlabelled %}
+                            {% labelled id='mpc_score' label='MPC' help=annotation_description.mpc_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.mpc_score }}{% endlabelled %}
+                            {% labelled id='mutpred2_score' label='MutPred2' help=annotation_description.mutpred2_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.mutpred2_score }}{% endlabelled %}
+                            {% labelled id='primateai_score' label='PrimateAI' help=annotation_description.primateai_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.primateai_score }}{% endlabelled %}
+                            {% labelled id='revel_score' label='REVEL' help=annotation_description.revel_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.revel_score }}{% endlabelled %}
+                            {% labelled id='varity_r_score' label='VARITY_R' help=annotation_description.varity_r_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.varity_r_score }}{% endlabelled %}
+                            {% labelled id='varity_er_score' label='VARITY_ER' help=annotation_description.varity_er_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.varity_er_score }}{% endlabelled %}
+                            {% labelled id='vest4_score' label='VEST4' help=annotation_description.vest4_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.vest4_score }}{% endlabelled %}
+
+                            {% labelled id='nmd_escaping_variant' label='NMD escaping variant' help=annotation_description.nmd_escaping_variant hint="tiny" value_css="text-monospace" %}{{ variant_annotation.nmd_escaping_variant }}{% endlabelled %}
+                            {% labelled id='aloft_pred' label='ALoFT prediction' help=annotation_description.aloft_pred hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_aloft_pred_display }}{% endlabelled %}
+                            {% if variant_annotation.aloft_pred %}
+                                {% labelled id='aloft_prob_tolerant' label='ALoFT prob. Tolerant' help=annotation_description.aloft_prob_tolerant hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_prob_tolerant }}{% endlabelled %}
+                                {% labelled id='aloft_prob_recessive' label='ALoFT prob Recessive' help=annotation_description.aloft_prob_recessive hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_prob_recessive }}{% endlabelled %}
+                                {% labelled id='aloft_prob_dominant' label='ALoFT prob Dominant' help=annotation_description.aloft_prob_dominant hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_prob_dominant }}{% endlabelled %}
+                                {% labelled id='aloft_high_confidence' label='ALoFT high confidence' help=annotation_description.aloft_high_confidence hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_high_confidence }}{% endlabelled %}
+                                {% labelled id='aloft_ensembl_transcript' label='ALoFT Transcript' help=annotation_description.aloft_ensembl_transcript hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_ensembl_transcript }}{% endlabelled %}
+                            {% endif %}
+
+                            {% settings_value 'ANNOTATION_SHOW_LEGACY_RANKSCORES' as show_legacy_rankscores %}
+                            {% if show_legacy_rankscores %}
+                                {% labelled label="rankscores" hint="tiny" %}
+                                    <a class='toggle-link' data-toggle="collapse" href='#rankscores-collapse'>Show rankscores</a>
+                                {% endlabelled %}
+                                <div id="rankscores-collapse" class="collapse">
+                                    {% labelled id='alphamissense_rankscore' label='AlphaMissense rankscore' help=annotation_description.alphamissense_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.alphamissense_rankscore }}{% endlabelled %}
+                                    {% labelled id='bayesdel_noaf_rankscore' label='BayesDel (No AF) rankscore' help=annotation_description.bayesdel_noaf_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_rankscore }}{% endlabelled %}
+                                    {% labelled id='cadd_raw_rankscore' label='CADD Raw rankscore' help=annotation_description.cadd_raw_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.cadd_raw_rankscore }}{% endlabelled %}
+                                    {% labelled id='clinpred_rankscore' label='ClinPred rankscore' help=annotation_description.clinpred_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.clinpred_rankscore }}{% endlabelled %}
+                                    {% labelled id='metalr_rankscore' label='MetaLR rankscore' help=annotation_description.metalr_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.metalr_rankscore }}{% endlabelled %}
+                                    {% labelled id='revel_rankscore' label='REVEL rankscore' help=annotation_description.revel_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.revel_rankscore }}{% endlabelled %}
+                                    {% labelled id='vest4_rankscore' label='VEST4 rankscore' help=annotation_description.vest4_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.vest4_rankscore }}{% endlabelled %}
+                                </div>
+                            {% endif %}
                         {% elif annotation_version.variant_annotation_version.columns_version >= 2 %}
                             {% if annotation_version.variant_annotation_version.columns_version >= 3 %}
                                 {% labelled id='alphamissense_rankscore' label='AlphaMissense rankscore' help=annotation_description.alphamissense_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.alphamissense_rankscore }}{% endlabelled %}
@@ -711,6 +776,7 @@ function applyVariantValues() {
                         {% else %}
                             Unknown annotation columns_version = {{ annotation_version.variant_annotation_version.columns_version }}
                         {% endif %}
+                        <div class="text-right mt-2"><a class="hover-link text-small" href="{% url 'pathogenicity_thresholds' %}" target="_blank">PP3/BP4 thresholds &amp; sources</a></div>
                     </div>
                 </div>
             </div>
@@ -721,7 +787,9 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">Conservation</div>
                     <div class="card-body">
-                        {% labelled id="gerp_pp_rs" label="Gerp++ (-12 - 6.8)" help=annotation_description.aloft_ensembl_transcript help=annotation_description.gerp_pp_rs hint="tiny" %}{% endlabelled %}
+                        {% if variant_annotation.has_dbnsfp %}
+                            {% labelled id="gerp_pp_rs" label="Gerp++ (-12 - 6.8)" help=annotation_description.aloft_ensembl_transcript help=annotation_description.gerp_pp_rs hint="tiny" %}{% endlabelled %}
+                        {% endif %}
                         {% labelled id="phastcons_100_way_vertebrate" label="PhastCons 100 way vertebrate (0-1)" help=annotation_description.phastcons_100_way_vertebrate hint="tiny" %}{% endlabelled %}
                         {% if annotation_version.variant_annotation_version.has_phastcons_30_way_mammalian %}
                             {% labelled id="phastcons_30_way_mammalian" label="PhastCons 30 way mammalian (0-1)" label_css="text-small" help=annotation_description.phastcons_30_way_mammalian hint="tiny" %}{% endlabelled %}
@@ -800,6 +868,111 @@ function applyVariantValues() {
                                         {% labelled id='gnomad_sv_overlap_af' label='SV Overlap AF' help=annotation_description.gnomad_sv_overlap_af hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_af|format_unit_as_percent }}{% endlabelled %}
                                         {% labelled id='gnomad_sv_overlap_percent' label='SV Overlap %' help=annotation_description.gnomad_sv_overlap_percent hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_percent }}{% endlabelled %}
                                     {% endfor %}
+                                </div>
+
+                                {% if variant_annotation.annotsv_acmg_class is not None or variant_annotation.annotsv_acmg_score is not None %}
+                                    {% labelled id='annotsv_acmg_class' label='AnnotSV ACMG class' help=annotation_description.annotsv_acmg_class hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_acmg_class|default_if_none:"-" }}{% endlabelled %}
+                                    {% labelled id='annotsv_acmg_score' label='AnnotSV ACMG score' help=annotation_description.annotsv_acmg_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_acmg_score|default_if_none:"-" }}{% endlabelled %}
+                                    {% if variant_annotation.annotsv_acmg_criteria %}
+                                        {% labelled id='annotsv_acmg_criteria' label='AnnotSV ACMG criteria' help=annotation_description.annotsv_acmg_criteria hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_acmg_criteria }}{% endlabelled %}
+                                    {% endif %}
+                                {% endif %}
+
+                                {% labelled label="Genomic context (AnnotSV)" hint="tiny" %}
+                                    <a class='toggle-link' data-toggle="collapse" href='#annotsv-context'>Show AnnotSV genomic context</a>
+                                {% endlabelled %}
+                                <div id="annotsv-context" class="collapse">
+                                    {% if variant_annotation.annotsv_re_gene %}
+                                        {% labelled id='annotsv_re_gene' label='Regulatory element gene' help=annotation_description.annotsv_re_gene hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_re_gene }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_repeat_type_left or variant_annotation.annotsv_repeat_type_right %}
+                                        {% labelled id='annotsv_repeat_left' label='Repeat (left)' help=annotation_description.annotsv_repeat_type_left hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_repeat_type_left|default_if_none:"-" }}{% endlabelled %}
+                                        {% labelled id='annotsv_repeat_right' label='Repeat (right)' help=annotation_description.annotsv_repeat_type_right hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_repeat_type_right|default_if_none:"-" }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_segdup_left or variant_annotation.annotsv_segdup_right %}
+                                        {% labelled id='annotsv_segdup_left' label='SegDup (left)' help=annotation_description.annotsv_segdup_left hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_segdup_left|default_if_none:"-" }}{% endlabelled %}
+                                        {% labelled id='annotsv_segdup_right' label='SegDup (right)' help=annotation_description.annotsv_segdup_right hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_segdup_right|default_if_none:"-" }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_encode_blacklist_left or variant_annotation.annotsv_encode_blacklist_right %}
+                                        {% labelled id='annotsv_encode_blacklist_left' label='ENCODE blacklist (left)' help=annotation_description.annotsv_encode_blacklist_left hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_encode_blacklist_left|default_if_none:"-" }}{% if variant_annotation.annotsv_encode_blacklist_characteristics_left %} ({{ variant_annotation.annotsv_encode_blacklist_characteristics_left }}){% endif %}{% endlabelled %}
+                                        {% labelled id='annotsv_encode_blacklist_right' label='ENCODE blacklist (right)' help=annotation_description.annotsv_encode_blacklist_right hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_encode_blacklist_right|default_if_none:"-" }}{% if variant_annotation.annotsv_encode_blacklist_characteristics_right %} ({{ variant_annotation.annotsv_encode_blacklist_characteristics_right }}){% endif %}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_b_gain_af_max is not None %}
+                                        {% labelled id='annotsv_b_gain_af_max' label='AnnotSV benign gain AF max' help=annotation_description.annotsv_b_gain_af_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_b_gain_af_max|format_unit_as_percent }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_b_loss_af_max is not None %}
+                                        {% labelled id='annotsv_b_loss_af_max' label='AnnotSV benign loss AF max' help=annotation_description.annotsv_b_loss_af_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_b_loss_af_max|format_unit_as_percent }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_b_ins_af_max is not None %}
+                                        {% labelled id='annotsv_b_ins_af_max' label='AnnotSV benign ins AF max' help=annotation_description.annotsv_b_ins_af_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_b_ins_af_max|format_unit_as_percent }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_b_inv_af_max is not None %}
+                                        {% labelled id='annotsv_b_inv_af_max' label='AnnotSV benign inv AF max' help=annotation_description.annotsv_b_inv_af_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_b_inv_af_max|format_unit_as_percent }}{% endlabelled %}
+                                    {% endif %}
+
+                                    {% if variant_annotation.annotsv_frameshift is not None %}
+                                        {% labelled id='annotsv_frameshift' label='AnnotSV frameshift' help=annotation_description.annotsv_frameshift hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_frameshift|yesno:"yes,no" }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_exons_spanned is not None %}
+                                        {% labelled id='annotsv_exons_spanned' label='AnnotSV exons spanned' help=annotation_description.annotsv_exons_spanned hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_exons_spanned }}{% endlabelled %}
+                                    {% endif %}
+                                    {% if variant_annotation.annotsv_dist_nearest_ss is not None or variant_annotation.annotsv_nearest_ss_type %}
+                                        {% labelled id='annotsv_nearest_ss' label='AnnotSV nearest splice site' help=annotation_description.annotsv_dist_nearest_ss hint="tiny" value_css="text-monospace" %}
+                                            {{ variant_annotation.annotsv_nearest_ss_type|default_if_none:"-" }} ({{ variant_annotation.annotsv_dist_nearest_ss|default_if_none:"-" }} bp)
+                                        {% endlabelled %}
+                                    {% endif %}
+
+                                    {% if variant_annotation.annotsv_omim_id or variant_annotation.annotsv_omim_inheritance or variant_annotation.annotsv_omim_phenotype or variant_annotation.annotsv_omim_morbid is not None %}
+                                        {% if variant_annotation.annotsv_omim_id %}
+                                            {% labelled id='annotsv_omim_id' label='OMIM ID' help=annotation_description.annotsv_omim_id hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_omim_id }}{% endlabelled %}
+                                        {% endif %}
+                                        {% if variant_annotation.annotsv_omim_phenotype %}
+                                            {% labelled id='annotsv_omim_phenotype' label='OMIM phenotype' help=annotation_description.annotsv_omim_phenotype hint="tiny" %}{{ variant_annotation.annotsv_omim_phenotype }}{% endlabelled %}
+                                        {% endif %}
+                                        {% if variant_annotation.annotsv_omim_inheritance %}
+                                            {% labelled id='annotsv_omim_inheritance' label='OMIM inheritance' help=annotation_description.annotsv_omim_inheritance hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_omim_inheritance }}{% endlabelled %}
+                                        {% endif %}
+                                        {% if variant_annotation.annotsv_omim_morbid is not None %}
+                                            {% labelled id='annotsv_omim_morbid' label='OMIM morbid' help=annotation_description.annotsv_omim_morbid hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_omim_morbid|yesno:"yes,no" }}{% endlabelled %}
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {% if variant_annotation.annotsv_pathogenic_overlaps %}
+                                        {% labelled label="Pathogenic SV overlaps" help=annotation_description.annotsv_pathogenic_overlaps hint="tiny" %}
+                                            <a class='toggle-link' data-toggle="collapse" href='#annotsv-p-overlaps'>Show pathogenic SV overlaps</a>
+                                        {% endlabelled %}
+                                        <div id="annotsv-p-overlaps" class="collapse">
+                                            {% for event, fields in variant_annotation.annotsv_pathogenic_overlaps.items %}
+                                                {% with collapse_id="annotsv-p-overlap-"|add:event %}
+                                                    {% labelled label="Pathogenic"|add:" "|add:event hint="tiny" value_css="text-monospace" %}
+                                                        {% if fields.source %}<strong>{{ fields.source }}</strong>{% endif %}
+                                                        {% if fields.coord %} - {{ fields.coord }}{% endif %}
+                                                        <a class='toggle-link ml-2' data-toggle="collapse" href='#{{ collapse_id }}'>Details</a>
+                                                        <div id="{{ collapse_id }}" class="collapse mt-1">
+                                                            <dl class="row mb-0">
+                                                                {% if fields.phen %}
+                                                                    <dt class="col-sm-3">Phenotype</dt>
+                                                                    <dd class="col-sm-9">{{ fields.phen }}</dd>
+                                                                {% endif %}
+                                                                {% if fields.hpo %}
+                                                                    <dt class="col-sm-3">HPO</dt>
+                                                                    <dd class="col-sm-9">{{ fields.hpo }}</dd>
+                                                                {% endif %}
+                                                                {% if fields.coord %}
+                                                                    <dt class="col-sm-3">Coords</dt>
+                                                                    <dd class="col-sm-9">{{ fields.coord }}</dd>
+                                                                {% endif %}
+                                                                {% if fields.source %}
+                                                                    <dt class="col-sm-3">Source</dt>
+                                                                    <dd class="col-sm-9">{{ fields.source }}</dd>
+                                                                {% endif %}
+                                                            </dl>
+                                                        </div>
+                                                    {% endlabelled %}
+                                                {% endwith %}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             {% elif variant_annotation.gnomad_url %}
                                 {% labelled label="View in gnomAD" hint="tiny" %}
@@ -949,6 +1122,41 @@ function applyVariantValues() {
                         {% else %}
                             {% labelled label="Mastermind" hint="tiny" help=annotation_description.mastermind %}No local Mastermind entry<br><i>may be others on site</i>{% endlabelled %}
                         {% endif %}
+
+                    {% with denovo_db_records=variant_annotation.denovo_db_records %}
+                        {% if denovo_db_records %}
+                            <div class="mt-3">
+                                <a data-toggle="collapse" href="#denovo-db-records" class="hover-link" title="{{ annotation_description.denovo_db_studies }}">
+                                    <i class="fas fa-caret-right"></i>
+                                    <b>denovo-db</b>: {{ variant_annotation.denovo_db_case_count|default_if_none:0 }} case(s) / {{ variant_annotation.denovo_db_control_count|default_if_none:0 }} control(s)
+                                </a>
+                            </div>
+                            <div id="denovo-db-records" class="collapse">
+                                <table class="table table-sm mt-2">
+                                    <thead>
+                                        <tr><th>Study</th><th>Primary Phenotype</th><th>PubMed</th><th class="text-right">Count</th></tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for record in denovo_db_records %}
+                                        <tr>
+                                            <td>{{ record.study }}</td>
+                                            <td>{{ record.primary_phenotype }}</td>
+                                            <td>
+                                                {% if record.pubmed_url %}
+                                                    <a target="_blank" class='hover-link' href="{{ record.pubmed_url }}">{{ record.pubmed_id }}</a>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-right">{{ record.count }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                                <div class="text-secondary">
+                                    <i>Source: <a target="_blank" class='hover-link' href="https://denovo-db.gs.washington.edu/">denovo-db</a></i>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
 
                     </div>
                 </div>

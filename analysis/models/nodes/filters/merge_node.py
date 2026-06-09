@@ -7,7 +7,6 @@ from auditlog.registry import auditlog
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from variantgrid import settings
 
 
 class MergeNode(AnalysisNode):
@@ -76,8 +75,14 @@ class MergeNode(AnalysisNode):
             if non_none_keys:
                 # We don't pass in arg_q_dict (ie run all where clauses in inner query)
                 # This has worse best-case performance but better worse case performance
+                # disable_cache=True bypasses parent NodeCache substitution: a parent with a stale
+                # VariantCollection-backed cache from a prior version would collapse to Q(pk__in=vc_join)
+                # and the merge would OR stale parent results with live siblings (see #240, ad35a7fb1).
                 qs = parent.get_queryset(disable_cache=True)
-                variant_ids = qs.values_list("pk", flat=True)
+                # Materialise to an explicit PK list (issue #546): merge parents are small, and a
+                # lazy TransformerQuerySet embedded in the Q makes arg_q_dict unpicklable (the q-cache
+                # cache.set in get_arg_q_dict then fails) as well as forcing a pk IN (subquery).
+                variant_ids = list(qs.values_list("pk", flat=True))
                 or_list.append(Q(pk__in=variant_ids))
             else:
                 if remaining_q_dict := arg_q_dict.get(None):
@@ -129,12 +134,10 @@ class MergeNode(AnalysisNode):
     def _get_arg_q_dict_from_parents_and_node(self):
         parent_arg_q_dict = {}
         for parent in self.get_non_empty_parents():
-            if settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX and \
-                    parent.count <= settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX:
-                variant_ids = list(parent.get_queryset().values_list("pk", flat=True))
-                q = Q(pk__in=variant_ids)
-                arg_q_dict = {None: {q: q}}
+            if (small_arg_q_dict := AnalysisNode.get_small_parent_arg_q_dict(parent)) is not None:
+                arg_q_dict = small_arg_q_dict
             else:
+                # disable_cache=True: see comment in _split_common_filters above (#240, ad35a7fb1).
                 arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
             parent_arg_q_dict[parent] = arg_q_dict
         return self._get_merged_q_dict(parent_arg_q_dict)

@@ -30,6 +30,7 @@ from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from annotation.models import VariantAnnotation
+from annotation.pathogenicity_predictions import TOOLS
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_coordinate, get_hgvs_variant, HGVSException
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
@@ -40,6 +41,7 @@ from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import GenomicInterval, Sample, VCFFilter, Tag, Lab
+from snpdb.models.models_genome import Contig
 
 # Can use this for ModelForm.exclude to only use node specific fields
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
@@ -166,6 +168,11 @@ class AnalysisOutputNodeChoiceForm(forms.Form):
 
 
 class AllVariantsNodeForm(BaseNodeForm):
+    contigs = forms.ModelMultipleChoiceField(required=False,
+                                             queryset=Contig.objects.all(),
+                                             widget=ModelSelect2Multiple(url='contig_autocomplete',
+                                                                         attrs={'data-placeholder': 'Chromosome...'}))
+
     class Meta:
         model = AllVariantsNode
         fields = ('max_variant', "gene_symbol",
@@ -186,6 +193,24 @@ class AllVariantsNodeForm(BaseNodeForm):
                    'max_het_count': WIDGET_INTEGER_MIN_1,
                    'min_hom_count': WIDGET_INTEGER_MIN_0,
                    'max_hom_count': WIDGET_INTEGER_MIN_1}
+
+    def __init__(self, *args, **kwargs):
+        genome_build = kwargs.pop("genome_build", None)
+        super().__init__(*args, **kwargs)
+        if genome_build:
+            self.fields["contigs"].widget.forward = [forward.Const(genome_build.pk, "genome_build_id")]
+
+    def save(self, commit=True):
+        node = super().save(commit=False)
+
+        contigs_set = self.instance.allvariantsnodecontig_set
+        contigs_set.all().delete()
+        for contig in self.cleaned_data["contigs"]:
+            contigs_set.create(contig=contig)
+
+        if commit:
+            node.save()
+        return node
 
 
 class VennNodeForm(BaseNodeForm):
@@ -252,7 +277,7 @@ class CohortNodeForm(VCFSourceNodeForm):
     def __init__(self, *args, **kwargs):
         genome_build = kwargs.pop("genome_build", None)
         super().__init__(*args, **kwargs)
-        widget_forward = []
+        widget_forward = [forward.Const(True, "exclude_archived")]
         if genome_build:
             widget_forward.append(forward.Const(genome_build.pk, "genome_build_id"))
         self.fields["cohort"].widget.forward = widget_forward
@@ -342,6 +367,18 @@ class DamageNodeForm(BaseNodeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["damage_predictions_min"].widget.attrs["max"] = self.instance.num_prediction_fields
+        # Columns v4 raw-score sliders driven by the per-tool table. data-* threshold attrs drive the
+        # calibrated ClinGen colour bands and value colouring in damagenode_editor.html (omitted when None).
+        for tool in TOOLS:
+            if tool.raw_field:
+                field_name = f"{tool.raw_field}_min"
+                if field_name in self.fields:
+                    attrs = {"min": tool.raw_min, "max": tool.raw_max, "step": tool.raw_step}
+                    if tool.raw_pathogenic_threshold is not None:
+                        attrs["data-pathogenic-min"] = tool.raw_pathogenic_threshold
+                    if tool.raw_max_benign_threshold is not None:
+                        attrs["data-benign-max"] = tool.raw_max_benign_threshold
+                    self.fields[field_name].widget = HiddenInput(attrs=attrs)
 
 
 class FilterNodeForm(BaseNodeForm):
@@ -625,6 +662,7 @@ class MOINodeForm(BaseNodeForm):
 
 class PedigreeNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
     genome_build_fields = ["pedigree"]
+    exclude_archived = True
 
     class Meta:
         model = PedigreeNode
@@ -715,6 +753,7 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
                        "allele_frequency"]
     LOCKED_INPUT_FIELDS = ['sample', 'restrict_to_qc_gene_list']
     genome_build_fields = ["sample"]
+    exclude_archived = True
 
     class Meta:
         model = SampleNode
@@ -803,6 +842,7 @@ class TissueNodeForm(BaseNodeForm):
 
 class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
     genome_build_fields = ["trio"]
+    exclude_archived = True
 
     class Meta:
         model = TrioNode
@@ -830,6 +870,7 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
 
 class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
     genome_build_fields = ["quad"]
+    exclude_archived = True
 
     class Meta:
         model = QuadNode

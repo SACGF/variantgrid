@@ -1,6 +1,6 @@
 import logging
 import re
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from functools import cached_property
 from typing import Iterable
 
@@ -12,6 +12,8 @@ from genes.models import GeneSymbol, GeneSymbolAlias, GeneListGeneSymbol, GeneAn
 from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
 from library.cache import timed_cache
 from library.utils import clean_string
+
+TokenizeResult = namedtuple("TokenizeResult", ["valid", "oversized"])
 
 
 class GeneSymbolMatcher:
@@ -45,13 +47,20 @@ class GeneSymbolMatcher:
         return gene_symbol_id
 
     def create_gene_list_gene_symbols_from_text(self, gene_list, gene_text, save=True):
-        gene_names = tokenize_gene_symbols(gene_text)
-        return self.create_gene_list_gene_symbols(gene_list, gene_names, save=save)
+        tokens = tokenize_gene_symbols(gene_text)
+        return self.create_gene_list_gene_symbols(gene_list, tokens.valid, save=save,
+                                                  oversized_skipped=tokens.oversized)
 
-    def create_gene_list_gene_symbols(self, gene_list, gene_names_list, modification_info=None, save=True):
-        """ save=False only returns unsaved objects """
+    def create_gene_list_gene_symbols(self, gene_list, gene_names_list, modification_info=None, save=True,
+                                      oversized_skipped=None):
+        """ save=False only returns unsaved objects.
+            oversized_skipped: names already filtered out upstream (e.g. by tokenize_gene_symbols) that
+            should be reported alongside any oversized names found here. """
+        valid_names, oversized_here = partition_oversized_names(gene_names_list)
+        all_oversized = list(oversized_skipped or []) + oversized_here
+
         gene_list_gene_symbols = []
-        for original_name in gene_names_list:
+        for original_name in valid_names:
             gene_symbol_id, alias_id = self.get_gene_symbol_id_and_alias_id(original_name)
             gene_list_gene_symbols.append(GeneListGeneSymbol(gene_list=gene_list,
                                                              original_name=original_name,
@@ -61,6 +70,8 @@ class GeneSymbolMatcher:
 
         if save:
             GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols, ignore_conflicts=True)
+            if all_oversized:
+                apply_oversized_warning(gene_list, all_oversized)
             gene_list.set_modified_to_now()
             self._match_symbols_to_genes_in_releases()
 
@@ -258,14 +269,45 @@ log = logging.getLogger(__name__)
 MAX_GENE_SYMBOL_LENGTH = 100
 
 
-def tokenize_gene_symbols(text):
-    """ returns set of strings """
+def tokenize_gene_symbols(text) -> TokenizeResult:
+    """ Returns TokenizeResult(valid, oversized) where valid is a set of accepted symbols and
+        oversized is a list of raw tokens that exceeded MAX_GENE_SYMBOL_LENGTH. Callers should
+        surface the oversized list to the user (e.g. via apply_oversized_warning). """
     text = clean_string(text)
     tokens = re.findall(r'[^,;\s]+', text.upper())
-    valid_tokens = set()
-    for t in tokens:
-        if len(t) > MAX_GENE_SYMBOL_LENGTH:
-            log.warning("Skipping token too long to be a gene symbol (%d chars): '%s...'", len(t), t[:40])
+    valid, oversized = partition_oversized_names(tokens)
+    return TokenizeResult(valid=set(valid), oversized=oversized)
+
+
+def partition_oversized_names(names: Iterable[str]) -> tuple[list[str], list[str]]:
+    """ Splits names into (valid, oversized) by MAX_GENE_SYMBOL_LENGTH. Anything longer cannot
+        fit in the genes_genelistgenesymbol unique index (btree row size limit). """
+    valid = []
+    oversized = []
+    for name in names:
+        if name is not None and len(name) > MAX_GENE_SYMBOL_LENGTH:
+            oversized.append(name)
         else:
-            valid_tokens.add(t)
-    return valid_tokens
+            valid.append(name)
+    return valid, oversized
+
+
+def format_oversized_warning(oversized: list[str]) -> str:
+    n = len(oversized)
+    example = oversized[0]
+    preview = example[:40]
+    plural = "entry" if n == 1 else "entries"
+    return (f"Skipped {n} oversized {plural} (gene symbols must be ≤ {MAX_GENE_SYMBOL_LENGTH} chars). "
+            f"First example: '{preview}...' ({len(example)} chars). "
+            f"Check the input is a plain gene list.")
+
+
+def apply_oversized_warning(gene_list, oversized: list[str]):
+    """ Append an oversized-tokens warning to gene_list.error_message and persist it.
+        Modifies the in-memory instance so subsequent caller saves preserve the message. """
+    warning = format_oversized_warning(oversized)
+    if gene_list.error_message:
+        gene_list.error_message = f"{gene_list.error_message}\n{warning}"
+    else:
+        gene_list.error_message = warning
+    type(gene_list).objects.filter(pk=gene_list.pk).update(error_message=gene_list.error_message)

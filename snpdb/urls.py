@@ -39,12 +39,15 @@ urlpatterns = [
     path('cohort/create_sub_cohort/<int:cohort_id>', views_json.create_sub_cohort, name='create_sub_cohort'),
     path('cohorts', views.cohorts, name='cohorts'),
     path('view_vcf/<int:vcf_id>', views.view_vcf, name='view_vcf'),
+    path('vcf/<int:vcf_id>/archive', views.archive_vcf_view, name='archive_vcf'),
+    path('vcf/<int:vcf_id>/restore', views.restore_vcf_view, name='restore_vcf'),
     path('vcf/<int:vcf_id>/populate_clingen_alleles', views_json.vcf_populate_clingen_alleles, name='vcf_populate_clingen_alleles'),
     path('vcf/<int:vcf_id>/change_zygosity_count/<int:vzcc_id>/<operation>', views_json.vcf_change_zygosity_count, name='vcf_change_zygosity_count'),
     path('get_patient_upload_csv_for_vcf/<int:pk>', views.get_patient_upload_csv_for_vcf, name='get_patient_upload_csv_for_vcf'),
 
     path('view_sample/<int:sample_id>', views.view_sample, name='view_sample'),
     path('view_genomic_intervals/<int:genomic_intervals_collection_id>', views.view_genomic_intervals, name='view_genomic_intervals'),
+    path('genomic_intervals_graphs_tab/<int:genomic_intervals_collection_id>', views.genomic_intervals_graphs_tab, name='genomic_intervals_graphs_tab'),
     path('view_cohort_details_tab/<int:cohort_id>', views.view_cohort_details_tab, name='view_cohort_details_tab'),
     path('view_cohort/<int:cohort_id>', views.view_cohort, name='view_cohort'),
     path('cohort/hotspot/<int:cohort_id>', views.cohort_hotspot, name='cohort_hotspot'),
@@ -146,6 +149,7 @@ urlpatterns = [
 
     # Autocompletes
     path('autocomplete/Cohort/', views_autocomplete.CohortAutocompleteView.as_view(), name='cohort_autocomplete'),
+    path('autocomplete/Contig/', views_autocomplete.ContigAutocompleteView.as_view(), name='contig_autocomplete'),
     path('autocomplete/CustomColumn/', views_autocomplete.CustomColumnAutocompleteView.as_view(), name='custom_column_autocomplete'),
     path('autocomplete/GenomicIntervalsCollection/', views_autocomplete.GenomicIntervalsCollectionAutocompleteView.as_view(), name='genomic_intervals_collection_autocomplete'),
     path('autocomplete/Project/', views_autocomplete.ProjectAutocompleteView.as_view(), name='project_autocomplete'),

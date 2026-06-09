@@ -11,6 +11,7 @@ from typing import Any, Optional
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
@@ -22,6 +23,7 @@ from django.views.decorators.http import require_POST
 from analysis.models import VariantTag
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
     VariantAnnotationVersion, VariantAnnotation, AnnotationStatus, ClinVarRecordCollection
+from annotation.manual_variant_entry import check_can_create_variants
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
@@ -362,8 +364,10 @@ def database_statistics(request):
 def variant_tag_detail(request, variant_id, tag):
     """ Loaded via tags grid on variant page """
 
-    variant = Variant.objects.get(pk=variant_id)
+    variant = get_object_or_404(Variant, pk=variant_id)
     tag = get_object_or_404(Tag, pk=tag)
+    if not VariantTag.filter_for_user(request.user).filter(variant=variant, tag=tag).exists():
+        raise PermissionDenied
     context = {
         "variant": variant,
         "tag": tag,
@@ -610,7 +614,7 @@ def export_classifications_allele(request, allele_id: int):
     """
     CSV export of what is currently filtered into the classification grid
     """
-    allele = Allele.objects.get(pk=allele_id)
+    allele = get_object_or_404(Allele, pk=allele_id)
     return ClassificationExportFormatterCSV(
         ClassificationFilter(
             user=request.user,
@@ -625,6 +629,7 @@ def export_classifications_allele(request, allele_id: int):
 @require_POST
 def create_variant_for_allele(request, allele_id, genome_build_name):
     """ Shortcut to create manual variant, but as a POST """
+    check_can_create_variants(request.user)
     allele = get_object_or_404(Allele, pk=allele_id)
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
@@ -657,7 +662,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                                        extra_context: dict = None):
     """ Main Variant Details page """
     variant = get_object_or_404(Variant, pk=variant_id)
-    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
     genome_build = annotation_version.genome_build
     latest_annotation_version = AnnotationVersion.latest(genome_build)
     variant_annotation = None
@@ -784,7 +789,7 @@ def nearby_variants_tab(request, variant_id, annotation_version_id):
 
 def nearby_variants(request, variant_id, annotation_version_id):
     variant = get_object_or_404(Variant, pk=variant_id)
-    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
 
     variant_annotation_version = annotation_version.variant_annotation_version
     variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()

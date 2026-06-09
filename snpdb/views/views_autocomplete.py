@@ -11,6 +11,7 @@ from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 from snpdb.models import VCF, Sample, Cohort, CustomColumnsCollection, CustomColumn, Tag, Trio, Quad, \
     Lab, GenomicIntervalsCollection, GenomeBuild, ImportStatus, Project
+from snpdb.models.models_genome import Contig
 
 
 class GenomeBuildAutocompleteView(AutocompleteView, ABC):
@@ -20,6 +21,13 @@ class GenomeBuildAutocompleteView(AutocompleteView, ABC):
         if genome_build_id:
             genome_build = GenomeBuild.objects.get(pk=genome_build_id)
             qs = qs.filter(**{path_to_genome_build: genome_build})
+        return qs
+
+    def exclude_archived_if_forwarded(self, qs, path_to_archived_date):
+        """ When the consumer forwards exclude_archived=True (e.g. analysis source
+            nodes), drop rows whose underlying data has been archived. """
+        if self.forwarded.get('exclude_archived'):
+            qs = qs.filter(**{f"{path_to_archived_date}__isnull": True})
         return qs
 
 
@@ -70,6 +78,7 @@ class VCFAutocompleteView(GenomeBuildAutocompleteView):
 
     def get_user_queryset(self, user):
         qs = VCF.filter_for_user(user, True).filter(import_status=ImportStatus.SUCCESS)
+        qs = self.exclude_archived_if_forwarded(qs, "data_archived_date")
         return self.filter_to_genome_build(qs, "genome_build")
 
 
@@ -79,6 +88,7 @@ class SampleAutocompleteView(GenomeBuildAutocompleteView):
 
     def get_user_queryset(self, user):
         sample_qs = Sample.filter_for_user(user, True).filter(import_status=ImportStatus.SUCCESS)
+        sample_qs = self.exclude_archived_if_forwarded(sample_qs, "vcf__data_archived_date")
         return self.filter_to_genome_build(sample_qs, "vcf__genome_build")
 
 
@@ -89,6 +99,10 @@ class CohortAutocompleteView(GenomeBuildAutocompleteView):
     def get_user_queryset(self, user):
         vcf_success_if_exists = Q(vcf__isnull=True) | Q(vcf__import_status=ImportStatus.SUCCESS)
         qs = Cohort.filter_for_user(user, success_status_only=True).filter(vcf_success_if_exists)
+        if self.forwarded.get('exclude_archived'):
+            archived_vcf = Q(vcf__data_archived_date__isnull=False)
+            archived_parent_vcf = Q(parent_cohort__vcf__data_archived_date__isnull=False)
+            qs = qs.exclude(archived_vcf | archived_parent_vcf)
         return self.filter_to_genome_build(qs, "genome_build")
 
 
@@ -114,6 +128,21 @@ class GenomicIntervalsCollectionAutocompleteView(GenomeBuildAutocompleteView):
         return self.filter_to_genome_build(qs, "genome_build")
 
 
+@method_decorator(cache_page(MINUTE_SECS), name='dispatch')
+class ContigAutocompleteView(AutocompleteView):
+    fields = ['name', 'ucsc_name', 'refseq_accession']
+
+    def get_user_queryset(self, user):
+        genome_build_id = self.forwarded.get('genome_build_id')
+        if not genome_build_id:
+            return Contig.objects.none()
+        genome_build = GenomeBuild.objects.get(pk=genome_build_id)
+        return genome_build.standard_contigs
+
+    def get_result_label(self, obj):
+        return obj.name
+
+
 @method_decorator(cache_page(5), name='dispatch')
 class TagAutocompleteView(AutocompleteView):
     fields = ['id']
@@ -128,6 +157,7 @@ class TrioAutocompleteView(GenomeBuildAutocompleteView):
 
     def get_user_queryset(self, user):
         qs = Trio.filter_for_user(user, success_status_only=True)
+        qs = self.exclude_archived_if_forwarded(qs, "cohort__vcf__data_archived_date")
         return self.filter_to_genome_build(qs, "cohort__genome_build")
 
 
@@ -137,4 +167,5 @@ class QuadAutocompleteView(GenomeBuildAutocompleteView):
 
     def get_user_queryset(self, user):
         qs = Quad.filter_for_user(user).filter(cohort__import_status=ImportStatus.SUCCESS)
+        qs = self.exclude_archived_if_forwarded(qs, "cohort__vcf__data_archived_date")
         return self.filter_to_genome_build(qs, "cohort__genome_build")

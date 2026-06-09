@@ -197,7 +197,7 @@
                             <td>
                             {% if columnvepfield %}
                                 <div class='vep-category vep-category-{{ columnvepfield.category }}'>
-                                    {{ columnvepfield.get_category_display }}
+                                    {{ columnvepfield.category.label }}
                                 </div>
                             {% endif %}
                             </td>
@@ -215,7 +215,7 @@
                             {% if columnvepfield %}
                                 <div class='vep-source-field'>
                                     {% if columnvepfield.vep_plugin %}
-                                        Plugin: <b>{{ columnvepfield.get_vep_plugin_display }}</b>
+                                        Plugin: <b>{{ columnvepfield.vep_plugin.label }}</b>
                                     {% endif %}
 
                                     {% if columnvepfield.vep_custom %}

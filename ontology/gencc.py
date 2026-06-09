@@ -5,7 +5,7 @@ from io import StringIO
 import requests
 from dateutil import parser
 from django.conf import settings
-from pandas import DataFrame, read_csv
+from pandas import DataFrame, isna, read_csv
 
 from annotation.models import CachedWebResource
 from library.constants import MINUTE_SECS
@@ -31,6 +31,13 @@ def _clean_date(date_str) -> datetime.date:
     return dt.date()
 
 
+def _none_if_na(value):
+    """ pandas iterrows() coerces df_nan_to_none's Python None back to float NaN — re-normalise here. """
+    if value is None or isna(value):
+        return None
+    return value
+
+
 def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -> int:
     if isinstance(file_or_filename, str):
         url_or_filename = file_or_filename
@@ -48,7 +55,7 @@ def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -
     ontology_builder.cache_everything()
 
     logging.info("About to load gencc")
-    gencc_df: DataFrame = df_nan_to_none(read_csv(file_or_filename, sep=","))
+    gencc_df: DataFrame = df_nan_to_none(read_csv(file_or_filename, sep=",", dtype={"submitted_as_pmids": str}))
 
     # only want strong and definitive relationships
     gencc_df = gencc_df.sort_values(by=["gene_curie", "disease_curie"])
@@ -70,21 +77,25 @@ def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -
             evaluated_date = _clean_date(row["submitted_as_date"])
             submitted_date = _clean_date(row["submitted_run_date"])
             pubmed_ids = []
-            if pmids_str := row["submitted_as_pmids"]:
-                pubmed_ids = [p.strip() for p in pmids_str.split(",")]
+            pmids_value = row["submitted_as_pmids"]
+            if pmids_value is not None and not isna(pmids_value):
+                pmids_str = str(pmids_value)
+                if pmids_str.endswith(".0"):
+                    pmids_str = pmids_str[:-2]
+                pubmed_ids = [p.strip() for p in pmids_str.split(",") if p.strip()]
 
             gencc_classification = row["classification_title"]
             classification_enum = gene_disease_classification_lookup[gencc_classification]
             classifications.add(classification_enum)
 
             sources.append({
-                "submitter": submitter_title,
+                "submitter": _none_if_na(submitter_title),
                 "gencc_classification": gencc_classification,
-                "mode_of_inheritance":  row["moi_title"],
-                "notes": row["submitted_as_notes"],
+                "mode_of_inheritance": _none_if_na(row["moi_title"]),
+                "notes": _none_if_na(row["submitted_as_notes"]),
                 "pubmed_ids": pubmed_ids,
-                "public_report_url": row["submitted_as_public_report_url"],
-                "assertion_criteria_url": row["submitted_as_assertion_criteria_url"],
+                "public_report_url": _none_if_na(row["submitted_as_public_report_url"]),
+                "assertion_criteria_url": _none_if_na(row["submitted_as_assertion_criteria_url"]),
                 "evaluated_date": str(evaluated_date),
                 "submitted_date": str(submitted_date),
             })

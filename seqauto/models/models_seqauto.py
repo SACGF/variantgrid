@@ -343,23 +343,54 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         except SequencingRunCurrentSampleSheet.DoesNotExist:
             return False
 
-        try:
-            combo = current_sample_sheet.samplesheetcombinedvcffile_set.get()
-            if combo.needs_to_be_linked():
+        for joint_called_vcf in current_sample_sheet.jointcalledvcf_set.all():
+            if joint_called_vcf.needs_to_be_linked():
                 return True
-        except Exception:
-            pass
 
         old_sample_sheets = self.get_old_sample_sheets()
         illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet=current_sample_sheet)
         old_illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet__in=old_sample_sheets)
-        old_sample_sheet_combined_vcf = SampleSheetCombinedVCFFile.objects.filter(sample_sheet__in=old_sample_sheets)
+        old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
         old_sample_links = SampleFromSequencingSample.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
         old_unaligned_reads = UnalignedReads.get_for_old_sample_sheets(self)
         return any([not illuminate_qc.exists() and old_illuminate_qc.exists(),
-                    old_sample_sheet_combined_vcf.exists(),
+                    old_joint_called_vcfs.exists(),
                     old_unaligned_reads.exists(),
                     old_sample_links.exists()])
+
+    @staticmethod
+    def get_external_links_for(name: str, date: Optional[datetime.date],
+                               enrichment_kit_name: Optional[str]) -> list[tuple[str, str]]:
+        """ Returns (label, url) tuples for external systems configured in
+            SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS that apply to a run with these fields.
+            Used from both the detail page (via get_external_links) and the runs grid. """
+        links = []
+        params = None
+        for cfg in settings.SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS:
+            min_date_str = cfg.get("min_date")
+            if min_date_str:
+                min_date = datetime.strptime(min_date_str, "%Y-%m-%d").date()
+                if not date or date < min_date:
+                    continue
+            excluded = cfg.get("exclude_enrichment_kits") or []
+            if excluded and enrichment_kit_name:
+                kit_name_lower = enrichment_kit_name.lower()
+                if any(ex.lower() == kit_name_lower for ex in excluded):
+                    continue
+            if params is None:
+                original = SequencingRun.get_original_illumina_sequencing_run(name)
+                params = {
+                    "sequencing_run": name,
+                    "original_sequencing_run": original,
+                    "flowcell_id": original.split("_")[-1],
+                    "enrichment_kit": enrichment_kit_name or "",
+                }
+            links.append((cfg["label"], cfg["url_pattern"] % params))
+        return links
+
+    def get_external_links(self) -> list[tuple[str, str]]:
+        kit_name = self.enrichment_kit.name if self.enrichment_kit else None
+        return self.get_external_links_for(self.name, self.date, kit_name)
 
     def __str__(self):
         return self.name
@@ -555,19 +586,8 @@ class VCFFromSequencingRun(models.Model):
     sequencing_run = models.ForeignKey(SequencingRun, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, null=True, on_delete=SET_NULL)
 
-    class Meta:
-        unique_together = ("sequencing_run", "variant_caller")
-
     def get_variant_caller(self):
-        """ Because we can't do a schema change for VG3, we need to basically always store variant_caller as None
-            for single sample VCFs """
-        if self.variant_caller:
-            return self.variant_caller
-        try:
-            return self.vcf.uploadedvcf.backendvcf.variant_caller
-        except Exception:
-            pass
-        return None
+        return self.variant_caller
 
 
 class IlluminaFlowcellQC(SeqAutoRecord):
@@ -892,8 +912,8 @@ class DontAutoLoadException(Exception):
     pass
 
 
-class VCFFile(SeqAutoRecord):
-    """ VCFs from the file system """
+class SingleSampleVCF(SeqAutoRecord):
+    """ Single-sample VCFs from the file system, tied to exactly one BamFile """
     bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
 
@@ -938,7 +958,7 @@ class VCFFile(SeqAutoRecord):
         return f"VCF {self.name} ({self.get_data_state_display()})"
 
 
-class SampleSheetCombinedVCFFile(SeqAutoRecord):
+class JointCalledVCF(SeqAutoRecord):
     sample_sheet = models.ForeignKey(SampleSheet, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
 
@@ -964,6 +984,19 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
             return VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)
         except VCF.DoesNotExist:
             return None
+
+    @property
+    def sample_count(self) -> Optional[int]:
+        if vcf := self.vcf:
+            return vcf.sample_set.count()
+        return None
+
+    @property
+    def is_full_sheet(self) -> Optional[bool]:
+        count = self.sample_count
+        if count is None:
+            return None
+        return count == self.sample_sheet.sequencingsample_set.count()
 
     def load_from_file(self, seqauto_run, **kwargs):
         if not settings.SEQAUTO_IMPORT_COMBO_VCF:
@@ -1019,7 +1052,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
 
     def __str__(self):
         num_samples = self.sample_sheet.sequencingsample_set.count()
-        return f"{self.variant_caller} ComboVCF ({self.pk}) for {self.sequencing_run} ({num_samples} samples)"
+        return f"{self.variant_caller} JointCalledVCF ({self.pk}) for {self.sequencing_run} ({num_samples} samples)"
 
 
 class QC(SeqAutoRecord):
@@ -1034,7 +1067,7 @@ class QC(SeqAutoRecord):
         TODO: Make this not a SeqAutoRecord. Perhaps make this unique_together w/bam+vcf?
     """
     bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
-    vcf_file = models.ForeignKey(VCFFile, on_delete=CASCADE)
+    vcf_file = models.ForeignKey(SingleSampleVCF, on_delete=CASCADE)
 
     @property
     def genome_build(self):

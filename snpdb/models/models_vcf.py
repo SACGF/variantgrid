@@ -21,6 +21,8 @@ from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 
 from library.django_utils import SortByPKMixin
+from library.django_utils.data_archive_mixin import DataArchiveMixin
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback, report_event
@@ -58,7 +60,7 @@ class Project(models.Model):
         return name
 
 
-class VCF(models.Model, PreviewModelMixin):
+class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     name = models.TextField(null=True)
     date = models.DateTimeField()
     # genome_build will be set if imported successfully
@@ -85,10 +87,28 @@ class VCF(models.Model, PreviewModelMixin):
     allele_frequency_percent = models.BooleanField(default=False)  # Legacy data used AF as percent
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
+    # Set when an async archive (snpdb.tasks.vcf_archive_tasks) is queued/running. Cleared
+    # in both terminal states: on success data_archived_date is stamped, on failure
+    # data_archive_error is stamped (so a failed archive stays visible instead of the page
+    # silently reverting to looking un-archived).
+    data_archive_started_date = models.DateTimeField(null=True, blank=True)
+    # Set if the async archive task raised; holds the error message. Cleared when a fresh
+    # archive is queued (mark_vcf_archive_started) or once successfully archived.
+    data_archive_error = models.TextField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'VCF'
         verbose_name_plural = 'VCFs'
+
+    @property
+    def data_archive_in_progress(self) -> bool:
+        """ True between queueing the archive task and it reaching a terminal state. """
+        return self.data_archive_started_date is not None and not self.data_archived
+
+    @property
+    def data_archive_failed(self) -> bool:
+        """ True when the last archive attempt errored and the VCF is still un-archived. """
+        return bool(self.data_archive_error) and not self.data_archived
 
     @classmethod
     def preview_icon(cls) -> str:
@@ -117,7 +137,7 @@ class VCF(models.Model, PreviewModelMixin):
         return percent
 
     @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False):
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
         if has_write_permission:
             perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
         else:
@@ -128,7 +148,10 @@ class VCF(models.Model, PreviewModelMixin):
         else:
             queryset = VCF.objects.filter(user=user)
 
-        return queryset.exclude(import_status__in=ImportStatus.DELETION_STATES)
+        queryset = queryset.exclude(import_status__in=ImportStatus.DELETION_STATES)
+        if not include_archived:
+            queryset = queryset.filter(data_archived_date__isnull=True)
+        return queryset
 
     @staticmethod
     def get_for_user(user, vcf_id):
@@ -137,14 +160,6 @@ class VCF(models.Model, PreviewModelMixin):
         if not user.has_perm(read_perm, vcf):
             raise PermissionDenied()
         return vcf
-
-    def can_view(self, user_or_group: Union[User, Group]) -> bool:
-        read_perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
-        return user_or_group.has_perm(read_perm, self)
-
-    def can_write(self, user_or_group: Union[User, Group]) -> bool:
-        write_perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
-        return user_or_group.has_perm(write_perm, self)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -191,8 +206,12 @@ class VCF(models.Model, PreviewModelMixin):
         qs = qs.annotate(**cgc.get_annotation_kwargs())
         return qs.filter(**{f"{cgc.cohortgenotype_alias}__isnull": False})  # Inner join to CohortGenotype
 
-    def delete_internal_data(self):
-        """ Remove internal data but keep VCF and samples for reloading in place """
+    def delete_internal_data(self, recreate_partitions: bool = True):
+        """ Remove internal data but keep VCF and samples for reloading in place.
+
+            recreate_partitions=False is used by archive (snpdb/archive.py) — we want
+            the partitions dropped, not replaced with empty ones.
+        """
 
         # Remove VCF filters - some old ones had diff symbol/filter combos that cause errors trying to re-use
         self.vcffilter_set.all().delete()
@@ -213,11 +232,17 @@ class VCF(models.Model, PreviewModelMixin):
         except ObjectDoesNotExist:
             pass
 
-        # Delete and recreate rather than truncate as we may have had a schema change since
-        logging.warning("*** Deleting then recreating partitions ***")
-        for p in partitions:
-            p.delete_related_objects()
-            p.create_partition()
+        if recreate_partitions:
+            # Delete and recreate rather than truncate as we may have had a schema change since
+            logging.warning("*** Deleting then recreating partitions ***")
+            for p in partitions:
+                p.delete_related_objects()
+                p.create_partition()
+        else:
+            logging.warning("*** Deleting partitions and CohortGenotypeCollection rows ***")
+            for p in partitions:
+                p.delete_related_objects()
+                p.delete()
 
 
 @receiver(pre_delete, sender=VCF)
@@ -293,7 +318,7 @@ class VCFTag(models.Model):
         return f"{self.tag}:{self.vcf}"
 
 
-class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
+class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.Model):
     """ A VCF sample storing genotype information
         Sample data is stored as packed fields in CohortGenotype (via vcf.cohort.cohortgenotypecollection) """
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
@@ -332,6 +357,10 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         return self.vcf.has_genotype
 
     @property
+    def data_archived(self) -> bool:
+        return self.vcf.data_archived
+
+    @property
     def is_somatic(self):
         return self.variants_type in VariantsType.SOMATIC_TYPES
 
@@ -366,6 +395,10 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
             msg = f"You do not have permission to modify sample {self.pk} (vcf {self.vcf.pk})"
             raise PermissionDenied(msg)
 
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        return True  # User data; deletable via the group_permissions delete view
+
     def delete_internal_data(self):
         """ for reloading in place """
         try:
@@ -390,6 +423,21 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
 
         for o in related_objects:
             o.all().delete()
+
+        # New CohortGenotype*Stats family — only the per-sample (sample IS NOT NULL)
+        # rows belong to this Sample. Aggregate / filter-keyed rows are owned by
+        # the CGC and die when the CGC is deleted. Imports are inline to avoid
+        # a snpdb-internal load-order cycle (CohortGenotypeStats → SampleStatsCodeVersion
+        # in this module) and a snpdb→annotation cycle.
+        from annotation.models import (
+            CohortGenotypeClinVarAnnotationStats, CohortGenotypeGeneAnnotationStats,
+            CohortGenotypeVariantAnnotationStats,
+        )
+        from snpdb.models.models_cohort_stats import CohortGenotypeStats as _CGS
+        _CGS.objects.filter(sample=self).delete()
+        CohortGenotypeVariantAnnotationStats.objects.filter(sample=self).delete()
+        CohortGenotypeGeneAnnotationStats.objects.filter(sample=self).delete()
+        CohortGenotypeClinVarAnnotationStats.objects.filter(sample=self).delete()
 
     @cached_property
     def cohort_genotype_collection(self):
@@ -420,7 +468,12 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         return f"sample_{self.pk}"
 
     def get_annotation_kwargs(self, **kwargs) -> dict:
-        """ For annotating Variant queries """
+        """ For annotating Variant queries.
+
+        SUBSTRING+IN beats regex for small numbers of constrained samples (single sample
+        here, ~6.5x faster). The cohort path keeps regex because regex wins for wider
+        cohorts — see CohortGenotypeCollection.get_zygosity_q and #1494.
+        """
         cgc = self.cohort_genotype_collection
         i = cgc.get_sql_index_for_sample_id(self.pk)
         sample_zygosity = Substr(f"{cgc.cohortgenotype_alias}__samples_zygosity", i, length=1)
@@ -459,9 +512,10 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         return reverse('data')
 
     @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False):
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
         """ May be given permission for whole VCF or just a sample """
-        vcfs = VCF.filter_for_user(user, group_data, has_write_permission=has_write_permission)
+        vcfs = VCF.filter_for_user(user, group_data, has_write_permission=has_write_permission,
+                                   include_archived=include_archived)
         q_filters = [Q(vcf__in=vcfs)]
         if group_data:
             if has_write_permission:
@@ -469,7 +523,10 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
             else:
                 perm = DjangoPermission.perm(Sample, DjangoPermission.READ)
             queryset = get_objects_for_user(user, perm, klass=Sample, accept_global_perms=True)
-            q_filters.append(Q(pk__in=queryset.values_list("pk", flat=True)))
+            sample_q = Q(pk__in=queryset.values_list("pk", flat=True))
+            if not include_archived:
+                sample_q &= Q(vcf__data_archived_date__isnull=True)
+            q_filters.append(sample_q)
 
         ored_q_filters = reduce(operator.or_, q_filters)
         return Sample.objects.filter(ored_q_filters).exclude(import_status__in=ImportStatus.DELETION_STATES)
@@ -505,30 +562,13 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         }
         if patient := self.patient:
             params["patient_id"] = patient.pk
-            params["patient_code"] = patient.last_name
+            params["patient_code"] = patient.patient_code or ""
             params["patient"] = str(patient)
 
         if specimen := self.specimen:
             params["specimen_id"] = specimen.pk
             params["specimen"] = str(specimen)
         return params
-
-    @staticmethod
-    def _validate_sample_formatter_func(sample_label_template):
-        """ Throws error if invalid """
-        specimen = Specimen(reference_id='refId', description='description')
-        patient = Patient(pk=2, first_name='first_name', last_name='last_name')
-        sample = Sample(pk=1, name="sample", patient=patient, specimen=specimen)
-        params = sample._get_sample_formatter_params()
-        errors = []
-        for i, t in enumerate(sample_label_template.split("||")):
-            try:
-                t % params
-            except (ValueError, KeyError) as exception:
-                errors.append(f"{i+1}: '{t}: {exception=}'")
-        if errors:
-            error_msg = '\n'.join(errors)
-            raise ValueError(f"Sample formatter function failed: {error_msg}")
 
     @staticmethod
     def _get_sample_formatter_func(sample_label_template, fallback=True):
@@ -581,7 +621,7 @@ class VCFAlleleSource(AlleleSource):
         return genome_build
 
     def get_variant_qs(self):
-        if self.vcf:
+        if self.vcf and not self.vcf.data_archived:
             qs = self.vcf.get_variant_qs()
         else:
             qs = Variant.objects.none()

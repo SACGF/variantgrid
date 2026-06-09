@@ -1,6 +1,5 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
 {% load classification_tags %}
-{% load datatable_tags %}
 {% load js_tags %}
 {% load settings_tags %}
 {% load tz %}
@@ -62,12 +61,9 @@ $(document).ready(function() {
         {% endif %}
     {% endif %}
 
-    EKeys.load().then(() => {
-        {% datatable_definition table_config=datatable_config table_id='tag-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %};
-        let vcDatatable = $('#tag-datatable');
-        vcDatatable.on('draw.dt', () => {
-            Flags.instance.init({userId: '{{user.id}}'});
-        });
+    let vcDatatable = $('#tag-datatable');
+    vcDatatable.on('draw.dt', () => {
+        Flags.instance.init({userId: '{{user.id}}'});
     });
 });
 </script>
@@ -139,7 +135,11 @@ $(document).ready(function() {
 
     {% if node.analysis.analysisclassification_set.exists %}
         <h3>Classifications for this analysis</h3>
-        {% datatable datatable_config 'tag-datatable' class_name='classification-table' %}
+        <table id="tag-datatable"
+               data-datatable-url="{% url 'classification_datatables' %}"
+               data-datatable-data="classificationFilter"
+               data-datatable-filter-count="hide"
+               class="classification-table"></table>
     {% endif %}
 
 </div>

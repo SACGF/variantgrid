@@ -4,12 +4,12 @@ import pandas as pd
 from django.conf import settings
 from django.http.response import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404
-from django.views.decorators.http import require_POST
-from jfu.http import upload_receive, UploadResponse, JFUResponse
+from django.views.decorators.http import require_POST, require_http_methods
 
 from annotation.models.models_phenotype_match import TextPhenotypeMatch
 from annotation.phenotype_matching import create_phenotype_description
 from library.django_utils import add_save_message, set_form_read_only
+from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
 from library.log_utils import log_traceback
 from library.utils import invert_dict
 from library.utils.file_utils import rm_if_exists
@@ -105,31 +105,28 @@ def patient_file_upload(request, patient_id):
     try:
         patient = Patient.get_for_user(request.user, patient_id)
         patient.check_can_write(request.user)
-        uploaded_file = upload_receive(request)
+        uploaded_file = filepond_upload_receive(request)
         patient_attachment = PatientAttachment.objects.create(patient=patient, file=uploaded_file)
-        file_dict = patient_attachment.get_file_dict()
-    except Exception as e:
+    except Exception:
         log_traceback()
-        file_dict = {"error": str(e)}
+        return HttpResponse("Upload failed", status=500)
 
-    return UploadResponse(request, file_dict)
+    return filepond_process_response(patient_attachment.pk)
 
 
-@require_POST
+@require_http_methods(["DELETE", "POST"])
 def patient_file_delete(request, pk):
-    success = False
     try:
         patient_attachment = PatientAttachment.objects.get(pk=pk)
-        patient_attachment.patient.check_can_write(request.user)
-        rm_if_exists(patient_attachment.file.path)
-        if patient_attachment.thumbnail_path:
-            rm_if_exists(patient_attachment.thumbnail_path)
-        patient_attachment.delete()
-        success = True
     except PatientAttachment.DoesNotExist:
-        pass
+        return HttpResponse(status=404)
 
-    return JFUResponse(request, success)
+    patient_attachment.patient.check_can_write(request.user)
+    rm_if_exists(patient_attachment.file.path)
+    if patient_attachment.thumbnail_path:
+        rm_if_exists(patient_attachment.thumbnail_path)
+    patient_attachment.delete()
+    return HttpResponse(status=200)
 
 
 def get_patient_attachment_file_dicts(patient):
@@ -137,7 +134,7 @@ def get_patient_attachment_file_dicts(patient):
     for patient_attachment in patient.patientattachment_set.all():
         file_dicts.append(patient_attachment.get_file_dict())
 
-    file_dicts = list(reversed(file_dicts))  # JFU adds most recent at the end
+    file_dicts = list(reversed(file_dicts))  # render newest-first
     return file_dicts
 
 
@@ -303,7 +300,7 @@ def patient_term_approvals(request, patient_id_offset=0, num_patients_per_page=2
 
     if patient_id_offset:
         filter_kwargs["pk__gt"] = patient_id_offset
-    patients_qs = Patient.objects.filter(**filter_kwargs).order_by("pk")
+    patients_qs = Patient.filter_for_user(request.user).filter(**filter_kwargs).order_by("pk")
     num_total = patients_qs.count()
 
     end = min(num_patients_per_page, num_total)

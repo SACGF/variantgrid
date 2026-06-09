@@ -19,10 +19,9 @@ from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.timezone import now
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
-from jfu.http import upload_receive, UploadResponse, JFUResponse
 from more_itertools import first
 from requests.models import Response
 from rest_framework.status import HTTP_200_OK
@@ -55,6 +54,7 @@ from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
 from genes.hgvs import HGVSMatcher
 from library.django_utils import require_superuser, get_url_from_view_path
+from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
 from library.log_utils import log_traceback
 from library.utils import delimited_row
 from library.utils.django_utils import render_ajax_view
@@ -644,38 +644,34 @@ def classification_file_upload(request, classification_id):
     try:
         classification = get_object_or_404(Classification, pk=classification_id)
         if not classification.can_write(request.user):
-            raise Exception('User can not edit this variant classification')
-        uploaded_file = upload_receive(request)
+            raise PermissionDenied('User can not edit this variant classification')
+        uploaded_file = filepond_upload_receive(request)
 
         vc_attachment = ClassificationAttachment(classification=classification,
                                                  file=uploaded_file)
         vc_attachment.save()
-
-        file_dict = vc_attachment.get_file_dict()
-    except Exception as e:
+    except Exception:
         log_traceback()
-        file_dict = {"error": str(e)}
+        return HttpResponse("Upload failed", status=500)
 
-    return UploadResponse(request, file_dict)
+    return filepond_process_response(vc_attachment.pk)
 
 
-@require_POST
+@require_http_methods(["DELETE", "POST"])
 def classification_file_delete(request, pk):
-    success = False
     try:
         vc_attachment = ClassificationAttachment.objects.get(pk=pk)
-        if not vc_attachment.classification.can_write(request.user):
-            raise Exception('User can not edit this variant classification')
-
-        rm_if_exists(vc_attachment.file.path)
-        if vc_attachment.thumbnail_path:
-            rm_if_exists(vc_attachment.thumbnail_path)
-        vc_attachment.delete()
-        success = True
     except ClassificationAttachment.DoesNotExist:
-        pass
+        return HttpResponse(status=404)
 
-    return JFUResponse(request, success)
+    if not vc_attachment.classification.can_write(request.user):
+        raise PermissionDenied('User can not edit this variant classification')
+
+    rm_if_exists(vc_attachment.file.path)
+    if vc_attachment.thumbnail_path:
+        rm_if_exists(vc_attachment.thumbnail_path)
+    vc_attachment.delete()
+    return HttpResponse(status=200)
 
 
 def get_classification_attachment_file_dicts(classification) -> list[dict]:
@@ -684,7 +680,7 @@ def get_classification_attachment_file_dicts(classification) -> list[dict]:
     for vca in classification.classificationattachment_set.all():
         file_dicts.append(vca.get_file_dict())
 
-    file_dicts = list(reversed(file_dicts))  # JFU adds most recent at the end
+    file_dicts = list(reversed(file_dicts))  # render newest-first
     return file_dicts
 
 

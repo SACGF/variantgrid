@@ -1,0 +1,23 @@
+{% load static %}
+<style>
+    #gene-list-chromosome-graph, #gene-list-chromosome-graph img {
+        width: 640px;
+        height: 960px;
+        text-align: center;
+    }
+</style>
+<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+
+<script>
+$(document).ready(function() {
+    {% if gene_list.import_status == 'S' %}
+        var poll_url = "{% url 'gene_list_chromosome_graph' gene_list.pk %}";
+        var delete_url = "{% url 'cached_generated_file_delete' %}";
+        poll_graph_status($('#gene-list-chromosome-graph'), poll_url, delete_url);
+    {% else %}
+        $('#gene-list-chromosome-graph').html("Gene list has not finished importing.");
+    {% endif %}
+});
+</script>
+
+<div id='gene-list-chromosome-graph' class='generated-graph graph-loading'></div>

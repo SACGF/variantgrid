@@ -6,17 +6,19 @@ from annotation.vep_annotation import VEPConfig
 from genes.models import TranscriptVersion
 from snpdb.models import GenomeBuild
 
-_VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation/VEP"
+_VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation"
 
 
 def _get_fix_instructions(filename) -> str:
+    # Anchor at ANNOTATION_BASE_DIR (not the narrower VEP subdir) so files outside
+    # /data/annotation/VEP - eg reference_fasta in fasta/, liftover chains - map to a real URL
     dirname = os.path.dirname(filename)
-    vg_path = filename.replace(settings.ANNOTATION_VEP_BASE_DIR, _VARIANTGRID_DOWNLOAD_BASE_DIR)
+    vg_path = filename.replace(settings.ANNOTATION_BASE_DIR, _VARIANTGRID_DOWNLOAD_BASE_DIR)
     fix_instructions = f"cd {dirname};wget {vg_path}"
     return fix_instructions
 
 
-def annotation_data_exists(flat=False) -> dict:
+def annotation_data_exists(flat=False, include_tbi_for_gz=False) -> dict:
     all_build_data = {}
     # We can sometimes use files twice, only report once
     unique_filenames = set()
@@ -54,7 +56,9 @@ def annotation_data_exists(flat=False) -> dict:
 
             unique_filenames.add(base_filename)
             files = {base_key: base_filename}
-            if ".vcf" in base_filename:
+            tbi_for_gz = (include_tbi_for_gz and base_filename.endswith(".gz")
+                          and base_filename.startswith(settings.ANNOTATION_VEP_BASE_DIR))
+            if ".vcf" in base_filename or tbi_for_gz:
                 files[f"{base_key}_tbi"] = base_filename + ".tbi"
 
             for key, filename in files.items():

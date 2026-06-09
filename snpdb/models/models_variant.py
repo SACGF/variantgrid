@@ -23,6 +23,7 @@ from pydantic import field_validator
 
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
@@ -341,6 +342,15 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
 
+    @property
+    def can_be_made_explicit(self) -> bool:
+        """ <CNV> (copy-number-variable region) and <INS> have no unambiguous explicit ref/alt
+            expansion (cf. Variant.can_make_g_hgvs), so as_external_explicit() will raise for them.
+            Their external VCF representation stays symbolic. """
+        if not self.is_symbolic:
+            return True
+        return self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
+
     def calculated_reference(self, genome_build) -> str:
         contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
         # reference sequence is 0-based
@@ -434,7 +444,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         vc_symbolic = self.as_internal_symbolic(genome_build)
         if vc_symbolic.svlen and abs(vc_symbolic.svlen) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
             vc = vc_symbolic
-        elif self.is_symbolic:
+        elif self.is_symbolic and self.can_be_made_explicit:
             vc = self.as_external_explicit(genome_build)
         else:
             vc = self
@@ -861,7 +871,7 @@ class VariantAllele(TimeStampedModel):
         return s
 
 
-class VariantCollection(RelatedModelsPartitionModel):
+class VariantCollection(DataArchiveMixin, RelatedModelsPartitionModel):
     """ A set of variants - usually used as a cached result """
 
     RECORDS_BASE_TABLE_NAMES = ["snpdb_variantcollectionrecord"]
@@ -880,6 +890,9 @@ class VariantCollection(RelatedModelsPartitionModel):
         return {self.variant_collection_alias: FilteredRelation('variantcollectionrecord', condition=vcr_condition)}
 
     def get_arg_q_dict(self) -> dict[Optional[str], set[Q]]:
+        if self.data_archived:
+            from snpdb.archive import DataArchivedError
+            raise DataArchivedError(self)
         if self.status != ProcessingStatus.SUCCESS:
             raise ValueError(f"{self}: status {self.get_status_display()} != SUCCESS")
 

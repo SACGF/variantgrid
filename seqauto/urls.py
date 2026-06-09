@@ -8,14 +8,14 @@ from seqauto.grids.qc_data_grids import IlluminaFlowcellQCGrid, FastQCGrid, Flag
 from seqauto.grids.seqauto_grids import SeqAutoRunsGrid, EnrichmentKitGeneCoverageGrid, \
     GoldCoverageSummaryGrid, SequencingSamplesGrid, SequencingSamplesHistoricalGrid
 from seqauto.grids.sequencing_data_grids import SequencingRunListGrid, \
-    UnalignedReadsListGrid, BamFileListGrid, VCFFileListGrid, QCFileListGrid, \
+    UnalignedReadsListGrid, BamFileListGrid, SingleSampleVCFListGrid, QCFileListGrid, \
     EnrichmentKitColumns, ExperimentColumns
 from seqauto.grids.sequencing_software_versions_grids import LibraryColumns, SequencerColumns, \
     AssayColumns, AlignerColumns, VariantCallerColumns, VariantCallingPipelineColumns
 from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCallerUpdate, \
     AlignerUpdate, VariantCallingPipelineUpdate
 from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
-    ExperimentViewSet, VariantCallerViewSet, VCFFileViewSet, SampleSheetCombinedVCFFileViewSet, FastQCViewSet, \
+    ExperimentViewSet, VariantCallerViewSet, SingleSampleVCFViewSet, JointCalledVCFViewSet, FastQCViewSet, \
     SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
     QCExecSummaryViewSet, QCGeneListBulkCreateView, SequencingFilesBulkCreateView, QCExecSummaryBulkCreateView, \
     QCGeneCoverageBulkCreateView
@@ -59,7 +59,11 @@ urlpatterns = [
 
     path('view_unaligned_reads/<int:unaligned_reads_id>', views.view_unaligned_reads, name='view_unaligned_reads'),
     path('view_bam/<int:bam_file_id>', views.view_bam_file, name='view_bam_file'),
+    path('view_joint_called_vcf/<int:joint_called_vcf_id>', views.view_joint_called_vcf, name='view_joint_called_vcf'),
+    # Backwards-compat URL alias (predates the JointCalledVCF rename)
     path('view_combo_vcf_file/<int:combo_vcf_file_id>', views.view_combo_vcf_file, name='view_combo_vcf_file'),
+    path('view_single_sample_vcf/<int:single_sample_vcf_id>', views.view_single_sample_vcf, name='view_single_sample_vcf'),
+    # Backwards-compat URL alias (predates the SingleSampleVCF rename)
     path('view_vcf/<int:vcf_file_id>', views.view_vcf_file, name='view_vcf_file'),
     path('view_qc/<int:qc_id>', views.view_qc, name='view_qc'),
     path('view_qc/view_qc_exec_summary_tab/<int:qc_id>', views.view_qc_exec_summary_tab, name='view_qc_exec_summary_tab'),
@@ -76,7 +80,7 @@ urlpatterns = [
     path('sequencing_run/grid/<slug:op>/', JQGridView.as_view(grid=SequencingRunListGrid), name='sequencing_run_grid'),
     path('unaligned_reads/grid/<slug:op>/', JQGridView.as_view(grid=UnalignedReadsListGrid), name='unaligned_reads_grid'),
     path('bam_file/grid/<slug:op>/', JQGridView.as_view(grid=BamFileListGrid), name='bam_file_grid'),
-    path('vcf_file/grid/<slug:op>/', JQGridView.as_view(grid=VCFFileListGrid), name='vcf_file_grid'),
+    path('vcf_file/grid/<slug:op>/', JQGridView.as_view(grid=SingleSampleVCFListGrid), name='vcf_file_grid'),
     path('qc/grid/<slug:op>/', JQGridView.as_view(grid=QCFileListGrid), name='qc_grid'),
     path('enrichment_kit/grid/', DatabaseTableView.as_view(column_class=EnrichmentKitColumns), name='enrichment_kit_datatable'),
     path('enrichment_kit/gene/grid/<int:enrichment_kit_id>/<genome_build_name>/<gene_symbol>/<slug:op>/', JQGridView.as_view(grid=EnrichmentKitGeneCoverageGrid), name='enrichment_kit_gene_coverage_grid'),
@@ -119,8 +123,12 @@ router.register(r'api/v1/experiment', ExperimentViewSet, basename='api_experimen
 router.register(r'api/v1/variant_caller', VariantCallerViewSet, basename='api_variant_caller')
 router.register(r'api/v1/sequencing_run', SequencingRunViewSet, basename='api_sequencing_run')
 router.register(r'api/v1/sample_sheet', SampleSheetViewSet, basename='api_sample_sheet')
-router.register(r'api/v1/vcf_file', VCFFileViewSet, basename='api_vcf_file')
-router.register(r'api/v1/sample_sheet_combined_vcf_file', SampleSheetCombinedVCFFileViewSet, basename='api_sample_sheet_combined_vcf_file')
+router.register(r'api/v1/single_sample_vcf', SingleSampleVCFViewSet, basename='api_single_sample_vcf')
+# Backwards-compat API endpoint (predates the SingleSampleVCF rename)
+router.register(r'api/v1/vcf_file', SingleSampleVCFViewSet, basename='api_vcf_file')
+router.register(r'api/v1/joint_called_vcf', JointCalledVCFViewSet, basename='api_joint_called_vcf')
+# Backwards-compat API endpoint (predates the JointCalledVCF rename)
+router.register(r'api/v1/sample_sheet_combined_vcf_file', JointCalledVCFViewSet, basename='api_sample_sheet_combined_vcf_file')
 router.register(r'api/v1/fastqc', FastQCViewSet, basename='api_fastqc')
 router.register(r'api/v1/illumina_flowcell_qc', IlluminaFlowcellQCViewSet, basename='api_illumina_flowcell_qc')
 router.register(r'api/v1/qc_gene_list', QCGeneListViewSet, basename='api_qc_gene_list')

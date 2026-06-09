@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from auditlog.models import LogEntry
 from celery.contrib.abortable import AbortableAsyncResult
+from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
@@ -39,7 +40,7 @@ from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, An
 from analysis.models.enums import AnalysisTemplateType, SNPMatrix, MinimisationResultType, NodeStatus, TrioSample, QuadSample
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask
+from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask, NodeCount
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
 from analysis.models.nodes.node_types import get_node_types_hash
 from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
@@ -185,6 +186,20 @@ def create_analysis_from_template(request, genome_build_name):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=request.user)
     template_run.populate_arguments(data)
+
+    # Block creation against archived sources. populate_arguments has already resolved
+    # each variable to its model instance; just check the common `data_archived` interface.
+    for arg in template_run.analysistemplaterunargument_set.all():
+        if not arg.object_pk:
+            continue
+        klass = apps.get_model(arg.variable.class_name)
+        obj = klass.objects.filter(pk=arg.object_pk).first()
+        if obj is not None and getattr(obj, "data_archived", False):
+            raise PermissionDenied(
+                "Cannot create new analysis: source data is archived. "
+                "Restore the data first."
+            )
+
     populate_analysis_from_template_run(template_run)
 
     return view_active_node(template_run.analysis, None)
@@ -357,7 +372,8 @@ def analysis_template_settings(request, pk):
     has_write_permission = analysis_template.can_write(request.user)
 
     at_form = _get_form(request, AnalysisTemplateForm, 'at-pre', instance=analysis_template)
-    formset = AutoLaunchFormSet(request.POST or None, instance=analysis_template)
+    formset_data = request.POST if 'auto-launch' in request.POST else None
+    formset = AutoLaunchFormSet(formset_data, prefix='auto-launch', instance=analysis_template)
     atv_form = None
     if atv := analysis_template.active:
         atv_form = _get_form(request, AnalysisTemplateVersionForm, 'atv-pre', instance=atv)
@@ -373,11 +389,16 @@ def analysis_template_settings(request, pk):
             raise PermissionDenied(f"Don't have permission to modify {analysis_template}")
 
         if at_form and at_form.is_bound:
-            valid = at_form.is_valid() and formset.is_valid()
+            valid = at_form.is_valid()
             if valid:
                 at_form.save()
-                formset.save()
             add_save_message(request, valid, "Analysis Template")
+
+        if formset.is_bound:
+            valid = formset.is_valid()
+            if valid:
+                formset.save()
+            add_save_message(request, valid, "Auto Launch Config")
 
         if atv_form and atv_form.is_bound:
             valid = atv_form.is_valid()
@@ -693,7 +714,7 @@ def node_load(request, analysis_id, node_id):
 @require_POST
 def node_cancel_load(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
-    if node_task := NodeTask.objects.filter(node=node, version=node.version).first():
+    if node_task := NodeTask.objects.filter(node_version__node=node, node_version__version=node.version).first():
         if node_task.celery_task:
             logging.debug("TODO: Cancelling task %s", node_task.celery_task)
             app.control.revoke(node_task.celery_task, terminate=True)  # @UndefinedVariable
@@ -931,6 +952,54 @@ def analysis_settings_audit_log_tab(request, analysis_id):
         "log_entry_wrappers": log_entry_wrappers
     }
     return render(request, 'analysis/analysis_settings_audit_log_tab.html', context)
+
+
+@user_passes_test(is_superuser)
+def analysis_settings_benchmark_tab(request, analysis_id):
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    nodes_qs = analysis.analysisnode_set.all().select_subclasses()
+
+    node_rows = []
+    total_load_seconds = 0.0
+    nodes_with_load = 0
+    for node in nodes_qs:
+        if node.load_seconds is not None:
+            total_load_seconds += node.load_seconds
+            nodes_with_load += 1
+        node_rows.append({
+            "pk": node.pk,
+            "name": node.name or "",
+            "node_type": type(node).__name__,
+            "count": node.count,
+            "load_seconds": node.load_seconds,
+            "status": node.get_status_display(),
+            "version": node.version,
+        })
+    node_rows.sort(key=lambda r: (r["load_seconds"] is None, -(r["load_seconds"] or 0.0)))
+
+    nc_times = list(NodeCount.objects.filter(node_version__node__analysis=analysis)
+                    .values_list("created", flat=True))
+    if nc_times:
+        wall_start = min(nc_times)
+        wall_end = max(nc_times)
+        wall_seconds = (wall_end - wall_start).total_seconds()
+    else:
+        wall_start = None
+        wall_end = None
+        wall_seconds = None
+
+    context = {
+        "analysis": analysis,
+        "node_rows": node_rows,
+        "total_load_seconds": total_load_seconds,
+        "nodes_with_load": nodes_with_load,
+        "node_total": len(node_rows),
+        "wall_seconds": wall_seconds,
+        "wall_start": wall_start,
+        "wall_end": wall_end,
+        "node_count_sample_size": len(nc_times),
+    }
+    return render(request, 'analysis/analysis_settings_benchmark_tab.html', context)
 
 
 @require_POST

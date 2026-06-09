@@ -14,9 +14,9 @@ from snpdb.models.models_genome import GenomeBuild
 
 def get_or_create_variant_annotation_version_from_current_vep(genome_build: GenomeBuild) -> tuple[VariantAnnotationVersion, bool]:
     kwargs = get_vep_variant_annotation_version_kwargs(genome_build)
-    # When creating, don't set as active as it won't have all the annotation done - that will be done manually
-    variant_annotation_version, created = VariantAnnotationVersion.objects.get_or_create(**kwargs,
-                                                                                         defaults={"active": False})
+    # New rows start as NEW; promotion to ACTIVE happens once tables are populated
+    variant_annotation_version, created = VariantAnnotationVersion.objects.get_or_create(
+        **kwargs, defaults={"status": VariantAnnotationVersion.Status.NEW})
     now = timezone.now()
     if created:
         logging.info("New Variant Annotation version created!")
