@@ -6,12 +6,14 @@ from annotation.vep_annotation import VEPConfig
 from genes.models import TranscriptVersion
 from snpdb.models import GenomeBuild
 
-_VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation/VEP"
+_VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation"
 
 
 def _get_fix_instructions(filename) -> str:
+    # Anchor at ANNOTATION_BASE_DIR (not the narrower VEP subdir) so files outside
+    # /data/annotation/VEP - eg reference_fasta in fasta/, liftover chains - map to a real URL
     dirname = os.path.dirname(filename)
-    vg_path = filename.replace(settings.ANNOTATION_VEP_BASE_DIR, _VARIANTGRID_DOWNLOAD_BASE_DIR)
+    vg_path = filename.replace(settings.ANNOTATION_BASE_DIR, _VARIANTGRID_DOWNLOAD_BASE_DIR)
     fix_instructions = f"cd {dirname};wget {vg_path}"
     return fix_instructions
 
