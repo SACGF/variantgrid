@@ -29,6 +29,18 @@ ANNOTATION_VEP_BUFFER_SIZE = {
 # The variant table is usually ~55% alt variants but may be different due to data or if you've deleted records
 ANNOTATION_VEP_BATCH_MIN = 5000  # Dont' set too low due to overhead of running pipeline etc
 ANNOTATION_VEP_BATCH_MAX = 25_000  # Set to None to do all in 1 job (probably want to set FORK higher)
+
+# Annotation dispatcher (#2667). The dispatcher launches at most as many runs as there are free
+# annotation_workers slots, keeping the rest as pending DB state it can merge into bigger batches.
+# Worker-slot count is derived live from the annotation_workers pool (annotation.celery_utils);
+# this fallback is only used when celery inspection sees no workers (eg headless/cron, no pool up).
+ANNOTATION_WORKER_SLOTS_FALLBACK = 2
+# Lease reclaims (dead-worker re-dispatch) allowed before a run is failed to ERROR.
+ANNOTATION_MAX_RUN_ATTEMPTS = 3
+# Lease window. Must exceed the worst-case single-run time so a live worker is never reclaimed
+# under us. A run is capped at BATCH_MAX (25k ~= 45 min); prod runs ~1.5 h / 50k. 16200 = 4.5 h
+# is a deliberately generous 3x margin - reclaim is the rare dead-worker path so erring long is cheap.
+ANNOTATION_RUN_LEASE_SECONDS = 16200
 ANNOTATION_VEP_ARGS = []
 ANNOTATION_VEP_VERSION = "110"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")

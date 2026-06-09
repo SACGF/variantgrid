@@ -3,6 +3,7 @@ import os
 
 import celery
 from celery import chain
+from celery.canvas import Signature
 from django.conf import settings
 from django.db.models.functions.math import Abs
 from django.db.models.query_utils import Q
@@ -21,6 +22,29 @@ from library.log_utils import get_traceback, report_message, log_traceback
 from library.utils import execute_cmd
 from library.utils.file_utils import name_from_filename, mk_path_for_file
 from snpdb.variants_to_vcf import write_contig_sorted_values_to_vcf_file, VARIANT_GRID_INFO_DICT
+
+
+# #2667: kick the single-authority dispatcher by name to avoid importing annotation_scheduler_task
+# (which imports this module). Mirror of analysis _trigger_rescheduling (#346).
+DISPATCH_ANNOTATION_RUNS_TASK = "annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs"
+
+
+def _trigger_dispatch(variant_annotation_version_id):
+    """ A run just completed (success OR failure) - a worker has freed up. Kick the dispatcher to
+        launch the next (merged) batch. Both kicks serialise through scheduling_single_worker and
+        fast-exit if nothing is dispatchable, so firing twice is safe (the dispatcher is single
+        authority and leases atomically).
+
+        Why two kicks: race condition releasing the lock. This worker has just cleared the run's
+        task_id/lease and saved, but the dispatcher (a separate worker) computes free capacity by
+        reading in-flight runs from the DB. If its read transaction starts before our completion
+        commit is visible to it, it still counts this run as in-flight, sees no free slot, and exits -
+        leaving the freed slot idle until the next event. The immediate kick handles the common case
+        (commit already visible, lowest latency); the 3s-delayed kick re-runs the dispatcher once the
+        lock release is unambiguously committed, so the freed capacity is actually picked up. """
+    sig = Signature(DISPATCH_ANNOTATION_RUNS_TASK, args=(variant_annotation_version_id,))
+    sig.apply_async()
+    sig.apply_async(countdown=3)
 
 
 @celery.shared_task
@@ -104,8 +128,13 @@ def annotate_variants(annotation_run_id):
         raise
     finally:
         annotation_run.set_task_log("end", timezone.now())
+        # #2667: release the dispatcher lease so the now-completed run no longer looks in-flight,
+        # then kick the dispatcher to refill this freed worker slot (covers success and failure).
         annotation_run.task_id = None
+        annotation_run.leased_by = None
+        annotation_run.lease_expires = None
         annotation_run.save()
+        _trigger_dispatch(annotation_run.annotation_range_lock.version_id)
 
 
 def dump_variants(annotation_run, dump_dir=None) -> int:

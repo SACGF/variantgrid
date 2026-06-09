@@ -11,5 +11,3 @@ def annotation_run_complete_signal_handler(variant_annotation_version, **kwargs)
                                                                           uploaded_vcf__vcf__genome_build=genome_build,
                                                                           finished__isnull=True):
         pending_annotation.attempt_schedule_annotation_stage_steps(lowest_unannotated_variant)
-
-    # TODO: Check for any hung pipelines where there's no other annotation runs?

@@ -105,6 +105,8 @@ CELERY_TASK_ROUTES = {
 
     # Scheduling single worker
     'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,
+    # #2667: single-authority annotation dispatcher - all run leasing/merge serialises here
+    'annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
 
@@ -120,6 +122,7 @@ CELERY_IMPORTS = (
     'analysis.tasks.node_update_tasks',
     'analysis.tasks.reanalysis_tasks',
     'annotation.tasks.annotate_variants',
+    'annotation.tasks.annotation_scheduler_task',
     'annotation.tasks.calculate_sample_stats',
     'annotation.tasks.cohort_sample_gene_damage_counts',
     'annotation.tasks.import_clinvar_vcf_task',

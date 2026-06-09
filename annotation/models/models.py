@@ -18,6 +18,7 @@ from django.db.models.functions import Coalesce, Greatest
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import slugify
 from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
@@ -705,7 +706,10 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # default to 0 on the model, so legacy rows look "no pathogenic predictions"
     # until backfilled. Flipped by `manage.py fix_columns_version2_damage_counts`
     # (for columns_version=2 VAVs) and `fix_columns_version4_damage_counts`
-    # (for columns_version=4). Backfill source:
+    # (for columns_version=4). columns_version=3 needs no recompute - those rows
+    # had the aggregates populated at insert time (rankscores + alphamissense), so
+    # migration 0155 just flips their flag back True (0151 flipped all VAVs False).
+    # Backfill source:
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_pathogenicity_prediction_counts
     backfilled_damage_counts = models.BooleanField(default=True)
 
@@ -999,6 +1003,12 @@ class AnnotationRun(TimeStampedModel):
                                      default=VariantAnnotationPipelineType.STANDARD)
     # task_id is used as a lock to prevent multiple Celery jobs from executing same job
     task_id = models.CharField(max_length=36, null=True)
+    # Lease fields (#2667) - mirror analysis NodeTask. The dispatcher (dispatch_annotation_runs)
+    # is the single authority that leases a run before launching it; lease_expires lets a dead
+    # worker's run be reclaimed. task_id remains the in-annotate_variants execution lock.
+    leased_by = models.CharField(max_length=64, null=True)  # worker/dispatch id holding the lease
+    lease_expires = models.DateTimeField(null=True)  # for dead-worker reclaim
+    attempt_count = models.IntegerField(default=0)  # bounded retries before giving up
     # External annotation (#1568): set by the annotation_external --dump command. The normal scheduler /
     # annotate_variants skip these so VEP is never auto-run on a run the operator is managing off-VM.
     external = models.BooleanField(default=False)
@@ -1092,6 +1102,36 @@ class AnnotationRun(TimeStampedModel):
                 if self.upload_end:
                     status = AnnotationStatus.FINISHED
         return status
+
+    def _lease_is_live(self, now=None) -> bool:
+        if self.lease_expires is None:
+            return False
+        if now is None:
+            now = timezone.now()
+        return self.lease_expires >= now
+
+    def is_dispatchable(self, now=None) -> bool:
+        """ #2667: Ready for the dispatcher to lease + launch - pending state with no live lease.
+            External runs (#1568) are operator-managed and never auto-dispatched. """
+        if self.external:
+            return False
+        if self.task_id is not None:
+            return False
+        if self.status != AnnotationStatus.CREATED:
+            return False
+        return not self._lease_is_live(now)
+
+    def is_in_flight(self, now=None) -> bool:
+        """ #2667: A run that currently occupies a worker slot - live lease, holding the task_id
+            execution lock, or part-way through the pipeline (a running, non-completed status). A
+            completed run never occupies a slot even if its lease has not been cleared yet. """
+        if self.status in AnnotationStatus.get_completed_states():
+            return False
+        if self._lease_is_live(now):
+            return True
+        if self.task_id is not None:
+            return True
+        return self.status != AnnotationStatus.CREATED
 
     @property
     def annotation_consortium(self):

@@ -79,6 +79,14 @@ app.conf.beat_schedule['reschedule-stalled-analyses'] = {
     'schedule': MINUTE_SECS,
 }
 
+# Annotation dispatcher safety-net (issue #2667): no-arg sweep of all ACTIVE VAVs. Reclaims leases
+# abandoned by dead annotation workers and launches any pending work that freed capacity can now take
+# (merged into bigger batches under load). Cheap fast-exit when nothing is dispatchable.
+app.conf.beat_schedule['dispatch-annotation-runs'] = {
+    'task': 'annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs',
+    'schedule': MINUTE_SECS,
+}
+
 
 # send update emails once a day (if there has been activity)
 if settings.DISCORDANCE_EMAIL:
