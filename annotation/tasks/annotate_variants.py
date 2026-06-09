@@ -53,6 +53,12 @@ def annotate_variants(annotation_run_id):
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
     logging.info("annotate_variants: %s", annotation_run)
 
+    # External annotation (#1568): VEP for these runs is managed off-VM via the annotation_external
+    # command. Never auto-run VEP here while waiting for the operator to import an annotated VCF.
+    if annotation_run.external and annotation_run.vcf_annotated_filename is None:
+        logging.info("Skipping external AnnotationRun %s (awaiting external annotation)", annotation_run.pk)
+        return
+
     # task_id used as Celery lock
     num_modified = AnnotationRun.objects.filter(pk=annotation_run.pk,
                                                 task_id__isnull=True).update(task_id=annotate_variants.request.id)
@@ -102,6 +108,26 @@ def annotate_variants(annotation_run_id):
         annotation_run.save()
 
 
+def dump_variants(annotation_run, dump_dir=None) -> int:
+    """ Write the unannotated variants in range to the dump VCF and set dump_* fields; returns dump count.
+        Factored out of dump_and_annotate_variants so the annotation_external --dump command (#1568) can
+        dump (into --output-dir) and stop before VEP. """
+    vcf_dump_filename = annotation_run.get_dump_filename(dump_dir=dump_dir)
+    annotation_run.dump_start = timezone.now()
+    annotation_run.vcf_dump_filename = vcf_dump_filename
+    annotation_run.save()
+
+    genome_build = annotation_run.genome_build
+    vcf_dump_count = _unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
+                                                  annotation_run.annotation_range_lock,
+                                                  annotation_run.pipeline_type)
+
+    annotation_run.dump_count = vcf_dump_count
+    annotation_run.dump_end = timezone.now()
+    annotation_run.save()
+    return vcf_dump_count
+
+
 def dump_and_annotate_variants(annotation_run, vep_version_check=True):
     if vep_version_check:
         # Do a check before we annotate
@@ -111,20 +137,11 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
                 and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
             annotsv_check_command_line_version_match(annotation_run.variant_annotation_version)
 
-    vcf_dump_filename = annotation_run.get_dump_filename()
-    annotation_run.dump_start = timezone.now()
-    annotation_run.vcf_dump_filename = vcf_dump_filename
-    annotation_run.save()
+    vcf_dump_count = dump_variants(annotation_run)
+    vcf_dump_filename = annotation_run.vcf_dump_filename
 
     genome_build = annotation_run.genome_build
     annotation_consortium = annotation_run.annotation_consortium
-    vcf_dump_count = _unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
-                                                  annotation_run.annotation_range_lock,
-                                                  annotation_run.pipeline_type)
-
-    annotation_run.dump_count = vcf_dump_count
-    annotation_run.dump_end = timezone.now()
-    annotation_run.save()
 
     logging.info("Annotating %d variants", vcf_dump_count)
     if vcf_dump_count:

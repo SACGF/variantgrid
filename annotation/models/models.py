@@ -18,6 +18,7 @@ from django.db.models.functions import Coalesce, Greatest
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
+from django.utils.text import slugify
 from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
@@ -998,6 +999,9 @@ class AnnotationRun(TimeStampedModel):
                                      default=VariantAnnotationPipelineType.STANDARD)
     # task_id is used as a lock to prevent multiple Celery jobs from executing same job
     task_id = models.CharField(max_length=36, null=True)
+    # External annotation (#1568): set by the annotation_external --dump command. The normal scheduler /
+    # annotate_variants skip these so VEP is never auto-run on a run the operator is managing off-VM.
+    external = models.BooleanField(default=False)
     dump_start = models.DateTimeField(null=True)
     dump_end = models.DateTimeField(null=True)
     annotation_start = models.DateTimeField(null=True)
@@ -1074,6 +1078,10 @@ class AnnotationRun(TimeStampedModel):
                 status = AnnotationStatus.DUMP_COMPLETED
             if self.dump_count == 0:
                 status = AnnotationStatus.FINISHED
+            elif self.external and self.dump_end and self.vcf_annotated_filename is None:
+                # External annotation (#1568): once dumped, park awaiting the operator rather than getting
+                # stuck at DUMP_COMPLETED. Once --import sets vcf_annotated_filename the normal flow resumes.
+                status = AnnotationStatus.EXTERNAL_DUMP_COMPLETED
             else:
                 if self.annotation_start:
                     status = AnnotationStatus.ANNOTATION_STARTED
@@ -1101,14 +1109,28 @@ class AnnotationRun(TimeStampedModel):
             qs = get_queryset_for_annotation_version(klass, annotation_version)
             qs.filter(annotation_run=self).delete()
 
-    def get_dump_filename(self) -> str:
-        PIPELINE_TYPE = {
-            VariantAnnotationPipelineType.STANDARD: "standard",
-            VariantAnnotationPipelineType.STRUCTURAL_VARIANT: "structural_variant",
-        }
-        type_desc = PIPELINE_TYPE.get(self.pipeline_type, str(self.pipeline_type))
-        vcf_base_name = f"dump_{self.pk}_{type_desc}.vcf"
-        return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_base_name)
+    PIPELINE_TYPE_DESC = {
+        VariantAnnotationPipelineType.STANDARD: "standard",
+        VariantAnnotationPipelineType.STRUCTURAL_VARIANT: "structural_variant",
+    }
+
+    def get_dump_filename(self, dump_dir=None) -> str:
+        """ Self-describing dump filename (#1568): the stem carries site/build/version/run identity so dumps
+            copied to other machines remain self-explanatory. Matching is driven by the sidecar metadata
+            (get_dump_metadata), not by parsing this name. dump_dir defaults to ANNOTATION_VCF_DUMP_DIR;
+            the annotation_external --dump command passes its --output-dir instead. """
+        type_desc = self.PIPELINE_TYPE_DESC.get(self.pipeline_type, str(self.pipeline_type))
+        vav = self.variant_annotation_version
+        site = slugify(settings.SITE_NAME) or "site"
+        stem = (f"{site}__{vav.genome_build.name}__{vav.get_annotation_consortium_display()}"
+                f"__vep{vav.vep}__cv{vav.columns_version}__gar{vav.gene_annotation_release_id}"
+                f"__run{self.pk}__{type_desc}")
+        vcf_base_name = f"{stem}.vcf"
+        return os.path.join(dump_dir or settings.ANNOTATION_VCF_DUMP_DIR, vcf_base_name)
+
+    def get_dump_metadata_filename(self, dump_dir=None) -> str:
+        """ Sidecar metadata path written next to the dump VCF (#1568). """
+        return os.path.splitext(self.get_dump_filename(dump_dir=dump_dir))[0] + ".meta.json"
 
     def delete(self, using=None, keep_parents=False):
         self.delete_related_objects()

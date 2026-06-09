@@ -62,6 +62,12 @@ def _handle_range_lock(range_lock, pipeline_type=None):
     for pipeline_type in pipeline_types:
         annotation_run, created = AnnotationRun.objects.get_or_create(annotation_range_lock=range_lock,
                                                                       pipeline_type=pipeline_type)
+        if annotation_run.external:
+            # External annotation (#1568): VEP is managed off-VM via the annotation_external command.
+            # Belt-and-braces guard - the scheduler only operates on ACTIVE versions and external runs
+            # live on NEW versions, so this should not normally be reached.
+            logging.info("Skipping external AnnotationRun %s (awaiting external annotation)", annotation_run.pk)
+            continue
         if created:
             annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
 
