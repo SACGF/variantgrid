@@ -108,7 +108,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     @cached_property
     def genome_build_prefs(self) -> List[GenomeBuild]:
         builds = GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
-        return [gb for gb in builds if gb in ImportedAlleleInfo.supported_genome_builds]
+        return [gb for gb in builds if gb in ImportedAlleleInfo.supported_genome_builds()]
 
     def render_c_hgvs(self, row: CellData) -> JsonDataType:
         def get_preferred_chgvs_json() -> Dict:

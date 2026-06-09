@@ -33,10 +33,15 @@ DECLARE
     r RECORD;
     fk_recreate TEXT[] := ARRAY[]::TEXT[];
     fk_def TEXT;
+    col_name TEXT;
+    col_attnum SMALLINT;
+    idx_name TEXT;
 BEGIN
     FOR r IN
         SELECT conname,
                conrelid::regclass::text AS table_name,
+               conrelid,
+               conkey,
                pg_get_constraintdef(oid) AS def
         FROM pg_constraint
         WHERE confrelid = 'genes_genesymbol'::regclass
@@ -55,6 +60,42 @@ BEGIN
         );
         EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I',
                        r.table_name, r.conname);
+
+        -- genes_genesymbol.symbol uses the nondeterministic 'case_insensitive'
+        -- collation, so Postgres requires every referencing FK column to share
+        -- that exact collation. The columns were created with the 'default'
+        -- collation, so retarget them before the constraints are recreated
+        -- below (otherwise ADD CONSTRAINT fails with CollationMismatch).
+        FOR col_name, col_attnum IN
+            SELECT a.attname, a.attnum
+            FROM pg_attribute a
+            WHERE a.attrelid = r.conrelid
+              AND a.attnum = ANY(r.conkey)
+        LOOP
+            -- Drop any text_pattern_ops/varchar_pattern_ops (Django "_like")
+            -- indexes on the column first: a nondeterministic collation is not
+            -- supported by the *_pattern_ops operator classes, so the column
+            -- type change would fail. The case-insensitive PK can't have these
+            -- LIKE indexes anyway, so dropping them matches the final schema.
+            FOR idx_name IN
+                SELECT DISTINCT i.indexrelid::regclass::text
+                FROM pg_index i
+                CROSS JOIN LATERAL unnest(i.indkey, i.indclass)
+                    WITH ORDINALITY AS k(att, opc, ord)
+                JOIN pg_opclass oc ON oc.oid = k.opc
+                WHERE i.indrelid = r.conrelid
+                  AND k.att = col_attnum
+                  AND oc.opcname IN ('text_pattern_ops',
+                                     'varchar_pattern_ops',
+                                     'bpchar_pattern_ops')
+            LOOP
+                EXECUTE format('DROP INDEX %s', idx_name);
+            END LOOP;
+
+            EXECUTE format(
+                'ALTER TABLE %s ALTER COLUMN %I TYPE text COLLATE "case_insensitive"',
+                r.table_name, col_name);
+        END LOOP;
     END LOOP;
 
     ALTER TABLE genes_genesymbol DROP CONSTRAINT genes_genesymbol_pkey;

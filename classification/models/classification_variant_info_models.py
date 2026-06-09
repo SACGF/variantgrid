@@ -519,7 +519,6 @@ class ImportedAlleleInfo(TimeStampedModel):
         return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
 
     @classmethod
-    @property
     def supported_genome_builds(cls) -> set:
         """ While we have hardcoded genome builds, we can only use these. Eventually can remove this and/or
             just return all annotated builds here """
