@@ -8,29 +8,33 @@ from library.utils import is_url
 
 
 class Git:
+    ALLOWED_SUBCOMMANDS = {"rev-parse", "log", "config"}
+
     def __init__(self, directory=None):
         self.directory = directory
 
-    def git_cmd(self, params) -> str:
-        output = subprocess.check_output(["git"] + params, cwd=self.directory)
+    def git_cmd(self, subcommand: str, *params) -> str:
+        if subcommand not in self.ALLOWED_SUBCOMMANDS:
+            raise ValueError(f"git subcommand '{subcommand}' is not in the allow-list {self.ALLOWED_SUBCOMMANDS}")
+        output = subprocess.check_output(["git", subcommand, *params], cwd=self.directory)
         return output.decode().strip()
 
     @cached_property
     def hash(self) -> str:
-        return self.git_cmd(["rev-parse", "HEAD"])
+        return self.git_cmd("rev-parse", "HEAD")
 
     @cached_property
     def last_modified_date(self):
-        date_string = self.git_cmd(["log", "-1", "--format=%cd"])
+        date_string = self.git_cmd("log", "-1", "--format=%cd")
         return parse(date_string)
 
     @cached_property
     def branch(self) -> str:
-        return self.git_cmd(["rev-parse", "--abbrev-ref", "HEAD"])
+        return self.git_cmd("rev-parse", "--abbrev-ref", "HEAD")
 
     @cached_property
     def site(self):
-        git_site = self.git_cmd(["config", "--get", "remote.origin.url"])
+        git_site = self.git_cmd("config", "--get", "remote.origin.url")
         return re.sub(r"([^/]+@|\.git)", "", git_site)
 
     @cached_property

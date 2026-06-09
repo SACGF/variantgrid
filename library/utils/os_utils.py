@@ -18,6 +18,10 @@ class CmdOutput(FormerTuple):
 
 
 def execute_cmd(cmd: list, **kwargs) -> CmdOutput:
+    # The shell=True branch is opt-in and currently used by exactly one caller
+    # (snpdb.bcftools_liftover) to build a trusted, server-side command pipeline -
+    # no user-supplied input reaches `cmd`. Keep it that way: never pass
+    # user-controlled values with shell=True.
     if kwargs.pop("shell", False):
         command = ' '.join(cmd)
         logging.info('About to call %s', command)
