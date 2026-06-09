@@ -22,6 +22,7 @@ WEB_IP = '3.104.38.188'
 
 DEBUG = False
 
+PARTITION_ARCHIVE_DIR = "/data/database_dumps/partition_dumps/"
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 
 # This deployment used dbNSFP rankscores before raw scores - keep them visible (see annotation_settings.py)
