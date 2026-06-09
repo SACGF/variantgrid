@@ -84,7 +84,10 @@ There are per-app research documents generated in claude/research
 ## Security
 
 ### Authentication
-The project uses `global_login_required.GlobalLoginRequiredMiddleware`, which enforces login on **all** views globally. Individual views do **not** need `@login_required` decorators — their absence is intentional, not a security gap. Do not flag missing `@login_required` as a security issue during audits.
+The project enforces two protections via global middleware, so individual views do **not** need per-view decorators for either — their absence is intentional, not a security gap, and must not be flagged during audits:
+
+- **Login:** `global_login_required.GlobalLoginRequiredMiddleware` enforces login on **all** views globally, so no view needs `@login_required`.
+- **CSRF:** Django's `CsrfViewMiddleware` is active globally, so all state-changing views (POST/PUT/DELETE), including jQGrid and DataTables handlers, are CSRF-protected without `@csrf_protect`.
 
 DRF is configured with `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`, so all REST API endpoints require authentication by default. Individual API views do not need explicit `permission_classes` — their absence is intentional, not a security gap.
 
