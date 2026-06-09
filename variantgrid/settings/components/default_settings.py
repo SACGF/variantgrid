@@ -98,6 +98,16 @@ DATABASES = {
     }
 }
 
+# DB load / DOS protection - see variantgrid_private #1502
+# Global statement_timeout applied to every connection (see variantgrid/wsgi.py)
+DATABASE_STATEMENT_TIMEOUT_SECONDS = 10 * 60
+# "Major operations" are expensive requests (eg analysis node grids). We cap how many a single
+# user can run concurrently, and bound each one's DB query time, to stop accidental/malicious DOS.
+MAJOR_OPERATION_LIMITS_ENABLED = True
+MAJOR_OPERATION_MAX_CONCURRENT_PER_USER = 20
+MAJOR_OPERATION_STATEMENT_TIMEOUT_SECONDS = 5 * 60
+MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request frees its slot
+
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
