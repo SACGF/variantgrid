@@ -437,6 +437,9 @@ SEARCH_COSMIC_ENABLED = True
 SEARCH_COSMIC_TRANSCRIPT_MESSAGES = False
 SEARCH_CONTIG_GENOME_BUILD_ADMIN_ONLY = False
 
+# Max length used when reflecting user-supplied strings (e.g. search terms) back in page content
+MAX_STRING_DISPLAY_LENGTH = 1000
+
 SILENCED_SYSTEM_CHECKS = [
     'models.E006',  # 'captcha.recaptcha_test_key_error'
 ]

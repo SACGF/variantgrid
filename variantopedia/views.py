@@ -23,6 +23,7 @@ from django.views.decorators.http import require_POST
 from analysis.models import VariantTag
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
     VariantAnnotationVersion, VariantAnnotation, AnnotationStatus, ClinVarRecordCollection
+from annotation.manual_variant_entry import check_can_create_variants
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
@@ -628,6 +629,7 @@ def export_classifications_allele(request, allele_id: int):
 @require_POST
 def create_variant_for_allele(request, allele_id, genome_build_name):
     """ Shortcut to create manual variant, but as a POST """
+    check_can_create_variants(request.user)
     allele = get_object_or_404(Allele, pk=allele_id)
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
