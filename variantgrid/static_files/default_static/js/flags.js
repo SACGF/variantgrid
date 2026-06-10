@@ -148,7 +148,7 @@ const Flags = (function () {
                     });
             },
             raisableFlags() {
-                flagTypes = this.flagTypes().filter(ft => {
+                const flagTypes = this.flagTypes().filter(ft => {
                     const userPermission = this.user_permission;
                     const requiredPermission = ft.raise_permission;
                     return userPermission >= requiredPermission;
@@ -340,7 +340,7 @@ const Flags = (function () {
                 }
                 this.setPosting();
 
-                sendParams = {
+                const sendParams = {
                     comment: comment || null,
                 };
                 if (resolution) {
@@ -402,7 +402,7 @@ const Flags = (function () {
 
             updateComments() {
                 // fixme, don't re-render comments already rendered
-                shouldScroll = (isScrolledToBottom(this.scrollablePanel) && !this.firstUpdate) || this.justPosted;
+                const shouldScroll = (isScrolledToBottom(this.scrollablePanel) && !this.firstUpdate) || this.justPosted;
                 
                 let lastEntry = this.lastEntry;
                 let reachedStart = lastEntry == null;
@@ -721,7 +721,7 @@ const Flags = (function () {
                 } else {
                     this.applyActiveContent(new FlagCollectionSummaryContent(this.collection, this));
                 }
-                modalDialog = modalContent.modal({focus:true, show:true});
+                const modalDialog = modalContent.modal({focus:true, show:true});
                 if (params.triggerDom) {
                     $(params.triggerDom).LoadingOverlay('hide');
                 }
@@ -940,7 +940,7 @@ const Flags = (function () {
                 
                 if (this.data && this.data.transcript) {
                     const transcript = this.data.transcript;
-                    parts = /^([_A-Z0-9]+)(?:[.]([0-9]+))?$/i;
+                    const parts = /^([_A-Z0-9]+)(?:[.]([0-9]+))?$/i;
                     const match = parts.exec(transcript);
                     if (match) {
                         let transcriptUrl = null;
@@ -1052,7 +1052,7 @@ const Flags = (function () {
 
                 let timestamp = moment(this.created * 1000).format('DD-MMM-YYYY');
                 if (lastEntry) {
-                    oldTimestamp = moment(lastEntry.created * 1000).format('DD-MMM-YYYY');
+                    const oldTimestamp = moment(lastEntry.created * 1000).format('DD-MMM-YYYY');
                     if (oldTimestamp === timestamp) {
                         timestamp = null;
                     }
@@ -1081,7 +1081,7 @@ const Flags = (function () {
                 }
 
                 const actionCommentDom = $('<div>', { class: 'action-text' }).appendTo(content);
-                action = this.action();
+                const action = this.action();
 
                 if (params.includeTitle) {
                     $('<div>', {
