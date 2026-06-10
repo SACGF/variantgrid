@@ -2,7 +2,7 @@ import logging
 
 from django.core.management import BaseCommand
 
-from snpdb.models import Variant, Allele, ClinGenAllele, Contig, AlleleLiftover
+from snpdb.models import Allele, AlleleLiftover, ClinGenAllele, Contig, Variant
 
 
 class Command(BaseCommand):
@@ -34,13 +34,13 @@ class Command(BaseCommand):
                 try:
                     clingen_vc = allele.clingen_allele.get_variant_coordinate(va.genome_build)
                     if existing_vc != clingen_vc:
-                        logging.info(f"{allele} has variant {repr(existing_vc)} not matching expected for build {va.genome_build}: {repr(clingen_vc)}")
+                        logging.info(f"{allele} has variant {existing_vc!r} not matching expected for build {va.genome_build}: {clingen_vc!r}")
                         if not dry_run:
                             liftover_res = AlleleLiftover.objects.filter(allele=allele,
                                                                          liftover__genome_build=va.genome_build).delete()
-                            logging.info(f"Removing liftover record: %s", liftover_res)
+                            logging.info("Removing liftover record: %s", liftover_res)
                             va_res = va.delete()
-                            logging.info(f"Unlinking variant: %s", va_res)
+                            logging.info("Unlinking variant: %s", va_res)
 
                 except (ClinGenAllele.ClinGenBuildNotInResponseError, Contig.ContigNotInBuildError):
                     pass

@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from django.contrib import admin, messages
@@ -11,8 +11,16 @@ from annotation import models
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
-from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, ClinVar, \
-    AnnotationRun, VariantAnnotation, VariantAnnotationVersion
+from annotation.models import (
+    AnnotationRun,
+    Citation,
+    CitationFetchRequest,
+    ClinVar,
+    ClinVarRecord,
+    ClinVarRecordCollection,
+    VariantAnnotation,
+    VariantAnnotationVersion,
+)
 from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
 

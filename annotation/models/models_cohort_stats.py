@@ -8,7 +8,7 @@ from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 from django_extensions.db.models import TimeStampedModel
 
-from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, GeneAnnotationVersion
+from annotation.models.models import ClinVarVersion, GeneAnnotationVersion, VariantAnnotationVersion
 from snpdb.models import SampleStatsCodeVersion
 
 

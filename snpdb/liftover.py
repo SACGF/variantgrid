@@ -6,8 +6,9 @@ import logging
 import operator
 import os
 from collections import defaultdict
+from collections.abc import Iterable
 from functools import reduce
-from typing import Iterable, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -15,14 +16,19 @@ from django.db.models.query_utils import Q
 
 from genes.hgvs import HGVSMatcher
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, get_contigs_header_lines
+from library.genomics.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
 from library.guardian_utils import admin_bot
 from snpdb.bcftools_liftover import bcftools_pre_liftover_error_check
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
-from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
+from snpdb.models.models_enums import (
+    AlleleConversionTool,
+    AlleleOrigin,
+    ImportSource,
+    ProcessingStatus,
+)
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
-from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
+from snpdb.models.models_variant import Allele, AlleleLiftover, LiftoverRun, Variant, VariantAllele
+from upload.models import UploadedFile, UploadedFileTypes, UploadedLiftover, UploadPipeline
 from upload.upload_processing import process_upload_pipeline
 
 # VariantCoordinate can be None, with an error string at the end
@@ -88,7 +94,7 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
 
             if vcf_ids:  # Need to write VCF and run
                 # BCFTools uses chromosomes not contigs
-                used_chroms = set((vc.chrom for vc in variant_coordinates))
+                used_chroms = set(vc.chrom for vc in variant_coordinates)
                 header_lines = get_contigs_header_lines(vcf_genome_build, use_accession=False,
                                                         contig_allow_list=used_chroms)
                 write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates=variant_coordinates,
@@ -234,8 +240,8 @@ def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBui
         Optionally pass in hgvs_matcher to save re-instantiating it all the time """
 
     from annotation.models import VariantAnnotationVersion
-    from snpdb.models.models_dbsnp import DbSNP
     from genes.hgvs import get_hgvs_variant_coordinate
+    from snpdb.models.models_dbsnp import DbSNP
 
     conversion_tool = None
     g_hgvs = None

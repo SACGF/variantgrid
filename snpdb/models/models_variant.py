@@ -1,19 +1,20 @@
 import logging
 import re
+from collections.abc import Iterable
 from functools import cached_property
-from typing import Optional, Iterable, Union, Any
+from typing import Any, Optional, Union
 
 import django
 import pydantic
 from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import models, IntegrityError
-from django.db.models import Value, QuerySet
+from django.db import IntegrityError, models
+from django.db.models import QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
 from django.db.models.functions.text import Concat
-from django.db.models.query_utils import Q, FilteredRelation
+from django.db.models.query_utils import FilteredRelation, Q
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils.text import slugify
@@ -21,15 +22,15 @@ from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 from pydantic import field_validator
 
-from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
+from flags.models import FlagCollection, FlagInfos, flag_collection_extra_info_signal
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.genomics.vcf_enums import VCFSymbolicAllele, INFO_LIFTOVER_SWAPPED_REF_ALT
+from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT, VCFSymbolicAllele
 from library.guardian_utils import admin_bot
-from library.preview_request import PreviewModelMixin, PreviewKeyValue
+from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
@@ -325,7 +326,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             return VariantCoordinate.from_variant_match(full_match, genome_build)
         elif full_match := VARIANT_SYMBOLIC_PATTERN.fullmatch(variant_string):
             return VariantCoordinate.from_symbolic_match(full_match, genome_build)
-        regex_patterns = ", ".join((str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN)))
+        regex_patterns = ", ".join(str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN))
         raise ValueError(f"{variant_string=} did not match against {regex_patterns=}")
 
     @staticmethod

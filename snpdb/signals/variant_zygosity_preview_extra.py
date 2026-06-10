@@ -4,12 +4,14 @@ from django.template.loader import render_to_string
 from django.utils.safestring import SafeString
 from registration.forms import User
 
-from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
+from annotation.annotation_version_querysets import (
+    get_variant_queryset_for_latest_annotation_version,
+)
 from library.log_utils import get_current_logged_in_user
-from library.preview_request import preview_extra_signal, PreviewKeyValue
+from library.preview_request import PreviewKeyValue, preview_extra_signal
 from library.utils import first
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Allele, Variant, VariantZygosityCountCollection, GenomeBuild
+from snpdb.models import Allele, GenomeBuild, Variant, VariantZygosityCountCollection
 from variantopedia.interesting_nearby import interesting_summary
 
 

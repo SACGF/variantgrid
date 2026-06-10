@@ -2,36 +2,53 @@ import logging
 import operator
 import shutil
 import time
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
+from collections.abc import Iterable
 from functools import cached_property
-from typing import Optional, Iterable, TypeAlias
+from typing import Optional, TypeAlias
 
 import intervaltree
 from django.conf import settings
 
 from annotation import vep_columns as vep_columns_registry
-from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
-    MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
-    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction, \
-    MetaRNNPrediction, PrimateAIPrediction
-from annotation.models.models import VariantAnnotation, \
-    VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
+from annotation.models.damage_enums import (
+    ALoFTPrediction,
+    AlphaMissensePrediction,
+    FATHMMPrediction,
+    MetaRNNPrediction,
+    MutationAssessorPrediction,
+    MutationTasterPrediction,
+    PathogenicityImpact,
+    Polyphen2Prediction,
+    PrimateAIPrediction,
+    SIFTPrediction,
+)
+from annotation.models.models import (
+    AnnotationRun,
+    VariantAnnotation,
+    VariantAnnotationVersion,
+    VariantGeneOverlap,
+    VariantTranscriptAnnotation,
+)
 from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
 from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion, GeneVersion
+from genes.models import GeneVersion, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
-from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
-from library.genomics import overlap_fraction, Range, parse_gnomad_coord
+from library.django_utils.django_file_utils import (
+    get_import_processing_dir,
+    get_import_processing_filename,
+)
+from library.genomics import Range, overlap_fraction, parse_gnomad_coord
 from library.genomics.vcf_enums import VariantClass
 from library.log_utils import log_traceback
 from library.utils import invert_dict, split_dict_multi_values
 from snpdb.models import GenomeBuild, VariantCoordinate
-from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
+from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 VEP_SEPARATOR = '&'
 EMPTY_VALUES = {'', '.'}
@@ -1069,7 +1086,7 @@ class SVOverlapProcessor:
                 update_fields[f] = VEP_SEPARATOR.join([r[f] for r in filtered_sv_records])
         else:
             # Nothing left after filtering - need to blank out all our values
-            update_fields = {f: None for f in self.sv_fields}
+            update_fields = dict.fromkeys(self.sv_fields)
 
         raw_db_data.update(update_fields)
 

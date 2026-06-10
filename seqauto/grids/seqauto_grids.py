@@ -7,8 +7,13 @@ from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.pandas_utils import nan_to_none
-from seqauto.models import SeqAutoRun, SequencingSample, GoldCoverageSummary, \
-    GoldReference, EnrichmentKit
+from seqauto.models import (
+    EnrichmentKit,
+    GoldCoverageSummary,
+    GoldReference,
+    SeqAutoRun,
+    SequencingSample,
+)
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df, group_enrichment_kits_df
 
 

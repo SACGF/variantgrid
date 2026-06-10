@@ -7,17 +7,30 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
 
-from classification.enums import SpecialEKeys, AlleleOriginBucket
-from classification.models import EvidenceKeyMap, ClassificationModification
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
-from classification.views.exports.vcf_export_utils import ExportVCF, export_vcf_info_cell, VCFHeaderType, \
-    VCFHeaderNumberSpecial, VCFHeader, VCFExportTweak
+from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.models import ClassificationModification, EvidenceKeyMap
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
+from classification.views.exports.vcf_export_utils import (
+    ExportVCF,
+    VCFExportTweak,
+    VCFHeader,
+    VCFHeaderNumberSpecial,
+    VCFHeaderType,
+    export_vcf_info_cell,
+)
 from library.django_utils import get_url_from_view_path
 from library.utils import local_date_str_no_dash
 from ontology.models import OntologyTerm
-from snpdb.models import Variant, Allele
+from snpdb.models import Allele, Variant
 
 
 class VCFTargetSystem(str, Enum):
@@ -200,7 +213,7 @@ class ClassificationVCF(ExportVCF):
                     all_plain_text.add(plain)
             elif condition := cm.get(SpecialEKeys.CONDITION):
                 all_plain_text.add(condition)
-        return [f"{t.id} {t.name}" for t in sorted(all_terms)] + list(sorted(all_plain_text))
+        return [f"{t.id} {t.name}" for t in sorted(all_terms)] + sorted(all_plain_text)
 
     @export_vcf_info_cell(
         header_id="classification",

@@ -1,7 +1,7 @@
 from django.core.management import BaseCommand
 from django.db.models import Count
 
-from classification.models import ClinVarExport, ClinVarAllele
+from classification.models import ClinVarAllele, ClinVarExport
 from ontology.models import AncestorCalculator, OntologySnake
 
 

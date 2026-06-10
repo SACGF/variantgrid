@@ -2,9 +2,17 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from snpdb.models import VCF, VariantZygosityCountForVCF, VariantZygosityCountForSample, VariantZygosityCountCollection
+from snpdb.models import (
+    VCF,
+    VariantZygosityCountCollection,
+    VariantZygosityCountForSample,
+    VariantZygosityCountForVCF,
+)
 from snpdb.models.models_enums import ImportStatus
-from snpdb.variant_zygosity_count import create_variant_zygosity_counts, update_variant_zygosity_count_for_vcf
+from snpdb.variant_zygosity_count import (
+    create_variant_zygosity_counts,
+    update_variant_zygosity_count_for_vcf,
+)
 
 
 class Command(BaseCommand):

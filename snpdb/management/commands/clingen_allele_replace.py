@@ -23,7 +23,7 @@ class Command(BaseCommand):
             cga_qs = cga_qs.filter(modified__lte=before_date)
 
         if indels:
-            filter_message.append(f"(Indels only)")
+            filter_message.append("(Indels only)")
             variants_with_clingen = Variant.objects.filter(variantallele__allele__clingen_allele__in=cga_qs)
             indel_qs = variants_with_clingen.exclude(Variant.get_snp_q())
             values_qs = indel_qs.values_list("variantallele__allele__clingen_allele__id", flat=True)

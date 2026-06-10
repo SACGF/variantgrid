@@ -1,10 +1,25 @@
 from rest_framework import serializers
 
-from genes.serializers import SampleGeneListSerializer, GeneCoverageCollectionSerializer
-from seqauto.models import IlluminaFlowcellQC, QCGeneList, QC, QCGeneCoverage, QCExecSummary, FastQC, SequencingSample, \
-    SampleSheet, SequencingRun, SingleSampleVCF
-from seqauto.serializers.sequencing_serializers import SampleSheetLookupSerializer, FastqSerializer, \
-    BamFilePathSerializer, SingleSampleVCFPathSerializer, SequencingSampleLookupSerializer
+from genes.serializers import GeneCoverageCollectionSerializer, SampleGeneListSerializer
+from seqauto.models import (
+    QC,
+    FastQC,
+    IlluminaFlowcellQC,
+    QCExecSummary,
+    QCGeneCoverage,
+    QCGeneList,
+    SampleSheet,
+    SequencingRun,
+    SequencingSample,
+    SingleSampleVCF,
+)
+from seqauto.serializers.sequencing_serializers import (
+    BamFilePathSerializer,
+    FastqSerializer,
+    SampleSheetLookupSerializer,
+    SequencingSampleLookupSerializer,
+    SingleSampleVCFPathSerializer,
+)
 from snpdb.models import DataState
 
 

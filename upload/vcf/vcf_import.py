@@ -13,19 +13,46 @@ from django.utils import timezone
 from django_messages.models import Message
 
 from library.genomics.vcf_enums import VCFConstant
-from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, cyvcf2_get_contig_lengths_dict
+from library.genomics.vcf_utils import (
+    cyvcf2_get_contig_lengths_dict,
+    cyvcf2_header_get,
+    cyvcf2_header_types,
+)
 from library.guardian_utils import assign_permission_to_user_and_groups
-from library.utils import invert_dict, get_single_element
-from seqauto.models import JointCalledVCF, SingleSampleVCF, VCFFromSequencingRun, \
-    SampleFromSequencingSample, QCGeneList
+from library.utils import get_single_element, invert_dict
+from seqauto.models import (
+    JointCalledVCF,
+    QCGeneList,
+    SampleFromSequencingSample,
+    SingleSampleVCF,
+    VCFFromSequencingRun,
+)
 from seqauto.signals.signals_list import backend_vcf_import_start_signal
-from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
-    Cohort, CohortSample, UserSettings, VCFSourceSettings, SampleFilePath, VCFInfo, AbstractVCFField, VCFFormat
-from snpdb.models.models_enums import ImportSource, VariantsType, SampleFileType, VCFInfoTypes
+from snpdb.models import (
+    VCF,
+    AbstractVCFField,
+    Cohort,
+    CohortSample,
+    ImportStatus,
+    Sample,
+    SampleFilePath,
+    UserSettings,
+    VCFFilter,
+    VCFFormat,
+    VCFInfo,
+    VCFSourceSettings,
+)
+from snpdb.models.models_enums import ImportSource, SampleFileType, VariantsType, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
-from upload.models import UploadedVCF, PipelineFailedJobTerminateEarlyException, \
-    BackendVCF, UploadStep, UploadStepTaskType, VCFPipelineStage
+from upload.models import (
+    BackendVCF,
+    PipelineFailedJobTerminateEarlyException,
+    UploadedVCF,
+    UploadStep,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor

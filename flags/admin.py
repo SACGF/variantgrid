@@ -1,9 +1,9 @@
 from django.contrib import admin
 from django.contrib.admin import RelatedFieldListFilter, TabularInline
 
-from flags.models import Flag, FlagComment, FlagCollection
+from flags.models import Flag, FlagCollection, FlagComment
 from flags.models.models import FlagType
-from snpdb.admin_utils import ModelAdminBasics, AllValuesChoicesFieldListFilter
+from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics
 
 
 class FlagCommentAdminTabular(TabularInline):

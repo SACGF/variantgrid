@@ -1,7 +1,7 @@
 from django.core.management import BaseCommand
 from django.db.models import QuerySet
 
-from flags.models import FlagComment, Flag, FlagResolution, FlagStatus, FlagType, FlagTypeResolution
+from flags.models import Flag, FlagComment, FlagResolution, FlagStatus, FlagType, FlagTypeResolution
 
 
 class Command(BaseCommand):

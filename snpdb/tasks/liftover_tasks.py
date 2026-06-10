@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 
 from library.log_utils import log_traceback
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import GenomeBuild, ImportSource, Allele
+from snpdb.models import Allele, GenomeBuild, ImportSource
 
 
 @celery.shared_task
@@ -20,5 +20,5 @@ def liftover_alleles(username, genome_build_name):
                 logging.info("creating liftover pipelines from %s to %s", other_build, genome_build)
                 create_liftover_pipelines(user, alleles, ImportSource.WEB, other_build, [genome_build])
                 logging.info("/ finished creating pipelines")
-            except Exception as e:
+            except Exception:
                 log_traceback()

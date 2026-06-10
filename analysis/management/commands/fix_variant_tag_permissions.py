@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from guardian.shortcuts import get_groups_with_perms, get_group_perms, assign_perm
+from guardian.shortcuts import assign_perm, get_group_perms, get_groups_with_perms
 
 from analysis.models.models_analysis import Analysis
 from analysis.models.models_variant_tag import VariantTag

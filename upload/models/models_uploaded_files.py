@@ -8,13 +8,13 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 from analysis.models.models_variant_tag import VariantTagsImport
-from annotation.models.models import ManualVariantEntryCollection, ClinVarVersion
+from annotation.models.models import ClinVarVersion, ManualVariantEntryCollection
 from classification.models import ClassificationImport
-from genes.models import GeneList, GeneCoverageCollection
+from genes.models import GeneCoverageCollection, GeneList
 from library.utils.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
-from snpdb.models import GenomicIntervalsCollection, ImportStatus, Sample, ImportedWikiCollection
+from snpdb.models import GenomicIntervalsCollection, ImportedWikiCollection, ImportStatus, Sample
 from snpdb.models.models_variant import LiftoverRun
 from upload.bed_file_processing import process_bed_file
 from upload.models import UploadedFile

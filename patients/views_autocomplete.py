@@ -11,7 +11,7 @@ from django.views.decorators.vary import vary_on_cookie
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
-from patients.models import Patient, Clinician, Specimen, ExternalPK
+from patients.models import Clinician, ExternalPK, Patient, Specimen
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')

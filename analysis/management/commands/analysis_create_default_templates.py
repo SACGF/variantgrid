@@ -5,8 +5,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from analysis.analysis_import_export import analysis_import
-from analysis.models import AnalysisTemplateType, AnalysisTemplate, AnalysisTemplateVersion
-from library.guardian_utils import admin_bot, add_public_group_read_permission
+from analysis.models import AnalysisTemplate, AnalysisTemplateType, AnalysisTemplateVersion
+from library.guardian_utils import add_public_group_read_permission, admin_bot
 from snpdb.models import GenomeBuild
 
 

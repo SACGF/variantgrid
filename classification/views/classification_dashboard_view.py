@@ -11,14 +11,25 @@ from django.urls import reverse
 from termsandconditions.decorators import terms_required
 
 from classification.enums import ShareLevel
-from classification.models import classification_flag_types, ClinVarExport, DiscordanceReportClassification, \
-    DiscordanceReport, ConditionText, ConditionTextMatch
+from classification.models import (
+    ClinVarExport,
+    ConditionText,
+    ConditionTextMatch,
+    DiscordanceReport,
+    DiscordanceReportClassification,
+    classification_flag_types,
+)
 from classification.models.classification import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync
-from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData, \
-    DiscordanceReportCategories
-from classification.views.classification_accumulation_graph import \
-    AccumulationReportMode, get_accumulation_graph_data
+from classification.models.discordance_models_utils import (
+    DiscordanceReportCategories,
+    DiscordanceReportRowData,
+    DiscordanceReportTableData,
+)
+from classification.views.classification_accumulation_graph import (
+    AccumulationReportMode,
+    get_accumulation_graph_data,
+)
 from classification.views.exports import ClassificationExportFormatterFlags
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from flags.models import FlagCollection

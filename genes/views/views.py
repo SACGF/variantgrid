@@ -1,10 +1,11 @@
 import operator
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property, reduce
 from itertools import combinations
-from typing import Optional, Iterable, Union, Any
+from typing import Any, Optional, Union
 
 from django.conf import settings
 from django.contrib import messages
@@ -12,7 +13,7 @@ from django.db.models import QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.http.response import JsonResponse
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.datastructures import OrderedSet
 from django.views.decorators.cache import cache_page
@@ -20,31 +21,58 @@ from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
 from annotation.models import Citation
-from annotation.models.models import AnnotationVersion, DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation
+from annotation.models.models import (
+    AnnotationVersion,
+    DBNSFPGeneAnnotation,
+    DBNSFPGeneAnnotationVersion,
+)
 from classification.models import ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
-    GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
+from genes.forms import (
+    CustomGeneListForm,
+    GeneAnnotationReleaseGenomeBuildForm,
+    GeneListForm,
+    GeneSymbolForm,
+    NamedCustomGeneListForm,
+    UserGeneListForm,
+)
 from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
 from genes.hgvs import HGVSMatcher
-from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
-    GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
-    CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, NoTranscript, GnomADGeneConstraint
+from genes.models import (
+    HGNC,
+    CanonicalTranscriptCollection,
+    CustomTextGeneList,
+    Gene,
+    GeneCoverage,
+    GeneCoverageCanonicalTranscript,
+    GeneCoverageCollection,
+    GeneInfo,
+    GeneList,
+    GeneListCategory,
+    GeneSymbol,
+    GeneVersion,
+    GnomADGeneConstraint,
+    NoTranscript,
+    PanelAppServer,
+    SampleGeneList,
+    Transcript,
+    TranscriptVersion,
+    TranscriptVersionSequenceInfo,
+)
 from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import WEEK_SECS
-from library.django_utils import get_field_counts, add_save_message
-from library.utils import defaultdict_to_dict, LazyAttribute, full_class_name
-from ontology.models import OntologySnake, OntologyService, OntologyTerm
+from library.django_utils import add_save_message, get_field_counts
+from library.utils import LazyAttribute, defaultdict_to_dict, full_class_name
+from ontology.models import OntologyService, OntologySnake, OntologyTerm
 from seqauto.models import EnrichmentKit
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.graphs import graphcache
-from snpdb.models import VariantZygosityCountCollection, Sample, VariantGridColumn
+from snpdb.models import Sample, VariantGridColumn, VariantZygosityCountCollection
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.variant_queries import get_has_classifications_q, get_variant_queryset_for_gene_symbol
@@ -337,7 +365,7 @@ class GeneSymbolViewInfo:
         ).filter(reduce(operator.or_, evidence_q_list))
         classifications_qs = ClassificationModification.filter_for_user(user=self.user, queryset=classifications_qs)
         classifications_qs = classifications_qs.select_related('classification', 'classification__lab')
-        return list(sorted(classifications_qs[0:100], key=lambda c: c.curated_date_check, reverse=True))
+        return sorted(classifications_qs[0:100], key=lambda c: c.curated_date_check, reverse=True)
 
     @cached_property
     def unmatched_classifications_title(self):

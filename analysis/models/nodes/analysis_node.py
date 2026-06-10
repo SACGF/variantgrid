@@ -3,10 +3,11 @@ import abc
 import logging
 import operator
 from collections import defaultdict
+from collections.abc import Sequence
 from functools import cached_property, reduce
 from random import random
 from time import time
-from typing import Sequence, Optional
+from typing import Optional
 
 from auditlog.context import disable_auditlog
 from auditlog.models import AuditlogHistoryField, LogEntry
@@ -17,32 +18,56 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import FieldError
 from django.db import connection, models
-from django.db.models import Value, IntegerField, QuerySet
+from django.db.models import IntegerField, QuerySet, Value
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-from django_dag.models import node_factory, edge_factory
+from django_dag.models import edge_factory, node_factory
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
-from analysis.exceptions import NonFatalNodeError, NodeParentErrorsException, NodeConfigurationException, \
-    NodeParentNotReadyException, NodeNotFoundException, NodeOutOfDateException
-from analysis.models.enums import GroupOperation, NodeStatus, NodeColors, NodeErrorSource, AnalysisTemplateType
+from analysis.exceptions import (
+    NodeConfigurationException,
+    NodeNotFoundException,
+    NodeOutOfDateException,
+    NodeParentErrorsException,
+    NodeParentNotReadyException,
+    NonFatalNodeError,
+)
+from analysis.models.enums import (
+    AnalysisTemplateType,
+    GroupOperation,
+    NodeColors,
+    NodeErrorSource,
+    NodeStatus,
+)
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
-from library.log_utils import report_event, log_traceback
-from library.utils import format_percent, add_exception_note
+from library.log_utils import log_traceback, report_event
+from library.utils import add_exception_note, format_percent
 from library.utils.database_utils import queryset_to_sql
 from library.utils.django_utils import get_model_content_type_dict
-from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
-    ProcessingStatus, GenomeBuild, AlleleSource, Contig, SampleFilePath
+from snpdb.models import (
+    AlleleSource,
+    BuiltInFilters,
+    Cohort,
+    Contig,
+    GenomeBuild,
+    ProcessingStatus,
+    Sample,
+    SampleFilePath,
+    Variant,
+    VariantCollection,
+    VCFFilter,
+    Wiki,
+)
 from snpdb.variant_collection import write_sql_to_variant_collection
 
 

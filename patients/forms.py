@@ -1,12 +1,17 @@
 from dal import forward
 from django import forms
-from django.forms.models import inlineformset_factory, ALL_FIELDS
+from django.forms.models import ALL_FIELDS, inlineformset_factory
 from django.forms.widgets import TextInput
 
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Patient, Specimen, ExternalPK, PatientModification, \
-    PatientRecordOriginType
+from patients.models import (
+    ExternalPK,
+    Patient,
+    PatientModification,
+    PatientRecordOriginType,
+    Specimen,
+)
 from patients.models_enums import PopulationGroup
 
 

@@ -22,7 +22,7 @@ class Command(BaseCommand):
                 lab = Lab.objects.get(id=lab_id)
             else:
                 lab = Lab.objects.get(group_name=lab_id)
-            print(f"Lab = {str(lab)}")
+            print(f"Lab = {lab!s}")
 
         qs = ClassificationModification.objects.filter(is_last_published=True, is_last_edited=True)
         if lab:
@@ -38,7 +38,7 @@ class Command(BaseCommand):
                 print(f"{mod.classification.pk} has illegal evidence keys = {bonus_keys}")
 
                 if apply:
-                    patch = {k: None for k in bonus_keys}
+                    patch = dict.fromkeys(bonus_keys)
                     classification = mod.classification
                     classification.patch_value(patch=patch,
                                                source=SubmissionSource.API,

@@ -1,15 +1,23 @@
+from collections.abc import Mapping
 from functools import cached_property
-from typing import Optional, Mapping
+from typing import Optional
 
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils.timezone import now
 
 # from classification.enums import ForceUpdate
-from classification.enums import ShareLevel, SubmissionSource, SpecialEKeys
-from classification.models import ClassificationProcessError, ClassificationRef, \
-    EvidenceMixin, classification_flag_types, ClassificationJsonParams, ClassificationModification, \
-    ClassificationPatchResponse, ClassificationImportRun
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
+from classification.models import (
+    ClassificationImportRun,
+    ClassificationJsonParams,
+    ClassificationModification,
+    ClassificationPatchResponse,
+    ClassificationProcessError,
+    ClassificationRef,
+    EvidenceMixin,
+    classification_flag_types,
+)
 from classification.models.classification_utils import ClassificationPatchStatus
 from classification.models.variant_resolver import VariantResolver
 from eventlog.models import create_event

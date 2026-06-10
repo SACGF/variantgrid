@@ -4,9 +4,13 @@ import cyvcf2
 from django.conf import settings
 from django.test import TestCase
 
-from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, vcf_to_variant_coordinates, \
-    vcf_to_variant_coordinates_and_records, vcf_get_ref_alt_svlen_and_modification
-from snpdb.models import VariantCoordinate, Sequence
+from library.genomics.vcf_utils import (
+    vcf_get_ref_alt_svlen_and_modification,
+    vcf_to_variant_coordinates,
+    vcf_to_variant_coordinates_and_records,
+    write_vcf_from_variant_coordinates,
+)
+from snpdb.models import Sequence, VariantCoordinate
 from upload.models import ModifiedImportedVariant
 
 

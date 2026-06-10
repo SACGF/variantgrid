@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import TextChoices
 
-from library.guardian_utils import public_group, all_users_group
+from library.guardian_utils import all_users_group, public_group
 from library.utils import ChoicesEnum
 
 CRITERIA_NOT_MET = 'NM'
@@ -236,7 +236,9 @@ class EvidenceKeyValueType:
     )
 
 
-_ShareLevelData = typing.NamedTuple('ShareLevelData', [('index', int), ('label', str)])
+class _ShareLevelData(typing.NamedTuple):
+    index: int
+    label: str
 
 
 @total_ordering

@@ -2,11 +2,12 @@ import csv
 import operator
 import re
 from collections import Counter
+from collections.abc import Iterator
 from io import StringIO
-from typing import Iterator, Optional
+from typing import Optional
 
-from vcf import Writer, Reader
-from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
+from vcf import Reader, Writer
+from vcf.model import _Call, _Record, _Substitution, make_calldata_tuple
 
 from analysis.grids import ExportVariantGrid
 from analysis.models import AnalysisNode
@@ -16,7 +17,7 @@ from library.django_utils import get_model_fields
 from library.django_utils.jqgrid_view import grid_export_csv
 from library.utils import StashFile
 from patients.models_enums import Zygosity
-from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes
+from snpdb.models import ColumnVCFInfo, Sample, VCFInfoTypes
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
 

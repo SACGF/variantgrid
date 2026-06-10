@@ -29,13 +29,12 @@ import random
 import socket
 import sys
 import time
-import traceback
 from datetime import datetime
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
-from django.db.models import F, Q
+from django.db.models import Q
 from django.db.models.functions import Substr as DjSubstr
 
 from analysis.models import Analysis
@@ -44,7 +43,6 @@ from annotation.models import VariantAnnotationVersion, VariantGeneOverlap
 from genes.models import GeneList
 from snpdb.models import Cohort, Sample, Trio, Variant, VariantCollection
 from snpdb.models.models_enums import ProcessingStatus
-
 
 CSV_FIELDS = [
     "source",

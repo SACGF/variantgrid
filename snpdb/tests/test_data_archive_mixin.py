@@ -12,9 +12,17 @@ from django.utils import timezone
 
 from annotation.models import VariantAnnotationVersion
 from genes.models import GeneCoverageCollection
-from snpdb.archive import archive_vcf, ArchivePreconditionError, DataArchivedError, mark_vcf_archive_started
-from snpdb.models import GenomeBuild, VCF
-from snpdb.models.models_zygosity_counts import VariantZygosityCountCollection, VariantZygosityCountForVCF
+from snpdb.archive import (
+    ArchivePreconditionError,
+    DataArchivedError,
+    archive_vcf,
+    mark_vcf_archive_started,
+)
+from snpdb.models import VCF, GenomeBuild
+from snpdb.models.models_zygosity_counts import (
+    VariantZygosityCountCollection,
+    VariantZygosityCountForVCF,
+)
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 

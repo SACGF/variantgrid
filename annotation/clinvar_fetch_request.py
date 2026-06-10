@@ -1,8 +1,9 @@
 import logging
 import time
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Type, Optional, Collection
+from typing import Optional
 from urllib.error import HTTPError
 
 from django.db import transaction
@@ -10,7 +11,7 @@ from django.utils import timezone
 
 from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS, ClinVarXmlParser
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
-from annotation.models import ClinVarRecordCollection, ClinVarVersion, ClinVar
+from annotation.models import ClinVar, ClinVarRecordCollection, ClinVarVersion
 from snpdb.models import GenomeBuild
 
 
@@ -31,7 +32,7 @@ class ClinVarFetchRequest:
     How old until the cache is considered stale, provide seconds=0 if you want to force a refresh
     """
 
-    parser: Type[ClinVarXmlParser] = ClinVarXmlParserViaVCV
+    parser: type[ClinVarXmlParser] = ClinVarXmlParserViaVCV
 
     clinvar_versions: Optional[Collection[ClinVarVersion]] = None
 

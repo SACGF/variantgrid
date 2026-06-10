@@ -5,15 +5,31 @@ from django.conf import settings
 from django.test import TestCase
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
-from genes.canonical_transcripts.create_canonical_transcripts import create_canonical_transcript_collection
+from genes.canonical_transcripts.create_canonical_transcripts import (
+    create_canonical_transcript_collection,
+)
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCollection, TranscriptVersion
-from seqauto.models import SequencerModel, Sequencer, SequencingRun, SampleSheet, \
-    SequencingRunCurrentSampleSheet, SequencingSample, Fastq, UnalignedReads, Aligner, \
-    BamFile, SingleSampleVCF, QC, VariantCaller, EnrichmentKit, QCGeneCoverage
+from seqauto.models import (
+    QC,
+    Aligner,
+    BamFile,
+    EnrichmentKit,
+    Fastq,
+    QCGeneCoverage,
+    SampleSheet,
+    Sequencer,
+    SequencerModel,
+    SequencingRun,
+    SequencingRunCurrentSampleSheet,
+    SequencingSample,
+    SingleSampleVCF,
+    UnalignedReads,
+    VariantCaller,
+)
 from seqauto.models.models_enums import DataGeneration
 from seqauto.tasks.gold_summary_tasks import calculate_gold_summary
-from snpdb.models import Manufacturer, GenomeBuild, DataState
+from snpdb.models import DataState, GenomeBuild, Manufacturer
 
 
 class TestSeqAutoModels(TestCase):

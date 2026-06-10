@@ -6,7 +6,7 @@ from django.contrib.admin import RelatedFieldListFilter
 from django.db.models import QuerySet
 
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
-from sync.models import SyncRun, ClassificationModificationSyncRecord
+from sync.models import ClassificationModificationSyncRecord, SyncRun
 from sync.models.models import SyncDestination
 from sync.sync_runner import sync_runner_for_destination
 
@@ -23,7 +23,7 @@ class SyncDestinationAdmin(ModelAdminBasics):
     def _run_sync(self, request, queryset: QuerySet[SyncDestination], max_rows: Optional[int] = None):
         for sync_destination in queryset:
             sync_destination.run(full_sync=False, max_rows=max_rows)
-            self.message_user(request, message=f"Completed {str(sync_destination)} row limit = {max_rows}")
+            self.message_user(request, message=f"Completed {sync_destination!s} row limit = {max_rows}")
 
     @admin_action("Validate configuration")
     def validate_configuration(self, request, queryset: QuerySet[SyncDestination]):
@@ -61,7 +61,7 @@ class SyncDestinationAdmin(ModelAdminBasics):
         sync_destination: SyncDestination
         for sync_destination in queryset:
             sync_destination.run(full_sync=True)
-            self.message_user(request, message=f"Completed {str(sync_destination)}")
+            self.message_user(request, message=f"Completed {sync_destination!s}")
 
 
 @admin.register(SyncRun)

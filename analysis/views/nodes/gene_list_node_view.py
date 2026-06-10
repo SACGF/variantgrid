@@ -5,7 +5,7 @@ from django.utils.timesince import timesince
 from analysis.forms.forms_nodes import GeneListNodeForm
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.views.nodes.gene_coverage_node_view import GeneCoverageNodeView
-from genes.models import GeneListCategory, GeneList, SampleGeneList, PanelAppServer, PanelAppPanel
+from genes.models import GeneList, GeneListCategory, PanelAppPanel, PanelAppServer, SampleGeneList
 
 
 class GeneListNodeView(GeneCoverageNodeView):

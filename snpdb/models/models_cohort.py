@@ -1,9 +1,9 @@
 import logging
 from functools import cached_property
-from typing import Union, Optional
+from typing import Optional, Union
 
 import celery
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models
@@ -11,8 +11,8 @@ from django.db.models import QuerySet
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT
 from django.db.models.expressions import F, Value
-from django.db.models.query_utils import Q, FilteredRelation
-from django.db.models.signals import pre_delete, post_delete
+from django.db.models.query_utils import FilteredRelation, Q
+from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -25,10 +25,10 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import DjangoPermission
-from library.preview_request import PreviewModelMixin, PreviewKeyValue
+from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
-from snpdb.models.models_enums import ImportStatus, CohortGenotypeCollectionType, ProcessingStatus
+from snpdb.models.models_enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant, VariantCollection
 from snpdb.models.models_vcf import VCF, Sample

@@ -1,12 +1,17 @@
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from classification.models import resolve_uploaded_url_to_handle, UploadedClassificationsUnmappedStatus, \
-    UploadedClassificationsUnmapped
-from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
+from classification.models import (
+    UploadedClassificationsUnmapped,
+    UploadedClassificationsUnmappedStatus,
+    resolve_uploaded_url_to_handle,
+)
+from classification.tasks.classification_import_map_and_insert_task import (
+    ClassificationImportMapInsertTask,
+)
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from snpdb.models import Lab
-from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
+from sync.sync_runner import SyncRunInstance, SyncRunner, register_sync_runner
 
 _ALISSA_DOWNLOAD_TIMEOUT = MINUTE_SECS * 10  # set the timeout to 10 minutes
 

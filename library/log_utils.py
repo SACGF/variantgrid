@@ -7,13 +7,12 @@ import traceback
 from abc import ABC, abstractmethod
 from logging import StreamHandler
 from re import Match
-from typing import Optional, Any, Union
+from typing import Any, Optional, Union
 
 import markdown
 import requests
 import rollbar
 from django.conf import settings
-from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.auth.models import User
 from django.db.models import Model
 from django.forms import ModelForm

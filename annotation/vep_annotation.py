@@ -9,7 +9,7 @@ from django.conf import settings
 
 from annotation import vep_columns
 from annotation.fake_annotation import get_fake_vep_version
-from annotation.models.models_enums import VEPPlugin, VEPCustom, VariantAnnotationPipelineType
+from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_config import VEPConfig, parse_gnomad_version_from_filename
 from genes.models_enums import AnnotationConsortium

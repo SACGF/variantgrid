@@ -1,26 +1,28 @@
 import operator
 import re
 from functools import reduce
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.conf import settings
-from django.core.paginator import Paginator, InvalidPage
+from django.core.paginator import InvalidPage, Paginator
 from django.db import connection
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
-from analysis.models import VariantTag, Analysis
-from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version, \
-    get_variant_queryset_for_annotation_version
+from analysis.models import Analysis, VariantTag
+from annotation.annotation_version_querysets import (
+    get_variant_queryset_for_annotation_version,
+    get_variant_queryset_for_latest_annotation_version,
+)
 from annotation.models import AnnotationVersion, VariantAnnotation
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import update_dict_of_dict_values, JsonDataType
+from library.utils import JsonDataType, update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag, VariantWiki
-from snpdb.models.models_user_settings import UserSettings, UserGridConfig
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
+from snpdb.models import GenomeBuild, Tag, Variant, VariantWiki, VariantZygosityCountCollection
+from snpdb.models.models_user_settings import UserGridConfig, UserSettings
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 from variantopedia.interesting_nearby import get_nearby_qs
 
 

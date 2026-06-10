@@ -1,16 +1,27 @@
 import re
 from datetime import timedelta
 
-from django.contrib import messages, admin
-from django.db.models import QuerySet, TextField, Q
-from django.db.models.functions import Length, Cast
+from django.contrib import admin, messages
+from django.db.models import Q, QuerySet, TextField
+from django.db.models.functions import Cast, Length
 from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 
-from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, \
-    ClinVarExportRequest, ClinVarExportSubmission
-from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
-from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics, admin_action, admin_list_column
+from classification.models import (
+    ClinVarAllele,
+    ClinVarExport,
+    ClinVarExportBatch,
+    ClinVarExportBatchStatus,
+    ClinVarExportRequest,
+    ClinVarExportSubmission,
+)
+from classification.models.clinvar_export_sync import ClinVarRequestException, clinvar_export_sync
+from snpdb.admin_utils import (
+    AllValuesChoicesFieldListFilter,
+    ModelAdminBasics,
+    admin_action,
+    admin_list_column,
+)
 
 
 class ClinVarExportSubmissionAdmin(admin.TabularInline):

@@ -4,13 +4,21 @@ from typing import Optional
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 
-from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from annotation.manual_variant_entry import CreateManualVariantForbidden, check_can_create_variants
 from annotation.models import VariantAnnotation
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.models import Classification, ImportedAlleleInfo
 from snpdb.liftover import allele_can_attempt_liftover
-from snpdb.models import Allele, GenomeBuild, VariantAllele, \
-    Variant, AlleleOrigin, AlleleMergeLog, LiftoverRun, AlleleLiftover
+from snpdb.models import (
+    Allele,
+    AlleleLiftover,
+    AlleleMergeLog,
+    AlleleOrigin,
+    GenomeBuild,
+    LiftoverRun,
+    Variant,
+    VariantAllele,
+)
 from snpdb.variant_links import variant_link_info
 
 
@@ -118,11 +126,9 @@ class AlleleCard:
 
     @cached_property
     def imported_allele_infos(self):
-        return list(
-            sorted(ImportedAlleleInfo.objects.filter(
+        return sorted(ImportedAlleleInfo.objects.filter(
                 allele=self.allele
             ).all())
-        )
 
     @property
     def imported_allele_info_label(self):

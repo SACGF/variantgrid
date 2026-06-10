@@ -6,7 +6,7 @@ from typing import Optional
 
 from Bio.Data.IUPACData import protein_letters_1to3_extended
 
-from genes.models import TranscriptVersion, TranscriptParts, Transcript, LRGRefSeqGene
+from genes.models import LRGRefSeqGene, Transcript, TranscriptParts, TranscriptVersion
 from snpdb.models.models_genome import GenomeBuild
 
 

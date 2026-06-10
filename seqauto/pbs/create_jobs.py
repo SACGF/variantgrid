@@ -6,11 +6,20 @@ from collections import defaultdict
 from django.conf import settings
 
 from library.utils.file_utils import add_permissions_to_file, mk_path_for_file
-from seqauto.job_scripts import get_job_data, create_bash_script
-from seqauto.models import SingleSampleVCF, SampleSheet, BamFile, \
-    SequencingFileType, QC, JointCalledVCF, IlluminaFlowcellQC, \
-    FastQC, Flagstats, JobScript
-from seqauto.pbs.pbs_scripts import get_dependency_flags, create_pbs_script
+from seqauto.job_scripts import create_bash_script, get_job_data
+from seqauto.models import (
+    QC,
+    BamFile,
+    FastQC,
+    Flagstats,
+    IlluminaFlowcellQC,
+    JobScript,
+    JointCalledVCF,
+    SampleSheet,
+    SequencingFileType,
+    SingleSampleVCF,
+)
+from seqauto.pbs.pbs_scripts import create_pbs_script, get_dependency_flags
 from snpdb.models import DataState
 
 

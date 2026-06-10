@@ -1,8 +1,11 @@
 import numpy as np
 from rest_framework import serializers
 
-from genes.serializers import TranscriptSerializer, GeneSymbolSerializer, \
-    TranscriptVersionSerializer
+from genes.serializers import (
+    GeneSymbolSerializer,
+    TranscriptSerializer,
+    TranscriptVersionSerializer,
+)
 from seqauto.models import GoldCoverageSummary, GoldReference
 from seqauto.serializers.enrichment_kit_serializers import EnrichmentKitSummarySerializer
 

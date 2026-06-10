@@ -1,15 +1,27 @@
-from django.contrib.auth.views import PasswordChangeView, PasswordChangeDoneView
+from django.contrib.auth.views import PasswordChangeDoneView, PasswordChangeView
 from django.urls import include
 from django.urls.conf import path as path_standard
 from django.views.generic import RedirectView
 
 from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
-from snpdb.grids import CohortListColumns, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListColumns, \
-    CustomColumnsCollectionColumns, QuadsListColumns, TriosListColumns, VCFListGrid, TagColorsCollectionColumns, \
-    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, \
-    ManualVariantEntryCollectionColumns, SampleColumns
-from snpdb.views import views, views_json, views_rest, views_autocomplete
+from snpdb.grids import (
+    AlleleLiftoverFailureColumns,
+    CohortListColumns,
+    CohortSampleListGrid,
+    CustomColumnsCollectionColumns,
+    GenomicIntervalsListColumns,
+    LiftoverRunAlleleLiftoverColumns,
+    LiftoverRunColumns,
+    ManualVariantEntryCollectionColumns,
+    QuadsListColumns,
+    SampleColumns,
+    SamplesListGrid,
+    TagColorsCollectionColumns,
+    TriosListColumns,
+    VCFListGrid,
+)
+from snpdb.views import views, views_autocomplete, views_json, views_rest
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 

@@ -4,7 +4,7 @@ import os
 import subprocess
 from hashlib import md5
 from pathlib import Path
-from typing import Optional, Union, IO
+from typing import IO, Optional, Union
 
 
 def open_file_or_filename(f, mode='r', **kwargs):

@@ -7,8 +7,10 @@ from hgvs.exceptions import HGVSInvalidVariantError
 from pyhgvs import InvalidHGVSName
 
 from classification.classification_import import reattempt_variant_matching
-from classification.models.classification_variant_info_models import ImportedAlleleInfo, \
-    ImportedAlleleInfoStatus
+from classification.models.classification_variant_info_models import (
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
+)
 from genes.hgvs import HGVSMatcher
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild

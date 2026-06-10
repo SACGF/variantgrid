@@ -8,11 +8,11 @@ from django.test import TestCase
 from annotation.fake_annotation import get_fake_annotation_version
 from library.utils import sha256sum_str
 from snpdb.models import ImportSource, Sequence
-from upload.models import UploadedFile, UploadPipeline, UploadedVCF, UploadStep, UploadedFileTypes
+from upload.models import UploadedFile, UploadedFileTypes, UploadedVCF, UploadPipeline, UploadStep
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
 from upload.vcf.sql_copy_files import COHORT_GENOTYPE_HEADER
-from upload.vcf.vcf_import import create_vcf_from_vcf, create_cohort_genotype_collection_from_vcf
+from upload.vcf.vcf_import import create_cohort_genotype_collection_from_vcf, create_vcf_from_vcf
 
 
 class TestVCFProcessors(TestCase):

@@ -19,10 +19,20 @@ from analysis.models.nodes.analysis_node import NodeCache
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.venn_node import VennNode, VennNodeCache, venn_cache_count
 from analysis.tasks import analysis_update_tasks
-from analysis.tasks.analysis_update_tasks import lease_ready_nodes, _node_launch_signature, \
-    _node_ready_to_lease, create_and_launch_analysis_tasks
-from analysis.tasks.node_update_tasks import next_backoff, _backoff_node, reschedule_stalled_analyses, \
-    update_node_task, node_cache_task, MAX_NODE_ATTEMPTS
+from analysis.tasks.analysis_update_tasks import (
+    _node_launch_signature,
+    _node_ready_to_lease,
+    create_and_launch_analysis_tasks,
+    lease_ready_nodes,
+)
+from analysis.tasks.node_update_tasks import (
+    MAX_NODE_ATTEMPTS,
+    _backoff_node,
+    next_backoff,
+    node_cache_task,
+    reschedule_stalled_analyses,
+    update_node_task,
+)
 from analysis.tests.utils import AnalysisSetupMixin
 from snpdb.models import ProcessingStatus, VariantCollection
 

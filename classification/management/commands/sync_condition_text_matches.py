@@ -2,8 +2,12 @@ from collections import defaultdict
 
 from django.core.management.base import BaseCommand
 
-from classification.models import ConditionText, sync_all_condition_resolutions_to_classifications, Classification, \
-    ClinVarExport
+from classification.models import (
+    Classification,
+    ClinVarExport,
+    ConditionText,
+    sync_all_condition_resolutions_to_classifications,
+)
 from classification.models.condition_text_matching import ConditionTextMatch
 
 

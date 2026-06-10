@@ -1,6 +1,6 @@
 from django.test.testcases import TestCase
 
-from annotation.regexes import db_ref_regexes, DbRegexes, db_citation_regexes
+from annotation.regexes import DbRegexes, db_citation_regexes, db_ref_regexes
 
 
 class RegexTests(TestCase):

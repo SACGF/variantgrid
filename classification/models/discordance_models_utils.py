@@ -1,18 +1,26 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Iterable, Optional
+from typing import Optional
 
 from django.utils import timezone
 from frozendict import frozendict
 from more_itertools import first
 
-from classification.models import DiscordanceReport, DiscordanceReportTriage, DiscordanceReportTriageStatus, \
-    ClassificationModification, ClassificationLabSummary, DiscordanceReportNextStep, DiscordanceReportClassification
+from classification.models import (
+    ClassificationLabSummary,
+    ClassificationModification,
+    DiscordanceReport,
+    DiscordanceReportClassification,
+    DiscordanceReportNextStep,
+    DiscordanceReportTriage,
+    DiscordanceReportTriageStatus,
+)
 from genes.hgvs import CHGVS
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column, ExportDataType, pretty_label
+from library.utils import ExportDataType, ExportRow, export_column, pretty_label
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 

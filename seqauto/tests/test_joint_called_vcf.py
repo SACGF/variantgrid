@@ -16,14 +16,14 @@ from seqauto.models import (
     SequencingRun,
     SequencingRunCurrentSampleSheet,
     SequencingSample,
-    UnalignedReads,
     SingleSampleVCF,
+    UnalignedReads,
     VariantCaller,
     VCFFromSequencingRun,
 )
 from seqauto.models.models_enums import DataGeneration, PairedEnd
 from seqauto.serializers.sequencing_serializers import JointCalledVCFSerializer
-from snpdb.models import VCF, Sample, DataState
+from snpdb.models import VCF, DataState, Sample
 from upload.models import BackendVCF, UploadedFile, UploadedVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
 

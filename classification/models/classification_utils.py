@@ -1,10 +1,11 @@
 # used for validating multiple keys when one changes
 import operator
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from functools import reduce, cached_property
-from typing import List, Set, Optional, Union, Any, Dict, Iterable
+from functools import cached_property, reduce
+from typing import Any, Optional, Union
 
 from django.contrib.auth.models import User
 from django.db.models import Q
@@ -46,9 +47,9 @@ class ClassificationPatchStatus(str, Enum):
 class ClassificationPatchResponse(VarsDict):
 
     def __init__(self):
-        self.warnings: List[PatchMessage] = []
-        self.modified_keys: Set[str] = set()
-        self.classification_json: Optional[Dict] = None
+        self.warnings: list[PatchMessage] = []
+        self.modified_keys: set[str] = set()
+        self.classification_json: Optional[dict] = None
         self.internal_error: Optional[Any] = None
         self.withdrawn = None
         self.deleted = None
@@ -202,7 +203,7 @@ class ClassificationJsonParams:
                  strip_complicated=False,
                  strip_notes_and_explains=False,
                  api_version=1,
-                 hardcode_extra_data: Dict = None,
+                 hardcode_extra_data: dict = None,
                  fix_data_types=False,
                  remove_acmg_namespace: Optional[bool] = None,
                  inject_source_url: bool = False,
@@ -298,7 +299,7 @@ class PatchMeta:
         """
         return self.revalidate_all or key in self.modified_keys
 
-    def intersection_modified(self, key_set: Set[str]) -> Set[str]:
+    def intersection_modified(self, key_set: set[str]) -> set[str]:
         """
         Performs is_modified but over a set
         :param key_set: The set of str evidence keys we're asking about

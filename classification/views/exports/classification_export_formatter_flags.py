@@ -1,17 +1,25 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Optional, Iterator
+from typing import Optional
 
 from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData, \
-    ClassificationIssue
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
-from flags.models import FlagComment, Flag
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+    ClassificationIssue,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
+from flags.models import Flag, FlagComment
 from library.django_utils import get_url_from_view_path
-from library.utils import export_column, ExportDataType, ExportRow, delimited_row
+from library.utils import ExportDataType, ExportRow, delimited_row, export_column
 
 
 @dataclass(frozen=True)

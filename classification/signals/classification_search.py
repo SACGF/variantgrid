@@ -10,11 +10,11 @@ from django.dispatch import receiver
 from annotation.models import VariantAnnotationVersion
 from classification.enums import AlleleOriginBucket
 from classification.models import Classification, ClassificationModification
-from library.preview_request import preview_extra_signal, PreviewKeyValue
+from library.preview_request import PreviewKeyValue, preview_extra_signal
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Lab, Organization, Allele, Variant, GenomeBuild
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample
+from snpdb.models import Allele, GenomeBuild, Lab, Organization, Variant
+from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 
 @search_receiver(

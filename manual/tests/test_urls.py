@@ -3,7 +3,7 @@ import unittest
 from django.contrib.auth.models import User
 
 from library.django_utils.unittest_utils import URLTestCase
-from manual.models.manual_migration_models import ManualMigrationTask, ManualMigrationAttempt
+from manual.models.manual_migration_models import ManualMigrationAttempt, ManualMigrationTask
 
 
 class Test(URLTestCase):

@@ -2,7 +2,7 @@ from django.template.library import Library
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
-from snpdb.models import Trio, Quad
+from snpdb.models import Quad, Trio
 
 register = Library()
 

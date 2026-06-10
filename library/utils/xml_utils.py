@@ -1,5 +1,6 @@
 import inspect
-from typing import Callable, Optional, Any, Union
+from collections.abc import Callable
+from typing import Any, Optional, Union
 
 from lxml import etree
 from lxml.etree import Element

@@ -4,10 +4,18 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from analysis.models import Analysis, AnalysisLock, SampleNode, GeneListNode, ZygosityNode
+from analysis.models import Analysis, AnalysisLock, GeneListNode, SampleNode, ZygosityNode
 from annotation.fake_annotation import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
-from snpdb.models import GenomeBuild, VCF, Sample, Cohort, CohortSample, CohortGenotypeCollection, ImportStatus
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CohortGenotypeCollection,
+    CohortSample,
+    GenomeBuild,
+    ImportStatus,
+    Sample,
+)
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)

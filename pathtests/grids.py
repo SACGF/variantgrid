@@ -1,5 +1,5 @@
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from pathtests.models import PathologyTestOrder, Case, PathologyTest
+from pathtests.models import Case, PathologyTest, PathologyTestOrder
 
 
 class PathologyTestOrdersGrid(JqGridUserRowConfig):

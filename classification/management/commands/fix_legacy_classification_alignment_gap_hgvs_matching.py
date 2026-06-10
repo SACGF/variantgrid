@@ -82,10 +82,10 @@ class Command(BaseCommand):
 
         # Revalidate
         user = admin_bot()
-        print(f"Revalidating...")
+        print("Revalidating...")
         for c in classification_qs:
             c.revalidate(user)
 
-        print(f"Rematching...")
+        print("Rematching...")
         matched_count = reattempt_variant_matching(user, classification_qs)
         print(f"{matched_count=}")

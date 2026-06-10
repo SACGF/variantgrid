@@ -4,7 +4,7 @@ from django.db.models.functions import Length
 
 from annotation.models import AnnotationRangeLock, ClinVar
 from genes.hgvs import HGVSMatcher
-from snpdb.models import Variant, Sequence, GenomeBuild, Locus
+from snpdb.models import GenomeBuild, Locus, Sequence, Variant
 
 
 class Command(BaseCommand):

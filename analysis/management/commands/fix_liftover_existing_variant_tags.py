@@ -5,7 +5,7 @@ from library.guardian_utils import admin_bot
 from library.utils import iter_fixed_chunks
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import GenomeBuild, ImportSource, Variant, Allele
+from snpdb.models import Allele, GenomeBuild, ImportSource, Variant
 
 
 class Command(BaseCommand):

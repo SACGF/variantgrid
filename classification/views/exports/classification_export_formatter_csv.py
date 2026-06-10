@@ -1,22 +1,36 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.conf import settings
 from django.http import HttpRequest
 
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap
 from classification.models.classification_groups import ClassificationGroupUtils
-from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
-    DiscordanceReportStatus
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter, \
-    ClassificationExportExtraData
+from classification.views.classification_export_utils import KeyValueFormatter, UsedKeyTracker
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+    DiscordanceReportStatus,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportExtraData,
+    ClassificationExportFormatter,
+)
 from classification.views.exports.classification_export_utils import CitationCounter
 from library.django_utils import get_url_from_view_path
-from library.utils import delimited_row, export_column, ExportRow, ExportDataType, html_to_text, ExportTweak
+from library.utils import (
+    ExportDataType,
+    ExportRow,
+    ExportTweak,
+    delimited_row,
+    export_column,
+    html_to_text,
+)
 from snpdb.models import GenomeBuild
 
 

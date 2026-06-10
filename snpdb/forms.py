@@ -2,15 +2,15 @@ import collections
 from functools import cached_property
 
 from crispy_forms.bootstrap import FieldWithButtons
-from crispy_forms.layout import Layout, Submit, Field
+from crispy_forms.layout import Field, Layout, Submit
 from dal import forward
 from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.forms import EmailInput, URLInput, inlineformset_factory, ALL_FIELDS
+from django.forms import ALL_FIELDS, EmailInput, URLInput, inlineformset_factory
 from django.forms.forms import DeclarativeFieldsMetaclass
-from django.forms.widgets import TextInput, HiddenInput, NullBooleanSelect
+from django.forms.widgets import HiddenInput, NullBooleanSelect, TextInput
 from guardian import shortcuts
 from guardian.shortcuts import assign_perm, remove_perm
 
@@ -20,14 +20,29 @@ from library.cache import timed_cache
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
-from snpdb import models
-from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
-    ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
-    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath
 from patients.models import Patient, Specimen
+from snpdb import models
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CustomColumnsCollection,
+    GenomicIntervalsCollection,
+    ImportStatus,
+    LabUserSettingsOverride,
+    OrganizationUserSettingsOverride,
+    Project,
+    Sample,
+    SampleFilePath,
+    SettingsInitialGroupPermission,
+    Tag,
+    UserContact,
+    UserSettings,
+    UserSettingsOverride,
+    VariantsType,
+)
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
-from uicore.utils.form_helpers import form_helper_horizontal, FormHelperHelper
+from uicore.utils.form_helpers import FormHelperHelper, form_helper_horizontal
 from variantgrid.perm_path import get_visible_url_names
 
 

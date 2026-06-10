@@ -7,7 +7,7 @@ from django.contrib.auth.models import Group, User
 from email_manager.models import EmailLog
 from library.log_utils import NotificationBuilder, send_notification
 from library.utils import empty_to_none
-from snpdb.models import Lab, UserSettings, Tag, TagColorsCollection
+from snpdb.models import Lab, Tag, TagColorsCollection, UserSettings
 
 
 class LabNotificationBuilder(NotificationBuilder):

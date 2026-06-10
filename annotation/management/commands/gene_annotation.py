@@ -1,22 +1,35 @@
 import argparse
 import os
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from datetime import timedelta
 
 from django.conf import settings
 from django.core.management import BaseCommand
 from django.utils import timezone
 
-from annotation.models import GeneAnnotationVersion, OntologyTerm, GenomeBuild, AnnotationVersion, \
-    InvalidAnnotationVersionError, GeneAnnotation, DBNSFPGeneAnnotationVersion, VariantAnnotationVersion
+from annotation.models import (
+    AnnotationVersion,
+    DBNSFPGeneAnnotationVersion,
+    GeneAnnotation,
+    GeneAnnotationVersion,
+    GenomeBuild,
+    InvalidAnnotationVersionError,
+    OntologyTerm,
+    VariantAnnotationVersion,
+)
 from genes.gene_matching import ReleaseGeneMatcher
-from genes.models import GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene, Gene
+from genes.models import Gene, GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
 from library.django_utils.django_file_utils import get_import_processing_filename
-from ontology.models import OntologyService, GeneDiseaseClassification, OntologyTermRelation, \
-    OntologyVersion, ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER
+from ontology.models import (
+    ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER,
+    GeneDiseaseClassification,
+    OntologyService,
+    OntologyTermRelation,
+    OntologyVersion,
+)
 from ontology.ontology_traversal import get_ontology_traverser
 from ontology.panel_app_ontology import bulk_update_gene_relations, panel_app_bulk_data_age
-from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
+from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 
 class Command(BaseCommand):
@@ -285,7 +298,7 @@ class Command(BaseCommand):
                 snake = traverser.terms_for_gene_symbol(hgnc_ot.name, OntologyService.MONDO,
                                                         max_depth=0)
                 uc_symbol = gene_symbol.upper()
-                hgnc_data[uc_symbol]["mondo_terms"] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
+                hgnc_data[uc_symbol]["mondo_terms"] = self.TERM_JOIN_STRING.join(str(lt) for lt in snake.leafs())
                 hgnc_data[uc_symbol]["gene_disease"] = self._get_gene_disease(traverser,
                                                                               gene_symbol, Command.TERM_JOIN_STRING)
 
@@ -351,7 +364,7 @@ class Command(BaseCommand):
                 if gene_symbol := gene_symbol_for_gene.get(ga.gene_id):
                     try:
                         snake = traverser.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=1)
-                        if omim_terms := self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs())):
+                        if omim_terms := self.TERM_JOIN_STRING.join(str(lt) for lt in snake.leafs()):
                             ga.omim_terms = omim_terms
                             update_records.append(ga)
                     except ValueError:
@@ -428,7 +441,7 @@ class Command(BaseCommand):
             gene_symbol = hgnc_ot.name
             for ontology_service in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
                 snake = traverser.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=1)
-                service_terms[ontology_service] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
+                service_terms[ontology_service] = self.TERM_JOIN_STRING.join(str(lt) for lt in snake.leafs())
 
             gene_disease_supportive_or_below, gene_disease_moderate_or_above = self._get_gene_disease(traverser,
                                                                                                       gene_symbol,
@@ -475,7 +488,7 @@ class Command(BaseCommand):
         for gene_id, ga_data in annotation_by_gene.items():
             ga_data["gene_id"] = gene_id
             ga_data["version_id"] = gav.pk
-            gene_annotation_records.append(tuple((ga_data.get(k) for k in self.GENE_ANNOTATION_HEADER)))
+            gene_annotation_records.append(tuple(ga_data.get(k) for k in self.GENE_ANNOTATION_HEADER))
 
         if gene_annotation_records:
             self._write_records(gav, gene_annotation_records)

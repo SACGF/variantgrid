@@ -1,9 +1,27 @@
-from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, AnalysisTemplatesGrid, \
-    NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid, \
-    NodeGeneListGenesColumns, AnalysisLogEntryColumns, CandidateSearchRunColumns, CandidateColumns, AnalysesColumns, \
-    AnalysisNodeIssuesColumns, KaryomappingAnalysesColumns, NodeTissueExpressionGenesColumns, \
-    NodeTissueUniProtGenesColumns
-from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete, views_candidate_search
+from analysis.grids import (
+    AnalysesColumns,
+    AnalysesGrid,
+    AnalysisLogEntryColumns,
+    AnalysisNodeIssuesColumns,
+    AnalysisTemplatesGrid,
+    CandidateColumns,
+    CandidateSearchRunColumns,
+    KaryomappingAnalysesColumns,
+    NodeColumnSummaryGrid,
+    NodeGeneDiseaseClassificationGenesGrid,
+    NodeGeneListGenesColumns,
+    NodeOntologyGenesGrid,
+    NodeTissueExpressionGenesColumns,
+    NodeTissueUniProtGenesColumns,
+)
+from analysis.views import (
+    views,
+    views_autocomplete,
+    views_candidate_search,
+    views_grid,
+    views_json,
+    views_karyomapping,
+)
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path

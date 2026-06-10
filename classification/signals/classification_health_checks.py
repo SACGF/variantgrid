@@ -1,13 +1,22 @@
 from django.dispatch import receiver
 
 from classification.enums import ShareLevel
-from classification.models import Classification, classification_flag_types, ImportedAlleleInfo, \
-    ImportedAlleleInfoStatus
+from classification.models import (
+    Classification,
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
+    classification_flag_types,
+)
 from flags.models import FlagType
 from flags.models.flag_health_check import flag_chanced_since
-from library.health_check import health_check_signal, \
-    HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity, HealthCheckStat, \
-    health_check_overall_stats_signal
+from library.health_check import (
+    HealthCheckRecentActivity,
+    HealthCheckRequest,
+    HealthCheckStat,
+    HealthCheckTotalAmount,
+    health_check_overall_stats_signal,
+    health_check_signal,
+)
 from library.utils import limit_str
 
 """

@@ -1,10 +1,10 @@
 import operator
 from functools import reduce
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import F, IntegerField, OuterRef, QuerySet, Subquery, Value, Func
+from django.db.models import F, Func, IntegerField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import CharField, TextField
 from django.db.models.query_utils import Q
@@ -13,20 +13,38 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
-from annotation.models import ManualVariantEntryCollection, PATIENT_ONTOLOGY_TERM_PATH
+from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, ManualVariantEntryCollection
 from library.django_utils import get_url_from_view_path
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import calculate_age, JsonDataType
+from library.utils import JsonDataType, calculate_age
 from ontology.models import OntologyService
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
-from snpdb.models import VCF, Cohort, CohortGenotypeStats, Sample, ImportStatus, \
-    GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, Quad, UserGridConfig, GenomeBuild, ClinGenAllele, \
-    VariantZygosityCountCollection, TagColorsCollection, LiftoverRun, AlleleConversionTool, AlleleLiftover, \
-    ProcessingStatus, Allele
+from snpdb.models import (
+    VCF,
+    Allele,
+    AlleleConversionTool,
+    AlleleLiftover,
+    ClinGenAllele,
+    Cohort,
+    CohortGenotypeStats,
+    CustomColumnsCollection,
+    GenomeBuild,
+    GenomicIntervalsCollection,
+    ImportStatus,
+    LiftoverRun,
+    ProcessingStatus,
+    Quad,
+    Sample,
+    TagColorsCollection,
+    Trio,
+    UserGridConfig,
+    Variant,
+    VariantZygosityCountCollection,
+)
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
-from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
+from snpdb.tasks.soft_delete_tasks import remove_soft_deleted_vcfs_task, soft_delete_vcfs
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_for_js
 

@@ -1,17 +1,27 @@
 import logging
 import operator
 from functools import cached_property, reduce
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 
 from django.conf import settings
-from django.db.models import Q, When, Case, TextField, Value, IntegerField, QuerySet
+from django.db.models import Case, IntegerField, Q, QuerySet, TextField, Value, When
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
-from django.db.models.functions import Lower, Cast
+from django.db.models.functions import Cast, Lower
 from django.http import HttpRequest
 
-from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket, ClinicalSignificance
-from classification.models import ClassificationModification, EvidenceKeyMap, \
-    ImportedAlleleInfo, DiscordanceReport
+from classification.enums import (
+    AlleleOriginBucket,
+    ClinicalSignificance,
+    EvidenceCategory,
+    ShareLevel,
+    SpecialEKeys,
+)
+from classification.models import (
+    ClassificationModification,
+    DiscordanceReport,
+    EvidenceKeyMap,
+    ImportedAlleleInfo,
+)
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus
 from genes.hgvs import CHGVS
@@ -19,7 +29,7 @@ from genes.models import TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import UserSettings, GenomeBuild, Variant, Lab
+from snpdb.models import GenomeBuild, Lab, UserSettings, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']
@@ -37,17 +47,17 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         "pathogenic": ClinicalSignificance.PATHOGENIC,
     }
 
-    def render_somatic(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_somatic(self, row: dict[str, Any]) -> JsonDataType:
         if row["classification__allele_origin_bucket"] != "G":
             return row["classification__summary__somatic"]
 
-    def render_classification(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_classification(self, row: dict[str, Any]) -> JsonDataType:
         return {
             SpecialEKeys.CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value"]
         }
 
-    def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
-        def get_preferred_chgvs_json() -> Dict:
+    def render_c_hgvs(self, row: dict[str, Any]) -> JsonDataType:
+        def get_preferred_chgvs_json() -> dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 try:
@@ -84,14 +94,14 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         return response
 
-    def render_condition(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_condition(self, row: dict[str, Any]) -> JsonDataType:
         if cr := row['classification__condition_resolution']:
             return cr
         else:
             return {"display_text": row['published_evidence__condition__value']}
 
-    def classification_id(self, row: Dict[str, Any]) -> JsonDataType:
-        matches: Optional[Dict[str, str]] = None
+    def classification_id(self, row: dict[str, Any]) -> JsonDataType:
+        matches: Optional[dict[str, str]] = None
         if id_filter := self.get_query_param("id_filter"):
             matches = {}
             id_keys = self.id_columns
@@ -119,7 +129,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         }
 
     @cached_property
-    def genome_build_prefs(self) -> List[GenomeBuild]:
+    def genome_build_prefs(self) -> list[GenomeBuild]:
         return GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
 
     @cached_property
@@ -127,7 +137,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         return self.genome_build_prefs[0]
 
     def __init__(self, request: HttpRequest):
-        self.term_cache: Dict[str, OntologyTerm] = {}
+        self.term_cache: dict[str, OntologyTerm] = {}
         super().__init__(request)
 
         user_settings = UserSettings.get_for_user(self.user)
@@ -141,7 +151,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             except ValueError:
                 pass
         if not (c_hgvs and genomic_sort):
-            possible_builds = ', '.join((str(gb) for gb in self.genome_build_prefs))
+            possible_builds = ', '.join(str(gb) for gb in self.genome_build_prefs)
             raise ValueError(f"Couldn't find c_hgvs and genomic_sort in builds: {possible_builds}")
 
         self.rich_columns = [
@@ -232,7 +242,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 key='classification__sample__name',
                 name='sample_name',
                 label='Sample',
-                client_renderer=f'VCTable.sample',
+                client_renderer='VCTable.sample',
                 enabled=settings.CLASSIFICATION_GRID_SHOW_SAMPLE,
                 orderable=True
             ),
@@ -328,7 +338,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         return initial_qs
 
     @cached_property
-    def id_columns(self) -> List[str]:
+    def id_columns(self) -> list[str]:
         keys = EvidenceKeyMap.instance()
         return [e_key.key for e_key in keys.all_keys if '_id' in e_key.key and
                 e_key.evidence_category in (EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
@@ -344,7 +354,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             q = Q(clinical_significance__in=clinical_significance_list)
         return q
 
-    def value_columns(self) -> List[str]:
+    def value_columns(self) -> list[str]:
         all_columns = super().value_columns()
         if self.get_query_param("id_filter"):
             id_keys = self.id_columns
@@ -353,7 +363,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         return all_columns
 
     def filter_queryset(self, qs: QuerySet[ClassificationModification]) -> QuerySet[ClassificationModification]:
-        filters: List[Q] = []
+        filters: list[Q] = []
         if settings.CLASSIFICATION_GRID_SHOW_USERNAME:
             if user_id := self.get_query_param('user'):
                 filters.append(Q(classification__user__pk=user_id))
@@ -373,7 +383,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         if id_filter := self.get_query_param("id_filter"):
             id_keys = self.id_columns
-            ids_contain_q_list: List[Q] = []
+            ids_contain_q_list: list[Q] = []
             for id_key in id_keys:
                 ids_contain_q_list.append(Q(**{f'published_evidence__{id_key}__value__icontains': id_filter}))
             id_filter_q = reduce(operator.or_, ids_contain_q_list)

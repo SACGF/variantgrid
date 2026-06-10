@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from genes.hgvs import HGVSVariant, HGVSNomenclatureException
+from genes.hgvs import HGVSNomenclatureException, HGVSVariant
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 

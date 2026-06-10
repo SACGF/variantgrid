@@ -1,19 +1,31 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Field
+from crispy_forms.layout import Field, Layout
 from django.conf import settings
 from django.http.response import HttpResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404, render
 
 from analysis.forms import SampleCandidatesSearchForm
 from analysis.models import CandidateSearchRun, CandidateSearchType
-from analysis.views.views_candidate_search import AbstractCandidateSearchView, AbstractNewCandidateSearchView
-from classification.forms import ClassificationAlleleOriginForm, ClinicalSignificanceForm, \
-    ClassificationEvidenceUpdateForm
+from analysis.views.views_candidate_search import (
+    AbstractCandidateSearchView,
+    AbstractNewCandidateSearchView,
+)
+from classification.forms import (
+    ClassificationAlleleOriginForm,
+    ClassificationEvidenceUpdateForm,
+    ClinicalSignificanceForm,
+)
 from genes.forms import GeneSymbolForm
 from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm
-from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm, ProjectChoiceForm, VCFChoiceForm, \
-    SampleMultiForm
+from snpdb.forms import (
+    LabMultiSelectForm,
+    LabSelectForm,
+    ProjectChoiceForm,
+    SampleMultiForm,
+    UserSelectForm,
+    VCFChoiceForm,
+)
 from snpdb.models import Lab, Sample
 from snpdb.user_settings_manager import UserSettingsManager
 

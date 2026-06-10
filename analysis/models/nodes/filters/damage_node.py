@@ -10,8 +10,12 @@ from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models.damage_enums import (
-    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction,
-    ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction,
+    ALoFTPrediction,
+    AlphaMissensePrediction,
+    ClinPredPrediction,
+    MetaRNNPrediction,
+    PathogenicityImpact,
+    PrimateAIPrediction,
 )
 from annotation.models.models import VariantAnnotation
 from annotation.pathogenicity_predictions import TOOLS, TOOLS_BY_PRED_FIELD

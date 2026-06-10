@@ -3,8 +3,15 @@ import unittest
 from django.contrib.auth.models import User
 
 from library.django_utils.unittest_utils import URLTestCase
-from seqauto.models import QCColumn, EnrichmentKit, SequencingRun, SequencerModel, DataGeneration, Sequencer
-from snpdb.models import Manufacturer, DataState
+from seqauto.models import (
+    DataGeneration,
+    EnrichmentKit,
+    QCColumn,
+    Sequencer,
+    SequencerModel,
+    SequencingRun,
+)
+from snpdb.models import DataState, Manufacturer
 
 
 class Test(URLTestCase):

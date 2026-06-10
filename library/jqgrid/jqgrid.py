@@ -34,9 +34,9 @@ from copy import deepcopy
 from functools import reduce
 
 from django.core.exceptions import FieldError, ImproperlyConfigured
-from django.core.paginator import Paginator, InvalidPage
+from django.core.paginator import InvalidPage, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import fields, JSONField, F
+from django.db.models import F, JSONField, fields
 from django.db.models.fields.json import KeyTransform
 from django.db.models.query_utils import Q
 from django.utils.encoding import smart_str

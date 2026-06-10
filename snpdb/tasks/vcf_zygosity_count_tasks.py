@@ -1,6 +1,6 @@
 import celery
 
-from snpdb.models import VariantZygosityCountCollection, VCF
+from snpdb.models import VCF, VariantZygosityCountCollection
 from snpdb.variant_zygosity_count import update_variant_zygosity_count_for_vcf
 
 

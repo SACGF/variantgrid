@@ -1,4 +1,4 @@
-from typing import Optional, TypedDict, Any
+from typing import Any, Optional, TypedDict
 
 
 class ClassificationJsonLabDict(TypedDict):

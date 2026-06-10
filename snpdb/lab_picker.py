@@ -1,7 +1,8 @@
 import itertools
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Union, Iterator, Iterable
+from typing import Optional, Union
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -11,7 +12,7 @@ from django.urls import reverse
 
 from library.guardian_utils import admin_bot
 from library.utils import first
-from snpdb.models import Lab, Organization, GenomeBuild, UserSettings
+from snpdb.models import GenomeBuild, Lab, Organization, UserSettings
 
 
 @dataclass

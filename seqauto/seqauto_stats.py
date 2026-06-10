@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 from django.conf import settings
 
-from library.utils.date_utils import parse_yymm, get_months_since, month_range
-from seqauto.models import SequencingSample, SequencingRun
+from library.utils.date_utils import get_months_since, month_range, parse_yymm
+from seqauto.models import SequencingRun, SequencingSample
 
 
 def get_sample_enrichment_kits_df():
@@ -93,7 +93,7 @@ def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None):
     if max_groups is not None and len(enrichment_kit_data) > max_groups:
         named_groups = max_groups - 1
         enrichment_kit_data_sum = [(name, array, sum(array)) for name, array in enrichment_kit_data]
-        enrichment_kit_data_sum = list(sorted(enrichment_kit_data_sum, key=operator.itemgetter(2), reverse=True))
+        enrichment_kit_data_sum = sorted(enrichment_kit_data_sum, key=operator.itemgetter(2), reverse=True)
         enrichment_kit_data = []
         for name, array, _ in enrichment_kit_data_sum[:named_groups]:
             enrichment_kit_data.append((name, array))

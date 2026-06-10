@@ -2,8 +2,9 @@ import itertools
 import operator
 import os
 import re
+from collections.abc import Iterable
 from functools import cached_property, reduce
-from typing import Optional, Iterable
+from typing import Optional
 
 from django.conf import settings
 from django.db import models
@@ -21,7 +22,7 @@ from library.genomics.fasta_wrapper import FastaFileWrapper
 from library.preview_request import PreviewModelMixin
 from library.utils import invert_dict
 from snpdb.genome.fasta_index import load_genome_fasta_index
-from snpdb.models.models_enums import SequenceRole, AssemblyMoleculeType
+from snpdb.models.models_enums import AssemblyMoleculeType, SequenceRole
 
 
 class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):

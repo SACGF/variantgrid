@@ -5,15 +5,22 @@ from typing import Optional
 import celery
 from celery.app.task import Task
 from celery.canvas import chain
-from django.db.models.aggregates import Min, Max
+from django.db.models.aggregates import Max, Min
 from django.db.models.expressions import F
 from django.utils import timezone
 
 from library.log_utils import get_traceback
-from library.utils import import_class, full_class_name
-from upload.models import UploadPipeline, ProcessingStatus, \
-    UploadStep, PipelineFailedJobTerminateEarlyException, VCFPipelineStage, SkipUploadStepException, UploadStepTaskType, \
-    SimpleVCFImportInfo
+from library.utils import full_class_name, import_class
+from upload.models import (
+    PipelineFailedJobTerminateEarlyException,
+    ProcessingStatus,
+    SimpleVCFImportInfo,
+    SkipUploadStepException,
+    UploadPipeline,
+    UploadStep,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
 
 
 class ImportVCFStepTask(Task):

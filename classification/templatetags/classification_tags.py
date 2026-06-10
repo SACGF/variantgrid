@@ -1,9 +1,10 @@
 import json
 import logging
 import uuid
+from collections.abc import Collection, Iterable
 from datetime import timedelta
 from html import escape
-from typing import Union, Optional, Iterable, Any, Collection
+from typing import Any, Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -13,18 +14,30 @@ from django.template import Library
 from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
-from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
+from classification.criteria_strengths import AcmgPointScore, CriteriaStrength
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
-    EvidenceMixin, ClassificationSummaryCacheDictPathogenicity
-from classification.models.classification import ClassificationModification, Classification
-from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
-    ClassificationGroupUtils
+from classification.models import (
+    ClassificationLabSummary,
+    ClassificationSummaryCacheDictPathogenicity,
+    ConditionResolved,
+    ConditionTextMatch,
+    EvidenceMixin,
+    ImportedAlleleInfo,
+)
+from classification.models.classification import Classification, ClassificationModification
+from classification.models.classification_groups import (
+    ClassificationGroup,
+    ClassificationGroups,
+    ClassificationGroupUtils,
+)
 from classification.models.classification_ref import ClassificationRef
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport
-from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
+from classification.models.discordance_models_utils import (
+    DiscordanceReportRowData,
+    DiscordanceReportTableData,
+)
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
 from eventlog.models import ViewEvent
@@ -183,7 +196,7 @@ def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = N
     elif (isinstance(val, list) or isinstance(val, set)) and len(val) == 0:
         if value_if_none is not None:
             return value_if_none
-        return mark_safe(f'<span class="no-value">-</span>')
+        return mark_safe('<span class="no-value">-</span>')
     return pretty_val
 
 
@@ -228,7 +241,7 @@ def clinical_significance_values(vcm: ClassificationModification):
         "css_class": "cs cs-" + (value.lower() if value else "none")
     }]
 
-    if always_show_somatic or somatic_dict and somatic_dict.get("classification"):
+    if always_show_somatic or (somatic_dict and somatic_dict.get("classification")):
         somatic_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
         value = somatic_dict.get("clinical_significance")
         label = somatic_key.pretty_value(value, value) or "No Data"

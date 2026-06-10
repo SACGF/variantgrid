@@ -12,15 +12,23 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 
 from annotation.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
-from library.django_utils import single_string_to_first_last_name_q, \
-    ensure_mutally_exclusive_fields_not_set
+from library.django_utils import (
+    ensure_mutally_exclusive_fields_not_set,
+    single_string_to_first_last_name_q,
+)
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.enums.file_attachments import AttachmentFileType
 from library.enums.titles import Title
-from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
+from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import calculate_age
-from patients.models_enums import NucleicAcid, Mutation, Sex, PopulationGroup, PatientRecordMatchType
+from patients.models_enums import (
+    Mutation,
+    NucleicAcid,
+    PatientRecordMatchType,
+    PopulationGroup,
+    Sex,
+)
 
 TEST_PATIENT_KWARGS = {"first_name": "PATIENT", "last_name": "TESTPATIENT"}
 

@@ -1,6 +1,6 @@
 
 from snpdb.models import Lab
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HAS_3_ALPHA_MIN
+from snpdb.search import HAS_3_ALPHA_MIN, SearchExample, SearchInputInstance, search_receiver
 
 
 @search_receiver(

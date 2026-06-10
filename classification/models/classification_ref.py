@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Tuple
+from typing import Optional
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -10,8 +10,11 @@ from django.http.response import Http404
 
 from classification.enums import SubmissionSource
 from classification.models import ClassificationJsonParams, ClassificationPatchResponse
-from classification.models.classification import Classification, \
-    ClassificationProcessError, ClassificationModification
+from classification.models.classification import (
+    Classification,
+    ClassificationModification,
+    ClassificationProcessError,
+)
 from library.utils import empty_to_none, utc_from_timestamp
 from snpdb.models import Lab
 
@@ -120,7 +123,7 @@ class ClassificationRef:
                source: SubmissionSource,
                data: dict = None,
                save: bool = True,
-               make_fields_immutable=False) -> Tuple[Classification, ClassificationPatchResponse]:
+               make_fields_immutable=False) -> tuple[Classification, ClassificationPatchResponse]:
         if not self.lab:
             raise ValueError('Cannot create record without a lab')
         if self.exists():

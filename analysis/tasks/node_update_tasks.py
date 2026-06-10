@@ -6,17 +6,28 @@ from auditlog.context import disable_auditlog
 from celery.canvas import Signature
 from celery.contrib.abortable import AbortableTask
 from celery.result import AsyncResult
-from django.db.models import OuterRef, Subquery, F, Q
-from django.db.utils import OperationalError, IntegrityError
+from django.db.models import F, OuterRef, Q, Subquery
+from django.db.utils import IntegrityError, OperationalError
 from django.utils import timezone
 
-from analysis.exceptions import NodeConfigurationException, NodeParentErrorsException, CeleryTasksObsoleteException, \
-    NodeOutOfDateException
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion, NodeCache, NodeTask, NodeColors
+from analysis.exceptions import (
+    CeleryTasksObsoleteException,
+    NodeConfigurationException,
+    NodeOutOfDateException,
+    NodeParentErrorsException,
+)
+from analysis.models.nodes.analysis_node import (
+    AnalysisNode,
+    NodeCache,
+    NodeColors,
+    NodeStatus,
+    NodeTask,
+    NodeVersion,
+)
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
-from library.log_utils import log_traceback, get_traceback
+from library.log_utils import get_traceback, log_traceback
 from snpdb.models import ProcessingStatus
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"

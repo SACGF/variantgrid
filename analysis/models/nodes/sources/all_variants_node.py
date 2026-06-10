@@ -4,7 +4,7 @@ from typing import Optional
 
 from auditlog.registry import auditlog
 from django.db import models
-from django.db.models import Q, CASCADE, SET_NULL
+from django.db.models import CASCADE, SET_NULL, Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode

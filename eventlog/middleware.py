@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User

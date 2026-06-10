@@ -1,6 +1,6 @@
 import html
 from functools import cached_property
-from typing import Union, Optional, Any
+from typing import Any, Optional, Union
 
 from django.contrib.auth.models import User
 from django.db import models

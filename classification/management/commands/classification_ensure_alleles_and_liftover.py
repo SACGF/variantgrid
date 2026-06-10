@@ -1,15 +1,16 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from classification.autopopulate_evidence_keys.evidence_from_variant import \
-    get_clingen_allele_and_evidence_value_for_variant
+from classification.autopopulate_evidence_keys.evidence_from_variant import (
+    get_clingen_allele_and_evidence_value_for_variant,
+)
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification
 from library.git import Git
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Variant, Allele
+from snpdb.models import Allele, Variant
 from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
 

@@ -14,7 +14,6 @@ from typing import Any, Optional
 
 from annotation.models.models import AnnotationRun, VariantAnnotation
 
-
 # AnnotSV preserves the input VCF INFO column when run with -SVinputInfo 1.
 # The dump VCF writes "variant_id=NNN" into INFO; we use that to join back.
 _VARIANT_ID_RE = re.compile(r"(?:^|;)variant_id=(\d+)")

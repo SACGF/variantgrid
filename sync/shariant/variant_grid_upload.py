@@ -1,5 +1,6 @@
 import socket
-from typing import Iterable, TypeVar, Union
+from collections.abc import Iterable
+from typing import TypeVar, Union
 
 from django.db.models import QuerySet
 
@@ -14,7 +15,7 @@ from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
 from sync.shariant.query_json_filter import QueryJsonFilter
-from sync.sync_runner import register_sync_runner, SyncRunner, SyncRunInstance
+from sync.sync_runner import SyncRunInstance, SyncRunner, register_sync_runner
 
 # add variant_type to private fields as the key has been deprecated
 SHARIANT_PRIVATE_FIELDS = [

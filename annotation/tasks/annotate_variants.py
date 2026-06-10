@@ -10,7 +10,7 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.annotsv_annotation import run_annotsv, annotsv_check_command_line_version_match
+from annotation.annotsv_annotation import annotsv_check_command_line_version_match, run_annotsv
 from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals.manual_signals import annotation_run_complete_signal
@@ -18,11 +18,10 @@ from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_command, vep_check_command_line_version_match
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
-from library.log_utils import get_traceback, report_message, log_traceback
+from library.log_utils import get_traceback, log_traceback, report_message
 from library.utils import execute_cmd
-from library.utils.file_utils import name_from_filename, mk_path_for_file
-from snpdb.variants_to_vcf import write_contig_sorted_values_to_vcf_file, VARIANT_GRID_INFO_DICT
-
+from library.utils.file_utils import mk_path_for_file, name_from_filename
+from snpdb.variants_to_vcf import VARIANT_GRID_INFO_DICT, write_contig_sorted_values_to_vcf_file
 
 # #2667: kick the single-authority dispatcher by name to avoid importing annotation_scheduler_task
 # (which imports this module). Mirror of analysis _trigger_rescheduling (#346).

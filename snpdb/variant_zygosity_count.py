@@ -11,8 +11,15 @@ from eventlog.models import create_event
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback
 from library.utils.database_utils import run_sql
-from snpdb.models import VCF, VariantZygosityCountForVCF, VariantZygosityCountForSample, Sample, Variant, \
-    VariantZygosityCount, VariantZygosityCountCollection
+from snpdb.models import (
+    VCF,
+    Sample,
+    Variant,
+    VariantZygosityCount,
+    VariantZygosityCountCollection,
+    VariantZygosityCountForSample,
+    VariantZygosityCountForVCF,
+)
 
 
 def _sample_excluded_from_variant_zygosity_count(sample: Sample) -> bool:

@@ -7,14 +7,14 @@ from typing import Optional
 import celery
 from auditlog.registry import auditlog
 from django.db import models
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
-from snpdb.models import VariantCollection, ProcessingStatus, VariantCollectionRecord
+from snpdb.models import ProcessingStatus, VariantCollection, VariantCollectionRecord
 
 
 class VennNode(AnalysisNode):

@@ -7,8 +7,11 @@ from django.test import TestCase, override_settings
 from pyhgvs import HGVSName  # This is used for pyhgvs specific test
 
 from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
-from genes.hgvs import HGVSMatcher, HGVSException, HGVSConverterType
+from annotation.tests.test_data_fake_genes import (
+    create_fake_transcript_version,
+    create_gata2_transcript_version,
+)
+from genes.hgvs import HGVSConverterType, HGVSException, HGVSMatcher
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSVariant
 from snpdb.models import GenomeBuild, VariantCoordinate
@@ -155,11 +158,11 @@ class TestHGVS(TestCase):
 
         version = 4
         key_up_then_down = HGVSMatcher._get_sort_key_transcript_version_and_methods(version)
-        sorted_up_then_down = list(sorted(transcript_version_and_methods, key=key_up_then_down))
+        sorted_up_then_down = sorted(transcript_version_and_methods, key=key_up_then_down)
         self.assertEqual(sorted_up_then_down, expected_up_then_down, "Sorted up then down")
 
         key_closest = HGVSMatcher._get_sort_key_transcript_version_and_methods(version, closest=True)
-        sorted_closest = list(sorted(transcript_version_and_methods, key=key_closest))
+        sorted_closest = sorted(transcript_version_and_methods, key=key_closest)
         self.assertEqual(sorted_closest, expected_closest, "Sorted closest")
 
     def test_hgvs_pyhgvs(self):

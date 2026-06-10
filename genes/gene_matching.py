@@ -1,15 +1,23 @@
 import logging
 import re
 from collections import defaultdict, namedtuple
+from collections.abc import Iterable
 from functools import cached_property
-from typing import Iterable
 
 from django.db.models import Q
 from django.db.models.functions import Upper
 
-from genes.models import GeneSymbol, GeneSymbolAlias, GeneListGeneSymbol, GeneAnnotationRelease, GeneVersion, \
-    ReleaseGeneSymbol, ReleaseGeneSymbolGene, HGNC
-from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
+from genes.models import (
+    HGNC,
+    GeneAnnotationRelease,
+    GeneListGeneSymbol,
+    GeneSymbol,
+    GeneSymbolAlias,
+    GeneVersion,
+    ReleaseGeneSymbol,
+    ReleaseGeneSymbolGene,
+)
+from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from library.cache import timed_cache
 from library.utils import clean_string
 

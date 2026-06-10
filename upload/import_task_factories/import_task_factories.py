@@ -1,30 +1,58 @@
-from typing import Type
 
 import pandas as pd
 from django.conf import settings
 
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.utils import import_class, full_class_name
+from library.utils import full_class_name, import_class
 from patients.models import PatientColumns
-from upload.import_task_factories.abstract_vcf_import_task_factory import AbstractVCFImportTaskFactory
+from upload.import_task_factories.abstract_vcf_import_task_factory import (
+    AbstractVCFImportTaskFactory,
+)
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
-from upload.models import UploadedFileTypes, UploadedBed, \
-    UploadedGeneList, UploadedPatientRecords, UploadedPedFile, UploadedVCF, \
-    UploadedGeneCoverage, UploadStep, UploadStepTaskType, UploadedWikiCollection, VCFPipelineStage
+from upload.models import (
+    UploadedBed,
+    UploadedFileTypes,
+    UploadedGeneCoverage,
+    UploadedGeneList,
+    UploadedPatientRecords,
+    UploadedPedFile,
+    UploadedVCF,
+    UploadedWikiCollection,
+    UploadStep,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
 from upload.tasks.import_ped_task import ImportPedTask
 from upload.tasks.import_variant_tags_task import VariantTagsCreateVCFTask, VariantTagsInsertTask
-from upload.tasks.import_wiki_task import ImportGeneWikiCollection, VariantWikiCreateVCFTask, VariantWikiInsertTask
-from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, ProcessGenotypeVCFDataTask, \
-    ImportGenotypeVCFSuccessTask, UpdateVariantZygosityCountsTask, SampleLocusCountsTask, \
-    ImportCreateVCFModelForGenotypeVCFTask, SomalierVCFTask
-from upload.tasks.vcf.import_vcf_tasks import ProcessVCFSetMaxVariantTask, \
-    ImportCreateUploadedVCFTask, ProcessVCFLinkAllelesSetMaxVariantTask, LiftoverCompleteTask, LiftoverCreateVCFTask, \
-    PreprocessAndAnnotateVCFTask, ProcessVCFClinGenAlleleTask, ProcessVCFLinkManualVariantEntrySetMaxVariantTask, \
-    LiftoverPreprocessVCFTask
+from upload.tasks.import_wiki_task import (
+    ImportGeneWikiCollection,
+    VariantWikiCreateVCFTask,
+    VariantWikiInsertTask,
+)
+from upload.tasks.vcf.genotype_vcf_tasks import (
+    ImportCreateVCFModelForGenotypeVCFTask,
+    ImportGenotypeVCFSuccessTask,
+    ProcessGenotypeVCFDataTask,
+    SampleLocusCountsTask,
+    SomalierVCFTask,
+    UpdateVariantZygosityCountsTask,
+    VCFCheckAnnotationTask,
+)
+from upload.tasks.vcf.import_vcf_tasks import (
+    ImportCreateUploadedVCFTask,
+    LiftoverCompleteTask,
+    LiftoverCreateVCFTask,
+    LiftoverPreprocessVCFTask,
+    PreprocessAndAnnotateVCFTask,
+    ProcessVCFClinGenAlleleTask,
+    ProcessVCFLinkAllelesSetMaxVariantTask,
+    ProcessVCFLinkManualVariantEntrySetMaxVariantTask,
+    ProcessVCFSetMaxVariantTask,
+)
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -129,7 +157,7 @@ class GenotypeVCFImportFactory(AbstractVCFImportTaskFactory):
     def get_create_data_from_vcf_header_task_class(self):
         return ImportCreateVCFModelForGenotypeVCFTask
 
-    def _get_preprocess_class(self) -> Type:
+    def _get_preprocess_class(self) -> type:
         return PreprocessAndAnnotateVCFTask
 
     def get_known_variants_parallel_vcf_processing_task_class(self):
@@ -231,7 +259,7 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
             pre_vcf_task = LiftoverCreateVCFTask.si(unknown_variants_step.pk, 0)
         return pre_vcf_task
 
-    def _get_preprocess_class(self) -> Type:
+    def _get_preprocess_class(self) -> type:
         return LiftoverPreprocessVCFTask
 
     def get_create_data_from_vcf_header_task_class(self):

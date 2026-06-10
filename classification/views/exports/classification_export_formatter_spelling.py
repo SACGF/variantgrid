@@ -8,11 +8,18 @@ from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column, delimited_row
+from library.utils import ExportRow, delimited_row, export_column
 from library.utils.nltk_utils import ensure_nltk_data
 
 RE_HAS_BAD_CHAR = re.compile(r"[\d._]")

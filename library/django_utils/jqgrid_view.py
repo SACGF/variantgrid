@@ -1,14 +1,15 @@
 import csv
 import json
-from typing import Type, Any, Optional, Iterator
+from collections.abc import Iterator
+from typing import Any, Optional
 
 from django.core.exceptions import PermissionDenied
-from django.http.response import JsonResponse, HttpResponse, StreamingHttpResponse
+from django.http.response import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.urls.base import resolve, reverse
 from django.utils.text import slugify
 from django.views.generic.base import View
 
-from library.utils import nice_class_name, StashFile
+from library.utils import StashFile, nice_class_name
 from library.utils.date_utils import local_date_string
 
 
@@ -26,7 +27,7 @@ class JQGridView(View):
         perm_path('analyses/grid/<slug:op>/', JQGridView.as_view(grid=AnalysesGrid, delete=True), name='analyses_grid'),
     """
 
-    grid: Optional[Type[Any]] = None  # JqGridUserRowConfig (or grid initialised w/user, has delete_row method)
+    grid: Optional[type[Any]] = None  # JqGridUserRowConfig (or grid initialised w/user, has delete_row method)
     delete_row = False
     csv_download = False  # via request - can also do via JSON
 
@@ -53,7 +54,7 @@ class JQGridView(View):
             msg = f"{nice_class_name(self)}.grid not set"
             raise ValueError(msg)
         else:
-            grid_klass: Type[Any] = self.grid
+            grid_klass: type[Any] = self.grid
 
         return self.create_grid_from_request(request, grid_klass, **kwargs)
 

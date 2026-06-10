@@ -3,15 +3,21 @@ from typing import Optional, Union
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, MultiCondition, \
-    ConditionMatchingSuggestion, condition_matching_suggestions
+from classification.models import (
+    ConditionMatchingSuggestion,
+    ConditionText,
+    ConditionTextMatch,
+    MultiCondition,
+    condition_matching_suggestions,
+    update_condition_text_match_counts,
+)
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm

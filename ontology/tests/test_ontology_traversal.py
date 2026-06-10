@@ -2,7 +2,10 @@ from django.test import TestCase
 
 from ontology.models import OntologyService, OntologyTerm
 from ontology.ontology_traversal import DbOntologyTraverser, MemoryOntologyTraverser
-from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
+from ontology.tests.test_data_ontology import (
+    create_ontology_test_data,
+    create_test_ontology_version,
+)
 
 
 class OntologyTraversalParityTest(TestCase):

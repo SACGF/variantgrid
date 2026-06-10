@@ -11,16 +11,26 @@ from django.urls import reverse
 from annotation.views import simple_citation_html
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
-from classification.models.classification_groups import ClassificationGroups, ClassificationGroupUtils
+from classification.models.classification_groups import (
+    ClassificationGroups,
+    ClassificationGroupUtils,
+)
 from classification.views.classification_export_utils import ConflictStrategy
 from classification.views.classification_export_view import InvalidExportParameter
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
-    DiscordanceReportStatus
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+    DiscordanceReportStatus,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
 from classification.views.exports.classification_export_utils import CHGVSData, CitationCounter
 from library.django_utils import get_url_from_view_path
-from library.utils import delimited_row, export_column, ExportRow, ExportTweak
+from library.utils import ExportRow, ExportTweak, delimited_row, export_column
 from snpdb.models import Allele, AlleleOriginFilterDefault
 
 

@@ -4,8 +4,8 @@ from django.conf import settings
 from django.db.models import Q
 
 from library.enums.log_level import LogLevel
-from snpdb.models import GenomeBuild, Contig
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchMessageOverall
+from snpdb.models import Contig, GenomeBuild
+from snpdb.search import SearchExample, SearchInputInstance, SearchMessageOverall, search_receiver
 
 
 @search_receiver(

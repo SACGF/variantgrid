@@ -4,7 +4,13 @@ from celery.result import AsyncResult
 
 from eventlog.models import create_event
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import UploadPipeline, ProcessingStatus, UploadedFileTypes, UploadedFile, UploadStepOrigin
+from upload.models import (
+    ProcessingStatus,
+    UploadedFile,
+    UploadedFileTypes,
+    UploadPipeline,
+    UploadStepOrigin,
+)
 
 
 def get_upload_processing_task(file_type, upload_pipeline):

@@ -3,13 +3,13 @@ import json
 from dal import forward
 from django import forms
 from django.forms.models import fields_for_model
-from django.forms.widgets import TextInput, HiddenInput
+from django.forms.widgets import HiddenInput, TextInput
 from django.utils.text import slugify
 from django_starfield import Stars
 
 from analysis import models
-from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis, MOINode
-from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
+from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
+from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
@@ -23,24 +23,27 @@ from analysis.models.nodes.filters.tissue_node import TissueNode
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.classifications_node import ClassificationsNode
-from analysis.models.nodes.sources.cohort_node import CohortNode, CohortNodeZygosityFiltersCollection, \
-    CohortNodeZygosityFilter
+from analysis.models.nodes.sources.cohort_node import (
+    CohortNode,
+    CohortNodeZygosityFilter,
+    CohortNodeZygosityFiltersCollection,
+)
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
-from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.quad_node import QuadNode
+from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from annotation.models import VariantAnnotation
 from annotation.pathogenicity_predictions import TOOLS
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.hgvs import get_hgvs_variant_coordinate, get_hgvs_variant, HGVSException
-from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
+from genes.hgvs import HGVSException, get_hgvs_variant, get_hgvs_variant_coordinate
+from genes.models import CustomTextGeneList, GeneList, GeneListCategory, PanelAppPanel
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
-from snpdb.models import GenomicInterval, Sample, VCFFilter, Tag, Lab
+from snpdb.models import GenomicInterval, Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_genome import Contig
 
 # Can use this for ModelForm.exclude to only use node specific fields

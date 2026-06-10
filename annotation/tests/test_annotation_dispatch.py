@@ -17,17 +17,22 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
-from annotation.models import AnnotationRangeLock, AnnotationRun, AnnotationVersion, VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.annotation_versions import merge_pending_range_locks
+from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    VariantAnnotationVersion,
+)
+from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.tasks import annotation_scheduler_task
+from annotation.tasks.annotate_variants import annotate_variants
 from annotation.tasks.annotation_scheduler_task import (
     _handle_range_lock,
     dispatch_annotation_runs,
     reclaim_stalled_annotation_runs,
 )
-from annotation.tasks.annotate_variants import annotate_variants
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

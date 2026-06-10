@@ -5,8 +5,13 @@ import pandas as pd
 from django.core.management import BaseCommand
 
 from classification.classification_import import reattempt_variant_matching
-from classification.models import Classification, ImportedAlleleInfo, DiscordanceReport, ClinVarExport, \
-    ResolvedVariantInfo
+from classification.models import (
+    Classification,
+    ClinVarExport,
+    DiscordanceReport,
+    ImportedAlleleInfo,
+    ResolvedVariantInfo,
+)
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuildPatchVersion
 
@@ -118,7 +123,7 @@ class Command(BaseCommand):
         rematch_count = 0
         total_count = Classification.objects.count()
 
-        print(f"Will rematch classifications with no Allele Info, speed will vary based on how many classifications were imported with the same details")
+        print("Will rematch classifications with no Allele Info, speed will vary based on how many classifications were imported with the same details")
         print(f"Total classification count = {total_count}")
 
         bulk: list[Classification] = []

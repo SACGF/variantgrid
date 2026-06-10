@@ -4,14 +4,22 @@ from functools import cached_property
 from crispy_forms.helper import FormHelper
 from django.core.exceptions import PermissionDenied
 from django.http.response import HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.generic.base import TemplateView, View
 
-from analysis.forms import AnalysisFilterForm, SampleCandidatesSearchForm, CandidateStatusForm, get_mult_choice_form
-from analysis.models import CandidateSearchRun, Candidate, CandidateStatus, CandidateSearchType
-from classification.views.views import CreateClassificationForVariantView, create_classification_object
+from analysis.forms import (
+    AnalysisFilterForm,
+    CandidateStatusForm,
+    SampleCandidatesSearchForm,
+    get_mult_choice_form,
+)
+from analysis.models import Candidate, CandidateSearchRun, CandidateSearchType, CandidateStatus
+from classification.views.views import (
+    CreateClassificationForVariantView,
+    create_classification_object,
+)
 from snpdb.forms import SampleChoiceForm
 from snpdb.models import GenomeBuild
 

@@ -1,8 +1,9 @@
 import json
 import re
 import uuid
+from collections.abc import Iterable
 from html import escape
-from typing import Optional, Any, Iterable
+from typing import Any, Optional
 
 from django import template
 from django.contrib.auth.models import User
@@ -15,7 +16,7 @@ from django.utils.safestring import SafeString
 from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
 from library.preview_request import PreviewModelMixin
-from library.utils import diff_text, html_id_safe, emoji_to_unicode, format_diff_text, pretty_label
+from library.utils import diff_text, emoji_to_unicode, format_diff_text, html_id_safe, pretty_label
 from snpdb.admin_utils import get_admin_url
 from uicore.views.ajax_form_view import LazyRender
 from variantgrid.perm_path import get_visible_url_names
@@ -256,7 +257,7 @@ class LabelledValueTag(template.Node):
         if output:
             output = output.strip()
         give_div_id = complete_id
-        if not complete_id and not '<label' in output:
+        if not complete_id and '<label' not in output:
             if found_id := LabelledValueTag.id_regex.search(output):
                 complete_id = found_id.group(1)
                 give_div_id = False

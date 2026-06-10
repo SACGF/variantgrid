@@ -33,7 +33,9 @@ from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
 from patients.models_enums import Zygosity
 from snpdb.models import GenomeBuild, Variant
 from snpdb.models.models_cohort import (
-    CohortGenotype, CohortGenotypeCollection, CohortGenotypeCommonFilterVersion,
+    CohortGenotype,
+    CohortGenotypeCollection,
+    CohortGenotypeCommonFilterVersion,
 )
 from snpdb.models.models_enums import CohortGenotypeCollectionType
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio

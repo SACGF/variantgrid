@@ -4,27 +4,28 @@ import os
 import re
 import shutil
 import types
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import cached_property, total_ordering
 from io import StringIO
-from typing import Optional, Union, Iterable, Any
-from urllib.error import URLError, HTTPError
+from typing import Any, Optional, Union
+from urllib.error import HTTPError, URLError
 
 import requests
 from Bio import Entrez, SeqIO
 from cache_memoize import cache_memoize
 from cdot.pyhgvs.pyhgvs_transcript import PyHGVSTranscriptFactory
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
-from django.db import models, IntegrityError, transaction
+from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist, PermissionDenied
+from django.db import IntegrityError, models, transaction
 from django.db.models import QuerySet, TextField
-from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
-from django.db.models.functions import Upper, Collate
+from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
+from django.db.models.functions import Collate, Upper
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
@@ -37,26 +38,34 @@ from guardian.shortcuts import get_objects_for_user
 from requests import RequestException
 
 from genes.gene_coverage import load_gene_coverage_df
-from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus
+from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus, MANEStatus
 from library.cache import timed_cache
-from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS, DAY_SECS
+from library.constants import DAY_SECS, HOUR_SECS, MINUTE_SECS, WEEK_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
-from snpdb.archive import DataArchivedError
-from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
-    add_public_group_read_permission
+from library.guardian_utils import (
+    DjangoPermission,
+    add_public_group_read_permission,
+    admin_bot,
+    assign_permission_to_user_and_groups,
+)
 from library.log_utils import log_traceback
 from library.preview_request import PreviewData, PreviewModelMixin
-from library.utils import get_single_element, iter_fixed_chunks, FormerTuple
+from library.utils import FormerTuple, get_single_element, iter_fixed_chunks
 from library.utils.file_utils import mk_path
-from snpdb.models import Wiki, Company, Sample, DataState
+from snpdb.archive import DataArchivedError
+from snpdb.models import Company, DataState, Sample, Wiki
 from snpdb.models.models_enums import ImportStatus
-from snpdb.models.models_genome import GenomeBuild, Contig
-from upload.vcf.sql_copy_files import write_sql_copy_csv, gene_coverage_canonical_transcript_sql_copy_csv, \
-    gene_coverage_sql_copy_csv, GENE_COVERAGE_HEADER
+from snpdb.models.models_genome import Contig, GenomeBuild
+from upload.vcf.sql_copy_files import (
+    GENE_COVERAGE_HEADER,
+    gene_coverage_canonical_transcript_sql_copy_csv,
+    gene_coverage_sql_copy_csv,
+    write_sql_copy_csv,
+)
 
 
 class HGNCImport(TimeStampedModel):
@@ -389,19 +398,19 @@ class GeneSymbolAliasesMeta:
         for alias_summary in self.alias_list:
             if not alias_summary.different_genes:
                 gene_symbol_strs.add(alias_summary.other_symbol)
-        return list(sorted(gene_symbol_strs))
+        return sorted(gene_symbol_strs)
 
     @cached_property
     def alias_symbols_in_db(self) -> list[GeneSymbolAlias]:
-        return list(sorted([alias for alias in self.alias_list if not alias.different_genes and alias.other_symbol_in_database]))
+        return sorted([alias for alias in self.alias_list if not alias.different_genes and alias.other_symbol_in_database])
 
     @cached_property
     def aliases_out(self) -> list[GeneSymbolAliasSummary]:
-        return list(sorted([alias for alias in self.alias_list if not alias.my_symbol_is_main]))
+        return sorted([alias for alias in self.alias_list if not alias.my_symbol_is_main])
 
     @cached_property
     def aliases_in(self) -> list[GeneSymbolAliasSummary]:
-        return list(sorted([alias for alias in self.alias_list if alias.my_symbol_is_main]))
+        return sorted([alias for alias in self.alias_list if alias.my_symbol_is_main])
 
 
 class GeneAnnotationImport(TimeStampedModel):
@@ -1017,7 +1026,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                                 break
                         transcript_version = transcript_versions_qs.filter(version=use_version).last()
                     else:
-                        version_list = ', '.join((str(v) for v in possible_versions))
+                        version_list = ', '.join(str(v) for v in possible_versions)
                         raise MissingTranscript(f"No Transcript for '{transcript_name}' (build: {genome_build}) - but there are entries for versions {version_list}") from exc
         else:
             transcript_version = transcript_versions_qs.last()

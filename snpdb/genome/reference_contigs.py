@@ -19,7 +19,7 @@ from django.conf import settings
 from django.utils.text import slugify
 
 from library.pandas_utils import read_csv_skip_header
-from snpdb.models import SequenceRole, AssemblyMoleculeType
+from snpdb.models import AssemblyMoleculeType, SequenceRole
 
 GRCH37 = "GCF_000001405.25_GRCh37.p13_assembly_report.txt"
 ASSEMBLY_REPORTS = {
@@ -107,8 +107,8 @@ def create_build_and_contigs(get_model: callable, build_name, alias=None, igv_ge
 
     genome_build = GenomeBuild.objects.create(**kwargs)
     logging.info("Created build %s", genome_build)
-    role_lookup = dict(((k.label, k.value) for k in SequenceRole))
-    molecule_type_lookup = dict(((k.label, k.value) for k in AssemblyMoleculeType))
+    role_lookup = dict((k.label, k.value) for k in SequenceRole)
+    molecule_type_lookup = dict((k.label, k.value) for k in AssemblyMoleculeType)
     molecule_type_lookup["na"] = None
 
     i = 0

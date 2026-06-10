@@ -1,13 +1,14 @@
 import operator
 from collections import Counter, defaultdict
-from typing import Optional, Any, Iterable
+from collections.abc import Iterable
+from typing import Any, Optional
 
 import numpy as np
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
-from classification.enums import ClinicalSignificance, AlleleOriginBucket
+from classification.enums import AlleleOriginBucket, ClinicalSignificance
 from classification.enums.classification_enums import CriteriaEvaluation
 from classification.models import EvidenceKeyMap
 from classification.models.classification import Classification, ClassificationModification

@@ -4,7 +4,7 @@ from django.conf import settings
 from django.template import Library
 
 from genes.forms import GeneSymbolForm
-from ontology.forms import HPOForm, OMIMForm, MONDOForm
+from ontology.forms import HPOForm, MONDOForm, OMIMForm
 
 register = Library()
 

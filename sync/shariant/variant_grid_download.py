@@ -8,10 +8,10 @@ from classification.views.classification_view import BulkClassificationInserter
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from library.oauth import ServerAuth
-from library.utils import make_json_safe_in_place, batch_iterator
-from snpdb.models.models import Lab, Organization, Country
+from library.utils import batch_iterator, make_json_safe_in_place
+from snpdb.models.models import Country, Lab, Organization
 from sync.models.models import SyncRun
-from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
+from sync.sync_runner import SyncRunInstance, SyncRunner, register_sync_runner
 
 
 @register_sync_runner(config={"type": {"shariant", "variantgrid"}, "direction": "download"})

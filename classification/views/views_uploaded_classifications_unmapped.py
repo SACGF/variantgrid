@@ -1,23 +1,32 @@
 import datetime
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Any, Optional
+from typing import Any, Optional
 
 import django
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet, Q
-from django.http import HttpResponseRedirect, HttpRequest, StreamingHttpResponse
+from django.db.models import Q, QuerySet
+from django.http import HttpRequest, HttpResponseRedirect, StreamingHttpResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views import View
 
-from classification.models import ClassificationImportRun, resolve_uploaded_url_to_handle, FileHandle, \
-    UploadedClassificationsUnmappedValidationRow
-from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, \
-    UploadedClassificationsUnmappedStatus
-from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
+from classification.models import (
+    ClassificationImportRun,
+    FileHandle,
+    UploadedClassificationsUnmappedValidationRow,
+    resolve_uploaded_url_to_handle,
+)
+from classification.models.uploaded_classifications_unmapped import (
+    UploadedClassificationsUnmapped,
+    UploadedClassificationsUnmappedStatus,
+)
+from classification.tasks.classification_import_map_and_insert_task import (
+    ClassificationImportMapInsertTask,
+)
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder, report_exc_info
 from library.utils import empty_to_none

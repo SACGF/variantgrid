@@ -7,11 +7,18 @@ from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.enums.titles import Title
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Clinician, ExternalPK, ExternalModelManager, Patient, PatientRecords, PatientImport, \
-    Specimen
-from snpdb.models import Sex, ImportSource
+from patients.models import (
+    Clinician,
+    ExternalModelManager,
+    ExternalPK,
+    Patient,
+    PatientImport,
+    PatientRecords,
+    Specimen,
+)
+from snpdb.models import ImportSource, Sex
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import UploadedFile, UploadedPatientRecords, UploadedFileTypes
+from upload.models import UploadedFile, UploadedFileTypes, UploadedPatientRecords
 
 
 class Test(URLTestCase):

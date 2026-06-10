@@ -7,7 +7,7 @@ from django.shortcuts import render
 
 from classification.models import ImportedAlleleInfo
 from genes.hgvs import HGVSConverterType, HGVSMatcher, VariantResolvingError
-from genes.models import TranscriptVersion, TranscriptParts
+from genes.models import TranscriptParts, TranscriptVersion
 from library.django_utils import require_superuser
 from library.utils import all_equal
 from snpdb.models import GenomeBuild, VariantCoordinate

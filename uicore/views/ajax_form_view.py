@@ -1,9 +1,10 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import TypeVar, Generic, Callable, Optional
+from typing import Generic, Optional, TypeVar
 
 from django.db.models import Model
-from django.http import HttpResponse, HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.template import loader
 from django.utils.safestring import SafeString
 from django.views import View
@@ -91,7 +92,7 @@ class LazyRender(Generic[T]):
             )
         elif mode == AjaxFormMode.EMBEDDED_CARD:
             return (
-                f'<div class="card embed-wrapper">',
+                '<div class="card embed-wrapper">',
                 AjaxFormMode.CARD,
                 '</div>'
             )

@@ -1,6 +1,6 @@
 from django.core.management import BaseCommand
 
-from genes.gene_matching import ReleaseGeneMatcher, HGNCMatcher
+from genes.gene_matching import HGNCMatcher, ReleaseGeneMatcher
 from genes.models import GeneAnnotationRelease, GeneVersion
 from genes.models_enums import AnnotationConsortium
 

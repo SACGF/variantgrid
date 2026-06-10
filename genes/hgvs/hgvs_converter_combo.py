@@ -1,9 +1,9 @@
 import logging
 
-from genes.hgvs import HGVSVariant, HGVSException
+from genes.hgvs import HGVSException, HGVSVariant
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HgvsOriginallyNormalized
 from library.utils import all_equal
-from snpdb.models import VariantCoordinate, GenomeBuild
+from snpdb.models import GenomeBuild, VariantCoordinate
 
 
 class ComboCheckerHGVSConverter(HGVSConverter):

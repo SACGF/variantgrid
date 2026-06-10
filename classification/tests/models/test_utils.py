@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 
-from snpdb.models import Lab, Organization, Country
+from snpdb.models import Country, Lab, Organization
 
 
 class ClassificationTestUtils:

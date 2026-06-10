@@ -9,7 +9,7 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 from toposort import toposort
 
-from analysis.models import Analysis, NodeStatus, NodeColors
+from analysis.models import Analysis, NodeColors, NodeStatus
 from analysis.models.nodes.analysis_node import AnalysisEdge, NodeVersion
 from analysis.tasks.node_update_tasks import delete_analysis_old_node_versions
 from library.utils import add_exception_note

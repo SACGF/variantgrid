@@ -11,7 +11,7 @@ from django.db import models
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
 
-from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, GeneAnnotationVersion
+from annotation.models.models import ClinVarVersion, GeneAnnotationVersion, VariantAnnotationVersion
 from snpdb.models import Sample, SampleStatsCodeVersion
 from snpdb.models.models_enums import BuiltInFilters
 

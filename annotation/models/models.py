@@ -2,18 +2,19 @@ import logging
 import os
 import re
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Callable, Iterable
+from typing import Optional
 
 from Bio.Data.IUPACData import protein_letters_1to3
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
-from django.db import models, transaction, connection
-from django.db.models import F, Q, QuerySet, Subquery, OuterRef, Min, Max
-from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
+from django.db import connection, models, transaction
+from django.db.models import F, Max, Min, OuterRef, Q, QuerySet, Subquery
+from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.functions import Coalesce, Greatest
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -24,32 +25,61 @@ from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
-from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
-from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
-    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction, \
-    AlphaMissensePrediction, ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction
+from annotation.external_search_terms import (
+    get_variant_pubmed_search_terms,
+    get_variant_search_terms,
+)
+from annotation.models.damage_enums import (
+    ALoFTPrediction,
+    AlphaMissensePrediction,
+    ClinPredPrediction,
+    FATHMMPrediction,
+    MetaRNNPrediction,
+    MutationAssessorPrediction,
+    MutationTasterPrediction,
+    PathogenicityImpact,
+    Polyphen2Prediction,
+    PrimateAIPrediction,
+    SIFTPrediction,
+)
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
+from annotation.models.models_enums import (
+    AnnotationStatus,
+    ClinVarReviewStatus,
+    EssentialGeneCRISPR,
+    EssentialGeneCRISPR2,
+    EssentialGeneGeneTrap,
+    HumanProteinAtlasAbundance,
+    ManualVariantEntryType,
+    VariantAnnotationPipelineType,
+    VEPSkippedReason,
+)
 from annotation.models.repeat_masker import RepeatMaskerSummary
-from annotation.models.models_enums import AnnotationStatus, \
-    ClinVarReviewStatus, VEPSkippedReason, \
-    ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
-    EssentialGeneGeneTrap, VariantAnnotationPipelineType
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import AlleleOriginBucket
-from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
+from genes.models import Gene, GeneAnnotationRelease, GeneSymbol, Transcript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
-from library.log_utils import report_message
-from snpdb.archive import DataArchivedError
 from library.genomics import parse_gnomad_coord
 from library.genomics.vcf_enums import VariantClass
-from library.utils import invert_dict, name_from_filename, first, all_equal
+from library.log_utils import report_message
+from library.utils import all_equal, first, invert_dict, name_from_filename
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
-from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN, \
-    HGVS_UNCLEANED_PATTERN, Allele, VARIANT_SYMBOLIC_PATTERN
+from snpdb.archive import DataArchivedError
+from snpdb.models import (
+    DBSNP_PATTERN,
+    HGVS_UNCLEANED_PATTERN,
+    VARIANT_PATTERN,
+    VARIANT_SYMBOLIC_PATTERN,
+    VCF,
+    Allele,
+    GenomeBuild,
+    Q,
+    Variant,
+)
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -193,7 +223,7 @@ class ClinVar(models.Model):
                     name = name[25:]
                 return name
 
-            db_names = list(sorted(fix_name(db_name) for db_name in re.split("[|,]", db_name_text)))
+            db_names = sorted(fix_name(db_name) for db_name in re.split("[|,]", db_name_text))
             return db_names
         return []
 
@@ -353,10 +383,10 @@ class ClinVarRecordCollection(TimeStampedModel):
             ).update(allele=allele)
 
     def records_with_min_stars(self, min_stars: int) -> list['ClinVarRecord']:
-        return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
+        return sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True)
 
     def update_with_records_and_save(self, records: list['ClinVarRecord']):
-        records = list(sorted(records, reverse=True))
+        records = sorted(records, reverse=True)
         self.clinvarrecord_set.all().delete()
         for record in records:
             record.clinvar_record_collection = self
@@ -415,11 +445,11 @@ class ClinVarRecord(TimeStampedModel):
         return []
 
     def mark_invalid(self):
-        setattr(self, '_invalid', True)
+        self._invalid = True
 
     def __bool__(self) -> bool:
         if hasattr(self, '_invalid'):
-            return not getattr(self, '_invalid')
+            return not self._invalid
         return True
 
     def __lt__(self, other):
@@ -832,7 +862,10 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         """Raw-score + pred contributions to predictions_num_pathogenic at v4. Empty pre-v4."""
         if self.columns_version < 4:
             return {}
-        from annotation.pathogenicity_predictions import raw_score_pathogenic_funcs, pred_pathogenic_funcs
+        from annotation.pathogenicity_predictions import (
+            pred_pathogenic_funcs,
+            raw_score_pathogenic_funcs,
+        )
         return {**raw_score_pathogenic_funcs(), **pred_pathogenic_funcs()}
 
     @cached_property

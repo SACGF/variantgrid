@@ -1,10 +1,10 @@
 from typing import Optional
 
-from cdot.hgvs.dataproviders import LocalDataProvider, FastaSeqFetcher, ChainedSeqFetcher
+from cdot.hgvs.dataproviders import ChainedSeqFetcher, FastaSeqFetcher, LocalDataProvider
 from django.conf import settings
 from hgvs.exceptions import HGVSDataNotAvailableError
 
-from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo, NoTranscript
+from genes.models import NoTranscript, TranscriptVersion, TranscriptVersionSequenceInfo
 from genes.transcripts_utils import get_refseq_type
 from snpdb.models import Contig
 

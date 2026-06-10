@@ -13,7 +13,7 @@ import logging
 
 import pandas as pd
 
-from genes.models import GnomADGeneConstraint, GeneSymbol, TranscriptVersion
+from genes.models import GeneSymbol, GnomADGeneConstraint, TranscriptVersion
 from library.pandas_utils import df_nan_to_none
 from snpdb.models import GenomeBuild
 

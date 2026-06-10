@@ -15,17 +15,17 @@ from datetime import datetime
 from functools import cached_property, total_ordering
 from html import escape
 from re import RegexFlag
-from typing import TypedDict, Optional
+from typing import Optional, TypedDict
 
 from celery import signature
 from celery.result import AsyncResult
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet, TextChoices
-from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
+from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls import reverse
@@ -41,7 +41,7 @@ from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.preview_request import PreviewModelMixin
-from library.utils import import_class, JsonObjType
+from library.utils import JsonObjType, import_class
 from snpdb.models.models_enums import UserAwardLevel
 
 
@@ -714,7 +714,7 @@ class UserAwards:
 
     def __init__(self, user: User):
         award_qs = UserAward.objects.filter(user=user).all()
-        award_list: list[UserAward] = list(sorted(award_qs, key=lambda x: (not x.active, 100 - UserAwardLevel(x.award_level).int_value, x.award_text)))
+        award_list: list[UserAward] = sorted(award_qs, key=lambda x: (not x.active, 100 - UserAwardLevel(x.award_level).int_value, x.award_text))
 
         self.all_awards = award_list
         self.awards = [award for award in award_list if award.active]

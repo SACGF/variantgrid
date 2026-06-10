@@ -5,9 +5,16 @@ from typing import Optional
 from django.db.models.functions import Lower
 
 from library.preview_request import PreviewProxyModel
-from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HAS_3_ALPHA_MIN, SearchResult, \
-    SearchResultMatchStrength, SearchMessage
+from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
+from snpdb.search import (
+    HAS_3_ALPHA_MIN,
+    SearchExample,
+    SearchInputInstance,
+    SearchMessage,
+    SearchResult,
+    SearchResultMatchStrength,
+    search_receiver,
+)
 
 
 def validate_ontology(term: OntologyTerm, preview_proxy: Optional[PreviewProxyModel] = None) -> SearchResult:

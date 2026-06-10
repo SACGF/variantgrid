@@ -6,25 +6,42 @@ from typing import Any, Optional
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, TextField, QuerySet, OuterRef, Subquery, IntegerField
+from django.db.models import Count, IntegerField, OuterRef, QuerySet, Subquery, TextField
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
 from analysis.models import VariantTag
-from annotation.models.models import AnnotationVersion, GeneAnnotationVersion, InvalidAnnotationVersionError
-from genes.models import CanonicalTranscript, GeneList, GeneSymbol, \
-    GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
-    GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion, GeneSymbolWiki
+from annotation.models.models import (
+    AnnotationVersion,
+    GeneAnnotationVersion,
+    InvalidAnnotationVersionError,
+)
+from genes.models import (
+    CanonicalTranscript,
+    CanonicalTranscriptCollection,
+    GeneAnnotationRelease,
+    GeneCoverageCanonicalTranscript,
+    GeneCoverageCollection,
+    GeneList,
+    GeneListGeneSymbol,
+    GeneSymbol,
+    GeneSymbolWiki,
+    ReleaseGeneVersion,
+    TranscriptVersion,
+)
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import update_dict_of_dict_values, JsonDataType
+from library.utils import JsonDataType, update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import UserSettings, Q, VariantGridColumn, Tag, ImportStatus
-from snpdb.models.models_genome import GenomeBuild, Contig
-from snpdb.variant_queries import get_variant_queryset_for_gene_symbol, variant_qs_filter_has_internal_data
+from snpdb.models import ImportStatus, Q, Tag, UserSettings, VariantGridColumn
+from snpdb.models.models_genome import Contig, GenomeBuild
+from snpdb.variant_queries import (
+    get_variant_queryset_for_gene_symbol,
+    variant_qs_filter_has_internal_data,
+)
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 

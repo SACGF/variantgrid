@@ -4,16 +4,31 @@ from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 
-from annotation.annotation_versions import get_or_create_variant_annotation_version_from_current_vep, \
-    get_annotation_range_lock_and_unannotated_count
+from annotation.annotation_versions import (
+    get_annotation_range_lock_and_unannotated_count,
+    get_or_create_variant_annotation_version_from_current_vep,
+)
 from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation
-from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
+from annotation.models.damage_enums import (
+    ALoFTPrediction,
+    AlphaMissensePrediction,
+    PathogenicityImpact,
+)
+from annotation.models.models import (
+    AnnotationRun,
+    VariantAnnotationVersion,
+    VariantTranscriptAnnotation,
+)
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
-from annotation.vep_annotation import vep_parse_version_line, get_vep_version_from_vcf, \
-    vep_dict_to_variant_annotation_version_kwargs, VEPVersionMismatchError, VEPConfig
+from annotation.vep_annotation import (
+    VEPConfig,
+    VEPVersionMismatchError,
+    get_vep_version_from_vcf,
+    vep_dict_to_variant_annotation_version_kwargs,
+    vep_parse_version_line,
+)
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf

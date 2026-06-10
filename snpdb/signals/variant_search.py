@@ -2,8 +2,9 @@ import itertools
 import logging
 import re
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from itertools import zip_longest
-from typing import Optional, Iterable, Union, Callable
+from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -12,22 +13,42 @@ from django.urls import reverse
 from hgvs_shim import HGVSException, HGVSImplementationException, HGVSNomenclatureException
 
 from annotation.cosmic import CosmicAPI
-from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from annotation.manual_variant_entry import CreateManualVariantForbidden, check_can_create_variants
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher, VariantResolvingError, HgvsOriginallyNormalized
+from genes.hgvs import HGVSMatcher, HgvsOriginallyNormalized, VariantResolvingError
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
-from genes.models import MissingTranscript, MANE, TranscriptVersion, BadTranscript
+from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
-from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
-    ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN, VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN, Allele, \
-    Sequence
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResult, SearchMessageOverall, \
-    SearchMessage, INVALID_INPUT
+from snpdb.models import (
+    DBSNP_PATTERN,
+    HGVS_UNCLEANED_PATTERN,
+    LOCUS_NO_REF_PATTERN,
+    LOCUS_PATTERN,
+    VARIANT_PATTERN,
+    VARIANT_SYMBOLIC_PATTERN,
+    Allele,
+    ClinGenAllele,
+    Contig,
+    DbSNP,
+    GenomeBuild,
+    Sequence,
+    Variant,
+    VariantCoordinate,
+)
+from snpdb.search import (
+    INVALID_INPUT,
+    SearchExample,
+    SearchInputInstance,
+    SearchMessage,
+    SearchMessageOverall,
+    SearchResult,
+    search_receiver,
+)
 from upload.models import ModifiedImportedVariant
 
 COSMIC_PATTERN = re.compile(r"^(COS[VM])[0-9]{3,}$", re.IGNORECASE)
@@ -584,7 +605,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     except MissingTranscript:
         pass
-    except Contig.ContigNotInBuildError as e:
+    except Contig.ContigNotInBuildError:
         # HGVS is valid but g.HGVS contig from a different genome build than this one
         # we don't want to throw an error for 37 contig not in 38 (if both enabled)
         # but we do want to throw one if the contig is completely unrecognised

@@ -7,8 +7,8 @@ register = Library()
 
 
 from django import template
-from django.template.loader import render_to_string
 from django.conf import settings
+from django.template.loader import render_to_string
 
 register = template.Library()
 

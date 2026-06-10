@@ -3,12 +3,18 @@ from typing import Optional
 
 from celery.canvas import Signature
 from django.conf import settings
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from django.dispatch import receiver
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification, variants_classification_changed_signal
-from snpdb.models import CohortGenotypeCommonFilterVersion, Variant, Allele, VariantAllele, CommonVariantClassified
+from snpdb.models import (
+    Allele,
+    CohortGenotypeCommonFilterVersion,
+    CommonVariantClassified,
+    Variant,
+    VariantAllele,
+)
 
 
 def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersion]:

@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -7,11 +7,13 @@ from django.urls.base import reverse
 from model_utils.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
-from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin, \
-    GuardianPermissionsMixin
+from library.django_utils.guardian_permissions_mixin import (
+    GuardianPermissionsAutoInitialSaveMixin,
+    GuardianPermissionsMixin,
+)
 from library.preview_request import PreviewModelMixin
 from patients.models_enums import Sex
-from snpdb.models import ImportStatus, Cohort, CohortSample, Sample, SomalierRelate
+from snpdb.models import Cohort, CohortSample, ImportStatus, Sample, SomalierRelate
 
 
 class PedFile(GuardianPermissionsMixin, models.Model):

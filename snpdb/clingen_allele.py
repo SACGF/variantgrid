@@ -31,10 +31,22 @@ from library.constants import MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_enums import VCFSymbolicAllele
-from library.utils import iter_fixed_chunks, get_single_element
-from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta, \
-    VariantCoordinate
-from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGenAlleleExternalRecordType
+from library.utils import get_single_element, iter_fixed_chunks
+from snpdb.models import (
+    Allele,
+    ClinGenAllele,
+    Contig,
+    GenomeBuild,
+    GenomeFasta,
+    Variant,
+    VariantAllele,
+    VariantCoordinate,
+)
+from snpdb.models.models_enums import (
+    AlleleConversionTool,
+    AlleleOrigin,
+    ClinGenAlleleExternalRecordType,
+)
 
 
 class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException):

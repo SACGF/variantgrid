@@ -7,7 +7,7 @@ from django.db.models.query import QuerySet
 from django_extensions.db.models import TimeStampedModel
 
 from classification.models.classification import ClassificationModification
-from sync.models.models import SyncRun, SyncDestination
+from sync.models.models import SyncDestination, SyncRun
 
 
 class ClassificationModificationSyncRecord(TimeStampedModel):

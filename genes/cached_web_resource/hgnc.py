@@ -9,10 +9,17 @@ import requests
 
 from annotation.models import CachedWebResource
 from genes.gene_matching import ReleaseGeneMatcher
-from genes.models import HGNCImport, GeneAnnotationRelease, GeneSymbol, HGNC, GeneSymbolAlias, UniProt
-from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
+from genes.models import (
+    HGNC,
+    GeneAnnotationRelease,
+    GeneSymbol,
+    GeneSymbolAlias,
+    HGNCImport,
+    UniProt,
+)
+from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from library.constants import MINUTE_SECS
-from library.django_utils import get_model_fields, get_field_counts
+from library.django_utils import get_field_counts, get_model_fields
 
 HGNC_BASE_URL = "https://rest.genenames.org/fetch/status/"
 

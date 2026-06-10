@@ -3,7 +3,7 @@ from functools import cached_property, reduce
 
 from auditlog.registry import auditlog
 from django.db import models
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 
 from analysis.models.enums import TagNodeMode

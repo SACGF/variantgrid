@@ -60,7 +60,7 @@ def smart_open(path):
     p = Path(path)
     if p.suffix == ".gz":
         return gzip.open(p, "rt", encoding="utf-8", errors="replace")
-    return open(p, "rt", encoding="utf-8", errors="replace")
+    return open(p, encoding="utf-8", errors="replace")
 
 
 def normalize_chrom(s: str) -> str:

@@ -1,5 +1,5 @@
 import operator
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from functools import cached_property, reduce
 from typing import Optional
 

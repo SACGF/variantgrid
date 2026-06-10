@@ -3,21 +3,28 @@ import mimetypes
 import pandas as pd
 from django.conf import settings
 from django.http.response import HttpResponse, JsonResponse
-from django.shortcuts import render, get_object_or_404
-from django.views.decorators.http import require_POST, require_http_methods
+from django.shortcuts import get_object_or_404, render
+from django.views.decorators.http import require_http_methods, require_POST
 
 from annotation.models.models_phenotype_match import TextPhenotypeMatch
 from annotation.phenotype_matching import create_phenotype_description
 from library.django_utils import add_save_message, set_form_read_only
-from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
+from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.log_utils import log_traceback
 from library.utils import invert_dict
 from library.utils.file_utils import rm_if_exists
-from ontology.forms import OMIMForm, HPOForm, HGNCForm, MONDOForm
+from ontology.forms import HGNCForm, HPOForm, MONDOForm, OMIMForm
 from patients import forms
-from patients.forms import PatientSearchForm, PatientContactForm
-from patients.models import PatientColumns, PatientRecords, Patient, PatientModification, PatientRecordOriginType, \
-    PatientAttachment, PatientRecord
+from patients.forms import PatientContactForm, PatientSearchForm
+from patients.models import (
+    Patient,
+    PatientAttachment,
+    PatientColumns,
+    PatientModification,
+    PatientRecord,
+    PatientRecordOriginType,
+    PatientRecords,
+)
 from snpdb.models import Sample
 from uicore.utils.form_helpers import form_helper_horizontal
 
@@ -216,7 +223,7 @@ def get_patient_upload_csv(filename, sample_qs, columns_lookup=None):
         }
     sample_values_qs = sample_qs.values(*columns_lookup)
 
-    empty_row = {c: '' for c in PatientColumns.COLUMNS}
+    empty_row = dict.fromkeys(PatientColumns.COLUMNS, '')
     rows = []
     for values in sample_values_qs:
         data = empty_row.copy()
@@ -257,7 +264,7 @@ def patients(request):
         if valid:
             patient = form.save()
             form = forms.PatientForm(user=request.user)  # clear form for next patient
-            msg = f"Patient #{patient.pk}: {str(patient)}"
+            msg = f"Patient #{patient.pk}: {patient!s}"
         else:
             msg = "Patient"
         add_save_message(request, valid, msg, created=True)
