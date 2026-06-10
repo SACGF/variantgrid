@@ -4,6 +4,7 @@ A series of models that currently stores the combination of MONDO, OMIM, HPO & H
 """
 import functools
 import logging
+import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -789,14 +790,19 @@ class OntologyVersion(TimeStampedModel):
 
     @staticmethod
     def latest(validate=True) -> Optional['OntologyVersion']:
-        oi_qs = OntologyImport.objects.all()
+        # Fetch candidates for all import fields in one query, then pick the latest per field
+        import_q_list = [Q(import_source=import_source, filename__in=filenames)
+                         for import_source, filenames in OntologyVersion.ONTOLOGY_IMPORTS.values()]
+        candidate_imports = OntologyImport.objects.filter(functools.reduce(operator.or_, import_q_list)).order_by("pk")
+
         kwargs = {}
-        missing_fields = set()
-        for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
-            if ont_import := oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last():
-                kwargs[field] = ont_import
-            elif field not in OntologyVersion.OPTIONAL_IMPORTS:
-                missing_fields.add(field)
+        for ont_import in candidate_imports:  # ordered by pk so the last match per field wins
+            for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
+                if ont_import.import_source == import_source and ont_import.filename in filenames:
+                    kwargs[field] = ont_import
+
+        missing_fields = {field for field in OntologyVersion.ONTOLOGY_IMPORTS
+                          if field not in kwargs and field not in OntologyVersion.OPTIONAL_IMPORTS}
 
         if not missing_fields:
             values = list(kwargs.values())
@@ -815,14 +821,17 @@ class OntologyVersion(TimeStampedModel):
                 ontology_version = None
         return ontology_version
 
-    def get_ontology_imports(self):
-        return [ont_import for ont_import in [
-            self.gencc_import,
-            self.mondo_import,
-            self.hp_owl_import,
-            self.hp_phenotype_to_genes_import,
-            self.omim_import
-        ] if ont_import is not None]
+    def get_ontology_imports(self) -> QuerySet[OntologyImport]:
+        """ Lazy QuerySet - using it in __in filters becomes a subquery (no extra queries,
+            unlike accessing the FK fields which lazy-loads each OntologyImport individually) """
+        import_ids = [import_id for import_id in [
+            self.gencc_import_id,
+            self.mondo_import_id,
+            self.hp_owl_import_id,
+            self.hp_phenotype_to_genes_import_id,
+            self.omim_import_id
+        ] if import_id is not None]
+        return OntologyImport.objects.filter(pk__in=import_ids)
 
     def get_ontology_term_relations(self):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())

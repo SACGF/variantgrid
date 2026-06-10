@@ -1,10 +1,75 @@
 import json
 import logging
+import os
+import re
+import time
+import traceback
+from collections import Counter
 from collections.abc import Mapping
+from contextlib import ExitStack
 
+from django.db import connection
 from django.test import Client, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.http import urlencode
+
+QUERY_PROFILE_FILE = os.environ.get("VG_QUERY_PROFILE")
+QUERY_TRACE_PATTERN = os.environ.get("VG_QUERY_TRACE")  # regex: log stack traces for matching SQL
+
+
+def _normalize_sql(sql: str) -> str:
+    """ Strip literals so queries differing only by parameters group together (N+1 detection) """
+    sql = re.sub(r"'[^']*'", "?", sql)
+    sql = re.sub(r"\b\d+(\.\d+)?\b", "?", sql)
+    sql = re.sub(r"IN \([^)]*\)", "IN (?)", sql)
+    return sql
+
+
+class QueryProfilingClient(Client):
+    """ Captures SQL for each GET and appends a JSON line to VG_QUERY_PROFILE """
+
+    def _trace_wrapper(self, path):
+        def wrapper(execute, sql, params, many, context):
+            if re.search(QUERY_TRACE_PATTERN, sql):
+                stack = [line for line in traceback.format_stack()
+                         if "/site-packages/" not in line and "unittest_utils" not in line]
+                with open(QUERY_PROFILE_FILE + ".trace", "a") as f:
+                    f.write(json.dumps({"path": path, "sql": sql[:300], "stack": stack[-12:]}) + "\n")
+            return execute(sql, params, many, context)
+        return wrapper
+
+    def get(self, path, *args, **kwargs):
+        start = time.monotonic()
+        with ExitStack() as stack:
+            ctx = stack.enter_context(CaptureQueriesContext(connection))
+            if QUERY_TRACE_PATTERN:
+                stack.enter_context(connection.execute_wrapper(self._trace_wrapper(path)))
+            response = super().get(path, *args, **kwargs)
+        request_ms = (time.monotonic() - start) * 1000
+        real_queries = [q for q in ctx.captured_queries
+                        if not q["sql"].startswith(("SAVEPOINT", "RELEASE SAVEPOINT", "ROLLBACK TO SAVEPOINT"))]
+        queries = [q["sql"] for q in real_queries]
+        duplicates = [{"count": count, "sql": sql}
+                      for sql, count in Counter(_normalize_sql(sql) for sql in queries).most_common()
+                      if count > 1]
+        record = {
+            "path": path,
+            "status": response.status_code,
+            "num_queries": len(queries),
+            "request_ms": round(request_ms, 1),
+            "sql_ms": round(sum(float(q["time"]) for q in real_queries) * 1000, 1),
+            "duplicates": duplicates,
+        }
+        with open(QUERY_PROFILE_FILE, "a") as f:
+            f.write(json.dumps(record) + "\n")
+        return response
+
+
+def _make_test_client() -> Client:
+    if QUERY_PROFILE_FILE:
+        return QueryProfilingClient()
+    return Client()
 
 
 def prevent_request_warnings(original_function):
@@ -42,7 +107,7 @@ class URLTestCase(TestCase):
         and contain the file asked. @see https://stackoverflow.com/a/51580328/295724 """
 
     def _test_urls(self, names_and_kwargs, user=None, expected_code_override=None):
-        client = Client()
+        client = _make_test_client()
         if user:
             client.force_login(user)
 
@@ -59,7 +124,7 @@ class URLTestCase(TestCase):
                 self.assertEqual(response.status_code, expected_code, msg=f"Url '{url}'")
 
     def _test_autocomplete_urls(self, names_obj_kwargs, user, in_results):
-        client = Client()
+        client = _make_test_client()
         client.force_login(user)
 
         for name, obj, get_kwargs in names_obj_kwargs:
@@ -95,7 +160,7 @@ class URLTestCase(TestCase):
         self._test_urls(datatable_definition_names_and_kwargs, user=user, expected_code_override=expected_code_override)
 
     def _test_datatables_grid_urls_contains_objs(self, names_obj, user, in_results):
-        client = Client()
+        client = _make_test_client()
         client.force_login(user)
 
         for name, kwargs, obj in names_obj:
@@ -139,7 +204,7 @@ class URLTestCase(TestCase):
     def _test_jqgrid_urls_contains_objs(self, names_obj, user, in_results):
         """ Also allow 403 if not expecting results
             TODO: Load grid properly call URL with sidx params etc, currently get UnorderedObjectListWarning """
-        client = Client()
+        client = _make_test_client()
         client.force_login(user)
 
         for name, kwargs, obj in names_obj:
