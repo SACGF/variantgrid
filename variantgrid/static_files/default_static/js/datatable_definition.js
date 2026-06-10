@@ -433,7 +433,7 @@ TableFormat.list_codes = (data, type, row) => {
     }
     const elements = [];
     let isFirst = true;
-    for (value of data) {
+    for (const value of data) {
         if (!isFirst) {
             elements.push(", ");
         }
@@ -579,7 +579,7 @@ TableFormat.combine = function(formatters, settings, data, type, columns) {
             part = eval(formatter)(data[index], type, columns);
         }
         if (settings.separator) {
-            dom.append($(separator));
+            dom.append($(settings.separator));
             dom.append(part);
         } else {
             dom.append($('<div>', {'html': part}));

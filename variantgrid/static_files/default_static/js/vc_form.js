@@ -59,6 +59,7 @@ const VCForm = (function() {
     let jShareButtons = null;
 
     let eKeys = null;
+    let eKeysBase = null;
     let vcLinks = null;
 
     const VCForm = function() {};
@@ -672,12 +673,6 @@ const VCForm = (function() {
 
                 $(`#label-${error.key}`).prepend(inlineError);
 
-                switch (error.severity) {
-                    case 'error': icon = '<i class="fas fa-exclamation-circle text-danger"></i>'; break;
-                    case 'warning': icon = '<i class="fas fa-exclamation-triangle text-warning"></i>'; break;
-                    case 'info': icon = '<i class="fas fa-info-circle text-primary"></i>'; break;
-                }
-
                 const listItem = $('<a>', {class: 'list-group-item list-group-item-action',  target: '_blank', click: () => {
                     jFilterBox.val('#' + eKey.key);
                     jFilterBox.keyup();
@@ -1043,7 +1038,7 @@ const VCForm = (function() {
         },
 
         cHGVS() {
-            vc_value = this.value(SpecialEKeys.C_HGVS);
+            const vc_value = this.value(SpecialEKeys.C_HGVS);
             if (vc_value) {
                 return vc_value;
             }
@@ -1576,7 +1571,7 @@ const VCForm = (function() {
                     ])
                 );
             } else {
-                descriptionSpan = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
+                const descriptionSpan = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
                 if (this.isEditMode()) {
                     if (eKey.hide === true) {
                         descriptionSpan.append($('<br/><br/><i>This field is not shown by default for your lab.</i>'));

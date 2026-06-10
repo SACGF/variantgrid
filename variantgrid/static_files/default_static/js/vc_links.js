@@ -55,7 +55,7 @@ const VCLink = (function() {
 
 })();
 
-EMPTY_LINK = new VCLink({
+const EMPTY_LINK = new VCLink({
     text: null,
     href: null,
     missing: true,
