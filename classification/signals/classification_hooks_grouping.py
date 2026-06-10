@@ -3,13 +3,22 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
 from classification.enums import ShareLevel
-from classification.models import classification_post_publish_signal, Classification, ClassificationModification, \
-    classification_withdraw_signal, allele_info_changed_signal, ImportedAlleleInfo, ClassificationImportRun, \
-    condition_set_signal
-from classification.models.classification_grouping import ClassificationGrouping, ClassificationGroupingEntry
+from classification.models import (
+    Classification,
+    ClassificationImportRun,
+    ClassificationModification,
+    ImportedAlleleInfo,
+    allele_info_changed_signal,
+    classification_post_publish_signal,
+    classification_withdraw_signal,
+    condition_set_signal,
+)
+from classification.models.classification_grouping import (
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
+)
 from classification.models.classification_import_run import classification_imports_complete_signal
 from library.utils import get_timer
-
 
 ###
 # Capture events that could require a ClassificationGrouping to update.

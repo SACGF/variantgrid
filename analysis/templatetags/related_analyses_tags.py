@@ -4,18 +4,21 @@ from collections import defaultdict
 from functools import reduce
 
 from django.conf import settings
-from django.db.models import Q, Model
+from django.db.models import Model, Q
 from django.template import Library
 
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
-from analysis.models import MutationalSignature, Analysis, AnalysisTemplate
+from analysis.models import Analysis, AnalysisTemplate, MutationalSignature
 from analysis.models.models_karyomapping import KaryomappingAnalysis
-from analysis.related_analyses import get_related_analysis_details_for_samples, \
-    get_related_analysis_details_for_cohort, \
-    get_related_analysis_details_for_pedigree, get_related_analysis_details_for_quad, \
-    get_related_analysis_details_for_trio
+from analysis.related_analyses import (
+    get_related_analysis_details_for_cohort,
+    get_related_analysis_details_for_pedigree,
+    get_related_analysis_details_for_quad,
+    get_related_analysis_details_for_samples,
+    get_related_analysis_details_for_trio,
+)
 from pedigree.models import Pedigree
-from snpdb.models import Cohort, Trio, Quad
+from snpdb.models import Cohort, Trio
 
 register = Library()
 

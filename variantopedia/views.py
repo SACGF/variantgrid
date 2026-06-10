@@ -4,7 +4,7 @@ import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from functools import reduce
 from typing import Any, Optional
 
@@ -14,20 +14,34 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.forms import model_to_dict
-from django.shortcuts import get_object_or_404, render, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.timesince import timesince
 from django.utils.timezone import localtime
 from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
-from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
-    VariantAnnotationVersion, VariantAnnotation, AnnotationStatus, ClinVarRecordCollection
 from annotation.manual_variant_entry import check_can_create_variants
+from annotation.models import (
+    AnnotationRun,
+    AnnotationStatus,
+    AnnotationVersion,
+    Classification,
+    ClassificationModification,
+    ClinVarRecordCollection,
+    VariantAnnotation,
+    VariantAnnotationVersion,
+)
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
-from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
-    EvidenceKeyMap, ClassificationGroupingEntry
+from classification.models import (
+    AlleleOriginGrouping,
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
+    DiscordanceReport,
+    EvidenceKeyMap,
+    OverlapStatus,
+)
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -36,12 +50,17 @@ from classification.views.exports.classification_export_formatter_csv import For
 from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
-from library.django_utils import require_superuser, highest_pk, get_field_counts
+from library.django_utils import get_field_counts, highest_pk, require_superuser
 from library.django_utils.jqgrid_view import JQGridView
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
-from library.log_utils import log_traceback, report_message, slack_bot_username, AdminNotificationBuilder
+from library.log_utils import (
+    AdminNotificationBuilder,
+    log_traceback,
+    report_message,
+    slack_bot_username,
+)
 from library.utils import flatten_nested_lists
 from pathtests.models import cases_for_user
 from patients.models import Clinician
@@ -51,8 +70,18 @@ from snpdb.clingen_allele import link_allele_to_existing_variants
 from snpdb.forms import TagForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleConversionTool, ImportSource, AlleleOrigin, \
-    VariantGridColumn, Tag
+from snpdb.models import (
+    VCF,
+    Allele,
+    AlleleConversionTool,
+    AlleleOrigin,
+    ImportSource,
+    Sample,
+    Tag,
+    Variant,
+    VariantGridColumn,
+    get_igv_data,
+)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
@@ -63,8 +92,12 @@ from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
-from variantopedia.grids import VariantTagsGrid, TaggedVariantGrid
-from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
+from variantopedia.grids import TaggedVariantGrid, VariantTagsGrid
+from variantopedia.interesting_nearby import (
+    get_method_summaries,
+    get_nearby_qs,
+    get_nearby_summaries,
+)
 from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status_now
 

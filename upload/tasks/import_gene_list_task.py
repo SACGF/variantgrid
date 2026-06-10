@@ -1,4 +1,4 @@
-from genes.gene_matching import tokenize_gene_symbols, GeneSymbolMatcher
+from genes.gene_matching import GeneSymbolMatcher, tokenize_gene_symbols
 from genes.models import GeneList
 from snpdb.models import ImportStatus
 from upload.models import UploadedGeneList

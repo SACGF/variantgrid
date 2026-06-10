@@ -3,7 +3,8 @@ import itertools
 import re
 from dataclasses import dataclass, field
 from html import escape
-from typing import Optional, Any, Pattern
+from re import Pattern
+from typing import Any, Optional
 
 from django.utils.safestring import SafeString
 

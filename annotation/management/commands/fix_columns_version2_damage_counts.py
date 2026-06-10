@@ -3,9 +3,9 @@ from functools import reduce
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db.models import Case, Value, IntegerField, When, Q, F
+from django.db.models import Case, F, IntegerField, Q, Value, When
 
-from annotation.models import VariantAnnotationVersion, VariantAnnotation
+from annotation.models import VariantAnnotation, VariantAnnotationVersion
 
 
 class Command(BaseCommand):

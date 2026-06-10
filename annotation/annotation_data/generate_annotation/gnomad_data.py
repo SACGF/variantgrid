@@ -357,7 +357,7 @@ def calculate_allele_frequency(version, gnomad_input_vcf, af_output_vcf):
                     infos[p] = str(af_popmax)
                 elif p.startswith("AC_"):
                     infos[p] = str(ac_popmax)
-                elif p.startswith(("AN_")):
+                elif p.startswith("AN_"):
                     infos[p] = str(an_popmax)
                 elif p in {"popmax", "grpmax"}:
                     infos[p] = popmax

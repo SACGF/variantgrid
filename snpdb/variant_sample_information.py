@@ -7,12 +7,19 @@ from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import Q, TextField
 
-from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_ONTOLOGY_TERM_PATH
+from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH, PATIENT_TPM_PATH
 from library.unit_percent import format_af
 from ontology.models import OntologyService
 from patients.models import Patient
 from patients.models_enums import Zygosity
-from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild, CohortGenotype
+from snpdb.models import (
+    CohortGenotype,
+    CohortGenotypeCollection,
+    GenomeBuild,
+    Locus,
+    Sample,
+    Variant,
+)
 
 
 class VariantSampleInformation:

@@ -2,7 +2,12 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
-from genes.models import GeneSymbol, PanelAppServer, PanelAppPanel, PanelAppPanelLocalCacheGeneSymbol
+from genes.models import (
+    GeneSymbol,
+    PanelAppPanel,
+    PanelAppPanelLocalCacheGeneSymbol,
+    PanelAppServer,
+)
 from genes.panel_app import get_panel_app_local_cache
 
 

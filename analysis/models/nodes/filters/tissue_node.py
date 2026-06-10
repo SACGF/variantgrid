@@ -7,8 +7,11 @@ from django.db.models.query_utils import Q
 
 from analysis.models import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
-from annotation.models.models import HumanProteinAtlasTissueSample, \
-    HumanProteinAtlasAnnotation, VariantTranscriptAnnotation
+from annotation.models.models import (
+    HumanProteinAtlasAnnotation,
+    HumanProteinAtlasTissueSample,
+    VariantTranscriptAnnotation,
+)
 from annotation.models.models_enums import DetectedHumanProteinAtlasAbundance
 from genes.models import Gene, GeneSymbol
 from genes.models_enums import AnnotationConsortium

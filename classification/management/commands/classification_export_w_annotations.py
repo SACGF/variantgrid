@@ -110,8 +110,8 @@ class Command(BaseCommand):
                                     status = "transcript-annotated"
                                 except:
                                     all_transcript_versions = transcript_version.transcript.transcriptversion_set.filter(genome_build=genome_build)
-                                    lower_versions = list(sorted((v for v in all_transcript_versions if v.version < transcript_version.version), reverse=True))
-                                    higher_versions = list(sorted((v for v in all_transcript_versions if v.version > transcript_version.version)))
+                                    lower_versions = sorted((v for v in all_transcript_versions if v.version < transcript_version.version), reverse=True)
+                                    higher_versions = sorted(v for v in all_transcript_versions if v.version > transcript_version.version)
                                     attempt_versions = higher_versions + lower_versions
                                     for attempt_version in attempt_versions:
                                         try:
@@ -127,7 +127,7 @@ class Command(BaseCommand):
                                     for key in transcript_annotation_keys:
                                         transcript_annotations_cells.append(annotation_data.get(key))
 
-                        except Exception as e:
+                        except Exception:
                             pass
 
                 row = [

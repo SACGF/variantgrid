@@ -10,29 +10,44 @@ from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import Q
 from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timesince import timesince
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django_downloadview import PathDownloadView
 
 from annotation.models import AnnotationRun
 from annotation.views import get_build_contigs
 from eventlog.models import create_event
-from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
+from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
 from library.utils.django_utils import render_ajax_view
 from snpdb.models import VCF
 from upload import forms, upload_processing, upload_stats
-from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
-    UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, \
-    VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant, TimeFilterMethod
-from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
-    get_uploaded_file_type, get_url_and_data_for_uploaded_file_data, \
-    retry_upload_pipeline, get_import_tasks_by_extension
+from upload.models import (
+    ImportSource,
+    ModifiedImportedVariant,
+    ProcessingStatus,
+    SimpleVCFImportInfo,
+    TimeFilterMethod,
+    UploadedFile,
+    UploadedFileTypes,
+    UploadPipeline,
+    UploadSettings,
+    UploadStep,
+    VCFImportInfo,
+    VCFSkippedContigs,
+)
+from upload.uploaded_file_type import (
+    get_import_tasks_by_extension,
+    get_upload_data_for_uploaded_file,
+    get_uploaded_file_type,
+    get_url_and_data_for_uploaded_file_data,
+    retry_upload_pipeline,
+)
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
                          UploadedFileTypes.GENE_LIST: "uploaded_gene_list"}

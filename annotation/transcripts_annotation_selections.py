@@ -6,11 +6,16 @@ from django.conf import settings
 from django.forms.models import model_to_dict
 from django.utils.timesince import timesince
 
-from annotation.models import VEPSkippedReason, AnnotationStatus
-from annotation.models.models import VariantAnnotation, AnnotationVersion, \
-    InvalidAnnotationVersionError, VariantTranscriptAnnotation, AnnotationRun
-from genes.hgvs import HGVSMatcher, HGVSException
-from genes.models import TranscriptVersion, GnomADGeneConstraint, Transcript
+from annotation.models import AnnotationStatus, VEPSkippedReason
+from annotation.models.models import (
+    AnnotationRun,
+    AnnotationVersion,
+    InvalidAnnotationVersionError,
+    VariantAnnotation,
+    VariantTranscriptAnnotation,
+)
+from genes.hgvs import HGVSException, HGVSMatcher
+from genes.models import GnomADGeneConstraint, Transcript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild

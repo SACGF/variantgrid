@@ -3,10 +3,15 @@
 import logging
 
 from django.core.management.base import BaseCommand
-from django.db.models import Q, Func, Value, F
+from django.db.models import F, Func, Q, Value
 
-from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, VariantAnnotationVersion, \
-    TranscriptVersion, defaultdict
+from annotation.models import (
+    TranscriptVersion,
+    VariantAnnotation,
+    VariantAnnotationVersion,
+    VariantTranscriptAnnotation,
+    defaultdict,
+)
 from snpdb.models.models_genome import GenomeBuild
 
 

@@ -2,7 +2,11 @@ from collections import Counter, defaultdict
 
 import celery
 
-from analysis.models.models_karyomapping import KaryotypeBins, GenomeKaryomappingCounts, ContigKaryomappingCounts
+from analysis.models.models_karyomapping import (
+    ContigKaryomappingCounts,
+    GenomeKaryomappingCounts,
+    KaryotypeBins,
+)
 from snpdb.models import Trio
 from snpdb.models.models_enums import ImportStatus
 

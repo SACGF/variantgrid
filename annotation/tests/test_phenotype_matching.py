@@ -5,7 +5,10 @@ from django.test import TestCase, override_settings
 from annotation.models.models_phenotype_match import PatientTextPhenotype
 from annotation.phenotype_matcher import PhenotypeMatcher
 from ontology.models import OntologyService
-from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
+from ontology.tests.test_data_ontology import (
+    create_ontology_test_data,
+    create_test_ontology_version,
+)
 from patients.models import Patient
 
 

@@ -4,7 +4,7 @@
 import logging
 import os
 import subprocess
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from datetime import datetime
 
 import cyvcf2
@@ -15,7 +15,7 @@ from django.db.models.query_utils import Q
 
 from library.genomics.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
 from library.utils import mk_path
-from snpdb.models import GenomeBuild, Sequence, Locus, Variant, VariantCoordinate
+from snpdb.models import GenomeBuild, Locus, Sequence, Variant, VariantCoordinate
 from upload.models import ModifiedImportedVariant
 
 
@@ -64,7 +64,7 @@ class Command(BaseCommand):
             if vcf_ids:
                 mk_path(processing_dir)
                 vcf_input_filename = os.path.join(processing_dir, f"old_variants_ref_n_{genome_build.name}.vcf")
-                used_chroms = set((vc.chrom for vc in variant_coordinates))
+                used_chroms = set(vc.chrom for vc in variant_coordinates)
                 header_lines = get_contigs_header_lines(genome_build, use_accession=True,
                                                         contig_allow_list=used_chroms)
                 logging.info("Writing old variants ref n VCF: %s", vcf_input_filename)

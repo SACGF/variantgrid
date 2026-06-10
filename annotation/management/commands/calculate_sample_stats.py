@@ -2,10 +2,15 @@
 
 from django.core.management.base import BaseCommand
 
-from annotation.models import SampleVariantAnnotationStats, \
-    SampleVariantAnnotationStatsPassingFilter, SampleGeneAnnotationStats, \
-    SampleGeneAnnotationStatsPassingFilter, SampleClinVarAnnotationStats, \
-    SampleClinVarAnnotationStatsPassingFilter, VCFAnnotationStats
+from annotation.models import (
+    SampleClinVarAnnotationStats,
+    SampleClinVarAnnotationStatsPassingFilter,
+    SampleGeneAnnotationStats,
+    SampleGeneAnnotationStatsPassingFilter,
+    SampleVariantAnnotationStats,
+    SampleVariantAnnotationStatsPassingFilter,
+    VCFAnnotationStats,
+)
 from annotation.tasks.calculate_sample_stats import calculate_needed_stats
 from snpdb.models import SampleStats, SampleStatsPassingFilter
 

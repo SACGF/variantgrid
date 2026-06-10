@@ -6,8 +6,7 @@ from django.http import HttpResponse
 from django.template import engines
 
 from classification.models import ClassificationJsonParams, ClassificationReportTemplate
-from classification.models.classification import ClassificationModification, \
-    Classification
+from classification.models.classification import Classification, ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap
 from snpdb.models import GenomeBuild
 
@@ -87,4 +86,4 @@ class ClassificationReport:
                 continue
             if evidence not in row_data:
                 unknown_evidence.add(evidence)
-        return list(sorted(unknown_evidence))
+        return sorted(unknown_evidence)

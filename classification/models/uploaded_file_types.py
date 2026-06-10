@@ -4,9 +4,10 @@ import os
 import re
 import tarfile
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from os import PathLike
 from pathlib import Path
-from typing import Iterator, Optional, Union
+from typing import Optional, Union
 from zipfile import ZipFile
 
 

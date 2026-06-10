@@ -82,4 +82,4 @@ class SyncRun(TimeStampedModel):
     meta = models.JSONField(null=True, blank=True, default=None)
 
     def __str__(self):
-        return f'{str(self.destination)} {str(self.created)}'
+        return f'{self.destination!s} {self.created!s}'

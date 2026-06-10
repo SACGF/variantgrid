@@ -1,18 +1,32 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Optional
 
 from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, ConditionTextMatch
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
 from genes.models import GeneSymbol
-from library.utils import ExportRow, export_column, delimited_row
-from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, \
-    PanelAppClassification, OntologySnake, OntologyService, GeneDiseaseClassification, \
-    ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER
+from library.utils import ExportRow, delimited_row, export_column
+from ontology.models import (
+    ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER,
+    GeneDiseaseClassification,
+    OntologyImportSource,
+    OntologyRelation,
+    OntologyService,
+    OntologySnake,
+    OntologyTerm,
+    PanelAppClassification,
+)
 
 
 @dataclass(frozen=True)
@@ -145,10 +159,10 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
     def extension(self) -> str:
         return "csv"
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         return [delimited_row(ClassificationConditionResolutionRow.csv_header())]
 
-    def footer(self) -> List[str]:
+    def footer(self) -> list[str]:
         return []
 
     def row(self, allele_data: AlleleData) -> list[str]:

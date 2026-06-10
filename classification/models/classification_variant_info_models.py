@@ -1,26 +1,36 @@
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Any, TypedDict, Literal
+from typing import Any, Literal, Optional, TypedDict
 
 import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices, \
-    CharField, JSONField, BooleanField, PROTECT
+from django.db.models import (
+    CASCADE,
+    PROTECT,
+    SET_NULL,
+    BooleanField,
+    CharField,
+    ForeignKey,
+    JSONField,
+    OneToOneField,
+    TextChoices,
+    TextField,
+)
 from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff, HGVSConverterType, chgvs_diff_description
-from genes.models import TranscriptVersion, GeneSymbol, Transcript, NoTranscript
+from genes.hgvs import CHGVS, CHGVSDiff, HGVSConverterType, HGVSMatcher, chgvs_diff_description
+from genes.models import GeneSymbol, NoTranscript, Transcript, TranscriptVersion
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
-from library.utils import pretty_label, IconWithTooltip, md5sum_str
+from library.utils import IconWithTooltip, md5sum_str, pretty_label
 from library.utils.django_utils import get_cached_project_git_hash
-from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
+from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
 
 """
 Now we have
@@ -659,7 +669,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             for rb in iai.resolved_builds:
                 if c_hgvs := rb.c_hgvs_obj:
                     all_chgvs.add(c_hgvs)
-        return list(sorted(all_chgvs, key=lambda x: (x.genome_build, x.sort_str)))
+        return sorted(all_chgvs, key=lambda x: (x.genome_build, x.sort_str))
 
     @property
     def get_transcript(self) -> str:
@@ -677,15 +687,15 @@ class ImportedAlleleInfo(TimeStampedModel):
                 if imported_gene_symbol_str := c_hgvs_obj.gene_symbol:
                     if symbol := GeneSymbol.cast(imported_gene_symbol_str):
                         gene_symbol_set.add(symbol)
-        return list(sorted(gene_symbol_set))
+        return sorted(gene_symbol_set)
 
     @property
     def transcript_versions(self) -> list[TranscriptVersion]:
-        return list(sorted({build.transcript_version for build in self.resolved_builds if build.transcript_version}))
+        return sorted({build.transcript_version for build in self.resolved_builds if build.transcript_version})
 
     @property
     def transcripts(self) -> list[Transcript]:
-        return list(sorted({build.transcript_version.transcript for build in self.resolved_builds if build.transcript_version}))
+        return sorted({build.transcript_version.transcript for build in self.resolved_builds if build.transcript_version})
 
     @staticmethod
     def icon_for(status: str, include: bool) -> Optional[IconWithTooltip]:
@@ -826,7 +836,7 @@ class ImportedAlleleInfo(TimeStampedModel):
                     if existing_vc and new_vc and existing_vc.ref != new_vc.ref:
                         new_dirty_message = f"DIFF REF\n{cvc.message}\nRef {existing_vc.ref} -> {new_vc.ref}"
                     else:
-                        new_dirty_message = f"????\n{cvc.message}\n{repr(existing_vc)} -> {repr(new_vc)}"
+                        new_dirty_message = f"????\n{cvc.message}\n{existing_vc!r} -> {new_vc!r}"
 
         def c_hgvs_diff_if_applicable(original_chgvs: str, new_chgvs: str):
 
@@ -969,7 +979,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.dirty_message = None
         if not force_update and self.matched_variant == matched_variant and self.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
             # nothing to do, and no force update, just update message if we need to
-            if message and message != self.message or self.dirty_message:
+            if (message and message != self.message) or self.dirty_message:
                 self.message = message
                 self.save()
             return

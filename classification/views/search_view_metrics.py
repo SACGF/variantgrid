@@ -1,7 +1,7 @@
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import timedelta, date
-from typing import Iterator
+from datetime import date, timedelta
 
 from django.contrib.auth.models import User
 from django.db.models import Q

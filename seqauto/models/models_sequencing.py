@@ -2,11 +2,17 @@ from django.db import models
 from django.db.models import CASCADE, PROTECT
 from django.urls import reverse
 
-from genes.models import GeneList, CanonicalTranscriptCollection
+from genes.models import CanonicalTranscriptCollection, GeneList
 from library.preview_request import PreviewModelMixin
 from seqauto.illumina import illumina_sequencers
 from seqauto.models.models_enums import DataGeneration, EnrichmentKitType
-from snpdb.models import Manufacturer, GenomicIntervalsCollection, SET_NULL, LabProject, VariantsType
+from snpdb.models import (
+    SET_NULL,
+    GenomicIntervalsCollection,
+    LabProject,
+    Manufacturer,
+    VariantsType,
+)
 
 
 class SequencerModel(models.Model):

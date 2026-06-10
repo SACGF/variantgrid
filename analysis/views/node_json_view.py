@@ -4,7 +4,7 @@ from django.http.response import JsonResponse
 from django.views.generic.base import View
 from rest_framework.status import HTTP_200_OK
 
-from analysis.exceptions import NonFatalNodeError, NodeNotFoundException
+from analysis.exceptions import NodeNotFoundException, NonFatalNodeError
 from analysis.models.nodes.analysis_node import AnalysisNode
 from library.log_utils import log_traceback
 

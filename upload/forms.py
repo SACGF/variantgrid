@@ -1,6 +1,6 @@
 from django import forms
 
-from upload.models import UploadSettings, UploadedFileTypes
+from upload.models import UploadedFileTypes, UploadSettings
 
 
 class UploadSettingsForm(forms.ModelForm):

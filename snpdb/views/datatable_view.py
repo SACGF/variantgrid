@@ -1,22 +1,22 @@
-# -*- coding: utf-8 -*-
 import enum
 import itertools
 import logging
 import operator
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property, reduce
-from typing import Optional, Any, Callable, Union, TypeVar, Generic, Type, List
+from typing import Any, Generic, Optional, TypeVar, Union
 
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import QuerySet, Q, F, OrderBy
+from django.db.models import F, OrderBy, Q, QuerySet
 from django.http import HttpRequest, QueryDict
 from django.urls import reverse
 from kombu.utils import json
 
 from library.log_utils import report_exc_info
-from library.utils import pretty_label, nice_class_name, JsonDataType, JsonObjType, full_class_name
+from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ class RichColumn:
                  enabled: bool = True,
                  renderer: Optional[Callable[[CellData], JsonDataType]] = None,
                  default_sort: Optional[SortOrder] = None,
-                 order_sequence: Optional[List[SortOrder]] = None,
+                 order_sequence: Optional[list[SortOrder]] = None,
                  client_renderer: Optional[str] = None,
                  client_renderer_td: Optional[str] = None,
                  visible: bool = True,
@@ -361,7 +361,7 @@ class DatatableConfig(Generic[DC]):
         pass
 
     @cached_property
-    def _model(self) -> Type[DC]:
+    def _model(self) -> type[DC]:
         return self.get_initial_queryset().model
 
     def view_primary_key(self, row: CellData) -> JsonDataType:
@@ -395,7 +395,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
     config: DatatableConfig
     max_display_length = 100
 
-    column_class: Type[DC] = None
+    column_class: type[DC] = None
 
     def config_for_request(self, request: HttpRequest) -> DatatableConfig[DC]:
         return self.column_class(request)
@@ -507,7 +507,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
                 value = self.render_cell(row=row, column=rc)
                 row_json[rc.name] = value
             if row_css := self.config.row_css(row):
-                row_json["row_css"] = row_css;
+                row_json["row_css"] = row_css
             data.append(row_json)
         return data
 

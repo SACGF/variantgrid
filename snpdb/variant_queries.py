@@ -7,7 +7,7 @@ from django.db.models.query_utils import Q
 from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import AnnotationVersion
-from genes.models import GeneSymbol, Gene
+from genes.models import Gene, GeneSymbol
 from snpdb.models import VariantZygosityCountCollection
 from snpdb.models.models_variant import VariantAllele
 

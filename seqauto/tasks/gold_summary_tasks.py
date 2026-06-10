@@ -18,11 +18,17 @@ import numpy as np
 from scipy import stats
 
 from eventlog.models import create_event
-from genes.models import GeneCoverageCollection, GeneCoverageCanonicalTranscript
+from genes.models import GeneCoverageCanonicalTranscript, GeneCoverageCollection
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
 from library.utils import get_single_element
-from seqauto.models import SequencingRun, GoldReference, GoldCoverageSummary, GoldGeneCoverageCollection, EnrichmentKit
+from seqauto.models import (
+    EnrichmentKit,
+    GoldCoverageSummary,
+    GoldGeneCoverageCollection,
+    GoldReference,
+    SequencingRun,
+)
 from snpdb.models import DataState
 from snpdb.models.models_enums import ImportStatus
 

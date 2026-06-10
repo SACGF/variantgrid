@@ -1,20 +1,30 @@
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Mapping, TypedDict, Optional
+from typing import Any, Optional, TypedDict
 
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationSource
 from annotation.regexes import db_citation_regexes
-from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel, AlleleOriginBucket
-from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
-    MultiCondition, ClinVarExport, classification_flag_types, Classification, ClinVarExportStatus, \
-    ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION
+from classification.enums import AlleleOriginBucket, EvidenceKeyValueType, ShareLevel, SpecialEKeys
+from classification.models import (
+    CLINVAR_EXPORT_CONVERSION_VERSION,
+    Classification,
+    ClassificationModification,
+    ClinVarExport,
+    ClinVarExportStatus,
+    ClinVarExportSubmission,
+    EvidenceKey,
+    EvidenceKeyMap,
+    MultiCondition,
+    classification_flag_types,
+)
 from genes.hgvs import CHGVS
-from library.utils import html_to_text, JsonObjType, JsonDiffs, invalidate_cached_property
-from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
-from snpdb.models import ClinVarKey, ClinVarCitationsModes
-from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
+from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
+from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
+from snpdb.models import ClinVarCitationsModes, ClinVarKey
+from uicore.json.validated_json import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
 
 """
 Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
@@ -390,7 +400,7 @@ class ClinVarExportConverter:
         if condition.ontology_service == OntologyService.OMIM:
             id_part = str(condition.index)  # OMIM is not 0 prefixed
         elif condition.ontology_service == OntologyService.ORPHANET:
-            id_part = f"ORPHA{str(condition.index)}"  # ORPHA is not 0 prefixed
+            id_part = f"ORPHA{condition.index!s}"  # ORPHA is not 0 prefixed
             db = "Orphanet"
 
         return ValidatedJson({

@@ -7,14 +7,23 @@ import celery
 from celery.result import AsyncResult
 from django.db.models.query_utils import Q
 
-from library.django_utils.django_postgres import pg_sql_array, model_to_insert_sql
+from library.django_utils.django_postgres import model_to_insert_sql, pg_sql_array
 from library.log_utils import log_traceback
 from library.utils import single_quote
 from library.utils.database_utils import run_sql
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_common_filter
-from snpdb.models import Cohort, ImportStatus, CohortGenotypeCommonFilterVersion, Variant, CommonVariantClassified, \
-    CohortGenotypeCollection, CohortGenotype, CohortGenotypeTaskVersion, CohortGenotypeCollectionType
+from snpdb.models import (
+    Cohort,
+    CohortGenotype,
+    CohortGenotypeCollection,
+    CohortGenotypeCollectionType,
+    CohortGenotypeCommonFilterVersion,
+    CohortGenotypeTaskVersion,
+    CommonVariantClassified,
+    ImportStatus,
+    Variant,
+)
 from snpdb.tasks.sub_cohort_tasks import enqueue_sub_cohort_any_sample_called_vc
 
 

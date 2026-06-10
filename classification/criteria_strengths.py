@@ -1,7 +1,8 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Iterable, Union
+from typing import Optional, Union
 
 from django.utils.safestring import SafeString
 

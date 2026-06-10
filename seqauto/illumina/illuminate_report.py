@@ -2,7 +2,7 @@ import re
 from collections import defaultdict
 
 from library.utils import FLOAT_REGEX
-from seqauto.models.models_enums import SequencerRead, PairedEnd
+from seqauto.models.models_enums import PairedEnd, SequencerRead
 from snpdb.models import DataState
 
 

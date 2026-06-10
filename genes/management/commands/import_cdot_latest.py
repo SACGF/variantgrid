@@ -3,7 +3,11 @@ import json
 import logging
 
 import requests
-from cdot.data_release import get_latest_combo_file_urls, get_latest_data_release_tag_name, _get_version_from_tag_name
+from cdot.data_release import (
+    _get_version_from_tag_name,
+    get_latest_combo_file_urls,
+    get_latest_data_release_tag_name,
+)
 from django.core.management import BaseCommand
 
 from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand
@@ -79,7 +83,7 @@ class Command(BaseCommand):
                 annotation_consortium = AnnotationConsortium(ac_lookup[annotation_consortium_label])
 
                 combo_file_url = get_single_element(combo_files)
-                logging.info(f"%s/%s - downloading: %s",
+                logging.info("%s/%s - downloading: %s",
                              genome_build, annotation_consortium.label, combo_file_url)
                 response = requests.get(combo_file_url, stream=True, timeout=2 * MINUTE_SECS)
                 with gzip.GzipFile(fileobj=response.raw) as fz:

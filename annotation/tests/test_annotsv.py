@@ -7,8 +7,8 @@ from django.test.utils import override_settings
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.annotsv_annotation import (
-    annotsv_check_command_line_version_match,
     AnnotSVVersionMismatchError,
+    annotsv_check_command_line_version_match,
     get_annotsv_command,
     run_annotsv,
 )
@@ -23,14 +23,13 @@ from annotation.vcf_files.bulk_annotsv_tsv_inserter import (
 )
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import (
+    VEPConfig,
     get_vep_version_from_vcf,
     vep_dict_to_variant_annotation_version_kwargs,
-    VEPConfig,
 )
 from genes.models_enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
-
 
 TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
 TEST_ANNOTSV_TSV = os.path.join(TEST_DATA_DIR, "annotsv", "test_grch37_sv.annotated.tsv")

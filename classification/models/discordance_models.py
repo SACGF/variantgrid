@@ -1,33 +1,39 @@
 import html
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Any, Union
+from typing import Any, Optional, Union
 
 import django.dispatch
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.db.models import TextChoices
-from django.db.models.deletion import PROTECT, CASCADE
+from django.db.models.deletion import CASCADE, PROTECT
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 
 from classification.enums.classification_enums import SpecialEKeys
-from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
-from classification.models.classification import ClassificationModification, Classification
-from classification.models.clinical_context_models import ClinicalContext, ClinicalContextRecalcTrigger
-from classification.models.clinical_context_models import ClinicalContextChangeData
+from classification.enums.discordance_enums import (
+    ContinuedDiscordanceReason,
+    DiscordanceReportResolution,
+)
+from classification.models.classification import Classification, ClassificationModification
+from classification.models.clinical_context_models import (
+    ClinicalContext,
+    ClinicalContextChangeData,
+    ClinicalContextRecalcTrigger,
+)
 from classification.models.flag_types import classification_flag_types
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
-from library.preview_request import PreviewModelMixin, PreviewKeyValue, PreviewData
+from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import invalidate_cached_property
 from library.utils.django_utils import refresh_for_update
-from review.models import ReviewableModelMixin, Review
+from review.models import Review, ReviewableModelMixin
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Lab, GenomeBuild
+from snpdb.models import GenomeBuild, Lab
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "clinical_context_change_data:ClinicalContextChangeData"
 

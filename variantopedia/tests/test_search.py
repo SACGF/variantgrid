@@ -3,7 +3,7 @@ from django.test import TestCase, override_settings
 
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from snpdb.models import GenomeBuild, ClinGenAllele
+from snpdb.models import ClinGenAllele, GenomeBuild
 from snpdb.search import search_data
 from variantopedia.models import SearchTypes
 

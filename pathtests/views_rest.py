@@ -1,11 +1,11 @@
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import RetrieveAPIView, get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from pathtests.models import PathologyTestVersion, PathologyTest
+from pathtests.models import PathologyTest, PathologyTestVersion
 from pathtests.serializers import PathologyTestVersionSerializer
 
 

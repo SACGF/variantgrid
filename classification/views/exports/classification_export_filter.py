@@ -1,29 +1,49 @@
 import operator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from functools import cached_property, reduce
-from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callable
+from typing import Any, Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from guardian.shortcuts import get_objects_for_user
 from threadlocals.threadlocals import get_current_request
 
-from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
-from classification.enums import ShareLevel, ClinicalContextStatus, AlleleOriginBucket
+from annotation.annotation_version_querysets import (
+    get_variant_queryset_for_latest_annotation_version,
+)
+from classification.enums import AlleleOriginBucket, ClinicalContextStatus, ShareLevel
 from classification.enums.discordance_enums import DiscordanceReportResolution
-from classification.models import ClassificationModification, Classification, classification_flag_types, \
-    DiscordanceReport, ClinicalContext, ImportedAlleleInfo, ClinVarExport
-from flags.models import FlagsMixin, Flag, FlagComment
-from genes.models import GeneSymbolAlias, GeneSymbol
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    ClinicalContext,
+    ClinVarExport,
+    DiscordanceReport,
+    ImportedAlleleInfo,
+    classification_flag_types,
+)
+from flags.models import Flag, FlagComment, FlagsMixin
+from genes.models import GeneSymbol, GeneSymbolAlias
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
-from library.utils import batch_iterator, local_date_string, http_header_date_now
+from library.utils import batch_iterator, http_header_date_now, local_date_string
 from snpdb.clingen_allele import get_clingen_allele
-from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault, ClinGenAllele, \
-    VariantCoordinate, VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN
+from snpdb.models import (
+    VARIANT_PATTERN,
+    VARIANT_SYMBOLIC_PATTERN,
+    Allele,
+    AlleleOriginFilterDefault,
+    ClinGenAllele,
+    GenomeBuild,
+    Lab,
+    Organization,
+    Variant,
+    VariantCoordinate,
+)
 from snpdb.signals.variant_search import get_results_from_variant_coordinate
 
 
@@ -36,7 +56,7 @@ class ClassificationIssue:
 
     @property
     def message(self) -> Optional[str]:
-        messages: List[str] = []
+        messages: list[str] = []
         if self.withdrawn:
             messages.append("Classification has been withdrawn")
         # if self.transcript_version or self.matching_warning:
@@ -78,7 +98,7 @@ class AlleleData:
     TODO, make this a method and make calling it an exception if we didn't split by allele origin
     """
 
-    all_cms: List[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
+    all_cms: list[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
 
     def sort(self):
         def record_order(ci: ClassificationIssue):
@@ -88,7 +108,7 @@ class AlleleData:
 
     cached_allele: Optional[Allele] = None
     cached_variant: Optional[Variant] = None
-    cached_data: Dict[str, Any] = None
+    cached_data: dict[str, Any] = None
 
     @staticmethod
     def from_allele_info(source: 'ClassificationFilter', allele_info: ImportedAlleleInfo, allele_origin_bucket: AlleleOriginBucket):
@@ -146,7 +166,7 @@ class AlleleData:
         return self.source.genome_build
 
     @property
-    def cms(self) -> List[ClassificationModification]:
+    def cms(self) -> list[ClassificationModification]:
         # The classifications that should be exported (passed validation, not withdrawn)
         return [ci.classification for ci in self.all_cms if not ci.has_issue]
 
@@ -158,11 +178,11 @@ class AlleleData:
         return all_allele_origins
 
     @property
-    def cms_regardless_of_issues(self) -> List[ClassificationModification]:
+    def cms_regardless_of_issues(self) -> list[ClassificationModification]:
         return [ci.classification for ci in self.all_cms]
 
     @property
-    def issues(self) -> List[ClassificationIssue]:
+    def issues(self) -> list[ClassificationIssue]:
         # All Classification Issues that actually have issues
         return [ci for ci in self.all_cms if ci.has_issue]
 
@@ -170,7 +190,7 @@ class AlleleData:
         return bool(self.all_cms)
 
 
-def flag_ids_to(model: Type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[FlagComment]]) -> Set[int]:
+def flag_ids_to(model: type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[FlagComment]]) -> set[int]:
     """
     Convert a qs of Flags or FlagComments to ids of Classification/Allele/etc.
     :param model: The Model to get the IDs of e.g. Classification, Allele, assumes the flag qs was for Flags that
@@ -350,8 +370,8 @@ class ClassificationFilter:
     allele_origin_filter: AlleleOriginFilterDefault = AlleleOriginFilterDefault.SHOW_ALL
     extra_filter: Optional[Q] = None
     allele_origin_split: bool = False  # if true, subdivide allele data by allele origin bucket
-    exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
-    include_sources: Optional[Set[Lab]] = None
+    exclude_sources: Optional[set[Union[Lab, Organization]]] = None
+    include_sources: Optional[set[Lab]] = None
     since: Optional[datetime] = None
     min_share_level: ShareLevel = ShareLevel.LAB
     transcript_strategy: TranscriptStrategy = TranscriptStrategy.ALL
@@ -379,9 +399,9 @@ class ClassificationFilter:
         if since := self.since:
             parts.append(f"Since {since.strftime('%Y%m%d')}")
         if self.allele:
-            parts.append(f"Limited to Single Allele")
+            parts.append("Limited to Single Allele")
         if self.min_share_level == ShareLevel.ALL_USERS:
-            parts.append(f"Shared Data Only")
+            parts.append("Shared Data Only")
         if not parts:
             return "No Filters"
         return ", ".join(parts)
@@ -419,7 +439,7 @@ class ClassificationFilter:
         return local_date_string()
 
     @staticmethod
-    def _string_to_group_name(model: Type[Union[Lab, Organization]], group_names: str) -> Union[Set[Lab], Set[Organization]]:
+    def _string_to_group_name(model: type[Union[Lab, Organization]], group_names: str) -> Union[set[Lab], set[Organization]]:
         """
         Converts comma separated group names to the org or lab objects.
         Invalid org/lab group names will be ignored
@@ -527,13 +547,13 @@ class ClassificationFilter:
             return 'classification__allele_info__grch38__c_hgvs'
 
     @cached_property
-    def _discordant_classification_ids(self) -> Dict[int, DiscordanceReportStatus]:
+    def _discordant_classification_ids(self) -> dict[int, DiscordanceReportStatus]:
         """
         Returns a set of classification IDs where the classification id discordant
         Ids are not necessarily part of this import
         :return: A set of classification IDs
         """
-        discordance_status: Dict[int, DiscordanceReportStatus] = {}
+        discordance_status: dict[int, DiscordanceReportStatus] = {}
         for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
             if dr := DiscordanceReport.latest_report(cc):
                 status: Optional[DiscordanceReportStatus]
@@ -554,7 +574,7 @@ class ClassificationFilter:
             return self._discordant_classification_ids.get(cm.classification_id)
 
     @cached_property
-    def _since_flagged_classification_ids(self) -> Set[int]:
+    def _since_flagged_classification_ids(self) -> set[int]:
         """
         TODO rename to indicate this is a flag check only
         Returns classification ids that have had flags change since the since date
@@ -587,18 +607,18 @@ class ClassificationFilter:
         return False
 
     @property
-    def _share_levels(self) -> Set[ShareLevel]:
+    def _share_levels(self) -> set[ShareLevel]:
         """
         :return: A set of all ShareLevels that should be considered
         """
-        share_levels: Set[ShareLevel] = set()
+        share_levels: set[ShareLevel] = set()
         for sl in ShareLevel.ALL_LEVELS:
             if sl >= self.min_share_level:
                 share_levels.add(sl)
         return share_levels
 
     @cached_property
-    def excluded_record_filters(self) -> List[str]:
+    def excluded_record_filters(self) -> list[str]:
         """
         Returns a list of record filters that are not valid
         """
@@ -675,7 +695,7 @@ class ClassificationFilter:
 
         if self.transcript_strategy == TranscriptStrategy.REFSEQ:
             from classification.views.classification_export_view import ALISSA_ACCEPTED_TRANSCRIPTS
-            acceptable_transcripts: List[Q] = [
+            acceptable_transcripts: list[Q] = [
                 Q(**{f'{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
             ]
             cms = cms.filter(reduce(operator.or_, acceptable_transcripts))
@@ -733,7 +753,7 @@ class ClassificationFilter:
             if self._passes_since(allele_data):
                 yield allele_data
 
-    def allele_data_filtered_pre_processed(self, batch_processor: Optional[Callable[[List[AlleleData]], None]] = None) -> Iterator[AlleleData]:
+    def allele_data_filtered_pre_processed(self, batch_processor: Optional[Callable[[list[AlleleData]], None]] = None) -> Iterator[AlleleData]:
         for batch in batch_iterator(self._allele_data_filtered(), batch_size=100):
             # AlleleData.pre_process(batch)
             if batch_processor:

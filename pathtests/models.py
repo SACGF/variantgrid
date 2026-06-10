@@ -1,20 +1,24 @@
 from typing import Union
 
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.db import models
-from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
+from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 
 from genes.models import GeneList, GeneSymbol
 from library.enums import ModificationOperation
 from library.preview_request import PreviewModelMixin
-from pathtests.models_enums import PathologyTestGeneModificationOutcome, \
-    CaseState, InvestigationType, CaseWorkflowStatus
-from patients.models import Patient, Clinician, ExternallyManagedModel, TEST_PATIENT_KWARGS
+from pathtests.models_enums import (
+    CaseState,
+    CaseWorkflowStatus,
+    InvestigationType,
+    PathologyTestGeneModificationOutcome,
+)
+from patients.models import TEST_PATIENT_KWARGS, Clinician, ExternallyManagedModel, Patient
 from patients.models_enums import PopulationGroup
-from seqauto.models import Experiment, SequencingRun, EnrichmentKit
-from snpdb.models import Wiki, Sample
+from seqauto.models import EnrichmentKit, Experiment, SequencingRun
+from snpdb.models import Sample, Wiki
 from snpdb.models.models_enums import ImportStatus
 
 

@@ -10,8 +10,11 @@ from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
-from annotation.vep_annotation import get_vep_version_from_vcf, vep_dict_to_variant_annotation_version_kwargs, \
-    VEPConfig
+from annotation.vep_annotation import (
+    VEPConfig,
+    get_vep_version_from_vcf,
+    vep_dict_to_variant_annotation_version_kwargs,
+)
 from library.genomics.vcf_enums import VariantClass
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild

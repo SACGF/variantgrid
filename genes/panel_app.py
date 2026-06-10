@@ -7,8 +7,15 @@ from rest_framework.exceptions import NotFound
 
 from annotation.models import CachedWebResource
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelAppServer, PanelAppPanelLocalCache, \
-    PanelAppPanelLocalCacheGeneSymbol, GeneSymbol, create_fake_gene_list
+from genes.models import (
+    GeneSymbol,
+    PanelAppPanel,
+    PanelAppPanelLocalCache,
+    PanelAppPanelLocalCacheGeneSymbol,
+    PanelAppPanelRelevantDisorders,
+    PanelAppServer,
+    create_fake_gene_list,
+)
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import MINUTE_SECS
 

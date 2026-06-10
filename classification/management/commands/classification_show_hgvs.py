@@ -24,6 +24,6 @@ class Command(BaseCommand):
                         converted_hgvs = matcher.variant_to_c_hgvs_parts(va.variant, transcript, throw_on_issue=True).full_c_hgvs
                         if original_hgvs != converted_hgvs:
                             cols = [vc.pk, vc.variant.pk, orig_allele.genome_build.name, original_hgvs, converted_hgvs]
-                            print("\t".join((str(c) for c in cols)))
+                            print("\t".join(str(c) for c in cols))
                 except Exception as e:
                     print(e)

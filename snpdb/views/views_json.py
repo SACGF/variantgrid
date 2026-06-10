@@ -8,7 +8,14 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 
 from library.django_utils import require_superuser
-from snpdb.models import CachedGeneratedFile, Cohort, Sample, VCF, CustomColumnsCollection, TagColorsCollection
+from snpdb.models import (
+    VCF,
+    CachedGeneratedFile,
+    Cohort,
+    CustomColumnsCollection,
+    Sample,
+    TagColorsCollection,
+)
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_vcf
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tasks.vcf_zygosity_count_tasks import update_variant_zygosity_count_for_vcf_task

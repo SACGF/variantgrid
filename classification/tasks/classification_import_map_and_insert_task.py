@@ -10,9 +10,12 @@ from celery import Task
 from django.conf import settings
 
 from classification.enums import SubmissionSource
-from classification.models import UploadedClassificationsUnmapped, UploadedClassificationsUnmappedStatus
+from classification.models import (
+    UploadedClassificationsUnmapped,
+    UploadedClassificationsUnmappedStatus,
+)
 from classification.models.classification_import_run import ClassificationImportRun
-from library.log_utils import report_message, NotificationBuilder
+from library.log_utils import NotificationBuilder, report_message
 from library.utils import batch_iterator, pretty_label
 from variantgrid.celery import app
 
@@ -116,7 +119,7 @@ class ClassificationImportMapInsertTask(Task):
                 "--publish", shlex.quote(publish),
                 "--org", shlex.quote(upload_file.lab.organization.group_name),
                 "--lab", shlex.quote(upload_file.lab.group_name.split("/")[1]),
-                "--env", f"file"
+                "--env", "file"
             ]
             if include_source:
                 args.append("--include_source")
@@ -145,7 +148,7 @@ class ClassificationImportMapInsertTask(Task):
             validation_list_file = output_dir / "validation_list.json"
             fatal_error = None
 
-            with open(validation_summary_file, 'r') as validation_handle:
+            with open(validation_summary_file) as validation_handle:
                 validation_json = json.load(validation_handle)
                 fatal_error = validation_json.get('fatal_error')
                 upload_file.validation_summary = validation_json
@@ -171,7 +174,7 @@ class ClassificationImportMapInsertTask(Task):
                     nb.add_field(formatted_key, value)
                 nb.send()
 
-            with open(validation_list_file, 'r') as validation_handle:
+            with open(validation_list_file) as validation_handle:
                 validation_list = json.load(validation_handle)
                 upload_file.validation_list = validation_list
 
@@ -183,7 +186,7 @@ class ClassificationImportMapInsertTask(Task):
 
             if import_records:
                 import_id = upload_file.file_data.filename + "_" + upload_file.lab.group_name
-                with open(classifications_file, 'r') as file_handle:
+                with open(classifications_file) as file_handle:
                     ClassificationImportMapInsertTask.update_status(upload_file, UploadedClassificationsUnmappedStatus.Importing)
 
                     def row_generator() -> dict:

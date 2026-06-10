@@ -2,7 +2,7 @@ import re
 
 from genes.models import Transcript, TranscriptVersion
 from library.utils import first
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 TRANSCRIPT_PATTERN = re.compile(r"^(ENST|NM_|NR_|XR_)\d+\.?\d*$", re.IGNORECASE)
 

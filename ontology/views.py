@@ -5,8 +5,14 @@ from django.views.generic import TemplateView
 
 from annotation.models import patients_qs_for_ontology_term
 from library.utils import LimitedCollection
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation, \
-    ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER
+from ontology.models import (
+    ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER,
+    OntologyRelation,
+    OntologyService,
+    OntologySnake,
+    OntologyTerm,
+    OntologyTermRelation,
+)
 from ontology.panel_app_ontology import update_gene_relations
 
 
@@ -36,7 +42,7 @@ class OntologyTermView(TemplateView):
                 # the reverse of gene_relationships
                 term_relationships = OntologySnake.snake_from(term=term, to_ontology=OntologyService.MONDO, quality_filter=ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER).snakes + \
                                      OntologySnake.snake_from(term=term, to_ontology=OntologyService.OMIM,  quality_filter=ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER).snakes
-                term_relationships = list(sorted((snake.reverse() for snake in term_relationships), key=lambda snake: snake.leaf_term))
+                term_relationships = sorted((snake.reverse() for snake in term_relationships), key=lambda snake: snake.leaf_term)
                 term_relationships = LimitedCollection(term_relationships, 250)
             else:
                 raw_gene_relationships = sorted(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC, quality_filter=ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER), key=lambda snake: snake.leaf_relationship.dest_term.short)

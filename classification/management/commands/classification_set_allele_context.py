@@ -2,8 +2,8 @@ from django.conf import settings
 from django.core.management import BaseCommand
 from django.db.models import QuerySet
 
-from classification.enums import SpecialEKeys, AlleleOriginBucket
-from classification.models import Classification, EvidenceKeyMap, ClassificationModification
+from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.models import Classification, ClassificationModification, EvidenceKeyMap
 from classification.models.clinical_context_utils import update_clinical_contexts
 from library.utils import iter_fixed_chunks
 

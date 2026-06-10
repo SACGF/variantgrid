@@ -6,7 +6,7 @@ from django.core.management import BaseCommand
 from classification.enums import SpecialEKeys
 from classification.models import Classification
 from genes.hgvs import CHGVS
-from snpdb.models import Lab, GenomeBuild
+from snpdb.models import GenomeBuild, Lab
 
 
 class Command(BaseCommand):

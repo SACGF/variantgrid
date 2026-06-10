@@ -2,11 +2,20 @@ import logging
 from collections import defaultdict
 
 from django.core.management.base import BaseCommand
-from django.db.models import Min, F, Count
+from django.db.models import Count, F, Min
 
 from library.guardian_utils import admin_bot
-from snpdb.models import GenomeBuild, Allele, ClinGenAllele, Contig, VariantAllele, \
-    AlleleLiftover, LiftoverRun, AlleleConversionTool, ProcessingStatus
+from snpdb.models import (
+    Allele,
+    AlleleConversionTool,
+    AlleleLiftover,
+    ClinGenAllele,
+    Contig,
+    GenomeBuild,
+    LiftoverRun,
+    ProcessingStatus,
+    VariantAllele,
+)
 
 
 class Command(BaseCommand):
@@ -99,7 +108,7 @@ class Command(BaseCommand):
                 logging.info("Assigning alleles to Liftover runs - %d/%d", i, num_liftover_runs)
             try:
                 status = lr.uploadedliftover.uploaded_file.uploadpipeline.status
-            except Exception as e:
+            except Exception:
                 if lr not in known_missing_upload_pipelines:
                     logging.error("Couldn't get upload pipeline status for run: %s", lr)
                 continue

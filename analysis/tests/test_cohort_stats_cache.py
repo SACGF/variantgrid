@@ -15,9 +15,9 @@ from django.test import TestCase
 
 from analysis.models.enums import TrioInheritance
 from analysis.models.nodes.sources._stats_cache import (
+    UNCACHEABLE,
     NoFilterHandler,
     TrioInheritanceHandler,
-    UNCACHEABLE,
     get_filter_keys_to_precompute_for_cohort,
 )
 from annotation.fake_annotation import get_fake_annotation_version

@@ -1,7 +1,8 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Iterable
+from typing import Optional
 
 import django.dispatch
 from django.conf import settings
@@ -11,10 +12,9 @@ from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
-from classification.enums import ShareLevel, SpecialEKeys, AlleleOriginBucket
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
-from classification.models.classification import Classification, \
-    ClassificationModification
+from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun
 from flags.models import Flag, FlagStatus
 from flags.models.models import FlagsMixin, FlagTypeContext

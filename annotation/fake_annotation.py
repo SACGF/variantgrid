@@ -10,14 +10,27 @@ from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
 from annotation.models import ClinVarReviewStatus, GeneAnnotationRelease
-from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, \
-    HumanProteinAtlasAnnotationVersion, AnnotationVersion, ClinVar, ClinVarCitation, \
-    ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion
+from annotation.models.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    ClinVar,
+    ClinVarCitation,
+    ClinVarCitationsCollection,
+    ClinVarVersion,
+    GeneAnnotationVersion,
+    HumanProteinAtlasAnnotationVersion,
+    VariantAnnotation,
+    VariantAnnotationVersion,
+)
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport
 from genes.models_enums import AnnotationConsortium
-from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
+from ontology.tests.test_data_ontology import (
+    create_ontology_test_data,
+    create_test_ontology_version,
+)
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf

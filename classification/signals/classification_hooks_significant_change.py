@@ -6,9 +6,16 @@ from django.dispatch import receiver
 from django.urls import reverse
 from django_messages.admin import User
 
-from classification.enums import ShareLevel, SpecialEKeys, ClinicalSignificance
-from classification.models import classification_post_publish_signal, Classification, classification_flag_types, \
-    EvidenceKey, ClassificationFlagTypes, ClassificationModification, EvidenceKeyMap
+from classification.enums import ClinicalSignificance, ShareLevel, SpecialEKeys
+from classification.models import (
+    Classification,
+    ClassificationFlagTypes,
+    ClassificationModification,
+    EvidenceKey,
+    EvidenceKeyMap,
+    classification_flag_types,
+    classification_post_publish_signal,
+)
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from library.utils import get_timer

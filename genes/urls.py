@@ -1,9 +1,21 @@
-from genes.grids import GeneListGenesColumns, GenesGrid, QCGeneCoverageGrid, \
-    UncoveredGenesGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns, \
-    GeneListColumns, CanonicalTranscriptCollectionColumns, CanonicalTranscriptColumns
+from genes.grids import (
+    CanonicalTranscriptCollectionColumns,
+    CanonicalTranscriptColumns,
+    GeneListColumns,
+    GeneListGenesColumns,
+    GenesGrid,
+    GeneSymbolVariantsGrid,
+    GeneSymbolWikiColumns,
+    QCGeneCoverageGrid,
+    UncoveredGenesGrid,
+)
 from genes.views import views, views_autocomplete, views_rest
-from genes.views.views_hotspot_graphs import HotspotGraphView, ClassificationsHotspotGraphView, CohortHotspotGraphView, \
-    PublicRUNX1HotspotGraphView
+from genes.views.views_hotspot_graphs import (
+    ClassificationsHotspotGraphView,
+    CohortHotspotGraphView,
+    HotspotGraphView,
+    PublicRUNX1HotspotGraphView,
+)
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path

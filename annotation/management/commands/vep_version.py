@@ -1,6 +1,10 @@
 from django.core.management.base import BaseCommand
 
-from annotation.vep_annotation import get_vep_version, VEPConfig, vep_dict_to_variant_annotation_version_kwargs
+from annotation.vep_annotation import (
+    VEPConfig,
+    get_vep_version,
+    vep_dict_to_variant_annotation_version_kwargs,
+)
 from snpdb.models.models_genome import GenomeBuild
 
 

@@ -10,12 +10,27 @@ from django.conf import settings
 from django.db import IntegrityError
 
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.log_utils import log_traceback, get_traceback
+from library.log_utils import get_traceback, log_traceback
 from library.utils import execute_cmd
 from patients.models_enums import Zygosity
-from snpdb.models import VCF, Cohort, Trio, SomalierVCFExtract, SomalierConfig, SomalierAncestryRun, \
-    SomalierCohortRelate, SomalierRelate, SomalierTrioRelate, SomalierAncestry, SuperPopulationCode, \
-    SomalierSampleExtract, ProcessingStatus, SomalierAllSamplesRelate, AbstractSomalierModel, SomalierRelatePairs
+from snpdb.models import (
+    VCF,
+    AbstractSomalierModel,
+    Cohort,
+    ProcessingStatus,
+    SomalierAllSamplesRelate,
+    SomalierAncestry,
+    SomalierAncestryRun,
+    SomalierCohortRelate,
+    SomalierConfig,
+    SomalierRelate,
+    SomalierRelatePairs,
+    SomalierSampleExtract,
+    SomalierTrioRelate,
+    SomalierVCFExtract,
+    SuperPopulationCode,
+    Trio,
+)
 from snpdb.variants_to_vcf import vcf_export_to_file
 
 
@@ -179,7 +194,7 @@ def somalier_all_samples():
                 pass  # Sample was deleted - just don't store
 
         all_samples.status = ProcessingStatus.SUCCESS
-    except Exception as e:
+    except Exception:
         tb = get_traceback()
         logging.error(tb)
         all_samples.error_exception = tb

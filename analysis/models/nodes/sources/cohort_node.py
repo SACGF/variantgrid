@@ -4,18 +4,20 @@ from typing import Optional
 from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
-from django.db.models.deletion import SET_NULL, CASCADE
-from django.db.models.expressions import Value, F
-from django.db.models.functions import Concat, Substr, Length, Replace
+from django.db.models.deletion import CASCADE, SET_NULL
+from django.db.models.expressions import F, Value
+from django.db.models.functions import Concat, Length, Replace, Substr
 
-from analysis.models import GroupOperation, AnalysisNode
+from analysis.models import AnalysisNode, GroupOperation
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.sources._stats_cache import (
-    get_cached_label_count_for_cohort, get_handler_for_node, UNCACHEABLE,
+    UNCACHEABLE,
+    get_cached_label_count_for_cohort,
+    get_handler_for_node,
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
-from patients.models_enums import Zygosity, SimpleZygosity
-from snpdb.models import Cohort, CohortSample, VariantsType, CohortGenotypeCollection
+from patients.models_enums import SimpleZygosity, Zygosity
+from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantsType
 
 
 class AbstractCohortBasedNode(CohortMixin, AnalysisNode):

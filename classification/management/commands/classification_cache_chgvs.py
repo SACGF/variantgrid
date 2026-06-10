@@ -36,7 +36,7 @@ class Command(BaseCommand):
             update_count += 1
             if update_count % 100 == 0:
                 print(f"Completed {update_count}")
-        print(f"Bulk Update of Cached c.hgvs - completed")
-        print(f"Biggest ref lengths are:")
+        print("Bulk Update of Cached c.hgvs - completed")
+        print("Biggest ref lengths are:")
         for conversion in conversions[::-1]:
             print(f"{conversion.ref_length} from vc.id {conversion.vc_id} {conversion.chgvs}")

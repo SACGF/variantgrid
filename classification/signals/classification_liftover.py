@@ -5,7 +5,7 @@ from django.dispatch import receiver
 from classification.models import ImportedAlleleInfo
 from library.log_utils import report_event
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
-from snpdb.models import liftover_run_complete_signal, LiftoverRun, AlleleConversionTool, Variant
+from snpdb.models import AlleleConversionTool, LiftoverRun, Variant, liftover_run_complete_signal
 
 
 @receiver(liftover_run_complete_signal, sender=LiftoverRun)

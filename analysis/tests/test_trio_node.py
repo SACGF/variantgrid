@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from analysis.models import Analysis, TrioNode
 from analysis.models.enums import TrioInheritance
 from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.models import GenomeBuild, Variant, BuiltInFilters
+from snpdb.models import BuiltInFilters, GenomeBuild, Variant
 from snpdb.models.models_cohort import CohortGenotype, CohortGenotypeCollection
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

@@ -3,22 +3,64 @@ from rest_framework import routers
 
 from library.django_utils.jqgrid_view import JQGridView
 from seqauto import views, views_autocomplete, views_rest
-from seqauto.grids.qc_data_grids import IlluminaFlowcellQCGrid, FastQCGrid, FlagstatsGrid, \
-    QCExecSummaryGrid
-from seqauto.grids.seqauto_grids import SeqAutoRunsGrid, EnrichmentKitGeneCoverageGrid, \
-    GoldCoverageSummaryGrid, SequencingSamplesGrid, SequencingSamplesHistoricalGrid
-from seqauto.grids.sequencing_data_grids import SequencingRunListGrid, \
-    UnalignedReadsListGrid, BamFileListGrid, SingleSampleVCFListGrid, QCFileListGrid, \
-    EnrichmentKitColumns, ExperimentColumns
-from seqauto.grids.sequencing_software_versions_grids import LibraryColumns, SequencerColumns, \
-    AssayColumns, AlignerColumns, VariantCallerColumns, VariantCallingPipelineColumns
-from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCallerUpdate, \
-    AlignerUpdate, VariantCallingPipelineUpdate
-from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
-    ExperimentViewSet, VariantCallerViewSet, SingleSampleVCFViewSet, JointCalledVCFViewSet, FastQCViewSet, \
-    SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
-    QCExecSummaryViewSet, QCGeneListBulkCreateView, SequencingFilesBulkCreateView, QCExecSummaryBulkCreateView, \
-    QCGeneCoverageBulkCreateView
+from seqauto.grids.qc_data_grids import (
+    FastQCGrid,
+    FlagstatsGrid,
+    IlluminaFlowcellQCGrid,
+    QCExecSummaryGrid,
+)
+from seqauto.grids.seqauto_grids import (
+    EnrichmentKitGeneCoverageGrid,
+    GoldCoverageSummaryGrid,
+    SeqAutoRunsGrid,
+    SequencingSamplesGrid,
+    SequencingSamplesHistoricalGrid,
+)
+from seqauto.grids.sequencing_data_grids import (
+    BamFileListGrid,
+    EnrichmentKitColumns,
+    ExperimentColumns,
+    QCFileListGrid,
+    SequencingRunListGrid,
+    SingleSampleVCFListGrid,
+    UnalignedReadsListGrid,
+)
+from seqauto.grids.sequencing_software_versions_grids import (
+    AlignerColumns,
+    AssayColumns,
+    LibraryColumns,
+    SequencerColumns,
+    VariantCallerColumns,
+    VariantCallingPipelineColumns,
+)
+from seqauto.views import (
+    AlignerUpdate,
+    AssayUpdate,
+    LibraryUpdate,
+    SequencerUpdate,
+    VariantCallerUpdate,
+    VariantCallingPipelineUpdate,
+)
+from seqauto.views_rest import (
+    EnrichmentKitViewSet,
+    ExperimentViewSet,
+    FastQCViewSet,
+    IlluminaFlowcellQCViewSet,
+    JointCalledVCFViewSet,
+    QCExecSummaryBulkCreateView,
+    QCExecSummaryViewSet,
+    QCGeneCoverageBulkCreateView,
+    QCGeneCoverageViewSet,
+    QCGeneListBulkCreateView,
+    QCGeneListViewSet,
+    SampleSheetViewSet,
+    SequencerModelViewSet,
+    SequencerViewSet,
+    SequencingFilesBulkCreateView,
+    SequencingRunViewSet,
+    SingleSampleVCFViewSet,
+    VariantCallerViewSet,
+)
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 

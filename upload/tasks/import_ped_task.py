@@ -2,7 +2,7 @@ import logging
 
 from django.conf import settings
 
-from pedigree.ped.import_ped import import_ped, automatch_pedigree_samples
+from pedigree.ped.import_ped import automatch_pedigree_samples, import_ped
 from upload.models import UploadedPedFile
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app

@@ -4,8 +4,16 @@ import cyvcf2
 from django.conf import settings
 
 from library.utils import invert_dict
-from snpdb.models import AlleleOrigin, VariantAllele, Allele, SequenceRole, Variant, AlleleLiftover, ProcessingStatus, \
-    VariantCoordinate
+from snpdb.models import (
+    Allele,
+    AlleleLiftover,
+    AlleleOrigin,
+    ProcessingStatus,
+    SequenceRole,
+    Variant,
+    VariantAllele,
+    VariantCoordinate,
+)
 from upload.models import ModifiedImportedVariant
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 

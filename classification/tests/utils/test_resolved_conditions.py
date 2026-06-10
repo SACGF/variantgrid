@@ -4,7 +4,7 @@ from django.test import TestCase
 
 from classification.models import ConditionResolved, MultiCondition
 from classification.tests.utils.data_utils import ConditionMock
-from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
+from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 
 
 class ResolvedConditionTest(TestCase):

@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from library.django_utils import require_superuser
 from library.git import Git
-from manual.models import ManualMigrationAttempt, ManualMigrationTask, ManualMigrationOutstanding
+from manual.models import ManualMigrationAttempt, ManualMigrationOutstanding, ManualMigrationTask
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 """

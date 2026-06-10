@@ -1,23 +1,32 @@
 import operator
 from functools import cached_property, reduce
-from typing import Dict, List, Optional
+from typing import Optional
 
 from django.conf import settings
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from more_itertools import first
 
-from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel
-from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
-    ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
-    Classification, DiscordanceReport, DiscordanceReportClassification
+from classification.enums import AlleleOriginBucket, EvidenceCategory, ShareLevel, SpecialEKeys
+from classification.models import (
+    Classification,
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
+    ClassificationGroupingSearchTerm,
+    ClassificationGroupingSearchTermType,
+    ClassificationModification,
+    DiscordanceReport,
+    DiscordanceReportClassification,
+    EvidenceKeyMap,
+    ImportedAlleleInfo,
+)
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologySnake
+from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Variant
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder, CellData
+from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
@@ -35,7 +44,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def render_row_header(self, row: CellData) -> JsonDataType:
 
-        matches: Optional[Dict[str, str]] = None
+        matches: Optional[dict[str, str]] = None
         search: Optional[str] = None
 
         if settings.CLASSIFICATION_ID_FILTER:
@@ -106,12 +115,12 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         }
 
     @cached_property
-    def genome_build_prefs(self) -> List[GenomeBuild]:
+    def genome_build_prefs(self) -> list[GenomeBuild]:
         builds = GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
         return [gb for gb in builds if gb in ImportedAlleleInfo.supported_genome_builds()]
 
     def render_c_hgvs(self, row: CellData) -> JsonDataType:
-        def get_preferred_chgvs_json() -> Dict:
+        def get_preferred_chgvs_json() -> dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
@@ -154,7 +163,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         page = self.get_query_param('page_id')
 
-        filters: List[Q] = []
+        filters: list[Q] = []
 
         # run the filters that are perma-applied on certain pages
 
@@ -186,7 +195,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         # run the filters that are optionally applied
 
-        filters: List[Q] = []
+        filters: list[Q] = []
         if lab_id := self.get_query_param('lab'):
             lab_list = lab_id.split(",")
             filters.append(Q(lab_id__in=lab_list))
@@ -226,7 +235,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             return dr
 
     @cached_property
-    def id_columns(self) -> List[str]:
+    def id_columns(self) -> list[str]:
         keys = EvidenceKeyMap.instance()
         return [e_key.key for e_key in keys.all_keys if '_id' in e_key.key and
                 e_key.evidence_category in (
@@ -248,7 +257,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         )
 
     def id_filter(self, text: str):
-        ids_contain_q_list: List[Q] = []
+        ids_contain_q_list: list[Q] = []
         for id_key in self.id_columns:
             ids_contain_q_list.append(Q(**{f'published_evidence__{id_key}__value__icontains': text}))
         id_filter_q = reduce(operator.or_, ids_contain_q_list)

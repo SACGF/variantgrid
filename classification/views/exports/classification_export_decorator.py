@@ -1,8 +1,10 @@
-from typing import Callable
+from collections.abc import Callable
 
 from django.http import HttpRequest
 
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
 
 ExportFormatterFactory = Callable[[HttpRequest], ClassificationExportFormatter]
 

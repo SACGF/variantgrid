@@ -1,16 +1,17 @@
 import dataclasses
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, List, Tuple, Dict, Set, Iterable, Any
+from typing import Any, Optional
 
 from avatar.templatetags.avatar_tags import avatar_url
 from dateutil.tz import gettz
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
@@ -18,11 +19,11 @@ from model_utils.managers import InheritanceManager
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
-from library.utils import string_deterministic_hash, rgb_invert
+from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
+from library.utils import rgb_invert, string_deterministic_hash
 from snpdb.models import AlleleOriginFilterDefault, UserAwards
-from snpdb.models.models import Tag, Lab, Organization
-from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
+from snpdb.models.models import Lab, Organization, Tag
+from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
 
@@ -60,7 +61,7 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
         self.version_id += 1
         self.save()
 
-    def get_user_colors_by_tag(self) -> Dict[str, Dict]:
+    def get_user_colors_by_tag(self) -> dict[str, dict]:
         user_colors_by_tag = {}
         for tag_id, rgb in self.tagcolor_set.all().values_list('tag', 'rgb'):
             user_colors_by_tag[tag_id] = {
@@ -286,7 +287,7 @@ class UserPreview(PreviewModelMixin):
         title = ""
         if self.user.is_superuser:
             title = "Admin"
-        elif labs := list(sorted(Lab.valid_labs_qs(self.user))):
+        elif labs := sorted(Lab.valid_labs_qs(self.user)):
             if len(labs) > 1:
                 title = f"{len(labs)} lab affiliations"
             else:
@@ -394,7 +395,7 @@ class UserSettings:
     default_lab: Optional[Lab]
     oauth_sub: str
     timezone: str
-    _settings_overrides: List[SettingsOverride]
+    _settings_overrides: list[SettingsOverride]
 
     @property
     def tz(self):
@@ -414,7 +415,7 @@ class UserSettings:
         raise ValueError("User doesn't have access to any Labs")
 
     @staticmethod
-    def get_settings_overrides(user=None, lab=None, organization=None) -> List[SettingsOverride]:
+    def get_settings_overrides(user=None, lab=None, organization=None) -> list[SettingsOverride]:
         user_settings_override = None
         lab_settings_override = None
 
@@ -445,7 +446,7 @@ class UserSettings:
     @staticmethod
     def get_for(user: Optional[User] = None, lab: Optional[Lab] = None, organization: Optional[Organization] = None):
         override_fields = [s.name for s in dataclasses.fields(UserSettings)]
-        kwargs = {f: None for f in override_fields}  # Need to pass all params
+        kwargs = dict.fromkeys(override_fields)  # Need to pass all params
         settings_overrides = UserSettings.get_settings_overrides(user=user, lab=lab, organization=organization)
         kwargs["_settings_overrides"] = settings_overrides
         for so in settings_overrides:
@@ -467,13 +468,13 @@ class UserSettings:
         return UserSettingsManager.get_user_settings(user)
 
     @cached_property
-    def initial_perm_read_and_write_groups(self) -> Tuple[Set[Group], Set[Group]]:
+    def initial_perm_read_and_write_groups(self) -> tuple[set[Group], set[Group]]:
         groups = self.user.groups.all()
         settings_overrides = self._settings_overrides
         return self.get_initial_perm_read_and_write_groups(groups, settings_overrides)
 
     @staticmethod
-    def get_initial_perm_read_and_write_groups(groups, settings_overrides) -> Tuple[Set[Group], Set[Group]]:
+    def get_initial_perm_read_and_write_groups(groups, settings_overrides) -> tuple[set[Group], set[Group]]:
         group_read = defaultdict(lambda x: False)
         group_write = defaultdict(lambda x: False)
         qs = SettingsInitialGroupPermission.objects.filter(group__in=groups)
@@ -488,13 +489,13 @@ class UserSettings:
         write_groups = {g for g, write_perm in group_write.items() if write_perm}
         return read_groups, write_groups
 
-    def get_override_source_and_values_before_user(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+    def get_override_source_and_values_before_user(self) -> tuple[dict[str, str], dict[str, str]]:
         override_fields = [s.name for s in dataclasses.fields(UserSettings)]
         parent_overrides = self._settings_overrides[:-1]  # Skip last, which is User override
         return self.get_override_source_and_values(override_fields, parent_overrides)
 
     @staticmethod
-    def get_override_source_and_values(override_fields: Iterable[str], parent_overrides: Iterable[SettingsOverride]) -> Tuple[Dict[str, str], Dict[str, str]]:
+    def get_override_source_and_values(override_fields: Iterable[str], parent_overrides: Iterable[SettingsOverride]) -> tuple[dict[str, str], dict[str, str]]:
         override_source = {}
         override_values = {}
         for so in parent_overrides:
@@ -541,7 +542,7 @@ class UserSettings:
         return genome_build
 
     @staticmethod
-    def get_lab_and_error(user: User) -> Tuple[Optional[Lab], Optional[str]]:
+    def get_lab_and_error(user: User) -> tuple[Optional[Lab], Optional[str]]:
         lab_error = None
         lab = None
         user_settings = UserSettings.get_for_user(user)

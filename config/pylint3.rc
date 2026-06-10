@@ -437,7 +437,20 @@ disable=raw-checker-failed,
         too-many-positional-arguments,
         import-outside-toplevel,
         cyclic-import,
-        pointless-string-statement
+        pointless-string-statement,
+        # --- Slimmed: the following are now owned by ruff (see ruff.toml). ---
+        # pylint is kept only for inference-heavy E-level checks (wrong arg
+        # counts, no-value-for-parameter, used-before-assignment, ...) and
+        # pylint_django. Style / imports / refactors are ruff's job.
+        C,  # convention: naming, docstrings, formatting, import style
+        R,  # refactoring: too-many-*, no-else-*, comprehensions (ruff B/C4/SIM)
+        unused-import,          # ruff F401
+        unused-variable,        # ruff F841
+        unused-wildcard-import, # ruff F403/F405
+        wildcard-import,        # ruff F403
+        reimported,             # ruff F811
+        wrong-import-position,  # ruff E402 / I001
+        dangerous-default-value # ruff B006
 
 
 # Enable the message, report, category or checker with the given id(s). You can

@@ -8,14 +8,14 @@ from functools import cached_property
 from typing import Optional, Union
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
-from django.db.models import Func, F, Value, CharField
+from django.db.models import CharField, F, Func, Value
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query import QuerySet
-from django.db.models.signals import pre_delete, post_save
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils import timezone
@@ -26,17 +26,29 @@ from eventlog.models import create_event
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.enums.log_level import LogLevel
-from library.log_utils import report_message, report_exc_info
+from library.log_utils import report_exc_info, report_message
 from library.utils import file_sha256sum
 from library.utils.file_utils import mk_path
-from seqauto.models import SingleSampleVCF, JointCalledVCF, get_samples_by_sequencing_sample, VariantCaller
+from seqauto.models import (
+    JointCalledVCF,
+    SingleSampleVCF,
+    VariantCaller,
+    get_samples_by_sequencing_sample,
+)
 from snpdb.import_status import set_vcf_and_samples_import_status
-from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild, VariantCoordinate
-from snpdb.models.models_enums import ImportSource, ProcessingStatus, ImportStatus
+from snpdb.models import VCF, GenomeBuild, SoftwareVersion, Variant, VariantCoordinate
+from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
-from upload.models.models_enums import UploadedFileTypes, VCFPipelineStage, \
-    UploadStepTaskType, TimeFilterMethod, VCFImportInfoSeverity, UploadStepOrigin, ModifiedImportedVariantOperation
+from upload.models.models_enums import (
+    ModifiedImportedVariantOperation,
+    TimeFilterMethod,
+    UploadedFileTypes,
+    UploadStepOrigin,
+    UploadStepTaskType,
+    VCFImportInfoSeverity,
+    VCFPipelineStage,
+)
 from variantgrid.celery import app
 
 

@@ -1,5 +1,4 @@
 # File for PyCharm DJango Structure plugin
 # noinspection PyUnresolvedReferences
 # pylint: disable=unused-import
-from classification.admin import ClassificationImportRunAdmin, ClassificationAdmin, ClassificationImportAdmin, ClinicalContextAdmin, EvidenceKeyAdmin, ClassificationReportTemplateAdmin, DiscordanceReportAdmin, DiscordanceReportTriageAdmin, DiscordanceNotificationAdmin, UploadedClassificationsUnmappedAdmin, ResolvedVariantInfoAdmin, ImportedAlleleInfoAdmin, ImportedAlleleInfoValidationAdmin, ClinVarExportAdmin, ClinVarAlleleAdmin, ClinVarExportBatchAdmin, ConditionTextAdmin, ClassificationGroupingAdmin
 # pylint: enable=unused-import

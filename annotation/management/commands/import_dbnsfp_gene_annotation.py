@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 from django.core.management import BaseCommand, CommandError
 
-from annotation.models import DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation
+from annotation.models import DBNSFPGeneAnnotation, DBNSFPGeneAnnotationVersion
 from genes.models import GeneSymbol
 from library.pandas_utils import df_nan_to_none
 from library.utils import file_sha256sum

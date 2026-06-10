@@ -2,7 +2,7 @@ import pandas as pd
 from django.core.management.base import BaseCommand
 
 from library.log_utils import console_logger
-from seqauto.models import SoftwarePipeline, SoftwarePipelineNode, SoftwarePipelineEdge
+from seqauto.models import SoftwarePipeline, SoftwarePipelineEdge, SoftwarePipelineNode
 
 PIPELINE_NAME = "Pipeline Name"
 PIPELINE_VERSION = "Pipeline Version"

@@ -1,6 +1,10 @@
 from ontology import views_autocomplete
 from ontology.views import OntologyTermView, ontology_term_text
-from ontology.views_rest import SearchMondoText, OntologyTermGeneListView, GeneDiseaseRelationshipView
+from ontology.views_rest import (
+    GeneDiseaseRelationshipView,
+    OntologyTermGeneListView,
+    SearchMondoText,
+)
 from variantgrid.perm_path import path
 
 urlpatterns = [

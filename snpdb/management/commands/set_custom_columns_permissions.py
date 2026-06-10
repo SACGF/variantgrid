@@ -1,6 +1,9 @@
 from django.core.management.base import BaseCommand
 
-from library.guardian_utils import assign_permission_to_user_and_groups, add_public_group_read_permission
+from library.guardian_utils import (
+    add_public_group_read_permission,
+    assign_permission_to_user_and_groups,
+)
 from snpdb.models import CustomColumnsCollection
 
 

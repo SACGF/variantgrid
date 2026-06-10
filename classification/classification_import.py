@@ -8,17 +8,22 @@ from django.db.models import QuerySet
 from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.classification import ClassificationImport
 from classification.models.classification_import_run import ClassificationImportRun
-from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
+from classification.tasks.classification_import_process_variants_task import (
+    ClassificationImportProcessVariantsTask,
+)
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, get_contigs_header_lines
+from library.genomics.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
 from library.utils import full_class_name
-from snpdb.models import Variant, ImportSource
+from snpdb.models import ImportSource, Variant
 from snpdb.models.models_variant import VariantCoordinate
-from snpdb.variant_pk_lookup import VariantPKLookup, VariantHash
-from upload.models import UploadedFile, UploadPipeline, UploadStep, \
-    UploadedClassificationImport
-from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, \
-    UploadStepTaskType, VCFPipelineStage
+from snpdb.variant_pk_lookup import VariantHash, VariantPKLookup
+from upload.models import UploadedClassificationImport, UploadedFile, UploadPipeline, UploadStep
+from upload.models.models_enums import (
+    UploadedFileTypes,
+    UploadStepOrigin,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
 from upload.upload_processing import process_upload_pipeline
 
 # MAX_VCF_FIELD_LENGTH = 131072
@@ -93,7 +98,7 @@ def _classification_upload_pipeline(
     if unknown_variant_coordinates:
         working_dir = get_import_processing_dir(classification_import.pk, "classification_import")
         vcf_filename = os.path.join(working_dir, "classification_import.vcf")
-        used_chroms = set((vc.chrom for vc in unknown_variant_coordinates))
+        used_chroms = set(vc.chrom for vc in unknown_variant_coordinates)
         header_lines = get_contigs_header_lines(classification_import.genome_build, use_accession=False,
                                                 contig_allow_list=used_chroms)
         write_vcf_from_variant_coordinates(vcf_filename, unknown_variant_coordinates, header_lines=header_lines)

@@ -80,7 +80,7 @@ class Command(BaseCommand):
                     kwargs["files"] = {"file": open(filename, 'rb')}
                     kwargs["params"] = {"path": filename}
                 else:
-                    with open(filename, "r") as f:
+                    with open(filename) as f:
                         json_data = json.load(f)
                         kwargs["json"] = json_data
 

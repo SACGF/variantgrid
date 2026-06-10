@@ -6,7 +6,7 @@ from django.db.utils import ProgrammingError
 from django.utils.text import slugify
 
 from library.log_utils import log_traceback
-from library.utils import single_quote, double_quote
+from library.utils import double_quote, single_quote
 from library.utils.database_utils import run_sql
 
 

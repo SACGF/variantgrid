@@ -2,9 +2,12 @@ from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.clingen_allele import get_clingen_allele
-from snpdb.liftover import _liftover_using_existing_contig, _liftover_using_dest_variant_coordinate, \
-    _liftover_using_source_variant_coordinate
-from snpdb.models import GenomeBuild, AlleleConversionTool, VariantCoordinate
+from snpdb.liftover import (
+    _liftover_using_dest_variant_coordinate,
+    _liftover_using_existing_contig,
+    _liftover_using_source_variant_coordinate,
+)
+from snpdb.models import AlleleConversionTool, GenomeBuild, VariantCoordinate
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 

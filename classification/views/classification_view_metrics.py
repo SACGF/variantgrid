@@ -1,12 +1,13 @@
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Any, Callable, TypeVar, Generic, Optional, Type
+from typing import Any, Generic, Optional, TypeVar
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.db.models import Model, Count, Q, QuerySet
+from django.db.models import Count, Model, Q, QuerySet
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
@@ -98,7 +99,7 @@ class ViewEventCounts:
         return sorted((Counted(pk, count, resolver) for pk, count in id_to_count.items()), reverse=True)
 
     @staticmethod
-    def resolver_for_model(model: Type[Model]):
+    def resolver_for_model(model: type[Model]):
         def resolver(pk: Any):
             if pk and pk != "undefined":
                 if first := model.objects.filter(pk=pk).first():

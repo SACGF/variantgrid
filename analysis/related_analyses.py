@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 from analysis.models.nodes.analysis_node import Analysis
-from analysis.models.nodes.sources import SampleNode, CohortNode, TrioNode, PedigreeNode
+from analysis.models.nodes.sources import CohortNode, PedigreeNode, SampleNode, TrioNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 
 

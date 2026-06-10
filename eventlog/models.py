@@ -2,7 +2,7 @@ import inspect
 import logging
 from typing import Optional, Union
 
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.contrib.auth.signals import user_logged_in
 from django.db import models
 from django.db.models.deletion import SET_NULL

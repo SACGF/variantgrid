@@ -2,9 +2,12 @@ from datetime import timedelta
 
 from django.dispatch import receiver
 
-from library.health_check import HealthCheckAge, HealthCheckRequest, \
-    health_check_overall_stats_signal
-from sync.models import SyncRun, SyncDestination, SyncStatus
+from library.health_check import (
+    HealthCheckAge,
+    HealthCheckRequest,
+    health_check_overall_stats_signal,
+)
+from sync.models import SyncDestination, SyncRun, SyncStatus
 
 
 @receiver(signal=health_check_overall_stats_signal)

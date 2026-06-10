@@ -13,14 +13,18 @@ from django.template.loader import render_to_string
 from django.utils.timesince import timesince
 
 from classification.enums.discordance_enums import DiscordanceReportResolution
-from classification.models import Classification, classification_flag_types, \
-    DiscordanceReportClassification, DiscordanceReport
+from classification.models import (
+    Classification,
+    DiscordanceReport,
+    DiscordanceReportClassification,
+    classification_flag_types,
+)
 from classification.models.discordance_models_utils import DiscordanceReportCategories
 from email_manager.models import EmailLog
-from flags.models import FlagCollection, Flag
+from flags.models import Flag, FlagCollection
 from library.log_utils import report_exc_info, report_message
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab, UserSettings, GenomeBuild
+from snpdb.models import GenomeBuild, Lab, UserSettings
 
 EmailOutput = collections.namedtuple('EmailOutput', 'subject html text')
 

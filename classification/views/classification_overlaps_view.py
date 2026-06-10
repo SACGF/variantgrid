@@ -7,12 +7,15 @@ from django.db import transaction
 from django.db.models import Model
 from django.http.request import HttpRequest
 from django.http.response import HttpResponseBase
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import get_object_or_404, redirect, render
 
 from classification.models import ClassificationRef
 from classification.models.allele_overlaps import OverlapsCalculator
 from classification.models.classification import Classification
-from classification.models.clinical_context_models import ClinicalContext, ClinicalContextRecalcTrigger
+from classification.models.clinical_context_models import (
+    ClinicalContext,
+    ClinicalContextRecalcTrigger,
+)
 from classification.models.flag_types import classification_flag_types
 from library.django_utils import require_superuser
 from snpdb.lab_picker import LabPickerData

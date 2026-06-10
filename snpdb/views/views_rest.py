@@ -2,7 +2,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import permissions, viewsets
 from rest_framework.generics import RetrieveAPIView, get_object_or_404
 from rest_framework.response import Response
@@ -11,9 +11,14 @@ from rest_framework.views import APIView
 from library.constants import MINUTE_SECS
 from patients.models_enums import Zygosity
 from snpdb.clingen_allele import get_variant_allele_for_variant
-from snpdb.models import Sample, Variant, Trio, Quad, GenomeBuild
+from snpdb.models import GenomeBuild, Quad, Sample, Trio, Variant
 from snpdb.models.models_vcf import Project
-from snpdb.serializers import QuadSerializer, TrioSerializer, VariantAlleleSerializer, ProjectSerializer
+from snpdb.serializers import (
+    ProjectSerializer,
+    QuadSerializer,
+    TrioSerializer,
+    VariantAlleleSerializer,
+)
 
 
 class VariantZygosityForSampleView(APIView):

@@ -6,11 +6,11 @@ from typing import Optional
 from django.db.models import Q
 
 from analysis.models.enums import GroupOperation
-from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
+from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from patients.models_enums import Zygosity
 from snpdb.archive import DataArchivedError
-from snpdb.models import VCFFilter, Cohort, Sample, CohortGenotypeCollection
+from snpdb.models import Cohort, CohortGenotypeCollection, Sample, VCFFilter
 from upload.models import UploadedVCF
 
 
@@ -74,7 +74,7 @@ class CohortMixin:
         visibility = {}
         if cohort := self._get_cohort():
             cohorts = [cohort]
-            visibility = {s: cohort.has_genotype for s in cohort.get_samples()}
+            visibility = dict.fromkeys(cohort.get_samples(), cohort.has_genotype)
         return cohorts, visibility
 
     @property
@@ -162,7 +162,7 @@ class CohortMixin:
                     arg_q_dict[vc.variant_collection_alias] = {str(q_vc): q_vc}
                 else:
                     missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
-                    sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
+                    sample_zygosities_dict = dict.fromkeys(cohort.get_samples(), missing)
                     q_sub = cgc.get_zygosity_q(sample_zygosities_dict, exclude=True)
                     q_and.append(q_sub)
             q_and.extend(self._get_q_and_list())

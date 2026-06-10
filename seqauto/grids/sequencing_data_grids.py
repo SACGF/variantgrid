@@ -2,7 +2,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import TextField, QuerySet
+from django.db.models import QuerySet, TextField
 from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
 from django.db.models.query_utils import Q
@@ -10,9 +10,17 @@ from django.utils.html import format_html_join, mark_safe
 
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonDataType
-from seqauto.models import SequencingRun, BamFile, UnalignedReads, SingleSampleVCF, QC, Experiment, EnrichmentKit, \
-    EnrichmentKitType
-from snpdb.models import UserGridConfig, DataState
+from seqauto.models import (
+    QC,
+    BamFile,
+    EnrichmentKit,
+    EnrichmentKitType,
+    Experiment,
+    SequencingRun,
+    SingleSampleVCF,
+    UnalignedReads,
+)
+from snpdb.models import DataState, UserGridConfig
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 

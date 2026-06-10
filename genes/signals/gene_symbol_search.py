@@ -7,8 +7,13 @@ from classification.models import ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.signals.classification_search import classification_qs_to_extras
 from genes.models import GeneSymbol, GeneSymbolAlias
-from library.preview_request import preview_extra_signal, PreviewKeyValue
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResultMatchStrength
+from library.preview_request import PreviewKeyValue, preview_extra_signal
+from snpdb.search import (
+    SearchExample,
+    SearchInputInstance,
+    SearchResultMatchStrength,
+    search_receiver,
+)
 
 GENE_SYMBOL_PATTERN = re.compile(r"^[a-zA-Z][\da-zA-Z\-\.]+$")
 

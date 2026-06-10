@@ -13,8 +13,14 @@ from django.dispatch.dispatcher import receiver
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from genes.hgvs import get_hgvs_variant
-from snpdb.models import GenomicIntervalsCollection, GenomicInterval, Sample, \
-    VCFBedIntersection, Cohort, VariantCollection
+from snpdb.models import (
+    Cohort,
+    GenomicInterval,
+    GenomicIntervalsCollection,
+    Sample,
+    VariantCollection,
+    VCFBedIntersection,
+)
 from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 

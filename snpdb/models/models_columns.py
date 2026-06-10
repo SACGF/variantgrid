@@ -4,7 +4,6 @@ from typing import Optional
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Q
 from django.db.models.deletion import CASCADE
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_group

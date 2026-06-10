@@ -1,8 +1,13 @@
 import numpy as np
-from django.db.models.aggregates import Min, Max, Count
+from django.db.models.aggregates import Count, Max, Min
 from django.template.library import Library
 
-from library.utils.date_utils import diff_month, date_to_month_year_string, month_year_string, month_range
+from library.utils.date_utils import (
+    date_to_month_year_string,
+    diff_month,
+    month_range,
+    month_year_string,
+)
 from snpdb.models.models_vcf import VCF
 
 register = Library()
@@ -23,7 +28,7 @@ def samples_by_month_graph(context):
         num_months = diff_month(ld, ed)
 
         labels = month_range(ed.month, ed.year, 0, num_months, fmt=month_year_string)
-        samples_by_month = {m: 0 for m in labels}
+        samples_by_month = dict.fromkeys(labels, 0)
 
         for d, count in vcf_qs.annotate(count=Count("sample")).values_list("date", "count"):
             l = date_to_month_year_string(d)

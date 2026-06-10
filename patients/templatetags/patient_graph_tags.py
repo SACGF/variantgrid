@@ -3,7 +3,7 @@ import uuid
 from django.db.models.aggregates import Count
 from django.template import Library
 
-from ontology.models import OntologyTerm, OntologyService
+from ontology.models import OntologyService, OntologyTerm
 from patients.models import Patient
 
 GENES_COLOR = "#99CD83"

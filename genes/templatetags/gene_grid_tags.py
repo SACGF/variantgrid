@@ -2,9 +2,14 @@ from django.conf import settings
 from django.db.models.query_utils import Q
 from django.template import Library
 
-from genes.forms import GeneListCategoryAutocompleteForm, NamedCustomGeneListForm, GeneSymbolForm, \
-    GeneAnnotationReleaseForm, panel_app_server_autocomplete_form_factory
-from genes.models import GeneInfo, GeneListCategory, PanelAppServer, GeneAnnotationRelease
+from genes.forms import (
+    GeneAnnotationReleaseForm,
+    GeneListCategoryAutocompleteForm,
+    GeneSymbolForm,
+    NamedCustomGeneListForm,
+    panel_app_server_autocomplete_form_factory,
+)
+from genes.models import GeneAnnotationRelease, GeneInfo, GeneListCategory, PanelAppServer
 from library.log_utils import log_traceback
 from ontology.forms import HPOForm, OMIMForm
 from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionForm

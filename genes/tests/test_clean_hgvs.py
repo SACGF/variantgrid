@@ -1,6 +1,6 @@
 from django.test import TestCase, override_settings
 
-from genes.hgvs import HGVSMatcher, HGVSConverterType
+from genes.hgvs import HGVSConverterType, HGVSMatcher
 from snpdb.models import GenomeBuild
 
 

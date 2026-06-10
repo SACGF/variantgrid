@@ -10,8 +10,14 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
-from upload.models import UploadStep, ModifiedImportedVariant, UploadStepTaskType, VCFPipelineStage, \
-    SimpleVCFImportInfo, ModifiedImportedVariantOperation
+from upload.models import (
+    ModifiedImportedVariant,
+    ModifiedImportedVariantOperation,
+    SimpleVCFImportInfo,
+    UploadStep,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.sql_copy_files import write_sql_copy_csv
 

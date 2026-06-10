@@ -5,9 +5,9 @@ from django.db.models.aggregates import Count
 from guardian.shortcuts import assign_perm
 from toposort import toposort
 
-from pedigree.models import PedFile, PedFileRecord, PedFileFamily, create_automatch_pedigree
-from pedigree.ped.ped_file_utils import get_sex, get_affection, PED_COLUMNS, get_parent_id
-from snpdb.models import ImportStatus, Cohort
+from pedigree.models import PedFile, PedFileFamily, PedFileRecord, create_automatch_pedigree
+from pedigree.ped.ped_file_utils import PED_COLUMNS, get_affection, get_parent_id, get_sex
+from snpdb.models import Cohort, ImportStatus
 
 
 def save_ped_records(ped_file_family, family_df, dependency_graph):

@@ -2,7 +2,7 @@ from django.dispatch import receiver
 
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized
-from library.preview_request import preview_request_signal, PreviewRequest
+from library.preview_request import PreviewRequest, preview_request_signal
 
 
 @receiver(signal=preview_request_signal)

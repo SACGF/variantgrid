@@ -4,15 +4,21 @@ from django.forms.forms import Form
 from django.forms.formsets import formset_factory
 from django.forms.models import ModelChoiceField
 from django.http.response import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
 
 from library.utils import full_class_name
 from pedigree import forms
 from pedigree.forms import BaseCohortSamplesForPedFileRecordsFormSet
 from pedigree.graphs.pedigree_chart import PedigreeChart
-from pedigree.models import PedFile, Pedigree, PedFileFamily, PedFileRecord, \
-    CohortSamplePedFileRecord, create_automatch_pedigree
+from pedigree.models import (
+    CohortSamplePedFileRecord,
+    PedFile,
+    PedFileFamily,
+    PedFileRecord,
+    Pedigree,
+    create_automatch_pedigree,
+)
 from snpdb.forms import UserCohortForm
 from snpdb.graphs import graphcache
 from snpdb.models import Cohort, UserGridConfig

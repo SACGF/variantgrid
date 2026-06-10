@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.db.models import Q
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.urls.base import reverse
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
@@ -23,10 +23,14 @@ from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.views.classification_export_report import ClassificationReport
 from classification.views.exports import ClassificationExportFormatterCSV
-from classification.views.exports.classification_export_filter import ClassificationFilter, \
-    classification_export_user_strings_to_q
+from classification.views.exports.classification_export_filter import (
+    ClassificationFilter,
+    classification_export_user_strings_to_q,
+)
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
-from classification.views.exports.classification_export_formatter_redcap import export_redcap_definition
+from classification.views.exports.classification_export_formatter_redcap import (
+    export_redcap_definition,
+)
 from classification.views.exports.classification_export_view import serve_export
 from library.django_utils import get_url_from_view_path
 from library.log_utils import report_exc_info
@@ -119,7 +123,7 @@ def _export_view_context(request: HttpRequest) -> dict:
         format_vcf
     ]
 
-    labs_for_user = list(sorted(Lab.valid_labs_qs(request.user, admin_check=True)))
+    labs_for_user = sorted(Lab.valid_labs_qs(request.user, admin_check=True))
     downloadable_field_counts = len(EvidenceKeyMap.cached().vital())
     all_field_counts = len(EvidenceKeyMap.cached().all_keys)
 
@@ -310,7 +314,7 @@ def internal_lab_download(request):
             genome_build=genome_build,
             allele_origin_filter=allele_origin,
             min_share_level=share_level,
-            file_prefix=f"Internal_lab_report",
+            file_prefix="Internal_lab_report",
             include_sources=user_labs,
             extra_filter=extra_filter_qs
         )

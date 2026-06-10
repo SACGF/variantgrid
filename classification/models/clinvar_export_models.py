@@ -1,6 +1,7 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Iterable
+from typing import Optional
 
 from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
@@ -11,10 +12,10 @@ from model_utils.models import TimeStampedModel
 
 from classification.enums import AlleleOriginBucket
 from classification.models import ClassificationModification, ConditionResolved
-from library.preview_request import PreviewModelMixin, PreviewData, PreviewKeyValue
-from library.utils import first, invalidate_cached_property, JsonObjType
-from snpdb.models import ClinVarKey, Allele
-from uicore.json.validated_json import ValidatedJson, JsonMessages
+from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
+from library.utils import JsonObjType, first, invalidate_cached_property
+from snpdb.models import Allele, ClinVarKey
+from uicore.json.validated_json import JsonMessages, ValidatedJson
 
 CLINVAR_EXPORT_CONVERSION_VERSION = 4
 

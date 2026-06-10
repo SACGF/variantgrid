@@ -4,7 +4,8 @@ import re
 import sys
 import traceback
 from collections import Counter, defaultdict
-from typing import Iterable, Optional
+from collections.abc import Iterable
+from typing import Optional
 
 import pandas as pd
 from django.conf import settings
@@ -16,16 +17,39 @@ from genes.models import TranscriptVersion
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
 from library.utils import file_md5sum
-from library.utils.file_utils import name_from_filename, file_to_array
+from library.utils.file_utils import file_to_array, name_from_filename
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_valid
-from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
-    UnalignedReads, BamFile, SingleSampleVCF, QC, JointCalledVCF, IlluminaFlowcellQC, FastQC, Flagstats, \
-    DontAutoLoadException, Experiment, SampleFromSequencingSample, QCGeneList, \
-    get_samples_by_sequencing_sample, QCGeneCoverage, SeqAutoMessage, SeqAutoRecord, get_variant_caller_from_vcf_file
+from seqauto.models import (
+    QC,
+    BamFile,
+    DontAutoLoadException,
+    Experiment,
+    Fastq,
+    FastQC,
+    Flagstats,
+    IlluminaFlowcellQC,
+    JointCalledVCF,
+    QCGeneCoverage,
+    QCGeneList,
+    SampleFromSequencingSample,
+    SampleSheet,
+    SeqAutoMessage,
+    SeqAutoRecord,
+    Sequencer,
+    SequencingRun,
+    SequencingSample,
+    SequencingSampleData,
+    SingleSampleVCF,
+    UnalignedReads,
+    get_samples_by_sequencing_sample,
+    get_variant_caller_from_vcf_file,
+)
 from seqauto.models.models_enums import SequencingFileType
-from seqauto.signals.signals_list import sequencing_run_current_sample_sheet_changed_signal, \
-    sequencing_run_created_signal
+from seqauto.signals.signals_list import (
+    sequencing_run_created_signal,
+    sequencing_run_current_sample_sheet_changed_signal,
+)
 from snpdb.models import DataState
 from upload.models import BackendVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
@@ -143,11 +167,11 @@ class FlowcellChecker:
     def __init__(self):
         self.skip_patterns = []
 
-        skip_patterns = getattr(settings, "SEQAUTO_SKIP_FLOWCELLS_PATTERNS")
+        skip_patterns = settings.SEQAUTO_SKIP_FLOWCELLS_PATTERNS
         if skip_patterns:
             self.skip_patterns.extend(skip_patterns)
 
-        skip_file = getattr(settings, "SEQAUTO_SKIP_FLOWCELLS_FILE")
+        skip_file = settings.SEQAUTO_SKIP_FLOWCELLS_FILE
         if skip_file:
             with open(skip_file) as f:
                 for line in f:
@@ -159,7 +183,7 @@ class FlowcellChecker:
         logging.info("Flowcell Skip patterns:")
         logging.info(self.skip_patterns)
 
-        self.skip_flowcell_filename = getattr(settings, "SEQAUTO_SKIP_INDIVIDUAL_FLOWCELL_FILE")
+        self.skip_flowcell_filename = settings.SEQAUTO_SKIP_INDIVIDUAL_FLOWCELL_FILE
 
     def skip(self, sequencing_run_dir):
         for p in self.skip_patterns:

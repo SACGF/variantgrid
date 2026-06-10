@@ -1,7 +1,7 @@
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.core.management import BaseCommand
 from django.db.models import Max
@@ -9,11 +9,11 @@ from django.urls import reverse
 from django.utils.http import urlencode
 
 from classification.models import ImportedAlleleInfo
-from genes.hgvs import HGVSMatcher, HGVSConverterType, VariantResolvingError
-from genes.models import TranscriptVersion, TranscriptParts
+from genes.hgvs import HGVSConverterType, HGVSMatcher, VariantResolvingError
+from genes.models import TranscriptParts, TranscriptVersion
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column, delimited_row
-from snpdb.models import Variant, GenomeBuild, VariantCoordinate
+from library.utils import ExportRow, delimited_row, export_column
+from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 
 class Change(int, Enum):

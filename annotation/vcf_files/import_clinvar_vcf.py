@@ -12,7 +12,7 @@ from annotation.vcf_files.vcf_types import VCFVariant
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadStep
-from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
+from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 """
 ##fileformat=VCFv4.1

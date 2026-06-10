@@ -2,24 +2,39 @@ import logging
 import operator
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from functools import reduce
-from typing import Optional, Any, Callable
+from typing import Any, Optional
 
 import pandas as pd
 from auditlog.models import LogEntry
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Max, F, Q, QuerySet
+from django.db.models import F, Max, Q, QuerySet
 from django.db.models.functions import Substr
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
-from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, GroupOperation, \
-    CandidateSearchRun, CandidateSearchType, Candidate, CandidateStatus, AnalysisType
+from analysis.models import (
+    Analysis,
+    AnalysisNode,
+    AnalysisTemplate,
+    AnalysisType,
+    Candidate,
+    CandidateSearchRun,
+    CandidateSearchType,
+    CandidateStatus,
+    GroupOperation,
+    NodeCount,
+    NodeStatus,
+)
 from analysis.models.models_karyomapping import KaryomappingAnalysis
-from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
+from analysis.models.nodes.analysis_node import (
+    NodeColumnSummaryCacheCollection,
+    get_extra_filters_q,
+)
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
 from genes.grids import GeneListGenesColumns
@@ -28,18 +43,29 @@ from library.jqgrid.jqgrid_sql import get_overrides
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import update_dict_of_dict_values, JsonDataType, sha256sum_str
+from library.utils import JsonDataType, sha256sum_str, update_dict_of_dict_values
 from ontology.grids import AbstractOntologyGenesGrid
-from ontology.models import OntologyTermRelation, GeneDiseaseClassification, OntologyVersion
+from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
 from patients.models_enums import Zygosity
-from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
-    get_variantgrid_extra_annotate
-from snpdb.grid_columns.grid_sample_columns import get_available_format_columns, \
-    get_variantgrid_zygosity_annotation_kwargs
+from snpdb.grid_columns.custom_columns import (
+    get_custom_column_fields_override_and_sample_position,
+    get_variantgrid_extra_annotate,
+)
+from snpdb.grid_columns.grid_sample_columns import (
+    get_available_format_columns,
+    get_variantgrid_zygosity_annotation_kwargs,
+)
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype, ProcessingStatus
+from snpdb.models import (
+    CohortGenotype,
+    ProcessingStatus,
+    Sample,
+    UserGridConfig,
+    VariantGridColumn,
+    VCFFilter,
+)
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class VariantGrid(AbstractVariantGrid):
@@ -230,7 +256,7 @@ class VariantGrid(AbstractVariantGrid):
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
         # empty values (what CyVCF2 returns using format()) @see https://github.com/SACGF/variantgrid/issues/59
         MISSING_VALUES = [CohortGenotype.MISSING_NUMBER_VALUE, CohortGenotype.MISSING_FT_VALUE, -2147483648]
-        packed_data_replace.update({mv: VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE for mv in MISSING_VALUES})
+        packed_data_replace.update(dict.fromkeys(MISSING_VALUES, VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE))
 
         # We now have separate aliases for packed data, so each cohort handled separately
         sample_cohort_index = {}

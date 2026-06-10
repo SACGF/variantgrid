@@ -16,8 +16,16 @@ from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC, HGNCImport
 from library.utils import file_md5sum
 from ontology.gencc import load_gencc
-from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
-    OntologyTermRelation, OntologyVersion, OntologyTermStatus
+from ontology.models import (
+    OntologyImport,
+    OntologyImportSource,
+    OntologyRelation,
+    OntologyService,
+    OntologyTerm,
+    OntologyTermRelation,
+    OntologyTermStatus,
+    OntologyVersion,
+)
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 """
@@ -93,7 +101,7 @@ def load_mondo(filename: str, force: bool):
     ontology_builder.cache_everything()
 
     data_file: dict
-    with open(filename, 'r') as json_file:
+    with open(filename) as json_file:
         data_file = json.load(json_file)
 
     node_to_hgnc_id: [str, str] = {}
@@ -329,7 +337,7 @@ def load_hpo(filename: str, force: bool):
             definition=term.definition,
             primary_source=True,
             status=status,
-            aliases=list(sorted(aliases))
+            aliases=sorted(aliases)
         )
 
         children = itertools.islice(term.subclasses(), 1, None)
@@ -460,7 +468,7 @@ def load_omim(filename: str, force: bool):
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
 
-    with open(filename, "r") as csv_file:
+    with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter='\t')
         next(csv_reader)  # title row
         next(csv_reader)  # date row (worth reading e.g. "Generated: 20201-02-04")

@@ -3,23 +3,29 @@ import logging
 import operator
 import re
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property, reduce
-from re import IGNORECASE
-from typing import Optional, Type, Pattern, Callable, Any, Match, Union, Iterable
+from re import IGNORECASE, Match, Pattern
+from typing import Any, Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from django.dispatch import Signal
 from more_itertools import take
 
 from library.enums.log_level import LogLevel
-from library.log_utils import report_exc_info, report_message, log_level_to_int, log_level_to_bootstrap
+from library.log_utils import (
+    log_level_to_bootstrap,
+    log_level_to_int,
+    report_exc_info,
+    report_message,
+)
 from library.preview_request import PreviewCoordinator, PreviewData
 from library.utils import clean_string, first, remove_duplicates_from_list
-from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
+from snpdb.models import Allele, GenomeBuild, UserSettings, Variant
 
 search_signal = Signal()
 HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
@@ -119,7 +125,9 @@ class SearchInput:
     def get_visible_variants(self, genome_build: GenomeBuild) -> QuerySet[Variant]:
         """ Shariant wants to restrict search to only classified variants """
 
-        from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+        from annotation.annotation_version_querysets import (
+            get_variant_queryset_for_annotation_version,
+        )
         from annotation.models import AnnotationVersion
         from classification.models import Classification
 
@@ -150,7 +158,7 @@ class SearchInputInstance:
     Useful for @search_receivers that have a capture group, not real bonus otherwise
     """
 
-    expected_type: Type
+    expected_type: type
     search_input: SearchInput
     match: Match
 
@@ -447,7 +455,7 @@ class SearchResult:
     @property
     def annotation_consortia(self) -> Optional[list['AnnotationConsortia']]:
         if consortia := self.preview.annotation_consortia:
-            return list(sorted(consortia))
+            return sorted(consortia)
 
 
 def _default_make_search_result(obj) -> Optional['SearchResult']:
@@ -644,8 +652,8 @@ class SearchResponse:
         for i, result in enumerate(self.results):
             result.original_order = i
             result.parent = self
-            result.messages = list(sorted(result.messages))
-        self.results = list(sorted(self.results))
+            result.messages = sorted(result.messages)
+        self.results = sorted(self.results)
         self.messages_overall = [om.with_response(self) for om in self.messages_overall]
 
     @property
@@ -695,7 +703,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
 
     for allele, variant_results in allele_to_variants.items():
         genome_builds = set().union(*[vr.preview.genome_builds for vr in variant_results if vr.preview.genome_builds])
-        all_messages = list(sorted(set().union(*(v.messages for v in variant_results))))
+        all_messages = sorted(set().union(*(v.messages for v in variant_results)))
 
         strongest_match = max(variant.match_strength for variant in variant_results)
 
@@ -756,7 +764,7 @@ class SearchResponsesCombined:
 
     def __init__(self, search_input: SearchInput, responses: list[SearchResponse]):
         self.search_input = search_input
-        self.responses = list(sorted(responses))
+        self.responses = sorted(responses)
 
     @cached_property
     def search_counts(self) -> list[SearchCount]:
@@ -772,7 +780,7 @@ class SearchResponsesCombined:
             sc.resolved += len(response.results)
             sc.total += response.total_count
 
-        return list(sorted((sc for sc in counts.values() if sc.resolved), key=lambda x: x.category))
+        return sorted((sc for sc in counts.values() if sc.resolved), key=lambda x: x.category)
 
     @property
     def has_excluded_records(self):
@@ -955,7 +963,7 @@ def search_receiver(
                 example=example,
                 matched_pattern=matched_pattern,
                 results=results,
-                messages_overall=list(sorted(overall_messages)),
+                messages_overall=sorted(overall_messages),
                 total_count=total_count
             )
 

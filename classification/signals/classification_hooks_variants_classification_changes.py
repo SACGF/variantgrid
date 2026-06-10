@@ -1,8 +1,13 @@
 from django.contrib.auth.models import User
 from django.dispatch import receiver
 
-from classification.models import classification_post_publish_signal, Classification, ClassificationModification, \
-    variants_classification_changed_signal, ImportedAlleleInfo
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    ImportedAlleleInfo,
+    classification_post_publish_signal,
+    variants_classification_changed_signal,
+)
 from classification.models.classification_variant_info_models import allele_info_changed_signal
 from snpdb.models import Allele
 

@@ -6,7 +6,7 @@ from django_messages.models import Message
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
 from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
-from snpdb.models import UserDataPrefix, SettingsInitialGroupPermission, Organization, Lab
+from snpdb.models import Lab, Organization, SettingsInitialGroupPermission, UserDataPrefix
 from snpdb.tasks.vcf_bed_file_task import create_backend_vcf_bed_intersections
 
 

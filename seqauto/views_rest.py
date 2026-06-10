@@ -10,9 +10,9 @@ from django.db.models.query_utils import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status
-from rest_framework.generics import get_object_or_404, RetrieveAPIView
+from rest_framework.generics import RetrieveAPIView, get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
@@ -21,18 +21,52 @@ from genes.models import GeneVersion
 from genes.views.views import get_coverage_stats
 from library.constants import WEEK_SECS
 from library.utils import defaultdict_to_dict
-from seqauto.models import GoldCoverageSummary, EnrichmentKit, SequencerModel, Sequencer, Experiment, VariantCaller, \
-    SequencingRun, SampleSheet, SingleSampleVCF, JointCalledVCF, FastQC, QCExecSummary, QCGeneCoverage, QCGeneList, \
-    QC, IlluminaFlowcellQC
-from seqauto.serializers import EnrichmentKitSerializer, \
-    GoldCoverageSummarySerializer, EnrichmentKitSummarySerializer
-from seqauto.serializers.seqauto_qc_serializers import FastQCSerializer, QCExecSummarySerializer, \
-    QCGeneCoverageSerializer, QCGeneListSerializer, QCSerializer, IlluminaFlowcellQCSerializer, \
-    QCGeneListCreateSerializer, QCGeneListBulkCreateSerializer, QCExecSummaryBulkCreateSerializer, \
-    QCGeneCoverageBulkCreateSerializer
-from seqauto.serializers.sequencing_serializers import SequencerModelSerializer, SequencerSerializer, \
-    ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer, SampleSheetSerializer, \
-    SingleSampleVCFSerializer, JointCalledVCFSerializer, SequencingFilesBulkCreateSerializer
+from seqauto.models import (
+    QC,
+    EnrichmentKit,
+    Experiment,
+    FastQC,
+    GoldCoverageSummary,
+    IlluminaFlowcellQC,
+    JointCalledVCF,
+    QCExecSummary,
+    QCGeneCoverage,
+    QCGeneList,
+    SampleSheet,
+    Sequencer,
+    SequencerModel,
+    SequencingRun,
+    SingleSampleVCF,
+    VariantCaller,
+)
+from seqauto.serializers import (
+    EnrichmentKitSerializer,
+    EnrichmentKitSummarySerializer,
+    GoldCoverageSummarySerializer,
+)
+from seqauto.serializers.seqauto_qc_serializers import (
+    FastQCSerializer,
+    IlluminaFlowcellQCSerializer,
+    QCExecSummaryBulkCreateSerializer,
+    QCExecSummarySerializer,
+    QCGeneCoverageBulkCreateSerializer,
+    QCGeneCoverageSerializer,
+    QCGeneListBulkCreateSerializer,
+    QCGeneListCreateSerializer,
+    QCGeneListSerializer,
+    QCSerializer,
+)
+from seqauto.serializers.sequencing_serializers import (
+    ExperimentSerializer,
+    JointCalledVCFSerializer,
+    SampleSheetSerializer,
+    SequencerModelSerializer,
+    SequencerSerializer,
+    SequencingFilesBulkCreateSerializer,
+    SequencingRunSerializer,
+    SingleSampleVCFSerializer,
+    VariantCallerSerializer,
+)
 
 
 class EnrichmentKitSummaryView(RetrieveAPIView):

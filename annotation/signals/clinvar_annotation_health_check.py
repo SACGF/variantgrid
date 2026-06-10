@@ -3,8 +3,11 @@ from datetime import timedelta
 from django.dispatch import receiver
 
 from annotation.models import ClinVarVersion
-from library.health_check import HealthCheckRequest, HealthCheckAge, \
-    health_check_overall_stats_signal
+from library.health_check import (
+    HealthCheckAge,
+    HealthCheckRequest,
+    health_check_overall_stats_signal,
+)
 from snpdb.models import GenomeBuild
 
 

@@ -3,7 +3,7 @@ from collections import Counter
 from bgzip import BGZipWriter
 
 from library.genomics.vcf_utils import vcf_allele_is_symbolic
-from snpdb.models import VCF, Zygosity, Sample
+from snpdb.models import VCF, Sample, Zygosity
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs, get_vcf_header_lines
 
 
@@ -167,7 +167,7 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
                                 ad = '.'
                             if dp is None:
                                 dp = '.'
-                            sample = ":".join((str(s) for s in (gt, ad, dp)))
+                            sample = ":".join(str(s) for s in (gt, ad, dp))
                         samples_list.append(sample)
 
                 row = [chrom, str(position), str(pk), ref, alt or ref, '.', '.', '.', vcf_format] + samples_list

@@ -12,16 +12,16 @@ Ideally, this could have been done via Django FilteredRelation - but that doesn'
 
 import operator
 from functools import reduce
-from typing import TypeVar, Optional
+from typing import Optional, TypeVar
 
 from django.conf import settings
-from django.db.models import QuerySet, Model, F
+from django.db.models import F, Model, QuerySet
 from django.db.models.query_utils import Q
 
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from snpdb.archive import DataArchivedError
-from snpdb.models import Variant, GenomeBuild
+from snpdb.models import GenomeBuild, Variant
 
 
 def get_variant_queryset_for_latest_annotation_version(genome_build: GenomeBuild) -> QuerySet[Variant]:

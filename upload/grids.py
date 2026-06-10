@@ -8,8 +8,8 @@ from annotation.annotation_version_querysets import get_queryset_for_latest_anno
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models import ProcessingStatus
 from snpdb.models.models_variant import Variant
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
-from upload.models import UploadStep, ModifiedImportedVariant, UploadPipeline, VCFPipelineStage
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn
+from upload.models import ModifiedImportedVariant, UploadPipeline, UploadStep, VCFPipelineStage
 
 
 class UploadStepColumns(DatatableConfig[UploadStep]):

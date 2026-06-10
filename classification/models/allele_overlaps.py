@@ -1,20 +1,29 @@
 import itertools
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import cached_property, reduce
-from typing import Optional, Iterator
+from typing import Optional
 
 from django.db.models import Count, QuerySet, Subquery
 
 from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths, CriteriaSummarizer
-from classification.enums import SpecialEKeys, ShareLevel
-from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
-    ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport, Classification
-from classification.models.clinical_context_models import DiscordanceStatus, DiscordanceLevel
+from classification.enums import ShareLevel, SpecialEKeys
+from classification.models import (
+    Classification,
+    ClassificationFlagTypes,
+    ClassificationLabSummary,
+    ClassificationLabSummaryEntry,
+    ClassificationModification,
+    ClinicalContext,
+    DiscordanceReport,
+    classification_flag_types,
+)
+from classification.models.clinical_context_models import DiscordanceLevel, DiscordanceStatus
 from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS
-from library.utils import group_by_key, segment, first
+from library.utils import first, group_by_key, segment
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
 
@@ -366,7 +375,7 @@ class OverlapsCalculator:
         all_overlaps = []
         cms_list: list[ClassificationModification]
         for allele, cms_list in group_by_key(cm_qs, lambda x: x.classification.allele_object):
-            if len(cms_list) >= 2 and any((cms.classification.lab_id in lab_ids for cms in cms_list)):
+            if len(cms_list) >= 2 and any(cms.classification.lab_id in lab_ids for cms in cms_list):
                 overlap = AlleleOverlap(calculator_state=self.calculator_state, allele=allele)
                 all_overlaps.append(overlap)
                 cm: Classification

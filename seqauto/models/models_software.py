@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import CASCADE
 from django.urls import reverse
-from django_dag.models import node_factory, edge_factory
+from django_dag.models import edge_factory, node_factory
 
 from snpdb.models import SoftwareVersion
 

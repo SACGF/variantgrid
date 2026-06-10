@@ -1,5 +1,14 @@
-from genes.models import GeneSymbol, Transcript, Gene, GeneAnnotationImport, GeneVersion, TranscriptVersion, \
-    GeneAnnotationRelease, ReleaseGeneSymbol, ReleaseGeneSymbolGene
+from genes.models import (
+    Gene,
+    GeneAnnotationImport,
+    GeneAnnotationRelease,
+    GeneSymbol,
+    GeneVersion,
+    ReleaseGeneSymbol,
+    ReleaseGeneSymbolGene,
+    Transcript,
+    TranscriptVersion,
+)
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 

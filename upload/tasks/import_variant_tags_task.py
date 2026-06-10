@@ -5,16 +5,21 @@ import pandas as pd
 from dateutil import parser
 from django.utils.timezone import make_aware
 
-from analysis.models import VariantTagsImport, ImportedVariantTag, VariantTag, TagLocation
+from analysis.models import ImportedVariantTag, TagLocation, VariantTag, VariantTagsImport
 from library.django_utils import UserMatcher
 from library.genomics.vcf_utils import write_vcf_from_variant_coordinates
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from library.utils import invert_dict
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import GenomeBuild, ImportSource, Tag, VariantAllele, VariantCoordinate, Allele
+from snpdb.models import Allele, GenomeBuild, ImportSource, Tag, VariantAllele, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
-from upload.models import UploadedVariantTags, UploadStep, ModifiedImportedVariant, SimpleVCFImportInfo
+from upload.models import (
+    ModifiedImportedVariant,
+    SimpleVCFImportInfo,
+    UploadedVariantTags,
+    UploadStep,
+)
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 

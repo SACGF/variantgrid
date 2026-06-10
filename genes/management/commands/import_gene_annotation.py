@@ -9,8 +9,18 @@ from django.db.models.functions import Upper
 from annotation.models import VariantAnnotationVersion
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
 from genes.gene_matching import ReleaseGeneMatcher
-from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript, HGNC, \
-    GeneAnnotationRelease, ReleaseGeneVersion, ReleaseTranscriptVersion
+from genes.models import (
+    HGNC,
+    Gene,
+    GeneAnnotationImport,
+    GeneAnnotationRelease,
+    GeneSymbol,
+    GeneVersion,
+    ReleaseGeneVersion,
+    ReleaseTranscriptVersion,
+    Transcript,
+    TranscriptVersion,
+)
 from genes.models_enums import AnnotationConsortium
 from library.utils import invert_dict
 from library.utils.file_utils import open_handle_gzip

@@ -9,12 +9,29 @@ from unidecode import unidecode
 
 from snpdb import models
 from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
-from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_list_column, \
-    admin_action
+from snpdb.admin_utils import (
+    GuardedModelAdminBasics,
+    ModelAdminBasics,
+    admin_action,
+    admin_list_column,
+)
 from snpdb.liftover import liftover_alleles
-from snpdb.models import Allele, VariantAllele, ClinVarKey, ClinVarKeyExcludePattern, UserSettingsOverride, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab, GlobalSettings, Variant, \
-    AlleleLiftover, SiteMessage
+from snpdb.models import (
+    Allele,
+    AlleleLiftover,
+    ClinVarKey,
+    ClinVarKeyExcludePattern,
+    GlobalSettings,
+    Lab,
+    LabUserSettingsOverride,
+    Organization,
+    OrganizationUserSettingsOverride,
+    SiteMessage,
+    UserPageAck,
+    UserSettingsOverride,
+    Variant,
+    VariantAllele,
+)
 from snpdb.models.models_genome import GenomeBuild
 
 

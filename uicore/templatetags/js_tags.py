@@ -7,13 +7,13 @@ import urllib
 from datetime import date, timedelta
 from decimal import Decimal
 from html import escape
-from typing import Union, Any, Optional
+from typing import Any, Optional, Union
 
 from django import template
 from django.db.models import TextChoices
-from django.utils.safestring import mark_safe, SafeString
+from django.utils.safestring import SafeString, mark_safe
 
-from library.utils import format_significant_digits, JsonDataType, format_diff_text
+from library.utils import JsonDataType, format_diff_text, format_significant_digits
 from snpdb.user_settings_manager import UserSettingsManager
 from uicore.json.validated_json import ValidatedJson
 
@@ -161,7 +161,7 @@ def code_json(data: JsonDataType, css_class: Optional[str] = "", dash_if_empty: 
         data = data.serialize()
 
     # note that we still want to print data if it's "false" or "0" but not if it's None or an empty dict or list
-    if dash_if_empty and data is None or (isinstance(data, collections.abc.Sized) and len(data) == 0):
+    if (dash_if_empty and data is None) or (isinstance(data, collections.abc.Sized) and len(data) == 0):
         return {"blank": True}
 
     if not css_class:

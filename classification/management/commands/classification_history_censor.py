@@ -93,14 +93,14 @@ class Command(BaseCommand):
                 lab = Lab.objects.get(id=lab_id)
             else:
                 lab = Lab.objects.get(group_name=lab_id)
-            print(f"Lab = {str(lab)}")
+            print(f"Lab = {lab!s}")
 
         if org_id:
             if org_id.isnumeric():
                 org = Organization.objects.get(id=org_id)
             else:
                 org = Organization.objects.get(group_name=org_id)
-            print(f"Org = {str(org)}")
+            print(f"Org = {org!s}")
 
         print(f"Pattern = {pattern}, icase = {pattern_icase}")
         if not apply_remaining:

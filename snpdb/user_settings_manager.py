@@ -2,9 +2,9 @@ from typing import Optional
 
 from dateutil.tz import gettz
 from django.contrib.auth.models import User
-from threadlocals.threadlocals import get_current_user, set_request_variable, get_request_variable
+from threadlocals.threadlocals import get_current_user, get_request_variable, set_request_variable
 
-from snpdb.models import UserSettings, AvatarDetails
+from snpdb.models import AvatarDetails, UserSettings
 
 
 class UserSettingsManager:

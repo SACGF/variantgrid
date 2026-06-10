@@ -3,7 +3,6 @@ from pedigree.grids import PedFilesColumns, PedigreeColumns
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
-
 urlpatterns = [
     path('pedigrees', views.pedigrees, name='pedigrees'),
     path('view_pedigree/<int:pedigree_id>', views.view_pedigree, name='view_pedigree'),

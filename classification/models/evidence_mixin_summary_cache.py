@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TypedDict, Optional, Self
+from typing import Optional, Self, TypedDict
 
 from classification.criteria_strengths import CriteriaStrength
-from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation
+from classification.enums import AlleleOriginBucket, CriteriaEvaluation, SpecialEKeys
 from library.utils import strip_json
 
 """
@@ -116,7 +116,7 @@ class ClassificationSummaryCalculator:
 
     @cached_property
     def pending_classification_value(self) -> Optional[str]:
-        from classification.models import classification_flag_types, ClassificationFlagTypes
+        from classification.models import ClassificationFlagTypes, classification_flag_types
         from flags.models import Flag, FlagStatus
         if flag := Flag.objects.filter(
             flag_type=classification_flag_types.classification_pending_changes,

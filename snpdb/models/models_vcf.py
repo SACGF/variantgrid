@@ -5,12 +5,12 @@ from functools import cached_property, reduce
 from typing import Optional, Union
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields.array import ArrayField
-from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models
-from django.db.models import Lookup, Field
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models import Field, Lookup
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Substr
 from django.db.models.query_utils import Q
 from django.db.models.signals import pre_delete
@@ -26,14 +26,20 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback, report_event
-from library.preview_request import PreviewModelMixin, PreviewKeyValue
+from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from patients.models import FakeData, Patient, Specimen
 from patients.models_enums import Sex
-from snpdb.models.models import Tag, LabProject
-from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus, SampleFileType, VCFInfoTypes
+from snpdb.models.models import LabProject, Tag
+from snpdb.models.models_enums import (
+    ImportStatus,
+    ProcessingStatus,
+    SampleFileType,
+    VariantsType,
+    VCFInfoTypes,
+)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
-from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
+from snpdb.models.models_variant import AlleleSource, Variant, VariantCollection
 
 
 @Field.register_lookup
@@ -430,7 +436,8 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.
         # a snpdb-internal load-order cycle (CohortGenotypeStats → SampleStatsCodeVersion
         # in this module) and a snpdb→annotation cycle.
         from annotation.models import (
-            CohortGenotypeClinVarAnnotationStats, CohortGenotypeGeneAnnotationStats,
+            CohortGenotypeClinVarAnnotationStats,
+            CohortGenotypeGeneAnnotationStats,
             CohortGenotypeVariantAnnotationStats,
         )
         from snpdb.models.models_cohort_stats import CohortGenotypeStats as _CGS
@@ -579,7 +586,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.
                 for t in sample_label_template.split("||"):
                     try:
                         return t % params
-                    except (ValueError, KeyError) as e:
+                    except (ValueError, KeyError):
                         pass
             # In theory this should be valid due to form validator, but just in case
             return sample.name

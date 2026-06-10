@@ -4,7 +4,7 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from annotation.models import VariantAnnotationVersion, VariantAnnotation
+from annotation.models import VariantAnnotation, VariantAnnotationVersion
 from genes.hgvs import HGVSMatcher
 
 

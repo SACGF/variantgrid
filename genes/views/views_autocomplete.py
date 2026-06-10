@@ -6,8 +6,16 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
-from genes.models import PanelAppPanel, GeneList, GeneSymbol, Gene, Transcript, GeneAnnotationRelease, PanelAppServer
-from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
+from genes.models import (
+    Gene,
+    GeneAnnotationRelease,
+    GeneList,
+    GeneSymbol,
+    PanelAppPanel,
+    PanelAppServer,
+    Transcript,
+)
+from library.constants import HOUR_SECS, MINUTE_SECS, WEEK_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 
 

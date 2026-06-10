@@ -10,7 +10,7 @@ from celery.canvas import Signature, chain
 from django.db import transaction
 from django.utils import timezone
 
-from analysis.models import AnalysisEdge, NodeStatus, NodeColors, NodeTask, AnalysisNode
+from analysis.models import AnalysisEdge, AnalysisNode, NodeColors, NodeStatus, NodeTask
 from analysis.models.nodes.analysis_node import NodeCache, NodeVersion
 from analysis.models.nodes.node_utils import get_nodes_by_id
 from analysis.tasks.node_update_tasks import MAX_NODE_ATTEMPTS

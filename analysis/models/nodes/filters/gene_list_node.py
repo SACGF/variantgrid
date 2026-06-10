@@ -5,7 +5,7 @@ from typing import Optional
 from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 from rest_framework.exceptions import NotFound
@@ -16,12 +16,18 @@ from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.models import GeneList, CustomTextGeneList, SampleGeneList, \
-    ActiveSampleGeneList, PanelAppPanel, PanelAppPanelLocalCache
+from genes.models import (
+    ActiveSampleGeneList,
+    CustomTextGeneList,
+    GeneList,
+    PanelAppPanel,
+    PanelAppPanelLocalCache,
+    SampleGeneList,
+)
 from genes.models_enums import PanelAppConfidence
 from genes.panel_app import get_panel_app_local_cache
 from pathtests.models import PathologyTestVersion
-from snpdb.models import Sample, Contig
+from snpdb.models import Contig, Sample
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -110,7 +116,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         gene_names_set = set()
         for gene_list in self.get_gene_lists():
             gene_names_set.update(gene_list.get_gene_names())
-        return list(sorted(gene_names_set))
+        return sorted(gene_names_set)
 
     def _get_gene_list_names(self) -> list[str]:
         gene_list_names = []

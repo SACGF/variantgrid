@@ -13,20 +13,26 @@ import csv
 import json
 import re
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Iterator
+from typing import Optional
 
-from annotation.models import ClinVar, AnnotationVersion
+from annotation.models import AnnotationVersion, ClinVar
 from classification.enums import SpecialEKeys
-from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKeyMap, \
-    ConditionResolved
+from classification.models import (
+    Classification,
+    ClinVarAllele,
+    ClinVarExport,
+    ConditionResolved,
+    EvidenceKeyMap,
+)
 from genes.hgvs import CHGVS, HGVSException
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
-from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
-from snpdb.models import GenomeBuild, Variant, Allele, ClinVarKey
+from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
+from snpdb.models import Allele, ClinVarKey, GenomeBuild, Variant
 from snpdb.search import SearchInput
 from snpdb.signals.variant_search import search_hgvs
 

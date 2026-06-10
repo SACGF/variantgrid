@@ -1,6 +1,11 @@
 from library.django_utils.jqgrid_view import JQGridView
 from patients import views, views_autocomplete
-from patients.grids import PatientListGrid, PatientOntologyGenesGrid, PatientRecordColumns, PatientRecordsColumns
+from patients.grids import (
+    PatientListGrid,
+    PatientOntologyGenesGrid,
+    PatientRecordColumns,
+    PatientRecordsColumns,
+)
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 

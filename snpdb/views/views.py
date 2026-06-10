@@ -3,23 +3,28 @@ import json
 import logging
 import os
 from collections import OrderedDict, defaultdict
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.models import User, Group
-from django.core.exceptions import PermissionDenied, ImproperlyConfigured, ObjectDoesNotExist
+from django.contrib.auth.models import Group, User
+from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist, PermissionDenied
 from django.db.utils import IntegrityError
-from django.forms.models import inlineformset_factory, ALL_FIELDS
-from django.utils.html import escape
+from django.forms.models import ALL_FIELDS, inlineformset_factory
 from django.forms.widgets import TextInput
 from django.http import HttpRequest
-from django.http.response import HttpResponse, HttpResponseRedirect, HttpResponseServerError, JsonResponse
-from django.shortcuts import get_object_or_404, render, redirect
+from django.http.response import (
+    HttpResponse,
+    HttpResponseRedirect,
+    HttpResponseServerError,
+    JsonResponse,
+)
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
+from django.utils.html import escape
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
@@ -33,55 +38,126 @@ from analysis.forms import AnalysisOutputNodeChoiceForm
 from analysis.models import AnalysisTemplate
 from analysis.tasks.analysis_grid_export_tasks import get_annotated_download_files_cgf
 from annotation.forms import GeneCountTypeChoiceForm
-from annotation.manual_variant_entry import create_manual_variants, can_create_variants
-from annotation.models import AnnotationVersion, CohortGenotypeVariantAnnotationStats, \
-    CohortGenotypeGeneAnnotationStats, CohortGenotypeClinVarAnnotationStats
+from annotation.manual_variant_entry import can_create_variants, create_manual_variants
+from annotation.models import (
+    AnnotationVersion,
+    CohortGenotypeClinVarAnnotationStats,
+    CohortGenotypeGeneAnnotationStats,
+    CohortGenotypeVariantAnnotationStats,
+)
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
-from annotation.models.models_gene_counts import GeneValueCountCollection, \
-    GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
+from annotation.models.models_gene_counts import (
+    CohortGeneCounts,
+    GeneCountType,
+    GeneValueCountCollection,
+    SampleAnnotationVersionVariantSource,
+)
 from annotation.serializers import ManualVariantEntryCollectionSerializer
 from classification.classification_stats import get_grouped_classification_counts
 from classification.enums import AlleleOriginBucket
 from classification.models.clinvar_export_sync import clinvar_export_sync
-from classification.views.classification_accumulation_graph import get_accumulation_graph_data, \
-    AccumulationReportMode
+from classification.views.classification_accumulation_graph import (
+    AccumulationReportMode,
+    get_accumulation_graph_data,
+)
 from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
-from genes.models import GeneListCategory, CustomTextGeneList, GeneList
+from genes.forms import CustomGeneListForm, GeneAndTranscriptForm, UserGeneListForm
+from genes.models import CustomTextGeneList, GeneList, GeneListCategory
 from library import uptime_check
-from library.constants import WEEK_SECS, HOUR_SECS
-from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser, \
-    get_field_counts
+from library.constants import HOUR_SECS, WEEK_SECS
+from library.django_utils import (
+    add_save_message,
+    get_field_counts,
+    get_model_fields,
+    require_superuser,
+    set_form_read_only,
+)
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
 from ontology.models import OntologyTerm
 from patients.forms import PatientForm
-from patients.models import Patient, Clinician
+from patients.models import Clinician, Patient
 from patients.views import get_patient_upload_csv
 from snpdb import forms
-from snpdb.archive import DataArchivedError, ArchivePreconditionError, check_vcf_archive_precondition, \
-    mark_vcf_archive_started
-from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
-    UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
-    OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
+from snpdb.archive import (
+    ArchivePreconditionError,
+    DataArchivedError,
+    check_vcf_archive_precondition,
+    mark_vcf_archive_started,
+)
+from snpdb.forms import (
+    LabForm,
+    LabUserSettingsOverrideForm,
+    OrganizationForm,
+    OrganizationUserSettingsOverrideForm,
+    SampleChoiceForm,
+    SampleForm,
+    SettingsInitialGroupPermissionForm,
+    TagForm,
+    UserContactForm,
+    UserForm,
+    UserSettingsOverrideForm,
+    VCFChoiceForm,
+)
 from snpdb.graphs import graphcache
 from snpdb.graphs.allele_frequency_graph import AlleleFrequencyHistogramGraph
 from snpdb.graphs.chromosome_density_graph import SampleChromosomeDensityGraph
 from snpdb.graphs.chromosome_intervals_graph import ChromosomeIntervalsGraph
 from snpdb.graphs.homozygosity_percent_graph import HomozygosityPercentGraph
 from snpdb.import_status import set_vcf_and_samples_import_status
-from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
-    VCF, CustomColumnsCollection, CustomColumn, Cohort, \
-    CohortSample, GenomicIntervalsCollection, Sample, UserDataPrefix, UserGridConfig, \
-    get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
-    Trio, Quad, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, \
-    Lab, LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, \
-    CohortGenotypeStats, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
-from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, AlleleConversionTool
+from snpdb.models import (
+    VCF,
+    AbstractNodeCountSettings,
+    Allele,
+    AlleleLiftover,
+    AvatarDetails,
+    CachedGeneratedFile,
+    ClinVarKey,
+    Cohort,
+    CohortGenotypeCollection,
+    CohortGenotypeStats,
+    CohortSample,
+    Contig,
+    CustomColumn,
+    CustomColumnsCollection,
+    GenomeBuild,
+    GenomicIntervalsCollection,
+    Lab,
+    LabHead,
+    LabUserSettingsOverride,
+    LiftoverRun,
+    NodeCountSettingsCollection,
+    Organization,
+    OrganizationUserSettingsOverride,
+    Quad,
+    Sample,
+    SampleLocusCount,
+    SomalierRelatePairs,
+    State,
+    Tag,
+    TagColorsCollection,
+    Trio,
+    UserContact,
+    UserDataPrefix,
+    UserGridConfig,
+    UserSettings,
+    UserSettingsOverride,
+    VariantGridColumn,
+    VariantZygosityCountCollection,
+    VariantZygosityCountForVCF,
+    VCFLengthStatsCollection,
+    Wiki,
+    get_igv_data,
+)
+from snpdb.models.models_enums import (
+    AlleleConversionTool,
+    BuiltInFilters,
+    ImportStatus,
+    ProcessingStatus,
+)
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.liftover_tasks import liftover_alleles
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
@@ -1026,7 +1102,7 @@ def view_lab(request, lab_id: int):
     if settings.CLASSIFICATION_STATS_USE_SHARED:
         visibility = "Shared"
     else:
-        visibility = f"Created"
+        visibility = "Created"
 
     context = {
         "lab": lab,
@@ -1822,7 +1898,7 @@ def global_sample_gene_matrix(request):
         try:
             genome_build = GenomeBuild.builds_with_annotation().get()
         except GenomeBuild.MultipleObjectsReturned:
-            msg = f"settings.PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD must be set when there are multiple genome builds"
+            msg = "settings.PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD must be set when there are multiple genome builds"
             raise ImproperlyConfigured(msg)
     else:
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)

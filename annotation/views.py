@@ -1,43 +1,74 @@
 import logging
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 
 import cdot
 from django.conf import settings
 from django.contrib import messages
-from django.http.response import HttpResponse, Http404, \
-    JsonResponse
-from django.shortcuts import get_object_or_404, render, redirect
+from django.http.response import Http404, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
+from annotation import vep_columns
 from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.manual_variant_entry import create_manual_variants
-from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
-    VariantAnnotationVersionDiff, Citation, InvalidAnnotationVersionError
-from annotation import vep_columns
-from annotation.pathogenicity_predictions import TOOLS
-from annotation.models.models import CachedWebResource, HumanProteinAtlasAnnotationVersion, \
-    HumanProteinAtlasAnnotation, DBNSFPGeneAnnotationVersion
+from annotation.models import (
+    AnnotationRun,
+    AnnotationVersion,
+    Citation,
+    InvalidAnnotationVersionError,
+    VariantAnnotationVersion,
+    VariantAnnotationVersionDiff,
+)
+from annotation.models.models import (
+    CachedWebResource,
+    DBNSFPGeneAnnotationVersion,
+    HumanProteinAtlasAnnotation,
+    HumanProteinAtlasAnnotationVersion,
+)
 from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_version_diff import VersionDiff
+from annotation.pathogenicity_predictions import TOOLS
 from annotation.tasks.annotate_variants import annotation_run_retry
-from annotation.tasks.annotation_scheduler_task import annotation_scheduler, subdivide_annotation_range_lock
-from annotation.vep_annotation import VEPConfig, get_vep_command, get_vep_variant_annotation_version_kwargs
-from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
+from annotation.tasks.annotation_scheduler_task import (
+    annotation_scheduler,
+    subdivide_annotation_range_lock,
+)
+from annotation.vep_annotation import (
+    VEPConfig,
+    get_vep_command,
+    get_vep_variant_annotation_version_kwargs,
+)
+from genes.models import (
+    GeneAnnotationImport,
+    GeneListCategory,
+    GeneSymbolAlias,
+    GeneVersion,
+    TranscriptVersion,
+)
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
-from library.django_utils import require_superuser, get_field_counts
+from library.django_utils import get_field_counts, require_superuser
 from library.utils import first
-from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyVersion
-from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
+from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
+from snpdb.models import (
+    VCF,
+    ColumnAnnotationLevel,
+    GenomeBuild,
+    SomalierConfig,
+    UserSettings,
+    VariantGridColumn,
+)
 from variantgrid.celery import app
-from variantgrid.deployment_validation.annotation_status_checks import \
-    is_variant_annotation_version_populated, get_variant_annotation_progress
+from variantgrid.deployment_validation.annotation_status_checks import (
+    get_variant_annotation_progress,
+    is_variant_annotation_version_populated,
+)
 from variantgrid.deployment_validation.somalier_check import verify_somalier_config
 
 

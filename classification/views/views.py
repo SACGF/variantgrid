@@ -3,11 +3,11 @@ import mimetypes
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, Any, Union
+from typing import Any, Optional, Union
 
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons
-from crispy_forms.layout import Layout, Field, Submit
+from crispy_forms.layout import Field, Layout, Submit
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -16,10 +16,10 @@ from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.timezone import now
-from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.views.generic import TemplateView
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
@@ -30,17 +30,41 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
-    create_classification_for_sample_and_variant_objects, generate_auto_populate_data
+from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
+    create_classification_for_sample_and_variant_objects,
+    generate_auto_populate_data,
+)
 from classification.classification_changes import ClassificationChanges
-from classification.classification_stats import get_grouped_classification_counts, \
-    get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason, AlleleOriginBucket
+from classification.classification_stats import (
+    get_classification_counts,
+    get_criteria_counts,
+    get_grouped_classification_counts,
+)
+from classification.enums import (
+    AlleleOriginBucket,
+    ShareLevel,
+    SpecialEKeys,
+    SubmissionSource,
+    WithdrawReason,
+)
 from classification.forms import ClassificationAlleleOriginForm
-from classification.models import ClassificationAttachment, Classification, \
-    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping, AlleleOriginGrouping, \
-    ImportedAlleleInfo, ImportedAlleleInfoStatus, ClassificationImportRun
+from classification.models import (
+    AlleleGrouping,
+    AlleleOriginGrouping,
+    Classification,
+    ClassificationAttachment,
+    ClassificationConsensus,
+    ClassificationGrouping,
+    ClassificationImportRun,
+    ClassificationJsonParams,
+    ClassificationRef,
+    ClassificationReportTemplate,
+    ConditionResolvedDict,
+    DiscordanceReport,
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
+    ReportNames,
+)
 from classification.models.classification import ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
@@ -48,23 +72,32 @@ from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
-from classification.views.exports import ClassificationExportFormatterCSV, ClassificationExportFormatterRedCap
+from classification.views.exports import (
+    ClassificationExportFormatterCSV,
+    ClassificationExportFormatterRedCap,
+)
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
 from genes.hgvs import HGVSMatcher
-from library.django_utils import require_superuser, get_url_from_view_path
-from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
+from library.django_utils import get_url_from_view_path, require_superuser
+from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.log_utils import log_traceback
 from library.utils import delimited_row
 from library.utils.django_utils import render_ajax_view
 from library.utils.file_utils import rm_if_exists
-from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm, LabMultiSelectForm, UserLabChoiceForm
+from snpdb.forms import (
+    LabMultiSelectForm,
+    LabSelectForm,
+    SampleChoiceForm,
+    UserLabChoiceForm,
+    UserSelectForm,
+)
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
+from snpdb.models import Allele, Lab, Sample, UserSettings, Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
 from uicore.utils.form_helpers import form_helper_horizontal
@@ -857,7 +890,7 @@ def lab_gene_classification_counts(request):
     if settings.CLASSIFICATION_STATS_USE_SHARED:
         visibility = "Shared"
     else:
-        visibility = f"Visible to user"
+        visibility = "Visible to user"
 
     data_columns_whitelist = {
 
@@ -956,7 +989,7 @@ def clin_sig_change_data(request):
     response = StreamingHttpResponse(yield_data(), content_type='text/tsv')
     # modified_str = now().strftime("%a, %d %b %Y %H:%M:%S GMT")  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'
     # response['Last-Modified'] = modified_str
-    response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.tsv"'
+    response['Content-Disposition'] = 'attachment; filename="clin_sig_changes.tsv"'
     return response
 
 
@@ -1005,7 +1038,7 @@ class AlleleOriginGroupingVisible:
                 visible_groups.append(
                     AlleleOriginGroupingVisible(
                         allele_origin_grouping=allele_origin_grouping,
-                        classification_groupings=list(sorted(allele_origin_grouping.classificationgrouping_set.all())),
+                        classification_groupings=sorted(allele_origin_grouping.classificationgrouping_set.all()),
                         discordance_reports=discordance_reports
                     )
                 )

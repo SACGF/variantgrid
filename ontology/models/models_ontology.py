@@ -6,15 +6,16 @@ import functools
 import logging
 import re
 from collections import defaultdict
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Union, Iterable, Any, Iterator
+from typing import Any, Optional, Union
 
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
-from django.db import models, connection
-from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max, TextChoices
+from django.db import connection, models
+from django.db.models import CASCADE, PROTECT, Max, Q, QuerySet, TextChoices
 from django.http import Http404
 from django.urls import reverse
 from model_utils.models import TimeStampedModel, now
@@ -848,7 +849,7 @@ class OntologyVersion(TimeStampedModel):
             for source in extra["sources"]:
                 moi.add(source["mode_of_inheritance"])
                 submitters.add(source["submitter"])
-        return list(sorted(moi)), list(sorted(submitters))
+        return sorted(moi), sorted(submitters)
 
     @cache_memoize(DAY_SECS)
     def cached_gene_symbols_for_terms_tuple(self, terms_tuple: tuple[int]) -> QuerySet:
@@ -1085,7 +1086,7 @@ class OntologySnake:
         if otr_qs is None:
             otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
 
-        from ontology.ontology_traversal import bfs_to_ontology, _make_db_step_fn
+        from ontology.ontology_traversal import _make_db_step_fn, bfs_to_ontology
         step_fn = _make_db_step_fn(otr_qs, quality_filter)
         return bfs_to_ontology(term, to_ontology, max_depth, step_fn)
 
@@ -1253,13 +1254,13 @@ class OntologySnakes:
         return self.snakes[item]
 
     def leafs(self) -> list[OntologyTerm]:
-        return list(sorted({snake.leaf_term for snake in self}))
+        return sorted({snake.leaf_term for snake in self})
 
     def leaf_relations(self, ontology_relation: str = None) -> list[OntologyTermRelation]:
         relations = {snake.leaf_relationship for snake in self}
         if ontology_relation:
             relations = {otr for otr in relations if otr.relation == ontology_relation}
-        return list(sorted(relations))
+        return sorted(relations)
 
 
 class SingleTermH:

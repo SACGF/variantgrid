@@ -1,5 +1,6 @@
 import itertools
-from typing import Iterable, Optional
+from collections.abc import Iterable
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -7,24 +8,29 @@ from django.contrib.sites.models import Site
 from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import Citation
-from annotation.models.damage_enums import FATHMMPrediction, \
-    MutationTasterPrediction, Polyphen2Prediction, SIFTPrediction, \
-    MutationAssessorPrediction, ALoFTPrediction, MetaRNNPrediction
-from annotation.models.models import VariantAnnotation, AnnotationVersion, GenePubMedCount
+from annotation.models.damage_enums import (
+    ALoFTPrediction,
+    FATHMMPrediction,
+    MetaRNNPrediction,
+    MutationAssessorPrediction,
+    MutationTasterPrediction,
+    Polyphen2Prediction,
+    SIFTPrediction,
+)
+from annotation.models.models import AnnotationVersion, GenePubMedCount, VariantAnnotation
 from annotation.models.models_enums import ClinVarReviewStatus
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
-from classification.enums import SubmissionSource, \
-    SpecialEKeys
-from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
+from classification.enums import SpecialEKeys, SubmissionSource
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion, GnomADGeneConstraint
+from genes.models import GnomADGeneConstraint, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_choices_formatter
 from library.genomics.vcf_enums import VariantClass
 from library.log_utils import log_traceback
 from seqauto.models import get_20x_gene_coverage
-from snpdb.clingen_allele import get_clingen_allele_for_variant, ClinGenAlleleAPIException
+from snpdb.clingen_allele import ClinGenAlleleAPIException, get_clingen_allele_for_variant
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import ColumnAnnotationLevel
@@ -385,7 +391,7 @@ def get_evidence_fields_from_preferred_transcript(
             data[SpecialEKeys.C_HGVS] = c_hgvs.full_c_hgvs
     except Exception as e:
         value_obj = {}
-        data.message = f'Could not parse HGVS value {str(e)}'
+        data.message = f'Could not parse HGVS value {e!s}'
         data[SpecialEKeys.C_HGVS] = value_obj
 
     # If we classify against a transcript we don't have annotation for, try to grab p.HGVS from ClinGen

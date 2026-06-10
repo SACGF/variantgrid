@@ -14,7 +14,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied, EmptyResultSet
+from django.core.exceptions import EmptyResultSet, PermissionDenied
 from django.db.models import Count
 from django.forms.models import inlineformset_factory
 from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
@@ -28,40 +28,96 @@ from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
 from analysis import forms
-from analysis.analysis_templates import populate_analysis_from_template_run, get_auto_launch_analysis_template_matches
-from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
-from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, UserQuadWizardForm, VCFLocusFilterForm, \
-    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm, AnalysisTemplateForm, \
-    AnalysisTemplateAutoLaunchForm, AutoLaunchFormSet
+from analysis.analysis_templates import (
+    get_auto_launch_analysis_template_matches,
+    populate_analysis_from_template_run,
+)
+from analysis.exceptions import NodeOutOfDateException, NonFatalNodeError
+from analysis.forms import (
+    AnalysisChoiceForm,
+    AnalysisTemplateAutoLaunchForm,
+    AnalysisTemplateForm,
+    AnalysisTemplateTypeChoiceForm,
+    AnalysisTemplateVersionForm,
+    AutoLaunchFormSet,
+    SelectGridColumnForm,
+    UserQuadWizardForm,
+    UserTrioWizardForm,
+    VCFLocusFilterForm,
+)
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
-from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
-    AnalysisTemplateRun, AnalysisLock, Analysis
-from analysis.models.enums import AnalysisTemplateType, SNPMatrix, MinimisationResultType, NodeStatus, TrioSample, QuadSample
+from analysis.models import (
+    Analysis,
+    AnalysisLock,
+    AnalysisNode,
+    AnalysisTemplate,
+    AnalysisTemplateRun,
+    AnalysisVariable,
+    NodeGraphType,
+    TagNode,
+    VariantTag,
+)
+from analysis.models.enums import (
+    AnalysisTemplateType,
+    MinimisationResultType,
+    NodeStatus,
+    QuadSample,
+    SNPMatrix,
+    TrioSample,
+)
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask, NodeCount
-from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
+from analysis.models.nodes.analysis_node import (
+    AnalysisClassification,
+    NodeCount,
+    NodeTask,
+    NodeVCFFilter,
+)
+from analysis.models.nodes.node_counts import (
+    get_node_count_colors,
+    get_node_counts_mine_and_available,
+)
 from analysis.models.nodes.node_types import get_node_types_hash
-from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
+from analysis.models.nodes.sources.cohort_node import (
+    CohortNodeZygosityFilter,
+    CohortNodeZygosityFiltersCollection,
+)
 from analysis.serializers import AnalysisNodeSerializer
-from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
-    get_node_subclass_or_non_fatal_exception
+from analysis.views.analysis_permissions import (
+    get_analysis_or_404,
+    get_node_subclass_or_404,
+    get_node_subclass_or_non_fatal_exception,
+)
 from analysis.views.nodes.node_view import NodeView
 from annotation.models.models import MutationalSignatureInfo
-from classification.views.views import create_classification_object, CreateClassificationForVariantView
+from classification.views.views import (
+    CreateClassificationForVariantView,
+    create_classification_object,
+)
 from library import pandas_utils
-from library.constants import WEEK_SECS, HOUR_SECS
+from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
-from library.utils import full_class_name, defaultdict_to_dict
-from library.utils.database_utils import run_sql, queryset_to_sql
+from library.utils import defaultdict_to_dict, full_class_name
+from library.utils.database_utils import queryset_to_sql, run_sql
 from pedigree.models import Pedigree
 from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm
 from snpdb.graphs import graphcache
-from snpdb.models import UserSettings, Sample, \
-    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Quad, Variant, GenomeBuild
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CohortSample,
+    GenomeBuild,
+    ImportStatus,
+    Quad,
+    Sample,
+    Trio,
+    UserSettings,
+    Variant,
+    get_igv_data,
+)
 from variantgrid.celery import app
 
 

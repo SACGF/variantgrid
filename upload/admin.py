@@ -5,8 +5,15 @@ from django.utils.safestring import SafeString
 from snpdb.admin_utils import ModelAdminBasics, admin_list_column
 from snpdb.models import ProcessingStatus
 from snpdb.user_settings_manager import UserSettingsManager
-from .models import UploadStep, UploadPipeline, UploadedFile, UploadedVCF, UploadedClassificationImport, \
-    ModifiedImportedVariant
+
+from .models import (
+    ModifiedImportedVariant,
+    UploadedClassificationImport,
+    UploadedFile,
+    UploadedVCF,
+    UploadPipeline,
+    UploadStep,
+)
 
 
 class UploadStepStatusFilter(admin.SimpleListFilter):

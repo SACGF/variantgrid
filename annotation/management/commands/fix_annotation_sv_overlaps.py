@@ -6,7 +6,12 @@ from collections import Counter
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from annotation.models import VariantAnnotation, VariantAnnotationVersion, VariantGeneOverlap, VEPSkippedReason
+from annotation.models import (
+    VariantAnnotation,
+    VariantAnnotationVersion,
+    VariantGeneOverlap,
+    VEPSkippedReason,
+)
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import SVGeneOverlapResolver
 
 

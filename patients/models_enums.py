@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Q
 
-from library.utils import invert_dict, Constant, get_single_element
+from library.utils import Constant, get_single_element, invert_dict
 
 
 class NucleicAcid(models.TextChoices):

@@ -90,3 +90,13 @@ django_threadlocals
 frozendict
 pydantic>=2.4.0
 deepdiff
+
+# --- linting & type checking (dev only) ---
+# Run: mypy --config-file mypy.ini snpdb   (or any app)
+# Lint: ./scripts/linting/run_pylint.sh   |   ruff check
+ruff
+mypy
+django-stubs
+djangorestframework-stubs
+pylint
+pylint-django

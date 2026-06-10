@@ -1,16 +1,19 @@
 import csv
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict, defaultdict
 
 from django.core.exceptions import PermissionDenied
 from django.http.response import StreamingHttpResponse
-from django.shortcuts import get_object_or_404, render, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
 from analysis.forms import KaryomappingGeneForm, UserTrioForm
-from analysis.models.models_karyomapping import KaryomappingAnalysis, KaryotypeBins, \
-    KaryomappingGene
+from analysis.models.models_karyomapping import (
+    KaryomappingAnalysis,
+    KaryomappingGene,
+    KaryotypeBins,
+)
 from library.constants import DAY_SECS
 from library.django_utils import add_save_message
 from library.utils import StashFile
