@@ -17,6 +17,33 @@ from django.utils.http import urlencode
 QUERY_PROFILE_FILE = os.environ.get("VG_QUERY_PROFILE")
 QUERY_TRACE_PATTERN = os.environ.get("VG_QUERY_TRACE")  # regex: log stack traces for matching SQL
 
+# Models whose managers (ObjectManagerCachingImmutable/Request) cache lookups in production
+# but disable caching under settings.UNIT_TEST - so repeated gets on these tables in a test
+# are not real production queries. Used by production_query_count().
+PRODUCTION_CACHED_TABLES = (
+    "snpdb_genomebuild",
+    "genes_genesymbol",
+    "flags_flagtype",
+    "classification_resolvedvariantinfo",
+    "snpdb_allele",
+    "snpdb_organization",
+    "snpdb_lab",
+)
+
+
+def production_query_count(captured_queries) -> int:
+    """ Number of queries that would hit the database in production: excludes test
+        savepoints and lookups on tables whose object managers cache in production """
+    count = 0
+    for query in captured_queries:
+        sql = query["sql"]
+        if sql.startswith(("SAVEPOINT", "RELEASE SAVEPOINT", "ROLLBACK TO SAVEPOINT")):
+            continue
+        if sql.startswith("SELECT") and any(f'FROM "{table}"' in sql for table in PRODUCTION_CACHED_TABLES):
+            continue
+        count += 1
+    return count
+
 
 def _normalize_sql(sql: str) -> str:
     """ Strip literals so queries differing only by parameters group together (N+1 detection) """
