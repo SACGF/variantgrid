@@ -5,6 +5,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 from variantgrid import views
 from variantgrid.views import ContactFormView
@@ -44,6 +45,9 @@ urlpatterns = [
     path('system/keycloak_admin', views.keycloak_admin, name='keycloak_admin'),
     path('terms/', include('termsandconditions.urls')),
     path('avatar/', include('avatar.urls')),
+    path('api/schema', SpectacularAPIView.as_view(), name='openapi-schema'),
+    path('api/docs', SpectacularSwaggerView.as_view(url_name='openapi-schema'), name='api-docs'),
+    path('api/redoc', SpectacularRedocView.as_view(url_name='openapi-schema'), name='api-redoc'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:

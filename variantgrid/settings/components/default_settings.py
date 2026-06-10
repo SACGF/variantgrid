@@ -598,7 +598,7 @@ FINISH_IMPORT_VCF_STEP_TASKS_CLASSES = []
 CACHE_GENERATED_FILES = True
 
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 
     # NOTE: Middleware is run first - so GlobalLoginRequiredMiddleware will reject tokens w/o logins
     # before DRF even sees it. You need to add your APIs to PUBLIC_PATHS
@@ -613,6 +613,22 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'rollbar.contrib.django_rest_framework.post_exception_handler'
     #    'PAGE_SIZE': 10,
     #    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+}
+
+# drf-spectacular OpenAPI schema / Swagger docs (served at /api/schema and /api/docs)
+# The docs pages are public (see PUBLIC_PATHS) but the API endpoints themselves still require auth
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'VariantGrid API',
+    'DESCRIPTION': 'REST API for VariantGrid - variant database, annotation and classification platform. '
+                   'Authenticate with a session, HTTP basic auth, or a token from your user profile page.',
+    'VERSION': '4.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SERVE_PUBLIC': True,  # list all endpoints in the schema regardless of viewer permissions
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
+    # Serve Swagger UI/ReDoc assets from drf-spectacular-sidecar via staticfiles instead of a CDN
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
 }
 
 AUTHENTICATION_BACKENDS = (
@@ -667,6 +683,8 @@ INSTALLED_APPS = [
     "psqlextra",
     'rest_framework',
     'rest_framework.authtoken',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
     'termsandconditions',
     'crispy_forms',  # used to make bootstrap compatible forms
     'crispy_bootstrap4',
@@ -795,6 +813,7 @@ LOGGING = {
 PUBLIC_PATHS = [
     r'^/accounts/.*',  # allow public access to all django registration views,
     r'^/oidc/.*',  # all oidc URLs
+    r'^/api/.*',  # OpenAPI schema + Swagger/ReDoc docs pages (drf-spectacular)
     r'^/classification/api/.*',  # REST framework used by command line tools
     r'^/seqauto/api/.*',
     r'^/upload/api/.*',

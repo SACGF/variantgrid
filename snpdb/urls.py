@@ -1,9 +1,7 @@
 from django.contrib.auth.views import PasswordChangeView, PasswordChangeDoneView
 from django.urls import include
 from django.urls.conf import path as path_standard
-from rest_framework.permissions import AllowAny
-from rest_framework.renderers import OpenAPIRenderer
-from rest_framework.schemas import get_schema_view
+from django.views.generic import RedirectView
 
 from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
@@ -14,15 +12,6 @@ from snpdb.grids import CohortListColumns, CohortSampleListGrid, SamplesListGrid
 from snpdb.views import views, views_json, views_rest, views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
-
-schema = get_schema_view(
-    title="VariantGrid API",
-    version="4.0.0",
-    public=True,
-    permission_classes=[AllowAny],
-    renderer_classes=[OpenAPIRenderer],  # raw OpenAPI JSON
-)
-
 
 urlpatterns = [
     # public pages
@@ -175,5 +164,6 @@ urlpatterns = [
     path('api/variant_allele_for_variant/<int:variant_id>/<genome_build_name>',
          views_rest.VariantAlleleForVariantView.as_view(), name='variant_allele_for_variant'),
     path('api/project/create', views_rest.ProjectViewSet.as_view({"post": "create"}), name='api_project_create'),
-    path("docs/", schema, name="openapi-schema"),
+    # Schema/docs moved to drf-spectacular at /api/schema and /api/docs (see variantgrid/urls.py)
+    path_standard("docs/", RedirectView.as_view(pattern_name="api-docs", permanent=True)),
 ]

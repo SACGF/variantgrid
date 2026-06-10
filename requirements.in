@@ -35,6 +35,8 @@ django_recaptcha>=4.0.0
 django-registration-redux
 django_termsandconditions
 djangorestframework
+drf-spectacular
+drf-spectacular-sidecar
 easy_thumbnails
 fontawesomefree==6.4.0
 git+https://github.com/davmlaw/django-messages/#egg=django-messages
