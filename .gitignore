@@ -43,3 +43,4 @@ cover/
 /.idea/dataSources.local.xml
 /.idea/dataSources.xml
 /.idea/dataSources
+node_modules/
