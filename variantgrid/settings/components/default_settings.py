@@ -629,6 +629,10 @@ SPECTACULAR_SETTINGS = {
     'SWAGGER_UI_DIST': 'SIDECAR',
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
     'REDOC_DIST': 'SIDECAR',
+    # Several predictors share the same Tolerated/Damaging choice set - use one canonical enum name
+    'ENUM_NAME_OVERRIDES': {
+        'ToleratedDamagingPredictionEnum': 'annotation.models.damage_enums.ToleratedDamagingPrediction.CHOICES',
+    },
 }
 
 AUTHENTICATION_BACKENDS = (

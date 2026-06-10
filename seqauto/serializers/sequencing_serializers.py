@@ -148,7 +148,7 @@ class SequencingRunSerializer(serializers.ModelSerializer):
         )
         return instance
 
-    def get_vcf_set(self, obj):
+    def get_vcf_set(self, obj) -> list[dict]:
         vcfs = []
         for vsr in obj.vcffromsequencingrun_set.all().order_by("pk"):
             vcf = vsr.vcf
@@ -268,6 +268,9 @@ class FastqSerializer(serializers.ModelSerializer):
     class Meta:
         model = Fastq
         fields = ("path", "name", "read")
+
+    def get_read(self, obj) -> str:
+        return obj.read
 
     def create(self, validated_data):
         path = validated_data["path"]

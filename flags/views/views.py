@@ -3,6 +3,8 @@ from collections import defaultdict
 from typing import Iterable, Any, Union, Optional
 
 from django.conf import settings
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework.response import Response
@@ -337,7 +339,14 @@ class FlagHelper:
 
 
 class FlagsView(APIView):
+    """API for one or more FlagCollections: retrieve flags/comments and raise flags or set watch status."""
 
+    @extend_schema(
+        summary="Retrieve flag types, collections, open flags and comments for the given flag collection(s)",
+        responses=OpenApiTypes.OBJECT,
+        parameters=[OpenApiParameter("flag_collection_id", OpenApiTypes.STR, OpenApiParameter.PATH,
+                                     description="Comma-separated FlagCollection ids")]
+    )
     def get(self, request, **kwargs) -> Response:
         pks = kwargs.get('flag_collection_id').split(',')
         fcs = FlagCollection.objects.filter(pk__in=pks)
@@ -369,6 +378,13 @@ class FlagsView(APIView):
 
         return Response(flag_helper.to_json())
 
+    @extend_schema(
+        summary="Raise a new flag on the flag collection, or set the user's watch status for it",
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+        parameters=[OpenApiParameter("flag_collection_id", OpenApiTypes.STR, OpenApiParameter.PATH,
+                                     description="FlagCollection id")]
+    )
     def post(self, request, **kwargs) -> Response:
         pk = kwargs.get('flag_collection_id')
         fc = FlagCollection.objects.get(pk=pk)
@@ -386,7 +402,12 @@ class FlagsView(APIView):
 
 
 class FlagView(APIView):
+    """API for a single Flag: retrieve it with its comments, or apply a resolution/comment to it."""
 
+    @extend_schema(
+        summary="Retrieve a single flag with its comments",
+        responses=OpenApiTypes.OBJECT
+    )
     def get(self, request, **kwargs) -> Response:
         pk = kwargs.get('flag_id')
         f = Flag.objects.get(pk=pk)
@@ -396,6 +417,11 @@ class FlagView(APIView):
         flag_helper.include_user(request.user)
         return Response(flag_helper.to_json())
 
+    @extend_schema(
+        summary="Apply an action to a flag: set a resolution and/or add a comment",
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT
+    )
     def post(self, request, **kwargs) -> Response:
         pk = kwargs.get('flag_id')
         f = Flag.objects.get(pk=pk)  # type: Flag

@@ -1,6 +1,8 @@
 from django.http.response import Http404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,7 +13,18 @@ from snpdb.models import GenomeBuild, Variant
 
 
 class VariantAnnotationView(APIView):
+    """Retrieve the latest VariantAnnotation for a variant identified by coordinate string."""
 
+    @extend_schema(
+        summary="Retrieve latest variant annotation for a variant in a genome build",
+        parameters=[
+            OpenApiParameter("genome_build_name", OpenApiTypes.STR, OpenApiParameter.PATH,
+                             description="Genome build name or alias, e.g. 'GRCh37' or 'GRCh38'"),
+            OpenApiParameter("variant_string", OpenApiTypes.STR, OpenApiParameter.PATH,
+                             description="Variant as 'chrom-position-ref-alt', e.g. '1-169519049-T-C'"),
+        ],
+        responses=VariantAnnotationSerializer,
+    )
     def get(self, request, *args, **kwargs):
         genome_build_name = self.kwargs['genome_build_name']
         variant_string = self.kwargs['variant_string']

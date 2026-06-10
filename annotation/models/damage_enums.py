@@ -80,7 +80,9 @@ class PathogenicityImpact(AbstractPathogenicity):
         return q
 
 
-class SIFTPrediction(AbstractPathogenicity):
+class ToleratedDamagingPrediction(AbstractPathogenicity):
+    """ Shared choice set for predictors that make Tolerated/Damaging calls.
+        Referenced by ENUM_NAME_OVERRIDES in settings so the OpenAPI schema has one canonical enum """
     TOLERATED = 'T'
     DAMAGING = 'D'
 
@@ -89,6 +91,9 @@ class SIFTPrediction(AbstractPathogenicity):
         (DAMAGING, "Damaging"),
     ]
     MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+
+
+class SIFTPrediction(ToleratedDamagingPrediction):
     VARIANT_PATH = "variantannotation__sift"
 
 
@@ -122,15 +127,7 @@ class MutationTasterPrediction(AbstractPathogenicity):
     VARIANT_PATH = "variantannotation__mutation_taster_pred_most_damaging"
 
 
-class FATHMMPrediction(AbstractPathogenicity):
-    TOLERATED = 'T'
-    DAMAGING = 'D'
-
-    CHOICES = [
-        (TOLERATED, "Tolerated"),
-        (DAMAGING, "Damaging"),
-    ]
-    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+class FATHMMPrediction(ToleratedDamagingPrediction):
     VARIANT_PATH = "variantannotation__fathmm_pred_most_damaging"
 
 
@@ -167,37 +164,13 @@ class AlphaMissensePrediction(models.TextChoices):
     PATHOGENIC = 'P', 'pathogenic'
 
 
-class ClinPredPrediction(AbstractPathogenicity):
-    TOLERATED = 'T'
-    DAMAGING = 'D'
-
-    CHOICES = [
-        (TOLERATED, "Tolerated"),
-        (DAMAGING, "Damaging"),
-    ]
-    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+class ClinPredPrediction(ToleratedDamagingPrediction):
     VARIANT_PATH = "variantannotation__clinpred_pred"
 
 
-class MetaRNNPrediction(AbstractPathogenicity):
-    TOLERATED = 'T'
-    DAMAGING = 'D'
-
-    CHOICES = [
-        (TOLERATED, "Tolerated"),
-        (DAMAGING, "Damaging"),
-    ]
-    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+class MetaRNNPrediction(ToleratedDamagingPrediction):
     VARIANT_PATH = "variantannotation__metarnn_pred"
 
 
-class PrimateAIPrediction(AbstractPathogenicity):
-    TOLERATED = 'T'
-    DAMAGING = 'D'
-
-    CHOICES = [
-        (TOLERATED, "Tolerated"),
-        (DAMAGING, "Damaging"),
-    ]
-    MINIMUM_FLAG_DAMAGE_LEVEL = DAMAGING
+class PrimateAIPrediction(ToleratedDamagingPrediction):
     VARIANT_PATH = "variantannotation__primateai_pred"

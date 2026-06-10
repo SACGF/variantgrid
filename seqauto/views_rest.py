@@ -9,6 +9,8 @@ from django.conf import settings
 from django.db.models.query_utils import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from rest_framework import status
 from rest_framework.generics import get_object_or_404, RetrieveAPIView
 from rest_framework.response import Response
@@ -101,6 +103,13 @@ class IlluminaFlowcellQCViewSet(ModelViewSet):
 
 
 class SequencingFilesBulkCreateView(APIView):
+    """ Bulk create sequencing file records (fastqs, BAM and VCF) for samples on a sample sheet """
+
+    @extend_schema(
+        summary="Bulk create sequencing file records (fastqs, BAM, VCF) for a sample sheet",
+        request=SequencingFilesBulkCreateSerializer,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request, *args, **kwargs):
         serializer = SequencingFilesBulkCreateSerializer(data=request.data)
         if serializer.is_valid():
@@ -124,6 +133,13 @@ class QCGeneListViewSet(ModelViewSet):
 
 
 class QCGeneListBulkCreateView(APIView):
+    """ Bulk create QC gene lists """
+
+    @extend_schema(
+        summary="Bulk create QC gene lists",
+        request=QCGeneListBulkCreateSerializer,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request, *args, **kwargs):
         serializer = QCGeneListBulkCreateSerializer(data=request.data)
         if serializer.is_valid():
@@ -133,6 +149,13 @@ class QCGeneListBulkCreateView(APIView):
 
 
 class QCExecSummaryBulkCreateView(APIView):
+    """ Bulk create QC exec summaries """
+
+    @extend_schema(
+        summary="Bulk create QC exec summaries",
+        request=QCExecSummaryBulkCreateSerializer,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request, *args, **kwargs):
         serializer = QCExecSummaryBulkCreateSerializer(data=request.data)
         if serializer.is_valid():
@@ -142,6 +165,13 @@ class QCExecSummaryBulkCreateView(APIView):
 
 
 class QCGeneCoverageBulkCreateView(APIView):
+    """ Bulk create QC gene coverage records """
+
+    @extend_schema(
+        summary="Bulk create QC gene coverage records",
+        request=QCGeneCoverageBulkCreateSerializer,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request, *args, **kwargs):
         serializer = QCGeneCoverageBulkCreateSerializer(data=request.data)
         if serializer.is_valid():
@@ -161,10 +191,17 @@ class QCExecSummaryViewSet(ModelViewSet):
 
 
 class EnrichmentKitGeneCoverageView(APIView):
+    """ Coverage stats (mean, percent_20x) for a gene symbol across samples sequenced with an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
         return Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit=enrichment_kit)
 
+    @extend_schema(
+        summary="Coverage stats (mean, percent_20x) for a gene symbol across samples for an enrichment kit",
+        parameters=[OpenApiParameter("gene_symbol", OpenApiTypes.STR, OpenApiParameter.PATH,
+                                     description="Gene symbol to retrieve coverage stats for")],
+        responses=OpenApiTypes.OBJECT,
+    )
     @method_decorator(cache_page(WEEK_SECS))
     def get(self, request, *args, **kwargs):
         enrichment_kit_id = self.kwargs['enrichment_kit_id']
@@ -198,7 +235,16 @@ class EnrichmentKitGeneCoverageView(APIView):
         return Response(data)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        summary="Coverage stats for a gene symbol restricted to gold standard runs for an enrichment kit",
+        parameters=[OpenApiParameter("gene_symbol", OpenApiTypes.STR, OpenApiParameter.PATH,
+                                     description="Gene symbol to retrieve coverage stats for")],
+        responses=OpenApiTypes.OBJECT,
+    )
+)
 class EnrichmentKitGeneGoldCoverageView(EnrichmentKitGeneCoverageView):
+    """ Coverage stats for a gene symbol restricted to gold standard sequencing runs for an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
         gold_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__gold_standard=True)
@@ -206,7 +252,14 @@ class EnrichmentKitGeneGoldCoverageView(EnrichmentKitGeneCoverageView):
 
 
 class GoldCoverageSummaryView(APIView):
+    """ Gold standard coverage summary for a single gene symbol and enrichment kit """
 
+    @extend_schema(
+        summary="Gold standard coverage summary for a gene symbol and enrichment kit",
+        parameters=[OpenApiParameter("gene_symbol", OpenApiTypes.STR, OpenApiParameter.PATH,
+                                     description="Gene symbol to retrieve gold coverage summary for")],
+        responses=GoldCoverageSummarySerializer,
+    )
     def get(self, request, *args, **kwargs):
         enrichment_kit_id = self.kwargs['enrichment_kit_id']
         gene_symbol = self.kwargs['gene_symbol']
@@ -227,6 +280,11 @@ class GoldCoverageSummaryView(APIView):
 class BatchGoldCoverageSummaryView(APIView):
     """ Needs to be a post as we can send a large number of genes """
 
+    @extend_schema(
+        summary="Gold standard coverage summaries for a batch of gene symbols for an enrichment kit",
+        request=OpenApiTypes.OBJECT,
+        responses=GoldCoverageSummarySerializer(many=True),
+    )
     def post(self, request, enrichment_kit_id):
         gene_symbols_json = request.data["gene_symbols_json"]
         gene_symbols = json.loads(gene_symbols_json)

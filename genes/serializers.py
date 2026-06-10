@@ -84,7 +84,7 @@ class GeneListSerializer(serializers.ModelSerializer):
         model = GeneList
         fields = ('pk', 'category', 'name', 'user', 'import_status', 'genelistgenesymbol_set', 'can_write', 'absolute_url')
 
-    def get_can_write(self, obj: GeneList):
+    def get_can_write(self, obj: GeneList) -> bool:
         request = self.context.get('request')
         if request is not None:
             user = request.user
@@ -136,7 +136,7 @@ class GeneAnnotationReleaseSerializer(serializers.ModelSerializer):
         model = GeneAnnotationRelease
         fields = ("version", "annotation_consortium", "genome_build", "__str__")
 
-    def get___str__(self, obj):
+    def get___str__(self, obj) -> str:
         return str(obj)
 
 
@@ -155,7 +155,7 @@ class SampleGeneListSerializer(serializers.ModelSerializer):
         model = SampleGeneList
         fields = ('pk', 'visible', 'gene_list', 'active')
 
-    def get_active(self, obj):
+    def get_active(self, obj) -> bool:
         try:
             return obj.sample.activesamplegenelist.sample_gene_list == obj
         except ActiveSampleGeneList.DoesNotExist:

@@ -3,6 +3,8 @@ import re
 from django.http import Http404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
@@ -19,6 +21,20 @@ _GENE_SYMBOL_RE = re.compile(r'^[A-Za-z0-9\-]+$')
 
 
 class SearchMondoText(APIView):
+    """ Searches MONDO ontology terms by free text, optionally scoped to a gene symbol """
+
+    @extend_schema(
+        summary="Search MONDO ontology terms by text, optionally filtered by gene symbol",
+        parameters=[
+            OpenApiParameter("search_term", OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description="Free text to search MONDO terms for"),
+            OpenApiParameter("gene_symbol", OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description="Gene symbol to scope the search to"),
+            OpenApiParameter("selected", OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description="Comma-separated list of already-selected ontology term IDs"),
+        ],
+        responses=OpenApiTypes.OBJECT,
+    )
     def get(self, request, **kwargs) -> Response:
 
         search_term = request.GET.get('search_term') or ''
@@ -32,6 +48,12 @@ class SearchMondoText(APIView):
 
 
 class OntologyTermGeneListView(APIView):
+    """ Returns a fake gene list built from the gene symbols associated with an ontology term """
+
+    @extend_schema(
+        summary="Retrieve a gene list of gene symbols associated with an ontology term",
+        responses=OpenApiTypes.OBJECT,
+    )
     def get(self, request, *args, **kwargs):
         term_slug = self.kwargs['term']
         ontology_version = OntologyVersion.latest()
@@ -59,6 +81,16 @@ class OntologyTermGeneListView(APIView):
 
 @method_decorator(cache_page(WEEK_SECS), name='get')
 class GeneDiseaseRelationshipView(APIView):
+    """ Returns gene/disease relationships (medium quality or better) for a gene symbol """
+
+    @extend_schema(
+        summary="List gene/disease ontology relationships for a gene symbol",
+        parameters=[
+            OpenApiParameter("gene_symbol", OpenApiTypes.STR, OpenApiParameter.PATH,
+                             description="Gene symbol, e.g. BRCA1"),
+        ],
+        responses=OntologyTermRelationSerializer(many=True),
+    )
     def get(self, request, *args, **kwargs):
         gene_symbol = self.kwargs['gene_symbol']
         if not _GENE_SYMBOL_RE.match(gene_symbol):

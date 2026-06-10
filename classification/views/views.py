@@ -21,6 +21,8 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST, require_http_methods
 from django.views.generic import TemplateView
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from global_login_required import login_not_required
 from more_itertools import first
 from requests.models import Response
@@ -261,7 +263,13 @@ def classification_groupings(request):
 
 
 class AutopopulateView(APIView):
+    """ Generates auto-populated evidence key values for a variant (from annotation, sample data,
+    and optionally an existing classification to copy from), used to pre-fill the classification form. """
 
+    @extend_schema(
+        summary="Auto-populate classification evidence key values for a variant (query params: variant_id, genome_build_name, transcript accessions, sample_id, copy_from_vcm_id)",
+        responses=OpenApiTypes.OBJECT
+    )
     def get(self, request):
         variant_id = request.GET.get("variant_id")
         genome_build_name = request.GET.get("genome_build_name")

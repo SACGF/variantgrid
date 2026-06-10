@@ -241,7 +241,7 @@ class ClinGenAllele(TimeStampedModel):
         return Variant.format_tuple(*self.get_variant_coordinate(genome_build), abbreviate=abbreviate)
 
     @property
-    def human_url(self):
+    def human_url(self) -> str:
         return f"{settings.CLINGEN_ALLELE_REGISTRY_DOMAIN}/redmine/projects/registry/genboree_registry/by_caid?caid={self}"
 
     @staticmethod

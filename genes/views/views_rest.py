@@ -7,6 +7,8 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import permissions
 from rest_framework.generics import ListAPIView
 from rest_framework.generics import RetrieveAPIView
@@ -48,6 +50,12 @@ WriteGeneListPermission = is_owner_or_has_permission_factory(DjangoPermission.WR
 class PanelAppGeneListView(APIView):
     """ Tunnels through to panel app (can't make cross site requests) """
 
+    @extend_schema(
+        summary="Retrieve a PanelApp panel converted to gene list JSON",
+        parameters=[OpenApiParameter("id", OpenApiTypes.INT, OpenApiParameter.PATH,
+                                     description="PanelApp panel ID")],
+        responses=OpenApiTypes.OBJECT,
+    )
     @method_decorator(cache_page(HOUR_SECS))
     def get(self, request, *args, **kwargs):
         panel_app_id = self.kwargs['pk']
@@ -56,7 +64,14 @@ class PanelAppGeneListView(APIView):
 
 
 class GeneListView(APIView):
+    """ Retrieve a gene list (with gene symbols) the user has permission to view """
 
+    @extend_schema(
+        summary="Retrieve a gene list by ID",
+        parameters=[OpenApiParameter("id", OpenApiTypes.INT, OpenApiParameter.PATH,
+                                     description="GeneList ID")],
+        responses=GeneListSerializer,
+    )
     def get(self, request, *args, **kwargs):
         gene_list_id = self.kwargs['pk']
         gl = GeneList.get_for_user(request.user, gene_list_id)
@@ -78,6 +93,7 @@ class NamedGeneListView(MultipleFieldLookupMixin, RetrieveAPIView):
 
 
 class ModifyGeneListView(APIView):
+    """ Add/remove gene symbols from an existing gene list the user can write to """
     permission_classes = (permissions.IsAuthenticated, WriteGeneListPermission)
 
     def get_gene_list_modifications(self, data):
@@ -86,6 +102,11 @@ class ModifyGeneListView(APIView):
         gene_deletions = modifications.get('delete')
         return gene_additions, gene_deletions
 
+    @extend_schema(
+        summary="Add and/or remove gene symbols from a gene list",
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request, **kwargs):
         gene_list_id = kwargs.pop("pk")
         gene_list = GeneList.get_for_user(request.user, gene_list_id)
@@ -102,6 +123,12 @@ class ModifyGeneListView(APIView):
 class PanelAppGeneEvidenceView(APIView):
     """ Need to tunnel through due to Cross site requests """
 
+    @extend_schema(
+        summary="Retrieve PanelApp evidence for a gene symbol from a PanelApp server",
+        parameters=[OpenApiParameter("gene_symbol", OpenApiTypes.STR, OpenApiParameter.PATH,
+                                     description="Gene symbol to look up")],
+        responses=OpenApiTypes.OBJECT,
+    )
     @method_decorator(cache_page(WEEK_SECS))
     def get(self, request, *args, **kwargs):
         server_id = self.kwargs['server_id']
@@ -114,7 +141,13 @@ class PanelAppGeneEvidenceView(APIView):
 
 
 class CreateGeneListView(APIView):
+    """ Create a new gene list from a name and list of gene symbols """
 
+    @extend_schema(
+        summary="Create a gene list from gene symbols",
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request):
         data = request.data
         name = data["name"]
@@ -140,6 +173,11 @@ class CreateGeneListView(APIView):
 class TextToGeneListView(APIView):
     """ Text to gene list (doesn't actually save). Used to e.g. check gene names """
 
+    @extend_schema(
+        summary="Match free text gene symbols as an unsaved gene list (name checking)",
+        request=OpenApiTypes.OBJECT,
+        responses=GeneListSerializer,
+    )
     def post(self, request, *args, **kwargs):
         # Needed to be post as ~500 genes exceeded GET limit of ~4k
         name = self.request.data['name']
@@ -171,7 +209,12 @@ class GeneAnnotationReleaseView(RetrieveAPIView):
         return GeneAnnotationRelease.objects.all()
 
 
+@extend_schema(
+    parameters=[OpenApiParameter("gene_symbol", OpenApiTypes.STR, OpenApiParameter.PATH,
+                                 description="Gene symbol to retrieve GeneInfo for")],
+)
 class GeneInfoView(ListAPIView):
+    """ List GeneInfo records (e.g. tags/icons) for a gene symbol """
     serializer_class = GeneInfoSerializer
 
     def get_queryset(self):
@@ -183,6 +226,11 @@ class BatchGeneInfoView(APIView):
     """ Needs to be a post as we can send a large number of genes
         returns {gene_symbol : [gene_info_dict1, gene_info_dict2]} """
 
+    @extend_schema(
+        summary="Retrieve GeneInfo records for a batch of gene symbols",
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request):
         gene_symbols_json = request.data["gene_symbols_json"]
         gene_symbols = json.loads(gene_symbols_json)
@@ -200,6 +248,11 @@ class BatchGeneInfoView(APIView):
 class BatchGeneIdentifierForReleaseView(APIView):
     """ Needs to be a post as we can send a large number of genes """
 
+    @extend_schema(
+        summary="Map a batch of gene symbols to gene IDs for a GeneAnnotationRelease",
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request, release_id):
         gene_annotation_release = get_object_or_404(GeneAnnotationRelease, pk=release_id)
         gene_symbols_json = request.data["gene_symbols_json"]
@@ -214,7 +267,13 @@ class BatchGeneIdentifierForReleaseView(APIView):
 
 
 class SampleGeneListView(APIView):
+    """ Update a SampleGeneList's active/visible status """
 
+    @extend_schema(
+        summary="Set active/visible status of a sample gene list",
+        request=OpenApiTypes.OBJECT,
+        responses=SampleGeneListSerializer,
+    )
     def post(self, request, pk):
         sample_gene_list = get_object_or_404(SampleGeneList, pk=pk)
         sample_gene_list.sample.check_can_write(request.user)
