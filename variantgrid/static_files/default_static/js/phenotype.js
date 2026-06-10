@@ -28,7 +28,7 @@ function groupTerms(terms, minPrefixLen = 15) {
 
 
 function summariseTerms(terms, minPrefixLen = 15) {
-  let groups = groupTerms(terms, minPrefixLen);
+  const groups = groupTerms(terms, minPrefixLen);
   console.log("groups:");
   console.log(groups);
 
@@ -46,9 +46,9 @@ function summariseTerms(terms, minPrefixLen = 15) {
 
 
 function getOntologyTermObj(term_type, term, url) {
-    let termSpan = $("<span>", {class: `grid-term-link ${term_type}`, title: term, term: term, term_type: term_type});
+    const termSpan = $("<span>", {class: `grid-term-link ${term_type}`, title: term, term: term, term_type: term_type});
     if (url) {
-        let termLink = $("<a>", {href: url, target: "_blank", html: term});
+        const termLink = $("<a>", {href: url, target: "_blank", html: term});
         termSpan.append(termLink);
     } else {
         termSpan.html(term);
@@ -57,17 +57,17 @@ function getOntologyTermObj(term_type, term, url) {
 }
 
 function getOntologyTermLinks(term_type, term_list, getUrl) {
-    let MIN_PREFIX_LENGTH = 15;
-    let NUM_TERMS_TO_ATTEMPT_COLLAPSE = 5;
-    let MIN_COLLAPSES = 2;
+    const MIN_PREFIX_LENGTH = 15;
+    const NUM_TERMS_TO_ATTEMPT_COLLAPSE = 5;
+    const MIN_COLLAPSES = 2;
     let links = '';
     if (term_list) {
         const terms = term_list.split('|');
         const termsContainer = $("<div>", {class: "ontology-terms-container"});
         if (terms.length >= NUM_TERMS_TO_ATTEMPT_COLLAPSE) {
-            let groups = groupTerms(terms, MIN_PREFIX_LENGTH);
+            const groups = groupTerms(terms, MIN_PREFIX_LENGTH);
             for (const g of groups) {
-                let fullTerms = [];
+                const fullTerms = [];
                 for (const term of g.items) {
                     let url = null;
                     if (getUrl) {
@@ -78,13 +78,13 @@ function getOntologyTermLinks(term_type, term_list, getUrl) {
 
                 if (g.items.length >= MIN_COLLAPSES && g.prefix.length >= MIN_PREFIX_LENGTH) {
                     const prefix = g.prefix.replace(/[ ,]+$/, '');
-                    let collapsedLabel = `${prefix} [${g.items.length} matches]`;
-                    let collapsedTerm = getOntologyTermObj(term_type, collapsedLabel);
+                    const collapsedLabel = `${prefix} [${g.items.length} matches]`;
+                    const collapsedTerm = getOntologyTermObj(term_type, collapsedLabel);
                     collapsedTerm.addClass('collapsed-term');
                     collapsedTerm.attr("title", "click to expand full terms");
 
-                    let group = $("<span>", {class: "term-group"});
-                    let fullTermsContainer = $("<span>", {
+                    const group = $("<span>", {class: "term-group"});
+                    const fullTermsContainer = $("<span>", {
                         class: "full-terms",
                         style: "display:none"
                     })
@@ -104,7 +104,7 @@ function getOntologyTermLinks(term_type, term_list, getUrl) {
                 if (getUrl) {
                     url = getUrl(term_type, term);
                 }
-                let termObj = getOntologyTermObj(term_type, term, url);
+                const termObj = getOntologyTermObj(term_type, term, url);
                 termObj.addClass("grid-term-link");
                 termsContainer.append(termObj);
             }

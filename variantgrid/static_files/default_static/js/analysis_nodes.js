@@ -1,7 +1,7 @@
-var endpointColor = "#121212";
-var ACTIVE_CLASS = "ui-selected";
-var ACTIVE_NODE_COUNT_CLASS = "node-counts-selected"; // Needs to be different so not grabbed with multi-draggable
-var SHOW_NODE_IDS_IN_TOOLTIPS = true;
+const endpointColor = "#121212";
+const ACTIVE_CLASS = "ui-selected";
+const ACTIVE_NODE_COUNT_CLASS = "node-counts-selected"; // Needs to be different so not grabbed with multi-draggable
+const SHOW_NODE_IDS_IN_TOOLTIPS = true;
 
 function getNode(nodeId) {
 	return $("#analysis-node-" + nodeId);
@@ -54,12 +54,12 @@ function createNodeFromData(nodeData) {
 		"QuadNode" : createQuadNode,
 	};
 
-	let nodeClass = nodeData['node_class'];
+	const nodeClass = nodeData['node_class'];
 	let factory = NODE_FACTORIES[nodeClass];
 	if (!factory) {
 		factory = createDefaultNode;
 	}
-	let node = factory();
+	const node = factory();
 	updateNodeFromData(node, nodeData);
 
 	return node;
@@ -69,15 +69,15 @@ function createNodeFromData(nodeData) {
 function updateNodeFromData(node, nodeData) {
 	node.addClass(nodeData.node_class);
 	node.attr(nodeData.attributes);
-	let nodeOverlay = $(".node-overlay", node);
+	const nodeOverlay = $(".node-overlay", node);
 	nodeOverlay.attr("class", nodeData.overlay_css_classes);
 	$(".node-name", node).text(nodeData.name);
 	node.each(function() { this.updateState(nodeData['args']); });
 }
 
 // Wait for previous update to come back (so we don't end up with race conditions on the server)
-var waiting_for_message_callback = false;
-var update_message_buffer = [];
+let waiting_for_message_callback = false;
+const update_message_buffer = [];
 
 function updateNode(nodeId, op, params, on_success_function) {
 	const message = [nodeId, op, params, on_success_function];
@@ -315,21 +315,21 @@ function getActiveNodesIds() {
 }
 
 function copyNode() {
-	let nodes = getActiveNodesIds();
+	const nodes = getActiveNodesIds();
 	unselectActive(); // Unselect old, so we can select new
 
 	const addNewNodesToPage = function (data) {
-		let nodes_data = data['nodes'];
+		const nodes_data = data['nodes'];
 		for (let i = 0; i < nodes_data.length; ++i) {
-			let node_data = nodes_data[i];
-			let node = addNewNodeToPage(node_data);
+			const node_data = nodes_data[i];
+			const node = addNewNodeToPage(node_data);
 			node.addClass(ACTIVE_CLASS);
 		}
-		let edges = data['edges'];
+		const edges = data['edges'];
 		attatchAnalysisNodeConnections(edges);
 	};
 
-	let data = 'nodes=' + encodeURIComponent(JSON.stringify(nodes));
+	const data = 'nodes=' + encodeURIComponent(JSON.stringify(nodes));
 	$.ajax({
 	    type: "POST",
 	    data: data,
@@ -479,7 +479,7 @@ function updateDirtyNode(node, refresh) {
 
 		if (data.valid) {
 			const counts = data.counts;
-			for (let c in counts) {
+			for (const c in counts) {
 				const vc = $(".node-count-" + c, node_counts);
 				const count = counts[c];
 				if (count > 0 || vc.hasClass("show-zero")) {
@@ -648,13 +648,13 @@ function setupNodes(nodes_selector, readOnly) {
 	nodes_selector.click(function() {
 		unselectActive();
 		setActiveNode($(this));
-		let nodeId = $(this).attr('node_id');
+		const nodeId = $(this).attr('node_id');
 		loadNodeData(nodeId, null, true);
 	});
 	
 	setupConnections(nodes_selector, readOnly);
 	
-	let nodeCountTypes = ANALYSIS_SETTINGS['node_count_types'];
+	const nodeCountTypes = ANALYSIS_SETTINGS['node_count_types'];
 	if (nodeCountTypes) {
 		attachVariantCounters(nodes_selector, nodeCountTypes);
 	}
@@ -662,11 +662,11 @@ function setupNodes(nodes_selector, readOnly) {
 	if (Object.keys(NODE_HELP).length) { // Empty if no tooltips
 		nodes_selector.each(function () {
 			// test global if we should assign
-			let nodeClass = $(this).attr("node_class");
+			const nodeClass = $(this).attr("node_class");
 			let node_help = NODE_HELP[nodeClass];
 
 			if (SHOW_NODE_IDS_IN_TOOLTIPS) {
-				let nodeId = $(this).attr('node_id');
+				const nodeId = $(this).attr('node_id');
 				node_help += " (node #" + nodeId + ")";
 			}
 			$(this).attr('title', node_help);
@@ -681,29 +681,29 @@ function setupNodes(nodes_selector, readOnly) {
 function getMaxZIndex(nodes_selector) {
 	let maxZ = null;
 	nodes_selector.each(function() {
-		let zIndex = parseFloat($(this).css('z-index'));
+		const zIndex = parseFloat($(this).css('z-index'));
 		maxZ = (zIndex > maxZ) ? zIndex : maxZ;
 	});
 	return maxZ;
 }
 
 function bringNodeToFront(node) {
-		let zIndex = getMaxZIndex($(".window")) + 1;
+		const zIndex = getMaxZIndex($(".window")) + 1;
 		node.css("z-index", zIndex);
 }
 
 
 function setupNodeModifications(nodes_selector) {
 	function dragStart(event) {
-		let node = $(this);
+		const node = $(this);
 		// setActiveNode(node);
 		bringNodeToFront(node);
 	}
 
 	function dragStop(event) {
-		let nodeId = $(this).attr("node_id");
-		let position = $(this).position();
-		let params = {'x' : position.left, 'y' : position.top};
+		const nodeId = $(this).attr("node_id");
+		const position = $(this).position();
+		const params = {'x' : position.left, 'y' : position.top};
 		updateNode(nodeId, 'move', params);
 
 		// Avoid click event at end of drag
@@ -713,7 +713,7 @@ function setupNodeModifications(nodes_selector) {
 
 	// It's not clear to me how to always get a drag so we listen on both
 	// This can causes 2 POST's for an update, but is better than losing it
-	let params = {
+	const params = {
 		activeClass: ACTIVE_CLASS,
 		startNative: dragStart,
 		startAll: dragStart,
@@ -826,8 +826,8 @@ function drawCountLegend(nodeCountTypes) {
     }
 
     // Absolute positioning can sometimes get thrown off after resizing contents
-    let rowHeight = 31;
-    let numRows = 1 + nodeCountTypes.length
+    const rowHeight = 31;
+    const numRows = 1 + nodeCountTypes.length
     legend.height(rowHeight * numRows);
 }
 
@@ -900,8 +900,8 @@ function update_dirty_nodes(dirty_nodes) {
 }
 
 function updateNodeAppearance(data) {
-    let nodeId = data.attributes.node_id;
-    let node = getNode(nodeId);
+    const nodeId = data.attributes.node_id;
+    const node = getNode(nodeId);
     updateNodeFromData(node, data);
     setupConnections(node);
 }
@@ -909,7 +909,7 @@ function updateNodeAppearance(data) {
 
 function retrieveAndUpdateNodeAppearances(nodeList) {
     for (let i=0 ; i<nodeList.length ; ++i) {
-        let nodeId = nodeList[i];
+        const nodeId = nodeList[i];
         $.ajax({
             url: Urls.node_data(ANALYSIS_ID, nodeId),
             success: updateNodeAppearance,
@@ -943,16 +943,16 @@ function checkAndMarkDirtyNodes(aWin) {
 			const appearance_update_nodes = [];
 
 			for (let i=0 ; i<data.node_versions.length ; ++i) {
-                let nodeData = data.node_versions[i];
-                let nodeId = nodeData[0];
-                let nodeVersion = nodeData[1];
-                let nodeAppearanceVersion = nodeData[2];
-                let node = getNode(nodeId);
-                let localVersion = node.attr("version_id");
+                const nodeData = data.node_versions[i];
+                const nodeId = nodeData[0];
+                const nodeVersion = nodeData[1];
+                const nodeAppearanceVersion = nodeData[2];
+                const node = getNode(nodeId);
+                const localVersion = node.attr("version_id");
                 if (localVersion != nodeVersion) {
                     dirty_nodes.push(nodeId);
                 }
-                let localAppearanceVersion = node.attr("appearance_version_id");
+                const localAppearanceVersion = node.attr("appearance_version_id");
                 if (localAppearanceVersion != nodeAppearanceVersion) {
                     appearance_update_nodes.push(nodeId);
                 }

@@ -1,7 +1,7 @@
 function isScrolledToBottom(scrollDiv) {
     if (scrollDiv) {
         scrollDiv = $(scrollDiv).get(0);
-        let scrolledUpBy = scrollDiv.scrollHeight - scrollDiv.scrollTop - scrollDiv.clientHeight;
+        const scrolledUpBy = scrollDiv.scrollHeight - scrollDiv.scrollTop - scrollDiv.clientHeight;
         if (scrolledUpBy < 1) {
             return true;
         }
@@ -9,10 +9,10 @@ function isScrolledToBottom(scrollDiv) {
     return false;
 }
 
-let Flags = (function () {
+const Flags = (function () {
 
-    let DataCollection = (function () {
-        let DataCollection = function (initer) {
+    const DataCollection = (function () {
+        const DataCollection = function (initer) {
             this.initer = initer;
             this.dataMap = {};
         };
@@ -34,7 +34,7 @@ let Flags = (function () {
                 delete this.dataMap[id];
             },
             get(id) {
-                let existing = this.dataMap[id];
+                const existing = this.dataMap[id];
                 if (!existing) {
                     throw new Error(`No record for id ${id}`);
                 }
@@ -47,8 +47,8 @@ let Flags = (function () {
         return DataCollection;
     })();
 
-    let User = (function () {
-        let User = function (db) {
+    const User = (function () {
+        const User = function (db) {
             this.db = db;
         };
         User.prototype = {
@@ -64,17 +64,17 @@ let Flags = (function () {
         return User;
     })();
     
-    let FlagResolution = (function() {
-        let FlagResolution = function(db) {
+    const FlagResolution = (function() {
+        const FlagResolution = function(db) {
             this.db = db;
         };
         FlagResolution.prototype = {};
         return FlagResolution;
     })();
 
-    let FlagType = (function () {
+    const FlagType = (function () {
     
-        let FlagType = function (db) {
+        const FlagType = function (db) {
             this.db = db;
         };
         FlagType.prototype = {
@@ -82,7 +82,7 @@ let Flags = (function () {
 
             dom(params) {
                 params = params || {};
-                let {flag, statusFlag} = params;
+                const {flag, statusFlag} = params;
 
                 let content = [];
                 if (statusFlag) {
@@ -111,8 +111,8 @@ let Flags = (function () {
     FlagType.REJECTABLE = 'R';
     FlagType.STANDARD = 'S';
 
-    let FlagCollection = (function () {
-        let FlagCollection = function (db) {
+    const FlagCollection = (function () {
+        const FlagCollection = function (db) {
             this.db = db;
         };
         FlagCollection.prototype = {
@@ -121,7 +121,7 @@ let Flags = (function () {
             },
             commentsImportant() {
                 return this.db.comments.all().filter(c => {
-                    let flag = c.flagObj();
+                    const flag = c.flagObj();
                     if (flag.collection != this.id) {
                         return false;
                     }
@@ -136,28 +136,28 @@ let Flags = (function () {
             flags() {
                 return this.db.flags.all().filter(f => f.collection == this.id && f.open)
                     .sort((f1, f2) => {
-                        let localeCompare = -f2.flagTypeObj().label.localeCompare(f1.flagTypeObj().label);
+                        const localeCompare = -f2.flagTypeObj().label.localeCompare(f1.flagTypeObj().label);
                         return localeCompare ? localeCompare : f2.created - f1.created;
                     });
             },
             importantResolvedFlags() {
                 return this.db.flags.all().filter(f => f.collection == this.id && !f.open && f.flagTypeObj().importance >= 2)
                     .sort((f1, f2) => {
-                        let localeCompare = -f2.flagTypeObj().label.localeCompare(f1.flagTypeObj().label);
+                        const localeCompare = -f2.flagTypeObj().label.localeCompare(f1.flagTypeObj().label);
                         return localeCompare ? localeCompare : f2.created - f1.created;
                     });
             },
             raisableFlags() {
                 flagTypes = this.flagTypes().filter(ft => {
-                    let userPermission = this.user_permission;
-                    let requiredPermission = ft.raise_permission;
+                    const userPermission = this.user_permission;
+                    const requiredPermission = ft.raise_permission;
                     return userPermission >= requiredPermission;
                 });
                 return flagTypes.map(ft => this.createFlagFor(ft)).filter(f => f != null);
             },
             createFlagFor(flagType) {
                 if (flagType.only_one) {
-                    let existing = this.db.flags.all().find(f => f.collection == this.id && f.flag_type == flagType.id);
+                    const existing = this.db.flags.all().find(f => f.collection == this.id && f.flag_type == flagType.id);
                     if (existing) {
                         if (existing.status != 'O') {
                             return existing;
@@ -165,7 +165,7 @@ let Flags = (function () {
                         return null;
                     }
                 }
-                let newFlag = new Flag(this.db);
+                const newFlag = new Flag(this.db);
                 Object.assign(newFlag, {
                     flag_type: flagType.id,
                     collection: this.id,
@@ -176,7 +176,7 @@ let Flags = (function () {
                 return newFlag;
             },
             remove() {
-                for (let flag of this.flags()) {
+                for (const flag of this.flags()) {
                     flag.remove(flag.id);
                 }
                 this.db.collections._remove(this.id)
@@ -188,7 +188,7 @@ let Flags = (function () {
             },
 
             async watch_toggle() {
-                let watching = this.watching === 0 || this.watching;
+                const watching = this.watching === 0 || this.watching;
                 await this.db.post(
                     {
                         watch: !watching
@@ -200,8 +200,8 @@ let Flags = (function () {
         return FlagCollection;
     })();
 
-    let FlagTimeline = (function() {
-        let FlagTimeline = function(flagCollection, dialog) {
+    const FlagTimeline = (function() {
+        const FlagTimeline = function(flagCollection, dialog) {
             this.flagCollection = flagCollection;
             this.dialog = dialog;
             this.lastEntry = null;
@@ -213,29 +213,29 @@ let Flags = (function () {
         };
         FlagTimeline.prototype = {
             init() {
-                let dom = $('<div>');
+                const dom = $('<div>');
                 this.body = dom;
 
-                let content = $('<div>', { class: 'edit-flag-dialog container' }).appendTo(dom);
-                let details = $('<div>', {class: 'flag-details'}).appendTo(content);
+                const content = $('<div>', { class: 'edit-flag-dialog container' }).appendTo(dom);
+                const details = $('<div>', {class: 'flag-details'}).appendTo(content);
                 this.scrollablePanel = details;
                 
                 $('<div>', { class: 'flag-comments' }).appendTo(details);
             },
             update() {
                 // fixme, don't re-render comments already rendered
-                let shouldScroll = (isScrolledToBottom(this.scrollablePanel) && !this.firstUpdate) || this.justPosted;
+                const shouldScroll = (isScrolledToBottom(this.scrollablePanel) && !this.firstUpdate) || this.justPosted;
 
                 let lastEntry = this.lastEntry;
                 let reachedStart = lastEntry == null;
-                let commentsDom = this.body.find('.flag-comments');
-                let importantStuff = this.flagCollection.commentsImportant();
+                const commentsDom = this.body.find('.flag-comments');
+                const importantStuff = this.flagCollection.commentsImportant();
 
                 if (!importantStuff.length) {
                     commentsDom.empty();
                     $('<p>', {text: 'There have been no important flag actions against this record.'}).appendTo(commentsDom);
                 } else {
-                    for (let comment of importantStuff) {
+                    for (const comment of importantStuff) {
                         if (!reachedStart) {
                             reachedStart = comment.id == lastEntry.id;
                             continue;
@@ -259,8 +259,8 @@ let Flags = (function () {
         return FlagTimeline;
     })();
 
-    let FlagContent = (function() {
-        let FlagContent = function(flag, dialog) {
+    const FlagContent = (function() {
+        const FlagContent = function(flag, dialog) {
             this.flag = flag;
             this.dialog = dialog;
             
@@ -280,9 +280,9 @@ let Flags = (function () {
         };
         FlagContent.prototype = {
             init() {
-                let flag = this.flag;
-                let flagType = flag.flagTypeObj();
-                let flagDiv = $('<div>', { class: `flag flag-${flagType.id} res-${this.resolution} mr-1`});
+                const flag = this.flag;
+                const flagType = flag.flagTypeObj();
+                const flagDiv = $('<div>', { class: `flag flag-${flagType.id} res-${this.resolution} mr-1`});
                 this.titleDom = [flagDiv, flagType.label];
                 if (flag.open === false) {
                     flagDiv.addClass('closed');
@@ -292,11 +292,11 @@ let Flags = (function () {
                 } else {
                     this.titleDom.push(` (Raised: ${flag.ageText()})`);
                 }
-                let dom = $('<div>');
+                const dom = $('<div>');
                 this.body = dom;
 
-                let content = $('<div>', { class: 'edit-flag-dialog' }).appendTo(dom);
-                let details = $('<div>', {class: 'flag-details'}).appendTo(content);
+                const content = $('<div>', { class: 'edit-flag-dialog' }).appendTo(dom);
+                const details = $('<div>', {class: 'flag-details'}).appendTo(content);
                 this.scrollablePanel = details;
                 
                 $('<div>', { class: 'description' }).appendTo(details);
@@ -319,10 +319,10 @@ let Flags = (function () {
             },
             
             async postAction(params) {
-                let flag = this.flag;
+                const flag = this.flag;
             
                 params = params || {};
-                let { close } = params;
+                const { close } = params;
                 let comment = null;
                 if (this.textarea) {
                     comment = this.textarea.val().trim();
@@ -331,7 +331,7 @@ let Flags = (function () {
                     }
                     this.textarea.val('');
                 }
-                let resolution = $(`select[name='flag-res']`).val() || $(`input[name='flag-res']:checked`).val();
+                const resolution = $(`select[name='flag-res']`).val() || $(`input[name='flag-res']:checked`).val();
                 
                 if (!comment && flag.creating) {
                     alert('Please enter a comment before raising this flag.');
@@ -359,7 +359,7 @@ let Flags = (function () {
                     flag.db.addedOrClosedFlag = true;
                 }
 
-                let response = await flag.db.post(
+                const response = await flag.db.post(
                     sendParams,
                     url
                 );
@@ -367,8 +367,8 @@ let Flags = (function () {
                 
                 this.dialog.update();
                 if (flag.creating && response.created_flag_id) {
-                    let newFlagId = response.created_flag_id;
-                    let newFlag = flag.db.flags.get(newFlagId);
+                    const newFlagId = response.created_flag_id;
+                    const newFlag = flag.db.flags.get(newFlagId);
                     this.dialog.open(newFlag, {created: true});
                 } else {
                     //this.dialog.open(flag);
@@ -382,9 +382,9 @@ let Flags = (function () {
             },
 
             updateDescription() {
-                let description = this.body.find('.description');
+                const description = this.body.find('.description');
                 description.empty();
-                let flag = this.flag;
+                const flag = this.flag;
 
                 $('<div>', {class: 'flag-help', html: [
                     flag.helpFlagType(),
@@ -406,8 +406,8 @@ let Flags = (function () {
                 
                 let lastEntry = this.lastEntry;
                 let reachedStart = lastEntry == null;
-                let commentsDom = this.body.find('.flag-comments');
-                for (let comment of this.flag.comments()) {
+                const commentsDom = this.body.find('.flag-comments');
+                for (const comment of this.flag.comments()) {
                     if (!reachedStart) {
                         reachedStart = comment.id == lastEntry.id;
                         continue;
@@ -435,9 +435,9 @@ let Flags = (function () {
             },
 
             updateAction() {
-                let flag = this.flag;
-                let flagType = flag.flagTypeObj();
-                let creating = flag.creating;                
+                const flag = this.flag;
+                const flagType = flag.flagTypeObj();
+                const creating = flag.creating;                
                 let newRes = this.currentResolution();
                 
                 this.footer.LoadingOverlay('hide');
@@ -448,12 +448,12 @@ let Flags = (function () {
                 } else {
                     this.cachedState = newRes;
                 }
-                let resolutions = flag.resolutions();
+                const resolutions = flag.resolutions();
                 if (flag.creating && resolutions.length > 0) {
                     newRes = resolutions[0].id;
                 }
                 
-                let commentsEnabled = flagType.comments_enabled;
+                const commentsEnabled = flagType.comments_enabled;
                 this.textarea.hide();
                 if (commentsEnabled) {
                     this.textarea.show();
@@ -464,13 +464,13 @@ let Flags = (function () {
                     if (flag.creating) {
                         $('<label>', { class:'mb-2', text: 'Enter a comment and click save to raise this flag' }).appendTo(this.states);
                     }
-                    let content = $('<div>', {class:'d-flex mb-2'}).css('align-items','center').appendTo(this.states);
+                    const content = $('<div>', {class:'d-flex mb-2'}).css('align-items','center').appendTo(this.states);
                     $('<label/>', {text: 'Status:', class:'mr-2 align-center'}).appendTo(content);
-                    let statusButtons = $('<div>', {class:'btn-group btn-group-toggle', 'data-toggle':'buttons'}).appendTo(content)
-                    for (let resolution of resolutions) {
-                        let did = `res-${resolution.id}`;
-                        let input = $('<input>', {type:"radio", name:"flag-res", id:did, value:resolution.id});
-                        let label = $('<label>', {class:'btn btn-outline-secondary', html:[
+                    const statusButtons = $('<div>', {class:'btn-group btn-group-toggle', 'data-toggle':'buttons'}).appendTo(content)
+                    for (const resolution of resolutions) {
+                        const did = `res-${resolution.id}`;
+                        const input = $('<input>', {type:"radio", name:"flag-res", id:did, value:resolution.id});
+                        const label = $('<label>', {class:'btn btn-outline-secondary', html:[
                             input, resolution.label
                         ]});
                         if (resolution.id === newRes) {
@@ -495,7 +495,7 @@ let Flags = (function () {
                      */
                 }
                 
-                let canDoSomething = resolutions.length > 1 || commentsEnabled;
+                const canDoSomething = resolutions.length > 1 || commentsEnabled;
                 if (canDoSomething) {
                     this.newActionDom.show();
                     this.footer.show();
@@ -516,8 +516,8 @@ let Flags = (function () {
         return FlagContent;
     })();
 
-    let FlagCollectionSummaryContent = (function() {
-        let FlagCollectionSummaryContent = function (collection, dialog) {
+    const FlagCollectionSummaryContent = (function() {
+        const FlagCollectionSummaryContent = function (collection, dialog) {
             this.collection = collection;
             this.dialog = dialog;
             
@@ -528,8 +528,8 @@ let Flags = (function () {
         
         FlagCollectionSummaryContent.prototype = {
             flagIcon(flag, status) {
-                let flagType = flag.flagTypeObj();
-                let bigIcon = $('<div>', {class:`big-icon`, click: () => {
+                const flagType = flag.flagTypeObj();
+                const bigIcon = $('<div>', {class:`big-icon`, click: () => {
                     this.dialog.open(flag);
                 }});
                 $('<div>', {class:`flag flag-${flagType.id} res-${flag.resolution}`}).appendTo(bigIcon);
@@ -549,7 +549,7 @@ let Flags = (function () {
                     }
                 }
                 if (!flag.creating) {
-                    let ageDom = createTimestampDom(flag.created, true);
+                    const ageDom = createTimestampDom(flag.created, true);
                     ageDom.addClass('age');
                     ageDom.appendTo(bigIcon);
                 }
@@ -558,20 +558,20 @@ let Flags = (function () {
             },
             
             flagChunk(flags, title, status, showDetailed) {
-                let chunk = $('<div>', {class: 'containe container-flags'});
+                const chunk = $('<div>', {class: 'containe container-flags'});
                 $('<h5>', {text: title}).appendTo(chunk);
                 
                 if (showDetailed) {
-                    let rows = chunk;
+                    const rows = chunk;
                     
                     let lastType = null;
                     
-                    for (let flag of flags) {
-                        let row = $('<div>', {class: 'd-flex flex-row align-content-start mt-4 flag-detail-row'}).appendTo(rows);
+                    for (const flag of flags) {
+                        const row = $('<div>', {class: 'd-flex flex-row align-content-start mt-4 flag-detail-row'}).appendTo(rows);
                         this.flagIcon(flag, status).appendTo(row);
-                        let help = $('<div>', {style: 'flex-grow:1', class: 'ml-2'}).appendTo(row);
+                        const help = $('<div>', {style: 'flex-grow:1', class: 'ml-2'}).appendTo(row);
                         
-                        let firstOfType = false;
+                        const firstOfType = false;
                         if (flag.flag_type !== lastType) {
                             lastType = flag.flag_type;
                             // provide help for all flags of this type
@@ -579,7 +579,7 @@ let Flags = (function () {
                         }
                         flag.helpSpecific().appendTo(help);
                         if (status == 'open' && flag.resolution) {
-                            let res = flag.resolutionObj();
+                            const res = flag.resolutionObj();
                             $('<div>', {html: [
                                 $('<span>', {text: 'Current status : '}),
                                 $('<b>', {text: res.label})
@@ -588,7 +588,7 @@ let Flags = (function () {
                     }
                     return chunk;
                 } else {
-                    for (let flag of flags) {
+                    for (const flag of flags) {
                         this.flagIcon(flag, status).appendTo(chunk);
                     }
                 }
@@ -596,19 +596,19 @@ let Flags = (function () {
             },
         
             init() {
-                let dom = $('<div>');
-                let owner = this.collection.user_permission >= 1;
+                const dom = $('<div>');
+                const owner = this.collection.user_permission >= 1;
 
-                let openFlags = this.collection.flags();
+                const openFlags = this.collection.flags();
                 if (openFlags.length) {
                     this.flagChunk(openFlags, 'In Progress Flags', 'open', owner).appendTo(dom);
                 }
                 
-                let resolvedFlags = this.collection.importantResolvedFlags();
-                let seenOnlyOneFlagTypes = {};
+                const resolvedFlags = this.collection.importantResolvedFlags();
+                const seenOnlyOneFlagTypes = {};
                 if (resolvedFlags.length) {
                     this.flagChunk(resolvedFlags, 'Resolved Flags', false).appendTo(dom);
-                    for (let rf of resolvedFlags) {
+                    for (const rf of resolvedFlags) {
                         if (rf.db.flagTypes.get(rf.flag_type).only_one) {
                             seenOnlyOneFlagTypes[rf.flag_type] = true;
                         }
@@ -616,14 +616,14 @@ let Flags = (function () {
                 }
 
                 if (!openFlags.length && !resolvedFlags.length) {
-                    let chunk = $('<div>', {class: 'flag-chunk'}).appendTo(dom);
+                    const chunk = $('<div>', {class: 'flag-chunk'}).appendTo(dom);
                     $('<h3>', {text: 'No Flags'}).appendTo(chunk);
                     $('<p>', {text: 'There are no In Progress Flags or important Resolved Flags attached to this record.'}).appendTo(chunk);
                 }
 
-                let raisableFlags = this.collection.raisableFlags();
-                let notSeenRaisableFlags = [];
-                for (let raisableFlag of raisableFlags) {
+                const raisableFlags = this.collection.raisableFlags();
+                const notSeenRaisableFlags = [];
+                for (const raisableFlag of raisableFlags) {
                     if (!seenOnlyOneFlagTypes[raisableFlag.flag_type]) {
                         notSeenRaisableFlags.push(raisableFlag);
                     }
@@ -634,7 +634,7 @@ let Flags = (function () {
                 }
 
                 // this is mostly redundant to Variant Classification History
-                let timelineA = $('<a>', {text: 'See Full Timeline', class:'btn btn-outline-secondary'});
+                const timelineA = $('<a>', {text: 'See Full Timeline', class:'btn btn-outline-secondary'});
                 timelineA.click(() => {
                     this.dialog.timeline(); 
                 });
@@ -648,8 +648,8 @@ let Flags = (function () {
         return FlagCollectionSummaryContent;
     })();
     
-    let FlagCollectionDialog = (function() {
-        let FlagCollectionDialog = function(collection) {
+    const FlagCollectionDialog = (function() {
+        const FlagCollectionDialog = function(collection) {
             this.collection = collection;
             this.dialog = null;
             this.content = null;
@@ -674,9 +674,9 @@ let Flags = (function () {
                 
                 params = params || {};
                 await this.collection.db.refresh({ collection: this.collection });
-                let activeFlag = params.activeFlag;
+                const activeFlag = params.activeFlag;
                 
-                let modalContent = $(`
+                const modalContent = $(`
                     <div class="modal fade" id="FlagModal" tabindex="-1" role="dialog" aria-labelledby="FlagModalLabel" aria-hidden="true">
                         <div class="modal-dialog modal-lg" role="document">
                             <div class="modal-content">
@@ -702,8 +702,8 @@ let Flags = (function () {
 
                 this.content = modalContent;
 
-                let db = this.collection.db;
-                let dialog = this;
+                const db = this.collection.db;
+                const dialog = this;
                 modalContent.on('shown.bs.modal', function() {
                     db.setDialogState(dialog);
                 });
@@ -734,13 +734,13 @@ let Flags = (function () {
                 activeContent.init();
                 activeContent.update();
                 this.activeContent = activeContent;
-                let parentTitle = (this.collection.label || 'Flags').replace('/', '-'); // fixme trim title
-                let title = this.activeContent.title;
+                const parentTitle = (this.collection.label || 'Flags').replace('/', '-'); // fixme trim title
+                const title = this.activeContent.title;
                 let titleDom = this.activeContent.titleDom;
                 if (!titleDom && title) {
                     titleDom = $('<span/>', {text: title});
                 }
-                let breadcrumbs = this.content.find('ol.breadcrumb');
+                const breadcrumbs = this.content.find('ol.breadcrumb');
                 if (!title && !titleDom) {
                     breadcrumbs.html([
                         $('<li>', {class: 'breadcrumb-item', text: parentTitle})
@@ -753,7 +753,7 @@ let Flags = (function () {
                     ]);
                 }
                 this.content.find('.modal-body').html(this.activeContent.body);
-                let footer = this.content.find('.modal-footer');
+                const footer = this.content.find('.modal-footer');
                 footer.html(this.activeContent.footer);
                 if (!this.activeContent.footer || this.activeContent.footer.css('display') === 'none') {
                     footer.addClass('d-none');
@@ -775,8 +775,8 @@ let Flags = (function () {
         return FlagCollectionDialog;
     })();
 
-    let Flag = (function () {
-        let Flag = function (db, data) {
+    const Flag = (function () {
+        const Flag = function (db, data) {
             this.db = db;
         };
         Flag.prototype = {
@@ -787,14 +787,14 @@ let Flags = (function () {
             title() { return `${this.flagTypeObj().label}` }, //  (${this.id})
             resolutionObj() { return this.db.flagResolutions.get(this.resolution); },
             canEdit() {
-                let userPermission = this.collectionObj().user_permission;
-                let requiredPermission = this.flagTypeObj().permission;
+                const userPermission = this.collectionObj().user_permission;
+                const requiredPermission = this.flagTypeObj().permission;
                 return userPermission >= requiredPermission;
             },
             subFlags() {
-                let extraData = this.extra_data;
+                const extraData = this.extra_data;
                 if (extraData) {
-                    let subFlags = extraData.sub_flags;
+                    const subFlags = extraData.sub_flags;
                     if (subFlags) {
                         return subFlags;
                     } else {
@@ -814,10 +814,10 @@ let Flags = (function () {
             },
             
             resolutions() {
-                let resolutions = this.flagTypeObj().resolutions.map(r => this.db.flagResolutions.get(r) );
+                const resolutions = this.flagTypeObj().resolutions.map(r => this.db.flagResolutions.get(r) );
                 
                 if (this.creating) {
-                    let excludeStatuses = {'R': true};
+                    const excludeStatuses = {'R': true};
                     if (!this.canEdit()) {
                         excludeStatuses['C'] = true;
                     }
@@ -939,12 +939,12 @@ let Flags = (function () {
                 }
                 
                 if (this.data && this.data.transcript) {
-                    let transcript = this.data.transcript;
+                    const transcript = this.data.transcript;
                     parts = /^([_A-Z0-9]+)(?:[.]([0-9]+))?$/i;
-                    let match = parts.exec(transcript);
+                    const match = parts.exec(transcript);
                     if (match) {
                         let transcriptUrl = null;
-                        let transcriptNoVer = match[1];
+                        const transcriptNoVer = match[1];
                         transcriptUrl = Urls.view_transcript(transcriptNoVer);
                         return $('<div>', {html: [
                             'View details about the transcript ',
@@ -953,7 +953,7 @@ let Flags = (function () {
                         ]});
                     }
                 } else if (this.flag_type === 'classification_suggestion') {
-                    let user = this.userObj();
+                    const user = this.userObj();
                     return $('<div>', {html: [
                         `Raised by `,
                         $('<span>', {class: 'username', text:user.name}),
@@ -964,15 +964,15 @@ let Flags = (function () {
                 } else if (this.flag_type === 'classification_significance_change') {
                     return $('<div>', {text: firstComment});
                 } else if (this.flag_type === 'classification_matching_variant_warning') {
-                    let variantId = this.collectionObj().variant;
+                    const variantId = this.collectionObj().variant;
                     return $('<div>', {html: [
                         `See more information about the linked variant `,
                         $('<a>', {class: 'hover-link', text: `here`, href: Urls.view_allele_from_variant(variantId)})
                     ]});
                 } else if (this.flag_type === 'classification_discordant') {
-                    let reportId = this.collectionObj().discordance_report;
-                    let variantId = this.collectionObj().variant;
-                    let clinicalContext = this.collectionObj().clinical_context;
+                    const reportId = this.collectionObj().discordance_report;
+                    const variantId = this.collectionObj().variant;
+                    const clinicalContext = this.collectionObj().clinical_context;
                     if (reportId) {
                         return $('<div>', {html: [
                             `Go to the `,
@@ -992,13 +992,13 @@ let Flags = (function () {
                 return Object.values(this.db.comments.all()).filter(c => c.flag == this.id).sort((c1, c2) => c1.created - c2.created);
             },
             dom() {
-                let flagType = this.flagTypeObj();
-                let user = this.userObj();
+                const flagType = this.flagTypeObj();
+                const user = this.userObj();
 
-                let titleText = `${flagType.label} (${this.ageText()})`;
+                const titleText = `${flagType.label} (${this.ageText()})`;
 
-                let collectionObj = this.collectionObj();
-                let flagDiv = $('<div>', { class: `flag flag-${flagType.id} res-${this.resolution}`, title: titleText});
+                const collectionObj = this.collectionObj();
+                const flagDiv = $('<div>', { class: `flag flag-${flagType.id} res-${this.resolution}`, title: titleText});
                 flagDiv.click(() => {
                     flagDiv.tooltip('hide');
                     new FlagCollectionDialog(this.collectionObj()).init({activeFlag:this, triggerDom:flagDiv})
@@ -1009,7 +1009,7 @@ let Flags = (function () {
                 return flagDiv;
             },
             remove() {
-                for (let comment of this.comments()) {
+                for (const comment of this.comments()) {
                     comment.remove();
                 }
                 this.db.flags._remove(this.id);
@@ -1019,8 +1019,8 @@ let Flags = (function () {
     })();
 
 
-    let FlagComment = (function () {
-        let FlagComment = function (db) {
+    const FlagComment = (function () {
+        const FlagComment = function (db) {
             this.db = db;
         };
         FlagComment.prototype = {
@@ -1028,7 +1028,7 @@ let Flags = (function () {
             userObj() { return this.db.users.get(this.user); },
             resolutionObj() { return this.resolution ? this.db.flagResolutions.get(this.resolution) : null; },
             action() {
-                let resolution = this.resolutionObj();
+                const resolution = this.resolutionObj();
                 if (!resolution) {
                     return 'Commented';
                 } else {
@@ -1042,13 +1042,13 @@ let Flags = (function () {
                 `;
             },
             dom(params) {
-                let { includeTitle, lastEntry, dialog } = params || {};
+                const { includeTitle, lastEntry, dialog } = params || {};
 
-                let flag = this.flagObj();
-                let user = this.userObj();
-                let flagType = flag.flagTypeObj();
-                let title = `${flagType.label} (${flag.ageText()})`;
-                let commentDom = $('<div>', { class: 'flag-comment' });
+                const flag = this.flagObj();
+                const user = this.userObj();
+                const flagType = flag.flagTypeObj();
+                const title = `${flagType.label} (${flag.ageText()})`;
+                const commentDom = $('<div>', { class: 'flag-comment' });
 
                 let timestamp = moment(this.created * 1000).format('DD-MMM-YYYY');
                 if (lastEntry) {
@@ -1062,12 +1062,12 @@ let Flags = (function () {
                     commentDom.addClass('with-title');
                 }
 
-                let userActionDom = $('<div>', { class: 'user-action' }).appendTo(commentDom);
+                const userActionDom = $('<div>', { class: 'user-action' }).appendTo(commentDom);
 
-                let avatar = $('<div>', { class: 'avatar' }).css(`background-image`, `url(${user.avatar})`).css('background-color', user.color).appendTo(userActionDom);
-                let content = $('<div>', { class: 'content' }).appendTo(userActionDom);
-                let time = moment(this.created * 1000).format('hh:mm A');
-                let userInfo = $('<div>', {
+                const avatar = $('<div>', { class: 'avatar' }).css(`background-image`, `url(${user.avatar})`).css('background-color', user.color).appendTo(userActionDom);
+                const content = $('<div>', { class: 'content' }).appendTo(userActionDom);
+                const time = moment(this.created * 1000).format('hh:mm A');
+                const userInfo = $('<div>', {
                     class: 'header', html: [
                         $('<span>', { class: 'username', text: user.name }),
                         $('<span>', { class: 'text-secondary text-italic font-italic d-inline-block mr-2', text: user.lab}),
@@ -1080,7 +1080,7 @@ let Flags = (function () {
                     userInfo.css('display', 'none');
                 }
 
-                let actionCommentDom = $('<div>', { class: 'action-text' }).appendTo(content);
+                const actionCommentDom = $('<div>', { class: 'action-text' }).appendTo(content);
                 action = this.action();
 
                 if (params.includeTitle) {
@@ -1109,7 +1109,7 @@ let Flags = (function () {
     })();
 
 
-    let Flags = function (
+    const Flags = function (
         props
     ) {
         this.flagsUrl = '/flags/api/flags/';
@@ -1137,32 +1137,32 @@ let Flags = (function () {
         updateFilter() {
             if (this.summaryFilter.length) {
                 this.summaryFilter.empty();
-                let counts = {};
-                for (let flag of this.flags.all()) {
+                const counts = {};
+                for (const flag of this.flags.all()) {
                     if (flag.open) {
-                        let resolution_counts = counts[flag.flag_type] || {};
+                        const resolution_counts = counts[flag.flag_type] || {};
                         resolution_counts[flag.resolution] = (resolution_counts[flag.resolution] || 0) + 1;
                         counts[flag.flag_type] = resolution_counts;
                     }
                 }
-                let ordered_keys = Object.keys(counts).sort((k1, k2) => this.flagTypes.get(k1).label.localeCompare(this.flagTypes.get(k2).label));
-                for (let key of ordered_keys) {
+                const ordered_keys = Object.keys(counts).sort((k1, k2) => this.flagTypes.get(k1).label.localeCompare(this.flagTypes.get(k2).label));
+                for (const key of ordered_keys) {
                     
                     if (this.summaryFilterInclusions && !this.summaryFilterInclusions[key]) {
                         continue;
                     }
                     
-                    let resolution_counts = counts[key];
-                    let flagType = this.flagTypes.get(key);
-                    for (let [resolution, value] of Object.entries(resolution_counts)) {
+                    const resolution_counts = counts[key];
+                    const flagType = this.flagTypes.get(key);
+                    for (const [resolution, value] of Object.entries(resolution_counts)) {
 
-                        let label =  $('<span>', {class: 'label', text: flagType.label});
+                        const label =  $('<span>', {class: 'label', text: flagType.label});
                         if (resolution !== 'open') {
-                            let resolutionObj = this.flagResolutions.get(resolution);
+                            const resolutionObj = this.flagResolutions.get(resolution);
                             $('<span>', {text: ` (${resolutionObj.label})`}).appendTo(label);
                         }
                         
-                        let cell_parts = [
+                        const cell_parts = [
                             $('<div>').addClass('flag').addClass(`flag-${flagType.id} res-${resolution}`),
                             $('<div>', {class: 'text-monospace mx-2', text: value.toString(), style:'min-width: 2rem; text-align:right'}),
                             label
@@ -1171,7 +1171,7 @@ let Flags = (function () {
                             $('<span>', {class: 'plural', text: 's'}).appendTo(label);
                         }
                         
-                        let filterCell = $('<a/>', {
+                        const filterCell = $('<a/>', {
                             class: 'list-group-item list-group-item-action d-flex',
                             'data-flag-type': `${flagType.id}-${resolution}`,
                             html: cell_parts,
@@ -1186,7 +1186,7 @@ let Flags = (function () {
         },
         
         applyFilter(flag_type_id, resolution) {
-            let filterValue = `${flag_type_id}-${resolution}`;
+            const filterValue = `${flag_type_id}-${resolution}`;
             this.summaryFilter.find('.list-group-item').removeClass('list-group-item-primary');
             if (this.filterValue === filterValue || flag_type_id === null) {
                 this.filterValue = null;
@@ -1194,11 +1194,11 @@ let Flags = (function () {
             } else {
                 this.filterValue = filterValue;
                 this.summaryFilter.find(`[data-flag-type=${flag_type_id}-${resolution}]`).addClass('list-group-item-primary');
-                let matching_collection_ids = {};
-                let flags = this.flags.all().filter(f => f.flag_type === flag_type_id && f.resolution === resolution).forEach(f => {
+                const matching_collection_ids = {};
+                const flags = this.flags.all().filter(f => f.flag_type === flag_type_id && f.resolution === resolution).forEach(f => {
                     matching_collection_ids[f.collection] = true;
                 });
-                for (let fc of this.collections.all()) {
+                for (const fc of this.collections.all()) {
                     if (matching_collection_ids[fc.id]) {
                         fc.dom.closest('tr').show();
                     } else {
@@ -1234,7 +1234,7 @@ let Flags = (function () {
                 this.userId = props.userId;
             }
             let flagDoms = null;
-            let flagGroup = props.flagGroup || 'default';
+            const flagGroup = props.flagGroup || 'default';
             if (props.filter) {
                 flagDoms = $(`${props.filter} *[data-flags]`);
             } else {
@@ -1244,33 +1244,33 @@ let Flags = (function () {
             this.onClose = props.onClose || false;
             this.summaryFilter = $('#flags-filter');
             if (this.summaryFilter) {
-                let summaryFilterInclusions = this.summaryFilter.attr('data-filter') || null;
+                const summaryFilterInclusions = this.summaryFilter.attr('data-filter') || null;
                 if (summaryFilterInclusions) {
                     this.summaryFilterInclusions = {};
-                    for (let inclusion of summaryFilterInclusions.split(' ')) {
+                    for (const inclusion of summaryFilterInclusions.split(' ')) {
                         this.summaryFilterInclusions[inclusion.trim()] = true;
                     }
                 }
             }
 
             let changes = false;
-            let existingCollections = {};
-            for (let collection of this.collections.all()) {
+            const existingCollections = {};
+            for (const collection of this.collections.all()) {
                 existingCollections[collection.id] = collection;
             }
-            let flag_collection_doms = {};
+            const flag_collection_doms = {};
             flagDoms.toArray().forEach(e => {
-                let dom = $(e);
+                const dom = $(e);
                 dom.addClass('flags');
-                let id = parseInt(dom.attr('data-flags'));
+                const id = parseInt(dom.attr('data-flags'));
 
                 if (!isNaN(id)) {
                     flag_collection_doms[id] = Object.assign({ dom: dom }, flag_collection_doms[id] || {});
                 }
             });
-            for (let entry of Object.entries(flag_collection_doms)) {
-                let id = entry[0];
-                let data = entry[1];
+            for (const entry of Object.entries(flag_collection_doms)) {
+                const id = entry[0];
+                const data = entry[1];
                 if (existingCollections[id]) {
                     delete existingCollections[id];
                 } else {
@@ -1284,7 +1284,7 @@ let Flags = (function () {
                 });
             }
 
-            for (let collection of Object.values(existingCollections)) {
+            for (const collection of Object.values(existingCollections)) {
                 if (collection.flagGroup === flagGroup) {
                     collection.remove();
                 }
@@ -1328,7 +1328,7 @@ let Flags = (function () {
                 params = params || {};
 
                 rerender = true;
-                let collections = this.collections.all();
+                const collections = this.collections.all();
                 if (collections.length === 0) {
                     resolve();
                     return;
@@ -1378,36 +1378,36 @@ let Flags = (function () {
         },
 
         updateData(record) {
-            for (let user of (record.users || [])) {
+            for (const user of (record.users || [])) {
                 this.users.upsert(user);
             }
-            for (let flag of (record.flags || [])) {
+            for (const flag of (record.flags || [])) {
                 this.flags.upsert(flag);
             }
-            for (let comment of (record.comments || [])) {
+            for (const comment of (record.comments || [])) {
                 this.comments.upsert(comment);
             }
-            for (let flagResolution of (record.flag_resolutions || [])) {
+            for (const flagResolution of (record.flag_resolutions || [])) {
                 this.flagResolutions.upsert(flagResolution);
             }
-            for (let flagType of (record.flag_types || [])) {
+            for (const flagType of (record.flag_types || [])) {
                 this.flagTypes.upsert(flagType);
             }
-            for (let collection of (record.collections || [])) {
+            for (const collection of (record.collections || [])) {
                 this.collections.upsert(collection);
             }
         },
 
         render() {
-            for (let collection of this.collections.all()) {
-                let dom = collection.dom;
+            for (const collection of this.collections.all()) {
+                const dom = collection.dom;
                 if (!dom) {
                     continue;
                 }
                 dom.empty();
-                let flags = collection.flags();
-                let watch = collection.watching === 0 || collection.watching;
-                let flagSummary = $('<div>', { class: `flag add`, title: 'Add or review flags for ' + collection.label}).appendTo(dom);
+                const flags = collection.flags();
+                const watch = collection.watching === 0 || collection.watching;
+                const flagSummary = $('<div>', { class: `flag add`, title: 'Add or review flags for ' + collection.label}).appendTo(dom);
                 flagSummary.click(() => { new FlagCollectionDialog(collection).init({triggerDom: flagSummary}) });
 
                 if (collection.watching) {
@@ -1416,14 +1416,14 @@ let Flags = (function () {
                     $('<div>', { class: `notifications watching`, title: `starred` }).appendTo(flagSummary);
                 }
                 
-                for (let flag of collection.flags()) {
-                    let flagDom = flag.dom().appendTo(dom);
+                for (const flag of collection.flags()) {
+                    const flagDom = flag.dom().appendTo(dom);
                     dom.append(flagDom);
-                    let subFlags = flag.subFlags();
+                    const subFlags = flag.subFlags();
                     if (subFlags && subFlags.length) {
-                        let subFlagsDom = $('<div>', {class: 'sub-flags'}).appendTo(dom);
-                        for (let subFlag of subFlags) {
-                            let subFlagDom = $('<div>', {class: `sub-flag`, title: subFlag.label, text: subFlag.letter || 'X'});
+                        const subFlagsDom = $('<div>', {class: 'sub-flags'}).appendTo(dom);
+                        for (const subFlag of subFlags) {
+                            const subFlagDom = $('<div>', {class: `sub-flag`, title: subFlag.label, text: subFlag.letter || 'X'});
                             subFlagDom.appendTo(subFlagsDom);
                         }
                     }

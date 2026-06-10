@@ -2,17 +2,17 @@ VENN_TOGGLE_WIDGET_CLASS = "venn_toggle_widget";
 
 function venn_select(selector, venn_flag) {
 		$('.' + VENN_TOGGLE_WIDGET_CLASS, selector).each(function() {
-			var toggled = venn_flag & $(this).attr("venn_bit");
-			var widget = d3.select(this);
+			const toggled = venn_flag & $(this).attr("venn_bit");
+			const widget = d3.select(this);
 			toggleSelect(widget, !!toggled);
 		});
 }
 
 function vennAddToggleCallbacks(selector, callback) {
 	get_venn_flag = function() {
-		var venn_flag = 0;
+		let venn_flag = 0;
 		$('.' + VENN_TOGGLE_WIDGET_CLASS, selector).each(function() {
-			var widget = d3.select(this);
+			const widget = d3.select(this);
 			toggled = widget.attr("toggled");
 			if (toggled == "true") {
 				venn_flag |= widget.attr("venn_bit");
@@ -27,7 +27,7 @@ function vennAddToggleCallbacks(selector, callback) {
 	};
 
 	$('.' + VENN_TOGGLE_WIDGET_CLASS, selector).each(function() {
-		var widget = d3.select(this);
+		const widget = d3.select(this);
 		widget.on("click", toggleColor);
 	});
 }
@@ -47,24 +47,24 @@ venn_id = 0;
 
 function venn2(selector, w, h) {
 	venn_id++;
-	var circle1 = "circle1_" + venn_id;
-	var circle2 = "circle2_" + venn_id;
+	const circle1 = "circle1_" + venn_id;
+	const circle2 = "circle2_" + venn_id;
 
-	var radius = w * 0.25;
-	var svg = d3.select(selector).append("svg:svg")
+	const radius = w * 0.25;
+	const svg = d3.select(selector).append("svg:svg")
 	    .attr("width", w)
 	    .attr("height", h);
 	
-	var defs = svg.append("svg:defs");
+	const defs = svg.append("svg:defs");
 
-	var addCirc1 = function(selector) {
+	const addCirc1 = function(selector) {
 		return selector.append("svg:circle")
 	    .attr("cx", w*0.36)
 	    .attr("cy", h*0.5)
 	    .attr("r", radius);
 	};
 
-	var addCirc2 = function(selector) {
+	const addCirc2 = function(selector) {
 		return selector.append("svg:circle")
 	    .attr("cx", w*0.57)
 	    .attr("cy", h*0.5)
@@ -72,7 +72,7 @@ function venn2(selector, w, h) {
 	};
 
 	
-	var cp = defs.append("svg:clipPath").attr("id", circle1);
+	let cp = defs.append("svg:clipPath").attr("id", circle1);
 	addCirc1(cp);
 	
 	cp = defs.append("svg:clipPath").attr("id", circle2);
@@ -109,7 +109,7 @@ function venn2(selector, w, h) {
 	    .style("stroke-width", 2)
 	    .style("fill", "#ffffff");
 
-	var setRing = function(selector) {
+	const setRing = function(selector) {
 		return selector.style("stroke-width", 2)
 			.style("fill-opacity", 0)
 			.style("stroke", "gray")
@@ -124,11 +124,11 @@ function venn2(selector, w, h) {
 function venn3(selector, w, h) {
 	radius = w * 0.3
 
-	var svg = d3.select(selector).append("svg:svg")
+	const svg = d3.select(selector).append("svg:svg")
 	    .attr("width", w)
 	    .attr("height", h);
 	
-	var defs = svg.append("svg:defs");
+	const defs = svg.append("svg:defs");
 	
 	defs.append("svg:clipPath")
 	    .attr("id", "circle1")

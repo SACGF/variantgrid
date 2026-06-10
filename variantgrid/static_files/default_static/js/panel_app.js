@@ -1,19 +1,19 @@
 function getEvidenceHover(geneSymbol, evidence, confidence) {
-    let container = $("<div />");
-    let geneTitle = $("<h3>" + geneSymbol + "</h3>").addClass(confidence);
+    const container = $("<div />");
+    const geneTitle = $("<h3>" + geneSymbol + "</h3>").addClass(confidence);
     container.append(geneTitle);
-    let modeOfInheritance = evidence["mode_of_inheritance"];
+    const modeOfInheritance = evidence["mode_of_inheritance"];
     if (modeOfInheritance) {
         mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
         container.append(mohDiv);
     }
-    let penetrance = evidence["penetrance"];
+    const penetrance = evidence["penetrance"];
     if (penetrance) {
         penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
         container.append(penetranceDiv);
     }
 
-    let evidences = evidence["evidence"];
+    const evidences = evidence["evidence"];
     if (evidences) {
         container.append($("<h3 />").text("Sources"));
         evidencesUl = $("<ul />");
@@ -23,7 +23,7 @@ function getEvidenceHover(geneSymbol, evidence, confidence) {
         container.append(evidencesUl);
     }
 
-    let phenotypes = evidence["phenotypes"];
+    const phenotypes = evidence["phenotypes"];
     if (phenotypes) {
         container.append($("<h3 />").text("Phenotypes"));
         phenotypesUl = $("<ul />");
@@ -46,11 +46,11 @@ function getConfidenceCSS(confidence) {
 
 
 function addGeneEvidence(geneSymbol, evidence, geneContainer) {
-    let evidenceDiv = $("<div />").addClass("evidence hover-detail");
-    let confidence = evidence["confidence_level"];
-    let evidenceHover = getEvidenceHover(geneSymbol, evidence, confidence);
+    const evidenceDiv = $("<div />").addClass("evidence hover-detail");
+    const confidence = evidence["confidence_level"];
+    const evidenceHover = getEvidenceHover(geneSymbol, evidence, confidence);
     evidenceDiv.attr("data-content", evidenceHover.html());
-    let cssClass = getConfidenceCSS(confidence);
+    const cssClass = getConfidenceCSS(confidence);
     if (cssClass) {
         evidenceDiv.addClass(cssClass);
     }
@@ -59,32 +59,32 @@ function addGeneEvidence(geneSymbol, evidence, geneContainer) {
 
 
 function getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceResultsList) {
-    let newDiv = $("<div />");
+    const newDiv = $("<div />");
     let summaryText = null;
 
     if (panelAppEvidenceResultsList.length) {
-        let confidenceCount = {};
+        const confidenceCount = {};
         for (let i=0 ; i<panelAppEvidenceResultsList.length ; ++i) {
-            let evidence = panelAppEvidenceResultsList[i];
+            const evidence = panelAppEvidenceResultsList[i];
             addGeneEvidence(geneSymbol, evidence, newDiv);
 
-            let panel = evidence["panel"];
+            const panel = evidence["panel"];
             if (panel) {
-                let diseaseName = panel["name"];
-                let confidenceLabel = getConfidenceCSS(evidence["confidence_level"]);
-                let existingCount = confidenceCount[confidenceLabel] || 0;
+                const diseaseName = panel["name"];
+                const confidenceLabel = getConfidenceCSS(evidence["confidence_level"]);
+                const existingCount = confidenceCount[confidenceLabel] || 0;
                 confidenceCount[confidenceLabel] = existingCount + 1;
-                let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ". ");
+                const diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ". ");
                 newDiv.append(diseaseSpan);
             }
         }
 
         if (confidenceCount) {
-            let summaryDiv = $("<div />").addClass("hidden gene-symbol-summary");
+            const summaryDiv = $("<div />").addClass("hidden gene-symbol-summary");
             // go high to low
-            let evidenceList = [];
-            for (let evidence of ["HighEvidence", "ModerateEvidence", "LowEvidence"]) {
-                let count = confidenceCount[evidence];
+            const evidenceList = [];
+            for (const evidence of ["HighEvidence", "ModerateEvidence", "LowEvidence"]) {
+                const count = confidenceCount[evidence];
                 if (count) {
                     evidenceList.push(evidence + ": " + confidenceCount[evidence]);
                 }
@@ -104,7 +104,7 @@ function getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceRes
 
 function getPanelAppGeneEvidenceDiv(serverName, server_id, geneSymbol, summaryFunc) {
     // Returns a Div which is loading, then is filled in when API retrieved ok
-    let panelAppDiv = $("<div />").addClass("loading icon16");
+    const panelAppDiv = $("<div />").addClass("loading icon16");
     $.ajax({
         type: "GET",
         url: Urls.api_panel_app_gene_evidence(server_id, geneSymbol),
@@ -112,7 +112,7 @@ function getPanelAppGeneEvidenceDiv(serverName, server_id, geneSymbol, summaryFu
             const {div, summary} = getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceResultsList);
             panelAppDiv.replaceWith(div);
             if (summaryFunc) {
-                let summaryText = serverName + " - " + summary;
+                const summaryText = serverName + " - " + summary;
                 summaryFunc(summaryText);
             }
         },
@@ -121,7 +121,7 @@ function getPanelAppGeneEvidenceDiv(serverName, server_id, geneSymbol, summaryFu
             if (qXHR.status == 404) {
                 errorText = "Not found";
             }
-            let newDiv = $("<div />").text(errorText);
+            const newDiv = $("<div />").text(errorText);
             panelAppDiv.replaceWith(newDiv);
         }
     });

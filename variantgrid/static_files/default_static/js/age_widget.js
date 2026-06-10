@@ -10,7 +10,7 @@ $.widget('custom.age', {
         if (value === undefined) {
             return this.options.value;
         }
-        let parts = {num: null, unit: null};
+        const parts = {num: null, unit: null};
 
         if (value === null) {
             parts.num = '';
@@ -19,7 +19,7 @@ $.widget('custom.age', {
             parts.num = 'y';
             parts.unit = value;
         } else {
-            let unitsM = /^(.*?)(months|weeks_gestation)?$/.exec(`${value}`);
+            const unitsM = /^(.*?)(months|weeks_gestation)?$/.exec(`${value}`);
             parts.num = unitsM[1] || '';
             parts.unit = unitsM[2] || '';
         }
@@ -50,11 +50,11 @@ $.widget('custom.age', {
     },
 
     fieldsUpdated: function() {
-        let parts = {
+        const parts = {
             num: this.entryText.val().trim(),
             unit: this.unitSelect.val() || ''
         };
-        let value = `${parts.num}${parts.unit}`;
+        const value = `${parts.num}${parts.unit}`;
         this.options.value = `${parts.num}${parts.unit}`;
         this._refreshView(parts);
 

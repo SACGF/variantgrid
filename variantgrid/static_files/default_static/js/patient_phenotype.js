@@ -9,7 +9,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     
     phenotypeMatches = phenotypeMatches.sort(compareByStart);
     let overlapping_matches = [];
-    let ambiguousAcronymCandidates = {};  // acronym -> [{accession, name}, ...]
+    const ambiguousAcronymCandidates = {};  // acronym -> [{accession, name}, ...]
     const realMatches = [];
     for (let k = 0; k < phenotypeMatches.length; ++k) {
         const pm = phenotypeMatches[k];
@@ -28,7 +28,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     let phenotypeHTML = '';
     let phenoOffsetStart = 0;
 
-    let ambiguous = {};
+    const ambiguous = {};
     function addToAmbiguous(key, value) {
         if (!(key in ambiguous)) {
             ambiguous[key] = new Set();
@@ -42,7 +42,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
 
         let sliceEnd = 0;
         for (let j=phenoOffsetStart ; j<phenotypeMatches.length ; ++j) {
-            let pm = phenotypeMatches[j];
+            const pm = phenotypeMatches[j];
             if (pm.ambiguous) {
                 addToAmbiguous(pm.ambiguous, pm.accession)
             }
@@ -66,7 +66,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
         }
         
         for (let j=overlapping_matches.length - 1 ; j>= 0 ; --j) {
-            let pm = overlapping_matches[j];
+            const pm = overlapping_matches[j];
             if (pm.offset_end <= i) {
                 phenotypeHTML += "</span>";
                 overlapping_matches.splice(j, 1);
@@ -87,24 +87,24 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
 
     const ambiguousAcronyms = Object.keys(ambiguousAcronymCandidates);
     if (Object.keys(ambiguous).length > 0 || ambiguousAcronyms.length > 0) {
-        let phenoMessages = $("<div/>").addClass("phenotype-messages");
-        let messageContainer = $("<ul/>").addClass("messages");
+        const phenoMessages = $("<div/>").addClass("phenotype-messages");
+        const messageContainer = $("<ul/>").addClass("messages");
         phenoMessages.append(messageContainer);
 
         for (const [text, termSet] of Object.entries(ambiguous)) {
             const terms = Array.from(termSet).join(', ');
             const msg = `Phenotype: ${text}' was ambiguous (matched >=2 times in the same ontology service): ${terms}. Please resolve by being more specific`;
-            let listElement = $("<li/>").addClass("warning");
+            const listElement = $("<li/>").addClass("warning");
             listElement.text(msg);
             messageContainer.append(listElement);
         }
         for (const acronym of ambiguousAcronyms) {
             const candidates = ambiguousAcronymCandidates[acronym];
-            let listElement = $("<li/>").addClass("warning");
+            const listElement = $("<li/>").addClass("warning");
             listElement.text(`'${acronym}' is an ambiguous acronym (it matches multiple distinct ontology concepts) and has been excluded from gene-list matching. Please type the full term name or an HPO/OMIM/MONDO ID.`);
             if (candidates && candidates.length) {
-                let intro = $("<div/>").text("Possible matches:");
-                let candList = $("<ul/>").addClass("ambiguous-candidates");
+                const intro = $("<div/>").text("Possible matches:");
+                const candList = $("<ul/>").addClass("ambiguous-candidates");
                 for (const c of candidates) {
                     $("<li/>").text(`${c.accession} — ${c.name}`).appendTo(candList);
                 }
@@ -113,7 +113,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
             }
             messageContainer.append(listElement);
         }
-        let clearDiv = descriptionBox.siblings("div.clear")
+        const clearDiv = descriptionBox.siblings("div.clear")
         clearDiv.after(phenoMessages);
     }
 

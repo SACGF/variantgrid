@@ -1,7 +1,7 @@
 function renderGeneSymbol(geneSymbol, type, row) {
     let link = "";
     if (geneSymbol) {
-        let linkObj = $('<a>', {
+        const linkObj = $('<a>', {
             href: Urls.view_gene_symbol(geneSymbol),
             class: 'hover-link',
             html: [
@@ -14,11 +14,11 @@ function renderGeneSymbol(geneSymbol, type, row) {
 }
 
 function renderAnalysisAuditLogSummary(summary, type, row) {
-    let summaryText = summary['summary_text'];
+    const summaryText = summary['summary_text'];
     if (summaryText) {
         return "<span>" + summaryText + "</span>";
     }
-    let changes = summary['changes'];
+    const changes = summary['changes'];
     if (changes) {
         const hideValues = new Set(['valid', 'status', 'version', 'shadow_color', 'appearance_version']);
         let changesSummary = "<table class='table'>"

@@ -100,19 +100,19 @@ class AnnotatedFileDownload {
 
 	setPolling(download) {
 		// console.log("setPolling");
-		let that = this;
+		const that = this;
 		function downloadFile(data) {
 			that.setDownloadLink(data.url);
 			if (download) {
 				window.location.href = data.url;
 			}
 		}
-		let spinner = $(`<span><i class="fas fa-spinner fa-spin"></i> Preparing download... </span>`);
-		let progressIndicator = $("<span></span>");
+		const spinner = $(`<span><i class="fas fa-spinner fa-spin"></i> Preparing download... </span>`);
+		const progressIndicator = $("<span></span>");
 		spinner.append(progressIndicator);
 
 		function updateProgress(progress) {
-			let percent = Math.floor(100 * progress);
+			const percent = Math.floor(100 * progress);
 			progressIndicator.empty();
 			progressIndicator.append(`${percent}% complete`);
 		}
