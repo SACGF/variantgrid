@@ -99,13 +99,13 @@ function layoutAnalysisPanels(showAnalysisVariables, initialAnalysisPanelFractio
         if (!readOnly) {
             resizePanel();   // save panel widths
         }
-    }
+    };
     const initialGridAndEditorFraction = 1.0 - initialAnalysisPanelFraction;
     const splitParams = {
         sizes: [initialAnalysisPanelFraction * 100, initialGridAndEditorFraction * 100],
         expandToMin: true,
         onDragEnd: onDragEnd,
-    }
+    };
     Split(['#left-panel', '#right-panel'], splitParams);
 
     // Make clicking the background send a "click event" but not if you click on the .window
@@ -357,7 +357,7 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
         }
         const nodeTitle = $("<div />").append($("<b/>").html(nodeName));
         existingNodeContainer.append(nodeTitle);
-        $("#insert-analysis-variables-before-here", avContainer).before(existingNodeContainer)
+        $("#insert-analysis-variables-before-here", avContainer).before(existingNodeContainer);
     }
 
     let fieldAnalysisVariable = $("." + ANALYSIS_VARIABLE_CLASS + "[field=" + field + "]", existingNodeContainer);
@@ -429,7 +429,7 @@ function setupAnalysisTemplateTopBar(analysisTemplateId) {
                     severity = "error";
                     messageTime = 5000;
                 }
-                const sm = $("<li />", {class: severity}).html(message)
+                const sm = $("<li />", {class: severity}).html(message);
                 const saveMessage = $("<ul />", {class: 'messages'}).append(sm);
                 templateInfo.append(saveMessage);
                 saveMessage.fadeOut(messageTime, function () {
@@ -564,7 +564,7 @@ function setVisibleSliderValue(inputSelector, sliderSelector, value) {
     if (!isNaN(floatVal)) {
         value = floatVal.toFixed(decimalPlaces);
     }
-    sliderValue.html(value)
+    sliderValue.html(value);
 }
 
 function setupSlider(inputSelector, sliderSelector) {

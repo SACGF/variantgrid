@@ -1,26 +1,26 @@
 function groupTerms(terms, minPrefixLen = 15) {
   const lcp = (a, b) => {
-    let i = 0, m = Math.min(a.length, b.length)
-    while (i < m && a[i] === b[i]) i++
-    return a.slice(0, i)
-  }
+    let i = 0, m = Math.min(a.length, b.length);
+    while (i < m && a[i] === b[i]) i++;
+    return a.slice(0, i);
+  };
 
-  const groups = []
+  const groups = [];
   for (const t of terms) {
-    let bestGroup = null
-    let bestPrefix = ''
+    let bestGroup = null;
+    let bestPrefix = '';
     for (const g of groups) {
-      const p = lcp(g.prefix, t)
+      const p = lcp(g.prefix, t);
       if (p.length >= minPrefixLen && p.length > bestPrefix.length) {
-        bestGroup = g
-        bestPrefix = p
+        bestGroup = g;
+        bestPrefix = p;
       }
     }
     if (bestGroup) {
-      bestGroup.prefix = bestPrefix
-      bestGroup.items.push(t)
+      bestGroup.prefix = bestPrefix;
+      bestGroup.items.push(t);
     } else {
-      groups.push({ prefix: t, items: [t] })
+      groups.push({ prefix: t, items: [t] });
     }
   }
   return groups;
@@ -32,16 +32,16 @@ function summariseTerms(terms, minPrefixLen = 15) {
   console.log("groups:");
   console.log(groups);
 
-  const out = []
+  const out = [];
   for (const g of groups) {
     if (g.items.length > 1 && g.prefix.length >= minPrefixLen) {
-      const prefix = g.prefix.replace(/[ ,]+$/, '')
-      out.push(`${prefix} [${g.items.length} matches]`)
+      const prefix = g.prefix.replace(/[ ,]+$/, '');
+      out.push(`${prefix} [${g.items.length} matches]`);
     } else {
-      out.push(...g.items)
+      out.push(...g.items);
     }
   }
-  return out
+  return out;
 }
 
 
@@ -87,7 +87,7 @@ function getOntologyTermLinks(term_type, term_list, getUrl) {
                     const fullTermsContainer = $("<span>", {
                         class: "full-terms",
                         style: "display:none"
-                    })
+                    });
                     fullTermsContainer.append(...fullTerms);
 
                     group.append(collapsedTerm);
@@ -111,7 +111,7 @@ function getOntologyTermLinks(term_type, term_list, getUrl) {
         }
         links = termsContainer.prop("outerHTML");
     }
-    return links
+    return links;
 }
 
 

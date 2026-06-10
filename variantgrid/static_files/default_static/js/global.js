@@ -31,7 +31,7 @@ function tweakAjax() {
 
     $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
         if (settings.suppressErrors) {
-            console.log("suppressErrors = True")
+            console.log("suppressErrors = True");
             return;
         }
         // only relevant when using ODIC https://mozilla-django-oidc.readthedocs.io/en/stable/xhr.html
@@ -86,10 +86,10 @@ function enhanceAndMonitor() {
         {test: '[data-toggle="collapse"]', func: (node) => {
             const href = $(node).attr('href');
             const target = $(href);
-            target.on('show.bs.collapse', () => {alterAjaxCount(1, "toggle show start")});
-            target.on('shown.bs.collapse', () => {alterAjaxCount(-1, "toggle show end")});
-            target.on('hide.bs.collapse', () => {alterAjaxCount(1, "toggle hide start")});
-            target.on('hidden.bs.collapse', () => {alterAjaxCount(-1, "toggle hide end")})
+            target.on('show.bs.collapse', () => {alterAjaxCount(1, "toggle show start");});
+            target.on('shown.bs.collapse', () => {alterAjaxCount(-1, "toggle show end");});
+            target.on('hide.bs.collapse', () => {alterAjaxCount(1, "toggle hide start");});
+            target.on('hidden.bs.collapse', () => {alterAjaxCount(-1, "toggle hide end");});
         }},
 
         {test: '[data-toggle="embed-content"]', func: (node) => {
@@ -108,7 +108,7 @@ function enhanceAndMonitor() {
 
         {test: '[data-replace]', func: (node) => {
             const selector = node.attr('data-replace');
-            console.log(`Found replace for ${selector}`)
+            console.log(`Found replace for ${selector}`);
             node.detach();
            $(selector).html(node);
            node.fadeIn();
@@ -180,7 +180,7 @@ function enhanceAndMonitor() {
             $target.addClass('helpful');
             $target.attr('data-toggle', 'popover');
             $target.attr('title', title);
-            $target.attr('data-content', $node.attr('data-help'))
+            $target.attr('data-content', $node.attr('data-help'));
             $target.attr('data-html', true);
             $target.attr('data-placement', 'left'); // top & left are preferred as most help are labels with data to the right
             $target.on("mouseenter", function () {
@@ -247,7 +247,7 @@ function enhanceAndMonitor() {
                 url.searchParams.set('activeTab', $this.attr('data-tab-set') + ":" + id);
 
                 window.history.replaceState({}, $this.innerHTML, url);
-            })}
+            });}
         },
         // load the active ajax tab now
         {test: '.nav-tabs a.active[data-href][data-toggle="tab"]',
@@ -366,7 +366,7 @@ function enhanceAndMonitor() {
                     const dom = $node.closest(selector) || $(selector);
                     dom.LoadingOverlay('show', {fade:false});
                     return true;
-                })
+                });
             }
         },
 
@@ -572,7 +572,7 @@ function cardToModal(content) {
             content.find('.card-footer').removeClass('card-footer').addClass('modal-footer');
         }
     } else {
-        console.log("DID NOT FIND modal")
+        console.log("DID NOT FIND modal");
     }
     if (content.find('.auto-close-modal').length) {
         window.setTimeout(() => {
@@ -645,7 +645,7 @@ $(document).on("ajaxStart", () => {
 $(document).on("ajaxStop", () => {
     // give 100ms timeout before reducing ajaxCount, in case there's some JavaScript to run & animate etc when it finished
     window.setTimeout(
-        () => {alterAjaxCount(-1, "ajaxEnd")},
+        () => {alterAjaxCount(-1, "ajaxEnd");},
         200); // timeout was 350, but now we have timeout on spinners and modals, so can put a small buffer on this
 });
 
@@ -958,7 +958,7 @@ const JS_DATE_FORMAT_SECONDS = 'YYYY-MM-DD HH:mm:ss';
 const JS_DATE_FORMAT_MILLISECONDS = 'YYYY-MM-DD HH:mm:ss.SSS';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; //'lll';
-const JS_DATE_ONLY_FORMAT = 'YYYY-MM-DD'
+const JS_DATE_ONLY_FORMAT = 'YYYY-MM-DD';
 function configureTimestamps() {
     $.timeago.settings.allowFuture = true;
     $.timeago.settings.strings = {
@@ -1118,7 +1118,7 @@ function debounce( func , timeout ) {
         timeoutID = setTimeout( function () {
             func.apply( scope , Array.prototype.slice.call( args ) );
         }, timeout );
-   }
+   };
 }
 
 function highlightTextAsDom(value, full_text) {
@@ -1179,7 +1179,7 @@ function suggestionDialog(userName) {
     if (!modalDialog) {
         const siteName = window.SITE_NAME || 'Variant Grid';
         // FIXME need to escape username, siteName, location etc
-        const modalContent = createModalShell('suggestionModal', 'Suggestion / Bug Report')
+        const modalContent = createModalShell('suggestionModal', 'Suggestion / Bug Report');
         modalContent.find('.modal-body').html(
             `<p>Thank you for taking the time to report a bug or raise a suggestion to help us improve this product.</p>
             <form>
@@ -1265,7 +1265,7 @@ function showReloadPageErrorDialog(selector, message, allowClose) {
             click: function () {
                 $(this).dialog("close");
             },
-        }
+        };
         buttons.push(closeButton);
     }
 

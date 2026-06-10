@@ -435,7 +435,7 @@ function getVariantTagHtml(variantId, tag, readOnly, tagLabel) {
     if (typeof(tagLabel) === 'undefined') {
         tagLabel = tag;
     }
-    const outerClasses = ["grid-tag", "tagged-" + tag]
+    const outerClasses = ["grid-tag", "tagged-" + tag];
     if (!readOnly) {
         outerClasses.push("grid-tag-deletable");
     }
@@ -575,7 +575,7 @@ function splitAndLink(rawValue, split, buildLinkFunc) {
 
 function formatDBSNP(dbsnp_rs_ids) {
     function buildDBSNPLink(dbsnp_id) {
-        return "<a title='View dbSNP in new window' target='_blank' href='https://www.ncbi.nlm.nih.gov/snp/" + dbsnp_id + "'>" + dbsnp_id + "</a>"
+        return "<a title='View dbSNP in new window' target='_blank' href='https://www.ncbi.nlm.nih.gov/snp/" + dbsnp_id + "'>" + dbsnp_id + "</a>";
     }
     return splitAndLink(dbsnp_rs_ids, "&", buildDBSNPLink);
 }
@@ -583,7 +583,7 @@ function formatDBSNP(dbsnp_rs_ids) {
 
 function formatPubMed(pubmed) {
     function buildPubMedLink(pubmed_id) {
-        return "<a title='View PubMed article in new window' target='_blank' href='https://pubmed.ncbi.nlm.nih.gov/" + pubmed_id + "'>" + pubmed_id + "</a>"
+        return "<a title='View PubMed article in new window' target='_blank' href='https://pubmed.ncbi.nlm.nih.gov/" + pubmed_id + "'>" + pubmed_id + "</a>";
     }
     return splitAndLink(pubmed, "&", buildPubMedLink);
 }
@@ -593,7 +593,7 @@ function formatOntologyTerms(ontology_terms) {
     function buildOntologyTermLink(ontology_term) {
         const termSlug = ontology_term.split(" ")[0].replace(":", "_");
         const url = Urls.ontology_term(termSlug);
-        return "<a title='View Ontology Term in new window' target='_blank' href='" + url + "'>" + ontology_term + "</a>"
+        return "<a title='View Ontology Term in new window' target='_blank' href='" + url + "'>" + ontology_term + "</a>";
     }
     return splitAndLink(ontology_terms, " | ", buildOntologyTermLink);
 }
@@ -613,7 +613,7 @@ function unitAsPercentFormatter(unitValue) {
 
 function formatMasterMindMMID3(value) {
     function buildMasterMindLink(mmid3) {
-        return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>"
+        return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>";
     }
     return splitAndLink(value, "&", buildMasterMindLink);
 }
@@ -728,11 +728,11 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
                         if (data.deleted_nodes) {
                             deleteNodesFromDOM(data.deleted_nodes, []);
                             if (data.message) {
-                                $("#node-editor-container").text(data.message)
+                                $("#node-editor-container").text(data.message);
                             }
                         }
                     }
-                }
+                };
                 // height: auto screws up on firefox
                 if (typeof(data["height"]) === "undefined" || data["height"] === "auto") {
                     data["height"] = null;
@@ -741,7 +741,7 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
                 // You can only have 1 active grid request
                 data["loadBeforeSend"] = function(xhr) {
                     window.activeGridRequestXHR = xhr;
-                }
+                };
                 if (window.activeGridRequestXHR) {
                     window.activeGridRequestXHR.abort();
                     window.activeGridRequestXHR = null;
@@ -757,7 +757,7 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
 			        	{} // view options 
 		        	);
 
-				setRowChangeCallbacks(grid, data["caption"])
+				setRowChangeCallbacks(grid, data["caption"]);
 
                 grid.jqGrid(
 		            'navButtonAdd', pagerId, {
@@ -772,7 +772,7 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
 
                 const aWin = getAnalysisWindow();
                 if (aWin.ANALYSIS_SETTINGS && aWin.ANALYSIS_SETTINGS.canonical_transcript_collection) {
-                    const ctc = aWin.ANALYSIS_SETTINGS.canonical_transcript_collection
+                    const ctc = aWin.ANALYSIS_SETTINGS.canonical_transcript_collection;
                     grid.jqGrid(
                         'navButtonAdd', pagerId, {
                         caption : "Canonical transcript CSV",

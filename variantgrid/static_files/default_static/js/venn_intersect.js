@@ -114,7 +114,7 @@ function venn2(selector, w, h) {
 			.style("fill-opacity", 0)
 			.style("stroke", "gray")
 			.style("pointer-events", 'none');
-	}
+	};
 
 	setRing(addCirc1(svg));
 	setRing(addCirc2(svg));
@@ -122,7 +122,7 @@ function venn2(selector, w, h) {
 
 
 function venn3(selector, w, h) {
-	radius = w * 0.3
+	radius = w * 0.3;
 
 	const svg = d3.select(selector).append("svg:svg")
 	    .attr("width", w)
@@ -157,21 +157,21 @@ function venn3(selector, w, h) {
 	    .attr("width", w)
 	    .attr("height", h)
 	    .style("fill", "#ff0000")
-	    .on("click", function() { alert(2) });
+	    .on("click", function() { alert(2); });
 	
 	svg.append("svg:rect")
 	    .attr("clip-path", "url(#circle2)")
 	    .attr("width", w)
 	    .attr("height", h)
 	    .style("fill", "#00ff00")
-	    .on("click", function() { alert(2) });
+	    .on("click", function() { alert(2); });
 	
 	svg.append("svg:rect")
 	    .attr("clip-path", "url(#circle3)")
 	    .attr("width", w)
 	    .attr("height", h)
 	    .style("fill", "#0000ff")
-	    .on("click", function() { alert(3) });
+	    .on("click", function() { alert(3); });
 	
 	svg.append("svg:g")
 	    .attr("clip-path", "url(#circle1)")
@@ -180,7 +180,7 @@ function venn3(selector, w, h) {
 	    .attr("width", w)
 	    .attr("height", h)
 	    .style("fill", "#ffff00")
-	    .on("click", function() { alert("4") });
+	    .on("click", function() { alert("4"); });
 	
 	svg.append("svg:g")
 	    .attr("clip-path", "url(#circle2)")
@@ -189,7 +189,7 @@ function venn3(selector, w, h) {
 	    .attr("width", w)
 	    .attr("height", h)
 	    .style("fill", "#00ffff")
-	    .on("click", function() { alert("5") });
+	    .on("click", function() { alert("5"); });
 	
 	svg.append("svg:g")
 	    .attr("clip-path", "url(#circle3)")
@@ -198,7 +198,7 @@ function venn3(selector, w, h) {
 	    .attr("width", w)
 	    .attr("height", h)
 	    .style("fill", "#ff00ff")
-	    .on("click", function() { alert("6") });
+	    .on("click", function() { alert("6"); });
 	
 	svg.append("svg:g")
 	    .attr("clip-path", "url(#circle3)")
@@ -209,6 +209,6 @@ function venn3(selector, w, h) {
 	    .attr("width", w)
 	    .attr("height", h)
 	    .style("fill", "#ffffff")
-	    .on("click", function() { alert("7") });
+	    .on("click", function() { alert("7"); });
 }
 

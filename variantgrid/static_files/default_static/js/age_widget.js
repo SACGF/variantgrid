@@ -42,8 +42,8 @@ $.widget('custom.age', {
         this.element.append(this.entryText);
         this.element.append(this.unitSelect);
 
-        $(this.entryText).keyup(() => {this.fieldsUpdated()});
-        $(this.unitSelect).change(() => {this.fieldsUpdated()});
+        $(this.entryText).keyup(() => {this.fieldsUpdated();});
+        $(this.unitSelect).change(() => {this.fieldsUpdated();});
         $(this.unitSelect).chosen({width: '160px'});
 
         this.value(this.options.value);

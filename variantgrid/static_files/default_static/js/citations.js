@@ -3,15 +3,15 @@ const CitationsManager = (function() {
     function Deferred() {
         const self = this;
         this.promise = new Promise(function(resolve, reject) {
-            self.reject = reject
-            self.resolve = resolve
+            self.reject = reject;
+            self.resolve = resolve;
         });
     }
 
     const CitationsManager = function () {
         this.citationToDeferred = {};
         this.citationsToLoad = {};
-    }
+    };
 
     CitationsManager.prototype = {
 
@@ -41,7 +41,7 @@ const CitationsManager = (function() {
                 url: Urls.citations_json(loadIds.join('/')),
                 type: 'GET',
                 error: (call, status, text) => {
-                    console.log(text)
+                    console.log(text);
                 },
                 success: (record) => {
                     const requestedIds = {};
@@ -62,7 +62,7 @@ const CitationsManager = (function() {
                         if (deferred) {
                             deferred.resolve({
                                 "title": `Could not load ${remainingId}`
-                            })
+                            });
                         }
                     }
                 }
@@ -75,7 +75,7 @@ const CitationsManager = (function() {
             const $dom = $(dom);
             const citationId = $dom.attr('data-citation-id');
             const prettyId = this.prettyId(citationId);
-            $dom.text()
+            $dom.text();
             $dom.addClass('citation');
             $dom.addClass('loading');
             $dom.html([
@@ -100,7 +100,7 @@ const CitationsManager = (function() {
                     citDom.html([
                         $('<div>', {text: citation.id}),
                         $('<div>', {text: citation.error, class: 'text-danger'})
-                    ])
+                    ]);
                 } else {
                     citDom.html($('<div>', {html: citation.error, class: 'text-danger'}));
                 }
@@ -143,7 +143,7 @@ const CitationsManager = (function() {
 
             const safeId = citation.id.replace(':','_');
             if (!citation.error) {
-                $('<a>', {'class':'d-block', 'data-toggle':'ajax-modal', 'data-href':Urls.view_citation_detail(citation.id), 'data-title': prettyId, 'text':'Show Detail'}).appendTo(citDom)
+                $('<a>', {'class':'d-block', 'data-toggle':'ajax-modal', 'data-href':Urls.view_citation_detail(citation.id), 'data-title': prettyId, 'text':'Show Detail'}).appendTo(citDom);
             } else {
                 $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(detailContainer);
             }
@@ -169,7 +169,7 @@ const CitationsManager = (function() {
             } else if (renderNonCitations) {
                 let text = dbRef.id;
                 if (dbRef.db == "HTTP" || dbRef.db == "HTTPS") {
-                    text = `${dbRef.db.toLowerCase()}:${dbRef.idx}`
+                    text = `${dbRef.db.toLowerCase()}:${dbRef.idx}`;
                 }
                 const citationDom = $('<div>', {class: 'citation'});
                 if (dbRef.id && dbRef.url) {
@@ -189,7 +189,7 @@ CitationsManager.dbMigration = {
     "PUBMED": "PMID",
     "PMC": "PMCID",
     "NCBIBOOKSHELF": "Bookshelf ID"
-}
+};
 
 CitationsManager.normalizeInPlace = function(dbRef) {
     let dbArray = null;
@@ -219,7 +219,7 @@ CitationsManager.normalizeInPlace = function(dbRef) {
         }
     }
     return dbRef;
-}
+};
 
 CitationsManager.prototype.debounceRequestData = debounce(CitationsManager.prototype.requestData);
 CitationsManager.defaultManager = new CitationsManager();

@@ -148,7 +148,7 @@ const VCLinks = (function() {
             const allowSet = new Set(allowList);
             const blockSet = new Set(blockList);
             if (allowSet.size && blockSet.size) {
-                throw new Error("filterLinks: can only pass EITHER allowList OR blockList not both")
+                throw new Error("filterLinks: can only pass EITHER allowList OR blockList not both");
             }
             if (!allowMissing) {
                 links = links.filter(link => !link.isMissing());
@@ -312,7 +312,7 @@ const VCLinks = (function() {
                         text:'UCSC',
                         href:url,
                         build: this.buildName()
-                    })
+                    });
                 } catch (e) {
                 }
             }

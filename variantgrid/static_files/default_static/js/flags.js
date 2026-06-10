@@ -78,7 +78,7 @@ const Flags = (function () {
             this.db = db;
         };
         FlagType.prototype = {
-            collectionObj() { return this.db.collections.get(this.collection) },
+            collectionObj() { return this.db.collections.get(this.collection); },
 
             dom(params) {
                 params = params || {};
@@ -94,7 +94,7 @@ const Flags = (function () {
                 }
                 let bonusClass = '';
                 if (flag) {
-                    bonusClass = `res-${flag.resolution}`
+                    bonusClass = `res-${flag.resolution}`;
                 }
                 content = content.concat([
                     $('<div>', { class: `flag flag-${this.id} ${bonusClass}`}),
@@ -179,7 +179,7 @@ const Flags = (function () {
                 for (const flag of this.flags()) {
                     flag.remove(flag.id);
                 }
-                this.db.collections._remove(this.id)
+                this.db.collections._remove(this.id);
             },
 
             recent_activity() {
@@ -466,7 +466,7 @@ const Flags = (function () {
                     }
                     const content = $('<div>', {class:'d-flex mb-2'}).css('align-items','center').appendTo(this.states);
                     $('<label/>', {text: 'Status:', class:'mr-2 align-center'}).appendTo(content);
-                    const statusButtons = $('<div>', {class:'btn-group btn-group-toggle', 'data-toggle':'buttons'}).appendTo(content)
+                    const statusButtons = $('<div>', {class:'btn-group btn-group-toggle', 'data-toggle':'buttons'}).appendTo(content);
                     for (const resolution of resolutions) {
                         const did = `res-${resolution.id}`;
                         const input = $('<input>', {type:"radio", name:"flag-res", id:did, value:resolution.id});
@@ -719,7 +719,7 @@ const Flags = (function () {
                 if (activeFlag) {
                     this.open(activeFlag);
                 } else {
-                    this.applyActiveContent(new FlagCollectionSummaryContent(this.collection, this))
+                    this.applyActiveContent(new FlagCollectionSummaryContent(this.collection, this));
                 }
                 modalDialog = modalContent.modal({focus:true, show:true});
                 if (params.triggerDom) {
@@ -784,7 +784,7 @@ const Flags = (function () {
             userObj() { return this.db.users.get(this.user); },
             flagTypeObj() { return this.db.flagTypes.get(this.flag_type); },
             collectionObj() { return this.db.collections.get(this.collection); },
-            title() { return `${this.flagTypeObj().label}` }, //  (${this.id})
+            title() { return `${this.flagTypeObj().label}`; }, //  (${this.id})
             resolutionObj() { return this.db.flagResolutions.get(this.resolution); },
             canEdit() {
                 const userPermission = this.collectionObj().user_permission;
@@ -1001,7 +1001,7 @@ const Flags = (function () {
                 const flagDiv = $('<div>', { class: `flag flag-${flagType.id} res-${this.resolution}`, title: titleText});
                 flagDiv.click(() => {
                     flagDiv.tooltip('hide');
-                    new FlagCollectionDialog(this.collectionObj()).init({activeFlag:this, triggerDom:flagDiv})
+                    new FlagCollectionDialog(this.collectionObj()).init({activeFlag:this, triggerDom:flagDiv});
                 });
                 if (this.open === false) {
                     flagDiv.addClass('closed');
@@ -1408,7 +1408,7 @@ const Flags = (function () {
                 const flags = collection.flags();
                 const watch = collection.watching === 0 || collection.watching;
                 const flagSummary = $('<div>', { class: `flag add`, title: 'Add or review flags for ' + collection.label}).appendTo(dom);
-                flagSummary.click(() => { new FlagCollectionDialog(collection).init({triggerDom: flagSummary}) });
+                flagSummary.click(() => { new FlagCollectionDialog(collection).init({triggerDom: flagSummary}); });
 
                 if (collection.watching) {
                     $('<div>', { class: 'notifications', title: `${collection.watching} unseen activities` }).appendTo(flagSummary);

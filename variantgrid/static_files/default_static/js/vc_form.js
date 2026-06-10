@@ -35,7 +35,7 @@ const VCForm = (function() {
             const filtered_array = [];
             for (const sub_value of val) {
                 if (sub_value != null && sub_value !== '') {
-                    filtered_array.push(sub_value)
+                    filtered_array.push(sub_value);
                 }
             }
             return filtered_array;
@@ -199,11 +199,11 @@ const VCForm = (function() {
         generateExportButtons() {
             const wrapper = $('<div>', {html: $('<h5>', {text:'Export as', class: 'mt-4'})});
             const buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
-            const csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-csv', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv()}});
+            const csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-csv', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv();}});
             csvButton.appendTo(buttons);
 
             if (this.reportEnabled) {
-                const reportButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-report', html: '<i class="far fa-file"></i> Report', click: () => {this.report()}});
+                const reportButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-report', html: '<i class="far fa-file"></i> Report', click: () => {this.report();}});
                 reportButton.appendTo(buttons);
             } else {
                 buttons.append($('<div>'));
@@ -512,7 +512,7 @@ const VCForm = (function() {
             linkData[SpecialEKeys.VARIANT_COORDINATE] = this.variantCoordinate();
             linkData[SpecialEKeys.C_HGVS] = this.cHGVS();
 
-            const allLinks = vcLinks.generateLinks(linkData).map(vcLink => {return vcLink.asAnchor("bootstrap").addClass('list-group-item').addClass('list-group-item-action')});
+            const allLinks = vcLinks.generateLinks(linkData).map(vcLink => {return vcLink.asAnchor("bootstrap").addClass('list-group-item').addClass('list-group-item-action');});
             for (const link of allLinks) {
                 link.attr('data-placement', 'left');
             }
@@ -1011,7 +1011,7 @@ const VCForm = (function() {
                 let sampleElement = $('<a>', {class:'hover-link', text: this.record.sample_name, href:href});
                 sampleElement = $('<span>', {html: [
                     sampleElement,
-                ]})
+                ]});
                 appendLabelHeading('Sample', sampleElement);
             }
 
@@ -1311,7 +1311,7 @@ const VCForm = (function() {
                     $('<div>', {class: 'card', family: familyKey, html:[
                         $('<div>', {class:'card-header collapsed' + firstCss, "data-toggle":"collapse", "data-target": `#section-${familyKey}`, html:[
                             $('<a>', {class:'card-title', text: label})
-                        ], click: (e) => {this.toggleCheck(e)}}),
+                        ], click: (e) => {this.toggleCheck(e);}}),
                         $('<div>', {id:`section-${familyKey}`, class: "panel-collapse collapse" , 'data-parent': `#${jContent.attr('id')}`, html: [
                             $('<div>', {class:`card-body sub-content sub-content-${familyKey}`, family: familyKey})
                         ]})
@@ -1330,7 +1330,7 @@ const VCForm = (function() {
                     $('<div>', {family: familyKey, class: 'card', html:[
                         $('<div>', {class:'card-header collapsed', "data-toggle":"collapse", "data-target": `#section-${familyKey}`, html:[
                             $('<a>', {class:'card-title', text: 'Uploads'})
-                        ], click: (e) => {this.toggleCheck(e)}}),
+                        ], click: (e) => {this.toggleCheck(e);}}),
                         $('<div>', {id:`section-${familyKey}`, class: "panel-collapse collapse", 'data-parent': `#${jContent.attr('id')}`, html: [
                             $('<div>', {class:`card-body sub-content sub-content-${familyKey}`, family: familyKey})
                         ]})
@@ -1769,8 +1769,8 @@ const VCForm = (function() {
                     let optGroups = [];
                     let options = [];
 
-                    let standardPrefix = ""
-                    let overridePrefix = ""
+                    let standardPrefix = "";
+                    let overridePrefix = "";
                     let emptyValuePrefix = "";
                     if (type === "crit") {
                         overridePrefix = "❗";
@@ -1798,7 +1798,7 @@ const VCForm = (function() {
                         optDom.prop("disabled", !!option.exclude_namespace);
 
                         return optDom;
-                    }
+                    };
 
                     if (optionSources.find(o => o.override)) {
                         const optGroupNormal = optionSources.filter(o => !o.override).map(option => {
@@ -2184,7 +2184,7 @@ const VCForm = (function() {
                     let title = "";
                     if (points != 0) {
                         const plural = Math.abs(points) > 1 ? "s" : "";
-                        const direction = points < 0 ? "Benign" : "Oncogenic"
+                        const direction = points < 0 ? "Benign" : "Oncogenic";
                         title = `(${Math.abs(points)} point${plural}) Towards ${direction}`;
                     } else {
                         title = "Neutral";
@@ -2233,7 +2233,7 @@ const VCForm = (function() {
                     const td = $('<td>', {title: tooltip.join('\n'), id:`table-${fam}-${str}`});
                     if (values.actual.length > 0) {
                         const direction = str[0];
-                        td.addClass(`${direction}-cell`)
+                        td.addClass(`${direction}-cell`);
                         td.append($('<span>', {class: 'met', text: values.actual.length}));
                     }
                     if (values.notMet.length || values.possible.length) {
@@ -2253,7 +2253,7 @@ const VCForm = (function() {
                 critTable.append(row);
             });
 
-            jCritTable.empty().append(critTable)
+            jCritTable.empty().append(critTable);
 
             if (!pointBased) {
                 const result = this.calculateOverall(strengthCount);
@@ -2276,7 +2276,7 @@ const VCForm = (function() {
 
                 jCritTable.append(
                     $('<div>', {class: 'text-center my-2', html:`Calculated Score: ${score} ${overallValue}`})
-                )
+                );
             }
         }
     };
@@ -2363,9 +2363,9 @@ VCTable.format_hgvs = (parts) => {
     }
 
     if (variantId) {
-        url = Urls.view_allele_from_variant(variantId)
+        url = Urls.view_allele_from_variant(variantId);
     } else if (alleleId) {
-        url = Urls.view_allele(alleleId)
+        url = Urls.view_allele(alleleId);
     }
     // also turn into a link
 
@@ -2434,7 +2434,7 @@ VCTable.format_hgvs = (parts) => {
 
 VCTable.hgvs = (data, type, row) => {
     return VCTable.format_hgvs(data);
-}
+};
 
 VCTable.condition = (data, type, row) => {
     return VCForm.format_condition(data);
@@ -2461,9 +2461,9 @@ VCTable.latest_curation_and_link = (data, type, row) => {
         }
         return dom;
     } else {
-        return $("<span>", {text:"-", class: "no-value"})
+        return $("<span>", {text:"-", class: "no-value"});
     }
-}
+};
 
 VCTable.somatic_clinical_significance = (data, type, row) => {
     let value = null;
@@ -2502,11 +2502,11 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
     } else {
         return $('<div>', {class: 'c-pill scs-none no-value', html: 'No Data' + diffHtml});
     }
-}
+};
 
 VCTable.classification = (data, type, row) => {
     if (data === null) {
-        return "" // support for dirty groups still processing
+        return ""; // support for dirty groups still processing
     }
     const cs = data;
     let csVal = cs;
@@ -2519,7 +2519,7 @@ VCTable.classification = (data, type, row) => {
 
     if (typeof(cs) !== "string") {
         csVal = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-        newValue = cs["new"]
+        newValue = cs["new"];
         const pending = cs["pending"];
         if (pending) {
             old = csVal;
@@ -2535,7 +2535,7 @@ VCTable.classification = (data, type, row) => {
     }
 
     const label = csKey.prettyValue(csVal).val;
-    const csClass = `cs-` + (csVal || '').toLowerCase()
+    const csClass = `cs-` + (csVal || '').toLowerCase();
     let diffHtml = "";
     if (diff) {
         diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
@@ -2597,13 +2597,13 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
     let allele_origin_label = override_text;
     if (!allele_origin_label) {
         if (allele_origin_bucket == "S") {
-            allele_origin_label = "SOMATIC"
+            allele_origin_label = "SOMATIC";
         } else if (allele_origin_bucket == "G") {
-            allele_origin_label = "GERMLINE"
+            allele_origin_label = "GERMLINE";
         } else if (allele_origin_bucket == "U") {
-            allele_origin_label = "UNKNOWN"
+            allele_origin_label = "UNKNOWN";
         } else {
-            allele_origin_label = "???"
+            allele_origin_label = "???";
         }
     }
     return $('<div>', {
@@ -2615,15 +2615,15 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
             })
         ]
     });
-}
+};
 
 VCTable.alleleGroupingIdentifier = (data, type, row) => {
     const dom = $("div");
     for (const allele of data.alleles) {
-        dom.append(VCTable.format_hgvs(allele))
+        dom.append(VCTable.format_hgvs(allele));
     }
     return dom;
-}
+};
 
 VCTable.groupIdentifier = (data, type, row) => {
     const id = data.id;
@@ -2652,9 +2652,9 @@ VCTable.groupIdentifier = (data, type, row) => {
     const dom = $('<div>', {html: labLine});
 
     if (dirty) {
-        dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"))
+        dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"));
     } else if (classification_count === 0) {
-        dom.append("-Invalid Record - no Classifications")
+        dom.append("-Invalid Record - no Classifications");
     } else if (classification_count > 1) {
         dom.append($('<div>', {class:'text-muted text-small', text: `${classification_count} records`}));
     }
@@ -2685,7 +2685,7 @@ VCTable.groupIdentifier = (data, type, row) => {
     // }
 
     return fullDom;
-}
+};
 
 VCTable.identifier = (data, type, row) => {
     const id = data.id;
@@ -2730,7 +2730,7 @@ VCTable.identifier = (data, type, row) => {
     } else if (link) {
         dom = link;
     } else {
-        dom = $('<div>', {html: content})
+        dom = $('<div>', {html: content});
     }
 
     const indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;

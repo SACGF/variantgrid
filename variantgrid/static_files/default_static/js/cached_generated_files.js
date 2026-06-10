@@ -72,7 +72,7 @@ class AnnotatedFileDownload {
 		this.selector = $(selector);
 		this.pollUrl = pollUrl;
 		this.fileType = fileType;
-		this.ucFileType = this.fileType.toUpperCase()
+		this.ucFileType = this.fileType.toUpperCase();
 	}
 
 	setGenerateDownloadLink() {
@@ -122,6 +122,6 @@ class AnnotatedFileDownload {
 		}
 
 		$(this.selector).html(spinner);
-		poll_cached_generated_file(this.pollUrl, downloadFile, setError, updateProgress)
+		poll_cached_generated_file(this.pollUrl, downloadFile, setError, updateProgress);
 	}
 }

@@ -44,7 +44,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
         for (let j=phenoOffsetStart ; j<phenotypeMatches.length ; ++j) {
             const pm = phenotypeMatches[j];
             if (pm.ambiguous) {
-                addToAmbiguous(pm.ambiguous, pm.accession)
+                addToAmbiguous(pm.ambiguous, pm.accession);
             }
             if (pm.offset_start <= i) {
                 sliceEnd = j + 1;
@@ -113,7 +113,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
             }
             messageContainer.append(listElement);
         }
-        const clearDiv = descriptionBox.siblings("div.clear")
+        const clearDiv = descriptionBox.siblings("div.clear");
         clearDiv.after(phenoMessages);
     }
 

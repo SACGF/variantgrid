@@ -35,7 +35,7 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 
 		const error_function = function(data) {
 			that.stop_polling();
-		}
+		};
 
 		const data = 'nodes=' + JSON.stringify(nodes);
 		$.ajax({
@@ -76,7 +76,7 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
                         analysisTasksSpan.hide();
                     }
                 }
-            }
+            };
 
             $.ajax({
                 type: "GET",

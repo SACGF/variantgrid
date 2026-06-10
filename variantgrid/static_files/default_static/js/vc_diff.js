@@ -149,7 +149,7 @@ const Diff = (function() {
                 compareBox.append($('<div>', {
                     class: 'form-group form-check',
                     html: [checkbox, label]
-                }))
+                }));
             });
             modalContent.on('hidden.bs.modal', function() {
                 modalContent.modal('dispose');
@@ -220,7 +220,7 @@ const Diff = (function() {
                         heading = dbRef.label;
                     } else {
                         rowClass = 'citation-row';
-                        heading = CitationsManager.defaultManager.citationDomFor(dbRef, true)
+                        heading = CitationsManager.defaultManager.citationDomFor(dbRef, true);
                     }
 
                     const row = $('<tr>', {class: `${rowClass}`}).appendTo(tbody);

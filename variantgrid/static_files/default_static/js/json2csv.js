@@ -2,7 +2,7 @@
 function JSON2CSV(objArray, header, quote) {
     const getValue = function(val, defaultValue) {
         return (typeof val !== 'undefined') ?  val : defaultValue;
-    }
+    };
 
     var header = getValue(header, false);
     var quote = getValue(quote, false);

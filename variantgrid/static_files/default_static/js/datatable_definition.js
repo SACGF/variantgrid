@@ -102,7 +102,7 @@ const DataTableDefinition = (function() {
                 definitionData = $.getJSON(this.url + sep + 'dataTableDefinition=1');
                 DataTableDefinition.definitions[this.url] = definitionData;
             }
-            return definitionData.then(data => {this.serverParams = data});
+            return definitionData.then(data => {this.serverParams = data;});
         },
 
         convertDefinition: function() {
@@ -142,7 +142,7 @@ const DataTableDefinition = (function() {
                 }
             };
             if (defn.order) {
-                dtParams.orderSequence = defn.orderSequence
+                dtParams.orderSequence = defn.orderSequence;
             }
 
             if (defn.downloadCsvButtonEnabled) {
@@ -155,7 +155,7 @@ const DataTableDefinition = (function() {
                         text: "Download as CSV",
                         filename: csvName + '_' + dateStr,
                     }
-                ]
+                ];
             }
 
             if (this.filterCount === 'hide') {
@@ -178,7 +178,7 @@ const DataTableDefinition = (function() {
             let waitOnEKeys = null;
 
             if (!Array.isArray(defn.columns)) {
-                console.log("Invalid TableDefinition")
+                console.log("Invalid TableDefinition");
                 console.log(defn);
                 throw new Error("Received invalid datatable definition");
             }
@@ -197,7 +197,7 @@ const DataTableDefinition = (function() {
                             return output.prop("outerHTML");
                         }
                         return output;
-                    }
+                    };
                     columnDef.render = renderer;
                     if (col.render.includes('VCTable')) {
                         waitOnEKeys = true;
@@ -238,7 +238,7 @@ const DataTableDefinition = (function() {
                 if (row_css) {
                     $(row).addClass(row_css);
                 }
-            }
+            };
 
             const dataTable = dom.DataTable(dtParams);
             this.dataTable = dataTable;
@@ -412,10 +412,10 @@ TableFormat.timestampSeconds = (data, type, row) => {
 
 TableFormat.timestampMilliseconds = (data, type, row) => {
     if (data) {
-        const momentValue = moment(Number(data) * 1000)
+        const momentValue = moment(Number(data) * 1000);
         const timestampStr = momentValue.format(JS_DATE_FORMAT_SCIENTIFIC);
-        const seconds = momentValue.format("ss")
-        const milliseconds = momentValue.format("SSS")
+        const seconds = momentValue.format("ss");
+        const milliseconds = momentValue.format("SSS");
         return $('<span>', {class:'timestamp', 'html': [
                 timestampStr + ":",
                 $('<span>', {class:'seconds', text:seconds}),
@@ -441,7 +441,7 @@ TableFormat.list_codes = (data, type, row) => {
         elements.push($('<span>', {class: 'text-monospace text-secondary', text: value}));
     }
     return $('<div>', {html: elements});
-}
+};
 
 TableFormat.sizeBytes = (data, type, row) => {
     if (data) {
@@ -452,7 +452,7 @@ TableFormat.sizeBytes = (data, type, row) => {
             unit = 'KB';
             if (value > 1024) {
                 value = value / 1024;
-                unit = 'MB'
+                unit = 'MB';
             }
         }
         value = Math.round(value);
@@ -498,7 +498,7 @@ TableFormat.text = (data, type, row) => {
 
 TableFormat.plain = (data, type, row) => {
     return data;
-}
+};
 
 TableFormat.number = (data, type, row) => {
     if (data === '' || data === null) {
@@ -507,7 +507,7 @@ TableFormat.number = (data, type, row) => {
         // TODO, put in format commas, monospace etc
         return `<span class="text-number">${data.toLocaleString('en-US')}</span>`;
     }
-}
+};
 
 TableFormat.linkUrl = (data, type, row) => {
     if (!data) {
