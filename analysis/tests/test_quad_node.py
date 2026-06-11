@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
@@ -208,6 +210,24 @@ class TestQuadNodeInheritance(TestCase):
         node = self._make_node(QuadInheritance.COMPOUND_HET)
         self.assertEqual(node.min_inputs, 1)
         self.assertEqual(node.max_inputs, 1)
+
+    def test_quality_filter_ignores_foreign_ancestor_samples(self):
+        """Regression: COMPOUND_HET is the only mode with a parent input, so get_sample_ids()
+        includes ancestor samples that may not belong to this node's cohort. Per-sample quality
+        filters must skip those rather than raising KeyError in get_array_index_for_sample_id."""
+        node = self._make_node(QuadInheritance.COMPOUND_HET, min_dp=30)
+
+        quad_sample_ids = list(self.quad.cohort.get_sample_ids())
+        # A sample from the *other* quad's cohort - simulates a parent node feeding a foreign sample
+        foreign_sample_id = self.quad_aff.proband.sample_id
+        self.assertNotIn(foreign_sample_id, quad_sample_ids)
+
+        with patch.object(node, "get_sample_ids", return_value=quad_sample_ids + [foreign_sample_id]):
+            cohort, arg_q_dict = node.get_cohort_and_arg_q_dict()  # Must not raise KeyError
+
+        self.assertEqual(cohort, self.quad.cohort)
+        # min_dp filter is still applied (to the quad's own samples)
+        self.assertIn(self.cgc.cohortgenotype_alias, arg_q_dict)
 
     def test_simple_modes_are_source_nodes(self):
         for mode in [QuadInheritance.RECESSIVE, QuadInheritance.DENOVO,
