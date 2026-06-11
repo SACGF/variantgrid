@@ -102,12 +102,28 @@
     <div class="container-table">
         {% page_help 'annotation/variant_annotation_runs_help' 'Variant Annotation Runs' %}
 
+        {% if jobs_paused %}
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading"><i class="fas fa-pause-circle"></i> Analysis &amp; annotation jobs are PAUSED</h4>
+                <p class="mb-1">No new analysis or annotation work is being leased or launched - in-flight tasks finish, everything else (including newly started analyses) waits until resumed.</p>
+                {% if jobs_control.reason %}<p class="mb-1"><strong>Reason:</strong> {{ jobs_control.reason }}</p>{% endif %}
+                {% if jobs_control.paused_at %}<p class="mb-2"><small>Paused {{ jobs_control.paused_at }}{% if jobs_control.paused_by %} by {{ jobs_control.paused_by }}{% endif %}</small></p>{% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <button name="unpause-jobs" class="btn btn-success">Unpause jobs</button>
+                </form>
+            </div>
+        {% endif %}
+
             <form method="post">
                 {% csrf_token %}
                 <div class="btn-toolbar">
                     <button name="annotation-scheduler" class="btn btn-danger">Run Annotation Scheduler</button>
                     {% if any_new_vav %}
                         <button name="run-scheduler-new" class="btn btn-secondary ml-2">Run scheduler against NEW</button>
+                    {% endif %}
+                    {% if not jobs_paused %}
+                        <button name="pause-jobs" class="btn btn-outline-warning ml-2">Pause jobs</button>
                     {% endif %}
                 </div>
             </form>

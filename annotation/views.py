@@ -34,7 +34,8 @@ from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
 from library.utils import first
 from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyVersion
-from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
+from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel, \
+    JobsControl
 from variantgrid.celery import app
 from variantgrid.deployment_validation.annotation_status_checks import \
     is_variant_annotation_version_populated, get_variant_annotation_progress
@@ -356,6 +357,16 @@ def variant_annotation_runs(request):
     genome_build_summary = defaultdict(dict)
 
     if request.method == "POST":
+        if "unpause-jobs" in request.POST:
+            JobsControl.resume(by=str(request.user))
+            messages.add_message(request, messages.INFO,
+                                 "Resumed analysis + annotation job dispatch")
+        if "pause-jobs" in request.POST:
+            JobsControl.pause(reason=f"Paused from annotation runs page by {request.user}",
+                              by=str(request.user))
+            messages.add_message(request, messages.WARNING,
+                                 "Paused analysis + annotation job dispatch")
+
         if "annotation-scheduler" in request.POST:
             annotation_scheduler.si().apply_async()
 
@@ -450,6 +461,9 @@ def variant_annotation_runs(request):
         status=VariantAnnotationVersion.Status.NEW
     ).exists()
 
+    # Don't force-create the singleton just by viewing the page
+    jobs_control = JobsControl.objects.filter(pk=JobsControl.SINGLETON_PK).first()
+
     context = {
         "genome_build_summary": dict(genome_build_summary),
         "genome_build_field_counts": dict(genome_build_field_counts),
@@ -457,6 +471,8 @@ def variant_annotation_runs(request):
         "historical_variant_annotation_versions": historical_variant_annotation_versions,
         "genome_build_status_panel": genome_build_status_panel,
         "any_new_vav": any_new_vav,
+        "jobs_control": jobs_control,
+        "jobs_paused": bool(jobs_control and jobs_control.paused),
     }
     return render(request, "annotation/variant_annotation_runs.html", context)
 
