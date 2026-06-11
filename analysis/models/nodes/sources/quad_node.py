@@ -36,10 +36,10 @@ class AbstractQuadInheritance(ABC):
         """quad_zyg_data = (mum_zyg, dad_zyg, proband_zyg, sibling_zyg)"""
         quad = self.node.quad
         return _build_family_zyg_q(cgc, [
-            (quad.mother.sample,  quad_zyg_data[0], self.node.require_zygosity),
-            (quad.father.sample,  quad_zyg_data[1], self.node.require_zygosity),
+            (quad.mother.sample,  quad_zyg_data[0], self.node.require_parent_zygosity),
+            (quad.father.sample,  quad_zyg_data[1], self.node.require_parent_zygosity),
             (quad.proband.sample, quad_zyg_data[2], True),  # 947 - Always require zygosity for Proband
-            (quad.sibling.sample, quad_zyg_data[3], self.node.require_zygosity),
+            (quad.sibling.sample, quad_zyg_data[3], self.node.require_sibling_zygosity),
         ])
 
     @abstractmethod
@@ -268,7 +268,8 @@ class QuadNode(AbstractCohortBasedNode):
     quad = models.ForeignKey(Quad, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=QuadInheritance.choices,
                                    default=QuadInheritance.RECESSIVE)
-    require_zygosity = models.BooleanField(default=True)
+    require_parent_zygosity = models.BooleanField(default=True)
+    require_sibling_zygosity = models.BooleanField(default=True)
 
     @property
     def min_inputs(self):
@@ -332,7 +333,7 @@ class QuadNode(AbstractCohortBasedNode):
 
     def get_node_name(self):
         label = QuadInheritance(self.inheritance).label
-        if not self.require_zygosity:
+        if not (self.require_parent_zygosity and self.require_sibling_zygosity):
             label += "?"
         name_parts = [label]
         if desc := self.get_filter_description():
