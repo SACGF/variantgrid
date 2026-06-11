@@ -57,6 +57,7 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
+from snpdb.utils import get_genome_build_or_404
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.models import ModifiedImportedVariant
 from upload.upload_stats import get_vcf_variant_upload_stats
@@ -383,7 +384,7 @@ def view_variant(request, variant_id, genome_build_name=None):
     in_multiple_genome_builds = len(variant.genome_builds) > 1
     genome_build = None
     if genome_build_name:
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        genome_build = get_genome_build_or_404(genome_build_name)
         if genome_build not in variant.genome_builds:
             return redirect(reverse('view_variant', kwargs={'variant_id': variant_id}))
     else:
@@ -631,7 +632,7 @@ def create_variant_for_allele(request, allele_id, genome_build_name):
     """ Shortcut to create manual variant, but as a POST """
     check_can_create_variants(request.user)
     allele = get_object_or_404(Allele, pk=allele_id)
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    genome_build = get_genome_build_or_404(genome_build_name)
     non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
     if variant_allele := allele.variantallele_set.filter(origin__in=non_liftover_origin).first():
         create_liftover_pipelines(admin_bot(), [allele], ImportSource.WEB, variant_allele.genome_build, [genome_build])
@@ -742,7 +743,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
 def variant_sample_information(request, variant_id, genome_build_name):
     variant = get_object_or_404(Variant, pk=variant_id)
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    genome_build = get_genome_build_or_404(genome_build_name)
     vsi = VariantSampleInformation(request.user, variant, genome_build)
     other_loci_variants_by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(variant)
     g_hgvs = VariantAnnotation.get_hgvs_g(variant)
