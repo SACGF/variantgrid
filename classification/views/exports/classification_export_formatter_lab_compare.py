@@ -36,7 +36,7 @@ class ClassificationLab(ExportRow):
                 value_set.add(value_tuple)
         if value_set:
             value_set_strs = []
-            for vs in sorted(value_set):
+            for vs in sorted(value_set, key=lambda vs: tuple(v or "" for v in vs)):
                 value_set_strs.append(" ".join(v or "#" for v in vs))
             return "\n".join(value_set_strs)
 
