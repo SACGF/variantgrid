@@ -25,6 +25,9 @@ class VariantTranscriptSelections:
     REFSEQ_TRANSCRIPT = "refseq_transcript_accession"
     REPRESENTATIVE = "representative"
     NO_TRANSCRIPT = ''  # Can't be None as needs to be sortable
+    # CSS classes used to collapse rows behind their respective toggle links (see template)
+    OTHER_CONSORTIUM_COLLAPSE_CLASS = "other-annotation-consortium-transcripts"
+    OVERFLOW_COLLAPSE_CLASS = "overflow-transcripts"
 
     def __init__(self, variant: Variant,
                  genome_build: GenomeBuild, annotation_version=None,
@@ -47,6 +50,7 @@ class VariantTranscriptSelections:
         self.warning_messages = []
         self.error_messages = []
         self.initial_transcript_id = self.NO_TRANSCRIPT
+        self.num_hidden_overflow_transcripts = 0  # set in _apply_transcript_limit
         self._populate(variant, annotation_version)
         self.other_annotation_consortium_transcripts_warning = None  # set in _add_other_annotation_consortium_transcripts
         self._add_other_annotation_consortium_transcripts(variant)
@@ -56,6 +60,7 @@ class VariantTranscriptSelections:
             sort_order = [self.ENSEMBL_TRANSCRIPT]
         self.transcript_data.sort(key=operator.itemgetter(*sort_order), reverse=True)
         self._set_initial_and_selected()
+        self._apply_transcript_limit()
 
     def get_annotation_consortium_display(self):
         return AnnotationConsortium(self.annotation_consortium).label
@@ -192,6 +197,34 @@ class VariantTranscriptSelections:
                 selected_transcript_data["selected"] = True
                 self.initial_transcript_id = selected_transcript_data["transcript_id"]
 
+    def _apply_transcript_limit(self):
+        """ When there are too many annotated transcripts, collapse the least important ones behind a
+            toggle (see issue #1573). Important transcripts (selected / representative / canonical / tagged)
+            are always shown. The remainder are ranked by canonical_score then protein length (size), and
+            only enough are shown to reach VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN. """
+        max_shown = settings.VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN
+        if not max_shown:
+            return
+
+        # Only limit annotated (this-consortium) transcripts - other-consortium ones have their own toggle
+        annotated = [td for td in self.transcript_data if not td.get("collapse_class")]
+        if len(annotated) <= max_shown:
+            return
+
+        def _always_show(td) -> bool:
+            return bool(td.get("selected") or td.get(self.REPRESENTATIVE) or td.get("canonical")
+                        or td.get("canonical_score") or td.get("tags"))
+
+        pinned = [td for td in annotated if _always_show(td)]
+        rest = [td for td in annotated if not _always_show(td)]
+        # Most important first: canonical score, then largest protein (Ensembl '--pick' falls back to length)
+        rest.sort(key=lambda td: (td.get("canonical_score") or 0, td.get("protein_length") or 0), reverse=True)
+
+        num_extra_shown = max(0, max_shown - len(pinned))
+        for td in rest[num_extra_shown:]:
+            td["collapse_class"] = self.OVERFLOW_COLLAPSE_CLASS
+            self.num_hidden_overflow_transcripts += 1
+
     def _add_other_annotation_consortium_transcripts(self, variant: Variant):
         """ VariantAnnotation is populated from VEP as either RefSeq or Ensembl
             Whichever one is used will have molecular consequences etc.
@@ -244,8 +277,9 @@ class VariantTranscriptSelections:
                     self.REPRESENTATIVE: False,
                     "consequence": "?",
                     "canonical_score": -1,
-                    "hidden": self.hide_other_annotation_consortium_transcripts,
                 }
+                if self.hide_other_annotation_consortium_transcripts:
+                    t_data["collapse_class"] = self.OTHER_CONSORTIUM_COLLAPSE_CLASS
                 try:
                     # Transcript data may not be well formed
                     t_data["protein_length"] = transcript_version.protein_length

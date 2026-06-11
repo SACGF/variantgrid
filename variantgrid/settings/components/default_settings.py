@@ -196,6 +196,10 @@ MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
 # Use highest TranscriptVersion canonical, set False to use representative transcript (ie VEP pick = variant annotation)
 VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
+# When a variant has more than this many annotated transcripts, only show the top ones (by importance) on
+# the variant details transcript selection table, collapsing the rest behind a toggle. Set None to show all.
+# Important transcripts (selected/representative/canonical/tagged) are always shown regardless of this limit.
+VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN = 8
 
 VARIANT_ZYGOSITY_GLOBAL_COLLECTION = "global"
 # Skip samples from variant zygosity counts when their vcf_sample_name matches this regex (e.g. "^VALIDATION_")
