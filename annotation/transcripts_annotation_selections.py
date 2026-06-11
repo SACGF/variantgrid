@@ -199,9 +199,9 @@ class VariantTranscriptSelections:
 
     def _apply_transcript_limit(self):
         """ When there are too many annotated transcripts, collapse the least important ones behind a
-            toggle (see issue #1573). Important transcripts (selected / representative / canonical / tagged)
-            are always shown. The remainder are ranked by canonical_score then protein length (size), and
-            only enough are shown to reach VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN. """
+            toggle (see issue #1573). A hard limit of VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN are shown,
+            ranked by: selected, representative, MANE (canonical_score), canonical, tagged, then largest
+            protein (Ensembl '--pick' falls back to length). """
         max_shown = settings.VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN
         if not max_shown:
             return
@@ -211,17 +211,18 @@ class VariantTranscriptSelections:
         if len(annotated) <= max_shown:
             return
 
-        def _always_show(td) -> bool:
-            return bool(td.get("selected") or td.get(self.REPRESENTATIVE) or td.get("canonical")
-                        or td.get("canonical_score") or td.get("tags"))
+        def _importance(td) -> tuple:
+            return (
+                bool(td.get("selected")),
+                bool(td.get(self.REPRESENTATIVE)),
+                td.get("canonical_score") or 0,
+                bool(td.get("canonical")),
+                bool(td.get("tags")),
+                td.get("protein_length") or 0,
+            )
 
-        pinned = [td for td in annotated if _always_show(td)]
-        rest = [td for td in annotated if not _always_show(td)]
-        # Most important first: canonical score, then largest protein (Ensembl '--pick' falls back to length)
-        rest.sort(key=lambda td: (td.get("canonical_score") or 0, td.get("protein_length") or 0), reverse=True)
-
-        num_extra_shown = max(0, max_shown - len(pinned))
-        for td in rest[num_extra_shown:]:
+        ranked = sorted(annotated, key=_importance, reverse=True)
+        for td in ranked[max_shown:]:
             td["collapse_class"] = self.OVERFLOW_COLLAPSE_CLASS
             self.num_hidden_overflow_transcripts += 1
 
