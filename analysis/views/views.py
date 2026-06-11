@@ -61,7 +61,7 @@ from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
-    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Quad, Variant, GenomeBuild
+    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Quad, Variant, GenomeBuild, JobsControl
 from variantgrid.celery import app
 
 
@@ -1052,6 +1052,17 @@ def node_method_description(request, analysis_id, node_id, node_version):
 
 @user_passes_test(is_superuser)
 def view_analysis_issues(request):
+    if request.method == "POST":
+        if "unpause-jobs" in request.POST:
+            JobsControl.resume(by=str(request.user))
+            messages.add_message(request, messages.INFO,
+                                 "Resumed analysis + annotation job dispatch")
+        if "pause-jobs" in request.POST:
+            JobsControl.pause(reason=f"Paused from analysis issues page by {request.user}",
+                              by=str(request.user))
+            messages.add_message(request, messages.WARNING,
+                                 "Paused analysis + annotation job dispatch")
+
     all_nodes = AnalysisNode.objects.all()
     field_counts = get_field_counts(all_nodes, "status")
     summary_data = Counter()
@@ -1060,8 +1071,12 @@ def view_analysis_issues(request):
         summary_data[summary] += count
 
     field_counts = {NodeStatus(k).label: v for k, v in field_counts.items()}
+    # Don't force-create the singleton just by viewing the page
+    jobs_control = JobsControl.objects.filter(pk=JobsControl.SINGLETON_PK).first()
     context = {"nodes_status_summary": summary_data,
-               "field_counts": field_counts}
+               "field_counts": field_counts,
+               "jobs_control": jobs_control,
+               "jobs_paused": bool(jobs_control and jobs_control.paused)}
     return render(request, 'analysis/view_analysis_issues.html', context)
 
 
