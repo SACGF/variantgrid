@@ -6,10 +6,11 @@
 <script>
 	IN_ANALYSIS = $("#analysis-and-toolbar-container").length > 0;
     
-	function reloadNodes() {
+	function reloadNodes(onlyErrors) {
 		$.ajax({
 		    type: "POST",
 		    url: "{% url 'analysis_reload' analysis.pk %}",
+		    data: 'only_errors=' + encodeURIComponent(JSON.stringify(!!onlyErrors)),
 		    success: function(data) {
 		    	if (IN_ANALYSIS) {
                     checkAndMarkDirtyNodes();
@@ -42,9 +43,11 @@
 
 		if (!IN_ANALYSIS) {
 		  $("#force-reload-nodes-button").hide();
+		  $("#force-reload-error-nodes-button").hide();
 		}
 
-        $('#force-reload-nodes-button').click(reloadNodes);
+        $('#force-reload-nodes-button').click(function() { reloadNodes(false); });
+        $('#force-reload-error-nodes-button').click(function() { reloadNodes(true); });
         $("button#lock-analysis-button").click(function() { lockAnalysis(); });
         $("button#unlock-analysis-button").click(function() { lockAnalysis(false); });
         // TODO: Lock history...
@@ -97,7 +100,8 @@
 	<div>
         <button class="btn btn-outline-primary fas fas-fw fa-window-close" id='close-analysis-settings' type='button'>Close</button>
         {% if has_write_permission %}
-		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-nodes-button' type='button'>Force Reload Nodes</button>
+		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-nodes-button' type='button'>Force Reload All Nodes</button>
+		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-error-nodes-button' type='button'>Force Reload Error Nodes</button>
 		    <button class="btn btn-outline-danger fas fa-lock" id='lock-analysis-button' type='button'>Lock Analysis</button>
         {% elif analysis.is_locked %}
             <div>

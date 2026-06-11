@@ -337,7 +337,8 @@ def sample_patient_gene_disease(request, sample_id, ontology_version_id):
 @require_POST
 def analysis_reload(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
-    node_utils.reload_analysis_nodes(analysis.pk)
+    only_errors = json.loads(request.POST.get("only_errors", "false"))
+    node_utils.reload_analysis_nodes(analysis.pk, only_errors=only_errors)
     return JsonResponse({})
 
 
