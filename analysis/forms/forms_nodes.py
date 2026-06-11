@@ -474,12 +474,16 @@ class GeneListNodeForm(BaseNodeForm):
 
 
 class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
-    genome_build_fields = ["genomic_intervals_collection"]
+    genome_build_fields = ["genomic_intervals_collection", "contigs"]
     CUSTOM_INTERVAL_FIELDS = {'chrom', 'start', 'end'}
     # also be able to save GenomicInterval
     chrom = forms.CharField(required=False, empty_value=None, widget=TextInput(attrs={'placeholder': 'chrom'}))
     start = forms.IntegerField(required=False, widget=NumberInput(attrs={'placeholder': 'start'}))
     end = forms.IntegerField(required=False, widget=NumberInput(attrs={'placeholder': 'end'}))
+    contigs = forms.ModelMultipleChoiceField(required=False,
+                                             queryset=Contig.objects.all(),
+                                             widget=ModelSelect2Multiple(url='contig_autocomplete',
+                                                                         attrs={'data-placeholder': 'Chromosome...'}))
 
     class Meta:
         model = IntersectionNode
@@ -544,6 +548,11 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
         if "hgvs_string" in self.changed_data:
             hgvs_string = self.cleaned_data.get("hgvs_string")
             node.hgvs_variant = get_hgvs_variant(hgvs_string, self.instance.analysis.genome_build)
+
+        contigs_set = self.instance.intersectionnodecontig_set
+        contigs_set.all().delete()
+        for contig in self.cleaned_data["contigs"]:
+            contigs_set.create(contig=contig)
 
         if commit:
             node.save()
