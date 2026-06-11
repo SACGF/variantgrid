@@ -697,38 +697,28 @@ function applyVariantValues() {
                                 dbNSFP covers non-synonymous SNVs in coding regions only, so indels
                                 and non-coding/synonymous variants have no scores available.
                             </div>
-                        {% elif annotation_version.variant_annotation_version.columns_version == 1 %}
-                            {% labelled id='cadd_phred' label='CADD Phred' help=annotation_description.cadd_phred hint="tiny" %}{% endlabelled %}
-                            {% labelled id='grantham' label='Grantham' help=annotation_description.grantham hint="tiny" %}{% endlabelled %}
-                            {% labelled id='revel_score' label='REVEL score' help=annotation_description.revel_score hint="tiny" %}{% endlabelled %}
-                            {% labelled id='fathmm_pred_most_damaging' label='FATHMM' help=annotation_description.fathmm_pred_most_damaging hint="tiny" %}{% endlabelled %}
-                            {% labelled id='mutation_assessor_pred_most_damaging' label='Mutation Assessor' help=annotation_description.mutation_assessor_pred_most_damaging hint="tiny" %}{% endlabelled %}
-                            {% labelled id='polyphen2_hvar_pred_most_damaging' label='Polyphen2 HVAR' help=annotation_description.polyphen2_hvar_pred_most_damaging hint="tiny" %}{% endlabelled %}
-                            {% labelled id='sift' label='SIFT' help=annotation_description.sift hint="tiny" %}{% endlabelled %}
+                        {% else %}
+                            {% labelled id='alphamissense_score' visible_fields=visible_fields label='AlphaMissense' help=annotation_description.alphamissense_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.alphamissense_score }}{% endlabelled %}
+                            {% labelled id='bayesdel_noaf_score' visible_fields=visible_fields label='BayesDel (No AF)' help=annotation_description.bayesdel_noaf_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_score }}{% endlabelled %}
+                            {% labelled id='cadd_phred' visible_fields=visible_fields label='CADD (phred)' help=annotation_description.cadd_phred hint="tiny" value_css="text-monospace" %}{{ variant_annotation.cadd_phred }}{% endlabelled %}
+                            {% labelled id='clinpred_score' visible_fields=visible_fields label='ClinPred' help=annotation_description.clinpred_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.clinpred_score }}{% endlabelled %}
+                            {% labelled id='fathmm_pred_most_damaging' visible_fields=visible_fields label='FATHMM' help=annotation_description.fathmm_pred_most_damaging hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_fathmm_pred_most_damaging_display }}{% endlabelled %}
+                            {% labelled id='grantham' visible_fields=visible_fields label='Grantham' help=annotation_description.grantham hint="tiny" value_css="text-monospace" %}{{ variant_annotation.grantham }}{% endlabelled %}
+                            {% labelled id='metarnn_score' visible_fields=visible_fields label='MetaRNN' help=annotation_description.metarnn_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.metarnn_score }}{% endlabelled %}
+                            {% labelled id='mpc_score' visible_fields=visible_fields label='MPC' help=annotation_description.mpc_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.mpc_score }}{% endlabelled %}
+                            {% labelled id='mutation_assessor_pred_most_damaging' visible_fields=visible_fields label='Mutation Assessor' help=annotation_description.mutation_assessor_pred_most_damaging hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_mutation_assessor_pred_most_damaging_display }}{% endlabelled %}
+                            {% labelled id='mutation_taster_pred_most_damaging' visible_fields=visible_fields label='Mutation Taster' help=annotation_description.mutation_taster_pred_most_damaging hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_mutation_taster_pred_most_damaging_display }}{% endlabelled %}
+                            {% labelled id='mutpred2_score' visible_fields=visible_fields label='MutPred2' help=annotation_description.mutpred2_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.mutpred2_score }}{% endlabelled %}
+                            {% labelled id='polyphen2_hvar_pred_most_damaging' visible_fields=visible_fields label='Polyphen2 HVAR' help=annotation_description.polyphen2_hvar_pred_most_damaging hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_polyphen2_hvar_pred_most_damaging_display }}{% endlabelled %}
+                            {% labelled id='primateai_score' visible_fields=visible_fields label='PrimateAI' help=annotation_description.primateai_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.primateai_score }}{% endlabelled %}
+                            {% labelled id='revel_score' visible_fields=visible_fields label='REVEL' help=annotation_description.revel_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.revel_score }}{% endlabelled %}
+                            {% labelled id='sift' visible_fields=visible_fields label='SIFT' help=annotation_description.sift hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_sift_display }}{% endlabelled %}
+                            {% labelled id='varity_r_score' visible_fields=visible_fields label='VARITY_R' help=annotation_description.varity_r_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.varity_r_score }}{% endlabelled %}
+                            {% labelled id='varity_er_score' visible_fields=visible_fields label='VARITY_ER' help=annotation_description.varity_er_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.varity_er_score }}{% endlabelled %}
+                            {% labelled id='vest4_score' visible_fields=visible_fields label='VEST4' help=annotation_description.vest4_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.vest4_score }}{% endlabelled %}
 
-                            {% labelled label="other predictions" hint="tiny" %}
-                                <a class='toggle-link' data-toggle="collapse" href='#other-predictions'>Show other predictions</a>
-                            {% endlabelled %}
-
-                            <div id="other-predictions" class="collapse">
-                                {% labelled id='mutation_taster_pred_most_damaging' label='Mutation Taster' help=annotation_description.mutation_taster_pred_most_damaging hint="tiny" %}{% endlabelled %}
-                            </div>
-                        {% elif annotation_version.variant_annotation_version.columns_version >= 4 %}
-                            {% labelled id='alphamissense_score' label='AlphaMissense' help=annotation_description.alphamissense_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.alphamissense_score }}{% endlabelled %}
-                            {% labelled id='bayesdel_noaf_score' label='BayesDel (No AF)' help=annotation_description.bayesdel_noaf_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_score }}{% endlabelled %}
-                            {% labelled id='cadd_phred' label='CADD (phred)' help=annotation_description.cadd_phred hint="tiny" value_css="text-monospace" %}{{ variant_annotation.cadd_phred }}{% endlabelled %}
-                            {% labelled id='clinpred_score' label='ClinPred' help=annotation_description.clinpred_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.clinpred_score }}{% endlabelled %}
-                            {% labelled id='metarnn_score' label='MetaRNN' help=annotation_description.metarnn_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.metarnn_score }}{% endlabelled %}
-                            {% labelled id='mpc_score' label='MPC' help=annotation_description.mpc_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.mpc_score }}{% endlabelled %}
-                            {% labelled id='mutpred2_score' label='MutPred2' help=annotation_description.mutpred2_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.mutpred2_score }}{% endlabelled %}
-                            {% labelled id='primateai_score' label='PrimateAI' help=annotation_description.primateai_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.primateai_score }}{% endlabelled %}
-                            {% labelled id='revel_score' label='REVEL' help=annotation_description.revel_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.revel_score }}{% endlabelled %}
-                            {% labelled id='varity_r_score' label='VARITY_R' help=annotation_description.varity_r_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.varity_r_score }}{% endlabelled %}
-                            {% labelled id='varity_er_score' label='VARITY_ER' help=annotation_description.varity_er_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.varity_er_score }}{% endlabelled %}
-                            {% labelled id='vest4_score' label='VEST4' help=annotation_description.vest4_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.vest4_score }}{% endlabelled %}
-
-                            {% labelled id='nmd_escaping_variant' label='NMD escaping variant' help=annotation_description.nmd_escaping_variant hint="tiny" value_css="text-monospace" %}{{ variant_annotation.nmd_escaping_variant }}{% endlabelled %}
-                            {% labelled id='aloft_pred' label='ALoFT prediction' help=annotation_description.aloft_pred hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_aloft_pred_display }}{% endlabelled %}
+                            {% labelled id='nmd_escaping_variant' visible_fields=visible_fields label='NMD escaping variant' help=annotation_description.nmd_escaping_variant hint="tiny" value_css="text-monospace" %}{{ variant_annotation.nmd_escaping_variant }}{% endlabelled %}
+                            {% labelled id='aloft_pred' visible_fields=visible_fields label='ALoFT prediction' help=annotation_description.aloft_pred hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_aloft_pred_display }}{% endlabelled %}
                             {% if variant_annotation.aloft_pred %}
                                 {% labelled id='aloft_prob_tolerant' label='ALoFT prob. Tolerant' help=annotation_description.aloft_prob_tolerant hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_prob_tolerant }}{% endlabelled %}
                                 {% labelled id='aloft_prob_recessive' label='ALoFT prob Recessive' help=annotation_description.aloft_prob_recessive hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_prob_recessive }}{% endlabelled %}
@@ -737,44 +727,20 @@ function applyVariantValues() {
                                 {% labelled id='aloft_ensembl_transcript' label='ALoFT Transcript' help=annotation_description.aloft_ensembl_transcript hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_ensembl_transcript }}{% endlabelled %}
                             {% endif %}
 
-                            {% settings_value 'ANNOTATION_SHOW_LEGACY_RANKSCORES' as show_legacy_rankscores %}
-                            {% if show_legacy_rankscores %}
+                            {% if variant_annotation.show_rankscores %}
                                 {% labelled label="rankscores" hint="tiny" %}
                                     <a class='toggle-link' data-toggle="collapse" href='#rankscores-collapse'>Show rankscores</a>
                                 {% endlabelled %}
                                 <div id="rankscores-collapse" class="collapse">
-                                    {% labelled id='alphamissense_rankscore' label='AlphaMissense rankscore' help=annotation_description.alphamissense_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.alphamissense_rankscore }}{% endlabelled %}
-                                    {% labelled id='bayesdel_noaf_rankscore' label='BayesDel (No AF) rankscore' help=annotation_description.bayesdel_noaf_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_rankscore }}{% endlabelled %}
-                                    {% labelled id='cadd_raw_rankscore' label='CADD Raw rankscore' help=annotation_description.cadd_raw_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.cadd_raw_rankscore }}{% endlabelled %}
-                                    {% labelled id='clinpred_rankscore' label='ClinPred rankscore' help=annotation_description.clinpred_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.clinpred_rankscore }}{% endlabelled %}
-                                    {% labelled id='metalr_rankscore' label='MetaLR rankscore' help=annotation_description.metalr_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.metalr_rankscore }}{% endlabelled %}
-                                    {% labelled id='revel_rankscore' label='REVEL rankscore' help=annotation_description.revel_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.revel_rankscore }}{% endlabelled %}
-                                    {% labelled id='vest4_rankscore' label='VEST4 rankscore' help=annotation_description.vest4_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.vest4_rankscore }}{% endlabelled %}
+                                    {% labelled id='alphamissense_rankscore' visible_fields=visible_fields label='AlphaMissense rankscore' help=annotation_description.alphamissense_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.alphamissense_rankscore }}{% endlabelled %}
+                                    {% labelled id='bayesdel_noaf_rankscore' visible_fields=visible_fields label='BayesDel (No AF) rankscore' help=annotation_description.bayesdel_noaf_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_rankscore }}{% endlabelled %}
+                                    {% labelled id='cadd_raw_rankscore' visible_fields=visible_fields label='CADD Raw rankscore' help=annotation_description.cadd_raw_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.cadd_raw_rankscore }}{% endlabelled %}
+                                    {% labelled id='clinpred_rankscore' visible_fields=visible_fields label='ClinPred rankscore' help=annotation_description.clinpred_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.clinpred_rankscore }}{% endlabelled %}
+                                    {% labelled id='metalr_rankscore' visible_fields=visible_fields label='MetaLR rankscore' help=annotation_description.metalr_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.metalr_rankscore }}{% endlabelled %}
+                                    {% labelled id='revel_rankscore' visible_fields=visible_fields label='REVEL rankscore' help=annotation_description.revel_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.revel_rankscore }}{% endlabelled %}
+                                    {% labelled id='vest4_rankscore' visible_fields=visible_fields label='VEST4 rankscore' help=annotation_description.vest4_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.vest4_rankscore }}{% endlabelled %}
                                 </div>
                             {% endif %}
-                        {% elif annotation_version.variant_annotation_version.columns_version >= 2 %}
-                            {% if annotation_version.variant_annotation_version.columns_version >= 3 %}
-                                {% labelled id='alphamissense_rankscore' label='AlphaMissense rankscore' help=annotation_description.alphamissense_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.alphamissense_rankscore }}{% endlabelled %}
-                            {% endif %}
-
-                            {% labelled id='bayesdel_noaf_rankscore' label='BayesDel (No AF) rankscore' help=annotation_description.bayesdel_noaf_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_rankscore }}{% endlabelled %}
-                            {% labelled id='cadd_raw_rankscore' label='CADD Raw rankscore' help=annotation_description.cadd_raw_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.cadd_raw_rankscore }}{% endlabelled %}
-                            {% labelled id='clinpred_rankscore' label='ClinPred rankscore' help=annotation_description.clinpred_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.clinpred_rankscore }}{% endlabelled %}
-                            {% labelled id='metalr_rankscore' label='MetaLR rankscore' help=annotation_description.metalr_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.metalr_rankscore }}{% endlabelled %}
-                            {% labelled id='revel_rankscore' label='REVEL rankscore' help=annotation_description.revel_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.revel_rankscore }}{% endlabelled %}
-                            {% labelled id='vest4_rankscore' label='VEST4 rankscore' help=annotation_description.vest4_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.vest4_rankscore }}{% endlabelled %}
-
-                            {% labelled id='nmd_escaping_variant' label='NMD escaping variant' help=annotation_description.nmd_escaping_variant hint="tiny" value_css="text-monospace" %}{{ variant_annotation.nmd_escaping_variant }}{% endlabelled %}
-                            {% labelled id='aloft_pred' label='ALoFT prediction' help=annotation_description.aloft_pred hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_aloft_pred_display }}{% endlabelled %}
-                            {% if variant_annotation.aloft_pred %}
-                                {% labelled id='aloft_prob_tolerant' label='ALoFT prob. Tolerant' help=annotation_description.aloft_prob_tolerant hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_prob_tolerant }}{% endlabelled %}
-                                {% labelled id='aloft_prob_recessive' label='ALoFT prob Recessive' help=annotation_description.aloft_prob_recessive hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_prob_recessive }}{% endlabelled %}
-                                {% labelled id='aloft_prob_dominant' label='ALoFT prob Dominant' help=annotation_description.aloft_prob_dominant hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_prob_dominant }}{% endlabelled %}
-                                {% labelled id='aloft_high_confidence' label='ALoFT high confidence' help=annotation_description.aloft_high_confidence hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_high_confidence }}{% endlabelled %}
-                                {% labelled id='aloft_ensembl_transcript' label='ALoFT Transcript' help=annotation_description.aloft_ensembl_transcript hint="tiny" value_css="text-monospace" %}{{ variant_annotation.aloft_ensembl_transcript }}{% endlabelled %}
-                            {% endif %}
-                        {% else %}
-                            Unknown annotation columns_version = {{ annotation_version.variant_annotation_version.columns_version }}
                         {% endif %}
                         <div class="text-right mt-2"><a class="hover-link text-small" href="{% url 'pathogenicity_thresholds' %}" target="_blank">PP3/BP4 thresholds &amp; sources</a></div>
                     </div>
@@ -787,17 +753,15 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">Conservation</div>
                     <div class="card-body">
-                      {% with vc=variant_annotation.visible_columns %}
                         {% if variant_annotation.has_dbnsfp %}
                             {% labelled id="gerp_pp_rs" label="Gerp++ (-12 - 6.8)" help=annotation_description.aloft_ensembl_transcript help=annotation_description.gerp_pp_rs hint="tiny" %}{% endlabelled %}
                         {% endif %}
                         {% labelled id="phastcons_100_way_vertebrate" label="PhastCons 100 way vertebrate (0-1)" help=annotation_description.phastcons_100_way_vertebrate hint="tiny" %}{% endlabelled %}
-                        {% labelled id="phastcons_30_way_mammalian" visible_fields=vc label="PhastCons 30 way mammalian (0-1)" label_css="text-small" help=annotation_description.phastcons_30_way_mammalian hint="tiny" %}{% endlabelled %}
-                        {% labelled id="phastcons_46_way_mammalian" visible_fields=vc label="PhastCons 46 way mammalian (0-1)" label_css="text-small" help=annotation_description.phastcons_46_way_mammalian hint="tiny" %}{% endlabelled %}
+                        {% labelled id="phastcons_30_way_mammalian" visible_fields=visible_fields label="PhastCons 30 way mammalian (0-1)" label_css="text-small" help=annotation_description.phastcons_30_way_mammalian hint="tiny" %}{% endlabelled %}
+                        {% labelled id="phastcons_46_way_mammalian" visible_fields=visible_fields label="PhastCons 46 way mammalian (0-1)" label_css="text-small" help=annotation_description.phastcons_46_way_mammalian hint="tiny" %}{% endlabelled %}
                         {% labelled id="phylop_100_way_vertebrate" label="PhyloP 100 way vertebrate (-20 - 10)" label_css="text-small" help=annotation_description.phylop_100_way_vertebrate hint="tiny" %}{% endlabelled %}
-                        {% labelled id="phylop_30_way_mammalian" visible_fields=vc label="PhyloP 30 way mammalian (-20 - 1.3)" label_css="text-small" help=annotation_description.phylop_30_way_mammalian hint="tiny" %}{% endlabelled %}
-                        {% labelled id="phylop_46_way_mammalian" visible_fields=vc label="PhyloP 46 way mammalian" label_css="text-small" help=annotation_description.phylop_46_way_mammalian hint="tiny" %}{% endlabelled %}
-                      {% endwith %}
+                        {% labelled id="phylop_30_way_mammalian" visible_fields=visible_fields label="PhyloP 30 way mammalian (-20 - 1.3)" label_css="text-small" help=annotation_description.phylop_30_way_mammalian hint="tiny" %}{% endlabelled %}
+                        {% labelled id="phylop_46_way_mammalian" visible_fields=visible_fields label="PhyloP 46 way mammalian" label_css="text-small" help=annotation_description.phylop_46_way_mammalian hint="tiny" %}{% endlabelled %}
                     </div>
                 </div>
             </div>
@@ -814,14 +778,13 @@ function applyVariantValues() {
                     {% endif %}
                         {% labelled label='gnomAD version' hint='tiny' %}{{ variant_annotation.version.gnomad }}{% endlabelled %}
                         {% if variant_annotation.has_gnomad %}
-                          {% with vc=variant_annotation.visible_columns %}
-                            {% labelled id='gnomad_af' visible_fields=vc label='gnomAD Allele Frequency' help=annotation_description.gnomad_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
-                            {% labelled id='gnomad_fafmax_faf95_max' visible_fields=vc label='Grpmax Filtering AF (95% confidence)' help=annotation_description.gnomad_fafmax_faf95_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fafmax_faf95_max|format_unit_as_percent }}{% endlabelled %}
+                            {% labelled id='gnomad_af' visible_fields=visible_fields label='gnomAD Allele Frequency' help=annotation_description.gnomad_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
+                            {% labelled id='gnomad_fafmax_faf95_max' visible_fields=visible_fields label='Grpmax Filtering AF (95% confidence)' help=annotation_description.gnomad_fafmax_faf95_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fafmax_faf95_max|format_unit_as_percent }}{% endlabelled %}
 
                             {% if variant_annotation.gnomad2_liftover_af %}
                                 {% labelled id='gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' help=annotation_description.gnomad2_liftover_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad2_liftover_af|format_unit_as_percent }}{% endlabelled %}
                             {% endif %}
-                            {% labelled id='gnomad_popmax_af' visible_fields=vc label='gnomAD Pop Max' help=annotation_description.gnomad_popmax hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_af|format_unit_as_percent }}{% if 'gnomad_popmax' in vc %} ({{ variant_annotation.get_gnomad_popmax_display }}){% endif %}{% endlabelled %}
+                            {% labelled id='gnomad_popmax_af' visible_fields=visible_fields label='gnomAD Pop Max' help=annotation_description.gnomad_popmax hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_af|format_unit_as_percent }}{% if 'gnomad_popmax' in visible_fields %} ({{ variant_annotation.get_gnomad_popmax_display }}){% endif %}{% endlabelled %}
 
                             {% if variant_annotation.gnomad_filtered %}
                                 {% labelled label="gnomAD Is Filtered" label_css="gnomad-filtered" help=annotation_description.gnomad_filtered hint="tiny" %}{{ variant_annotation.gnomad_filtered }}{% endlabelled %}
@@ -829,9 +792,9 @@ function applyVariantValues() {
                                 {% labelled label="gnomAD Is Filtered" help=annotation_description.gnomad_filtered hint="tiny" %}{% endlabelled %}
                             {% endif %}
 
-                            {% labelled id='gnomad_hom_alt' visible_fields=vc label='gnomAD Total Homozygotes' help=annotation_description.gnomad_hom_alt hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
-                            {% labelled id='gnomad_ac' visible_fields=vc label='gnomAD Alt Allele Count' help=annotation_description.gnomad_ac hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
-                            {% labelled id='gnomad_an' visible_fields=vc label='gnomAD Total number of alleles' help=annotation_description.gnomad_an hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
+                            {% labelled id='gnomad_hom_alt' visible_fields=visible_fields label='gnomAD Total Homozygotes' help=annotation_description.gnomad_hom_alt hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
+                            {% labelled id='gnomad_ac' visible_fields=visible_fields label='gnomAD Alt Allele Count' help=annotation_description.gnomad_ac hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
+                            {% labelled id='gnomad_an' visible_fields=visible_fields label='gnomAD Total number of alleles' help=annotation_description.gnomad_an hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
 
                             {% if variant_annotation.has_hemi %}
                                 {% labelled id='gnomad_hemi_count' label='gnomAD Hemizygotes' help=annotation_description.gnomad_hemi_count hint="tiny" value_css="text-monospace" %}
@@ -976,19 +939,18 @@ function applyVariantValues() {
                             {% endlabelled %}
 
                             <div id="gnomad-pops" class="collapse">
-                                {% labelled id='gnomad_popmax_ac' visible_fields=vc label='PopMax Alt Allele Count' help=annotation_description.gnomad_popmax_ac hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
-                                {% labelled id='gnomad_popmax_an' visible_fields=vc label='PopMax number of alleles' help=annotation_description.gnomad_popmax_an hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
+                                {% labelled id='gnomad_popmax_ac' visible_fields=visible_fields label='PopMax Alt Allele Count' help=annotation_description.gnomad_popmax_ac hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
+                                {% labelled id='gnomad_popmax_an' visible_fields=visible_fields label='PopMax number of alleles' help=annotation_description.gnomad_popmax_an hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
 
-                                {% labelled id='gnomad_afr_af' visible_fields=vc label='African' help=annotation_description.gnomad_afr_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_afr_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_asj_af' visible_fields=vc label='Ashkenazi Jewish' help=annotation_description.gnomad_asj_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_asj_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_eas_af' visible_fields=vc label='East Asian' help=annotation_description.gnomad_eas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_eas_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_fin_af' visible_fields=vc label='European (Finnish)' help=annotation_description.gnomad_fin_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_nfe_af' visible_fields=vc label='European (Non-Finnish)' help=annotation_description.gnomad_nfe_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_amr_af' visible_fields=vc label='Latino' help=annotation_description.gnomad_amr_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_mid_af' visible_fields=vc label='Middle Eastern' help=annotation_description.gnomad_mid_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_mid_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_sas_af' visible_fields=vc label='South Asian' help=annotation_description.gnomad_sas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_afr_af' visible_fields=visible_fields label='African' help=annotation_description.gnomad_afr_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_afr_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_asj_af' visible_fields=visible_fields label='Ashkenazi Jewish' help=annotation_description.gnomad_asj_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_asj_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_eas_af' visible_fields=visible_fields label='East Asian' help=annotation_description.gnomad_eas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_eas_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_fin_af' visible_fields=visible_fields label='European (Finnish)' help=annotation_description.gnomad_fin_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_nfe_af' visible_fields=visible_fields label='European (Non-Finnish)' help=annotation_description.gnomad_nfe_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_amr_af' visible_fields=visible_fields label='Latino' help=annotation_description.gnomad_amr_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_mid_af' visible_fields=visible_fields label='Middle Eastern' help=annotation_description.gnomad_mid_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_mid_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_sas_af' visible_fields=visible_fields label='South Asian' help=annotation_description.gnomad_sas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
                             </div>
-                          {% endwith %}
                         {% else %}
                             {% labelled id='gnomad_none' label='gnomAD' hint="tiny" help=annotation_description.gnomad %}No gnomAD entry{% endlabelled %}
                         {% endif %}

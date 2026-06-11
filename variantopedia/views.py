@@ -734,6 +734,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
+        "visible_fields": variant_annotation.visible_columns if variant_annotation else frozenset(),
         "vts": vts,
     }
     if extra_context:

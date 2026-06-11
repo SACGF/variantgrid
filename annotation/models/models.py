@@ -1600,6 +1600,16 @@ class VariantAnnotation(AbstractVariantAnnotation):
             self.cadd_phred,
         ))
 
+    @cached_property
+    def show_rankscores(self) -> bool:
+        """ dbNSFP rankscores arrived in columns_version 2. Once raw scores exist (columns_version 4+)
+            they're legacy - shown only when ANNOTATION_SHOW_LEGACY_RANKSCORES is set. columns_version
+            2-3 carry only rankscores (no raw scores), so always show them. """
+        cv = self.version.columns_version
+        if cv < 2:
+            return False
+        return settings.ANNOTATION_SHOW_LEGACY_RANKSCORES or cv < 4
+
     @property
     def has_conservation(self) -> bool:
         """ Thanks to summary stats we can now do this in VEP112 """
