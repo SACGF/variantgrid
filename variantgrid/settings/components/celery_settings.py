@@ -160,3 +160,21 @@ CELERY_IMPORTS = (
 
 CELERY_TASK_ALWAYS_EAGER = False  # True to execute in http server process (or Eclipse)
 CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
+
+# Per-queue cap on a worker process's virtual address space (GB, RLIMIT_AS) so a runaway allocation
+# raises a catchable MemoryError in Python (update_node_task perma-fails the node + reports to
+# Rollbar) instead of the OS OOM-killer locking up the whole box. {} = no limit.
+# A worker is capped only if EVERY queue it serves (its -Q list) is listed here, so a worker that
+# also runs uncapped work (e.g. VEP bulk inserts on annotation_workers) is never throttled.
+# RLIMIT_AS caps VSZ (virtual, overcounts RSS) so set generously above the worker's baseline - too
+# low and the worker MemoryErrors on warmup. Tune per deployment.
+CELERY_WORKER_ADDRESS_SPACE_LIMIT_GB = {
+    "analysis_workers": 8,
+}
+
+# Crash safety brake: after a host reboot (low /proc/uptime) the worker auto-pauses the analysis +
+# annotation job dispatchers once per boot, so jobs that may have crashed the box don't immediately
+# re-launch and crash it again. An admin resumes with 'manage.py jobs_control resume'. Turn this OFF
+# on ephemeral / autoscaled hosts, where a fresh boot is routine rather than a crash signal.
+JOBS_AUTOPAUSE_ON_REBOOT = True
+JOBS_AUTOPAUSE_ON_REBOOT_UPTIME_SECS = 600  # uptime under this on worker start => treat as a reboot
