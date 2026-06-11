@@ -113,6 +113,12 @@ def send_summary_emails():
 def send_summary_email_to_user(user: User) -> bool:
     discordance_email = settings.DISCORDANCE_EMAIL
     if discordance_email:
+        if not Lab.valid_labs_qs(user=user, admin_check=True).exclude(organization__active=False).exists():
+            # User has no accessible lab, so there's nothing to summarise - skip rather than raise
+            report_message("Skipping weekly summary email - user has no accessible lab", level="debug",
+                           extra_data={"user": user.username})
+            return False
+
         content = summary_email_content(LabPickerData.for_user(user))
 
         return EmailLog.send_mail(subject=content.subject,
