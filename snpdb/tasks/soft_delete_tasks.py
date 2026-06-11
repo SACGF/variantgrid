@@ -47,7 +47,10 @@ def remove_soft_deleted_vcfs_task():
             vcf = qs.get()
             logging.info("Deleting vcfs %s", vcf)
             try:
-                update_all_variant_zygosity_counts_for_vcf(vcf, '-')
+                # skip_if_cannot_delete: an old/incomplete VCF may have a zygosity count that never
+                # completed (count_complete is None) or was already subtracted - skip it with a
+                # warning rather than aborting the subtraction for this VCF (see #1595)
+                update_all_variant_zygosity_counts_for_vcf(vcf, '-', skip_if_cannot_delete=True)
             except:  # Already logged etc
                 pass
 
