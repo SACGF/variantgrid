@@ -1,4 +1,5 @@
 import requests
+from requests import RequestException
 
 from library.constants import MINUTE_SECS
 from ontology.models import OntologyTerm
@@ -10,14 +11,22 @@ def condition_text_search(search_text: str, row_limit: int = 10) -> list[Ontolog
         # This is probably not what you want, so return early without API call
         return []
 
-    response = requests.get(
-        'https://api.monarchinitiative.org/v3/api/search', {
-            "q": search_text,
-            "category": "biolink:Disease",
-            "limit": row_limit
-        }, timeout=MINUTE_SECS).json()
+    try:
+        http_response = requests.get(
+            'https://api.monarchinitiative.org/v3/api/search', {
+                "q": search_text,
+                "category": "biolink:Disease",
+                "limit": row_limit
+            }, timeout=MINUTE_SECS)
+        http_response.raise_for_status()
+        response = http_response.json()
+    except (RequestException, ValueError):
+        # The Monarch API is external and intermittently returns errors or non-JSON error pages
+        # (e.g. a 502 HTML page), which makes .json() raise. Treat any such failure as "no results"
+        # rather than aborting the whole condition search.
+        return []
 
-    results = response.get("items")
+    results = response.get("items") or []
 
     terms: list[OntologyTerm] = []
     for result in results:
