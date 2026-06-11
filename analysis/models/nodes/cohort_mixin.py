@@ -48,9 +48,11 @@ class CohortMixin:
         if cohort:
             try:
                 cdc = cohort.cohort_genotype_collection
-            except DataArchivedError:
+            except (DataArchivedError, CohortGenotypeCollection.DoesNotExist):
                 # Surface via _get_configuration_errors → ERROR_CONFIGURATION;
                 # keep node-internal "no source" code paths working.
+                # A missing CGC (mid-reload / version mismatch) is treated the same
+                # as archived data so the node shows a config error instead of 500ing.
                 cdc = None
         else:
             cdc = None
