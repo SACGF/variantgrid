@@ -19,4 +19,12 @@ def condition_text_search(search_text: str, row_limit: int = 10) -> list[Ontolog
 
     results = response.get("items")
 
-    return [OntologyTerm.get_or_stub(result.get("id")) for result in results]
+    terms: list[OntologyTerm] = []
+    for result in results:
+        try:
+            terms.append(OntologyTerm.get_or_stub(result.get("id")))
+        except ValueError:
+            # The Monarch search can return terms from ontologies we don't support
+            # (e.g. MPATH), whose prefix isn't a member of OntologyService - skip those
+            continue
+    return terms
