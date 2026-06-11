@@ -844,7 +844,8 @@ class BulkVEPVCFAnnotationInserter:
     def remove_processing_files(self):
         import_processing_dir = get_import_processing_dir(self.annotation_run.pk, prefix=self.PREFIX)
         logging.info("********* Deleting '%s' *******", import_processing_dir)
-        shutil.rmtree(import_processing_dir)
+        # ignore_errors so a missing dir (eg cleaned-up retry) doesn't blow up - we just want it gone
+        shutil.rmtree(import_processing_dir, ignore_errors=True)
 
     @cached_property
     def gene_identifiers(self):
