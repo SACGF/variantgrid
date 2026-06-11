@@ -30,6 +30,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     AlphaMissensePrediction, ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.repeat_masker import RepeatMaskerSummary
+from annotation.vep_columns import gnomad_columns_for
 from annotation.models.models_enums import AnnotationStatus, \
     ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
@@ -1611,6 +1612,19 @@ class VariantAnnotation(AbstractVariantAnnotation):
     def has_gnomad(self) -> bool:
         return bool(self.gnomad_af or self.gnomad2_liftover_af)
 
+    @cached_property
+    def gnomad_columns(self) -> frozenset[str]:
+        """ gnomAD VariantGrid columns populated for this annotation's build / pipeline / version.
+            Drives the variant detail gnomAD show/hide (via `labelled visible_fields=`) off the same
+            VEP_COLUMNS table that controls what annotation writes, so the two can't drift (#1148). """
+        return gnomad_columns_for(
+            genome_build_name=self.version.genome_build.name,
+            pipeline_type=self.annotation_run.pipeline_type,
+            columns_version=self.version.columns_version,
+            vep_version=self.version.vep,
+            gnomad4_minor_version=self.version.gnomad,
+        )
+
     @property
     def has_non_gnomad_population_frequency(self) -> bool:
         return self.is_standard_annotation
@@ -1624,28 +1638,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.is_standard_annotation and self.version.columns_version >= 3
 
     @property
-    def has_gnomad_faf(self) -> bool:
-        return self.is_standard_annotation and self.gnomad4_or_later
-
-    @cached_property
-    def has_extended_gnomad_fields(self):
-        """ I grabbed a few new fields but haven't patched back to GRCh37 yet
-            TODO: remove this and if statements in variant_details.html once issue #231 is completed """
-        extended_fields = ["gnomad2_liftover_af", "gnomad_ac", "gnomad_an", "gnomad_popmax_ac",
-                           "gnomad_popmax_an", "gnomad_popmax_hom_alt"]
-        return any(getattr(self, f) is not None for f in extended_fields)
-
-    @property
     def gnomad4_or_later(self) -> bool:
         return self.version.gnomad_major_version >= 4
 
     @property
     def has_hemi(self):
         return self.gnomad4_or_later and self.variant.locus.contig.name == 'X'
-
-    @property
-    def has_mid(self):
-        return self.gnomad4_or_later
 
     @property
     def gnomad_url(self):
