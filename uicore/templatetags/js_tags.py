@@ -91,7 +91,7 @@ def limit_length(text, limit=100):
 @register.inclusion_tag("uicore/tags/limit_length_with_tooltip.html")
 def limit_length_with_tooltip(text, limit=100):
     tooltip = ""
-    if limit and len(text) > limit:
+    if limit and text and len(text) > limit:
         tooltip = text
         text = text[0:(limit-3)] + '...'
     return {"tooltip": tooltip, "text": text}
