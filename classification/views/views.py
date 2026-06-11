@@ -740,8 +740,7 @@ class CreateClassificationForVariantView(TemplateView):
             raise ValueError(msg)
 
         genome_build = self._get_genome_build()
-        vts = VariantTranscriptSelections(variant, genome_build,
-                                          hide_other_annotation_consortium_transcripts=False)
+        vts = VariantTranscriptSelections(variant, genome_build)
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
         consensuses = ClassificationConsensus.all_consensus_candidates(allele=variant.allele, user=self.request.user)
