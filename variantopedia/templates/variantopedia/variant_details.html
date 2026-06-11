@@ -423,6 +423,12 @@ $(document).ready(function() {
         formatField($("#dbsnp_rs_id"), formatDBSNP);
     }
 
+    $('.search-terms-toggle').click(function() {
+        let container = $(this).parent();
+        container.find('.search-terms-short, .search-terms-full').toggle();
+        $(this).text(container.find('.search-terms-full').is(':visible') ? 'show less' : 'show all');
+    });
+
     // load hardcoded values through
     applyVariantValues();
 });
@@ -1031,7 +1037,8 @@ function applyVariantValues() {
                         {% labelled id='search_terms' label='Search Terms' hint="tiny" %}
                             {% with search_term=variant_annotation.get_search_terms %}
                                 {% if search_term %}
-                                    <a target="_blank" class='hover-link' href="http://google.com/search?q={{search_term}}">{{ search_term }}</a>
+                                    <a target="_blank" class='hover-link' href="http://google.com/search?q={{search_term}}"><span class="search-terms-short">{{ search_term|truncatechars:30 }}</span><span class="search-terms-full" style="display: none">{{ search_term }}</span></a>
+                                    {% if search_term|length > 30 %}<a href="javascript:void(0)" class="search-terms-toggle small text-secondary">show all</a>{% endif %}
                                 {% endif %}
                             {% endwith %}
                         {% endlabelled %}
@@ -1039,7 +1046,8 @@ function applyVariantValues() {
                             {% labelled id='pubmed_search_terms' label='PubMed Search' hint="tiny" %}
                                 {% with pubmed_search_term=variant_annotation.get_pubmed_search_terms %}
                                     {% if pubmed_search_term %}
-                                        <a target="_blank" class='hover-link' href="https://pubmed.ncbi.nlm.nih.gov/?term={{pubmed_search_term}}">{{ pubmed_search_term }}</a>
+                                        <a target="_blank" class='hover-link' href="https://pubmed.ncbi.nlm.nih.gov/?term={{pubmed_search_term}}"><span class="search-terms-short">{{ pubmed_search_term|truncatechars:30 }}</span><span class="search-terms-full" style="display: none">{{ pubmed_search_term }}</span></a>
+                                        {% if pubmed_search_term|length > 30 %}<a href="javascript:void(0)" class="search-terms-toggle small text-secondary">show all</a>{% endif %}
                                     {% endif %}
                                 {% endwith %}
                             {% endlabelled %}
