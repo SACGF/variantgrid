@@ -235,8 +235,11 @@ VCF_IMPORT_COMMON_FILTERS = {
         "clinical_significance_max": "3",
     },
     "GRCh38": {
-        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.0_GRCh38_af_greater_than_5.stripped.vcf.gz",
-        "gnomad_version": "4.0",
+        # Intersection of gnomAD 4.0 and 4.1 AF>5 so the common partition is valid (skippable) under either
+        # version - @see issue #1582. "additional_gnomad_versions" lists the extra versions beyond "gnomad_version".
+        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.0_and_4.1_GRCh38_af_greater_than_5.intersection.stripped.vcf.gz",
+        "gnomad_version": "4.1",
+        "additional_gnomad_versions": ["4.0"],
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
     },
