@@ -998,20 +998,13 @@ def all_variant_grid_column_ids() -> frozenset[str]:
     return frozenset(vgc for c in VEP_COLUMNS for vgc in c.variant_grid_columns)
 
 
-GNOMAD_VEP_CUSTOMS: frozenset[VEPCustom] = frozenset({
-    VEPCustom.GNOMAD_2, VEPCustom.GNOMAD_3, VEPCustom.GNOMAD_4,
-    VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME,
-})
-
-
-def gnomad_columns_for(**kwargs) -> frozenset[str]:
-    """ VariantGrid gnomAD column names populated for the given build / pipeline / version
-        (see `filter_for` for the kwargs). The variant detail page drives its gnomAD show/hide
-        off this, so the display can't drift from what annotation actually wrote - e.g. a
-        structural variant has no PopMax AC column, so it's absent here and the row hides (#1148). """
+def visible_columns_for(**kwargs) -> frozenset[str]:
+    """ All VariantGrid column names populated for the given build / pipeline / version / data files
+        (see `filter_for` for the kwargs - pass `vep_config` so missing data files drop their columns).
+        The variant detail page drives per-row show/hide off this (via `labelled visible_fields=`) so the
+        display can't drift from what annotation actually wrote (#1148). """
     return frozenset(
         vgc
         for c in filter_for(**kwargs)
-        if c.vep_custom in GNOMAD_VEP_CUSTOMS
         for vgc in c.variant_grid_columns
     )

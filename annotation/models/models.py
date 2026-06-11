@@ -30,7 +30,8 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     AlphaMissensePrediction, ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.repeat_masker import RepeatMaskerSummary
-from annotation.vep_columns import gnomad_columns_for
+from annotation.vep_columns import visible_columns_for
+from annotation.vep_config import VEPConfig
 from annotation.models.models_enums import AnnotationStatus, \
     ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
@@ -1613,11 +1614,14 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return bool(self.gnomad_af or self.gnomad2_liftover_af)
 
     @cached_property
-    def gnomad_columns(self) -> frozenset[str]:
-        """ gnomAD VariantGrid columns populated for this annotation's build / pipeline / version.
-            Drives the variant detail gnomAD show/hide (via `labelled visible_fields=`) off the same
-            VEP_COLUMNS table that controls what annotation writes, so the two can't drift (#1148). """
-        return gnomad_columns_for(
+    def visible_columns(self) -> frozenset[str]:
+        """ All VariantGrid columns populated for this annotation's build / pipeline / version / data files.
+            Drives variant detail per-row show/hide (via `labelled visible_fields=`) off the same VEP_COLUMNS
+            table that controls what annotation writes, so the two can't drift (#1148). Passing `vep_config`
+            drops columns whose data file isn't configured - matching the `VariantAnnotationVersion.has_*`
+            flags (e.g. PhastCons/PhyloP mammalian tracks). """
+        return visible_columns_for(
+            vep_config=VEPConfig(self.version.genome_build),
             genome_build_name=self.version.genome_build.name,
             pipeline_type=self.annotation_run.pipeline_type,
             columns_version=self.version.columns_version,
