@@ -8,14 +8,14 @@ from variantgrid.settings.env.shariantcommon import *  # pylint: disable=wildcar
 
 # import all the base settings #
 SITE_ID = 9
-SITE_NAME = "Shariant Shariant"
+SITE_NAME = "Security Shariant"
 SITE_MESSAGE = "This is the security testing version of Shariant. Please avoid sharing real data in this environment."
 SLACK['emoji'] = ':cop:'
 
 # OIDC SETTINGS
 OIDC_RP_CLIENT_ID = 'shariant-security'
 OIDC_REQUIRED_GROUP = '/variantgrid/shariant_security'
-LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fdemo.shariant.org.au'
+LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Ftest2.shariant.org.au'
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'demo_annotation_scratch')
 
