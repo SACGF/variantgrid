@@ -484,6 +484,7 @@ class SettingsOverrideForm(BaseModelForm):
             "allele_origin_exclude_filter": "Allele Origin (filter by default)",
             "grid_sample_label_template": "Grid Sample Label Template",
             "initially_show_zygosity_table": "Initially Show Trio/Quad Zygosity Table",
+            "node_grid_auto_load_max_variants": "Node Grid Auto Load Max Variants",
         }
 
     def __init__(self, *args, **kwargs):
@@ -538,6 +539,7 @@ class SettingsOverrideForm(BaseModelForm):
             "show_candidates_cross_sample_classification":  settings_config.cross_sample_classification_enabled,
             "show_candidates_classification_evidence_update": settings_config.classification_evidence_update_enabled,
             "initially_show_zygosity_table": settings_config.analysis_enabled,
+            "node_grid_auto_load_max_variants": settings_config.analysis_enabled,
         }
 
         for f, visible in field_visibility.items():

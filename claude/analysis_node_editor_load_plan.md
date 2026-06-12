@@ -1,260 +1,314 @@
-# Always-snappy node editor (issue #51)
+# Defer expensive grid loads (issue #51)
 
-Goal: when the user clicks a node, show the editor form **immediately** so they
-can change settings (cohort, sample, filters, etc.) without waiting for the
-grid to load. The grid loads independently underneath.
+Goal: clicking a node should be **snappy** and must never auto-run an expensive
+variant query. People click merge nodes fed by 2× VCF samples with ~6M variants
+just to *edit* settings, and today that fires the full row query immediately,
+hammering the DB.
 
-This is a UI-layer change; the server-side scheduling/gating that already
-exists is preserved.
+The fix: **don't auto-load a node's variant rows when the node is large.** Show
+the node's (already-cached) count plus a "Load variants" button and a CSV
+download, and only run the row query when the user explicitly asks. Small nodes
+behave exactly as they do today.
 
-## Today's flow
+This subsumes the original "make the editor snappy" framing of #51: if the data
+doesn't auto-load, the editor is trivially instant. This is mostly a UI-layer
+change; the server-side scheduling/gating already in place is preserved.
 
-```
-click node
-  └─> loadNodeData(nodeId) ─ analysis.js:27
-        └─> loadGridAndEditorForNode(nodeId) ─ analysis.js:459
-              ├─ dataContainer.attr("node_url", load_node_url)  ─── new URL stamp
-              ├─ #node-editor-container.empty()                  ─── editor cleared
-              ├─ showLoadingOverlay()  ─ analysis.js:515         ─── *** overlay covers whole right-panel ***
-              └─ dataContainer.load(Urls.node_load(...))         ─── AJAX
+## The central mechanism: the grid already loads in two phases
 
-server: node_load (views.py:675)
-  ├─ NodeStatus.is_error  → renders node_errors.html
-  ├─ NodeStatus.is_ready  → renders node_data_grid.html  (grid <table> + script)
-  └─ otherwise            → renders node_async_wait.html (polls via messagePoller, re-fires
-                                                          loadNodeData when status flips to ready)
+`setupGrid` (grid.js:699) makes **two** requests, chained:
 
-node_data_grid.html docready:
-  ├─ load_node_editor(node_view_url)   ── AJAX into #node-editor-container
-  └─ setupGrid(...)                    ── jqgrid AJAX
+1. **Config** → `node_grid_config` (`NodeGridConfig`, views_grid.py). Returns the
+   jqGrid **colModel** + `postData` + caption. This is **cheap** — it builds
+   column definitions only; no variant query.
+2. **Data** → `node_grid_handler` (`NodeGridHandler.get` → `grid.get_data`). This
+   is the **expensive row query** — the thing that melts down on a 6M-variant
+   merge node.
 
-editor finishes:  finishedLoadingEditor() → registerComponent(unique_code, EDITOR, everythingLoaded)
-grid finishes:    gridComplete()        → registerComponent(unique_code, GRID)
-                                          ↓
-                  registerComponent (analysis_editor_and_grid.html:34) requires BOTH
-                  EDITOR + GRID, then runs all queued callbacks
-                                          ↓
-                  everythingLoaded()  → hideLoadingOverlay()
-```
+Today, `grid.jqGrid(data)` (grid.js:751) initialises the grid from the config
+and *immediately* triggers phase 2. **The whole feature is: stop auto-firing
+phase 2 for large nodes.** Load config, render a placeholder, and fire the data
+fetch only on demand.
 
-### Why the editor "feels slow"
+### Why this is clean
 
-- `showLoadingOverlay()` appends `#overlay-container` to `#right-panel`, which
-  contains both `#node-editor-container` and `#node-grid-container`.
-- The overlay isn't dismissed until `everythingLoaded`, which fires only after
-  *both* EDITOR and GRID have registered.
-- The editor HTML usually comes back much faster than the grid (the grid view
-  triggers Celery-driven node updates and waits on them via `node_async_wait`),
-  so the editor is sitting fully rendered behind the overlay.
+- **The count is free.** `node.count` is an `IntegerField` (analysis_node.py:94)
+  populated by the Celery node-update pass, entirely independent of the grid. So
+  we can render *"6,000,000 variants — click to load"* without running anything.
+  The headline number costs nothing.
+- **FilterNode keeps working.** `filternode_editor.html:12-25` reparents
+  jqGrid's `searchGrid` dialog into the editor form — but that dialog is built
+  from the **colModel** (phase 1), not the row data (phase 2). As long as we
+  still fetch config, the filter-builder UI works with zero expensive query.
+  This also dissolves the race condition the issue itself describes (editor
+  waiting on the grid): the editor only ever needed the cheap config.
+- **CSV/VCF export already exists and only needs config.** `export_grid`
+  (grid.js:5) builds its download URL from `grid.jqGrid('getGridParam',
+  'postData')` — which comes from the config, not the data fetch — and hits
+  `node_grid_export` (async via `CachedGeneratedFile`). So "a CSV you can
+  download" is already built; it just needs surfacing in the placeholder.
 
-### Server-side "gate" (the dedup story you remembered)
+## Decision: threshold auto-load
 
-Three layers cooperate so duplicate clicks don't run duplicate work:
+A node auto-loads its rows when `node.count` is below a configurable threshold;
+otherwise it shows the placeholder. Small nodes feel exactly like today; only the
+heavy ones require a click. The threshold applies **uniformly to all node types**
+(including tag/selection nodes — nobody clicks 50k checkboxes, so they're
+effectively always under the threshold anyway).
 
-1. **Celery task scheduling** — `NodeTask` (analysis_node.py:1110) has
-   `unique_together = (node, version)`. `analysis_update_tasks.py:71` does a
-   `bulk_create(..., ignore_conflicts=True)`, so a second scheduling attempt
-   for the same (node, version) is silently dropped.
+- `node.count < threshold` → behave as today (config → data, auto).
+- `node.count >= threshold`, **or `node.count is None`** (not yet computed) →
+  render placeholder, load **config only**, defer the data fetch to a button.
+- **Already loaded this session** → auto-load regardless of count (see "Session
+  re-display" below): the result is in the page cache, so re-showing is instant.
 
-2. **`node_load`** itself is `@never_cache` and idempotent: it inspects current
-   status and redirects to one of three child templates. `node_async_wait` then
-   registers a one-shot `messagePoller.observe_node(id, "ready")`; when the
-   node flips to ready it calls `loadNodeData(id)` again, which the server
-   now redirects to `node_data_grid`. The poll callback also guards re-entry:
-   only re-fires if `node_id == getLoadedNodeId()`.
+The decision is made **server-side** in `node_data_grid.html`, which is rendered
+with `node` in context — so `node.count` is known at render time and no extra
+round-trip is needed.
 
-3. **`NodeGridHandler.get`** (the heavy grid-data endpoint) — *this* is the
-   per-request gate the user remembers:
+### Threshold = cascading setting (Global → Org → Lab → User)
 
-```python
-@method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
-class NodeGridHandler(NodeJSONViewMixin):
-    def get(self, request, *args, **kwargs):
-        """ This can be a really expensive operation (ie a few mins)
-            And users can sometimes click multiple times, causing the DB to get
-            slow running the same query multiple times, interfering with itself
-            — so make a per-user lock, and redirect any further calls which
-            should hopefully hit the cache next time
-        """
-        LOCK_EXPIRE = 60 * 10
-        node = self._get_node(request)
-        url = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
-        url = _add_allowed_node_grid_params(url, request.GET.dict())
-        lock_id = sha256sum_str(f"{url}_{request.user}")
-        if cache.add(lock_id, "true", LOCK_EXPIRE):
-            try:
-                response = self.get_response(request, *args, **kwargs)
-            finally:
-                cache.delete(lock_id)
-        else:
-            time.sleep(2)
-            response = HttpResponseRedirect(url)
-        return response
-```
+The threshold is a **cascading user setting**, not just a global constant, so a
+lab or individual user can tune it. This reuses the existing `SettingsOverride`
+cascade (snpdb/models_user_settings.py:149) — Global → Org → Lab → User, where
+later non-null levels override earlier ones.
 
-Per-(user, URL+params) `cache.add` lock. The first caller computes; concurrent
-callers sleep 2s then redirect to the same URL, which is `cache_page(WEEK_SECS)`
-+ `vary_on_cookie` — so by then the response is in the page cache and the
-redirect resolves instantly without re-running the query. Hence: the grid AJAX
-"only runs once" even if you spam clicks; further clicks land on the cache.
+1. Add a nullable field to `SettingsOverride`:
 
-So "make one request, redirect when ready" is really:
-**Celery dedup at the scheduling layer + status polling for the page render +
-per-user lock-then-cache for the grid AJAX**. Cancelling celery tasks for
-nodes the user clicked away from is unnecessary — the existing task finishes,
-its result populates `cache_page`, and the next visit is free.
+   ```python
+   node_grid_auto_load_max_variants = models.IntegerField(
+       null=True, blank=True,
+       help_text="Analysis nodes with at least this many variants don't auto-load "
+                 "their grid — the user clicks 'Load variants' to run the row query. "
+                 "Blank inherits the next level up.")
+   ```
+   (DB migration; field is inherited by `GlobalSettings`,
+   `OrganizationUserSettingsOverride`, `LabUserSettingsOverride`,
+   `UserSettingsOverride` automatically.)
+
+2. Add `node_grid_auto_load_max_variants: Optional[int]` to the `UserSettings`
+   dataclass annotations (models_user_settings.py:357) so
+   `dataclasses.fields(UserSettings)` picks it up — the `get_for` merge
+   (line 447-459) then cascades it with no further code.
+
+3. **Code default** still lives in `default_settings.py` as the ultimate
+   fallback when the whole cascade is null:
+
+   ```python
+   # Fallback when no Global/Org/Lab/User override is set. None = always auto-load.
+   ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000
+   ```
+
+   Resolution: `UserSettings.get_for_user(user).node_grid_auto_load_max_variants`
+   `or settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS`.
+
+4. The new field needs adding to whichever settings forms list fields explicitly
+   (Global/Org/Lab/User settings forms in `snpdb/forms.py` + their templates) so
+   it's editable in the UI.
+
+### Session re-display (already-loaded nodes)
+
+If the user already loaded a large node's grid this session, re-show it
+automatically rather than re-prompting — the row query result is in the
+`cache_page` server cache, so it returns instantly. Track loaded
+`(node, version)` client-side in the analysis window and let it force auto-load:
+
+- On a successful data load, `gridComplete` records the node-version:
+  `getAnalysisWindow().loadedGridVersions[node_id] = node_version`.
+- In `node_data_grid.html` docready, before deciding to defer, check that set —
+  if this `(node_id, node_version)` is present, treat as auto-load even when
+  `count >= threshold`.
+
+Editing a node bumps its `version`, so an edited node is a genuinely new query
+(new cache key) → not in the set → placeholder again, which is correct.
+
+## Why we don't also need to cancel previous Celery jobs
+
+The issue floats terminating previous jobs. Not needed — three layers already
+dedup, and with deferral the expensive query mostly doesn't run at all:
+
+1. **Celery scheduling** — `NodeTask` has `unique_together = (node, version)`
+   and is created via `bulk_create(..., ignore_conflicts=True)`, so duplicate
+   scheduling for the same `(node, version)` is silently dropped.
+2. **`node_load`** (`@never_cache`) is idempotent: it inspects status and
+   redirects to `node_data_grid` / `node_async_wait` / `node_errors`.
+3. **`NodeGridHandler.get`** takes a per-`(user, URL+params)` `cache.add` lock
+   (views_grid.py:54-82); concurrent callers sleep 2s and redirect to the same
+   URL, which is `cache_page(WEEK_SECS) + vary_on_cookie` — so the redirect
+   resolves from cache. It's also wrapped in `major_operation(user,
+   "node_grid")` to cap concurrent expensive queries per user. Spam-clicks don't
+   multiply DB work.
+
+So "finish the existing task, cache it, next visit is free" already holds — and
+deferral means we usually never start the heavy query in the first place.
 
 ## Proposed change
 
-Single principle: **the editor is its own loading lane, independent of the grid.**
+### 1. Setting
 
-### 1. Scope the loading overlay to the grid area only
+Add the cascading `node_grid_auto_load_max_variants` field + the
+`ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS` code default (see "Threshold =
+cascading setting" above). In the `node_data_grid` view compute `grid_auto_load`
+server-side:
 
-`analysis.js`, `showLoadingOverlay`:
-
-```diff
- function showLoadingOverlay() {
-     const oc = $("#overlay-container");
-     if (!oc.is(":visible")) {
--        // Move to right-panel (with top z-order), then things can load underneath.
--        oc.appendTo("#right-panel");
-+        // Cover only the grid — editor renders independently and is
-+        // interactive while the grid is still loading.
-+        oc.appendTo("#node-grid-container");
-         oc.show();
-         …
+```python
+max_variants = (UserSettings.get_for_user(request.user).node_grid_auto_load_max_variants
+                or settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS)
+grid_auto_load = (max_variants is None) or (node.count is not None and node.count < max_variants)
 ```
 
-`#node-grid-container` already exists (analysis_editor_and_grid.html:94) and
-sits to the right/below of `#node-editor-container`, so positioning the
-overlay's CSS (`top:0; bottom:0; left:0; right:0;`) within it covers the right
-panel grid only.
+(The session-re-display override is applied client-side in the template, since
+that state lives in the analysis window.)
 
-### 2. Drop "wait for grid" from editor activation
+### 2. `node_data_grid.html` — branch on `grid_auto_load`
 
-Currently `everythingLoaded` (analysis.js:546) is what dismisses the overlay,
-and it requires both EDITOR and GRID. We change the *meaning* of the registry:
+Today (node_data_grid.html:60-69) the docready unconditionally calls
+`setupGrid(...)`, which loads config then data. Split into:
 
-- Editor render is no longer gated on the grid.
-- The registry is kept **only** for components that genuinely need cross-wiring
-  (FilterNode connecting its editor to the grid).
+- **Always** load the editor (`load_node_editor`) and the grid **config** (so
+  colModel exists → FilterNode + CSV/VCF work).
+- **Conditionally** fetch data:
+  - `grid_auto_load` true (or this node-version already loaded this session) →
+    fetch immediately (as today).
+  - otherwise → render the placeholder block; wire the **Show Grid** button to
+    fire the data fetch on click.
 
 ```diff
- function finishedLoadingEditor(node_id, version_id) {
--    const everythingLoaded = function () {
--        hideLoadingOverlay();
--    };
--
-     const unique_code = node_id + "_" + version_id; // make sure only attach editor to grid that requested
--    registerComponent(unique_code, EDITOR, everythingLoaded);
-+    registerComponent(unique_code, EDITOR);
- }
+ $(document).ready(function() {
+     const node_view_url = "{% url 'node_view' ... %}";
+-    load_node_editor(node_view_url);
++    const unique_code = "{{ node_id }}_{{ node_version }}";
++    load_node_editor(node_view_url, unique_code);
+
+     const grid_url = "{% url 'node_grid_config' ... %}";
+-    const unique_code = "{{ node_id }}_{{ node_version }}";
+-    setupGrid(grid_url, {{ analysis_id }}, {{ node_id }}, {{ node_version }}, unique_code, gridComplete, gridLoadError, on_error_function);
++    // Re-show instantly if this exact node-version was already loaded this session (page cache hit).
++    const aWin = getAnalysisWindow();
++    aWin.loadedGridVersions = aWin.loadedGridVersions || {};
++    const alreadyLoaded = aWin.loadedGridVersions[{{ node_id }}] === {{ node_version }};
++    const autoLoad = {{ grid_auto_load|yesno:"true,false" }} || alreadyLoaded;
++    setupGrid(grid_url, {{ analysis_id }}, {{ node_id }}, {{ node_version }}, unique_code,
++              gridComplete, gridLoadError, on_error_function, autoLoad);
++    if (!autoLoad) {
++        $("#load-variants-{{ node_id }}").click(function() {
++            $("#grid-placeholder-{{ node_id }}").hide();
++            loadNodeGridData({{ node_id }}, unique_code);  // fires deferred phase 2
++        });
++    }
+ });
 ```
 
-And the overlay is dismissed when the **grid** finishes loading:
-
-`node_data_grid.html`:
+And `gridComplete` records the load so a later revisit re-shows automatically:
 
 ```diff
  function gridComplete() {
-     …
      const unique_code = "{{ node_id }}_{{ node_version }}";
--    registerComponent(unique_code, GRID);
-+    registerComponent(unique_code, GRID);
-+    hideLoadingOverlay();
+     if ($("#" + unique_code, "#node-data-container").length === 0) { return; }
+     ...
+     registerComponent(unique_code, GRID);
++    const aWin = getAnalysisWindow();
++    aWin.loadedGridVersions = aWin.loadedGridVersions || {};
++    aWin.loadedGridVersions[{{ node_id }}] = {{ node_version }};
  }
 ```
 
-`grid.js` also calls `gridLoadError` on failure — push `hideLoadingOverlay()`
-into that callback too, so a grid error doesn't leave a permanent overlay.
+**Placeholder UI — reuse the three existing icon buttons.** The patient
+phenotype toolbar (`patients/templates/patients/tags/phenotype_entry_tag.html:357-363`)
+already has exactly this trio — a "Show Grid" icon plus CSV/VCF download icons —
+backed by CSS in `global.css` (`.show-grid-icon` :2371, `.csv-icon` :2261,
+`.vcf-icon` :2265). Reuse those classes rather than new buttons; CSV/VCF reuse
+the node grid's existing `export_grid()` (which only needs `postData` from the
+config, so it works with no rows loaded):
 
-### 3. Keep registry for FilterNode wiring
-
-`filternode_editor.html:64` uses `registerComponent(EDITOR, connectFilterNodeEditorToGrid)`
-to defer DOM wiring until the grid table exists. That continues to work as-is
-because `registerComponent` still fires queued callbacks when both components
-register.
-
-We do need to make sure the FilterNode editor body shows a placeholder while
-waiting for the grid, so the user sees something:
-
-```diff
- <div id="FilterNode-editor"></div>
-+<div id="FilterNode-editor-loading">Loading filters…</div>
- <div id="filter-messages"></div>
+```html
+{% if not grid_auto_load %}
+<div id="grid-placeholder-{{ node_id }}" class="node-grid-placeholder">
+    <p>{{ node.count|default:"?" }} variants — not loaded.</p>
+    <a id="load-variants-{{ node_id }}" title="Show Grid" href="javascript:void(0)">
+        <div class="show-grid-icon icon32"></div> Show grid
+    </a>
+    <a title="Download as CSV"
+       href="javascript:export_grid({{ analysis_id }}, {{ node_id }}, '{{ node_id }}_{{ node_version }}', 'csv')">
+        <div class="csv-icon icon32"></div> CSV
+    </a>
+    <a title="Download as VCF"
+       href="javascript:export_grid({{ analysis_id }}, {{ node_id }}, '{{ node_id }}_{{ node_version }}', 'vcf')">
+        <div class="vcf-icon icon32"></div> VCF
+    </a>
+</div>
+{% endif %}
 ```
 
-And inside `connectFilterNodeEditorToGrid`:
+(The `.icon32 .has-phenotypes-icon hidden` combo in the phenotype toolbar is its
+own show/hide logic; here we just want the static icon, so use the icon class +
+`icon32` without `hidden`.)
+
+### 3. `grid.js` — split config-load from data-fetch
+
+`setupGrid` gains an `autoLoad` arg (default `true` to preserve other callers).
+Initialise the grid from config either way; defer the row fetch via jqGrid's
+`datatype: 'local'`, then flip to the server datatype and `reloadGrid` to fire
+phase 2 on demand.
 
 ```diff
- if (grid && grid.length > 0) {
-+    $("#FilterNode-editor-loading").hide();
-     // Make search always appear
-     …
+-function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridComplete, gridLoadError, on_error_function) {
++function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridComplete, gridLoadError, on_error_function, autoLoad) {
++    if (typeof autoLoad === "undefined") { autoLoad = true; }
+     $(function () {
+         $.getJSON(config_url, function(data) {
+             ...
++            // Remember the server datatype so a deferred load can flip back to it.
++            window.nodeGridServerDatatype = window.nodeGridServerDatatype || {};
++            window.nodeGridServerDatatype[nodeId] = data["datatype"] || "json";
++            if (!autoLoad) {
++                data["datatype"] = "local";  // build colModel/pager/nav, fetch no rows
++            }
+             const grid = getGrid(nodeId, unique_code);
+             grid.jqGrid(data).navGrid(...);
+             ...  // CSV / VCF / canonical-transcript nav buttons still added (need only postData)
+         });
+     });
  }
++
++// Fire the deferred row query (phase 2) for a node whose grid was config-loaded only.
++function loadNodeGridData(nodeId, unique_code) {
++    const grid = getGrid(nodeId, unique_code);
++    const datatype = (window.nodeGridServerDatatype || {})[nodeId] || "json";
++    grid.jqGrid('setGridParam', {datatype: datatype}).trigger('reloadGrid');
++}
 ```
 
-The rest of the FilterNode editor (group operation toggle, save state) is
-already interactive immediately because it's part of the editor template —
-the only thing waiting is the search dialog injection.
+Notes:
+- `gridComplete` already fires after the data load and registers the GRID
+  component / restores selected-variant checkboxes — that still runs on the
+  deferred load. With `datatype: 'local'` and no local data, jqGrid does not run
+  `gridComplete` for the empty config-only init, so the GRID component isn't
+  registered until a real load. FilterNode's `connectFilterNodeEditorToGrid`
+  uses `searchGrid` (colModel only) and does **not** depend on `gridComplete`,
+  so it still wires up — confirm during implementation.
+- `gridLoadError` already calls `hideLoadingOverlay()` (grid.js) and clears the
+  container; unchanged.
 
-### 4. Form-save + dirty-state interaction
+### 4. Client-side stale-response guard (carried over from prior plan)
 
-When the user changes settings and submits the editor form:
-
-1. `ajaxForm` POSTs to `node_view` (UpdateView).
-2. `NodeView.form_valid` (node_view.py:65) sets `queryset_dirty = True` and
-   calls `update_analysis(...)` which schedules a new `NodeTask`.
-3. On success, the JS calls `reloadNodeAndData(node.pk)` which calls
-   `loadNodeData(node.pk)` → `loadGridAndEditorForNode(node.pk)` again.
-4. Server returns `node_async_wait` (status is now LOADING) → poll until ready
-   → re-fire load.
-
-If the user submits while a previous grid load is still in flight, the
-re-entry into `loadGridAndEditorForNode` already empties the editor container
-and replaces the data container, so old in-flight responses populating into
-the new container is the only race we need to worry about.
-
-### 5. Stale in-flight responses on node switch
-
-Given the server-side gate above (per-user lock + `cache_page`), spamming
-clicks doesn't multiply DB work — the second click sleeps then redirects into
-the cached response. The remaining concern is purely *client-side*: when the
-user clicks B while A's grid AJAX is still in flight, A's response will
-arrive after B's containers have been swapped in.
-
-What actually happens today:
-
-- `load_node_editor` (`base_node_data.html:47`) injects HTML into
-  `#node-editor-container`. If A's response arrives *after* B has loaded, it
-  overwrites B's editor. ⚠️
-- `setupGrid` populates `#grid-{node_id}` *inside* `#{node_id}_{node_version}`
-  (a uniquely-scoped subtree). When A's data container subtree is replaced
-  by B's, the orphan `<table>` is gone from the DOM — jqgrid operating on a
-  detached element is harmless (no visible UI effect).
-- `gridComplete` calls `registerComponent(unique_code, GRID)` and (after this
-  change) `hideLoadingOverlay()`. If A fires after B started, A's callback
-  could prematurely hide the overlay for B. ⚠️
-
-So the correctness fix is small and scoped:
+When the user clicks B while A's editor/data AJAX is in flight, A's late
+response can clobber B. The server-side dedup covers DB cost; this is purely a
+DOM concern. Drop stale responses by checking the unique-code marker still
+exists:
 
 ```diff
  // base_node_data.html
 -function load_node_editor(node_edit_url) {
--    $("#node-editor-container").empty();
--    $.ajax(node_edit_url, {
--        success: function(html) { $("#node-editor-container").html(html); },
 +function load_node_editor(node_edit_url, unique_code) {
-+    $("#node-editor-container").empty();
-+    $.ajax(node_edit_url, {
+     $("#node-editor-container").empty();
+     $.ajax(node_edit_url, {
+-        success: function(html) { $("#node-editor-container").html(html); },
 +        success: function(html) {
-+            // Drop response if user navigated to a different node.
-+            if ($("#" + unique_code, "#node-data-container").length === 0) {
-+                return;
-+            }
++            if ($("#" + unique_code, "#node-data-container").length === 0) { return; }
 +            $("#node-editor-container").html(html);
 +        },
-         …
+         ...
 ```
 
 ```diff
@@ -264,74 +318,96 @@ So the correctness fix is small and scoped:
 +    if ($("#" + unique_code, "#node-data-container").length === 0) {
 +        return;  // user navigated away; ignore stale callback
 +    }
-     …
+     ...
      registerComponent(unique_code, GRID);
-+    hideLoadingOverlay();
  }
 ```
 
-Both checks rely on the unique-code DOM marker that `node_data_grid.html`
-already emits (`<div id="{{ node_id }}_{{ node_version }}">…</div>`).
-
 ## Diff summary by file
 
-- `variantgrid/static_files/default_static/js/analysis.js`
-  - `showLoadingOverlay()` → append to `#node-grid-container` instead of
-    `#right-panel`.
-  - `finishedLoadingEditor()` → drop `everythingLoaded` gating of overlay.
+- `snpdb/models/models_user_settings.py`
+  - Add `node_grid_auto_load_max_variants` to `SettingsOverride`; add the
+    annotation to the `UserSettings` dataclass (cascade is automatic).
+- `snpdb/migrations/` — new migration for the field.
+- `snpdb/forms.py` (+ settings templates) — add the field to the Global/Org/Lab/
+  User settings forms that list fields explicitly.
+- `variantgrid/settings/components/default_settings.py`
+  - Add `ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000` (cascade fallback).
+- `analysis/views/views.py` (`node_data_grid` view)
+  - Compute `grid_auto_load` from the cascaded setting + `node.count`; add to
+    context.
 - `analysis/templates/analysis/node_data/node_data_grid.html`
-  - `gridComplete()` → call `hideLoadingOverlay()` directly; pass `unique_code`
-    to `load_node_editor`.
+  - Branch docready on `grid_auto_load` (+ session `loadedGridVersions`); render
+    placeholder with the reused Show-Grid / CSV / VCF icons; pass `autoLoad` to
+    `setupGrid`; pass `unique_code` to `load_node_editor`; record the load and
+    add the unique-code stale guard in `gridComplete`.
+- `variantgrid/static_files/default_static/js/grid.js`
+  - `setupGrid(..., autoLoad)`: init from config; `datatype:'local'` when
+    deferred. Add `loadNodeGridData(nodeId, unique_code)` to fire phase 2.
+- `variantgrid/static_files/default_static/css/global.css` (only if the
+  placeholder needs layout polish — the icon classes already exist).
 - `analysis/templates/analysis/node_data/base_node_data.html`
-  - `load_node_editor(url, unique_code)` → drop response if user navigated.
-  - In `gridLoadError` path (defined in calling templates), also call
-    `hideLoadingOverlay()`.
-- `analysis/templates/analysis/node_editors/filternode_editor.html`
-  - Add `Loading filters…` placeholder; hide it inside
-    `connectFilterNodeEditorToGrid`.
+  - `load_node_editor(url, unique_code)`: drop stale response.
 
-No server-side changes.
+One DB migration (the cascading-settings field). No change to `NodeGridHandler` /
+`NodeGridConfig` / `node_grid_export`.
 
 ## Edge cases / regressions to test
 
-- Click slow node → editor visible and interactive within ~100 ms.
-- Click slow node A → click slow node B while A loading → only B's editor +
-  grid render; no flash of A.
-- Click node, change cohort, submit → `reloadNodeAndData` triggers new wait
-  cycle; overlay reappears over grid only.
-- FilterNode click: editor headers/group-op visible immediately; search
-  dialog appears once grid loads; "Loading filters…" placeholder hidden then.
-- `cancelNodeLoad` button (lives in `#overlay-container`): still appears with
-  the overlay over the grid area; clicking still revokes the celery task.
-- Dual-screen mode (`secondWindow`): overlay lives in the grid+editor window;
-  `#node-grid-container` exists there too — verify path.
-- `node_errors` view (`base_node_data.html` parent): on error there is no
-  grid; `on_error_function` already calls `hideLoadingOverlay()` (line 10 of
-  base_node_data.html). Confirm the editor is still rendered (it is — error
-  path goes through `load_node_editor`).
-- Tag node (`ANALYSIS_TAGS_NODE_ID` via `viewTags()`): same path as a normal
-  node load; nothing special.
-- Read-only analysis (`set_form_read_only` in NodeView.get_form): editor
-  fields disabled; nothing about loading changes.
+- **Small node** (`count < threshold`): loads rows automatically, identical to
+  today.
+- **Large node** (`count >= threshold`): placeholder shows the count; editor is
+  fully interactive immediately; no row query runs until "Load variants".
+- **Load variants click**: fires the deferred query once; pager, sorting,
+  paging, selected-variant checkboxes all work afterwards.
+- **FilterNode** (any size): the `searchGrid` filter UI appears from colModel
+  with no row fetch; saving a filter still `reloadNodeAndData`s.
+- **CSV / VCF / canonical-transcript download** from the placeholder (no rows
+  loaded): `export_grid` builds the URL from `postData` and downloads. Verify
+  the export iterator runs the query server-side independent of the browser grid
+  state.
+- **`count is None`** (node never computed, or just edited → dirty): treated as
+  "large" → placeholder. After an edit + node-update cycle, `count` repopulates.
+- **Tag / selection node** (`ANALYSIS_TAGS_NODE_ID` via `viewTags()`): threshold
+  applies uniformly; in practice always under it (nobody tags 50k variants), so
+  it auto-loads as today.
+- **Session re-display**: load a large node (placeholder → click), switch to
+  another node, switch back → grid re-shows automatically (no placeholder),
+  served from the page cache. Edit the node → version bumps → placeholder again.
+- **Click A then B while A in flight**: only B's editor/grid render (stale
+  guard).
+- **Dual-screen mode** (`secondWindow`): placeholder + Load button live in the
+  grid window; verify the button handler resolves the right grid.
+- **Read-only analysis** (`set_form_read_only`): editor fields disabled; Load
+  variants + CSV still work (they're reads).
+- **`extra_filters`** (e.g. show damage predictions) re-enters
+  `node_data_grid`: re-evaluates `grid_auto_load`; same behaviour.
+- **Node errors path** (`node_errors.html`): no grid; unaffected.
 
-## Open questions
+## Resolved decisions
 
-1. **FilterNode body while grid loads.** The proposal shows a "Loading
-   filters…" placeholder. Alternative: render the search dialog skeleton
-   server-side from the colmodels we already have and have it be inert
-   until the grid AJAX returns. Worth the extra code, or is the placeholder
-   fine?
-2. **Cancel-load button placement.** With the overlay scoped to
-   `#node-grid-container`, the cancel button is anchored over the grid area.
-   Acceptable, or do you want it pinned to a fixed corner of the right panel
-   so it's reachable while the user is editing the form?
-3. **Stale-response gating.** §5 is now small (two `unique_code` checks)
-   given the server-side dedup already covers the expensive part. Land it
-   alongside §1–4, or only if observed?
-4. **Anything else relying on `everythingLoaded`?** I only see overlay
-   dismissal. Worth a final grep before I implement — e.g. confirm no plugin
-   or external skill hooks the registry's "both" callback path.
-5. **Test coverage.** This is JS UI behaviour — no Python tests would catch a
-   regression. Do you want a manual regression checklist baked into the PR
-   description, or would you accept a lightweight Selenium/Playwright smoke
-   test for "editor visible within X ms after click"?
+1. **Threshold** = cascading setting (Global → Org → Lab → User), default
+   `50_000`, reusing the `SettingsOverride` mechanism.
+2. **Tag/selection nodes** — threshold applies uniformly (no special-case).
+3. **Placeholder UI** — reuse the existing Show-Grid / CSV / VCF icon buttons
+   from the patient phenotype toolbar (`.show-grid-icon` / `.csv-icon` /
+   `.vcf-icon`).
+4. **Session re-display** — if a node-version was already loaded this session,
+   auto-load it again (page-cache hit, instant); editing bumps the version so it
+   re-defers.
+
+## Tests
+
+Worth adding (the rest is interactive JS, system-tested by hand):
+
+- **`grid_auto_load` computation** (`analysis` view/unit test): a node with
+  `count >= threshold` → `grid_auto_load` False and the rendered
+  `node_data_grid` contains the placeholder (`load-variants-<id>`) and no
+  auto data fetch; a node with `count < threshold` → True, no placeholder. Use a
+  fake node/analysis from the existing analysis test helpers; assert on the
+  template context and/or rendered HTML.
+- **Cascading setting resolution** (`snpdb` settings test): set the field at
+  Global vs Lab vs User levels and assert
+  `UserSettings.get_for_user(user).node_grid_auto_load_max_variants` returns the
+  most-specific non-null value, and falls back to
+  `settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS` when all are null.

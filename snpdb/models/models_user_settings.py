@@ -200,6 +200,11 @@ class SettingsOverride(models.Model):
 
     initially_show_zygosity_table = models.BooleanField(null=True, blank=True,
                                                          help_text="Initially expand the zygosity requirements table in Trio/Quad node editors")
+    node_grid_auto_load_max_variants = models.IntegerField(
+        null=True, blank=True,
+        help_text="Analysis nodes with at least this many variants don't auto-load "
+                  "their grid — the user clicks 'Load variants' to run the row query. "
+                  "Blank inherits the next level up.")
 
 
 class GlobalSettings(SettingsOverride):
@@ -377,6 +382,7 @@ class UserSettings:
     show_candidates_cross_sample_classification: bool
     show_candidates_classification_evidence_update: bool
     initially_show_zygosity_table: bool
+    node_grid_auto_load_max_variants: Optional[int]
 
     @staticmethod
     def parse_value(field_name: str, value: Any) -> Any:

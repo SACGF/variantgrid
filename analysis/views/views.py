@@ -528,13 +528,19 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         }
         return HttpResponseRedirect(reverse("node_load", kwargs=kwargs))
 
+    max_variants = (UserSettings.get_for_user(request.user).node_grid_auto_load_max_variants
+                    or settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS)
+    grid_auto_load = (max_variants is None) or (node.count is not None and node.count < max_variants)
+
     context = {
         "analysis_id": analysis_id,
         "analysis_version": analysis_version,
         "node_id": node_id,
         "node_version": node_version,
         "extra_filters": extra_filters,
-        "bams_dict": node.get_bams_dict()
+        "bams_dict": node.get_bams_dict(),
+        "node": node,
+        "grid_auto_load": grid_auto_load,
     }
     return render(request, 'analysis/node_data/node_data_grid.html', context)
 

@@ -363,6 +363,10 @@ ANALYSIS_NODE_CACHE_Q = True
 # single-parent nodes and MergeNode inputs. 0 disables the substitution.
 ANALYSIS_NODE_STORE_ID_SIZE_MAX = 1000
 ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
+# Fallback when no Global/Org/Lab/User override is set. None = always auto-load.
+# Analysis nodes with at least this many variants don't auto-load their grid - the user clicks
+# "Load variants" to run the row query.
+ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_SHOW_CANONICAL_HGVS = True
