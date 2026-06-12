@@ -151,11 +151,14 @@ class GridLoadingAnimation(models.TextChoices):
         Values are the menu ids - the front end (analysis.js) maps these to VGLoaders ids. """
     FLOWCELL = "flowcell", "Flowcell"
     RIPPLE = "ripple", "Ripple"
+    PILEUP = "pileup", "Pileup"
     MATRIX = "matrix", "Matrix"
 
 
 # Shown when a user hasn't chosen (loading_animations is null/empty)
-DEFAULT_GRID_LOADING_ANIMATIONS = [GridLoadingAnimation.FLOWCELL.value, GridLoadingAnimation.RIPPLE.value]
+DEFAULT_GRID_LOADING_ANIMATIONS = [GridLoadingAnimation.FLOWCELL.value,
+                                   GridLoadingAnimation.RIPPLE.value,
+                                   GridLoadingAnimation.PILEUP.value]
 
 
 class SettingsOverride(models.Model):

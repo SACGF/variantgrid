@@ -577,13 +577,13 @@ function showGridLoadingOverlay(container) {
     // background, over the overlay's white), picked at random. ANALYSIS_LOADING_ANIMATIONS holds the
     // user's menu ids; map them to VGLoaders ids here. Fall back to the double-helix if the loaders
     // aren't available.
-    const LOADER_IDS = {flowcell: "flowcell", ripple: "base-fx-ripple", matrix: "base-fx-matrix"};
+    const LOADER_IDS = {flowcell: "flowcell", ripple: "base-fx-ripple", pileup: "pileup", matrix: "base-fx-matrix"};
     let menu = [];
     if (typeof VGLoaders !== "undefined") {
         const prefs = (typeof ANALYSIS_LOADING_ANIMATIONS !== "undefined" && ANALYSIS_LOADING_ANIMATIONS) || [];
         menu = prefs.filter(a => LOADER_IDS[a]);
         if (!menu.length) {
-            menu = ["flowcell", "ripple"];  // safety default if prefs are empty/unknown
+            menu = ["flowcell", "ripple", "pileup"];  // safety default if prefs are empty/unknown
         }
     }
 
