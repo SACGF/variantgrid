@@ -475,12 +475,14 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
         }
 
         dataContainer.attr("node_url", load_node_url);
+        removeGridLoadingOverlay();  // tear down any in-progress grid overlay from the previous node
         $("#node-editor-container", gridAndEditorContainer).empty();
         showLoadingOverlay();
         dataContainer.load(load_node_url, function() {
             $(this).attr('node_id', nodeId);
         });
     } else {
+        removeGridLoadingOverlay();
         $("#node-editor-container", gridAndEditorContainer).html("Please select a node");
         dataContainer.empty();
     }
@@ -569,22 +571,59 @@ function showGridLoadingOverlay(container) {
     if (available > 200) {
         overlay.css("height", available + "px");
     }
-    const canvas = $("<canvas />", {class: 'node-load-animation'});
-    canvas.attr({width: 50, height: 180});
-    canvas.css('opacity', 0.35);
-    canvas.DoubleHelix({fps: 20, spinSpeed: 4});
-    overlay.append(canvas);
     $container.append(overlay);
+
+    // Randomly pick the loading animation: the classic double-helix, or one of the full-size DNA
+    // "reading" effects (ripple / Illumina) with dark-mode glyphs on a clear background (shows on
+    // the overlay's white). Fall back to the helix if the VGLoaders effects aren't present.
+    const choices = (typeof VGLoaders !== "undefined") ? ["ripple", "illumina"] : ["helix"];
+    const choice = choices[Math.floor(Math.random() * choices.length)];
+
+    if (choice === "helix") {
+        const canvas = $("<canvas />", {class: 'node-load-animation'});
+        canvas.attr({width: 50, height: 180});
+        canvas.css('opacity', 0.35);
+        canvas.DoubleHelix({fps: 20, spinSpeed: 4});
+        overlay.append(canvas);
+    } else {
+        const stage = $("<div>", {class: "grid-loading-stage"});
+        stage.css({position: "absolute", top: 0, left: 0, right: 0, bottom: 0});
+        overlay.append(stage);
+        const id = (choice === "ripple") ? "base-fx-ripple" : "illumina";
+        overlay.data("stopLoader", VGLoaders.start(id, stage[0], {theme: "dark", clearBackground: true}));
+    }
 }
 
 function hideGridLoadingOverlay() {
     // Fade out (like the original hideLoadingOverlay) so the loaded grid eases in rather than jumping.
-    $("#grid-loading-overlay").fadeOut(function() {
+    const overlay = $("#grid-loading-overlay");
+    const stopLoader = overlay.data("stopLoader");
+    overlay.fadeOut(function() {
+        if (typeof stopLoader === "function") {
+            stopLoader();  // stop the ripple/illumina animation
+        }
         $(this).find('canvas.node-load-animation').each(function() {
-            this.active = false;  // stop the helix animation before removing
+            this.active = false;  // stop the helix animation before removing (fallback)
         });
         $(this).remove();
     });
+}
+
+// Synchronous teardown (no fade) for when we abandon a load - e.g. switching to another node
+// before the grid finished. Stops the animation loop so it doesn't keep running detached.
+function removeGridLoadingOverlay() {
+    const overlay = $("#grid-loading-overlay");
+    if (!overlay.length) {
+        return;
+    }
+    const stopLoader = overlay.data("stopLoader");
+    if (typeof stopLoader === "function") {
+        stopLoader();  // cancel the ripple/illumina requestAnimationFrame
+    }
+    overlay.find('canvas.node-load-animation').each(function() {
+        this.active = false;  // stop the helix animation (fallback)
+    });
+    overlay.remove();
 }
 
 
