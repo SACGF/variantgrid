@@ -764,7 +764,7 @@ class CohortGenotype(models.Model):
         unique_together = ("collection", "variant")
 
 
-class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+class Trio(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
         and karyomapping """
     name = models.TextField(blank=True)
@@ -779,6 +779,18 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     @classmethod
     def get_permission_class(cls):
         return Cohort
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-people-roof"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "trios"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(identifier=str(self))
 
     def get_permission_object(self):
         # Trio permissions based on cohort
@@ -822,7 +834,7 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
         return self.name or f"Trio {self.pk}"
 
 
-class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+class Quad(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     """Mother + Father + Proband + Sibling.
 
     Extends the Trio concept to 4 family members. The sibling (typically
@@ -843,6 +855,18 @@ class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     @classmethod
     def get_permission_class(cls):
         return Cohort
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-people-roof"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "quads"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(identifier=str(self))
 
     def get_permission_object(self):
         return self.cohort
