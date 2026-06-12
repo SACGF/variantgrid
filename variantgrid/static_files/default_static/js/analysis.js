@@ -574,9 +574,9 @@ function showGridLoadingOverlay(container) {
     $container.append(overlay);
 
     // Randomly pick the loading animation: the classic double-helix, or one of the full-size DNA
-    // "reading" effects (ripple / Illumina) with dark-mode glyphs on a clear background (shows on
+    // "reading" effects (ripple / flowcell) with dark-mode glyphs on a clear background (shows on
     // the overlay's white). Fall back to the helix if the VGLoaders effects aren't present.
-    const choices = (typeof VGLoaders !== "undefined") ? ["ripple", "illumina"] : ["helix"];
+    const choices = (typeof VGLoaders !== "undefined") ? ["ripple", "flowcell"] : ["helix"];
     const choice = choices[Math.floor(Math.random() * choices.length)];
 
     if (choice === "helix") {
@@ -589,7 +589,7 @@ function showGridLoadingOverlay(container) {
         const stage = $("<div>", {class: "grid-loading-stage"});
         stage.css({position: "absolute", top: 0, left: 0, right: 0, bottom: 0});
         overlay.append(stage);
-        const id = (choice === "ripple") ? "base-fx-ripple" : "illumina";
+        const id = (choice === "ripple") ? "base-fx-ripple" : "flowcell";
         overlay.data("stopLoader", VGLoaders.start(id, stage[0], {theme: "dark", clearBackground: true}));
     }
 }
@@ -600,7 +600,7 @@ function hideGridLoadingOverlay() {
     const stopLoader = overlay.data("stopLoader");
     overlay.fadeOut(function() {
         if (typeof stopLoader === "function") {
-            stopLoader();  // stop the ripple/illumina animation
+            stopLoader();  // stop the ripple/flowcell animation
         }
         $(this).find('canvas.node-load-animation').each(function() {
             this.active = false;  // stop the helix animation before removing (fallback)
@@ -618,7 +618,7 @@ function removeGridLoadingOverlay() {
     }
     const stopLoader = overlay.data("stopLoader");
     if (typeof stopLoader === "function") {
-        stopLoader();  // cancel the ripple/illumina requestAnimationFrame
+        stopLoader();  // cancel the ripple/flowcell requestAnimationFrame
     }
     overlay.find('canvas.node-load-animation').each(function() {
         this.active = false;  // stop the helix animation (fallback)

@@ -1,15 +1,14 @@
 /*
- * Illumina Read loader - an Illumina-style readout. 4 channel rows (A/C/G/T):
- * a fluorescence dot lights in the base's row, coloured by Illumina's 2-channel
- * dye identities (C red, T green, A red+green amber, G no dye / dim). A 5th row
- * is the base call, resolving N -> base to match the lit channel.
- * Adapted from claude/loading_animations/illumina-loader.html.
+ * Flowcell Read loader - a sequencing flowcell readout. 4 channel rows (A/C/G/T):
+ * a fluorescence dot lights in the base's row, coloured by a 2-channel dye scheme
+ * (C red, T green, A red+green amber, G no dye / dim). A 5th row is the base call,
+ * resolving N -> base to match the lit channel.
  */
 (function () {
     "use strict";
 
-    VGLoaders.register("illumina", {
-        label: "Illumina Read",
+    VGLoaders.register("flowcell", {
+        label: "Flowcell Read",
         start: function (container, opts) {
             const SEQ = "ACGTTGCAAGTCCGATAGGCTTACAGGTCATGCCAATGGTCAGATCCGTTAACGGCATTGACGTACCTGAA";
             const CH = "ACGT", FS = 18;
