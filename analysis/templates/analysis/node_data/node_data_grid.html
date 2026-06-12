@@ -1,5 +1,6 @@
 {% extends "analysis/node_data/base_node_data.html" %}
 {% load js_tags %}
+{% load humanize %}
 {% block css %}
 .node-grid-placeholder { padding: 12px; }
 .node-grid-placeholder .placeholder-buttons { display: flex; flex-direction: row; align-items: center; gap: 24px; }
@@ -63,12 +64,8 @@ function gridComplete() {
         aWin.loadedGridVersions = aWin.loadedGridVersions || {};
         aWin.loadedGridVersions[{{ node_id }}] = {{ node_version }};
 
-        // Clear the loading overlay we put up when the user clicked "Show grid".
-        const deferredGridLoad = window.deferredGridLoad || {};
-        if (deferredGridLoad[{{ node_id }}]) {
-            delete deferredGridLoad[{{ node_id }}];
-            hideLoadingOverlay();
-        }
+        // Clear the grid-only overlay we put up when the user clicked "Show grid" (no-op otherwise).
+        hideGridLoadingOverlay();
     }
 }
 
@@ -107,9 +104,8 @@ $(document).ready(function() {
         $("#load-variants-{{ node_id }}").click(function() {
             $("#grid-placeholder-{{ node_id }}").hide();
             $("#node-data-grid", "#" + unique_code).show();
-            window.deferredGridLoad = window.deferredGridLoad || {};
-            window.deferredGridLoad[{{ node_id }}] = true;
-            showLoadingOverlay();  // double-helix over the grid area while phase 2 runs
+            // Double-helix over just the grid section (editor stays usable) while phase 2 runs.
+            showGridLoadingOverlay("#node-grid-container");
             loadNodeGridData({{ node_id }}, unique_code);  // fires deferred phase 2
         });
     }
@@ -118,7 +114,7 @@ $(document).ready(function() {
 <div id="{{ node_id }}_{{ node_version }}">
 	{% if not grid_auto_load %}
 	<div id="grid-placeholder-{{ node_id }}" class="node-grid-placeholder">
-		<p>{{ node.count|default:"?" }} variants — not loaded.</p>
+		<p>Node contains {{ node.count|default_if_none:"?"|intcomma }} variants, grid auto-loads under {{ grid_auto_load_max_variants_display }} variants (change this in <a href="{% url 'view_user_settings' %}" target="_blank">user settings</a>)</p>
 		<div class="placeholder-buttons">
 			<a id="load-variants-{{ node_id }}" title="Show Grid" href="javascript:void(0)">
 				<div class="show-grid-icon icon32"></div> Show grid

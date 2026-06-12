@@ -833,5 +833,8 @@ function gridLoadError(jqXHR, textStatus, errorThrown) {
     ec.html("<ul class='messages'><li class='error'>Grid failed to load due to: " + errorMessage + "</li></ul>");
     $("#node-data-container").empty();
     hideLoadingOverlay();
+    if (typeof hideGridLoadingOverlay === 'function') {
+        hideGridLoadingOverlay();  // clear the grid-only overlay from a deferred "Show grid" load
+    }
 }
 

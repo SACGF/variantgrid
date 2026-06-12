@@ -543,6 +543,51 @@ function hideLoadingOverlay() {
 }
 
 
+// Loading overlay scoped to a single container (e.g. the grid section) so the rest of the node
+// (the editor) stays visible and usable. Builds its own double-helix inside the container rather
+// than reparenting the shared #overlay-container - which flashed over the whole panel before
+// snapping into place.
+function showGridLoadingOverlay(container) {
+    if ($("#grid-loading-overlay").length) {
+        return;
+    }
+    const $container = $(container);
+    // Guarantee the container is the positioning context so the absolute overlay fills only it
+    // (not a wider ancestor like #right-panel), and that it has room for the helix even when the
+    // grid is still empty mid-load. Don't rely on the CSS rule alone - the panel HTML can be
+    // served from browser cache without it.
+    if ($container.css("position") === "static") {
+        $container.css("position", "relative");
+    }
+    if ($container.height() < 200) {
+        $container.css("min-height", "200px");
+    }
+    const overlay = $("<div>", {id: "grid-loading-overlay"});
+    // Pin the overlay to the visible grid area (panel height minus the editor above it). A fixed
+    // height keeps the centred helix from jumping down as rows load and the container grows.
+    const available = $("#right-panel").height() - $("#node-editor-container").outerHeight(true);
+    if (available > 200) {
+        overlay.css("height", available + "px");
+    }
+    const canvas = $("<canvas />", {class: 'node-load-animation'});
+    canvas.attr({width: 50, height: 180});
+    canvas.css('opacity', 0.35);
+    canvas.DoubleHelix({fps: 20, spinSpeed: 4});
+    overlay.append(canvas);
+    $container.append(overlay);
+}
+
+function hideGridLoadingOverlay() {
+    // Fade out (like the original hideLoadingOverlay) so the loaded grid eases in rather than jumping.
+    $("#grid-loading-overlay").fadeOut(function() {
+        $(this).find('canvas.node-load-animation').each(function() {
+            this.active = false;  // stop the helix animation before removing
+        });
+        $(this).remove();
+    });
+}
+
+
 function finishedLoadingEditor(node_id, version_id) {
     const everythingLoaded = function () {
         hideLoadingOverlay();
