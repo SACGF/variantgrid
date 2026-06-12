@@ -23,7 +23,8 @@ from library.guardian_utils import DjangoPermission
 from snpdb import models
 from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
     ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
-    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath
+    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath, \
+    GridLoadingAnimation, DEFAULT_GRID_LOADING_ANIMATIONS
 from patients.models import Patient, Specimen
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
@@ -560,6 +561,14 @@ class LabUserSettingsOverrideForm(SettingsOverrideForm):
 
 
 class UserSettingsOverrideForm(SettingsOverrideForm):
+    # Personal preference - checkboxes rather than the JSONField's default textarea.
+    loading_animations = forms.MultipleChoiceField(
+        choices=GridLoadingAnimation.choices,
+        widget=forms.CheckboxSelectMultiple(),
+        required=False,
+        label="Grid Loading Animations",
+        help_text="DNA animations randomly shown while a node's variant grid loads.")
+
     class Meta(SettingsOverrideForm.Meta):
         model = UserSettingsOverride
         exclude = ['user', 'oauth_sub']
@@ -571,6 +580,12 @@ class UserSettingsOverrideForm(SettingsOverrideForm):
         if "columns" in self.fields:
             self.fields['columns'].queryset = models.CustomColumnsCollection.filter_for_user(user)
         self.fields['default_lab'].queryset = Lab.valid_labs_qs(user)
+
+        if not get_settings_form_features().analysis_enabled:
+            del self.fields['loading_animations']
+        elif self.instance.loading_animations is None:
+            # Not chosen yet - show the defaults ticked
+            self.initial['loading_animations'] = list(DEFAULT_GRID_LOADING_ANIMATIONS)
 
 
 class CreateCohortForm(BaseModelForm):

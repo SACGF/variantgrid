@@ -573,24 +573,33 @@ function showGridLoadingOverlay(container) {
     }
     $container.append(overlay);
 
-    // Randomly pick the loading animation: the classic double-helix, or one of the full-size DNA
-    // "reading" effects (ripple / flowcell) with dark-mode glyphs on a clear background (shows on
-    // the overlay's white). Fall back to the helix if the VGLoaders effects aren't present.
-    const choices = (typeof VGLoaders !== "undefined") ? ["ripple", "flowcell"] : ["helix"];
-    const choice = choices[Math.floor(Math.random() * choices.length)];
+    // Show one of the user's chosen full-size DNA "reading" effects (dark-mode glyphs on a clear
+    // background, over the overlay's white), picked at random. ANALYSIS_LOADING_ANIMATIONS holds the
+    // user's menu ids; map them to VGLoaders ids here. Fall back to the double-helix if the loaders
+    // aren't available.
+    const LOADER_IDS = {flowcell: "flowcell", ripple: "base-fx-ripple", matrix: "base-fx-matrix"};
+    let menu = [];
+    if (typeof VGLoaders !== "undefined") {
+        const prefs = (typeof ANALYSIS_LOADING_ANIMATIONS !== "undefined" && ANALYSIS_LOADING_ANIMATIONS) || [];
+        menu = prefs.filter(a => LOADER_IDS[a]);
+        if (!menu.length) {
+            menu = ["flowcell", "ripple"];  // safety default if prefs are empty/unknown
+        }
+    }
 
-    if (choice === "helix") {
+    if (menu.length) {
+        const choice = menu[Math.floor(Math.random() * menu.length)];
+        const stage = $("<div>", {class: "grid-loading-stage"});
+        stage.css({position: "absolute", top: 0, left: 0, right: 0, bottom: 0});
+        overlay.append(stage);
+        overlay.data("stopLoader", VGLoaders.start(LOADER_IDS[choice], stage[0], {theme: "dark", clearBackground: true}));
+    } else {
+        // Fallback: classic double-helix.
         const canvas = $("<canvas />", {class: 'node-load-animation'});
         canvas.attr({width: 50, height: 180});
         canvas.css('opacity', 0.35);
         canvas.DoubleHelix({fps: 20, spinSpeed: 4});
         overlay.append(canvas);
-    } else {
-        const stage = $("<div>", {class: "grid-loading-stage"});
-        stage.css({position: "absolute", top: 0, left: 0, right: 0, bottom: 0});
-        overlay.append(stage);
-        const id = (choice === "ripple") ? "base-fx-ripple" : "flowcell";
-        overlay.data("stopLoader", VGLoaders.start(id, stage[0], {theme: "dark", clearBackground: true}));
     }
 }
 
