@@ -1,0 +1,149 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VariantGrid loading animations</title>
+<style>
+  :root{
+    --bg:#07090c;
+    --page:radial-gradient(120% 90% at 50% 30%,#0c1117 0%,var(--bg) 70%);
+    --text:#c4d0db; --muted:#7e8c98; --accent:#9fd9cd; --h2:#6f7d89;
+    --btn-text:#b7c4cf; --btn-bg:rgba(255,255,255,.04); --btn-border:#232e38;
+    --btn-hover-border:#37454f; --btn-hover-bg:rgba(255,255,255,.07);
+    --on-bg:#7fd9cb; --on-text:#0a0d10;
+    --stage-border:#1b242d; --stage-bg:rgba(255,255,255,.012); --vignette:var(--bg);
+  }
+  body.light{
+    --bg:#eef1f5;
+    --page:radial-gradient(120% 90% at 50% 30%,#ffffff 0%,#e7ebf0 70%);
+    --text:#2b3640; --muted:#5a6b78; --accent:#1f7a6b; --h2:#6a7884;
+    --btn-text:#33424d; --btn-bg:rgba(0,0,0,.04); --btn-border:#cdd6de;
+    --btn-hover-border:#9fb0bb; --btn-hover-bg:rgba(0,0,0,.06);
+    --on-bg:#1f9a87; --on-text:#ffffff;
+    --stage-border:#cdd6de; --stage-bg:rgba(0,0,0,.02); --vignette:#eef1f5;
+  }
+  *{box-sizing:border-box} html,body{height:100%;margin:0}
+  body{
+    background:var(--page); color:var(--text);
+    font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    display:flex; flex-direction:column; min-height:100%;
+  }
+  header{padding:18px 22px 8px}
+  header h1{font-size:15px; letter-spacing:.16em; text-transform:uppercase; margin:0 0 4px}
+  header p{font-size:12px; color:var(--muted); margin:0; max-width:70ch; line-height:1.5}
+  .wrap{display:flex; gap:22px; flex:1; padding:18px 22px 28px; align-items:flex-start}
+  .panel{flex:0 0 230px; display:flex; flex-direction:column; gap:8px}
+  .panel h2{font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--h2); margin:6px 0 2px}
+  .panel button{
+    display:block; width:100%; text-align:left; font:inherit; font-size:12px; color:var(--btn-text);
+    background:var(--btn-bg); border:1px solid var(--btn-border);
+    border-radius:8px; padding:9px 12px; cursor:pointer; transition:.12s;
+  }
+  .panel button:hover{border-color:var(--btn-hover-border); background:var(--btn-hover-bg)}
+  .panel button[data-on]{color:var(--on-text); background:var(--on-bg); border-color:var(--on-bg); font-weight:600}
+  .panel .row{display:flex; gap:8px}
+  .panel .row button{text-align:center}
+  .stagewrap{flex:1; display:flex; flex-direction:column; gap:12px; align-items:center}
+  .stage{
+    position:relative; overflow:hidden; width:min(820px,82vw); height:min(420px,56vh);
+    border:1px solid var(--stage-border); border-radius:10px; background:var(--stage-bg);
+    box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 30px 80px -40px #000;
+  }
+  .stage::after{ content:""; position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(115% 135% at 50% 45%,transparent 62%,var(--vignette) 100%); }
+  .stage > *{position:relative; z-index:1}
+  .meta{font-size:11px; color:var(--h2)}
+  .meta b{color:var(--accent); font-weight:600}
+</style>
+</head>
+<body>
+  <header>
+    <h1>VariantGrid loading animations</h1>
+    <p>The DNA "reading" animations shown while analysis grids load. Pick one to watch it.
+       Logged-in users can choose their favourites in User Settings.</p>
+  </header>
+
+  <div class="wrap">
+    <div class="panel">
+      <h2>Animations</h2>
+      <div id="loader-list"></div>
+
+      <h2>Theme</h2>
+      <div class="row">
+        <button id="theme-dark" data-on>Dark</button>
+        <button id="theme-light">Light</button>
+      </div>
+
+      <h2>Actions</h2>
+      <div class="row">
+        <button id="btn-random">Random</button>
+        <button id="btn-stop">Stop</button>
+      </div>
+    </div>
+
+    <div class="stagewrap">
+      <div class="stage" id="stage"></div>
+      <div class="meta">Showing: <b id="current-label">-</b></div>
+    </div>
+  </div>
+
+  <script src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
+  <script src="{% static 'js/lib/double-helix.jquery.js' %}"></script>
+  <script src="{% static 'js/lib/loaders/vg-loaders.js' %}"></script>
+  <script src="{% static 'js/lib/loaders/double-helix.loader.js' %}"></script>
+  <script src="{% static 'js/lib/loaders/read-pulse.loader.js' %}"></script>
+  <script src="{% static 'js/lib/loaders/base-fx.loader.js' %}"></script>
+  <script src="{% static 'js/lib/loaders/flowcell.loader.js' %}"></script>
+  <script src="{% static 'js/lib/loaders/pileup.loader.js' %}"></script>
+
+  <script>
+    const stage = document.getElementById("stage");
+    const list = document.getElementById("loader-list");
+    const labelEl = document.getElementById("current-label");
+    let stopCurrent = null, currentId = null, theme = "dark";
+
+    function stop() {
+      if (stopCurrent) { stopCurrent(); stopCurrent = null; }
+      stage.innerHTML = "";
+      currentId = null;
+      labelEl.textContent = "-";
+      [...list.children].forEach(b => b.removeAttribute("data-on"));
+    }
+
+    function play(id) {
+      stop();
+      const loader = VGLoaders.get(id);
+      if (!loader) return;
+      currentId = id;
+      stopCurrent = VGLoaders.start(id, stage, {theme: theme});
+      labelEl.textContent = loader.label;
+      const btn = list.querySelector('[data-id="' + id + '"]');
+      if (btn) btn.setAttribute("data-on", "");
+    }
+
+    VGLoaders.list().forEach(loader => {
+      const btn = document.createElement("button");
+      btn.textContent = loader.label;
+      btn.dataset.id = loader.id;
+      btn.addEventListener("click", () => play(loader.id));
+      list.appendChild(btn);
+    });
+
+    function setTheme(t) {
+      theme = t;
+      document.body.classList.toggle("light", t === "light");
+      document.getElementById("theme-light").toggleAttribute("data-on", t === "light");
+      document.getElementById("theme-dark").toggleAttribute("data-on", t === "dark");
+      if (currentId) play(currentId);
+    }
+    document.getElementById("theme-dark").addEventListener("click", () => setTheme("dark"));
+    document.getElementById("theme-light").addEventListener("click", () => setTheme("light"));
+    document.getElementById("btn-random").addEventListener("click", () => play(VGLoaders.random().id));
+    document.getElementById("btn-stop").addEventListener("click", stop);
+
+    const first = VGLoaders.ids()[0];
+    if (first) play(first);
+  </script>
+</body>
+</html>

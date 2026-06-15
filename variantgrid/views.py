@@ -44,6 +44,12 @@ def index(request):
 
 
 @login_not_required
+def loading_animations(request):
+    """ Public gallery of the DNA loading animations (no login - linkable as an easter egg). """
+    return render(request, 'loading_animations.html')
+
+
+@login_not_required
 def page_not_found(request, exception):
     message = "The requested object could not be found"
     if isinstance(exception, Resolver404):  # don't want to show paths

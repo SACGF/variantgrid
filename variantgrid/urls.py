@@ -35,6 +35,7 @@ APPS_WITH_URLS = [
 
 urlpatterns = [
     path('', views.index),
+    path('loading_animations', views.loading_animations, name='loading_animations'),
     path('admin/', admin.site.urls),
     path('authenticated', views.authenticated, name='authenticated'),
     path('martor/', include('martor.urls')),
