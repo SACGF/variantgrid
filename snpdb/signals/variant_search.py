@@ -231,7 +231,7 @@ def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, va
         if alternative_variant.is_symbolic:
             alt_alt_desc = _sv_alt_description(alternative_variant)
         else:
-            alt_alt_desc = Sequence.abbreviate(alternative_variant.alt)
+            alt_alt_desc = str(alternative_variant.alt)
 
         alt_messages = search_messages + [
             SearchMessage(f'No results for alt "{original_alt_desc}", but found this using alt "{alt_alt_desc}"',
