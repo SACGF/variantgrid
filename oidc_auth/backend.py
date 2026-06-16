@@ -31,6 +31,13 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
     def create_or_update(self, user: User, claims):
 
+        missing_claims = set()
+        for claim in ('preferred_username', 'email', 'sub', 'groups'):
+            if claims.get(claim):
+                missing_claims.add(claim)
+        if missing_claims:
+            raise ValueError(f"Authentication claims missing {missing_claims}")
+
         # Copy over basic details from open ID connect
         # Assume there will be no user-name clashes
         user.username = claims.get('preferred_username')
@@ -45,7 +52,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         # convert it so we get 'some_group_1', 'some_group_2'
 
         user.is_active = True
-        all_claim_groups = claims["groups"]
+        all_claim_groups = claims.get("groups")
         if settings.OIDC_REQUIRED_GROUP and settings.OIDC_REQUIRED_GROUP not in all_claim_groups:
             user.is_active = False
             user.save()
