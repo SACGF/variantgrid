@@ -99,4 +99,3 @@ methods/figures in detail. **VarFish is the priority** of this group (closest co
 In `paper/literature/text/` as full PDF→text conversions: shariant_2022, vep_2016, gemini_2013,
 vcfminer_2016, opencravat_2019, clinvar_2018, exomiser_2015, exomiser_reinterp_2024,
 exome_reanalysis_review_2021, cancer_reclass_2020.
-</content>
