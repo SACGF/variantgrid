@@ -6,22 +6,22 @@
 <title>VariantGrid loading animations</title>
 <style>
   :root{
+    --bg:#ffffff;
+    --page:#ffffff;
+    --text:#2b3640; --muted:#5a6b78; --accent:#1f7a6b; --h2:#6a7884;
+    --btn-text:#33424d; --btn-bg:rgba(0,0,0,.04); --btn-border:#cdd6de;
+    --btn-hover-border:#9fb0bb; --btn-hover-bg:rgba(0,0,0,.06);
+    --on-bg:#1f9a87; --on-text:#ffffff;
+    --stage-border:#cdd6de; --stage-bg:#ffffff;
+  }
+  body.dark{
     --bg:#07090c;
     --page:radial-gradient(120% 90% at 50% 30%,#0c1117 0%,var(--bg) 70%);
     --text:#c4d0db; --muted:#7e8c98; --accent:#9fd9cd; --h2:#6f7d89;
     --btn-text:#b7c4cf; --btn-bg:rgba(255,255,255,.04); --btn-border:#232e38;
     --btn-hover-border:#37454f; --btn-hover-bg:rgba(255,255,255,.07);
     --on-bg:#7fd9cb; --on-text:#0a0d10;
-    --stage-border:#1b242d; --stage-bg:rgba(255,255,255,.012); --vignette:var(--bg);
-  }
-  body.light{
-    --bg:#eef1f5;
-    --page:radial-gradient(120% 90% at 50% 30%,#ffffff 0%,#e7ebf0 70%);
-    --text:#2b3640; --muted:#5a6b78; --accent:#1f7a6b; --h2:#6a7884;
-    --btn-text:#33424d; --btn-bg:rgba(0,0,0,.04); --btn-border:#cdd6de;
-    --btn-hover-border:#9fb0bb; --btn-hover-bg:rgba(0,0,0,.06);
-    --on-bg:#1f9a87; --on-text:#ffffff;
-    --stage-border:#cdd6de; --stage-bg:rgba(0,0,0,.02); --vignette:#eef1f5;
+    --stage-border:#1b242d; --stage-bg:#07090c;
   }
   *{box-sizing:border-box} html,body{height:100%;margin:0}
   body{
@@ -45,13 +45,11 @@
   .panel .row{display:flex; gap:8px}
   .panel .row button{text-align:center}
   .stagewrap{flex:1; display:flex; flex-direction:column; gap:12px; align-items:center}
+  /* Match the analysis node-loading overlay: a large, plain white box the loader draws over. */
   .stage{
-    position:relative; overflow:hidden; width:min(820px,82vw); height:min(420px,56vh);
+    position:relative; overflow:hidden; width:min(1100px,92vw); height:min(560px,70vh);
     border:1px solid var(--stage-border); border-radius:10px; background:var(--stage-bg);
-    box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 30px 80px -40px #000;
   }
-  .stage::after{ content:""; position:absolute; inset:0; pointer-events:none;
-    background:radial-gradient(115% 135% at 50% 45%,transparent 62%,var(--vignette) 100%); }
   .stage > *{position:relative; z-index:1}
   .meta{font-size:11px; color:var(--h2)}
   .meta b{color:var(--accent); font-weight:600}
@@ -60,7 +58,8 @@
 <body>
   <header>
     <h1>VariantGrid loading animations</h1>
-    <p>The DNA "reading" animations shown while analysis grids load. Pick one to watch it.
+    <p>The DNA "reading" animations shown while analysis grids load, drawn the same way as the
+       analysis loading screen (over a white background). Pick one to watch it.
        Logged-in users can choose their favourites in User Settings.</p>
   </header>
 
@@ -69,10 +68,10 @@
       <h2>Animations</h2>
       <div id="loader-list"></div>
 
-      <h2>Theme</h2>
+      <h2>Background</h2>
       <div class="row">
-        <button id="theme-dark" data-on>Dark</button>
-        <button id="theme-light">Light</button>
+        <button id="theme-light" data-on>White</button>
+        <button id="theme-dark">Dark</button>
       </div>
 
       <h2>Actions</h2>
@@ -89,19 +88,18 @@
   </div>
 
   <script src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
-  <script src="{% static 'js/lib/double-helix.jquery.js' %}"></script>
   <script src="{% static 'js/lib/loaders/vg-loaders.js' %}"></script>
-  <script src="{% static 'js/lib/loaders/double-helix.loader.js' %}"></script>
-  <script src="{% static 'js/lib/loaders/read-pulse.loader.js' %}"></script>
-  <script src="{% static 'js/lib/loaders/base-fx.loader.js' %}"></script>
   <script src="{% static 'js/lib/loaders/flowcell.loader.js' %}"></script>
   <script src="{% static 'js/lib/loaders/pileup.loader.js' %}"></script>
+  <script src="{% static 'js/lib/loaders/base-fx.loader.js' %}"></script>
 
   <script>
     const stage = document.getElementById("stage");
     const list = document.getElementById("loader-list");
     const labelEl = document.getElementById("current-label");
-    let stopCurrent = null, currentId = null, theme = "dark";
+    // "white" = the analysis look: dark glyphs drawn over a clear (white) background.
+    // "dark"  = each loader paints its own dark background instead.
+    let stopCurrent = null, currentId = null, mode = "white";
 
     function stop() {
       if (stopCurrent) { stopCurrent(); stopCurrent = null; }
@@ -116,7 +114,9 @@
       const loader = VGLoaders.get(id);
       if (!loader) return;
       currentId = id;
-      stopCurrent = VGLoaders.start(id, stage, {theme: theme});
+      // Glyphs always use the "dark" palette; on the white background we let it show through
+      // via clearBackground, exactly as the analysis overlay does.
+      stopCurrent = VGLoaders.start(id, stage, {theme: "dark", clearBackground: mode === "white"});
       labelEl.textContent = loader.label;
       const btn = list.querySelector('[data-id="' + id + '"]');
       if (btn) btn.setAttribute("data-on", "");
@@ -130,15 +130,15 @@
       list.appendChild(btn);
     });
 
-    function setTheme(t) {
-      theme = t;
-      document.body.classList.toggle("light", t === "light");
-      document.getElementById("theme-light").toggleAttribute("data-on", t === "light");
-      document.getElementById("theme-dark").toggleAttribute("data-on", t === "dark");
+    function setMode(m) {
+      mode = m;
+      document.body.classList.toggle("dark", m === "dark");
+      document.getElementById("theme-dark").toggleAttribute("data-on", m === "dark");
+      document.getElementById("theme-light").toggleAttribute("data-on", m === "white");
       if (currentId) play(currentId);
     }
-    document.getElementById("theme-dark").addEventListener("click", () => setTheme("dark"));
-    document.getElementById("theme-light").addEventListener("click", () => setTheme("light"));
+    document.getElementById("theme-light").addEventListener("click", () => setMode("white"));
+    document.getElementById("theme-dark").addEventListener("click", () => setMode("dark"));
     document.getElementById("btn-random").addEventListener("click", () => play(VGLoaders.random().id));
     document.getElementById("btn-stop").addEventListener("click", stop);
 

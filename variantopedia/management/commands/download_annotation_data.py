@@ -150,11 +150,30 @@ def _extract_tarball(tarball, dest):
 
 def _download(url, dest):
     tmp = dest + ".part"
-    with requests.get(url, stream=True, timeout=60) as resp:
+    resume_from = os.path.getsize(tmp) if os.path.exists(tmp) else 0
+
+    headers = {"Range": f"bytes={resume_from}-"} if resume_from else {}
+    with requests.get(url, stream=True, timeout=60, headers=headers) as resp:
+        if resume_from and resp.status_code == 416:
+            # Range not satisfiable - the partial file is already the complete download.
+            os.replace(tmp, dest)
+            return
         resp.raise_for_status()
-        total = int(resp.headers.get("content-length", 0)) or None
-        with open(tmp, "wb") as f, tqdm(
-            total=total, unit="B", unit_scale=True, desc=os.path.basename(dest)
+
+        content_length = int(resp.headers.get("content-length", 0)) or None
+        if resume_from and resp.status_code == 206:
+            # Server honoured the range request; append to the existing partial.
+            mode = "ab"
+            total = content_length + resume_from if content_length else None
+            initial = resume_from
+        else:
+            # No partial, or the server ignored the range (200 OK) - start fresh.
+            mode = "wb"
+            total = content_length
+            initial = 0
+
+        with open(tmp, mode) as f, tqdm(
+            total=total, initial=initial, unit="B", unit_scale=True, desc=os.path.basename(dest)
         ) as pbar:
             for chunk in resp.iter_content(chunk_size=1024 * 1024):
                 if chunk:

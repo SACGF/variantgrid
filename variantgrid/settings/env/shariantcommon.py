@@ -87,11 +87,11 @@ LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes", "ontol
 
 # OIDC SETTINGS
 USE_OIDC = True
+OIDC_STORE_ID_TOKEN = True  # needed so we can pass the token back to keycloak for an automatic logout
 LOGIN_URL = '/oidc_login/'
 OIDC_RP_SIGN_ALGO = 'RS256'
-# TODO, change this then move it to
 OIDC_RP_CLIENT_SECRET = get_secret('OIDC.client_secret')
-KEY_CLOAK_BASE = 'https://shariant.org.au/auth'
+KEY_CLOAK_BASE = 'https://auth.shariant.org.au'
 KEY_CLOAK_REALM = 'agha'
 KEY_CLOAK_PROTOCOL_BASE = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/protocol/openid-connect'
 OIDC_OP_JWKS_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/certs'
@@ -100,7 +100,6 @@ OIDC_OP_TOKEN_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/token'
 OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
 OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
-
 # login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
