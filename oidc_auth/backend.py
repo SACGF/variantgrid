@@ -34,11 +34,10 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         missing_claims = set()
         for claim in ('preferred_username', 'email', 'sub', 'groups'):
-            if claims.get(claim):
+            if not claims.get(claim):
                 missing_claims.add(claim)
         if missing_claims:
-            report_message(f"Authentication claims missing {missing_claims}", level='error')
-            raise ValueError(f"Authentication claims missing {missing_claims}")
+            report_message(f"Missing claims {missing_claims}", level='error')
 
         # Copy over basic details from open ID connect
         # Assume there will be no user-name clashes
@@ -59,12 +58,15 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             user.is_active = False
             user.save()
 
+            report_message(f"User {user.username} attempted to login but lacked the group permission {settings.OIDC_REQUIRED_GROUP} - belongs to groups {all_claim_groups}", level='error')
+
             # Please try our test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>
 
             allowed_environments_map = {
                 "/variantgrid/shariant_demo": """Please try out demo environment <a href="https://demo.shariant.org.au">https://demo.shariant.org.au</a>""",
                 "/variantgrid/shariant_test": """Please try out test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>""",
                 "/variantgrid/shariant_production": """Please try out production environment <a href="https://shariant.org.au">https://shariant.org.au</a>""",
+                "/variantgrid/shariant_security": """Please try out security testing environment <a href="https://test2.shariant.org.au">https://test2.shariant.org.au</a>""",
             }
             allowed_environment_list = []
             for group, message in allowed_environments_map.items():
