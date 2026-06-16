@@ -22,4 +22,17 @@
 {% menu_item 'changelog' %}
 {% menu_item 'version' %}
 <hr/>
-{% menu_item 'auth_logout' title="Logout <i class='fas fa-sign-out-alt'></i>" css_class='logout' method='post' %}
+{% settings_value "USE_OIDC" as use_oidc %}
+{% if use_oidc %}
+    <script>
+        function logout() {
+            $("#logout-form").submit();
+        }
+    </script>
+    <form id="logout-form" method="POST" action="{% url 'oidc_logout' %}">
+        {% csrf_token %}
+    </form>
+    <a href="#" onclick="logout()" class="nav-link">Logout <i class="fas fa-sign-out-alt"></i></a>
+{% else %}
+    {% menu_item 'auth_logout' title="Logout <i class='fas fa-sign-out-alt'></i>" css_class='logout' %}
+{% endif %}

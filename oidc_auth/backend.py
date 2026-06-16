@@ -1,7 +1,10 @@
+from urllib.parse import urlencode
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
+from mozilla_django_oidc.utils import import_from_settings
 
 from library.log_utils import report_message
 from snpdb.models import UserSettingsOverride
@@ -160,3 +163,14 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user_settings_override.save()
         user.save()
         return user
+
+
+def provider_logout(request) -> str:
+    oidc_logout = import_from_settings("KEY_CLOAK_PROTOCOL_BASE", "") + "/logout"
+    if redirect := import_from_settings("LOGOUT_REDIRECT_URL", ""):
+        if oidc_id_token := request.session["oidc_id_token"]:
+            oidc_logout += "?" + urlencode({
+                "id_token_hint": oidc_id_token,
+                "post_logout_redirect_uri": redirect
+            })
+    return oidc_logout
