@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.models import Group, User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
+from library.log_utils import report_message
 from snpdb.models import UserSettingsOverride
 
 
@@ -36,6 +37,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             if claims.get(claim):
                 missing_claims.add(claim)
         if missing_claims:
+            report_message(f"Authentication claims missing {missing_claims}", level='error')
             raise ValueError(f"Authentication claims missing {missing_claims}")
 
         # Copy over basic details from open ID connect
