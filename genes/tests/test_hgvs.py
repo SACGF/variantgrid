@@ -66,21 +66,17 @@ class TestHGVS(TestCase):
             print(f"\"{bad_hgvs}\" > \"{fixed_hgvs}\"")
             hgvs_matcher.create_hgvs_variant(fixed_hgvs)
 
-    def test_fix_gene_transcript(self):
-        swap_warning = "Swapped gene/transcript"
-        uc_warning = "Upper cased transcript"
-
+    def test_clean_hgvs_gene_transcript(self):
+        # Gene/transcript swap + casing fixes now run inside cdot's clean_hgvs()
         TEST_CASES = [
-            ("nm_000059.4:c.316+5G>A", [uc_warning]),
-            ("nm_000059.4(BRCA1):c.316+5G>A", [uc_warning]),
-            ("BRCA1(NM_000059.4):c.316+5G>A", [swap_warning]),
-            ("BRCA1(nm_000059.4):c.316+5G>A",  [swap_warning, uc_warning]),
+            ("nm_000059.4:c.316+5G>A", "NM_000059.4:c.316+5G>A"),
+            ("nm_000059.4(BRCA1):c.316+5G>A", "NM_000059.4(BRCA1):c.316+5G>A"),
+            ("BRCA1(NM_000059.4):c.316+5G>A", "NM_000059.4(BRCA1):c.316+5G>A"),
+            ("BRCA1(nm_000059.4):c.316+5G>A", "NM_000059.4(BRCA1):c.316+5G>A"),
         ]
-        hgvs_matcher = HGVSMatcher(GenomeBuild.grch38())
-        for hgvs_string, expected_warnings in TEST_CASES:
-            _, fix_messages = hgvs_matcher.fix_gene_transcript(hgvs_string)
-            for ew in expected_warnings:
-                self.assertIn(ew, fix_messages, f"Warning for {hgvs_string}")
+        for hgvs_string, expected in TEST_CASES:
+            cleaned, _messages = HGVSMatcher.clean_hgvs(hgvs_string)
+            self.assertEqual(cleaned, expected, f"clean_hgvs({hgvs_string})")
 
     def test_format_hgvs_remove_long_ref(self):
         LONG_AND_TRIMMED_HGVS = {  # 10bp
@@ -109,58 +105,57 @@ class TestHGVS(TestCase):
         with self.assertRaises(HGVSException):
             matcher.get_variant_coordinate("ENST00000300305.3:c.9999A>T")
 
-    def test_sort_transcript_versions(self):
-        transcript_version_and_methods = [
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            # Missing v4
-            (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
+    def test_sort_transcript_converter_types(self):
+        """ The version-rank (cdot) + method-priority (VG) composition used by
+            filter_best_transcripts_and_converter_type_by_accession - the actual
+            integration point. Exercises all three version strategies (via the
+            version=4 / version=None inputs) and locks the method_sort fix: local
+            (internal) resolution must sort before the external ClinGen Allele
+            Registry (the old code compared an enum against a string constant, so the
+            'prefer local' branch never engaged). """
+        LOCAL = HGVSConverterType.BIOCOMMONS_HGVS
+        CLINGEN = HGVSConverterType.CLINGEN_ALLELE_REGISTRY
+        # Local present for [1,2,3,5,6] (missing v4); ClinGen present for all [1..6]
+        tv_and_methods = [
+            (FakeTranscriptVersion("", 1), CLINGEN), (FakeTranscriptVersion("", 1), LOCAL),
+            (FakeTranscriptVersion("", 2), CLINGEN), (FakeTranscriptVersion("", 2), LOCAL),
+            (FakeTranscriptVersion("", 3), CLINGEN), (FakeTranscriptVersion("", 3), LOCAL),
+            (FakeTranscriptVersion("", 4), CLINGEN),  # missing v4 local
+            (FakeTranscriptVersion("", 5), CLINGEN), (FakeTranscriptVersion("", 5), LOCAL),
+            (FakeTranscriptVersion("", 6), CLINGEN), (FakeTranscriptVersion("", 6), LOCAL),
         ]
-
-        expected_up_then_down = [
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-        ]
-
-        expected_closest = [
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
-            (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-        ]
-
         version = 4
-        key_up_then_down = HGVSMatcher._get_sort_key_transcript_version_and_methods(version)
-        sorted_up_then_down = list(sorted(transcript_version_and_methods, key=key_up_then_down))
-        self.assertEqual(sorted_up_then_down, expected_up_then_down, "Sorted up then down")
 
-        key_closest = HGVSMatcher._get_sort_key_transcript_version_and_methods(version, closest=True)
-        sorted_closest = list(sorted(transcript_version_and_methods, key=key_closest))
-        self.assertEqual(sorted_closest, expected_closest, "Sorted closest")
+        def versions(result):
+            return [(tv.version, method) for tv, method in result]
+
+        # prefer_local=True -> method dominates (all LOCAL before all CLINGEN), version breaks ties
+        up_then_down = HGVSMatcher._sort_transcript_converter_types(tv_and_methods, version)
+        self.assertEqual(versions(up_then_down), [
+            (5, LOCAL), (6, LOCAL), (3, LOCAL), (2, LOCAL), (1, LOCAL),
+            (4, CLINGEN), (5, CLINGEN), (6, CLINGEN), (3, CLINGEN), (2, CLINGEN), (1, CLINGEN),
+        ], "Up then down, prefer_local")
+
+        closest = HGVSMatcher._sort_transcript_converter_types(tv_and_methods, version, closest=True)
+        self.assertEqual(versions(closest), [
+            (5, LOCAL), (3, LOCAL), (6, LOCAL), (2, LOCAL), (1, LOCAL),
+            (4, CLINGEN), (5, CLINGEN), (3, CLINGEN), (6, CLINGEN), (2, CLINGEN), (1, CLINGEN),
+        ], "Closest, prefer_local")
+
+        # prefer_local=False -> version dominates, method breaks ties (LOCAL before CLINGEN per version)
+        prefer_remote = HGVSMatcher._sort_transcript_converter_types(tv_and_methods, version, prefer_local=False)
+        self.assertEqual(versions(prefer_remote), [
+            (4, CLINGEN),
+            (5, LOCAL), (5, CLINGEN), (6, LOCAL), (6, CLINGEN), (3, LOCAL), (3, CLINGEN),
+            (2, LOCAL), (2, CLINGEN), (1, LOCAL), (1, CLINGEN),
+        ], "Up then down, prefer_remote")
+
+        # version=None -> LATEST (highest version first), method still dominates when prefer_local
+        latest = HGVSMatcher._sort_transcript_converter_types(tv_and_methods, None)
+        self.assertEqual(versions(latest), [
+            (6, LOCAL), (5, LOCAL), (3, LOCAL), (2, LOCAL), (1, LOCAL),
+            (6, CLINGEN), (5, CLINGEN), (4, CLINGEN), (3, CLINGEN), (2, CLINGEN), (1, CLINGEN),
+        ], "Latest, prefer_local")
 
     def test_hgvs_pyhgvs(self):
         self._test_hgvs_conversion(HGVSConverterType.PYHGVS)
