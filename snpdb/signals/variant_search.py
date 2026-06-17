@@ -211,6 +211,15 @@ def allele_search(search_input: SearchInputInstance):
 def _sv_alt_description(v: Union[Variant, VariantCoordinate]) -> str:
     return f"{v.alt}/SVLEN={v.svlen}"
 
+
+def _alt_description(v: Union[Variant, VariantCoordinate]) -> str:
+    """Describe the alt of a Variant or VariantCoordinate. Handles both Variant.alt (a Sequence) and
+       VariantCoordinate.alt (a str) - str() abbreviates a Sequence, while Sequence.abbreviate handles the str."""
+    if v.is_symbolic:
+        return _sv_alt_description(v)
+    return Sequence.abbreviate(str(v.alt))
+
+
 def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, variant_qs,
                                              variant_coordinate: VariantCoordinate,
                                              search_messages: list[SearchMessage]) -> Iterable[SearchResult]:
@@ -220,18 +229,12 @@ def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, va
                                                  variant_string=variant_string):
         yield SearchResult(cmv, messages=search_messages)
 
-    if variant_coordinate.is_symbolic:
-        original_alt_desc = _sv_alt_description(variant_coordinate)
-    else:
-        original_alt_desc = Sequence.abbreviate(variant_coordinate.alt)
+    original_alt_desc = _alt_description(variant_coordinate)
 
     # search for alt alts
     alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate, any_alt=True)
     for alternative_variant in alts:
-        if alternative_variant.is_symbolic:
-            alt_alt_desc = _sv_alt_description(alternative_variant)
-        else:
-            alt_alt_desc = str(alternative_variant.alt)
+        alt_alt_desc = _alt_description(alternative_variant)
 
         alt_messages = search_messages + [
             SearchMessage(f'No results for alt "{original_alt_desc}", but found this using alt "{alt_alt_desc}"',
