@@ -7,28 +7,25 @@ from variantgrid.settings.env.shariantcommon import *  # pylint: disable=wildcar
 # we import Shariant settings, all that's left is the overrides
 
 # import all the base settings #
-SITE_ID = 8
-SITE_NAME = "Shariant Demo"
-SITE_MESSAGE = "This is the demo version of Shariant. Please avoid sharing real data in this environment."
-
-OIDC_REQUIRED_GROUP = '/variantgrid/shariant_demo'
-SLACK['emoji'] = ':tv:'
+SITE_ID = 9
+SITE_NAME = "Security Shariant"
+SITE_MESSAGE = "This is the security testing version of Shariant. Please avoid sharing real data in this environment."
+SLACK['emoji'] = ':cop:'
 
 # OIDC SETTINGS
-OIDC_RP_CLIENT_ID = 'shariant-demo'
-OIDC_REQUIRED_GROUP = '/variantgrid/shariant_demo'
+OIDC_RP_CLIENT_ID = 'shariant-security'
+OIDC_REQUIRED_GROUP = '/variantgrid/shariant_security'
 LOGOUT_REDIRECT_URL = "https://test2.shariant.org.au"
 
+# SCRATCH
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
-ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'demo_annotation_scratch')
-
-
-CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "lab"
+ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'security_annotation_scratch')
 
 # SEARCH_HGVS_GENE_SYMBOL_USE_MANE = True
 
 SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
-SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_demo_static")
+SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_security_static")
 STATICFILES_DIRS = (SHARIANT_TEST_STATIC_FILES_DIR, SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
+

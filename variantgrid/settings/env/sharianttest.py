@@ -14,14 +14,14 @@ SITE_ID = 6
 SITE_NAME = "Shariant Test"
 SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real data in this environment."
 
-OIDC_REQUIRED_GROUP = '/variantgrid/shariant_test'
 SLACK['emoji'] = ':mouse:'
 # HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m785768698-f47e172d7c428063e2f452af783dadfcc07da004'
 CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = True
 
 # OIDC SETTINGS
+OIDC_REQUIRED_GROUP = '/variantgrid/shariant_test'
 OIDC_RP_CLIENT_ID = 'shariant-test'
-LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Ftest.shariant.org.au'
+LOGOUT_REDIRECT_URL = "https://test.shariant.org.au"
 
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'test_annotation_scratch')

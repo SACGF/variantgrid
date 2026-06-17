@@ -1,8 +1,12 @@
+from urllib.parse import urlencode
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
+from mozilla_django_oidc.utils import import_from_settings
 
+from library.log_utils import report_message
 from snpdb.models import UserSettingsOverride
 
 
@@ -31,6 +35,13 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
     def create_or_update(self, user: User, claims):
 
+        missing_claims = set()
+        for claim in ('preferred_username', 'email', 'sub', 'groups'):
+            if not claims.get(claim):
+                missing_claims.add(claim)
+        if missing_claims:
+            report_message(f"Missing claims {missing_claims}", level='error')
+
         # Copy over basic details from open ID connect
         # Assume there will be no user-name clashes
         user.username = claims.get('preferred_username')
@@ -45,10 +56,12 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         # convert it so we get 'some_group_1', 'some_group_2'
 
         user.is_active = True
-        all_claim_groups = claims["groups"]
+        all_claim_groups = claims.get("groups")
         if settings.OIDC_REQUIRED_GROUP and settings.OIDC_REQUIRED_GROUP not in all_claim_groups:
             user.is_active = False
             user.save()
+
+            report_message(f"User {user.username} attempted to login but lacked the group permission {settings.OIDC_REQUIRED_GROUP} - belongs to groups {all_claim_groups}", level='error')
 
             # Please try our test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>
 
@@ -56,6 +69,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
                 "/variantgrid/shariant_demo": """Please try out demo environment <a href="https://demo.shariant.org.au">https://demo.shariant.org.au</a>""",
                 "/variantgrid/shariant_test": """Please try out test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>""",
                 "/variantgrid/shariant_production": """Please try out production environment <a href="https://shariant.org.au">https://shariant.org.au</a>""",
+                "/variantgrid/shariant_security": """Please try out security testing environment <a href="https://test2.shariant.org.au">https://test2.shariant.org.au</a>""",
             }
             allowed_environment_list = []
             for group, message in allowed_environments_map.items():
@@ -149,3 +163,14 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user_settings_override.save()
         user.save()
         return user
+
+
+def provider_logout(request) -> str:
+    oidc_logout = import_from_settings("KEY_CLOAK_PROTOCOL_BASE", "") + "/logout"
+    if redirect := import_from_settings("LOGOUT_REDIRECT_URL", ""):
+        if oidc_id_token := request.session["oidc_id_token"]:
+            oidc_logout += "?" + urlencode({
+                "id_token_hint": oidc_id_token,
+                "post_logout_redirect_uri": redirect
+            })
+    return oidc_logout
