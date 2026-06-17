@@ -99,7 +99,7 @@ OIDC_OP_AUTHORIZATION_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/auth'
 OIDC_OP_TOKEN_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/token'
 OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
-OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
+OIDC_OP_LOGOUT_URL_METHOD = 'oidc_auth.backend.provider_logout'
 # login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
