@@ -3,8 +3,7 @@ more-itertools
 beautifulsoup4
 bgzip>=0.5.0
 biopython>=1.81
-# cdot: tracking github main (post-0.2.27 API changes for variantgrid#1488) until a release is cut
-git+https://github.com/SACGF/cdot@main#egg=cdot
+cdot>=0.2.28
 celery
 ConfigArgParse
 crispy-bootstrap4
