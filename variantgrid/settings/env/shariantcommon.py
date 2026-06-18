@@ -118,6 +118,13 @@ _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded an
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'annotation_scratch')
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
+# Stay on the historical annotation config (package default is now latest - see #1625)
+ANNOTATION_VEP_VERSION = "110"
+ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
+ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
+ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
+pin_annotation_to_columns_version_3(ANNOTATION)
+
 ANNOTATION[BUILD_GRCH37].update({
     "annotation_consortium": "RefSeq",
 })

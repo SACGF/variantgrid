@@ -42,7 +42,7 @@ ANNOTATION_MAX_RUN_ATTEMPTS = 3
 # is a deliberately generous 3x margin - reclaim is the rare dead-worker path so erring long is cheap.
 ANNOTATION_RUN_LEASE_SECONDS = 16200
 ANNOTATION_VEP_ARGS = []
-ANNOTATION_VEP_VERSION = "110"
+ANNOTATION_VEP_VERSION = "115"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
 ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
@@ -56,7 +56,8 @@ ANNOTATION_VEP_DISTANCE = 5000  # VEP --distance arg (default=5000) - how far up
 # Values: "primary" -> --gencode_primary, "basic" -> --gencode_basic, None -> full Ensembl set. Ignored for RefSeq VAVs.
 ANNOTATION_VEP_ENSEMBL_GENCODE = "primary"
 # columns version is used to drive config in vep_columns.py
-ANNOTATION_VEP_COLUMNS_VERSION = 1  # 1 = original version, 2 = May 2022
+# Default is the latest (see pin_annotation_to_columns_version_3() to stay on historical config). #1625
+ANNOTATION_VEP_COLUMNS_VERSION = 4  # 1 = original version, 2 = May 2022, 3 = 2024, 4 = 2025 (dbNSFP 5, raw scores)
 ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE = True  # Only 'dup' for dups, false is all SVs overlap
 ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD = "lowest_af"  # "greatest_overlap", "lowest_af", "exact_or_lowest_af"
 ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION = 0.8
@@ -85,7 +86,7 @@ ANNOTATION = {
     BUILD_GRCH37: {
         "enabled": True,
         "annotation_consortium": "Ensembl",
-        "columns_version": 3,
+        "columns_version": 4,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
@@ -100,9 +101,9 @@ ANNOTATION = {
         "vep_config": {
             "sift": True,
             "cosmic": "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz",
-            "dbnsfp": "annotation_data/GRCh37/dbNSFP4.5a.grch37.stripped.gz",
+            "dbnsfp": "annotation_data/GRCh37/dbNSFP5.3.1a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
-            "denovo_db": None,  # set per-deployment, e.g. "annotation_data/GRCh37/denovo-db.variants.v.1.6.1.GRCh37.vcf.gz"
+            "denovo_db": "annotation_data/GRCh37/denovo-db.variants.v.1.6.1.GRCh37.vcf.gz",
             "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
             # We use gnomAD SV VCF with --custom twice
             "gnomad_sv": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
@@ -119,8 +120,8 @@ ANNOTATION = {
             'phylop46way': "annotation_data/GRCh37/hg19.phyloP46way.placental.bw",
             'phylop30way': None,  # n/a for GRCh37
             "repeatmasker": "annotation_data/GRCh37/repeatmasker_hg19.bed.gz",
-            "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.hg19.vcf.gz",
-            "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.hg19.vcf.gz",
+            "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.masked.snv.hg19.vcf.gz",
+            "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.masked.indel.hg19.vcf.gz",
             "topmed": "annotation_data/GRCh37/TOPMED_GRCh37.vcf.gz",
             "transcript_blocklist": None,
             "uk10k": "annotation_data/GRCh37/UK10K_COHORT.20160215.sites.vcf.gz",
@@ -130,7 +131,7 @@ ANNOTATION = {
         # Only 37 is enabled by default - overwrite "enabled" in your server settings to use following builds
         "enabled": False,
         "annotation_consortium": "Ensembl",
-        "columns_version": 3,
+        "columns_version": 4,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
@@ -145,19 +146,19 @@ ANNOTATION = {
         "vep_config": {
             "sift": True,
             "cosmic": "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz",
-            "dbnsfp": "annotation_data/GRCh38/dbNSFP4.5a.grch38.stripped.gz",
+            "dbnsfp": "annotation_data/GRCh38/dbNSFP5.3.1a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
-            "denovo_db": None,  # set per-deployment, e.g. "annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz"
+            "denovo_db": "annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz",
             # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
             "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.toplevel.fa.gz"),
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
-            "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",
+            "gnomad4": "annotation_data/GRCh38/gnomad4.1_GRCh38_contigs.vcf.gz",
             # We use gnomAD SV VCF with --custom twice
             "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
-            "mave": "annotation_data/GRCh38/MaveDB_variants_2023-11-29.tsv.gz",
+            "mave": "annotation_data/GRCh38/MaveDB_variants_2026-04-30.tsv.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh38/hg38.phastCons100way.bw",
             'phastcons46way': None,  # n/a for GRCh38
@@ -166,8 +167,8 @@ ANNOTATION = {
             "phylop46way": None,  # n/a for GRCh38
             'phylop30way': "annotation_data/GRCh38/hg38.phyloP30way.bw",
             "repeatmasker": "annotation_data/GRCh38/repeatmasker_hg38.bed.gz",
-            "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.hg38.vcf.gz",
-            "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.hg38.vcf.gz",
+            "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.masked.snv.hg38.vcf.gz",
+            "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.masked.indel.hg38.vcf.gz",
             "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
             "transcript_blocklist": "annotation_data/GRCh38/blocklist_brca1_new_transcripts.txt",
             "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
@@ -215,6 +216,33 @@ ANNOTATION = {
         }
     },
 }
+
+def pin_annotation_to_columns_version_3(annotation):
+    """Restore the historical (pre-#1625) columns_version 3 annotation config.
+
+    The package default ANNOTATION now ships the latest annotation data (columns_version 4 -
+    dbNSFP 5.x raw scores, masked SpliceAI, gnomAD 4.1, denovo-db, ...) so a fresh deployment
+    gets latest without hunting for config. Existing deployments that haven't loaded the newer
+    annotation data files call this from their env settings file to stay on the previous config.
+    Note the caller is also responsible for keeping ANNOTATION_VEP_VERSION on its historical value.
+    """
+    annotation[BUILD_GRCH37]["columns_version"] = 3
+    annotation[BUILD_GRCH37]["vep_config"].update({
+        "denovo_db": None,
+        "dbnsfp": "annotation_data/GRCh37/dbNSFP4.5a.grch37.stripped.gz",
+        "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.hg19.vcf.gz",
+        "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.hg19.vcf.gz",
+    })
+    annotation[BUILD_GRCH38]["columns_version"] = 3
+    annotation[BUILD_GRCH38]["vep_config"].update({
+        "denovo_db": None,
+        "dbnsfp": "annotation_data/GRCh38/dbNSFP4.5a.grch38.stripped.gz",
+        "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",
+        "mave": "annotation_data/GRCh38/MaveDB_variants_2023-11-29.tsv.gz",
+        "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.hg38.vcf.gz",
+        "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.hg38.vcf.gz",
+    })
+
 
 ANNOTATION_VCF_DUMP_DIR = os.path.join(PRIVATE_DATA_ROOT, 'annotation_dump')
 

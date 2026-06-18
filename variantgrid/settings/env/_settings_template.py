@@ -15,15 +15,27 @@ ALLOWED_HOSTS = ["localhost", WEB_HOSTNAME, WEB_IP]
 # PEDIGREE_MADELINE2_COMMAND = "madeline2"
 
 
+# The package default is the latest annotation (latest VEP, columns_version, dbNSFP etc - see #1625).
+# A new deployment that has downloaded the latest annotation data needs nothing here.
+
 # Here is how you'd customise your VEP version and whether you want RefSeq etc:
 
 _different_vep_version = False
 if _different_vep_version:
-    ANNOTATION_VEP_VERSION = "112"
+    ANNOTATION_VEP_VERSION = "115"
     ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
     ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
     ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
     ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
+
+# If you only have the older (columns_version 3) annotation data, pin back to it:
+_historical_annotation = False
+if _historical_annotation:
+    ANNOTATION_VEP_VERSION = "110"
+    ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
+    ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
+    ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
+    pin_annotation_to_columns_version_3(ANNOTATION)
 
 _use_grch38 = False
 if _use_grch38:
