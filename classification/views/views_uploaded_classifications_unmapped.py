@@ -4,6 +4,7 @@ import tarfile
 import zipfile
 from dataclasses import dataclass
 from typing import Iterable, Any, Optional
+from zipfile import BadZipFile
 
 import django
 from django.contrib import messages
@@ -211,21 +212,25 @@ class UploadedClassificationsUnmappedView(View):
         file_name = in_memory_file.name.lower()
         extension = UploadedClassificationsUnmappedView.get_extension(file_name)
         detected_banned_extensions = set()
-        if extension == 'zip':
-            file_stream = io.BytesIO(in_memory_file.read())
-            with zipfile.ZipFile(file_stream, 'r') as zf:
-                for filename in zf.namelist():
-                    sub_extension = UploadedClassificationsUnmappedView.get_extension(filename)
-                    if sub_extension in UploadedClassificationsUnmappedView.BANNED_EXTENSIONS:
-                        detected_banned_extensions.add(sub_extension)
-        elif extension in {'gz', 'tgz', 'tar'}:
-            file_stream = io.BytesIO(in_memory_file.read())
-            mode = 'r:gz' if file_name.endswith(('gz', 'tgz')) else 'r'
-            with tarfile.open(fileobj=file_stream, mode=mode) as tf:
-                for filename in tf.getnames():
-                    sub_extension = UploadedClassificationsUnmappedView.get_extension(filename)
-                    if sub_extension in UploadedClassificationsUnmappedView.BANNED_EXTENSIONS:
-                        detected_banned_extensions.add(sub_extension)
+        try:
+            if extension == 'zip':
+                file_stream = io.BytesIO(in_memory_file.read())
+                with zipfile.ZipFile(file_stream, 'r') as zf:
+                    for filename in zf.namelist():
+                        sub_extension = UploadedClassificationsUnmappedView.get_extension(filename)
+                        if sub_extension in UploadedClassificationsUnmappedView.BANNED_EXTENSIONS:
+                            detected_banned_extensions.add(sub_extension)
+            elif extension in {'gz', 'tgz', 'tar'}:
+                file_stream = io.BytesIO(in_memory_file.read())
+                mode = 'r:gz' if file_name.endswith(('gz', 'tgz')) else 'r'
+                with tarfile.open(fileobj=file_stream, mode=mode) as tf:
+                    for filename in tf.getnames():
+                        sub_extension = UploadedClassificationsUnmappedView.get_extension(filename)
+                        if sub_extension in UploadedClassificationsUnmappedView.BANNED_EXTENSIONS:
+                            detected_banned_extensions.add(sub_extension)
+        except Exception:
+            raise ValueError(f"File doesn't appear to be a valid {extension}")
+
         if detected_banned_extensions:
             raise ValueError(f"Detected banned file extension {', '.join(sorted(detected_banned_extensions))}")
 
