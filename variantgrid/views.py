@@ -16,6 +16,7 @@ from django_recaptcha.fields import ReCaptchaField
 from django_recaptcha.widgets import ReCaptchaV3
 from global_login_required import login_not_required
 
+from email_manager.models import EmailLog
 from library.django_utils import require_superuser
 from library.email import Email
 from library.git import Git
@@ -193,7 +194,18 @@ def keycloak_admin(request):
                 )
                 ku.welcome_email = welcome_email
 
-                Keycloak().add_user(ku)
+                def send_welcome_email():
+                    welcome_text = render_to_string('keycloak/welcome.txt', context=context)
+                    welcome_html = render_to_string('keycloak/welcome.html', context=context)
+                    EmailLog.send_mail(
+                        from_email=settings.ACCOUNTS_EMAIL,
+                        subject=f'Welcome to {site.name}',
+                        html=welcome_html,
+                        text=welcome_text,
+                        recipient_list=[email]
+                    )
+
+                Keycloak().add_user(ku, send_welcome_email)
 
                 messages.success(request, 'User created and notified')
             except KeycloakError as kce:
