@@ -1,7 +1,7 @@
 function renderGeneSymbol(geneSymbol, type, row) {
     let link = "";
     if (geneSymbol) {
-        const linkObj = $('<a>', {
+        let linkObj = $('<a>', {
             href: Urls.view_gene_symbol(geneSymbol),
             class: 'hover-link',
             html: [
@@ -14,22 +14,22 @@ function renderGeneSymbol(geneSymbol, type, row) {
 }
 
 function renderAnalysisAuditLogSummary(summary, type, row) {
-    const summaryText = summary['summary_text'];
+    let summaryText = summary['summary_text'];
     if (summaryText) {
         return "<span>" + summaryText + "</span>";
     }
-    const changes = summary['changes'];
+    let changes = summary['changes'];
     if (changes) {
         const hideValues = new Set(['valid', 'status', 'version', 'shadow_color', 'appearance_version']);
-        let changesSummary = "<table class='table'>";
-        changesSummary += "<tr><th>field</th><th>old</th><th>new</th></tr>";
+        let changesSummary = "<table class='table'>"
+        changesSummary += "<tr><th>field</th><th>old</th><th>new</th></tr>"
         for (const [key, value] of Object.entries(changes)) {
             if (!hideValues.has(key)) {
                 changesSummary += `<tr><td>${key}</td><td>${value[0]}</td><td>${value[1]}</td>`;
             }
         }
-        changesSummary += "</table>";
-        return changesSummary;
+        changesSummary += "</table>"
+        return changesSummary
     }
 
 }
@@ -39,5 +39,5 @@ function renderExpandAnalysisAuditLogEntry(x) {
     return formatJson({
         "changes": x["changes"],
         "additional_data": x["additional_data"],
-    });
+    })
 }

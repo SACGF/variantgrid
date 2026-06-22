@@ -629,7 +629,18 @@ class EvidenceKeyMap:
     @staticmethod
     @timed_cache(ttl=60)
     def clinical_significance_to_bucket() -> dict[str, int]:
+        # DEPRECATED use onc_path_to_bucket()
         return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
+
+    @staticmethod
+    @timed_cache(ttl=60)
+    def onc_path_to_bucket() -> dict[str, int]:
+        return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
+
+    @staticmethod
+    @timed_cache(ttl=60)
+    def somatic_clinical_significance_to_bucket() -> dict[str, int]:
+        return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
 
 
 class WipeMode(Enum):

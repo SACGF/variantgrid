@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Any, TypedDict, Literal
+from typing import Optional, Any, TypedDict, Literal, Tuple
 
 import django.dispatch
 from django.conf import settings
@@ -20,6 +20,7 @@ from library.django_utils.django_object_managers import ObjectManagerCachingRequ
 from library.log_utils import report_exc_info
 from library.utils import pretty_label, IconWithTooltip, md5sum_str
 from library.utils.django_utils import get_cached_project_git_hash
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
 
 """
@@ -198,7 +199,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         variant = self.variant
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        hgvs_matcher = HGVSMatcher(genome_build=genome_build) #
 
         result = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
         c_hgvs = result.hgvs_variant.format()
@@ -525,7 +526,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return {GenomeBuild.grch37(), GenomeBuild.grch38()}
 
     @staticmethod
-    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'):
+    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'): #
         build_str: str
         if genome_build.is_equivalent(GenomeBuild.grch37()):
             build_str = 'grch37'
@@ -546,11 +547,11 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         return imported_vc, resolved_vc
 
-    def save(self, *args, **kwargs):
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None, **kwargs):
         if not self.imported_md5_hash:
             self.imported_md5_hash = md5sum_str(self.imported_c_hgvs or self.imported_g_hgvs)
 
-        super().save(*args, **kwargs)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields, **kwargs)
 
     def _calculate_validation(self) -> ImportedAlleleInfoValidationTags:
 
@@ -651,6 +652,32 @@ class ImportedAlleleInfo(TimeStampedModel):
         if g_hgvs := self.imported_g_hgvs_obj:
             return g_hgvs
         return None
+
+    @property
+    def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
+        # TODO - deprecate this in favour of imported hgvs (which handles g.HGVS imports)
+        if imported_c_hgvs := self.imported_c_hgvs:
+            c_hgvs = CHGVS(imported_c_hgvs)
+            if imported_genome_build := self.imported_genome_build:
+                c_hgvs.genome_build = imported_genome_build
+            return c_hgvs
+        else:
+            return None
+
+    def preferred_c_hgvs_obj(self, genome_build: Optional[GenomeBuild] = None) -> CHGVS:
+        if genome_build is None:
+            genome_build = GenomeBuildManager.get_current_genome_build()
+
+        if preferred := self[genome_build]:
+            return preferred.c_hgvs_obj
+        else:
+            for genome_build in GenomeBuild.builds_with_annotation_cached():
+                if alternative := self[genome_build]:
+                    if c_hgvs_obj := alternative.c_hgvs_obj:
+                        c_hgvs_obj.is_desired_build = False
+                        c_hgvs_obj.genome_build = genome_build
+                        return c_hgvs_obj
+        return self.imported_hgvs_obj()
 
     @staticmethod
     def all_chgvs(allele: Allele) -> list[CHGVS]:

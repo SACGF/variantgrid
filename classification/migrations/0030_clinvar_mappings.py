@@ -2,11 +2,11 @@
 
 from django.db import migrations
 
-from classification.autopopulate_evidence_keys.clinvar_option_updator import ClinVarOptionUpdator
+from classification.autopopulate_evidence_keys.clinvar_option_updator import EvidenceKeyOptionUpdator
 
 
 def clinical_significance(apps, _schema_editor):
-    options = ClinVarOptionUpdator(apps, "clinical_significance")
+    options = EvidenceKeyOptionUpdator(apps, "clinical_significance")
     options.set_clinvar_option("B", "Benign")
     options.set_clinvar_option("LB", "Likely benign")
     options.set_clinvar_option("VUS", "Uncertain significance")

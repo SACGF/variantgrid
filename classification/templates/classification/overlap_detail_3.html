@@ -1,0 +1,134 @@
+{% load classification_tags %}
+{% load user_tags %}
+{% load js_tags %}
+{% load ui_utils %}
+
+<div class="mt-4">
+    {% if render_mode == "ajax" %}
+        {% labelled label="Page Link" %}<a class="hover-link" href="{{ overlap_grouping.overlap.get_absolute_url }}">Overlap {{ overlap_grouping.overlap.pk }}</a>{% endlabelled %}
+    {% else %}
+        {% with overlap=overlap_grouping.overlap %}
+            {% labelled label="Overlap Status" %}
+                <span style="{% if overlap.has_pending_status %}opacity:0.6{% endif %}">
+                <span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>
+                    {% if overlap.overlap_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status.label }}{% endif %}
+                </span>
+                {% if overlap.has_pending_status  %}
+                    <br/>Pending :
+                    <span {% if overlap.overlap_pending_status.is_attention %}class="text-danger"{% endif %}>
+                    {% if overlap.overlap_pending_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_pending_status.label }}{% endif %}
+                </span>
+                {% endif %}
+                </span>
+                <div id="overlap-{{ overlap.pk }}-updated"></div>
+            {% endlabelled %}
+            {% if overlap.overlap_status_change_timestamp %}
+                {% labelled label="Status Changed as of" %}
+                 {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}
+                {% endlabelled %}
+            {% endif %}
+            {% labelled label="c.HGVS" %}
+                {% for c_hgvs in overlap.c_hgvses %}
+                    <div>{% c_hgvs c_hgvs %}</div>
+                {% endfor %}
+            {% endlabelled %}
+        {% endwith %}
+    {% endif %}
+    {% if overlap_grouping.overlap.allele %}
+        {% labelled label="Allele" %}<a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{{ overlap_grouping.overlap.allele }}</a>{% endlabelled %}
+    {% endif %}
+    {% labelled label="Involved Labs" %}
+        {% for lab_contact in overlap_grouping.involved_labs %}
+            <div>{% lab lab_contact.lab show_contact_link=True contact_subject=lab_contact.email_subject %}</div>
+        {% endfor %}
+        {% comment %}Add a warning if ClinVar is in the list of labs, they wont be diffed{% endcomment %}
+    {% endlabelled %}
+    {% if overlap_grouping.discordance_reports %}
+        {% labelled label="Legacy Discordance Reports" %}
+            {% for discordance_report in overlap_grouping.discordance_reports %}
+                <div>{% discordance_report discordance_report %}</div>
+            {% endfor %}
+        {% endlabelled %}
+    {% endif %}
+    {% if overlap_grouping.reviews %}
+        {% labelled label="Legacy Discordance Reports" %}
+            {% for review in overlap_grouping.reviews %}
+                <div><a href="{{ review.get_absolute_url }}" class="hover-link">Review on {{ review.review_date }}</a></div>
+            {% endfor %}
+        {% endlabelled %}
+    {% endif %}
+    {% if user.is_superuser %}
+        {% labelled label="Overlap Admin" %}{% admin_link overlap_grouping.overlap %}{% endlabelled %}
+    {% endif %}
+    {% labelled label="Compare" %}
+        <div><a class="hover-link" href="{% url 'classification_diff' %}?overlap={{ overlap_grouping.overlap.pk }}">Show Diffs</a>
+            {% if overlap_grouping.overlap.has_clinvar_expert_panel %} <span class="text-muted"> {{ 'i' | severity_icon }}ClinVar records won't appear in the diff{% endif %}</div>
+    {% endlabelled %}
+</div>
+
+<div class="card">
+    <div class="card-header">Classifications</div>
+    <div class="card-body">
+        <table class="table overlap-summary">
+            <thead>
+                <tr>
+                    <th class="overlap-lab" style="border-top:none">Lab</th>
+                    <th class="overlap-value" style="border-top:none">Value</th>
+                    <th class="overlap-condition" style="border-top:none">Condition</th>
+                    <th class="overlap-curated" style="border-top:none">Curated</th>
+                    <th class="overlap-triage" style="border-top:none">Triage Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for overlap_entry in overlap_grouping.rows %}
+                    {% ifchanged overlap_entry.is_cross_context %}
+                        {% if overlap_entry.is_cross_context %}
+                        <tr><td colspan="6" style="text-align: center; font-weight: 600">Cross Context Records</td></tr>
+                        {% endif %}
+                    {% endifchanged %}
+                    <tr class="{% if overlap_entry.is_cross_context %}cross-context-row{% elif overlap_entry.is_user_lab %}users-row{% endif %}">
+                        <td>
+                            {% lab overlap_entry.overlap_contribution.lab_like is_your_lab=overlap_entry.is_user_lab lab_css="font-weight:500" %}
+                            <div>{% testing_context overlap_entry.overlap_contribution style="subtle" %}</div>
+
+                            {% if overlap_entry.overlap_contribution.scv %}
+                                <a class=hover-link" href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ overlap_entry.overlap_contribution.scv }}">{{ overlap_entry.overlap_contribution.scv }}</a>
+                            {% else %}
+                                {% with classification=overlap_entry.overlap_contribution.classification_grouping.latest_classification_modification.classification %}
+                                    <a class="hover-link" href="{{ classification.get_absolute_url }}">{{ classification.cr_lab_id }}</a>
+                                {% endwith %}
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div id="triage-{{ overlap_entry.overlap_contribution.pk }}-value">
+                            {% if overlap_entry.overlap_contribution.effective_value != overlap_entry.overlap_contribution.value %}
+                                <div>{% clinical_significance overlap_entry.overlap_contribution.value extra_css="strike"%}</div>
+                                <div>{% clinical_significance overlap_entry.overlap_contribution.effective_value %}</div>
+                            {% else %}
+                                <div>{% clinical_significance overlap_entry.overlap_contribution.value %}</div>
+                            {% endif %}
+                            </div>
+                            <div class="overlap-criteria">
+                                {% for criteria_label in overlap_entry.overlap_contribution.classification_grouping.latest_cached_summary.criteria_labels %}<span class="comma-sep">{{ criteria_label }}</span>{% endfor %}
+                            </div>
+                        </td>
+                        <td>{% condition overlap_entry.overlap_contribution.conditions %}</td>
+                        <td>{% timestamp overlap_entry.overlap_contribution.effective_date_obj.date time_ago=True %}</td>
+
+                        <td>
+                            {% if not overlap_entry.is_cross_context %}
+                                <div style="display:inline-block; width:100%" id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_icon=True show_label=True show_link=overlap_entry.is_editable style="long" %}</div>
+                            {% else %}
+                                <div class="no-value">Cross Context</div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<br/>
+<div class="mb-4">
+    <a data-toggle="ajax-collapse" href="{% url 'overlap_history' overlap_grouping.overlap.pk %}" title="Overlap History <i class='fas fa-history'></i>"></a>
+</div>

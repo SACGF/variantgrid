@@ -1,7 +1,7 @@
 /* This is include with AnalysisNode form media */
 function analysisVariableNodeFieldSetup() {
-    const nodeId = $(this).parents("#node-editor-wrapper").attr("node_id");
-    const field = $(this).attr("field");
+    let nodeId = $(this).parents("#node-editor-wrapper").attr("node_id");
+    let field = $(this).attr("field")
     $(".add-analysis-variable-button", this).click(function() {
         analysisVariable(nodeId, field, 'add', function() {
             addAnalysisVariableButton(nodeId, field);
@@ -9,7 +9,7 @@ function analysisVariableNodeFieldSetup() {
         });
     });
 
-    const fieldSet = analysisNodeVariables[nodeId];
+    let fieldSet = analysisNodeVariables[nodeId];
     if (fieldSet) {
         if (fieldSet.has(field)) {
             lockNodeField(nodeId, field, true);

@@ -3,7 +3,7 @@ function defaultFor(arg, val) {
 }
 
 function defaultLayout(title, width, height) {
-    const layout = {
+    let layout = {
       title: title,
       'width': defaultFor(width, 600),
       'height': defaultFor(height, 400),
@@ -14,14 +14,14 @@ function defaultLayout(title, width, height) {
 
 
 function dictToData(dict, type) {
-    const labels = [];
-    const values = [];
-    for (const k in dict) {
+    let labels = [];
+    let values = [];
+    for (let k in dict) {
         labels.push(k);
         values.push(dict[k]);
     }
 
-    const data = {
+    let data = {
       values: values,
       labels: labels,
       type: type,
@@ -31,24 +31,24 @@ function dictToData(dict, type) {
 
 
 function plotPieDict(selector, title, dict, width, height) {
-    const data = dictToData(dict, 'pie');
-    const layout = defaultLayout(title, width, height);
+    let data = dictToData(dict, 'pie');
+    let layout = defaultLayout(title, width, height);
     Plotly.newPlot(selector, [data], layout);
 }
 
 
 function plotBoxDict(selector, title, dict, width, height) {
-    const keys = Object.keys(dict);
+    let keys = Object.keys(dict);
     return plotBoxKeysDict(selector, title, keys, dict, width, height);
 }
     
 
 function getBoxDataFromDict(keys, dict) {
-    const data = [];
+    let data = [];
 
     for (let i=0 ; i<keys.length ; i++) {
-        const k = keys[i];
-        const d = {
+        let k = keys[i];
+        let d = {
             name: k,
             type: 'box',
             y: dict[k],
@@ -62,17 +62,17 @@ function getBoxDataFromDict(keys, dict) {
 }
 
 function plotBoxKeysDict(selector, title, keys, dict, width, height) {
-    const data = getBoxDataFromDict(keys, dict);
-    const layout = defaultLayout(title, width, height);
+    let data = getBoxDataFromDict(keys, dict);
+    let layout = defaultLayout(title, width, height);
     Plotly.newPlot(selector, data, layout);
 }
 
 function getBoxDataFromLabelsMatrix(labels, matrix) {
-    const data = [];
+    let data = [];
 
     for (let i=0 ; i<matrix.length ; i++) {
-        const label = labels[i];
-        const d = {
+        let label = labels[i];
+        let d = {
             name: label,
             type: 'box',
             y: matrix[i],
@@ -86,21 +86,21 @@ function getBoxDataFromLabelsMatrix(labels, matrix) {
 }
 
 function plotBoxLabelsMatrix(selector, title, labels, matrix, width, height) {
-    const data = getBoxDataFromLabelsMatrix(labels, matrix);
-    const layout = defaultLayout(title, width, height);
+    let data = getBoxDataFromLabelsMatrix(labels, matrix);
+    let layout = defaultLayout(title, width, height);
     Plotly.newPlot(selector, data, layout);
 }
 
 function plotBarDict(selector, title, dict, width, height) {
-    const data = dictToData(dict, 'bar');
+    let data = dictToData(dict, 'bar');
 
-    const layout = defaultLayout(title, width, height);
+    let layout = defaultLayout(title, width, height);
     Plotly.newPlot(selector, [data], layout);
 }
 
 
 function plotBarArrays(selector, title, x, y, width, height, color) {
-    const data = {
+    let data = {
         x: x,
         y: y,
         type: 'bar',
@@ -109,14 +109,14 @@ function plotBarArrays(selector, title, x, y, width, height, color) {
     if (color) {
         data["marker"] = {color: color};
     }
-    const layout = defaultLayout(title, width, height);
+    let layout = defaultLayout(title, width, height);
     Plotly.newPlot(selector, [data], layout);
 }
 
 
 
 function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
-    const data = {
+    let data = {
         x: x,
         y: y,
         type: 'bar',
@@ -126,7 +126,7 @@ function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
     if (color) {
         data["marker"] = {color: color};
     }
-    const layout = defaultLayout(title, width, height);
+    let layout = defaultLayout(title, width, height);
     layout["xaxis"] = {autotick: true};
 
     if (margin) {
@@ -138,7 +138,7 @@ function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
 
 
 function plotLineArrays(selector, x, y, layout) {
-    const data = [
+    let data = [
       {
         x: x,
         y: y,
@@ -151,21 +151,21 @@ function plotLineArrays(selector, x, y, layout) {
 
 
 function showStackedBar(elementId, title, width, height, named_data, x_labels) {
-    const x = [];
+    let x = [];
     for (let i=0 ; i<x_labels.length ; ++i) {
         x.push(i);
     } 
     
-    const data = [];
+    let data = [];
     for(let i=0 ; i<named_data.length ; ++i) {
-        const nd = named_data[i];
+        let nd = named_data[i];
         data.push({ 'x' : x,
                     'y' : nd[1],
                     'name' : nd[0],
                     'type' : 'bar'});
     }
 
-    const layout = defaultLayout(title, width, height);
+    let layout = defaultLayout(title, width, height);
     layout.xaxis = {
         tickvals: x,
         ticktext: x_labels,
@@ -179,14 +179,14 @@ function showStackedBar(elementId, title, width, height, named_data, x_labels) {
 
 
 function showHeatMap(elementId, title, x, y, z, labels) {
-    const data = [{
+    let data = [{
       x: x,
       y: y,
       z: z,
       type: 'heatmap',
     }];
     
-    const layout = {
+    let layout = {
       title: title,
       titlefont: {
         size: 32,
@@ -210,13 +210,13 @@ function showHeatMap(elementId, title, x, y, z, labels) {
     let textColor;
     for ( let i = 0; i < y.length; i++ ) {
       for ( let j = 0; j < x.length; j++ ) {
-        const currentValue = labels[i][j];
+        let currentValue = labels[i][j];
         if (currentValue != 0.0) {
           textColor = 'white';
         } else {
           textColor = 'black';
         }
-        const result = {
+        let result = {
           xref: 'x1',
           yref: 'y1',
           x: x[j],
@@ -239,8 +239,8 @@ function showHeatMap(elementId, title, x, y, z, labels) {
     Plotly.newPlot(elementId, data, layout);
     
     // Shift title up a bit
-    const TITLE_Y = -20;
-    const textTitle = $("text.gtitle", "#" + elementId);
+    let TITLE_Y = -20;
+    let textTitle = $("text.gtitle", "#" + elementId);
     y = parseInt(textTitle.attr("y"));
     textTitle.attr("y", y + TITLE_Y);
 }

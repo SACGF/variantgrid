@@ -31,7 +31,7 @@ class ClassificationLab(ExportRow):
         value_set = set()
         for cm in self.cms:
             value_tuple = [cm.get(e_key) for e_key in args]
-            value_tuple = tuple(str(x) if x else None for x in value_tuple)
+            value_tuple = tuple(str(x) if x else "" for x in value_tuple)
             if any(value_tuple):
                 value_set.add(value_tuple)
         if value_set:

@@ -91,7 +91,9 @@ def limit_length(text, limit=100):
 @register.inclusion_tag("uicore/tags/limit_length_with_tooltip.html")
 def limit_length_with_tooltip(text, limit=100):
     tooltip = ""
-    if limit and text and len(text) > limit:
+    if text is None:
+        text = ""
+    if limit and len(text) > limit:
         tooltip = text
         text = text[0:(limit-3)] + '...'
     return {"tooltip": tooltip, "text": text}
@@ -224,6 +226,9 @@ def timedelta_tag(time: timedelta, show_micro=False):
 
 @register.inclusion_tag("uicore/tags/timestamp.html")
 def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, show_micro=False, text_only: bool = False, tooltip: str = ""):
+    if timestamp == '':
+        return {}
+
     css_classes = []
     if time_ago:
         css_classes.append('time-ago')
@@ -233,6 +238,13 @@ def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, sho
         css_classes.append('seconds')
 
     date_value = None
+    if isinstance(timestamp, str):
+        # assume yyyy-MM-ddd
+        try:
+            timestamp = date.fromisoformat(timestamp)#.replace(tzinfo=timezone.get_current_timezone())
+        except ValueError:
+            return {"invalid": timestamp}
+
     if timestamp:
         if not isinstance(timestamp, (int, float)):
             if not hasattr(timestamp, 'timestamp'):
@@ -240,7 +252,7 @@ def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, sho
                     date_value = timestamp
                     timestamp = datetime.datetime(year=timestamp.year, month=timestamp.month, day=timestamp.day, tzinfo=UserSettingsManager.get_user_timezone())
                 else:
-                    raise ValueError(f"Unsure how to convert {timestamp} to timestamp")
+                    return {"invalid": str(timestamp)}
             timestamp = timestamp.timestamp()
         return {
             "tooltip": tooltip,

@@ -434,7 +434,7 @@ class ClassificationGroup:
             return first(all_condition_resolutions)
 
         plain_text_combined = ", ".join(all_plain_texts) if all_plain_texts else None
-        return ConditionResolved(terms=list(all_terms), join=None, plain_text=plain_text_combined)
+        return ConditionResolved(references=list(all_terms), join=None, plain_text=plain_text_combined)
 
     # def sub_groups(self) -> Optional[list['ClassificationGroup']]:
     #     if len(self.modifications) > 1:

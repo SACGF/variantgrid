@@ -4,10 +4,13 @@ from classification.models import classification_flag_types, Classification, Cla
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 
 
-@receiver(flag_comment_action, sender=Flag)
-def check_for_pending(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):
-    if flag_comment.flag.flag_type == classification_flag_types.classification_pending_changes:
-        if c := Classification.objects.filter(flag_collection__id=flag_comment.flag.collection_id).first():
-            # print("UPDATING SUMMARY")
-            c.summary = ClassificationSummaryCalculator(c.last_published_version).cache_dict()
-            c.save(update_fields=["summary"])
+# this is no longer used AT ALL, as the "pending flags" do not affect the summary
+# instead that information is kept at the OverlapContrbution level
+
+# @receiver(flag_comment_action, sender=Flag)
+# def check_for_pending(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):
+#     if flag_comment.flag.flag_type == classification_flag_types.classification_pending_changes:
+#         if c := Classification.objects.filter(flag_collection__id=flag_comment.flag.collection_id).first():
+#             # print("UPDATING SUMMARY")
+#             c.summary = ClassificationSummaryCalculator(c.last_published_version).cache_dict()
+#             c.save(update_fields=["summary"])

@@ -189,6 +189,9 @@ def get_decorated_methods(cls, categories: Optional[dict[Any, Any]], attribute: 
         def passes_filter(export_method) -> bool:
             nonlocal categories
             # FIXME, some non-NONE but falsey values could get confused here, e.g. 0 and False
+            if not export_method.categories:
+                return True
+
             decorated_values = export_method.categories or {}
             # for every requirement of categories
             for key, value in categories.items():

@@ -413,6 +413,40 @@ a {
 	background-image: url(/static/icons/view-details-black.png);
 }
 
+.filter-link {
+	color: #4444bb !important;
+	text-decoration: none;
+
+	&:hover {
+		cursor: pointer;
+		text-decoration: underline;
+	}
+	&:after {
+		content:'\f0b0';
+		position: relative;
+		right: -4px;
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+	}
+}
+.filter-item {
+	cursor: pointer;
+	display: inline-block;
+	padding: 4px 8px 4px 8px;
+	border: 1px solid #aaaaee;
+	border-radius: 12px;
+	&:hover {
+		text-decoration: none;
+	}
+	&:after {
+		position: relative;
+		right: -4px;
+		content: '\f057';
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+	}
+}
+
 .hover-link {
 	color: #4444bb !important;
 	text-decoration: none;
@@ -1152,13 +1186,16 @@ table.datatable.expandable tr {
 }
 
 /* be able to show alerts in tables without them making the row giant */
-
+/* the below worked when we're in a table table cell, but screws up formatting if
+ we just so happen to be in a table (maybe an expanded row) */
+/*
 .table .alert {
 	margin-bottom: 1px;
 	height: 20px;
 	line-height: 16px;
 	padding: 0px 15px 3px 15px;
 }
+ */
 
 .dtrg-start td {
 	background-color: #efefef;
@@ -1273,6 +1310,16 @@ h3.admin {
 			font-weight: bold;
 		}
 	}
+}
+.tiny-pill {
+	font-size: 0.8rem;
+	padding: 2px 4px 0px 4px;
+	background-color: #fefefe;
+	border: 1px solid #aaccaa;
+	border-radius: 8px;
+	display: inline-block;
+	color: #448844;
+	text-decoration: none;
 }
 
 .chunk {
@@ -2989,6 +3036,95 @@ a.clinical-context {
 	}
 }
 
+.overlap-source {
+	font-size: 8pt;
+    text-align: center;
+	border-radius: 2px;
+    display: inline-block;
+    position: relative;
+    width: 80px;
+    background-color: #888888;
+	font-weight: bold;
+	color: #FFF;
+}
+
+.testing-context-box {
+    font-size: 8pt;
+    text-align: center;
+    display: inline-block;
+    position: relative;
+    width: 80px;
+	padding: 4px;
+	border-radius: 6px;
+    background-color: #ddbbdd;
+
+    /*
+    all testing contexts other than Germline are somatic
+
+    NON_CANCER = "N", "Non-Cancer Somatic"
+    HAEMATOLOGY = "H", "Haematology"
+    SOLID_TUMOR = "S", "Solid Tumour"
+    OTHER = "O", "Other" # FIXME Somatic Other
+    GERMLINE = "G", "Germline"
+    UNKNOWN = "U", "Unknown"
+     */
+
+    color: #FFF;
+    font-weight: bold;
+    &.testing-context-G {
+        color: #444;
+        background-color: #aaeeaa;
+    }
+}
+
+.testing-context-text-G {
+	color: #44cc22;
+	font-weight: bold;
+}
+.testing-context-text-S {
+	color: #aa33aa;
+	font-weight: bold;
+}
+.testing-context-text-H {
+	color: #aa3399;
+	font-weight: bold;
+}
+.testing-context-text-N {
+	color: #aa3388;
+	font-weight: bold;
+}
+
+.testing-context-G {
+	background-color: #ddeedd;
+}
+.testing-context-S {
+	background-color: #ffc6ff;
+}
+.testing-context-H {
+	background-color: #ffccff;
+}
+.testing-context-N {
+	background-color: #ffbbff;
+}
+td.allele-origin-G {
+	background-color: #ddffdd;
+}
+.testing-context-C {
+	// C for cross context
+	background-color: #eeeeee;
+	opacity: 0.7;
+	color: #444444;
+}
+td.allele-origin-S {
+	background-color: #ffdcff;
+}
+.testing-context-table {
+	tbody tr td {
+		border-top-width: 0;
+	}
+}
+
+
 a .c-hgvs-body {
 
 	.c-hgvs-transcript,
@@ -3066,8 +3202,8 @@ a .c-hgvs-body {
 	border-radius: 6px;
 	width: 130px;
 	text-align: center;
-	border: 1px solid rgba(255,255,255, 0.4);
-	color: #555;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	// color: #555;
 	font-weight: 600;
 
 	.amp-level {
@@ -3078,69 +3214,77 @@ a .c-hgvs-body {
 		//}
 	}
 
-	&.scs-none, &.cs-none {
-		border: none !important;
-		background-color: #eeeeee;
-	}
+}
+.cs-none {
+	border: none !important;
+	background-color: #eeeeee;
+}
 
-	&.scs-tier_1 {
-		background-color: #ffcccc;
-	}
+.cs-tier_1 {
+	background-color: #ffcccc;
+}
 
-	&.scs-tier_1_or_2 {
-		background-color: #ffd5d5;
-	}
+.cs-tier_1_or_2 {
+	background-color: #ffd5d5;
+}
 
-	&.scs-tier_2 {
-		background-color: #ffdddd;
-	}
+.cs-tier_2 {
+	background-color: #ffdddd;
+}
 
-	&.scs-tier_3 {
-		background-color: #dddddd;
-	}
+.cs-tier_3 {
+	background-color: #dddddd;
+}
 
-	&.scs-tier_4 {
-		background-color: #ccccff;
-	}
+.cs-tier_4 {
+	background-color: #ccccff;
+}
 
-	&.cs-b {
-		background-color: #ccccff;
-	}
+.cs-b {
+	background-color: #ccccff;
+}
 
-	&.cs-lb {
-		background-color: #ddddff;
-	}
+.cs-lb {
+	background-color: #ddddff;
+}
 
-	&.cs-r, cs-dr {
-		background-color: #eeeeee;
-	}
+.cs-r, cs-dr {
+	background-color: #eeeeee;
+}
 
-	&.cs-vus,
-	&.cs-vus_a,
-	&.cs-vus_b,
-	&.cs-vus_c {
-		background-color: #dddddd;
-	}
+.cs-vus,
+.cs-vus_a,
+.cs-vus_b,
+.cs-vus_c {
+	background-color: #dddddd;
+}
 
-	&.cs-lp, &.cs-lo {
-		background-color: #ffdddd;
-	}
+.cs-lp, .cs-lo {
+	background-color: #ffdddd;
+}
 
-	&.cs-p, &.cs-o {
-		background-color: #ffcccc;
-	}
+.cs-p, .cs-o {
+	background-color: #ffcccc;
+}
 
-	//.cs- {
-	//	background-color: #f0f0f0;
-	//}
+//.cs- {
+//	background-color: #f0f0f0;
+//}
 
-	&.cs-pending {
-		background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
-	}
+.cs-pending {
+	background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
+}
 
-	&.cs-withdrawn {
-		opacity: 0.5;
-	}
+.cs-withdrawn {
+	opacity: 0.5;
+}
+
+.cs-dot {
+	min-width: 16px;
+	border-radius: 6px;
+	padding: 6px;
+	text-align: center;
+	display: inline-block;
 }
 
 .cs-card {
@@ -3188,5 +3332,46 @@ a .c-hgvs-body {
 	time.ago {
 		color: black;
 		background: black;
+	}
+}
+
+.comment {
+	padding: 8px 8px 8px 0;
+	color: #888;
+
+	&:before {
+		content: '\f27a';
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+		padding-right: 8px;
+	}
+}
+
+table.overlap-summary {
+	th.overlap-lab {
+		width: 250px;
+	}
+	th.overlap-value {
+		width: 200px;
+	}
+	th.overlap-condition {
+		width: 200px;
+	}
+	th.overlap-curated {
+		width: 100px;
+	}
+	th.overlap-triage {
+		width: 300px;
+	}
+	tr.users-row {
+		background-color: #eeeeee;
+	}
+	tr.cross-context-row {
+		opacity: 0.6;
+		background-color: #f4f4f4;
+	}
+	.overlap-criteria {
+		padding: 3px 0 3px 0;
+		color: #444;
 	}
 }

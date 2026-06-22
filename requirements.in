@@ -67,7 +67,7 @@ pandas
 ped_parser
 pronto>=2.4.7
 psycopg2
-pypdf>=6.13.3
+pypdf
 pysam
 python_dateutil
 pyyaml
@@ -90,3 +90,6 @@ django_threadlocals
 frozendict
 pydantic>=2.4.0
 deepdiff
+dataclasses-json==0.6.7
+# required for omniimporter
+openpyxl

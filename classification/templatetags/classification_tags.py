@@ -10,14 +10,16 @@ from django.contrib.auth.models import User
 from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
+from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
 from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, TestingContextBucket, TriageComment
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
-    EvidenceMixin, ClassificationSummaryCacheDictPathogenicity
+    EvidenceMixin, Overlap, ClassificationGroupingEntry, \
+    OverlapContribution, ClassificationGrouping, ClassificationResultValue, TestingContextFull, ConditionReference
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -27,13 +29,15 @@ from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
+from classification.enums.overlaps_enums import TriageStatus
+from classification.services.overlaps_services import OverlapEntryCompare
 from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Lab
+from snpdb.models import Lab, LabLike
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant
@@ -212,15 +216,16 @@ def clinical_significance_values(vcm: ClassificationModification):
     classification = vcm.classification
     always_show_somatic = vcm.classification.allele_origin_bucket != "G"
 
-    pathogenicity = classification.summary_typed.get("pathogenicity")
-    somatic_dict: ClassificationSummaryCacheDictPathogenicity = classification.summary_typed.get("somatic")
+    summary_obj = classification.summary_obj
+    # pathogenicity: ClassificationSummaryCacheDictPathogenicity = classification.summary_typed.get("pathogenicity")
+    # somatic_dict: ClassificationSummaryCacheDictSomatic = classification.summary_typed.get("somatic")
 
     germline_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     pending_from = None
-    value = pathogenicity.get("classification")
-    if pending_classification_value := pathogenicity.get("pending"):
-        pending_from = germline_key.pretty_value(value, value) or "No Data"
-        value = pending_classification_value
+    value = summary_obj.pathogenicity.classification
+    # if pending_classification_value := pathogenicity.get("pending"):  # FIXME pending values will be in OverlapContribution now not "pending"
+    #     pending_from = germline_key.pretty_value(value, value) or "No Data"
+    #     value = pending_classification_value
     value_list = [{
         "title": germline_key.pretty_label,
         "pending_from": pending_from,
@@ -228,17 +233,17 @@ def clinical_significance_values(vcm: ClassificationModification):
         "css_class": "cs cs-" + (value.lower() if value else "none")
     }]
 
-    if always_show_somatic or somatic_dict and somatic_dict.get("classification"):
+    if always_show_somatic or summary_obj.somatic.clinical_significance:
         somatic_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-        value = somatic_dict.get("clinical_significance")
+        value = summary_obj.somatic.clinical_significance
         label = somatic_key.pretty_value(value, value) or "No Data"
-        if amp_level := somatic_dict.get("amp_level"):
+        if amp_level := summary_obj.somatic.amp_level:
             label += amp_level
 
         somatic = {
             "title": somatic_key.pretty_label,
             "label": label,
-            "css_class": f"scs scs-{value.lower() if value else 'none'}"
+            "css_class": f"scs cs-{value.lower() if value else 'none'}"
         }
         value_list.append(somatic)
 
@@ -246,11 +251,13 @@ def clinical_significance_values(vcm: ClassificationModification):
 
 
 @register.inclusion_tag("classification/tags/clinical_significance.html")
-def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True):
+def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True, extra_css: str = ""):
     if isinstance(value, EvidenceMixin):
         value = value.get(evidence_key)
     if value is None and not show_if_none:
         return {"skip": True}
+    if isinstance(value, str) and "tier" in value:
+        evidence_key = SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE
 
     key = EvidenceKeyMap.cached_key(evidence_key)
     label = key.option_dictionary.get(value, value) or "No Data"
@@ -258,9 +265,10 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
     if value == "withdrawn":
         label = "Withdrawn"
 
-    prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"
+    #prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"
+    prefix = "cs"
     css_value = value.lower() if value else "none"
-    css_class = f"{prefix} {prefix}-{css_value}"
+    css_class = f"{prefix} {prefix}-{css_value} {extra_css}"
 
     return {
         "css_class": css_class,
@@ -286,10 +294,14 @@ def clinical_significance_inline(value):
     }
 
 @register.inclusion_tag("classification/tags/lab.html")
-def lab(lab: Lab, your_lab: Optional[Lab] = None):
+def lab(lab: LabLike, is_your_lab: Optional[bool] = None, lab_css: Optional[str] = None, show_contact_link: bool = False, contact_subject: Optional[str] = None, contact_body: Optional[str] = None):
     return {
         "lab": lab,
-        "is_your_lab": your_lab is True or your_lab == lab
+        "is_your_lab": is_your_lab,
+        "show_contact_link": show_contact_link and not is_your_lab,
+        "subject": contact_subject or "",
+        "body": contact_body,
+        "lab_css": lab_css
     }
 
 
@@ -310,28 +322,59 @@ def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizonta
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
 def classification_quick(context,
-                         vc: Union[Classification, ClassificationModification],
-                         show_clinical_grouping=True,
+                         vc: Union[Classification, ClassificationModification, ClassificationGrouping],
+                         show_share_level=True,
+                         show_id=True,
                          show_lab=True,
+                         show_category=False,
                          show_condition=False,
                          show_criteria=False,
                          show_flags=False,
                          show_imported_c_hgvs=False,
+                         show_values=True,
                          record_count: Optional[int] = None,
-                         mode: Optional[str] = "detailed"):
+                         mode: Optional[str] = "detailed"):  # other options are "split" and "compact"
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
+    elif isinstance(vc, ClassificationGrouping):
+        vc = vc.latest_classification_modification.classification
+        vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
+
+    id_texts = []
+    if show_lab:
+        id_texts.append(str(vcm.classification.lab))
+    if show_id:
+        id_texts.append(str(vcm.cr_lab_id))
+
+    id_text: str
+    if id_texts:
+        id_text = " / ".join(id_texts)
+    else:
+        id_text = "record"
+
+    category_text = None
+    if show_category:
+        if grouping := ClassificationGroupingEntry.grouping_for(vcm.classification):
+            parts = grouping.allele_origin_grouping.labels(include_allele_origin=True)
+            if parts[0] == "Somatic":
+                parts = parts[1:]
+            category_text = " - ".join(p for p in parts if p)
+
     return {
         "vcm": vcm,
-        "show_clinical_grouping": show_clinical_grouping,
         "mode": mode,
+        "show_share_level": show_share_level,
+        "id_text": id_text,
+        "category_text": category_text,
+        "show_id": show_id,
         "show_lab": show_lab,
         "show_condition": show_condition,
         "show_criteria": show_criteria,
         "show_flags": show_flags,
         "show_imported_c_hgvs": show_imported_c_hgvs,
+        "show_values": show_values,
         "record_count": record_count
     }
 
@@ -449,13 +492,13 @@ def _to_c_hgvs(c_hgvs: Any) -> CHGVS:
 
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[CHGVS, ClassificationModification, str], show_genome_build: Optional[bool] = None):
+def c_hgvs(c_hgvs: Union[CHGVS, ClassificationModification, str], show_genome_build: Optional[bool] = None, inline: bool = False):
     c_hgvs = _to_c_hgvs(c_hgvs)
 
     if show_genome_build is None:
         show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
 
-    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None}
+    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None, "inline": inline}
 
 
 @register.inclusion_tag("classification/tags/allele.html")
@@ -577,12 +620,14 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
 
 
 @register.inclusion_tag("classification/tags/condition.html")
-def condition(condition_obj: Union[OntologyTerm, ConditionResolved],
+def condition(condition_obj: Union[OntologyTerm, ConditionResolved, dict],
               limit: Optional[int] = 100,
               show_link: Optional[bool] = True,
               no_condition_message: bool = False):
-    if isinstance(condition_obj, OntologyTerm):
-        condition_obj = ConditionResolved(terms=[condition_obj])
+    if isinstance(condition_obj, dict):
+        condition_obj = ConditionResolved.from_dict(condition_obj)
+    elif isinstance(condition_obj, OntologyTerm):
+        condition_obj = ConditionResolved(references=[ConditionReference(condition_obj)])
     return {"condition": condition_obj, "limit": limit, "show_link": show_link, "no_condition_message": no_condition_message}
 
 
@@ -704,3 +749,93 @@ def user_view_events(user: User, days: int = 1):
 def evidence_key_input(key: str):
     e_key = EvidenceKeyMap.cached_key(key)
     return {"e_key": e_key}
+
+
+@register.inclusion_tag("classification/tags/overlap.html")
+def overlap(overlap: Overlap, admin_link: bool = True, show_value_type: bool = True, versus: Optional[Overlap] = None):
+    return {
+        "overlap": overlap,
+        "admin_link": admin_link,
+        "show_value_type": show_value_type
+    }
+
+
+# FIXME rename to OverlapContribution
+@register.inclusion_tag("classification/tags/overlap_contribution.html")
+def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompare, show_lab: bool = False, show_context: bool = True):
+    compare_overlap_status = None
+    cross_context = False
+
+    if isinstance(overlap_entry, OverlapEntryCompare):
+        cross_context = overlap_entry.is_cross_context
+        compare_overlap_status = overlap_entry.comparison
+        overlap_entry = overlap_entry.entry_2
+
+    return {
+        "overlap_contribution": overlap_entry,
+        "show_lab": show_lab,
+        "show_context": show_context,
+        "compare_overlap_status": compare_overlap_status,
+        "cross_context": cross_context
+    }
+
+
+@register.inclusion_tag("classification/tags/testing_context.html")
+def testing_context(obj: Union[OverlapContribution, TestingContextFull], style: str = "normal"):
+    return {
+        "testing_context_bucket": TestingContextBucket(obj.testing_context_bucket),
+        "tumor_type_category": obj.tumor_type_category,
+        "style": style
+    }
+
+
+@register.inclusion_tag("classification/tags/triage.html", takes_context=True)
+def triage(context,
+           triage: OverlapContribution,
+           show_label: bool = False,
+           show_link: bool = False,
+           show_icon: bool = False,
+           style: str = "compact"
+           ):
+    new_value = None
+    # if show_link and isinstance(triage, ClassificationGroupingValueTriageHistory):
+    #     raise ValueError("can't show_link on Triage History")
+
+    if triage.triage_state_obj.status == TriageStatus.REVIEWED_WILL_FIX:
+        new_value = triage.triage_state_obj.amend_value
+        value_type = triage.value_type
+
+        if new_value == 'undecided':  # fixme standardise terminology
+            new_value = "To Be Determined"
+        elif value_type == ClassificationResultValue.ONC_PATH:
+            new_value = EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).pretty_value(new_value)
+        elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+            new_value = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(new_value)
+
+    last_comment = triage.last_comment
+    if last_comment and triage.triage_state_obj.status == TriageStatus.AMENDED:
+        last_comment = None  # TODO, would be good to see the date of the amend
+
+    return {
+        "triage": triage,
+        "new_value": new_value,
+        "show_label": show_label,
+        "show_link": show_link,
+        "show_icon": show_icon,
+        "style": style,
+        "last_comment": last_comment
+    }
+
+
+# Overlap Email
+@register.inclusion_tag("classification/tags/overlap_row_email.html")
+def overlap_row_email(overlap: Overlap, lab: Lab, genome_build: GenomeBuild):
+
+    date_str = f"{overlap.overlap_status_change_timestamp:%Y-%m-%d}"
+    if (timezone.now() - overlap.overlap_status_change_timestamp) <= timedelta(days=1):
+        date_str = f"{date_str} (NEW)"
+    return {
+        "date_str": date_str,
+        "overlap": overlap,
+        "c_hgvs": overlap.c_hgvs(lab, genome_build)
+    }

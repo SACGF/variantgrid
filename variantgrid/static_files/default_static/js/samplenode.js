@@ -84,7 +84,7 @@ function sampleNodeUpdateState(args) {
 	$('svg', this).remove();
 	const sideLength = SIDE_LENGTH;
 
-	const patient = args['patient'];
+	const patient = args['patient']
 	if (patient) {
 		const sex = patient['sex'];
 		const deceased = patient['deceased'];

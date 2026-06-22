@@ -1,18 +1,18 @@
 // From https://stackoverflow.com/a/24643992/295724
 function JSON2CSV(objArray, header, quote) {
-    const getValue = function(val, defaultValue) {
+    var getValue = function(val, defaultValue) {
         return (typeof val !== 'undefined') ?  val : defaultValue;
-    };
+    }
 
     var header = getValue(header, false);
     var quote = getValue(quote, false);
 
-    const array = typeof objArray != 'object' ? JSON.parse(objArray) : objArray;
-    let str = '';
+    var array = typeof objArray != 'object' ? JSON.parse(objArray) : objArray;
+    var str = '';
     var line = '';
 
     if (header) {
-        const head = array[0];
+        var head = array[0];
         if (quote) {
             for (var index in array[0]) {
                 var value = index + "";
@@ -28,7 +28,7 @@ function JSON2CSV(objArray, header, quote) {
         str += line + '\r\n';
     }
 
-    for (let i = 0; i < array.length; i++) {
+    for (var i = 0; i < array.length; i++) {
         var line = '';
 
         if (quote) {

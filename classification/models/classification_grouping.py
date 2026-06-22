@@ -1,31 +1,33 @@
 import operator
+from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Set, Self, Tuple
+from typing import Optional, Self, Tuple
 
 import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
-from django.db import models, transaction
-from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet
+from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet, OuterRef, Count, \
+    F
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
-
+from classification.enums import TestingContextBucket, TestingContextFull
+from django.db import models, transaction
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved
-from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
-    ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
+    ConditionResolved, ConditionReference, ClassificationSummaryCacheObj
+from classification.enums.overlaps_enums import ClassificationResultValue
 from genes.models import GeneSymbol
 from library.utils import strip_json
-from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
-
+classification_grouping_summary_signal = django.dispatch.Signal()  # args: "instance", expects ClassificationGrouping, old_summary, new_summary
 
 # TODO this needs to be moved to Classification
 # class ClassificationQualityLevel(TextChoices):
@@ -63,131 +65,74 @@ class ClassificationClassificationBucket(TextChoices):
 def classification_sort_order(clin_sig: str) -> int:
     return EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_indexes.get(clin_sig, 0)
 
-
-class OverlapStatus(IntegerChoices):
-    NO_SHARED_RECORDS = 0, "No Shared Records"
-    SINGLE_SUBMITTER = 10, "Single Shared Submitter"
-    NOT_COMPARABLE_OVERLAP = 20, "Multiple Submitters"  # e.g. no method to work out discordance
-    AGREEMENT = 30, "Agreement"
-    CONFIDENCE = 40, "Confidence"
-    DISCORDANCE = 50, "Discordance"
-    DISCORDANCE_MEDICALLY_SIGNIFICANT = 60, "Discordance"
-
-
-class AlleleGrouping(TimeStampedModel):
-    allele = models.OneToOneField(Allele, on_delete=models.CASCADE)
-    # TODO probably some more summary fields ew could have here?
-    # otherwise what is this serving that Allele isn't?
-
-    def get_absolute_url(self) -> str:
-        return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.pk})
-
-    @cached_property
-    def allele_origin_dict(self) -> dict[AlleleOriginBucket, 'AlleleOriginGrouping']:
-        by_bucket = {}
-        for ao in AlleleOriginGrouping.objects.filter(allele_grouping=self).prefetch_related("classificationgrouping_set"):
-            by_bucket[ao.allele_origin_bucket] = ao
-        return by_bucket
-
-    def allele_origin_grouping(self, allele_origin_bucket: AlleleOriginBucket) -> Optional['AlleleOriginGrouping']:
-        return self.allele_origin_dict.get(allele_origin_bucket)
+#
+# class OverlapStatus(IntegerChoices):
+#     NO_SHARED_RECORDS = 0, "No Shared Records"
+#     SINGLE_SUBMITTER = 10, "Single Shared Submitter"
+#     NOT_COMPARABLE_OVERLAP = 20, "Multiple Submitters"  # e.g., no method to work out discordance
+#     AGREEMENT = 30, "Agreement"
+#     CONFIDENCE = 40, "Confidence"
+#     DISCORDANCE = 50, "Discordance"
+#     DISCORDANCE_MEDICALLY_SIGNIFICANT = 60, "Discordance"
 
 
 class AlleleOriginGrouping(TimeStampedModel):
-    allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
+    allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.UNKNOWN)
+    testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, default=TestingContextBucket.UNKNOWN)
+    tumor_type_category = models.TextField(null=True, blank=True)
+
+    @staticmethod
+    def allele_origin_dict(allele: Allele) -> dict[AlleleOriginBucket, 'AlleleOriginGrouping']:
+        by_bucket = {}
+        for ao in AlleleOriginGrouping.objects.filter(allele=allele).prefetch_related("classificationgrouping_set"):
+            by_bucket[ao.allele_origin_bucket] = ao
+        return by_bucket
+
+    @property
+    def testing_context_bucket_obj(self):
+        return TestingContextBucket(self.testing_context_bucket)
+
+    @property
+    def testing_context_full(self):
+        return TestingContextFull(
+            testing_context_bucket=self.testing_context_bucket_obj,
+            tumor_type_category=self.tumor_type_category
+        )
+
+    def __str__(self):
+        return f"{self.allele} {self.get_allele_origin_bucket_display()} Testing Context: {self.get_testing_context_bucket_display()} Sub-Type: {self.tumor_type_category}"
+
+    def labels(self, include_allele_origin=True) -> list[Optional[str]]:
+        parts = []
+        if include_allele_origin:
+            parts.append(AlleleOriginBucket(self.allele_origin_bucket).label)
+        if self.allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+            if self.testing_context_bucket in {TestingContextBucket.UNKNOWN.value, TestingContextBucket.OTHER.value}:
+                parts.append("Testing Context")
+            parts.append(TestingContextBucket(self.testing_context_bucket).label)
+            if TestingContextBucket(self.testing_context_bucket).should_have_subdivide:
+                parts.append(self.tumor_type_category)
+        return parts
+
+    # class Meta:
+    #     unique_together = ("lab", "allele_origin_grouping", "allele_origin_bucket", "testing_context_bucket")
+    #     indexes = [
+    #         models.Index(fields=["allele_origin_grouping"]),
+    #         models.Index(fields=["testing_context_bucket", "tumor_type_category"])
+    #     ]
 
     @property
     def allele_origin_bucket_obj(self):
         return AlleleOriginBucket(self.allele_origin_bucket)
 
     class Meta:
-        unique_together = ("allele_grouping", "allele_origin_bucket")
-
-    overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_SHARED_RECORDS)
-    dirty = models.BooleanField(default=True)
-    # classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
-    # somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
+        unique_together = ("allele", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
     def __lt__(self, other: Self):
-        if id_diff := self.allele_grouping.pk - other.allele_grouping.pk:
+        if id_diff := self.allele.pk - other.allele.pk:
             return id_diff
         return self.allele_origin_bucket < other.allele_origin_bucket
-
-    def get_absolute_url(self) -> str:
-        return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.allele_grouping_id})
-
-    def update(self):
-        # FIX-ME re-do this once we work out how we handle discordance within a single lab ClassificationGrouping
-
-        # # not sure if this is the best solution, or if an AlleleOriginGrouping should just refuse to update if attached allele groupings are dirty
-        # all_classification_values = set()
-        # all_somatic_clinical_significance_values = set()
-        # classification_groupings: list[ClassificationGrouping] = list(self.classificationgrouping_set.all())
-        # for cg in classification_groupings:
-        #     if cg.dirty:
-        #         cg.update()
-        # shared_groupings = [cg for cg in classification_groupings if cg.share_level_obj.is_discordant_level]
-        # for cg in shared_groupings:
-        #     if classification_values := cg.classification_values:
-        #         all_classification_values |= set(classification_values)
-        #     if somatic_values := cg.somatic_clinical_significance_values:
-        #         all_somatic_clinical_significance_values |= set(somatic_values)
-        #
-        # self.classification_values = list(EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(all_classification_values))
-        # self.somatic_clinical_significance_values = [sg.as_str for sg in sorted(SomaticClinicalSignificanceValue.from_str(sg) for sg in all_somatic_clinical_significance_values)]
-        #
-        # overlap_status: OverlapStatus
-        # if len(shared_groupings) == 0:
-        #     overlap_status = OverlapStatus.NO_SHARED_RECORDS
-        # elif len(shared_groupings) == 1:
-        #     overlap_status = OverlapStatus.SINGLE_SUBMITTER
-        # elif self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
-        #     overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
-        # else:
-        #     bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
-        #     buckets = {bucket_mapping.get(class_value) for class_value in self.classification_values}
-        #     if None in buckets:
-        #         buckets.remove(None)
-        #
-        #     if len(buckets) > 1:
-        #         # discordant
-        #         if "P" in all_classification_values or "LP" in all_classification_values:
-        #             overlap_status = OverlapStatus.DISCORDANCE_MEDICALLY_SIGNIFICANT
-        #         else:
-        #             overlap_status = OverlapStatus.DISCORDANCE
-        #     else:
-        #         if len(all_classification_values) > 1:
-        #             overlap_status = OverlapStatus.CONFIDENCE
-        #         else:
-        #             # complete agreement
-        #             overlap_status = OverlapStatus.AGREEMENT
-        #
-        # self.overlap_status = overlap_status
-        self.dirty = False
-        self.save()
-
-        # TODO manage pending classifications
-
-
-# @dataclass
-# class ClassificationSubGrouping:
-#     latest_modification: ClassificationModification
-#     count: int
-#
-#     @staticmethod
-#     def from_modifications(modifications: list[ClassificationModification]) -> list['ClassificationSubGrouping']:
-#         # subgroup by classification value for germline and
-#         by_status: dict[str, ClassificationSubGrouping] = {}
-#         for mod in modifications:
-#             key = str(mod.somatic_clinical_significance_value) + str(mod.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
-#             if existing := by_status.get(key):
-#                 existing.count += 1
-#                 existing.latest_modification = max(mod, existing.latest_modification, key=lambda m: (m.curated_date_check, m.pk))
-#             else:
-#                 by_status[key] = ClassificationSubGrouping(latest_modification=mod, count=1)
-#         # FIXME sort
-#         return list(by_status.values())
 
 
 class ClassificationGroupingPathogenicDifference(IntegerChoices):
@@ -206,8 +151,65 @@ class ClassificationGrouping(TimeStampedModel):
     # key
     allele_origin_grouping = models.ForeignKey(AlleleOriginGrouping, on_delete=models.CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
-    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
+    classification_count = models.IntegerField(default=0)
+    # these differences are internal within a lab, even if it's medical significant the overall
+    pathogenic_difference = models.IntegerField(choices=ClassificationGroupingPathogenicDifference.choices, default=ClassificationGroupingPathogenicDifference.NO_DIFF)
+    somatic_difference = models.IntegerField(choices=ClassificationGroupingSomaticDifference.choices, default=ClassificationGroupingSomaticDifference.NO_DIFF)
+    dirty = models.BooleanField(default=True)
+    conditions = models.JSONField(null=True, blank=True)
+    zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
+    latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
+    latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
+    latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
+
+    @property
+    def latest_cached_summary_obj(self):
+        return ClassificationSummaryCacheObj.from_dict_safe(self.latest_cached_summary)
+
+    def contribution_for(self, value_type: ClassificationResultValue) -> 'OverlapContribution':
+        from classification.models import OverlapContribution
+        return OverlapContribution.objects.filter(classification_grouping=self, value_type=value_type).first()
+
+    def __str__(self):
+        parts = [
+            f"({self.pk})",
+            "Classification-Grouping",
+            f"{self.allele_origin_grouping.allele:CA}",
+            self.allele_origin_grouping.get_testing_context_bucket_display(),
+            str(self.lab),
+            "Shared" if self.share_level_obj.is_discordant_level else "Not-shared",
+        ]
+        if classification := self.latest_cached_summary.get("pathogenicity").get("classification"):
+            parts.append(f"Class({classification})")
+        if clin_sig := self.latest_cached_summary.get("somatic").get("clin_sig"):
+            parts.append(f"ClinSig({clin_sig})")
+        return " ".join(parts)
+
+    @property
+    def category_text_compact(self) -> str:
+        parts = self.allele_origin_grouping.labels(include_allele_origin=True)
+        if parts[0] == "Somatic":
+            parts = parts[1:]
+        return " - ".join(p for p in parts if p)
+
+    @property
+    def testing_context(self) -> TestingContextBucket:
+        return TestingContextBucket(self.allele_origin_grouping.testing_context_bucket)
+
+    @property
+    def tumor_type_category(self) -> str:
+        return self.allele_origin_grouping.tumor_type_category
+
+    @property
+    def testing_context_full(self) -> TestingContextFull:
+        return TestingContextFull(
+            testing_context_bucket=self.testing_context,
+            tumor_type_category=self.tumor_type_category)
+
+    @property
+    def allele_origin_bucket(self):
+        return self.allele_origin_grouping.allele_origin_bucket
 
     @property
     def share_level_obj(self):
@@ -235,40 +237,10 @@ class ClassificationGrouping(TimeStampedModel):
         else:
             return qs
 
-    classification_count = models.IntegerField(default=0)
-    pathogenic_difference = models.IntegerField(choices=ClassificationGroupingPathogenicDifference.choices, default=ClassificationGroupingPathogenicDifference.NO_DIFF)
-    somatic_difference = models.IntegerField(choices=ClassificationGroupingSomaticDifference.choices, default=ClassificationGroupingSomaticDifference.NO_DIFF)
-
-    dirty = models.BooleanField(default=True)
-
     def dirty_up(self):
+        # this method was more useful when we also dirtied up alleleOrigin
         self.dirty = True
         self.save(update_fields=["dirty"])
-        self.allele_origin_grouping.dirty = True
-        self.allele_origin_grouping.save(update_fields=["dirty"])
-
-    # def sub_groupings(self) -> list[ClassificationSubGrouping]:
-    #     return ClassificationSubGrouping.from_modifications(self.classification_modifications)
-
-    conditions = models.JSONField(null=True, blank=True)
-
-    zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
-    # # for discordances
-    # classification_bucket
-    #
-    # # search details
-    # gene_symbols
-    # conditions
-    # curated
-    #
-    # # cached details
-    # summary_curated
-    # summary_classification
-    # summary_somatic_clinical_significance
-    # summary_c_hgvses
-    # summary_criteria
-    latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
-    latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
 
     def __lt__(self, other):
         def _sort_value(obj: ClassificationGrouping):
@@ -288,15 +260,16 @@ class ClassificationGrouping(TimeStampedModel):
         lab = classification.lab
         share_level = classification.share_level
         if allele:
-            allele_grouping, _ = AlleleGrouping.objects.get_or_create(allele=allele)
-            allele_origin_grouping, _ = AlleleOriginGrouping.objects.get_or_create(allele_grouping=allele_grouping, allele_origin_bucket=classification.allele_origin_bucket)
-            allele_origin_grouping.dirty = True
-            allele_origin_grouping.save(update_fields=["dirty"])
+            allele_origin_grouping, _ = AlleleOriginGrouping.objects.get_or_create(
+                allele=allele,
+                allele_origin_bucket=classification.allele_origin_bucket,
+                testing_context_bucket=classification.testing_context_bucket,
+                tumor_type_category=classification.tumor_type_category
+            )
 
             grouping, is_new = ClassificationGrouping.objects.get_or_create(
                 allele_origin_grouping=allele_origin_grouping,
                 lab=lab,
-                allele_origin_bucket=classification.allele_origin_bucket,
                 share_level=share_level
             )
             return grouping, is_new
@@ -354,33 +327,32 @@ class ClassificationGrouping(TimeStampedModel):
 
     @cached_property
     def allele(self) -> Allele:
-        return self.allele_origin_grouping.allele_grouping.allele
-
-    # def to_json(self):
-    #     scs = self.latest_classification_modification.somatic_clinical_significance_value
-    #     return {
-    #         "lab": str(self.lab),
-    #         "classification": self.latest_classification_modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
-    #         "somatic_clinical_significance": scs.as_json() if scs else None,
-    #         "curated_date": str(self.latest_curation_date)  # fixme, need a quick way for yyyy-mm-dd
-    #     }
+        return self.allele_origin_grouping.allele
 
     @transaction.atomic
     def update(self):
 
-        self.allele_origin_grouping.dirty = True
-        self.allele_origin_grouping.save(update_fields=["dirty"])
+        # FIXME there's a bunch of overlap calculation here that doesn't need to happen
+        # as that is now managed by Overlaps
 
         if all_modifications := self.classification_modifications:
             # FIND THE MOST RECENT CLASSIFICATION
             best_classification = last(all_modifications)
 
+            # store these summary dicts, so we can compare them (after the save) and see if any extra actions need to be
+            # taken, e.g. updating triages
+            previous_summary = self.latest_cached_summary_obj
+            new_summary = best_classification.classification.summary_obj
+
             self.latest_classification_modification = best_classification
+            self.latest_cached_summary = best_classification.classification.summary
             self.latest_allele_info = best_classification.classification.allele_info
 
             # TODO check for dirty values
-            all_terms: Set[OntologyTerm] = set()
-            all_free_text_conditions: Set[str] = set()
+            all_terms = Counter()
+            all_free_text_conditions = Counter()
+
+            all_terms.keys()
 
             # UPDATE CLASSIFICATION / CLINICAL SIGNIFICANCE
             # TODO - CLINICAL SIGNIFICANCE
@@ -390,32 +362,33 @@ class ClassificationGrouping(TimeStampedModel):
             all_pathogenic_values = set()
             all_tiers = set()
             all_levels = set()
+            condition_references: list[ConditionReference] = []
 
             for modification in all_modifications:
                 if condition := modification.classification.condition_resolution_obj:
-                    all_terms |= set(condition.terms)
-                    if plain_text := condition.plain_text:
-                        all_free_text_conditions.add(plain_text)
+                    for term in condition.terms:
+                        all_terms[term] += 1
+                    # all_terms |= set(condition.terms)
+                    # if plain_text := condition.plain_text:
+                    #     all_free_text_conditions.add(plain_text)
                 elif condition_text := modification.get(SpecialEKeys.CONDITION):
-                    all_free_text_conditions.add(condition_text)
+                    all_free_text_conditions[condition_text] += 1
+                    # all_free_text_conditions.add(condition_text)
 
                 all_zygosities |= set(modification.get_value_list(SpecialEKeys.ZYGOSITY))
 
                 # only store valid terms as quick links to the classification
-                all_terms = {term for term in all_terms if term.is_valid_for_condition}
+                # all_terms = {term for term in all_terms if term.is_valid_for_condition}
                 # self._update_conditions(all_terms)
-                summary_dict: ClassificationSummaryCacheDict = modification.classification.summary
+                summary_obj = modification.classification.summary_obj
 
-                pathogenicity_dict: ClassificationSummaryCacheDictPathogenicity = summary_dict.get("pathogenicity", {})
-                somatic_dict: ClassificationSummaryCacheDictSomatic = summary_dict.get("somatic", {})
-
-                if bucket := pathogenicity_dict.get("bucket"):
+                if bucket := summary_obj.pathogenicity.bucket:
                     all_buckets.add(bucket)
-                if path_val := pathogenicity_dict.get("classification"):
+                if path_val := summary_obj.pathogenicity.classification:
                     all_pathogenic_values.add(path_val)
-                if tier := somatic_dict.get("clinical_significance"):
+                if tier := summary_obj.somatic.clinical_significance:
                     all_tiers.add(tier)
-                if level := somatic_dict.get("amp_level"):
+                if level := summary_obj.somatic.amp_level:
                     all_levels.add(level)
 
             evidence_map = EvidenceKeyMap.instance()
@@ -427,10 +400,16 @@ class ClassificationGrouping(TimeStampedModel):
             all_zygosities = list(sorted(evidence_map[SpecialEKeys.ZYGOSITY].sort_values(all_zygosities)))
             self.zygosity_values = all_zygosities
 
-            self.conditions = strip_json(ConditionResolved(
-                terms=list(sorted(all_terms)),
-                plain_text_terms=list(sorted(all_free_text_conditions))
-            ).to_json(include_join=False))
+            # self.conditions = strip_json(ConditionResolved.from_uncounted_terms(
+            #     terms=list(sorted(all_terms)),
+            #     plain_text_terms=list(sorted(all_free_text_conditions))
+            # ).to_json(include_join=False))
+            for term, count in all_terms.items():
+                condition_references.append(ConditionReference(term=term, count=count))
+            for text, count in all_free_text_conditions.items():
+                condition_references.append(ConditionReference(name=text, count=count))
+            condition_references.sort()
+            self.conditions = strip_json(ConditionResolved(references=condition_references).to_json())
 
             self.classification_count = len(all_modifications)
 
@@ -456,11 +435,28 @@ class ClassificationGrouping(TimeStampedModel):
             ClassificationGroupingSearchTerm.objects.filter(grouping=self).delete()
             ClassificationGroupingSearchTerm.objects.bulk_create(all_term_stubs)
 
-            self.dirty = False
-            self.save()
+            if previous_summary and previous_summary != new_summary:
+                classification_grouping_summary_signal.send(sender=ClassificationGrouping, instance=self, old_summary=previous_summary, new_summary=new_summary)
         else:
-            # there are no classifications, time to die
-            self.delete()
+            # soft delete
+            # share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
+
+            self.classification_count = 0
+            # these differences are internal within a lab, even if it's medical significant the overall
+            self.pathogenic_difference = ClassificationGroupingPathogenicDifference.NO_DIFF
+            self.somatic_difference = ClassificationGroupingSomaticDifference.NO_DIFF
+            self.conditions = None
+            self.zygosity_values = None
+            self.latest_classification_modification = None
+            self.latest_cached_summary = {}
+            # leaving the share level and allele info alone
+            # latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
+
+            # TODO if we're never shared or if the overlap was single only, maybe hard delete?
+            # self.delete()
+        self.dirty = False
+        self.save()
+        # note the save signal will update the OverlapContribution
 
     def gene_symbols(self):
         terms = set(self.classificationgroupingsearchterm_set.filter(term_type=ClassificationGroupingSearchTermType.GENE_SYMBOL).values_list("term", flat=True))
@@ -471,8 +467,17 @@ class ClassificationGrouping(TimeStampedModel):
         # maybe move this out since it does AlleleOriginGroupings too
         for dirty in ClassificationGrouping.objects.filter(dirty=True).iterator():
             dirty.update()
-        for dirty in AlleleOriginGrouping.objects.filter(dirty=True).iterator():
-            dirty.update()
+
+    @staticmethod
+    def dirty_incorrect_counts():
+        """
+        If a classification grouping has had records deleted from it, and didn't trigger a refresh of grou
+        :return:
+        """
+        grouping_counts = ClassificationGrouping.objects.annotate(live_count=ClassificationGroupingEntry.objects.filter(
+            grouping_id=OuterRef('id')
+        ).values('grouping_id').annotate(cnt=Count('pk')).values('cnt')[:1])
+        grouping_counts.exclude(classification_count=F('live_count')).update(dirty=True)
 
 
 class ClassificationGroupingSearchTermType(TextChoices):
@@ -545,6 +550,7 @@ class ClassificationGroupingSearchTermBuilder:
 
 class ClassificationGroupingEntry(TimeStampedModel):
     # this is just here so this model can stay completely separate from Classification
+    # should only ever be a single grouping per classification (should classification be made unique??)
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE)
 
@@ -556,3 +562,14 @@ class ClassificationGroupingEntry(TimeStampedModel):
 
     class Meta:
         unique_together = ("grouping", "classification")
+
+    @staticmethod
+    def grouping_for(classification: Classification) -> Optional[ClassificationGrouping]:
+        if entry := ClassificationGroupingEntry.objects.filter(classification=classification).select_related("grouping").first():
+            return entry.grouping
+        return None
+
+
+@receiver(pre_delete, sender=ClassificationGroupingEntry)
+def removed_grouping_entry(sender, instance: ClassificationGroupingEntry, **kwargs):
+    instance.grouping.dirty_up()

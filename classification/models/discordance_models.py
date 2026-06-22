@@ -12,6 +12,7 @@ from django.db.models import TextChoices
 from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 
 from classification.enums.classification_enums import SpecialEKeys
@@ -228,13 +229,15 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
     @property
     def is_review_locked(self) -> bool:
-        if self.resolution:
-            return True
-
-        if self != DiscordanceReport.objects.filter(clinical_context=self.clinical_context).order_by('-report_started_date').first():
-            return True
-
-        return False
+        # DISCORDANCE-DEPRECATION
+        return True
+        # if self.resolution:
+        #     return True
+        #
+        # if self != DiscordanceReport.objects.filter(clinical_context=self.clinical_context).order_by('-report_started_date').first():
+        #     return True
+        #
+        # return False
 
     @cached_property
     def discordance_report_classifications(self) -> list['DiscordanceReportClassification']:

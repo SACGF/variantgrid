@@ -20,6 +20,8 @@
             <link href="{% static 'css/branding.css' %}" rel="stylesheet">
         {% endcompress %}
         {% compress js %}
+        <!-- Used by flag dialogs to show loading -->
+        <script src="{% static 'js/lib/loadingoverlay.min.js' %}"></script>
             <script>window.SITE_NAME = "{{ site_name }}";</script>
             <script src="{% static 'js/global.js' %}"></script>
         {% endcompress %}

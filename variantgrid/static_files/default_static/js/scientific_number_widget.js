@@ -36,9 +36,9 @@ function toFixedString(value) {
     return strValue;
 }
 function toPercent(value, multiplier) {
-    const numValue = Number(value);
+    let numValue = Number(value);
     if (!isBlankOrNull(value) && !isNaN(numValue)) {
-        const percent = numValue * (multiplier || 100);
+        let percent = numValue * (multiplier || 100);
         if (percent >= 10) {
             return percent.toFixed(1) + '%';
         } else if (percent >= 1) {
@@ -85,9 +85,9 @@ $.widget('custom.scientific', {
         this.element.keyup(this.updateBinding);
         this.value(this.element.val());
         this.element.bind('blur', () => {
-            const oldValue = this.element.val();
+            let oldValue = this.element.val();
             this.value(this.element.val());
-            const neatValue = this.element.val();
+            let neatValue = this.element.val();
             if (oldValue != neatValue) {
                 this.element.trigger('change');
             }
@@ -103,7 +103,7 @@ $.widget('custom.scientific', {
         if (value === undefined) {
             return this.value;
         }
-        const strValue = toFixedString(value);
+        let strValue = toFixedString(value);
         this.element.val(strValue);
         this.refreshScientificNote();
     },

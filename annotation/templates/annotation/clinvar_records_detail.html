@@ -57,7 +57,7 @@
                     </td>
                     <td class="dt-clinical_significance text-center">
                         {% if record.somatic_clinical_significance %}
-                            <span class="c-pill cs scs-{{ record.somatic_clinical_significance }}">{{ record.somatic_clinical_significance | ekey:"somatic:clinical_significance" }}</span>
+                            <span class="c-pill cs cs-{{ record.somatic_clinical_significance }}">{{ record.somatic_clinical_significance | ekey:"somatic:clinical_significance" }}</span>
                         {% else %}
                             <span class="no-value">-</span>
                         {% endif %}

@@ -1,6 +1,6 @@
-const VCLink = (function() {
+let VCLink = (function() {
 
-    const VCLink = function(params) {
+    let VCLink = function(params) {
         this.text = params.text;
         this.href = params.href;
         this.missing = params.missing;
@@ -28,12 +28,12 @@ const VCLink = (function() {
                 title = (title ? `${title} ` : '') + ` : Missing ${this.missing}`;
                 cssClass += " general";
             }
-            const attribs = {href: this.href, title: title, class: cssClass};
+            let attribs = {href: this.href, title: title, class: cssClass};
             if (!this.href.startsWith("javascript:")) {
                 attribs.target = '_blank'; // open non-JS in new window
             }
             if (this.build) {
-                const buildTitle = this.buildTitle ? this.buildTitle :
+                let buildTitle = this.buildTitle ? this.buildTitle :
                 attribs.html = [
                     $('<span>', {text: this.text + ' '}),
                     $('<span>', {class: 'build-indicator', text: this.build})
@@ -64,9 +64,9 @@ EMPTY_LINK = new VCLink({
     geneLink: false,
 });
 
-const VCLinks = (function() {
+let VCLinks = (function() {
 
-    const VCLinks = function(eKeys) {
+    let VCLinks = function(eKeys) {
         this.eKeys = eKeys;
         this.data = {};
         this.variant_coordinate_parts = null;
@@ -97,7 +97,7 @@ const VCLinks = (function() {
             this.variant_coordinate_parts = null;
             this.variant_coordinate_symbolic_parts = null;
 
-            const variant_coordinate = this.data[SpecialEKeys.VARIANT_COORDINATE];
+            let variant_coordinate = this.data[SpecialEKeys.VARIANT_COORDINATE];
             if (variant_coordinate) {
                 this.variant_coordinate_parts = variant_coordinate.match(/(.+?):([0-9]+)(?:[ ])?(<.+>|[ATCG].+)/);
                 if (this.variant_coordinate_parts == null) {
@@ -106,9 +106,9 @@ const VCLinks = (function() {
 
             }
 
-            const links = [];
+            let links = [];
             if (data.igv_links_enabled) {
-                const igvLink = this.generateIgv();
+                let igvLink = this.generateIgv();
                 if (igvLink) {
                     // always put igvLink first as it's special
                     links.push(igvLink);
@@ -148,7 +148,7 @@ const VCLinks = (function() {
             const allowSet = new Set(allowList);
             const blockSet = new Set(blockList);
             if (allowSet.size && blockSet.size) {
-                throw new Error("filterLinks: can only pass EITHER allowList OR blockList not both");
+                throw new Error("filterLinks: can only pass EITHER allowList OR blockList not both")
             }
             if (!allowMissing) {
                 links = links.filter(link => !link.isMissing());
@@ -163,7 +163,7 @@ const VCLinks = (function() {
         },
 
         buildName() {
-            const genome_build = this.data[SpecialEKeys.GENOME_BUILD];
+            let genome_build = this.data[SpecialEKeys.GENOME_BUILD];
             if (genome_build) {
                 return genome_build.indexOf('38') !== -1 ? 'GRCh38' : 'GRCh37';
             } else {
@@ -182,11 +182,11 @@ const VCLinks = (function() {
         },
 
         generateMonarchLink() {
-            const hgnc_id = this.hgncIdSafe();
+            let hgnc_id = this.hgncIdSafe();
             if (hgnc_id) {
                 return new VCLink({text: 'Monarch Phen.', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/gene/${hgnc_id}`, geneLink: true});
             }
-            const gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
+            let gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
             if (gene_symbol) {
                 return new VCLink({text: 'Monarch Phen,', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/search/${gene_symbol}`, geneLink: true});
             }
@@ -200,14 +200,14 @@ const VCLinks = (function() {
         },
 
         generateClingenKb() {
-            const hgnc_id = this.hgncIdSafe();
+            let hgnc_id = this.hgncIdSafe();
             if (hgnc_id) {
-                const link = `https://search.clinicalgenome.org/kb/genes/${hgnc_id}`;
+                let link = `https://search.clinicalgenome.org/kb/genes/${hgnc_id}`;
                 return new VCLink({text: 'ClinGen KB', href: link, geneLink: true});
             }
-            const gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
+            let gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
             if (gene_symbol) {
-                const link = `https://search.clinicalgenome.org/kb/genes?search=${gene_symbol}`;
+                let link = `https://search.clinicalgenome.org/kb/genes?search=${gene_symbol}`;
                 return new VCLink({text: 'ClinGen KB', href: link, geneLink: true});
             }
 
@@ -222,9 +222,9 @@ const VCLinks = (function() {
         generateBeacon() {
             // https://beacon-network.org/#/search?pos=25288616&chrom=20&allele=GGCTCTTA&ref=G&rs=GRCh37
             if (this.variant_coordinate_parts) {
-                const parts = this.variant_coordinate_parts;
-                const chr = parts[1];
-                const pos = parts[2];
+                let parts = this.variant_coordinate_parts;
+                let chr = parts[1];
+                let pos = parts[2];
                 let ref = null;
                 let alt = null;
                 let refAlt = parts[3].match(/([ATCG]+)>([ATCG]+)/);
@@ -236,12 +236,12 @@ const VCLinks = (function() {
                     alt = ref;
                 }
                 let build = null;
-                const genome_build = this.data[SpecialEKeys.GENOME_BUILD];
+                let genome_build = this.data[SpecialEKeys.GENOME_BUILD];
                 if (genome_build) {
                     build = genome_build.indexOf('38') != -1 ? 'GRCh38' : 'GRCh37';
                 }
                 if (ref && alt && build) {
-                    const link = `https://beacon-network.org/#/search?pos=${encodeURIComponent(pos)}&chrom=${encodeURIComponent(chr)}&allele=${encodeURIComponent(alt)}&ref=${encodeURIComponent(ref)}&rs=${encodeURIComponent(build)}`;
+                    let link = `https://beacon-network.org/#/search?pos=${encodeURIComponent(pos)}&chrom=${encodeURIComponent(chr)}&allele=${encodeURIComponent(alt)}&ref=${encodeURIComponent(ref)}&rs=${encodeURIComponent(build)}`;
                     return new VCLink({
                         text:'Beacon',
                         href:link,
@@ -258,9 +258,9 @@ const VCLinks = (function() {
 
         generateGnomad() {
             if (this.variant_coordinate_parts && this.data[SpecialEKeys.GENOME_BUILD]) {
-                const parts = this.variant_coordinate_parts;
-                const genome_build = this.data[SpecialEKeys.GENOME_BUILD];
-                const safeUrl = parts[1] + '-' + parts[2] + '-' + (parts[3] || '').replace('>', '-');
+                let parts = this.variant_coordinate_parts;
+                let genome_build = this.data[SpecialEKeys.GENOME_BUILD];
+                let safeUrl = parts[1] + '-' + parts[2] + '-' + (parts[3] || '').replace('>', '-');
                 let linkText = "gnomAD v2.1";
                 let dataset = 'gnomad_r2_1';
                 if (genome_build.indexOf('38') !== -1) {
@@ -281,7 +281,7 @@ const VCLinks = (function() {
         },
 
         generateUcsc() {
-            const genome_build = this.data[SpecialEKeys.GENOME_BUILD];
+            let genome_build = this.data[SpecialEKeys.GENOME_BUILD];
             if (genome_build) {
                 try {
                     let use_build = 'hg19';
@@ -291,13 +291,13 @@ const VCLinks = (function() {
 
                     let range;
                     if (this.variant_coordinate_parts) {
-                        const parts = this.variant_coordinate_parts;
-                        const coordinate = parseInt(parts[2]);
+                        let parts = this.variant_coordinate_parts;
+                        let coordinate = parseInt(parts[2]);
                         range = `chr${parts[1]}%3A${coordinate - 20}-${coordinate + 20}`;
                     } else if (this.variant_coordinate_symbolic_parts) {
-                        const parts = this.variant_coordinate_symbolic_parts;
-                        const start = parseInt(parts[2]);
-                        const end = parseInt(parts[3]);
+                        let parts = this.variant_coordinate_symbolic_parts;
+                        let start = parseInt(parts[2]);
+                        let end = parseInt(parts[3]);
                         range = `chr${parts[1]}%3A${start - 20}-${end + 20}`;
                     } else {
                         return new VCLink({
@@ -307,12 +307,12 @@ const VCLinks = (function() {
                         });
                     }
 
-                    const url = `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${use_build}&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position=${range}`;
+                    let url = `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${use_build}&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position=${range}`;
                     return new VCLink({
                         text:'UCSC',
                         href:url,
                         build: this.buildName()
-                    });
+                    })
                 } catch (e) {
                 }
             }
@@ -324,7 +324,7 @@ const VCLinks = (function() {
         },
 
         generateVarsome() {
-            const genome_build = this.data[SpecialEKeys.GENOME_BUILD];
+            let genome_build = this.data[SpecialEKeys.GENOME_BUILD];
             if (genome_build) {
                 let use_build = 'hg19';
                 if (genome_build && genome_build.indexOf('38') != -1) {
@@ -333,16 +333,16 @@ const VCLinks = (function() {
                 let varsomeType = "variant";
                 let searchFor;
                 if (this.variant_coordinate_symbolic_parts) {
-                    const alt = this.variant_coordinate_symbolic_parts[4];
+                    let alt = this.variant_coordinate_symbolic_parts[4];
                     if (["DEL", "DUP"].includes(alt)) {
                         varsomeType = "cnv";
                         searchFor = this.variant_coordinate_symbolic_parts.slice(1).join("-");
                     } else {
                         // Can't search for
                         varsomeType = "position";
-                        const chrom = this.variant_coordinate_symbolic_parts[1];
-                        const start = this.variant_coordinate_symbolic_parts[2];
-                        const end = this.variant_coordinate_symbolic_parts[3];
+                        let chrom = this.variant_coordinate_symbolic_parts[1];
+                        let start = this.variant_coordinate_symbolic_parts[2];
+                        let end = this.variant_coordinate_symbolic_parts[3];
                         searchFor = `${chrom}-${start}..${end}`;
                     }
                 } else {
@@ -383,8 +383,8 @@ const VCLinks = (function() {
         },
 
         makeLink(text, link, param, key, title) {
-            const geneLink = key == SpecialEKeys.GENE_SYMBOL;
-            const val = this.data[key];
+            let geneLink = key == SpecialEKeys.GENE_SYMBOL;
+            let val = this.data[key];
             if (val) {
                 link = link + param.replace('@@', encodeURIComponent(val));
                 return new VCLink({text:text, href:link, title: title, geneLink: geneLink});

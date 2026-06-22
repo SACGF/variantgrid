@@ -4,7 +4,6 @@ from classification.views import clinvar_export_view, search_view_metrics, class
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, \
     classification_accumulation_graph
-from classification.views.allele_grouping_datatables import AlleleGroupingColumns
 from classification.views.classification_dashboard_view import issues_download
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import summary_email_preview_html, \
@@ -28,8 +27,12 @@ from classification.views.discordance_report_views import discordance_report_vie
     discordance_report_review, action_discordance_report_review, discordance_reports_download
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.exports.classification_export_formatter_redcap import redcap_data_dictionary
+from classification.views.exports_grouping.classification_grouping_export_view import \
+    view_classification_grouping_export, serve_export
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
+from classification.views.overlaps_datatables_3 import OverlapColumns
+from classification.views.overlaps_view_3 import view_overlaps_3, view_overlap_3, TriageView3, view_overlap_history
 from classification.views.views import classification_import_tool, AutopopulateView
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
@@ -49,12 +52,12 @@ urlpatterns = [
     path('classifications', views.classifications, name='classifications'),
 
     path('groupings', views.classification_groupings, name='classification_groupings'),
+    path('groupings/export_config', view_classification_grouping_export, name='classification_grouping_export_config'),
+    path('groupings/export', serve_export, name='classification_grouping_export'),
     path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
     path('groupings/<int:classification_grouping_id>/records', views.view_classification_grouping_records_detail,
          name='classification_grouping_records_detail'),
-    path('allele_groupings', views.allele_groupings, name='allele_groupings'),
-    path('allele_groupings/<str:lab_id>', views.allele_groupings, name='allele_groupings_lab'),
-    path('allele_grouping/<allele_grouping_id>', views.view_allele_grouping_detail, name='allele_grouping_detail'),
+
 
     path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
          name='create_classification_for_variant'),
@@ -101,7 +104,6 @@ urlpatterns = [
     path('clinvar_export_batch/<int:clinvar_export_batch_id>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
     path('condition_matchings', condition_matchings_view, name='condition_matchings'),
-    path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
     path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
     path('condition_matching/datatable/<str:lab_id>', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
     path('condition_matching/<int:pk>', condition_matching_view, name='condition_matching'),
@@ -179,6 +181,14 @@ urlpatterns = [
     path('overlaps', view_overlaps, name='overlaps'),
     path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
     path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
+
+    path('overlaps3/triage/<int:triage_id>', TriageView3.as_view(), name='triage_3'),
+    path('overlaps3/overlap/<int:overlap_id>/history', view_overlap_history, name='overlap_history'),
+    path('overlaps3/overlap/<int:overlap_id>', view_overlap_3, name='overlap_3'),
+    path('overlaps3/datatables', DatabaseTableView.as_view(column_class=OverlapColumns), name='overlaps_3_datatables'),
+    path('overlaps3/<str:lab_id>', view_overlaps_3, name='overlaps_3'),
+    path('overlaps3', view_overlaps_3, name='overlaps_3'),
+
     path('vus', view_overlaps_vus, name='vus'),
     path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),
     path('vus_detail/<str:lab_id>', view_overlaps_vus_detail, name='vus_detail'),
@@ -192,6 +202,8 @@ urlpatterns = [
     path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
     path('clinical_significance_change_data', views.clin_sig_change_data, name='clinical_significance_change_data'),
     path('autocomplete/EvidenceKey/', views_autocomplete.EvidenceKeyAutocompleteView.as_view(), name='evidence_key_autocomplete'),
+
+    path('public_info', views.view_public_info, name='classification_public_info'),
 
     path('api/imported_allele_info/datatables/', DatabaseTableView.as_view(column_class=ImportedAlleleInfoColumns), name='imported_allele_info_datatables'),
 
@@ -214,8 +226,6 @@ urlpatterns = [
     path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
     path('api/classifications/datatables/', DatabaseTableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
     path('api/classification/groups/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingColumns), name='classification_grouping_datatables'),
-    path('api/classification/allele_groups/datatables/<str:lab_id>', DatabaseTableView.as_view(column_class=AlleleGroupingColumns), name='allele_grouping_datatables'),
-
     path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
          name='lab_gene_classification_counts_api'),
 

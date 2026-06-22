@@ -281,37 +281,77 @@
 
     <h4>Classification Records</h4>
     <script>
+        let alleleOriginFilter = null;
+        let testingContextFilter = null;
+
+        function makeFilterBox(text) {
+            $('#classificationFilterBox').empty();
+            let box = $('<a>', {class: 'filter-item', text: text, onclick:"clearFilterBox()"});
+            $('#classificationFilterBox').append(box);
+        }
+        function clearFilterBox() {
+            alleleOriginFilter = null;
+            testingContextFilter = null;
+            $('#classificationFilterBox').empty();
+            classificationGroupingRedraw();
+        }
+
+        function filterAlleleOrigin(alleleOrigin, label) {
+            testingContextFilter = null;
+            alleleOriginFilter = alleleOrigin;
+            makeFilterBox(label);
+            classificationGroupingRedraw();
+        }
+        function filterTestingContext(testingContext, label) {
+            testingContextFilter = testingContext;
+            alleleOriginFilter = null;
+            makeFilterBox(label);
+            classificationGroupingRedraw();
+        }
         function classificationGroupingFilterExtra(data) {
             data.allele_id = {{ allele.pk }};
+            data.allele_origin = alleleOriginFilter;
+            data.testing_context = testingContextFilter;
         }
     </script>
-    {% for allele_origin_grouping_desc in allele_origin_groupings_desc %}
-        <div>
-            <span class="allele-origin-box horizontal allele-origin-{{ allele_origin_grouping_desc.allele_origin_grouping.allele_origin_bucket }}">
-                <div class="allele-origin-text">
-                    {{ allele_origin_grouping_desc.allele_origin_grouping.get_allele_origin_bucket_display }}
-                </div>
-            </span>
-            {% if allele_origin_grouping_desc.discordance_report %}
-                <span class="pipe-sep">{% discordance_report allele_origin_grouping_desc.discordance_report %}</span>
-            {% else %}
-                <span class="pipe-sep" title="Overlap Status">{{ allele_origin_grouping_desc.get_overlap_status_display }}</span>
-            {% endif %}
-            {% if allele_origin_grouping_desc.shared_counts > 1 %}
-                <span class="pipe-sep">&nbsp;<strong>{{ allele_origin_grouping_desc.shared_counts }}</strong> Sharing Lab{% plural allele_origin_grouping_desc.shared_counts %}</span>
-            {% endif %}
-            {% if allele_origin_grouping_desc.unshared_counts %}
-                <span class="pipe-sep" style="opacity:0.7">includes unshared records</span>
-            {% endif %}
-            {% if allele_origin_grouping_desc.should_show_diffs %}
-                <span class="pipe-sep">
-                    <a class="hover-link" href="{% url 'classification_diff' %}?allele_origin_grouping={{ allele_origin_grouping_desc.allele_origin_grouping.pk }}" title="Show differences between labs latest {{ allele_origin_grouping_desc.allele_origin_grouping.get_allele_origin_bucket_display }} classification records">
-                        Show Diffs
-                    </a>
-                </span>
-            {% endif %}
-        </div>
-    {% endfor %}
+    <table class="table testing-context-table">
+        <thead>
+            <tr>
+                <th>Allele Origin</th>
+                <th>Testing Context</th>
+                <th>Value Type</th>
+                <th>Values</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for overlap in overlaps %}
+                <tr class="testing-context-{{ overlap.testing_context_obj }}">
+                    <td class="allele-origin-{{ overlap.testing_context_obj.allele_origin }}">{% ifchanged overlap.testing_context_obj.allele_origin.label %}
+                        <a class="filter-link" onclick="filterAlleleOrigin('{{ overlap.testing_context_obj.allele_origin }}', '{{ overlap.testing_context_obj.allele_origin.label }}')">{{ overlap.testing_context_obj.allele_origin.label }}</a>
+                    {% endifchanged %}</td>
+                    <td>{% ifchanged overlap.testing_context_obj %}<a class="filter-link" onclick="filterTestingContext('{{ overlap.testing_context_obj }}', '{{ overlap.testing_context_obj.label }}')">{{ overlap.testing_context_obj.label }}</a>{% endifchanged %}</td>
+                    <td>{{ overlap.value_type_label }}</td>
+                    <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}{{ value }}{% endfor %}</td>
+                    <td class="font-weight-bold">
+                    {% if overlap.overlap_status.is_attention %}<a class="hover-link text-danger" href="{{ overlap.get_absolute_url }}">{{ overlap.overlap_status_label }}{% if overlap.overlap_status_obj.value == 90 %} <i class="fa-solid fa-kit-medical"></i>{% endif %}</a>
+                    {% else %}<span class="text-success">{{ overlap.overlap_status_label }}{% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            {% for overlap in cross_overlaps %}
+                <tr class="testing-context-C">
+                    <td class="allele-origin-C">{% if forloop.first %}Cross Contexts{% endif %}</td>
+                    <td>Cross Contexts</td>
+                    <td>{{ overlap.value_type_label }}</td>
+                    <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}{{ value }}{% endfor %}</td>
+                    <td class="font-weight-bold"><span class="{% if overlap.overlap_status_obj.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.overlap_status_label }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div id="classificationFilterBox" class="filter-box"></div>
+
     {% if show_overall_diff %}
         <div>
             <span class="allele-origin-box horizontal allele-origin-A">
@@ -319,7 +359,8 @@
             </span>
             <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ allele.id }}&latest=true" title="Show differences between labs latest classifications across all allele origins">Show Diffs</a></div>
     {% endif %}
-    {% classification_groupings %}
+
+    {% classification_groupings show_allele_origin_filter=False %}
 
     <div class="mt-4">
         {% clinvar allele=allele expert_panel_only=True %}

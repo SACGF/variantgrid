@@ -1,6 +1,6 @@
-const EKey = (function() {
+let EKey = (function() {
    
-    const EKey = function(keyData, index) {
+    let EKey = function(keyData, index) {
         Object.assign(this, keyData);
         this.safeKey = keyData.key.replace(':','_');
         this.label = keyData.label || EKey.prettyKey(keyData.key);
@@ -24,7 +24,7 @@ const EKey = (function() {
         },
     
         matchingOption: function(val) {
-            const options = this.options || [];
+            let options = this.options || [];
             return options.find(o => {
                 if ((val === '' || val === null) && (!('key' in o) || o.key === '')) {
                     return o;
@@ -35,7 +35,7 @@ const EKey = (function() {
         },
         
         namespace: function() {
-            const dividerIndex = this.key.indexOf(':');
+            let dividerIndex = this.key.indexOf(':');
             if (dividerIndex === -1) {
                 return null;
             } else {
@@ -44,9 +44,9 @@ const EKey = (function() {
         },
     
         prettyValue: function(val) {
-            const isBlank = false;
+            let isBlank = false;
             let isValidValue = true;
-            const freeText = false;
+            let freeText = false;
             if (typeof(val) === 'undefined') {
                 val = null;
             }
@@ -57,19 +57,19 @@ const EKey = (function() {
             if (this.value_type === 'S' || this.value_type === 'C' || this.value_type === 'M') {
                 if (val === null) {
                     // check for special blank option
-                    const matchingOpt = this.matchingOption(val);
+                    let matchingOpt = this.matchingOption(val);
                     if (matchingOpt) {
                         val = matchingOpt.label || EKey.prettyKey(matchingOpt.key);
                     }
                     return {val: val, isBlank: true, isValidValue: true};
                 }
 
-                const formattedValues = [];
+                let formattedValues = [];
                 if (!Array.isArray(val)) {
                     val = [val];
                 }
                 for (let v of val) {
-                    const matchingOpt = this.matchingOption(v);
+                    let matchingOpt = this.matchingOption(v);
                     if (matchingOpt) {
                         v = matchingOpt.label || EKey.prettyKey(matchingOpt.key);
                     } else {
@@ -101,19 +101,19 @@ const EKey = (function() {
         },
 
         comparator: function() {
-            const options = this.options;
+            let options = this.options;
             if (options) {
                 // TODO cache this dict
-                const byIndex = {};
+                let byIndex = {};
                 let index = 1;
-                for (const option of options) {
+                for (let option of options) {
                     byIndex[option.key] = index++;
                 }
                 return (a, b) => {
                     return (byIndex[a] || 1000) - (byIndex[b] || 1000);
                 };
             } else {
-                return (a, b) => {a.localeCompare(b);};
+                return (a, b) => {a.localeCompare(b)};
             }
         },
         
@@ -122,7 +122,7 @@ const EKey = (function() {
         },
         
         defaultValue: function() {
-            const default_option = this.options.find(o => o['default']);
+            let default_option = this.options.find(o => o['default']);
             if (default_option) {
                 return default_option.key;
             } else {
@@ -131,20 +131,20 @@ const EKey = (function() {
         },
 
         asSafeHtml: function(val) {
-            const html = $('<div>' + val + '</div>');
+            let html = $('<div>' + val + '</div>');
 
-            const allTags = html.find('*');
-            for (const tag of allTags) {
+            let allTags = html.find('*');
+            for (let tag of allTags) {
                 if (!EKey.HTML_WHITE_LIST.has(tag.tagName)) {
                     throw Error(`unsafe HTML tag ${tag.tagName}`);
                 }
                 // never allow attributes
                 if (tag.attributes.length) {
-                    const attributeNames = [];
-                    for (const attribute of tag.attributes) {
+                    let attributeNames = [];
+                    for (let attribute of tag.attributes) {
                         attributeNames.push(attribute.name);
                     }
-                    for (const attributeName of attributeNames) {
+                    for (let attributeName of attributeNames) {
                         tag.removeAttribute(attributeName);
                     }
                 }
@@ -162,7 +162,7 @@ const EKey = (function() {
         },
     
         formatValue: function(value, element, style) {
-            const report = style == true || style == "report";
+            let report = style == true || style == "report";
             if (typeof(element) === 'undefined') {
                 element = $('<div>', {});
             }
@@ -201,9 +201,9 @@ const EKey = (function() {
                     element.text(val);
                 }
             } else if (this.value_type === 'M' && Array.isArray(value) && value.length > 1 && style == "spaced") {
-                const valueDivs = [];
-                for (const subValue of value) {
-                    const prettySubValue = this.prettyValue(subValue).val;
+                let valueDivs = [];
+                for (let subValue of value) {
+                    let prettySubValue = this.prettyValue(subValue).val;
                     valueDivs.push($('<div>', {text: prettySubValue}));
                 }
                 element.html(valueDivs);
@@ -261,7 +261,7 @@ EKey.strengthToPoints = {
     "PM": 2,
     "PS": 4,
     "PVS": 8
-};
+}
 
 EKey.families = {
     V: 'Variant',
@@ -290,12 +290,12 @@ EKey.prettyKey = function(key) {
     if (/^([A-Z|a-z])[_-]/.test(key)) {
         key = key.substring(0,1) + '-' + key.substring(2);
     }
-    return key.substring(0,1).toUpperCase() + key.substring(1).replace(/_/g,' ');
+    return key.substring(0,1).toUpperCase() + key.substring(1).replace(/_/g,' ')
 };
 
-const EKeys = (function() {
+var EKeys = (function() {
     
-    const EKeys = function(loadedKeys) {
+    let EKeys = function(loadedKeys) {
         this._map = new Map();
         this.hasUnknown = false;
         loadedKeys.forEach((data, index) => {
@@ -307,7 +307,7 @@ const EKeys = (function() {
         
         configCopy(labConfig) {
             labConfig = labConfig || {};
-            const namespaces = new Set(labConfig['namespaces']);
+            let namespaces = new Set(labConfig['namespaces']);
             namespaces.add(null);
             // default namespace to include ACMG if we're not horak
             // as there are plenty of classifications that didn't set an assertion method
@@ -321,7 +321,7 @@ const EKeys = (function() {
                 if (config === true || config === false) {
                     config = {hide: config};
                 }
-                const exclude_namespace = !namespaces.has(ekey.namespace());
+                let exclude_namespace = !namespaces.has(ekey.namespace());
                 if (exclude_namespace) {
                     config = config || {};
                     config.exclude_namespace = true;
@@ -329,26 +329,26 @@ const EKeys = (function() {
                 }
                 if (ekey.namespace_overrides) {
                     config = config || {};
-                    for (const namespace of namespaces) {
-                        const namespace_config = ekey.namespace_overrides[namespace];
+                    for (let namespace of namespaces) {
+                        let namespace_config = ekey.namespace_overrides[namespace];
                         if (namespace_config) {
-                            config = Object.assign(config, namespace_config);
+                            config = Object.assign(config, namespace_config)
                         }
                     }
                     config.config_updates = true;
                 }
-                if (ekey.options && _.some(ekey.options, (input) => {return !!(input.namespace);})) {
+                if (ekey.options && _.some(ekey.options, (input) => {return !!(input.namespace)})) {
                     config = config || {};
                     config.config_updates = true;
                     config.options = _.cloneDeep(ekey.options);
-                    for (const option of config.options) {
+                    for (let option of config.options) {
                         if (option.namespace) {
                             option.exclude_namespace = !namespaces.has(option.namespace);
                         }
                     }
                 }
                 if (config) {
-                    const ekeyWithConfig = Object.assign({}, ekey, config);
+                    let ekeyWithConfig = Object.assign({}, ekey, config);
                     return new EKey(ekeyWithConfig, ekey.index);
                 } else {
                     return ekey;
@@ -375,7 +375,7 @@ const EKeys = (function() {
         },
         
         criteria() {
-            const c = [];
+            var c = [];
             this._map.forEach(e => {
                 if (e.value_type === 'C' && !e.exclude_namespace) {
                     c.push(e);
@@ -385,7 +385,7 @@ const EKeys = (function() {
         },
 
         criteriaIgnoreNamespace() {
-            const c = [];
+            var c = [];
             this._map.forEach(e => {
                 if (e.value_type === 'C') {
                     c.push(e);
@@ -404,14 +404,14 @@ const EKeys = (function() {
         },
 
         keySelectOptions() {
-            const alphabeticKeys = [];
+            let alphabeticKeys = [];
             this.forEach(e => {
                 alphabeticKeys.push(e);
             });
             alphabeticKeys.sort((a, b) => {
                 return a.label.localeCompare(b.label);
             });
-            const options = alphabeticKeys.map(e => {
+            let options = alphabeticKeys.map(e => {
                 return $('<option>', {value: e.key, text:e.label});
             });
             options.splice(0, 0, $('<option>'));
@@ -439,7 +439,7 @@ EKeys.load = function() {
         if (cached) {
             try {
                 cached = JSON.parse(cached);
-                const ageMs = Date.now() - cached.date;
+                let ageMs = Date.now() - cached.date;
                 if (ageMs <= EKeys.cacheTimeMs) {
                     use_cache = cached;
                 }
@@ -475,12 +475,12 @@ EKeys.levelToIndex = {
 };
 
 EKeys.shareLevelInfo = function(share_level, record, defaultToInstitution) {
-    const base = '/static/icons/share_level/';
+    var base = '/static/icons/share_level/';
     if (!share_level || share_level === 'user') {
         return { icon: base + 'draft.png', title: 'Last Edited'};
     }
     
-    const contentGenerator = () => {
+    let contentGenerator = () => {
         switch (share_level) {
             case 'latest': return { src: base + 'draft.png', title: 'Last Edited'};
             case 'lab':
@@ -507,10 +507,10 @@ EKeys.shareLevelInfo = function(share_level, record, defaultToInstitution) {
             default: return {icon: base + share_level, title: 'Shared with ' + share_level};
         }
     };
-    const content = contentGenerator();
+    let content = contentGenerator();
     if (record) {
-        const consider_level = EKeys.levelToIndex[share_level] || 0;
-        const current_level = EKeys.levelToIndex[record.publish_level] || (defaultToInstitution ? 1 : 0);
+        let consider_level = EKeys.levelToIndex[share_level] || 0;
+        let current_level = EKeys.levelToIndex[record.publish_level] || (defaultToInstitution ? 1 : 0);
         content.current = current_level === consider_level;
         content.included = consider_level < current_level;
     }
@@ -527,10 +527,10 @@ EKeys.fixDescription = function(htmlText) {
     htmlText = replaceAll(htmlText, /<\/ul>\s+/gm, '</ul>');
     htmlText = replaceAll(htmlText, /^\s+$/gm, '');
     htmlText = replaceAll(htmlText, /[\n\r]{3,}/gm, '\n\n');
-    const html = $('<span>', {html: htmlText});
+    let html = $('<span>', {html: htmlText});
     html.find('p').each(function() {
-        const $this = $(this);
-        const pHtml = $this.html().trim();
+        let $this = $(this);
+        let pHtml = $this.html().trim();
         if (pHtml.length === 0) {
             $this.remove();
         } else {
@@ -540,7 +540,7 @@ EKeys.fixDescription = function(htmlText) {
     return html;
 };
 
-const SpecialEKeys = {};
+SpecialEKeys = {};
 SpecialEKeys.ASSERTION_METHOD = 'assertion_method';
 SpecialEKeys.ALLELE_ORIGIN = 'allele_origin';
 SpecialEKeys.GENOME_BUILD = 'genome_build';

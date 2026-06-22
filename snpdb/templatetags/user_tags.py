@@ -42,7 +42,10 @@ def _group_str_for_user(user: User):
 @register.inclusion_tag("snpdb/tags/user.html", takes_context=True)
 def user(context, u: User,
          show_avatar=False, show_email=False, show_last_login=False, show_group=False, show_user_page_link=False,
-         role='user', size='normal'):
+         role='user', size='normal', align='left'):
+
+    if not isinstance(u, User):
+        raise ValueError(f"'{u}' is not a User object")
 
     @dataclass(frozen=True)
     class UserDetails:
@@ -106,7 +109,8 @@ def user(context, u: User,
                                     show_avatar=show_avatar, show_group=show_group,
                                     show_email=show_email, show_last_login=show_last_login,
                                     show_user_page_link=show_user_page_link,
-                                    role=role, size=size)
+                                    role=role, size=size),
+        "align": align
     }
 
 

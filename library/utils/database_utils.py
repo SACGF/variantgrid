@@ -1,9 +1,13 @@
-from typing import Iterable, Optional, Any
-
+from collections.abc import Callable
+from typing import Iterable, Optional, Any, TypeVar, Generic, Type
+import json
 import sqlparse
-from django.db import connection, transaction
+from dataclasses_json import DataClassJsonMixin
+from django.db import models, connection, transaction
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
+from django.db.models.enums import TextChoices, IntegerChoices
+from django_json_widget.widgets import JSONEditorWidget
 
 from library.cache import timed_cache
 from library.constants import DAY_SECS
@@ -141,3 +145,161 @@ def sql_delete_qs(qs, batch_size: Optional[int] = None) -> int:
 
 def postgres_arrays(array):
     return "{%s}" % ','.join([str(s) if s is not None else "NULL" for s in array])
+
+
+T1 = TypeVar('T1', bound=DataClassJsonMixin)
+
+
+class JSONDataclassField(models.JSONField, Generic[T1]):
+    """
+    DO NOT USE - doesn't work well with auditlog which double encodes, likely a problem with serialize as well
+    """
+
+    """
+    A field type that will return and expect a DataClassJsonMixin type.
+    e.g.
+    @dataclass
+    class Coordinate(DataClassJsonMixin):
+        x: int
+        y: int
+    Will be serialized into the database, and referring to this field will deserialize so you don't have to convert
+    from JSONB into your dataclass objects in custom code, it'll just be handled in ORM
+
+    PyCharm isn't smart enough to work out the execpted type, so just add the type hint after declaring using this in a model
+    """
+
+
+    def __init__(self,
+                 dataclass_type: Type[T1],
+                 illegal_value_result: Any = None,
+                 *args,
+                 **kwargs):
+        """
+        :param dataclass_type: The class to convert to/from JSON, should be @dataclass_json or DataClassJsonMixin
+        :param illegal_value_result: If we can't convert the JSONB from the database into dataclass_type, return this instead
+        """
+        self.dataclass_type = dataclass_type
+        self.illegal_value_result = illegal_value_result
+        super().__init__(*args, **kwargs)
+
+    @property
+    def non_db_attrs(self):
+        return super().non_db_attrs + ("dataclass_type", "illegal_value_result",)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        kwargs["dataclass_type"] = self.dataclass_type
+        kwargs["illegal_value_result"] = self.illegal_value_result
+        return name, path, args, kwargs
+
+    def get_fallback_value(self):
+        fallback_value = self.illegal_value_result
+        if fallback_value is None:
+            fallback_value = self.default
+        if isinstance(fallback_value, Callable):
+            fallback_value = fallback_value()
+        if isinstance(fallback_value, dict):
+            fallback_value = self.dataclass_type.from_dict(fallback_value)
+        return fallback_value
+
+    # def from_db_value(self, value, expression, connection) -> Optional[T1]:
+    #     if json_obj := super().from_db_value(value, expression, connection):
+    #         try:
+    #             return self.dataclass_type.from_dict(json_obj)
+    #         except Exception as ex:
+    #             # TODO raise warning
+    #             print(f"Found illegal value in database {value.__class__} \"{value}\"")
+    #             self.get_fallback_value()
+    #     return None
+
+    def from_db_value(self, value, expression, connection):
+        """Converts database JSON string/object to a dataclass instance."""
+        if value is None:
+            return None
+        try:
+            if isinstance(value, dict):
+                return self.dataclass_type.from_dict(value)
+            if isinstance(value, str):
+                return self.dataclass_type.from_json(value)
+        except:
+            print(f"Could not convert value from DB {value.__class__} \"{value}\" to {self.dataclass_type}")
+        return value
+
+    def get_prep_value(self, value: Optional[T1]):
+        if value is None:
+            return None
+        if hasattr(value, 'to_dict'):
+            return value.to_dict()
+        if not isinstance(value, dict):
+            # print(f"WARNING - prep value doesn't have to_dict or isn't a dict, it's {value.__class__}")
+            raise ValueError(f"WARNING - prep value doesn't have to_dict or isn't a dict, it's {value.__class__}")
+        return value
+
+
+TX = TypeVar('TX')
+
+
+class ChoicesMixin(Generic[TX]):
+    """
+    While IntegerField, TextField and CharField all allow choices, they'll still return an integer or string.
+    TextChoices or IntegerChoices allow you to add additional methods, so using one of the concrete implementations
+    below will gice you an instance of the actual Choices instead of the raw string or integer value.
+
+    Lastly you just need to provide the type and if you don't provide choices, they'll be taken from the type
+
+    PyCharm isn't smart enough to work out the execpted type, so just add the type hint after declaring using this in a model
+    """
+
+    def __init__(self, choices_type: Type[TX], *args, **kwargs):
+        if "choices" not in kwargs:
+            kwargs["choices"] = choices_type.choices
+        self.choices_type = choices_type
+        super().__init__(*args, **kwargs)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        kwargs["choices_type"] = self.choices_type
+        return name, path, args, kwargs
+
+    @property
+    def non_db_attrs(self):
+        return super().non_db_attrs + ("choices_type",)
+
+    def from_db_value(self, value, expression, connection) -> Optional[TX]:
+        if value is not None:
+            return self.choices_type(value)
+        return None
+
+
+T2 = TypeVar('T2', bound=TextChoices)
+
+
+class TextFieldChoices(ChoicesMixin[T2], models.TextField):
+    pass
+
+
+T3 = TypeVar('T3', bound=TextChoices)
+
+
+class CharFieldChoices(ChoicesMixin[T3], models.CharField):
+    pass
+
+
+T4 = TypeVar('T4', bound=IntegerChoices)
+
+
+class IntegerFieldChoices(ChoicesMixin[T4], models.IntegerField):
+    pass
+
+
+class JSONDataClassAdminWidget(JSONEditorWidget):
+
+    def format_value(self, value):
+        if not isinstance(value, (dict, list)):
+            value = json.loads(value)
+            if isinstance(value, str):
+                # TODO, why would these values be double escaped anyway?
+                value = json.loads(value)
+            return value
+        else:
+            return value

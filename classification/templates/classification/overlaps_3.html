@@ -1,0 +1,108 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load js_tags %}
+{% load lab_tags %}
+{% block title %}Overlaps{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+<style>
+    .dt-classification {
+        width: 240px;
+    }
+    .dt-testing_context {
+        width: 100px;
+    }
+    .dt-summary {
+        width: 400px;
+    }
+</style>
+<div class="container">
+
+    <a href="#missing-features" data-toggle="collapse" class="toggle-link">Toggle Missing Features List</a>
+    <div id="missing-features" class="collapse hide">
+        <br/>
+       ClinVar Specific
+       <ul>
+           <li>Investigate orphan ClinVar records that aren't connected to an allele, so have joined in one mega no-allele overlap</li>
+           <li>Implement date check so ClinVar older than non-ClinVar records don't cause discordance (but maybe a different level of Old ClinVar Discordance?) just in case anyone wants to see</li>
+       </ul>
+
+       Functional
+       <ul>
+           <li>Try dedicated date discordance detected column</li>
+           <li style="text-decoration: line-through;">Populate SUBJECT in email links to other labs</li>
+           <li style="text-decoration: line-through;">Show cross context values in the table view (but dulled out)</li>
+           <li>Link to other Overlaps for same allele</li>
+           <li style="text-decoration: line-through;">Mark the overall status (e.g. waiting your triage) as UPDATED once a triage is done</li>
+           <li>Live update the overlap History after a triage</li>
+           <li style="text-decoration: line-through;">Give the Triage popup an appropriate title</li>
+           <li style="text-decoration: line-through;">Give counts in the tabs</li>
+           <li style="text-decoration: line-through;">On dedicated overlap page, put details about the overlap (c.HGVS, Testing Context, as well as summary status)</li>
+           <li>Provide option for full Discordance Review again</li>
+       </ul>
+
+       Purely Visual
+       <ul>
+           <li>Try giving criteria strengths with overrides nicer visual e.g. PP5_M PP5<span class="no-value">-</span>M, maybe try diff font</li>
+           <li style="text-decoration: line-through;">Stop columns from changing widths between pages</li>
+           <li style="text-decoration: line-through;">Fix sorting order of rows within classification table</li>
+       </ul>
+
+        Migrate
+        <ul>
+            <li style="text-decoration: line-through;">Migrate triage status from discordance reports</li>
+            <li>Migrate Pending Change value from flags</li>
+            <li style="text-decoration: line-through;">Migrate partial history</li>
+            <li>Migrate full history</li>
+            <li>If historic triage was a pending change, try to detect if it had already been changed (and set it to amend)</li>
+        </ul>
+
+        Other Pages
+        <ul>
+            <li>Show the Triage status on Classification Form (especially if there's a pending change)</li>
+            <li style="text-decoration: line-through;">Show Pending Changes on Classification Listing</li>
+        </ul>
+   </div>
+
+    <script>
+        function groupingFilter(data) {
+            let selectedMode = $('[name=triage_status_filter]:checked').val();
+            data.skew_status = selectedMode;
+            data.lab_selection = {{ lab_picker_data.selection | jsonify }};
+        }
+        function filterGrid() {
+            $('#overlaps-table').DataTable().ajax.reload();
+        }
+        $(document).ready(() => {
+            $('#triage_status_filter').change(() => {
+                filterGrid();
+            });
+        });
+    </script>
+
+    {% lab_picker data=lab_picker_data %}
+
+    <div id="triage_status_filter" class="my-4">
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+            <label class="btn btn-outline-danger"><input type="radio" name="triage_status_filter" id="triage_status_filter-t" value="TT" {% if tab == "TT" %}checked="checked"{% endif %}>Awaiting Triage {{ counts.TT | badge }}</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-d" value="7" {% if tab == "D" %}checked="checked"{% endif %}>Ready to Discuss {{ counts.7 | badge }}</label>
+            <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="5" {% if tab == "AA" %}checked="checked"{% endif %}>Awaiting Amendment {{ counts.5 | badge }}</label>
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="2" {% if tab == "O" %}checked="checked"{% endif %}>Waiting on Other Lab {{ counts.2 | badge }}</label>
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="6" {% if tab == "C" %}checked="checked"{% endif %}>Complex {{ counts.6 | badge }}</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="S" {% if tab == "S" %}checked="checked"{% endif %}>Solved {{ counts.S | badge }}</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="X" {% if tab == "A" %}checked="checked"{% endif %}>All Overlaps</label>
+        </div>
+    </div>
+
+    <table
+           data-datatable-data='groupingFilter'
+           data-datatable-url="{% url 'overlaps_3_datatables' %}"
+           class="sticky-header thick-border"
+           id="overlaps-table"
+           data-adjust-columns="false">
+    </table>
+
+</div>
+{% endblock %}

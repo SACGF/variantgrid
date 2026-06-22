@@ -726,6 +726,8 @@ class Variant(PreviewModelMixin, models.Model):
 
     def clingen_allele_skip_reason(self) -> Optional[str]:
         """Return why ClinGen should be skipped for this variant, or None if it can be used."""
+        from snpdb.models.models_clingen_allele import ClinGenAllele
+
         if not self.can_make_g_hgvs:
             return f"Symbolic variant {self.alt} cannot form g.HGVS (only DEL/DUP/INV supported)"
         size = self._clingen_allele_size

@@ -1,17 +1,17 @@
 function createExampleSamplenode(patientDict) {
-	const container = $("#sample-node-container");
+	var container = $("#sample-node-container");
 	container.empty();
-	const nodeData = {name : patientDict['name'], attributes: {'class' : 'window'}};
-	const sample_node = createSampleNode(nodeData);
+	var nodeData = {name : patientDict['name'], attributes: {'class' : 'window'}};
+	var sample_node = createSampleNode(nodeData);
 	sample_node.each(function() { this.updateState({patient: patientDict}); });
 	container.append(sample_node);
 }
 
 
 function getName() {
-    const last_name = $("#id_last_name").val();
-    const first_name = $("#id_first_name").val();
-    let full_name = '';
+    var last_name = $("#id_last_name").val();
+    var first_name = $("#id_first_name").val();
+    var full_name = '';
     if (first_name) {
         full_name += first_name;         
     }
@@ -27,23 +27,23 @@ function getName() {
 
 
 function getPatientDict(form) {
-	const name = getName();
-	const sex = $('#id_sex', form).val();
-	const deceased = !!$("#id_date_of_death").val();
+	var name = getName();
+	var sex = $('#id_sex', form).val();
+	var deceased = !!$("#id_date_of_death").val();
 	return {name: name, sex : sex, deceased: deceased};
 }
 
 function formChanged() {
-	const patientDict = getPatientDict(this);
+	var patientDict = getPatientDict(this);
 	createExampleSamplenode(patientDict);
 }
 
 function setupPatientSamplenode(initialPatientDict) {
-	const form = $("form#patient-form");
+	var form = $("form#patient-form");
 
 	// Create a clear / init / reset function
 	form.each(function() {
-		const resetPatientSampleNode = function() {
+		var resetPatientSampleNode = function() {
 			createExampleSamplenode(initialPatientDict);
 		};
 		this.resetPatientSampleNode = resetPatientSampleNode;

@@ -72,7 +72,7 @@ class AnnotatedFileDownload {
 		this.selector = $(selector);
 		this.pollUrl = pollUrl;
 		this.fileType = fileType;
-		this.ucFileType = this.fileType.toUpperCase();
+		this.ucFileType = this.fileType.toUpperCase()
 	}
 
 	setGenerateDownloadLink() {
@@ -100,19 +100,19 @@ class AnnotatedFileDownload {
 
 	setPolling(download) {
 		// console.log("setPolling");
-		const that = this;
+		let that = this;
 		function downloadFile(data) {
 			that.setDownloadLink(data.url);
 			if (download) {
 				window.location.href = data.url;
 			}
 		}
-		const spinner = $(`<span><i class="fas fa-spinner fa-spin"></i> Preparing download... </span>`);
-		const progressIndicator = $("<span></span>");
+		let spinner = $(`<span><i class="fas fa-spinner fa-spin"></i> Preparing download... </span>`);
+		let progressIndicator = $("<span></span>");
 		spinner.append(progressIndicator);
 
 		function updateProgress(progress) {
-			const percent = Math.floor(100 * progress);
+			let percent = Math.floor(100 * progress);
 			progressIndicator.empty();
 			progressIndicator.append(`${percent}% complete`);
 		}
@@ -122,6 +122,6 @@ class AnnotatedFileDownload {
 		}
 
 		$(this.selector).html(spinner);
-		poll_cached_generated_file(this.pollUrl, downloadFile, setError, updateProgress);
+		poll_cached_generated_file(this.pollUrl, downloadFile, setError, updateProgress)
 	}
 }
