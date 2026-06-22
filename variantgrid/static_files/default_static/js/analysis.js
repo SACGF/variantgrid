@@ -25,16 +25,16 @@ function secondWindowClosing() {
 }
 
 function loadNodeData(nodeId, extra_filters, fromSelectNode) {
-    let win = getGridAndEditorWindow();
+    const win = getGridAndEditorWindow();
     win.loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode);
 }
 
 function resizeGrid() {
-    let panelSize = $("#right-panel").innerWidth;
-    let grid = $('.ui-jqgrid-btable:visible');
+    const panelSize = $("#right-panel").innerWidth;
+    const grid = $('.ui-jqgrid-btable:visible');
     if(grid.length) {
         grid.each(function(index) {
-            let gridId = $(this).attr('id');
+            const gridId = $(this).attr('id');
             $('#' + gridId).setGridWidth(panelSize - 2);
         });
     }
@@ -42,8 +42,8 @@ function resizeGrid() {
 
 function savePanelWidthSettings() {
     if (saveSettingsOnResize) {
-        let analysis_panel_fraction = $("#left-panel").outerWidth() / window.innerWidth;
-        let data = 'analysis_panel_fraction=' + analysis_panel_fraction;
+        const analysis_panel_fraction = $("#left-panel").outerWidth() / window.innerWidth;
+        const data = 'analysis_panel_fraction=' + analysis_panel_fraction;
         $.ajax({
             type: "POST",
             data: data,
@@ -63,10 +63,10 @@ function viewTags() {
 }
 
 function replaceEditorWindow(url) {
-    let nodeEditorContainer = $("#node-editor-container");
+    const nodeEditorContainer = $("#node-editor-container");
     nodeEditorContainer.empty();
     $("#error-container").empty();
-    let nodeDataContainer = $("#node-data-container");
+    const nodeDataContainer = $("#node-data-container");
     nodeDataContainer.empty();
     nodeDataContainer.removeAttr("node_url");
     nodeDataContainer.removeAttr("node_id");
@@ -94,18 +94,18 @@ function layoutAnalysisPanels(showAnalysisVariables, initialAnalysisPanelFractio
         });
     }
 
-    let onDragEnd = function() {
+    const onDragEnd = function() {
         resizeGrid();
         if (!readOnly) {
             resizePanel();   // save panel widths
         }
-    }
-    let initialGridAndEditorFraction = 1.0 - initialAnalysisPanelFraction;
-    let splitParams = {
+    };
+    const initialGridAndEditorFraction = 1.0 - initialAnalysisPanelFraction;
+    const splitParams = {
         sizes: [initialAnalysisPanelFraction * 100, initialGridAndEditorFraction * 100],
         expandToMin: true,
         onDragEnd: onDragEnd,
-    }
+    };
     Split(['#left-panel', '#right-panel'], splitParams);
 
     // Make clicking the background send a "click event" but not if you click on the .window
@@ -159,7 +159,7 @@ function ajaxError(event, jqxhr, settings, thrownError) {
         return;
     }
 
-    let rj = jqxhr.responseJSON;
+    const rj = jqxhr.responseJSON;
     if (rj) {
         if (rj.non_fatal) {
             console.log("Ignoring error");
@@ -206,7 +206,7 @@ function setupErrorHandlers() {
         userMessage += "<p>Error was: <pre>" + details + "</pre>";
         showReloadPageErrorDialog($("#error-dialog"), userMessage, true);
 
-        let suppressErrorAlert = false;
+        const suppressErrorAlert = false;
         return suppressErrorAlert;
     };
 }
@@ -214,7 +214,7 @@ function setupErrorHandlers() {
 function setupNodeTypeSelect() {
     $.widget( "custom.iconselectmenu", $.ui.selectmenu, {
       _renderItem: function( ul, item ) {
-        let li = $( "<li>" ),
+        const li = $( "<li>" ),
           wrapper = $( "<div>", { text: item.label } );
 
         if ( item.disabled ) {
@@ -247,8 +247,8 @@ function removeVariantTag(variantId, tagId, successFunc) {
 
 function setNumVariantTags(pulseLabel) {
     pulseLabel = getValue(pulseLabel, true);
-    let numberOfTags = $("#number-of-tags");
-    let numTags = Object.keys(variantTags).length;
+    const numberOfTags = $("#number-of-tags");
+    const numTags = Object.keys(variantTags).length;
     let label = "";
     if (numTags) {
         label = "x" + numTags;
@@ -273,7 +273,7 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
 
     const success = function () {
         const aWin = getAnalysisWindow();
-        let tagList = aWin.variantTags[variantId] || [];
+        const tagList = aWin.variantTags[variantId] || [];
         if (op == 'add') {
             tagList.push(tagId);
         } else if (op == 'del') {
@@ -303,8 +303,8 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
 }
 
 function analysisVariable(nodeId, field, op, successCallback) {
-    let url = Urls.analysis_template_variable(ANALYSIS_ID, nodeId);
-    let data = 'field=' + field + '&op=' + op;
+    const url = Urls.analysis_template_variable(ANALYSIS_ID, nodeId);
+    const data = 'field=' + field + '&op=' + op;
     $.ajax({
         type: "POST",
         data: data,
@@ -314,14 +314,14 @@ function analysisVariable(nodeId, field, op, successCallback) {
 }
 
 function getNodeFieldWrapper(nodeId, field) {
-    let nodeEditor = $("#node-editor-wrapper[node_id=" + nodeId + "]");
+    const nodeEditor = $("#node-editor-wrapper[node_id=" + nodeId + "]");
     return $(".analysis-variable-node-field-wrapper[field=" + field + "]", nodeEditor);
 }
 
 function lockNodeField(nodeId, field, lock) {
     const NODE_FIELD_LOCKED_CSS_CLASS = "node-field-locked";
-    let nodeFieldWrapper = getNodeFieldWrapper(nodeId, field);
-    let addVariableButton = $(".add-analysis-variable-button", nodeFieldWrapper);
+    const nodeFieldWrapper = getNodeFieldWrapper(nodeId, field);
+    const addVariableButton = $(".add-analysis-variable-button", nodeFieldWrapper);
 
     if (lock) {
         nodeFieldWrapper.addClass(NODE_FIELD_LOCKED_CSS_CLASS);
@@ -338,15 +338,15 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
     const NODE_CONTAINER_CLASS = "analysis-variable-node";
     const ANALYSIS_VARIABLE_CLASS = "analysis-variable";
 
-    let nodeFieldSet = analysisNodeVariables[nodeId] || new Set();
+    const nodeFieldSet = analysisNodeVariables[nodeId] || new Set();
     analysisNodeVariables[nodeId] = nodeFieldSet;
     nodeFieldSet.add(field);
 
     $("#av-example-add-button", ANALYSIS_VARIABLES_HELP_DIV).button({icon: "ui-icon-arrowthick-1-n"});
     $("#av-example-button", ANALYSIS_VARIABLES_HELP_DIV).button();
 
-    let node = getNode(nodeId);
-    let avContainer = $("#analysis-variables");
+    const node = getNode(nodeId);
+    const avContainer = $("#analysis-variables");
     let existingNodeContainer = $("." + NODE_CONTAINER_CLASS + "[node-id=" + nodeId + "]", avContainer);
     if (existingNodeContainer.length === 0) {
         existingNodeContainer = $("<div />").addClass("left").addClass(NODE_CONTAINER_CLASS).attr("node-id", nodeId);
@@ -355,14 +355,14 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
         if (!nodeName) {
             nodeName = node.attr("node_class") + ": " + nodeId;
         }
-        let nodeTitle = $("<div />").append($("<b/>").html(nodeName));
+        const nodeTitle = $("<div />").append($("<b/>").html(nodeName));
         existingNodeContainer.append(nodeTitle);
-        $("#insert-analysis-variables-before-here", avContainer).before(existingNodeContainer)
+        $("#insert-analysis-variables-before-here", avContainer).before(existingNodeContainer);
     }
 
     let fieldAnalysisVariable = $("." + ANALYSIS_VARIABLE_CLASS + "[field=" + field + "]", existingNodeContainer);
     if (fieldAnalysisVariable.length === 0) {
-        let attrDict = {"field": field};
+        const attrDict = {"field": field};
         fieldAnalysisVariable = $("<button />").addClass("btn btn-primary-outline").addClass(ANALYSIS_VARIABLE_CLASS).attr(attrDict).html(field);
         if (!readOnly) {
             fieldAnalysisVariable.click(function () {
@@ -388,8 +388,8 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
 }
 
 function checkTemplateSave() {
-    let analysisVariables = $(".analysis-variable-node", "#analysis-variables");
-    let templateSave = $("button#analysis-template-save-version", "#analysis-template-version");
+    const analysisVariables = $(".analysis-variable-node", "#analysis-variables");
+    const templateSave = $("button#analysis-template-save-version", "#analysis-template-version");
     if (analysisVariables.length) {
         templateSave.prop("disabled", false);
         templateSave.prop("title", "");
@@ -400,13 +400,13 @@ function checkTemplateSave() {
 }
 
 function setupAnalysisTemplateTopBar(analysisTemplateId) {
-    let templateInfo = $("#analysis-template-info");
-    let atVersion = $("#analysis-template-version");
+    const templateInfo = $("#analysis-template-info");
+    const atVersion = $("#analysis-template-version");
     $("button#analysis-template-save-version", atVersion).button().click(function() {
-        let analysisNameTemplate = $("#id_analysis_name_template").val();
+        const analysisNameTemplate = $("#id_analysis_name_template").val();
 
         atVersion.hide();
-        let savingMessage = $("<div />").html("saving...");
+        const savingMessage = $("<div />").html("saving...");
         templateInfo.append(savingMessage);
 
         $.ajax({
@@ -420,8 +420,8 @@ function setupAnalysisTemplateTopBar(analysisTemplateId) {
                 let messageTime = 1000;
 
                 if (data.version) {
-                    let savedDate = data.created ? new Date(data.created).toLocaleString() : "";
-                    let versionText = "v." + data.version + (savedDate ? " saved " + savedDate : "");
+                    const savedDate = data.created ? new Date(data.created).toLocaleString() : "";
+                    const versionText = "v." + data.version + (savedDate ? " saved " + savedDate : "");
                     $("#latest-template-version").html(versionText);
                 }
                 if (data.error) {
@@ -429,8 +429,8 @@ function setupAnalysisTemplateTopBar(analysisTemplateId) {
                     severity = "error";
                     messageTime = 5000;
                 }
-                let sm = $("<li />", {class: severity}).html(message)
-                let saveMessage = $("<ul />", {class: 'messages'}).append(sm);
+                const sm = $("<li />", {class: severity}).html(message);
+                const saveMessage = $("<ul />", {class: 'messages'}).append(sm);
                 templateInfo.append(saveMessage);
                 saveMessage.fadeOut(messageTime, function () {
                     atVersion.fadeIn();
@@ -443,7 +443,7 @@ function setupAnalysisTemplateTopBar(analysisTemplateId) {
 
 function addInitialAnalysisVariables(analysisVariablesArray, readOnly) {
     for (let i=0 ; i<analysisVariablesArray.length; ++i) {
-        let av = analysisVariablesArray[i];
+        const av = analysisVariablesArray[i];
         addAnalysisVariableButton(av[0], av[1], readOnly);
     }
 }
@@ -460,8 +460,8 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
     /* fromSelectNode - means we came from clicking on analysis (ie not reload etc)
         so won't reload if already selected */
 
-    let gridAndEditorContainer = $("#grid-and-editor-container");
-    let dataContainer = $("#node-data-container", gridAndEditorContainer);
+    const gridAndEditorContainer = $("#grid-and-editor-container");
+    const dataContainer = $("#node-data-container", gridAndEditorContainer);
     if (nodeId) {
         let load_node_url = Urls.node_load(ANALYSIS_ID, nodeId);
         if (extra_filters) {
@@ -647,25 +647,25 @@ function finishedLoadingEditor(node_id, version_id) {
 
 
 function setVisibleSliderValue(inputSelector, sliderSelector, value) {
-    let container = sliderSelector.parents(".slider-container");
-    let sliderValue = $(".slider-value", container);
+    const container = sliderSelector.parents(".slider-container");
+    const sliderValue = $(".slider-value", container);
     let decimalPlaces = inputSelector.attr("decimal_places");
     if (typeof decimalPlaces == 'undefined') {
         decimalPlaces = 2;
     }
-    let floatVal = parseFloat(value);
+    const floatVal = parseFloat(value);
     if (!isNaN(floatVal)) {
         value = floatVal.toFixed(decimalPlaces);
     }
-    sliderValue.html(value)
+    sliderValue.html(value);
 }
 
 function setupSlider(inputSelector, sliderSelector) {
     // Returns sliderValue
-    let sliderMinVal = Number(inputSelector.attr("min"));
-    let sliderMaxVal = Number(inputSelector.attr("max"));
-    let sliderVal = inputSelector.val();
-    let container = sliderSelector.parents(".slider-container");
+    const sliderMinVal = Number(inputSelector.attr("min"));
+    const sliderMaxVal = Number(inputSelector.attr("max"));
+    const sliderVal = inputSelector.val();
+    const container = sliderSelector.parents(".slider-container");
 
     setVisibleSliderValue(inputSelector, sliderSelector, sliderVal); // set initial
 

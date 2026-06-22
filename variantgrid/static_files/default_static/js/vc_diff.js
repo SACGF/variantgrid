@@ -9,13 +9,13 @@ const Diff = (function() {
         
         this.flagParams = flagParams;
         this.versions = records.map(r => {
-            let merged = Object.assign({}, r, r.data); 
+            const merged = Object.assign({}, r, r.data); 
             delete merged['data'];
             return merged;
         });
         let comparingDiffRecords = false;
         let firstId = null;
-        for (let record of records) {
+        for (const record of records) {
             if (!firstId) {
                 firstId = record.id;
             } else if (record.id !== firstId) {
@@ -24,26 +24,26 @@ const Diff = (function() {
             }
         }
 
-        let groupMap = {};
-        let criteriaMap = {};
-        for (let familyKey of Object.keys(EKey.families)) {
+        const groupMap = {};
+        const criteriaMap = {};
+        for (const familyKey of Object.keys(EKey.families)) {
             groupMap[familyKey] = {"label": EKey.families[familyKey], eKeys: []};
             criteriaMap[familyKey] = {eKeys: []};
         }
         
         eKeys.forEach(k => {
-            let key = k.key;
-            let isCriteria = k.value_type === 'C';
-            let category = k.evidence_category;
+            const key = k.key;
+            const isCriteria = k.value_type === 'C';
+            const category = k.evidence_category;
 
-            let dict = (isCriteria ? criteriaMap : groupMap)[category];
+            const dict = (isCriteria ? criteriaMap : groupMap)[category];
             if (dict) {
                 dict.eKeys.push(k);
             }
         });
 
-        let groups = Object.keys(groupMap).map(g => {
-            let combined = Object.assign({}, groupMap[g]);
+        const groups = Object.keys(groupMap).map(g => {
+            const combined = Object.assign({}, groupMap[g]);
             combined.eKeys = criteriaMap[g].eKeys.concat(combined.eKeys);
             return combined;
         }).filter(g => g.eKeys.length);
@@ -91,7 +91,7 @@ const Diff = (function() {
     
     Diff.compareDbRefs = function(db1, db2) {
         if (db1.db && db2.db) {
-            let sortDb = db1.db.localeCompare(db2.db);
+            const sortDb = db1.db.localeCompare(db2.db);
             if (sortDb) {
                 return sortDb;
             }
@@ -126,30 +126,30 @@ const Diff = (function() {
         },
        
         configureColumns() {
-            let modalContent = createModalShell('configureColumnsModal', 'Choose which columns to compare');
-            let content = modalContent.find('.modal-body');
+            const modalContent = createModalShell('configureColumnsModal', 'Choose which columns to compare');
+            const content = modalContent.find('.modal-body');
 
-            let compareBox = $('<div>').appendTo(content);
+            const compareBox = $('<div>').appendTo(content);
             this.versions.forEach((v, index) => {
                 let uniqueId = `${v.id}`;
                 if (v.version) {
                     uniqueId += `.${v.version}`;
                 }
                 
-                let checkbox = $('<input>', {type:'checkbox', class:"form-check-input", id:`ch-${uniqueId}`, click:event => {
-                    let checked = $(event.target).prop('checked');
+                const checkbox = $('<input>', {type:'checkbox', class:"form-check-input", id:`ch-${uniqueId}`, click:event => {
+                    const checked = $(event.target).prop('checked');
                     this.excluded[uniqueId] = !checked;
                     this.render();
                 }});
                 if (!this.excluded[uniqueId]) {
                     checkbox.prop('checked', true);
                 }
-                let label = $('<label>', {class:'form', for:`ch-${uniqueId}`,  text: `${v.org_name} / ${v.lab_name} / ${v.cr_lab_id}`});
+                const label = $('<label>', {class:'form', for:`ch-${uniqueId}`,  text: `${v.org_name} / ${v.lab_name} / ${v.cr_lab_id}`});
 
                 compareBox.append($('<div>', {
                     class: 'form-group form-check',
                     html: [checkbox, label]
-                }))
+                }));
             });
             modalContent.on('hidden.bs.modal', function() {
                 modalContent.modal('dispose');
@@ -160,7 +160,7 @@ const Diff = (function() {
                
         dbRefCompare(versionDbRefs, source) {
             // Move this out into its own function
-            let allDbRefs = {};
+            const allDbRefs = {};
             versionDbRefs.forEach((dbRefs, index) => {
                 if (dbRefs) {
                     dbRefs.forEach(dbRef => {
@@ -177,18 +177,18 @@ const Diff = (function() {
                     });
                 }
             });
-            let orderedDbRefs = Object.keys(allDbRefs).map(k => allDbRefs[k]);
+            const orderedDbRefs = Object.keys(allDbRefs).map(k => allDbRefs[k]);
             return orderedDbRefs.sort((meta1, meta2) => Diff.compareDbRefs(meta1.dbRef, meta2.dbRef));
         },
 
         render: function() {
-            let e = $(this.diffDom);
-            let includedVersions = this.versions.filter(v => this.isIncluded(v));
+            const e = $(this.diffDom);
+            const includedVersions = this.versions.filter(v => this.isIncluded(v));
            
-            let table = $('<table>', {class: 'diff table'});
-            let thead = $('<thead>').appendTo(table);
-            let tbody = $('<tbody>').appendTo(table);
-            let headerRow = $('<tr>', {class: 'versions no-compare'}).appendTo(thead);
+            const table = $('<table>', {class: 'diff table'});
+            const thead = $('<thead>').appendTo(table);
+            const tbody = $('<tbody>').appendTo(table);
+            const headerRow = $('<tr>', {class: 'versions no-compare'}).appendTo(thead);
 
             // top left cell
             $('<th>', {html: [
@@ -209,8 +209,8 @@ const Diff = (function() {
 
             let renderDbRefCompare = function(dbRefCompared) {
                 dbRefCompared.forEach(dbRefC => {
-                    let dbRef = dbRefC.dbRef;
-                    let whoHas = dbRefC.whoHas;
+                    const dbRef = dbRefC.dbRef;
+                    const whoHas = dbRefC.whoHas;
 
                     let rowClass;
                     let icon;
@@ -220,10 +220,10 @@ const Diff = (function() {
                         heading = dbRef.label;
                     } else {
                         rowClass = 'citation-row';
-                        heading = CitationsManager.defaultManager.citationDomFor(dbRef, true)
+                        heading = CitationsManager.defaultManager.citationDomFor(dbRef, true);
                     }
 
-                    let row = $('<tr>', {class: `${rowClass}`}).appendTo(tbody);
+                    const row = $('<tr>', {class: `${rowClass}`}).appendTo(tbody);
 
                     if (!dbRefC.everyoneHas) {
                         row.addClass('blanks');
@@ -232,7 +232,7 @@ const Diff = (function() {
                         icon = $('<i class="fas fa-check-square" style="color:#6d6"></i>');
                     }
 
-                    let th = $('<th>', {html: [icon, heading]}).appendTo(row);
+                    const th = $('<th>', {html: [icon, heading]}).appendTo(row);
 
                     let hasCount = 0;
                     let hasNotCount = 0;
@@ -244,7 +244,7 @@ const Diff = (function() {
                         if (whoHas[index]) {
                             hasCount++;
                             let title = null;
-                            let whoHasData = whoHas[index];
+                            const whoHasData = whoHas[index];
                             if (Array.isArray(whoHasData)) {
                                 title = 'Referenced in ' + whoHasData.join(', ');
                             }
@@ -258,14 +258,14 @@ const Diff = (function() {
                             $('<td>', {html: '<i class="far fa-square" style="opacity:0.2""></i>'}).appendTo(row);
                         }
                     });
-                    let tooltip = [];
-                    let referenceType = dbRefC.source === 'multiselect' ? 'value' : 'reference';
+                    const tooltip = [];
+                    const referenceType = dbRefC.source === 'multiselect' ? 'value' : 'reference';
                     if (hasCount) {
-                        let verb = hasCount === 1 ? 'record has this' : 'records have this';
+                        const verb = hasCount === 1 ? 'record has this' : 'records have this';
                         tooltip.push(`${hasCount} <span style="color:#444;font-size:smaller">x</span> ${verb} ${referenceType}`);
                     }
                     if (hasNotCount) {
-                        let verb = hasNotCount === 1 ? 'record does not have this' : 'records do not have this';
+                        const verb = hasNotCount === 1 ? 'record does not have this' : 'records do not have this';
                         tooltip.push(`${hasNotCount} <span style="color:#444;font-size:smaller">x</span> ${verb} ${referenceType}`);
                     }
                     th.attr('title', dbRef.label || dbRef.id);
@@ -278,22 +278,22 @@ const Diff = (function() {
             //var percent = Math.floor(100 / Math.max(1, this.versions.length));
             includedVersions.forEach((v, index) => {
 
-                let headers = [];
+                const headers = [];
 
                 let url = Urls.view_classification(v.id);
                 if (v.version) {
                     url += `.${v.version}`;
                 }
 
-                let titleDom = $('<a>', {class:'hover-link text-center d-flex flex-column flex-align-center', href: url});
+                const titleDom = $('<a>', {class:'hover-link text-center d-flex flex-column flex-align-center', href: url});
                 headers.push(titleDom);
 
-                let titlePart = $('<div>', {text:  v.org_name + ' / ' + v.lab_name + ' / ' + v.cr_lab_id}).appendTo(titleDom);
+                const titlePart = $('<div>', {text:  v.org_name + ' / ' + v.lab_name + ' / ' + v.cr_lab_id}).appendTo(titleDom);
                 if (v.first_seen) {
-                    let first_seen_date = moment(v.first_seen * 1000).format('DD/MMM/YYYY HH:mm');
-                    let last_seen_date = moment(v.version * 1000).format('DD/MMM/YYYY HH:mm');
+                    const first_seen_date = moment(v.first_seen * 1000).format('DD/MMM/YYYY HH:mm');
+                    const last_seen_date = moment(v.version * 1000).format('DD/MMM/YYYY HH:mm');
                     if (first_seen_date !== last_seen_date) {
-                        let title = `First uploaded at ${first_seen_date},<br/>Non-significant change at ${last_seen_date}`;
+                        const title = `First uploaded at ${first_seen_date},<br/>Non-significant change at ${last_seen_date}`;
                         $('<div>', {class: 'timestamp', text: first_seen_date + '*', 'data-content': title}).appendTo(titleDom);
                     } else {
                         $('<div>', {class: 'timestamp', text: moment(v.version * 1000).format('DD/MMM/YYYY HH:mm')}).appendTo(titleDom);
@@ -307,16 +307,16 @@ const Diff = (function() {
 
                 clinSigText = [];
 
-                let clin_sig_key = this.eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-                let clin_sig = clin_sig_key.prettyValue((v.clinical_significance || {}).value);
+                const clin_sig_key = this.eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+                const clin_sig = clin_sig_key.prettyValue((v.clinical_significance || {}).value);
                 if (clin_sig.val) {
                     clinSigText.push(clin_sig.val);
                 }
 
-                let somatic_clin_sig_value = v[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
+                const somatic_clin_sig_value = v[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
                 if (somatic_clin_sig_value && somatic_clin_sig_value.value) {
-                    let somatic_clin_sig_key = this.eKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
-                    let somatic_clin_sig_pretty = somatic_clin_sig_key.prettyValue(somatic_clin_sig_value.value);
+                    const somatic_clin_sig_key = this.eKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+                    const somatic_clin_sig_pretty = somatic_clin_sig_key.prettyValue(somatic_clin_sig_value.value);
                     clinSigText.push(somatic_clin_sig_pretty.val);
                 }
                 headers.push(
@@ -331,7 +331,7 @@ const Diff = (function() {
                     conditionRow.text((v.condition || {}).value);
                 }
                 */
-                let flagRow = $('<div>', {class:'d-flex mt-2 align-items-center', style:'min-height:20px'}).appendTo(titleDom);
+                const flagRow = $('<div>', {class:'d-flex mt-2 align-items-center', style:'min-height:20px'}).appendTo(titleDom);
                 $('<div>', {class:'flex-grow'}).appendTo(flagRow);
 
                 if (!v.version_is_published) {
@@ -356,10 +356,10 @@ const Diff = (function() {
 
                 headers.push(flagRow);
 
-                let th = $('<th>', {html: headers}).appendTo(headerRow);
+                const th = $('<th>', {html: headers}).appendTo(headerRow);
             });
 
-            let rowLabRecordId = $('<tr>', {class: 'group no-compare'}).appendTo(table);
+            const rowLabRecordId = $('<tr>', {class: 'group no-compare'}).appendTo(table);
             $('<th>', {text: "Lab ID", style: 'font-weight:normal'}).appendTo(rowLabRecordId);
             includedVersions.forEach(v => {
                 $('<td>', {text: v.lab_record_id}).appendTo(rowLabRecordId);
@@ -369,19 +369,19 @@ const Diff = (function() {
 
             // loop through groups of keys
             this.groups.forEach(group => {
-                let row = $('<tr>', {class: 'group no-compare'}).appendTo(table);
+                const row = $('<tr>', {class: 'group no-compare'}).appendTo(table);
                 $('<th>', {text:group["label"]}).appendTo(row);
                 $('<td>', {class:'filler', colspan: includedVersions.length}).appendTo(row);
 
                 group.eKeys.forEach(eKey => {
-                    let key = eKey.key;
+                    const key = eKey.key;
 
                     includedVersions.forEach((v, index) => {
-                        let db_refs = (v[key] || {}).db_refs;
+                        const db_refs = (v[key] || {}).db_refs;
                         if (db_refs) {
                             CitationsManager.normalizeInPlace(db_refs);
 
-                            for (let db_ref of db_refs) {
+                            for (const db_ref of db_refs) {
                                 let ref_details = all_db_refs[db_ref.id];
 
                                 if (!ref_details) {
@@ -398,22 +398,22 @@ const Diff = (function() {
                         }
                     });
 
-                    for (let show of ['value', 'resolved', 'note']) {
+                    for (const show of ['value', 'resolved', 'note']) {
                         let labelText = eKey.label;
                         if (show !== 'value') {
                             labelText += ` ${show}`;
                         }
-                        let label = $('<span>', {text: labelText});
+                        const label = $('<span>', {text: labelText});
 
-                        let row = $('<tr>', {class: `${show}`}).appendTo(table);
+                        const row = $('<tr>', {class: `${show}`}).appendTo(table);
 
-                        let th = $('<th>', {html: label}).appendTo(row);
+                        const th = $('<th>', {html: label}).appendTo(row);
 
-                        let uniqueValues = {};
-                        let blankValues = {};
+                        const uniqueValues = {};
+                        const blankValues = {};
                         let hasBlank = 0;
                         let hasMultiValues = false;
-                        let isCriteria = show === 'value' && eKey.value_type === 'C' && eKey.namespace() === 'acmg';
+                        const isCriteria = show === 'value' && eKey.value_type === 'C' && eKey.namespace() === 'acmg';
                         if (eKey.value_type === 'T') {
                             row.addClass('textarea');
                         }
@@ -423,10 +423,10 @@ const Diff = (function() {
 
                         includedVersions.forEach((v, index) => {
 
-                            let blob = v[key] || {};
-                            let {note, explain, resolved, value, hidden, db_refs} = blob;
+                            const blob = v[key] || {};
+                            const {note, explain, resolved, value, hidden, db_refs} = blob;
 
-                            let cell = $('<td>').appendTo(row);
+                            const cell = $('<td>').appendTo(row);
                             let val = null;
 
                             if (hidden) {
@@ -454,7 +454,7 @@ const Diff = (function() {
                                 }
                             }
 
-                            let valueKey = Diff.hash(val);
+                            const valueKey = Diff.hash(val);
                             if (valueKey) {
                                 cell.addClass(`not-blank`);
                                 if (!uniqueValues[valueKey]) {
@@ -483,7 +483,7 @@ const Diff = (function() {
                         });
 
                         let diffHelp = null;
-                        let uniqueIndex = Object.keys(uniqueValues).length;
+                        const uniqueIndex = Object.keys(uniqueValues).length;
                         if (uniqueIndex === 0) {
                             diffHelp = 'No values for any cell';
                             row.addClass('empty');
@@ -492,9 +492,9 @@ const Diff = (function() {
                         } else if (uniqueIndex > 1 || (uniqueIndex === 1 && hasBlank && isCriteria)) {
                             row.addClass('differences');
 
-                            let effectiveHasBlank = hasBlank;
+                            const effectiveHasBlank = hasBlank;
                             if (isCriteria) {
-                                let effectiveUniqueCount = uniqueIndex + Object.values(blankValues).length;
+                                const effectiveUniqueCount = uniqueIndex + Object.values(blankValues).length;
                                 diffHelp = `<span style="color:#A44">Cells have ${effectiveUniqueCount} unique values</span>`;
                             } else {
                                 diffHelp = `<span style="color:#A44">Cells have ${uniqueIndex} unique values` + (hasBlank ? ' and blanks ' : '') + '</span>';
@@ -515,17 +515,17 @@ const Diff = (function() {
                             th.prepend(icon);
                         }
 
-                        let diffBreakdown = [];
+                        const diffBreakdown = [];
                         if (hasBlank) {
                             if (isCriteria) {
-                                let blankCounts = Object.values(blankValues);
+                                const blankCounts = Object.values(blankValues);
                                 blankCounts.sort((vc1,vc2) => {
                                     if (vc1.count !== vc2.count) {
                                         return vc1.count - vc2.count;
                                     }
                                     return vc1.value.localeCompare(vc2.value);
                                 });
-                                for (let valueCount of blankCounts) {
+                                for (const valueCount of blankCounts) {
                                     diffBreakdown.push(`${valueCount.count} <span style="color:#888;font-size:smaller">x</span> <span style="color:#888">${valueCount.value}</span>`);
                                 }
                             } else {
@@ -539,7 +539,7 @@ const Diff = (function() {
                             }
                             return vc1.value.localeCompare(vc2.value);
                         });
-                        for (let valueCount of valueCounts) {
+                        for (const valueCount of valueCounts) {
                             let displayValue = valueCount.value;
                             displayValue = displayValue.replace(/</g,'&lt;').replace(/\n/g,' ');
                             if (displayValue.length > 40) {
@@ -547,7 +547,7 @@ const Diff = (function() {
                             }
                             diffBreakdown.push(`${valueCount.count} <span style="color:#888;font-size:smaller">x</span> ${displayValue}`);
                         }
-                        let diffBreakdownString = diffBreakdown.join('<br/>');
+                        const diffBreakdownString = diffBreakdown.join('<br/>');
 
                         let keyDescription;
                         if (eKey.description) {
@@ -555,19 +555,19 @@ const Diff = (function() {
                         } else {
                             keyDescription = "";
                         }
-                        let content = $('<div>', {style:'white-space: pre-wrap;'});
+                        const content = $('<div>', {style:'white-space: pre-wrap;'});
                         th.attr('title', eKey.label);
                         th.attr('data-content', `${diffHelp}<br>${diffBreakdownString}<br>---<br>${keyDescription}`);
 
                         if (show === 'value' && includedVersions.length >= 2 && hasMultiValues) {
                             // break down multiselect or dbRefs into their own checkboxes
-                            let multiselect = includedVersions.map(v => {
+                            const multiselect = includedVersions.map(v => {
                                 if (v[key] && Array.isArray(v[key].value)) {
                                     return v[key].value.map(k => ({id: k, label: eKey.prettyValue([k]).val}));
                                 }
                                 return null;
                             });
-                            let dbRefs = includedVersions.map(v => {
+                            const dbRefs = includedVersions.map(v => {
                                 if (v[key] && v[key].db_refs) {
                                     return CitationsManager.normalizeInPlace(v[key].db_refs);
                                 }
@@ -586,7 +586,7 @@ const Diff = (function() {
             // convert from map to array and sort
             all_db_refs = Object.keys(all_db_refs).map(k => all_db_refs[k]);
             all_db_refs.sort((aw,bw) => {
-                let [a,b] = [aw.dbRef, bw.dbRef];
+                const [a,b] = [aw.dbRef, bw.dbRef];
                 let diff = a.db.localeCompare(b.db);
                 if (diff === 0) {
                     try {
@@ -599,8 +599,8 @@ const Diff = (function() {
                 return diff;
             });
 
-            let references = all_db_refs.filter(ref => Diff.LITERATURE_DBS[ref.dbRef.db] !== true);
-            let citations = all_db_refs.filter(ref => Diff.LITERATURE_DBS[ref.dbRef.db] === true);
+            const references = all_db_refs.filter(ref => Diff.LITERATURE_DBS[ref.dbRef.db] !== true);
+            const citations = all_db_refs.filter(ref => Diff.LITERATURE_DBS[ref.dbRef.db] === true);
 
             let row = $('<tr>', {class: 'group no-compare'}).appendTo(table);
             $('<th>', {class: 'heading', text:"Links"}).appendTo(row);

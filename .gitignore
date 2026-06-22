@@ -44,3 +44,4 @@ cover/
 /.idea/dataSources.xml
 /.idea/dataSources
 node_modules/
+eslint.txt

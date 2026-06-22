@@ -7,14 +7,14 @@ const VCForm = (function() {
 
     // need a wrapper as disabled elements don't have tool tips
     const disableButton = button => {
-        let wrapper = $('<div>', {class: 'btn-disabled-wrapper', style:'position:relative; cursor: not-allowed'});
+        const wrapper = $('<div>', {class: 'btn-disabled-wrapper', style:'position:relative; cursor: not-allowed'});
         button.attr('click', null);
         button.attr("disabled", true);
         button.addClass('disabled');
         button.addClass('h-100');
 
         wrapper.append(button);
-        let bonusWrapper = $('<div>', {style:'z-index:1; position:absolute; left:0; top:0; right:0; bottom:0', title: button.attr('title'), 'data-toggle':"tooltip"});
+        const bonusWrapper = $('<div>', {style:'z-index:1; position:absolute; left:0; top:0; right:0; bottom:0', title: button.attr('title'), 'data-toggle':"tooltip"});
         bonusWrapper.tooltip({html:true, focus:'hover'});
         wrapper.append(bonusWrapper);
 
@@ -32,10 +32,10 @@ const VCForm = (function() {
         } else if (typeof(val) === 'undefined') {
             return null;
         } else if (Array.isArray(val)) {
-            let filtered_array = [];
-            for (let sub_value of val) {
+            const filtered_array = [];
+            for (const sub_value of val) {
                 if (sub_value != null && sub_value !== '') {
-                    filtered_array.push(sub_value)
+                    filtered_array.push(sub_value);
                 }
             }
             return filtered_array;
@@ -45,7 +45,7 @@ const VCForm = (function() {
     
     /* private variables */
     let filtering = false;
-    let filtered = {};
+    const filtered = {};
     
     let jContent = null;
     let jSyncStatus = null;
@@ -61,7 +61,7 @@ const VCForm = (function() {
     let eKeys = null;
     let vcLinks = null;
 
-    let VCForm = function() {};
+    const VCForm = function() {};
 
     VCForm.prototype = {
 
@@ -113,7 +113,7 @@ const VCForm = (function() {
         },
 
         clear() {
-            let res = confirm('Are you sure you wish to clear the form data?');
+            const res = confirm('Are you sure you wish to clear the form data?');
             if (res) {
                 Object.keys(this.data).forEach(key => {
                     this.data[key] = null;
@@ -125,8 +125,8 @@ const VCForm = (function() {
         },
 
         baseUrl() {
-            let url = window.location.href;
-            let questionIndex = url.indexOf("?");
+            const url = window.location.href;
+            const questionIndex = url.indexOf("?");
             if (questionIndex !== -1) {
                 return url.substring(0, questionIndex);
             }
@@ -144,7 +144,7 @@ const VCForm = (function() {
         },
         
         generateLink(href, html, new_tab) {
-            let a = $('<a>', {href: href, html: html });
+            const a = $('<a>', {href: href, html: html });
             if (new_tab) {
                 a.attr('target', '_blank');
             }
@@ -153,17 +153,17 @@ const VCForm = (function() {
 
         // init data with a record (or from localStorage if no record is there)
         initData(record) {
-            let data = {};
+            const data = {};
             if (record === null) {
                 // record = JSON.parse( localStorage.editingSubmission || '{}' );
                 record = {};
             }
             this.record = record;
-            let recordData = Object.assign({}, record['data'] || {});
-            let recordMessages = record['messages'] || [];
+            const recordData = Object.assign({}, record['data'] || {});
+            const recordMessages = record['messages'] || [];
             
             eKeys.forEach(eKey => {
-                let key = eKey.key;
+                const key = eKey.key;
                 data[key] = recordData[key] || null;
                 delete recordData[key]; 
             });
@@ -197,13 +197,13 @@ const VCForm = (function() {
         },
                 
         generateExportButtons() {
-            let wrapper = $('<div>', {html: $('<h5>', {text:'Export as', class: 'mt-4'})});
-            let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
-            let csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-csv', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv()}});
+            const wrapper = $('<div>', {html: $('<h5>', {text:'Export as', class: 'mt-4'})});
+            const buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
+            const csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-csv', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv();}});
             csvButton.appendTo(buttons);
 
             if (this.reportEnabled) {
-                let reportButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-report', html: '<i class="far fa-file"></i> Report', click: () => {this.report()}});
+                const reportButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-report', html: '<i class="far fa-file"></i> Report', click: () => {this.report();}});
                 reportButton.appendTo(buttons);
             } else {
                 buttons.append($('<div>'));
@@ -212,13 +212,13 @@ const VCForm = (function() {
             return wrapper;
         },
         createModal(headerText, bodyText, confirmButtonText, confirmCallback, cancelCallback, isWithdrawal = false) {
-            let dialogContent = createModalShell('confirmation-modal', headerText, 'lg');
-            let dialogBody = dialogContent.find('.modal-body');
-            let dialogFooter = dialogContent.find('.modal-footer');
-            let idPrefix = "modal-action";
+            const dialogContent = createModalShell('confirmation-modal', headerText, 'lg');
+            const dialogBody = dialogContent.find('.modal-body');
+            const dialogFooter = dialogContent.find('.modal-footer');
+            const idPrefix = "modal-action";
 
             if (isWithdrawal) {
-                let withdrawReasonDropdown = $('<select class="form-control" id="withdrawReasonDropdown" required></select>');
+                const withdrawReasonDropdown = $('<select class="form-control" id="withdrawReasonDropdown" required></select>');
                     withdrawReasonDropdown.append('<option value="">Select Withdrawal Reason</option>');
 
                     for (const [value, display] of this.withdrawReasons) {
@@ -286,9 +286,9 @@ const VCForm = (function() {
                     confirmAction
                 );
             } else {
-                let is_withdraw = this.record.publish_level === 'logged_in_users' ||
+                const is_withdraw = this.record.publish_level === 'logged_in_users' ||
                     this.record.publish_level === 'public' || !this.deleteEnabled;
-                let mode = is_withdraw ? "withdraw" : "delete";
+                const mode = is_withdraw ? "withdraw" : "delete";
                 confirmAction = () => {
                     if (is_withdraw) {
                         this.delete_reason = $('#withdrawReasonDropdown').val();
@@ -318,20 +318,20 @@ const VCForm = (function() {
         },
         
         share() {
-            let dialogContent = createModalShell('share', 'Submit and Share This With');
-            let dialogBody = dialogContent.find('.modal-body');
-            let dialogFooter = dialogContent.find('.modal-footer');
+            const dialogContent = createModalShell('share', 'Submit and Share This With');
+            const dialogBody = dialogContent.find('.modal-body');
+            const dialogFooter = dialogContent.find('.modal-footer');
             dialogContent.on('hidden.bs.modal', function() {
                 dialogContent.modal('dispose');
                 dialogContent.remove();
             });
 
-            let shareLevelDivs = [];
+            const shareLevelDivs = [];
             let newShareLevel = this.record.publish_level;
-            for (let share_level of VcSettings.SHARE_LEVELS) {
-                let label = this.labelForLevel(share_level);
+            for (const share_level of VcSettings.SHARE_LEVELS) {
+                const label = this.labelForLevel(share_level);
                 
-                let selectionDiv = $('<li>', {class: 'list-group-item share-list', 'data-current': label.included || label.current}).appendTo(dialogBody);
+                const selectionDiv = $('<li>', {class: 'list-group-item share-list', 'data-current': label.included || label.current}).appendTo(dialogBody);
                 shareLevelDivs.push(selectionDiv);
                 $('<i class="far fa-circle d-inline-block"></i>').appendTo(selectionDiv);
                 $('<img>', {class: 'ml-2 d-inline-block share-icon', width: '16px', height: '16px', src: label.icon }).appendTo(selectionDiv);
@@ -350,7 +350,7 @@ const VCForm = (function() {
                     selectionDiv.click(() => {
                         newShareLevel = share_level;
                         let hitMeYet = false;
-                        for (let divy of shareLevelDivs) {
+                        for (const divy of shareLevelDivs) {
                             if (hitMeYet) {
                                 divy.removeClass('list-group-item-secondary');
                                 divy.find('i').removeClass('fa-check-circle').addClass('fa-circle');
@@ -380,7 +380,7 @@ const VCForm = (function() {
 
         updateSubmitButton() {
             // The submit button appears next to the quick summary now so it's always at hand
-            let quickSubmitWrapper = $('#vc-quick-submit');
+            const quickSubmitWrapper = $('#vc-quick-submit');
             quickSubmitWrapper.empty();
             if (quickSubmitWrapper.length) {
                 let message = null;
@@ -403,7 +403,7 @@ const VCForm = (function() {
                         } else if (this.record.publish_level === 'organisation') {
                             message = `This record is only visible to users in your organisation.`;
                         } else {
-                            let message_suffix = VcSettings.LOGGED_IN_USERS_MESSAGE || "This record is shared to Shariant users.";
+                            const message_suffix = VcSettings.LOGGED_IN_USERS_MESSAGE || "This record is shared to Shariant users.";
                             $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: `<i class="fas fa-check-circle text-success"></i> ${message_suffix}`}).appendTo(quickSubmitWrapper);
                         }
                     }
@@ -447,7 +447,7 @@ const VCForm = (function() {
                         }
                     }
                 } else if (!this.record.is_last_published || this.record.can_write_latest) {
-                    let goToLatest = () => {
+                    const goToLatest = () => {
                         window.open(`/classification/classification/${this.record.id}`, '_self');
                     };
 
@@ -472,9 +472,9 @@ const VCForm = (function() {
         generateActionButtons() {
             this.updateSubmitButton();
 
-            let wrapper = $('<div>', {class:'mt-4'});
+            const wrapper = $('<div>', {class:'mt-4'});
             wrapper.append($('<h5>', {text: 'Actions'}));
-            let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
+            const buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
 
             let butt = $('<button>', {class: 'btn btn-danger btn-lg', html: '<i class="fas fa-trash-alt"></i> Delete', title: 'Delete', click: this.trash.bind(this)});
             if (this.record.withdrawn) {
@@ -504,26 +504,26 @@ const VCForm = (function() {
         
         updateLinks() {
             jLinks.empty();
-            let linkData = {};
-            for (let key of VCLinks.ALL_KEYS) {
+            const linkData = {};
+            for (const key of VCLinks.ALL_KEYS) {
                 linkData[key] = this.value(key);
             }
 
             linkData[SpecialEKeys.VARIANT_COORDINATE] = this.variantCoordinate();
             linkData[SpecialEKeys.C_HGVS] = this.cHGVS();
 
-            let allLinks = vcLinks.generateLinks(linkData).map(vcLink => {return vcLink.asAnchor("bootstrap").addClass('list-group-item').addClass('list-group-item-action')});
-            for (let link of allLinks) {
+            const allLinks = vcLinks.generateLinks(linkData).map(vcLink => {return vcLink.asAnchor("bootstrap").addClass('list-group-item').addClass('list-group-item-action');});
+            for (const link of allLinks) {
                 link.attr('data-placement', 'left');
             }
-            let length = allLinks.length;
-            let colA = allLinks;
-            let colB = colA.splice(0, Math.ceil(length/2));
+            const length = allLinks.length;
+            const colA = allLinks;
+            const colB = colA.splice(0, Math.ceil(length/2));
 
-            let columnLinks = [colB, colA];
-            let row = $('<div>', {class:'row no-gutters'}).appendTo(jLinks);
+            const columnLinks = [colB, colA];
+            const row = $('<div>', {class:'row no-gutters'}).appendTo(jLinks);
             for (let i=0; i < 2; i++) {
-                let col = $('<div>', {class: 'col-6', html:
+                const col = $('<div>', {class: 'col-6', html:
                     $('<ul>', {class: 'list-group', html: columnLinks[i]})
                 }).appendTo(row);
                 if (i === 1) {
@@ -536,9 +536,9 @@ const VCForm = (function() {
             jPublishHistory.show();
             jPublishHistory.empty();
             
-            let publishUL = $('<ul>', {class: 'list-group'}).appendTo(jPublishHistory);
+            const publishUL = $('<ul>', {class: 'list-group'}).appendTo(jPublishHistory);
             
-            let versions = [];
+            const versions = [];
             if (this.record.version !== this.record.last_edited && this.record.version !== this.record.published_version) {
                 versions.push({
                     label: 'this version',
@@ -564,12 +564,12 @@ const VCForm = (function() {
                 title: 'Version that was last shared with ' + this.labelForLevel(this.record.publish_level).title
             });
             
-            for (let version of versions) {
-                let content = $('<span>', {html:[
+            for (const version of versions) {
+                const content = $('<span>', {html:[
                     $('<img>', {src: '/static/icons/share_level/' + version.icon + '.png', class:'share-icon'}),
                     version.label
                 ]});
-                let isCurrentVersion = version.timestamp === this.record.version;
+                const isCurrentVersion = version.timestamp === this.record.version;
 
                 if (!version.timestamp) {
                     $('<span>', {class: 'timestamp', text: '---' }).appendTo(content);
@@ -601,7 +601,7 @@ const VCForm = (function() {
                 ).addClass('list-group-item').addClass('list-group-item-action').appendTo(publishUL);
             }
             if (this.otherClassificationsSummary) {
-                let viewSummary = "<i class=\"fas fa-columns\"></i> Compare with other classifications for this variant (" + this.otherClassificationsSummary + ")";
+                const viewSummary = "<i class=\"fas fa-columns\"></i> Compare with other classifications for this variant (" + this.otherClassificationsSummary + ")";
                 this.generateLink(
                     `/classification/diff/?variant_compare=${this.record.id}&allele_id=${(this.record.allele || {}).id}`,
                     viewSummary, true
@@ -620,15 +620,15 @@ const VCForm = (function() {
         },
         
         updateCitations() {
-            let seenIds = {};
-            let elements = [];
+            const seenIds = {};
+            const elements = [];
             Object.keys(this.data).forEach(k => {
-               let blob = this.data[k];
+               const blob = this.data[k];
                if (blob && blob['db_refs']) {
-                   for (let ref of blob['db_refs']) {
-                       let id = (ref.id || '').replace('\s*', '');
+                   for (const ref of blob['db_refs']) {
+                       const id = (ref.id || '').replace('\s*', '');
                        if (!seenIds[id]) {
-                           let dom = CitationsManager.defaultManager.citationDomFor(ref);
+                           const dom = CitationsManager.defaultManager.citationDomFor(ref);
                            if (dom) {
                                elements.push(dom);
                            }
@@ -661,12 +661,12 @@ const VCForm = (function() {
             
             jErrors.closest('.card').show();
         
-            let ul = $('<ul>', {class:'list-group'});
+            const ul = $('<ul>', {class:'list-group'});
             this.messages.forEach(error => {
-                let eKey = eKeys.key(error.key);
+                const eKey = eKeys.key(error.key);
                 
                 // add the warning next to the field as well
-                let inlineError = this.iconForSeverity(error.severity);
+                const inlineError = this.iconForSeverity(error.severity);
                 inlineError.addClass('inline-error');
                 inlineError.attr('title', error.message);
 
@@ -678,7 +678,7 @@ const VCForm = (function() {
                     case 'info': icon = '<i class="fas fa-info-circle text-primary"></i>'; break;
                 }
 
-                let listItem = $('<a>', {class: 'list-group-item list-group-item-action',  target: '_blank', click: () => {
+                const listItem = $('<a>', {class: 'list-group-item list-group-item-action',  target: '_blank', click: () => {
                     jFilterBox.val('#' + eKey.key);
                     jFilterBox.keyup();
                     $(`[entry="${eKey.key}"]`).trigger('click');
@@ -705,8 +705,8 @@ const VCForm = (function() {
             if (typeof(key) !== 'string') {
                 key = key.key;
             }
-            let messages = this.messages.filter(message => message.key === key);
-            for (let severity of ['error', 'warning', 'info']) {
+            const messages = this.messages.filter(message => message.key === key);
+            for (const severity of ['error', 'warning', 'info']) {
                 if (messages.find(m => m.severity === severity)) { return severity; }
             }
             return null;
@@ -728,7 +728,7 @@ const VCForm = (function() {
                    return undefined;
                 }
                 // Note custom message has almost no browser support
-                let confirmationMessage = `
+                const confirmationMessage = `
                 You have unsaved changes (they will automatically be uploaded shortly).\n
                 If you leave while changes are being uploaded, they will be lost.`;
                 
@@ -757,13 +757,13 @@ const VCForm = (function() {
             if (this.sendStatus.error) {
                 return;
             }
-            let sendingDelta = Object.assign({}, this.delta);
+            const sendingDelta = Object.assign({}, this.delta);
             this.updateSendingStatus({sending: true});
             this.delta = {};
 
             // have to request config if we change a key responsible for which namespaces get used
-            let requestConfig = !!sendingDelta[SpecialEKeys.ASSERTION_METHOD] || !!sendingDelta[SpecialEKeys.ALLELE_ORIGIN];
-            let envelope = {
+            const requestConfig = !!sendingDelta[SpecialEKeys.ASSERTION_METHOD] || !!sendingDelta[SpecialEKeys.ALLELE_ORIGIN];
+            const envelope = {
                 'id': {'record_id': this.record.id},
                 source: 'form',
                 patch: sendingDelta,
@@ -795,7 +795,7 @@ const VCForm = (function() {
                         error: text || status || 'Connection error'
                     });
                     // send failed, so re-populate the delta
-                    for (let key of Object.keys(sendingDelta)) {
+                    for (const key of Object.keys(sendingDelta)) {
                         if (!this.delta.hasOwnProperty(key)) {
                             this.delta[key] = sendingDelta[key];
                         }
@@ -815,14 +815,14 @@ const VCForm = (function() {
                         return;
                     }
 
-                    let updateSet = new Set();
+                    const updateSet = new Set();
 
                     if (record.config) {
                         eKeys = eKeysBase.configCopy(record.config);
                         eKeys.forEach(eKey => {
                             if (eKey.config_updates) {
-                                let original = jContent.find(`[entry="${eKey.key}"]`);
-                                let replacement = this.createEntry(eKey);
+                                const original = jContent.find(`[entry="${eKey.key}"]`);
+                                const replacement = this.createEntry(eKey);
                                 replacement.css('display', original.css('display'));
                                 original.replaceWith(replacement);
                                 updateSet.add(eKey.key);
@@ -837,8 +837,8 @@ const VCForm = (function() {
                     this.messages = record.messages || [];
                     
                     Object.assign(this.delayedPatch, record.data);
-                    let delayedPatch = {};
-                    for (let key of Object.keys(this.delayedPatch)) {
+                    const delayedPatch = {};
+                    for (const key of Object.keys(this.delayedPatch)) {
                         if (typeof(this.delta[key]) !== 'undefined') {
                             // only override values that the user hasn't changed since
                             // presumable values the user changed will be updated
@@ -887,17 +887,17 @@ const VCForm = (function() {
         },
 
         updateTitle() {
-            let appendLabelHeading = (label, valueElement) => {
+            const appendLabelHeading = (label, valueElement) => {
                 return $('<div>', {class: 'row no-gutters', html:[
                     $('<label>', {class:'col-3 text-right align-self-center', text: label}),
                     $('<div>', {class:'col-9 pl-3 align-self-center', html:valueElement})
                 ]}).appendTo(jSyncStatus);
             };
-            let appendLabelHeadingForKey = (key, showBlank, labelOverride, extra) => {
+            const appendLabelHeadingForKey = (key, showBlank, labelOverride, extra) => {
                 let value = this.value(key);
                 if (value !== null || showBlank) {
-                    let eKey = eKeys.key(key);
-                    let label = labelOverride || eKey.label;
+                    const eKey = eKeys.key(key);
+                    const label = labelOverride || eKey.label;
                     let valueElement;
                     if (value === null) {
                         valueElement = $('<span>', {class: 'no-value', text: '-'});
@@ -920,8 +920,8 @@ const VCForm = (function() {
             appendLabelHeadingForKey(SpecialEKeys.GENOME_BUILD, true, 'Build');
 
             if (this.record.allele && this.record.allele.resolved) {
-                let resolved = this.record.allele.resolved;
-                let hgvsDom = VCTable.format_hgvs(resolved);
+                const resolved = this.record.allele.resolved;
+                const hgvsDom = VCTable.format_hgvs(resolved);
                 appendLabelHeading("Variant", hgvsDom);
                 if (resolved.allele_info_id) {
                     appendLabelHeading('', $('<a>', {'data-toggle':'ajax-modal', href: Urls.view_imported_allele_info_detail(resolved.allele_info_id), text:'Resolution Details'}));
@@ -930,7 +930,7 @@ const VCForm = (function() {
 
             let p_hgvs = this.value(SpecialEKeys.P_HGVS);
             if (p_hgvs) {
-                let p_dot = p_hgvs.indexOf('p.');
+                const p_dot = p_hgvs.indexOf('p.');
                 if (p_dot !== -1) {
                     p_hgvs = p_hgvs.substring(p_dot);
                 }
@@ -943,9 +943,9 @@ const VCForm = (function() {
                 "G": "GERMLINE (default)",
                 "S": "SOMATIC (default)"
             }[alleleOriginBucket];
-            let alleleOriginValue = this.value(SpecialEKeys.ALLELE_ORIGIN);
+            const alleleOriginValue = this.value(SpecialEKeys.ALLELE_ORIGIN);
             if (alleleOriginValue) {
-                let eKey = eKeys.key(SpecialEKeys.ALLELE_ORIGIN);
+                const eKey = eKeys.key(SpecialEKeys.ALLELE_ORIGIN);
                 alleleOriginDisplay = eKey.prettyValue(alleleOriginValue).val;
                 // TODO hopefully replace this with an attribute of the allele origin drop down
                 // also see classification.py def calc_allele_origin_bucket(self) -> AlleleOriginBucket:
@@ -958,7 +958,7 @@ const VCForm = (function() {
                 }
             }
 
-            let bucketHtml = $(`<div class="allele-origin-box horizontal allele-origin-${alleleOriginBucket}">
+            const bucketHtml = $(`<div class="allele-origin-box horizontal allele-origin-${alleleOriginBucket}">
                 <div class="allele-origin-text">
                     ${alleleOriginDisplay}
                 </div>
@@ -973,7 +973,7 @@ const VCForm = (function() {
             if (this.record.resolved_condition) {
                 conditionElement = VCForm.format_condition(this.record.resolved_condition);
             } else {
-                let condition = this.value(SpecialEKeys.CONDITION);
+                const condition = this.value(SpecialEKeys.CONDITION);
                 //  if condition matching is enabled, if the user has permission to edit this record
                 //  if the record is germline (somatic text resolution not enabled yet)
                 // AND if the record doesn't have changes (which could cause confusion if there is un-submitted condition text change)
@@ -982,7 +982,7 @@ const VCForm = (function() {
                     this.record.can_write &&
                     this.record.allele_origin_bucket === "G" &&
                     !this.record.has_changes) {
-                    let conditionUrl = Urls.condition_matching(this.record.condition_text_match);
+                    const conditionUrl = Urls.condition_matching(this.record.condition_text_match);
                     conditionElement = $('<a>', {href: conditionUrl , title:`Resolve condition text<br>"${_.escape(condition)}"<br>to a standard term`, text: condition, class: 'hover-link edit-link', target: '_blank'});
                 } else {
                     conditionElement = $('<span>', { text: condition });
@@ -996,8 +996,8 @@ const VCForm = (function() {
 
             if (this.value(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)) {
                 let extra = null;
-                for (let level of ['a', 'b', 'c', 'd']) {
-                    let value = this.value(`amp:level_${level}`);
+                for (const level of ['a', 'b', 'c', 'd']) {
+                    const value = this.value(`amp:level_${level}`);
                     if (value) {
                         extra = ` ${level.toUpperCase()}`;
                         break;
@@ -1007,17 +1007,17 @@ const VCForm = (function() {
             }
 
             if (this.record.sample_id) {
-                let href = Urls.view_sample(this.record.sample_id);
+                const href = Urls.view_sample(this.record.sample_id);
                 let sampleElement = $('<a>', {class:'hover-link', text: this.record.sample_name, href:href});
                 sampleElement = $('<span>', {html: [
                     sampleElement,
-                ]})
+                ]});
                 appendLabelHeading('Sample', sampleElement);
             }
 
             if (this.userAdmin) {
-                let adminLinkHref = Urls["admin:classification_classification_change"](this.record.id);
-                let adminLink = $('<a>', {class:'admin-link', target: '_blank', html: 'Manage', href: adminLinkHref});
+                const adminLinkHref = Urls["admin:classification_classification_change"](this.record.id);
+                const adminLink = $('<a>', {class:'admin-link', target: '_blank', html: 'Manage', href: adminLinkHref});
                 appendLabelHeading('Admin', adminLink);
             }
 
@@ -1026,14 +1026,14 @@ const VCForm = (function() {
 
         variantCoordinate() {
             // Prefer to use the ekey
-            let vc_value = this.value(SpecialEKeys.VARIANT_COORDINATE);
+            const vc_value = this.value(SpecialEKeys.VARIANT_COORDINATE);
             if (vc_value) {
                 return vc_value;
             }
             // Try the resolved per-build coordinate (populated from ResolvedVariantInfo.variant.coordinate)
-            let genome_build = this.value(SpecialEKeys.GENOME_BUILD);
+            const genome_build = this.value(SpecialEKeys.GENOME_BUILD);
             if (genome_build) {
-                let build_vc = this.record.allele?.genome_builds?.[genome_build]?.[SpecialEKeys.VARIANT_COORDINATE];
+                const build_vc = this.record.allele?.genome_builds?.[genome_build]?.[SpecialEKeys.VARIANT_COORDINATE];
                 if (build_vc) {
                     return build_vc;
                 }
@@ -1054,10 +1054,10 @@ const VCForm = (function() {
         },
 
         populateForm(restrictToKeysSet) {
-            let vcform = this;
+            const vcform = this;
             jContent.find('[name]').each(function(index, elem) {
                 elem = $(elem);
-                let name = elem.attr('name');
+                const name = elem.attr('name');
                 if (restrictToKeysSet && !restrictToKeysSet.has(name)) {
                     return;
                 }
@@ -1068,14 +1068,14 @@ const VCForm = (function() {
 
                 let visualElement = elem;
                 if (elem.prop('tagName') === 'SELECT') {
-                    let container = elem.siblings('.chosen-container');
+                    const container = elem.siblings('.chosen-container');
                     if (container.length) {
                         visualElement = container;
                     }
                 }
 
                 let val = vcform.value( name );
-                let immutable = vcform.immutable( name );
+                const immutable = vcform.immutable( name );
                 
                 let immutableDiv = visualElement.siblings('.immutable');
                 if (immutable) {
@@ -1085,7 +1085,7 @@ const VCForm = (function() {
                     visualElement.hide();
                     if (!immutableDiv.length) {
                         immutableDiv = $('<div>', {class: 'immutable'});
-                        let isTextArea = elem.prop('tagName') === 'TEXTAREA';
+                        const isTextArea = elem.prop('tagName') === 'TEXTAREA';
                         if (isTextArea) {
                             immutableDiv.addClass('immutable-textarea');
                         }
@@ -1137,18 +1137,18 @@ const VCForm = (function() {
         populateSelect(select, val) {
             select = $(select);
             if (val != null) {
-                let options = Array.apply(null, select[0].options);
+                const options = Array.apply(null, select[0].options);
                 
                 if (!Array.isArray(val)) {
                     val = [val];
                 }
                 
                 // find all the values that have no matching options
-                let customValues = val.filter(v => !options.some(o => o.value === `${v}`));
+                const customValues = val.filter(v => !options.some(o => o.value === `${v}`));
 
                 if (customValues.length) {
                     let appendTo = select;
-                    let optGroups = select.children('optgroup');
+                    const optGroups = select.children('optgroup');
 
                     if (optGroups && optGroups.length > 0) {
                         appendTo = $(optGroups[ optGroups.length - 1]);
@@ -1169,12 +1169,12 @@ const VCForm = (function() {
             if (!this.isEditMode() || this.record.withdrawn) {
                 return true;
             }
-            let blob = this.data[key] || {};
+            const blob = this.data[key] || {};
             return !!blob.immutable || !!blob.hidden;
         },
         
         hidden(key) {
-            let blob = this.data[key] || {};
+            const blob = this.data[key] || {};
             return !!blob.hidden;
         },
 
@@ -1188,11 +1188,11 @@ const VCForm = (function() {
             }
 
             value = emptyToNull(value);
-            let eKey = eKeys.key(key);
+            const eKey = eKeys.key(key);
             if (eKey.value_type === 'B' && value != null) {
                 value = value == 'true';
             }
-            let blob = this.data[key] || {};
+            const blob = this.data[key] || {};
             if (blob.value === value) {
                 return;
             }
@@ -1210,8 +1210,8 @@ const VCForm = (function() {
         },
         
         valueLabel(key) {
-            let value = this.value(key);
-            let ekey = eKeys.key(key);
+            const value = this.value(key);
+            const ekey = eKeys.key(key);
             
             return ekey.prettyValue(value).val;
         },
@@ -1221,11 +1221,11 @@ const VCForm = (function() {
                 return emptyToNull( (this.data[key] || {}).note );
             }
             note = emptyToNull(note);
-            let noteDiv = $(`#note-${key}`);
+            const noteDiv = $(`#note-${key}`);
 
             this.fixNotePopover(noteDiv, note);
             
-            let blob = this.data[key] || {};
+            const blob = this.data[key] || {};
             blob.note = note;
             
             this.data[key] = blob;
@@ -1258,13 +1258,13 @@ const VCForm = (function() {
         },
         
         refs(key) {
-            let blob = this.data[key] || {};
+            const blob = this.data[key] || {};
             return blob.db_refs || [];
         },
 
         init: function(params, _eKeys, record) {
 
-            let vcform = this;
+            const vcform = this;
 
             jContent = $(params.content);
             jSyncStatus = $(params.summary);
@@ -1299,19 +1299,19 @@ const VCForm = (function() {
             this.initData(record);
             // Create the sections
             let firstFamily = true;
-            for (let familyKey of Object.keys(EKey.families)) {
+            for (const familyKey of Object.keys(EKey.families)) {
             
                 if (familyKey === 'U' && !eKeys.hasUnknown) {
                     continue;
                 }
 
-                let firstCss = firstFamily ? " in" : "";
-                let label = EKey.families[familyKey];
+                const firstCss = firstFamily ? " in" : "";
+                const label = EKey.families[familyKey];
                 jContent.append(
                     $('<div>', {class: 'card', family: familyKey, html:[
                         $('<div>', {class:'card-header collapsed' + firstCss, "data-toggle":"collapse", "data-target": `#section-${familyKey}`, html:[
                             $('<a>', {class:'card-title', text: label})
-                        ], click: (e) => {this.toggleCheck(e)}}),
+                        ], click: (e) => {this.toggleCheck(e);}}),
                         $('<div>', {id:`section-${familyKey}`, class: "panel-collapse collapse" , 'data-parent': `#${jContent.attr('id')}`, html: [
                             $('<div>', {class:`card-body sub-content sub-content-${familyKey}`, family: familyKey})
                         ]})
@@ -1325,12 +1325,12 @@ const VCForm = (function() {
             });
 
             if (this.attachmentsEnabled) {
-                let familyKey = 'uploads';
+                const familyKey = 'uploads';
                 jContent.append(
                     $('<div>', {family: familyKey, class: 'card', html:[
                         $('<div>', {class:'card-header collapsed', "data-toggle":"collapse", "data-target": `#section-${familyKey}`, html:[
                             $('<a>', {class:'card-title', text: 'Uploads'})
-                        ], click: (e) => {this.toggleCheck(e)}}),
+                        ], click: (e) => {this.toggleCheck(e);}}),
                         $('<div>', {id:`section-${familyKey}`, class: "panel-collapse collapse", 'data-parent': `#${jContent.attr('id')}`, html: [
                             $('<div>', {class:`card-body sub-content sub-content-${familyKey}`, family: familyKey})
                         ]})
@@ -1341,9 +1341,9 @@ const VCForm = (function() {
 
             jContent.find('[data-parent]').on('shown.bs.collapse', function() {
                 if (!filtering) {
-                    let scrollMe = $('.main-content');
-                    let scrollTo = $(this).closest('.card');
-                    let scrollToOffset = scrollTo.position().top;
+                    const scrollMe = $('.main-content');
+                    const scrollTo = $(this).closest('.card');
+                    const scrollToOffset = scrollTo.position().top;
                     // scrollMe.scrollTop(scrollToOffset + 15);
                     scrollMe.animate({scrollTop: scrollToOffset + 15}, 200);
                 } else {
@@ -1352,7 +1352,7 @@ const VCForm = (function() {
             });
 
             jContent.find("h3").attr('tabindex', 0);
-            let entries = jContent.find("[entry]");
+            const entries = jContent.find("[entry]");
             entries.focusin(function() {
                 vcform.updateContext($(this).attr('entry'));
             });
@@ -1361,13 +1361,13 @@ const VCForm = (function() {
             });
 
             jContent.find("label").click(function() {
-                let entry = $(this).closest('[entry]');
+                const entry = $(this).closest('[entry]');
                 entry.find('input').focus();
                 entry.find('[tabindex]').focus();
             });
 
             jFilterBox.keyup(function() {
-                let filterValue = $(this).val().trim();
+                const filterValue = $(this).val().trim();
                 vcform.filter( filterValue );
                 if (filterValue.length) {
                     jClearFilterButton.show();
@@ -1390,8 +1390,8 @@ const VCForm = (function() {
             this.setupUnloadWarning();
 
             $('#vc-extras').on('mousewheel', function(event) {
-                let scrollMe = $('.main-content');
-                let scroll = scrollMe.scrollTop();
+                const scrollMe = $('.main-content');
+                const scroll = scrollMe.scrollTop();
                 scrollMe.scrollTop(scroll - event.originalEvent.wheelDeltaY);
                 return false;
             });
@@ -1405,7 +1405,7 @@ const VCForm = (function() {
 
         // The actual show/hide of elements on the form
         filter: function(val) {
-            let oldFiltering = filtering;
+            const oldFiltering = filtering;
             let showUploads = null;
             if (val.length === 0) {
                 if (filtering) {
@@ -1434,7 +1434,7 @@ const VCForm = (function() {
                         matches = true;
                     }
                 }
-                let elem = $(`[entry="${eKey.key}"]`);
+                const elem = $(`[entry="${eKey.key}"]`);
 
                 filtered[eKey.key] = !matches;
                 let shouldHide = filtered[eKey.key];
@@ -1464,8 +1464,8 @@ const VCForm = (function() {
             }
             this.showHideFamilies();
             if (oldFiltering !== filtering) {
-                let allPanels = $('#vc-form [data-parent].collapse');
-                let scrollMe = $('.main-content');
+                const allPanels = $('#vc-form [data-parent].collapse');
+                const scrollMe = $('.main-content');
                 if (filtering) {
                     this.previously_expanded = allPanels.filter('.show');
                     $('#vc-form .accordion').removeClass('indicator-plus-before');
@@ -1488,18 +1488,18 @@ const VCForm = (function() {
         },
 
         showHideFamilies: function() {
-            let showing = {};
+            const showing = {};
             eKeys.forEach(eKey => {
                 if (eKey.exclude_namespace && this.value(eKey.key) == null) {
                     return;
                 }
-                let shouldHide = filtered[eKey.key];
+                const shouldHide = filtered[eKey.key];
                 if (!shouldHide) {
                     showing[eKey.evidence_category] = true;
                 }
             });
             Object.keys(EKey.families).forEach(family => {
-                let members = jContent.find(`.card[family='${family}']`);
+                const members = jContent.find(`.card[family='${family}']`);
                 if (showing[family]) {
                     members.removeClass('no-results');
                 } else {
@@ -1515,18 +1515,18 @@ const VCForm = (function() {
          * Updates the help context box based on an entry element
          */
         updateContext: function(key) {
-            let thisForm = this;
+            const thisForm = this;
             this.currentContextKey = key;
-            let value = this.value(key);
-            let note = this.note(key);
-            let explain = this.explain(key);
-            let refs = this.refs(key);
-            let eKey = eKeys.key(key);
-            let immutable = this.immutable(key);
+            const value = this.value(key);
+            const note = this.note(key);
+            const explain = this.explain(key);
+            const refs = this.refs(key);
+            const eKey = eKeys.key(key);
+            const immutable = this.immutable(key);
 
             jHelp.closest('.card').find('.card-title').text(eKey.label);
             jHelp.empty();
-            let content = jHelp;
+            const content = jHelp;
             
             let valueElement = $('<span>');
             eKey.formatValue(value, valueElement);
@@ -1546,8 +1546,8 @@ const VCForm = (function() {
                 ]}).appendTo(content);
             }
             if (refs !== null && refs.length) {
-                let refsDom = $('<div>', {class: 'refs'}).appendTo(content);
-                for (let ref of refs) {
+                const refsDom = $('<div>', {class: 'refs'}).appendTo(content);
+                for (const ref of refs) {
                     this.renderReference(ref).appendTo(refsDom);
                 }
             }
@@ -1582,7 +1582,7 @@ const VCForm = (function() {
                         descriptionSpan.append($('<br/><br/><i>This field is not shown by default for your lab.</i>'));
                     }
                 }
-                let description = $('<div>', {class: "description mt-2"}).appendTo(content);
+                const description = $('<div>', {class: "description mt-2"}).appendTo(content);
                 descriptionSpan.appendTo(description);
 
                 if (eKey.see) {
@@ -1606,8 +1606,8 @@ const VCForm = (function() {
                                 $("<div>", {class:'text-body', html: value})
                             ]});
                         }
-                        let helpHtml = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
-                        let popupContent = $('<div>');
+                        const helpHtml = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
+                        const popupContent = $('<div>');
                         popupContent.append(titledValue("Description", helpHtml));
 
                         if (eKey.see) {
@@ -1628,8 +1628,8 @@ const VCForm = (function() {
                         popupContent.append(titledValue("Value", valueHtml));
 
                         if (refs !== null && refs.length) {
-                            let refsDom = $('<ul>', {class: 'refs'});
-                            for (let ref of refs) {
+                            const refsDom = $('<ul>', {class: 'refs'});
+                            for (const ref of refs) {
                                 $('<li>', {html: thisForm.renderReference(ref) }).appendTo(refsDom);
                             }
                             popupContent.append(titledValue("References", refsDom));
@@ -1646,7 +1646,7 @@ const VCForm = (function() {
         },
 
         helpOverflowAmount: function() {
-            let box = jHelp[0];
+            const box = jHelp[0];
             return box.scrollHeight - box.clientHeight;
         },
         
@@ -1655,14 +1655,14 @@ const VCForm = (function() {
                 return;
             }
         
-            let vcform = this;
-            let eKey = eKeys.key(key);
+            const vcform = this;
+            const eKey = eKeys.key(key);
 
-            let dialogContent = createModalShell('note',eKey.label, 'lg');
-            let body = dialogContent.find('.modal-body');
+            const dialogContent = createModalShell('note',eKey.label, 'lg');
+            const body = dialogContent.find('.modal-body');
             $('<p>', {text: 'Edit the note for this field below'}).appendTo(body);
-            let textArea = $('<textarea>', {text: this.note(key), class:'form-control', rows:5}).appendTo(body);
-            let footer = dialogContent.find('.modal-footer');
+            const textArea = $('<textarea>', {text: this.note(key), class:'form-control', rows:5}).appendTo(body);
+            const footer = dialogContent.find('.modal-footer');
             footer.html([
                 $('<button>', {type:"button", class:"btn btn-secondary", 'data-dismiss':"modal", text:'Cancel'}),
                 $('<button>', {type:"button", class:"btn btn-primary", text:'OK', click: () => {
@@ -1682,8 +1682,8 @@ const VCForm = (function() {
         },
 
         createEntry: function(eKey) {
-            let key = eKey.key;
-            let vcform = this;
+            const key = eKey.key;
+            const vcform = this;
             
             let type = eKey.value_type;
             switch (type) {
@@ -1705,7 +1705,7 @@ const VCForm = (function() {
             if (eKey.mandatory) {
                 label = '*' + label;
             }
-            let labelDom =  $('<div>', {class: 'text-right align-self-center', id: `label-${key}`, html:[
+            const labelDom =  $('<div>', {class: 'text-right align-self-center', id: `label-${key}`, html:[
                 $('<label>', {text: label})
             ]});
             if (type === 'textarea') {
@@ -1718,21 +1718,21 @@ const VCForm = (function() {
                 labelDom.append($('<div>', {class: 'text-info', text: eKey.sub_label}));
             }
 
-            let noteText = this.note(key);
-            let explain = this.explain(key);
-            let hasNote = !!noteText;
-            let hasExplain = !!explain;
+            const noteText = this.note(key);
+            const explain = this.explain(key);
+            const hasNote = !!noteText;
+            const hasExplain = !!explain;
 
-            let widgetDiv = $('<div>', {class: "col-7"});
+            const widgetDiv = $('<div>', {class: "col-7"});
 
-            let noteDiv = $('<i/>', {
+            const noteDiv = $('<i/>', {
                 class: 'text-muted fa-comment-alt note',
                 id: `note-${key}`,
                 click: () => {this.promptNote(key);}
             });
             this.fixNotePopover(noteDiv, noteText);
 
-            let infoDiv = $('<i/>', {
+            const infoDiv = $('<i/>', {
                 id: `explain-${key}`,
                 title: 'This field has a custom description. Click on it and view the blue help box for details.',
                 class: `fas fa-info-circle text-muted explain`,
@@ -1741,7 +1741,7 @@ const VCForm = (function() {
                 infoDiv.addClass('d-none');
             }
 
-            let entry = $('<div>', {class:`row entry entry-${type} form-group`, entry:key, html:[
+            const entry = $('<div>', {class:`row entry entry-${type} form-group`, entry:key, html:[
                 labelDom,
                 widgetDiv,
                 $('<div>', {class: 'col-1 text-nowrap p-0 d-flex', html: [noteDiv, infoDiv]})
@@ -1754,7 +1754,7 @@ const VCForm = (function() {
                 case 'crit':
                 case 'select':
                 case 'multiple': {
-                    let value = this.value(key);
+                    const value = this.value(key);
                     let optionSources = eKey.options || [];
 
                     // move all disabled options to the bottom
@@ -1769,8 +1769,8 @@ const VCForm = (function() {
                     let optGroups = [];
                     let options = [];
 
-                    let standardPrefix = ""
-                    let overridePrefix = ""
+                    let standardPrefix = "";
+                    let overridePrefix = "";
                     let emptyValuePrefix = "";
                     if (type === "crit") {
                         overridePrefix = "❗";
@@ -1778,9 +1778,9 @@ const VCForm = (function() {
                         emptyValuePrefix = "⚪ ";
                     }
 
-                    let blankOption = optionSources.find(o => !('key' in o));
+                    const blankOption = optionSources.find(o => !('key' in o));
 
-                    let makeOption = (option, overridePrefix) => {
+                    const makeOption = (option, overridePrefix) => {
                         let prefix = "";
                         if (option.key === "NM" || option.key === "NA") {
                             prefix = emptyValuePrefix;
@@ -1791,20 +1791,20 @@ const VCForm = (function() {
                             prefix = overridePrefix;
                         }
 
-                        let optDom = $('<option>', {
+                        const optDom = $('<option>', {
                             value: option.key || '',
                             text: prefix + (option.label || EKey.prettyKey(option.key))
                         });
                         optDom.prop("disabled", !!option.exclude_namespace);
 
                         return optDom;
-                    }
+                    };
 
                     if (optionSources.find(o => o.override)) {
-                        let optGroupNormal = optionSources.filter(o => !o.override).map(option => {
+                        const optGroupNormal = optionSources.filter(o => !o.override).map(option => {
                             return makeOption(option);
                         });
-                        let optGroupOverride = optionSources.filter(o => o.override).map(option => {
+                        const optGroupOverride = optionSources.filter(o => o.override).map(option => {
                             return makeOption(option, overridePrefix);
                         });
                         optGroups.push($('<optgroup>', {label: 'standard values', html: optGroupNormal}));
@@ -1827,7 +1827,7 @@ const VCForm = (function() {
                         options.unshift($('<option>', {value: '', text: ''}));
                     }
 
-                    let select = $('<select>', {name: key, html: options.concat(optGroups)});
+                    const select = $('<select>', {name: key, html: options.concat(optGroups)});
                     if (type === 'multiple') {
                         select.attr('multiple', true);
                     }
@@ -1849,7 +1849,7 @@ const VCForm = (function() {
                         if (valueArray.indexOf('!CUSTOM!') !== -1) {
                             valueArray = valueArray.filter(v => v !== '!CUSTOM!');
                             custom = true;
-                            let customVal = emptyToNull(prompt('Please enter the custom value'));
+                            const customVal = emptyToNull(prompt('Please enter the custom value'));
                             valueArray.push(customVal);
                         }
 
@@ -1858,7 +1858,7 @@ const VCForm = (function() {
                         } else {
                             value = valueArray;
                         }
-                        let key = $(this).attr('name');
+                        const key = $(this).attr('name');
 
                         vcform.value(key, value);
 
@@ -1875,7 +1875,7 @@ const VCForm = (function() {
                 }
                 case 'textarea': {
                     labelDom.removeClass('text-right');
-                    let input =
+                    const input =
                         $('<textarea>', {
                             class: 'form-control',
                             name: key,
@@ -1894,7 +1894,7 @@ const VCForm = (function() {
                 }
                 case 'age':
                 {
-                    let ageSpan = $('<span>', {name: key});
+                    const ageSpan = $('<span>', {name: key});
                     widgetDiv.append(ageSpan);
                     ageSpan.age({
                         updated: (event, data) => {
@@ -1904,7 +1904,7 @@ const VCForm = (function() {
                 }
                 break;
                 default: {
-                    let input =
+                    const input =
                         $('<input>', {
                             class: 'form-control',
                             name: key,
@@ -1938,7 +1938,7 @@ const VCForm = (function() {
 
         populateFamily: function(divy) {
             divy = $(divy);
-            let family = divy.attr('family');
+            const family = divy.attr('family');
             eKeys.forEach(eKey => {
                 if (eKey.evidence_category === family) {
                     const entry = this.createEntry(eKey);
@@ -1960,7 +1960,7 @@ const VCForm = (function() {
         },
 
         setAccordionIndex: function(family) {
-            let segment = $(`.card[family=${family}] .collapse`);
+            const segment = $(`.card[family=${family}] .collapse`);
             if (filtering) {
                 this.clearFilter();
                 window.setTimeout(() => {
@@ -1976,13 +1976,13 @@ const VCForm = (function() {
         },
 
         evidenceWeights: function(strs) {
-            let weights = [];
-            let critValuesExtra = Object.assign({"BM": "Benign Moderate"}, EKey.critValues);
-            for (let strength of Object.keys(critValuesExtra)) {
+            const weights = [];
+            const critValuesExtra = Object.assign({"BM": "Benign Moderate"}, EKey.critValues);
+            for (const strength of Object.keys(critValuesExtra)) {
                 if (!this.hasStrength(strength)) {
                     continue;
                 }
-                let count = strs[strength] || 0;
+                const count = strs[strength] || 0;
                 if (count > 0) {
                     weights.push(`${count}x${strength}`);
                 }
@@ -2005,7 +2005,7 @@ const VCForm = (function() {
             const BX = getStr('BX');
             const PX = getStr('PX');
 
-            let result = {
+            const result = {
                 P: null,
                 LP: null,
                 B: null,
@@ -2096,10 +2096,10 @@ const VCForm = (function() {
         roman: ['-','i','ii','iii','iv','v','vi'],
 
         formatOverall: function(result) {
-            let footnote = (classification, note) => {
-                let assertionMethod = this.value(SpecialEKeys.ASSERTION_METHOD);
+            const footnote = (classification, note) => {
+                const assertionMethod = this.value(SpecialEKeys.ASSERTION_METHOD);
                 // FIXME maybe just check for "ACMG" in assertionMethod
-                let row = $('<span>');
+                const row = $('<span>');
                 if (assertionMethod && assertionMethod.indexOf('VCGS') !== -1) {
                     row.text(`Custom assertion method used.`);
                 } else {
@@ -2108,14 +2108,14 @@ const VCForm = (function() {
                     if (classification !== 'X') {
                         noteLabel = '(' + this.roman[note] + ')';
                     }
-                    let calculation = $('<span>', {text: ' ' + noteLabel, title: `See ${row.text()} ${noteLabel} in ACMG Standards and Guidelines Table 5. Rules for combining criteria to classify sequence variants`}).appendTo(row);
+                    const calculation = $('<span>', {text: ' ' + noteLabel, title: `See ${row.text()} ${noteLabel} in ACMG Standards and Guidelines Table 5. Rules for combining criteria to classify sequence variants`}).appendTo(row);
                 }
                 return row;
             };
 
-            let dom = $('<div>', {class:'calculated-result m-2'});
-            for (let key of Object.keys(result)) {
-                let value = result[key];
+            const dom = $('<div>', {class:'calculated-result m-2'});
+            for (const key of Object.keys(result)) {
+                const value = result[key];
                 if (value) {
                     dom.append(footnote(key, value));
                 }
@@ -2124,29 +2124,29 @@ const VCForm = (function() {
         },
 
         updateSummaryTable: function() {
-            let cellCount = {};
-            let strengthCount = {};
+            const cellCount = {};
+            const strengthCount = {};
             let score = 0;
 
-            let familiesWithCrits = {};
-            for (let crit of eKeys.criteria()) {
+            const familiesWithCrits = {};
+            for (const crit of eKeys.criteria()) {
                 familiesWithCrits[crit.evidence_category] = true;
-                let critId = crit.key;
-                let val = this.value(critId);
-                let str = crit.defaultValue();
+                const critId = crit.key;
+                const val = this.value(critId);
+                const str = crit.defaultValue();
 
                 let cell = crit.evidence_category + '-';
                 if (this.hasStrength(val)) {
                     cell += val;
                     strengthCount[val] = (strengthCount[val] || 0) + 1;
-                    let critPoints = EKey.strengthToPoints[val] || 0;
+                    const critPoints = EKey.strengthToPoints[val] || 0;
                     score += critPoints;
                 } else {
                     cell += str;
                 }
-                let cellEntry = cellCount[cell] || {possible:[], neutral:[], notMet:[], actual:[]};
+                const cellEntry = cellCount[cell] || {possible:[], neutral:[], notMet:[], actual:[]};
                 cellCount[cell] = cellEntry;
-                let label = crit.label;
+                const label = crit.label;
 
                 if (val == null && crit.hide) {
                     continue;
@@ -2162,29 +2162,29 @@ const VCForm = (function() {
                 }
             }
 
-            let assertionMethod = this.value(SpecialEKeys.ASSERTION_METHOD);
+            const assertionMethod = this.value(SpecialEKeys.ASSERTION_METHOD);
             let pointBased = false;
             // maybe look at the criteria to see if they're point based?
             if (assertionMethod && assertionMethod.indexOf('horak') !== -1) {
                 pointBased = true;
             }
 
-            let critTable = $('<table>');
-            let headerRow = $('<tr>');
+            const critTable = $('<table>');
+            const headerRow = $('<tr>');
             headerRow.append($('<th></th>'));
 
-            for (let key of Object.keys(EKey.critValues)) {
+            for (const key of Object.keys(EKey.critValues)) {
                 if (!this.hasStrength(key)) {
                     continue;
                 }
-                let label = key;
+                const label = key;
                 let th;
                 if (pointBased) {
-                    let points = EKey.strengthToPoints[key];
+                    const points = EKey.strengthToPoints[key];
                     let title = "";
                     if (points != 0) {
-                        let plural = Math.abs(points) > 1 ? "s" : "";
-                        let direction = points < 0 ? "Benign" : "Oncogenic"
+                        const plural = Math.abs(points) > 1 ? "s" : "";
+                        const direction = points < 0 ? "Benign" : "Oncogenic";
                         title = `(${Math.abs(points)} point${plural}) Towards ${direction}`;
                     } else {
                         title = "Neutral";
@@ -2198,25 +2198,25 @@ const VCForm = (function() {
             }
             critTable.append(headerRow);
 
-            let accordionWid = $(".content");
+            const accordionWid = $(".content");
             Object.keys(EKey.families).forEach(fam => {
                 if (!familiesWithCrits[fam]) {
                     return;
                 }
-                let familyLabel = EKey.families[fam];
+                const familyLabel = EKey.families[fam];
                     
-                let clickMethod = this.setAccordionIndex.bind(this, fam);
-                let row = $('<tr>', {click: clickMethod});
+                const clickMethod = this.setAccordionIndex.bind(this, fam);
+                const row = $('<tr>', {click: clickMethod});
 
                 row.append($('<th>', {text: fam, class: 'row-header', title: familyLabel}));
-                for (let str of Object.keys(EKey.critValues)) {
+                for (const str of Object.keys(EKey.critValues)) {
                     if (!this.hasStrength(str)) {
                         continue;
                     }
-                    let key = fam + '-' + str;
-                    let values = cellCount[fam + '-' + str] || {possible:[], notMet:[], neutral: [], actual:[]};
+                    const key = fam + '-' + str;
+                    const values = cellCount[fam + '-' + str] || {possible:[], notMet:[], neutral: [], actual:[]};
                     
-                    let tooltip = [];
+                    const tooltip = [];
                     if (values.actual.length) {
                         tooltip.push( 'Met : ' + values.actual.join(', ') );
                     }
@@ -2230,10 +2230,10 @@ const VCForm = (function() {
                         tooltip.push( 'Not Evaluated : ' + values.possible.join(', ') );
                     }
 
-                    let td = $('<td>', {title: tooltip.join('\n'), id:`table-${fam}-${str}`});
+                    const td = $('<td>', {title: tooltip.join('\n'), id:`table-${fam}-${str}`});
                     if (values.actual.length > 0) {
-                        let direction = str[0];
-                        td.addClass(`${direction}-cell`)
+                        const direction = str[0];
+                        td.addClass(`${direction}-cell`);
                         td.append($('<span>', {class: 'met', text: values.actual.length}));
                     }
                     if (values.notMet.length || values.possible.length) {
@@ -2253,12 +2253,12 @@ const VCForm = (function() {
                 critTable.append(row);
             });
 
-            jCritTable.empty().append(critTable)
+            jCritTable.empty().append(critTable);
 
             if (!pointBased) {
-                let result = this.calculateOverall(strengthCount);
-                let evidenceWeightsDom = $('<div>', {class: 'm-2', text: this.evidenceWeights(strengthCount)});
-                let resultDom = this.formatOverall(result);
+                const result = this.calculateOverall(strengthCount);
+                const evidenceWeightsDom = $('<div>', {class: 'm-2', text: this.evidenceWeights(strengthCount)});
+                const resultDom = this.formatOverall(result);
                 jCritTable.append(evidenceWeightsDom).append(resultDom);
             } else {
                 let overallValue;
@@ -2276,7 +2276,7 @@ const VCForm = (function() {
 
                 jCritTable.append(
                     $('<div>', {class: 'text-center my-2', html:`Calculated Score: ${score} ${overallValue}`})
-                )
+                );
             }
         }
     };
@@ -2288,12 +2288,12 @@ VCForm.format_condition = function(condition_json) {
     if (!condition_json) {
         return $('<span>', {text: "-", class:'no-value'});
     }
-    let dom = $('<div>');
+    const dom = $('<div>');
     let domUsed = false;
     if (condition_json.resolved_terms) {
 
         let first = true;
-        for (let term of condition_json.resolved_terms) {
+        for (const term of condition_json.resolved_terms) {
             domUsed = true;
             first = false;
             $('<div>', {
@@ -2311,7 +2311,7 @@ VCForm.format_condition = function(condition_json) {
         }
     }
     if (condition_json.plain_text_terms) {
-        for (let term of condition_json.plain_text_terms) {
+        for (const term of condition_json.plain_text_terms) {
             domUsed = true;
             $('<div>', {text: term, class:'ontology-term free-text semicolon-sep'}).appendTo(dom);
         }
@@ -2326,8 +2326,8 @@ VCForm.format_condition = function(condition_json) {
     return dom;
 };
 
-let VCTable = (function() {
-    let VCTable = function() {};
+const VCTable = (function() {
+    const VCTable = function() {};
     VCTable.prototype = {};
     return VCTable;
 })();
@@ -2342,42 +2342,42 @@ VCTable.format_hgvs = (parts) => {
     } else if (!parts) {
         return $('<span>', {text:'-', class:'no-value'});
     }
-    let genomeBuild = parts.genome_build;
-    let transcript = parts.transcript;
-    let geneSymbol = parts.gene_symbol;
-    let cNomen = parts.c_nomen || parts.variant; // older code called cNomen 'variant'
-    let allele = parts.allele;
-    let variantId = parts.variant_id;
-    let alleleId = parts.allele_id;
-    let alleleInfoId = parts.allele_info_id;
+    const genomeBuild = parts.genome_build;
+    const transcript = parts.transcript;
+    const geneSymbol = parts.gene_symbol;
+    const cNomen = parts.c_nomen || parts.variant; // older code called cNomen 'variant'
+    const allele = parts.allele;
+    const variantId = parts.variant_id;
+    const alleleId = parts.allele_id;
+    const alleleInfoId = parts.allele_info_id;
     // let validationInclude = parts.validation_include;
     // let alleleInfoStatus = parts.allele_info_status;
-    let icon = parts.icon;
-    let tooltip = parts.tooltip;
-    let pHgvs = parts.p_hgvs;
+    const icon = parts.icon;
+    const tooltip = parts.tooltip;
+    const pHgvs = parts.p_hgvs;
     let url = null;
-    let error = parts.error;
+    const error = parts.error;
 
     if (error) {
         return $(`<span><i class="fa-solid fa-circle-exclamation text-danger"></i> ${error}</span>`);
     }
 
     if (variantId) {
-        url = Urls.view_allele_from_variant(variantId)
+        url = Urls.view_allele_from_variant(variantId);
     } else if (alleleId) {
-        url = Urls.view_allele(alleleId)
+        url = Urls.view_allele(alleleId);
     }
     // also turn into a link
 
-    let outterDom = $('<div>').css("display", "inline-block");
-    let dom = $('<div>').appendTo(outterDom);
+    const outterDom = $('<div>').css("display", "inline-block");
+    const dom = $('<div>').appendTo(outterDom);
 
     if (allele) {
         outterDom.prepend($('<dom>', {class: 'font-weight-bold', text: allele}));
     }
 
     if (genomeBuild && (parts.desired === false || parts.normalized === false || parts.always_show_genome_build)) {
-        let genomeBuildWrapper = $('<div>');
+        const genomeBuildWrapper = $('<div>');
         let addNewLine = false;
         if (parts.normalized === false) {
             $('<span>', {html: 'not resolved<br/>showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
@@ -2418,11 +2418,11 @@ VCTable.format_hgvs = (parts) => {
     }
     dom.append(cDom);
     if (icon) {
-        let iconData = {"class": icon};
+        const iconData = {"class": icon};
         if (tooltip) {
             iconData.title = tooltip;
         }
-        let iconDom = $('<i>', iconData);
+        const iconDom = $('<i>', iconData);
         iconDom.appendTo(dom);
     }
 
@@ -2434,19 +2434,19 @@ VCTable.format_hgvs = (parts) => {
 
 VCTable.hgvs = (data, type, row) => {
     return VCTable.format_hgvs(data);
-}
+};
 
 VCTable.condition = (data, type, row) => {
     return VCForm.format_condition(data);
 };
 
 VCTable.latest_curation_and_link = (data, type, row) => {
-    let lastCurated = data["curation_date"];
+    const lastCurated = data["curation_date"];
     if (lastCurated) {
-        let dom = $("<div>");
+        const dom = $("<div>");
         let content = $("<data>", {"class": "convert-timestamp time-ago", "data-date": lastCurated});
 
-        let classificationId = data["classification_id"];
+        const classificationId = data["classification_id"];
         if (classificationId) {
              content = $('<a>', {
                 href: Urls.view_classification(classificationId),
@@ -2455,15 +2455,15 @@ VCTable.latest_curation_and_link = (data, type, row) => {
             });
             dom.append(content);
         }
-        let dateType = data["date_type"];
+        const dateType = data["date_type"];
         if (dateType) {
             dom.append($("<div>", {text: dateType}));
         }
         return dom;
     } else {
-        return $("<span>", {text:"-", class: "no-value"})
+        return $("<span>", {text:"-", class: "no-value"});
     }
-}
+};
 
 VCTable.somatic_clinical_significance = (data, type, row) => {
     let value = null;
@@ -2471,7 +2471,7 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
         return "";
     }
     if (typeof(data) === "string") {
-        let parts = data.split("|");
+        const parts = data.split("|");
         value = {};
         value[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE] = parts[0];
         if (parts.length > 1) {
@@ -2481,19 +2481,19 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
         value = data;
     }
 
-    let scs = value["clinical_significance"];
-    let diff = value["diff"];
+    const scs = value["clinical_significance"];
+    const diff = value["diff"];
     let diffHtml = "";
     if (diff) {
         diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
     }
 
     if (scs) {
-        let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
-        let scsLabel = scsKey.prettyValue(scs);
-        let dom = ($('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`}));
+        const scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+        const scsLabel = scsKey.prettyValue(scs);
+        const dom = ($('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`}));
 
-        let highest_level = value["amp_level"];
+        const highest_level = value["amp_level"];
         if (highest_level) {
             dom.append(`<span class="amp-level">${highest_level}</span>`);
         }
@@ -2502,25 +2502,25 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
     } else {
         return $('<div>', {class: 'c-pill scs-none no-value', html: 'No Data' + diffHtml});
     }
-}
+};
 
 VCTable.classification = (data, type, row) => {
     if (data === null) {
-        return "" // support for dirty groups still processing
+        return ""; // support for dirty groups still processing
     }
-    let cs = data;
+    const cs = data;
     let csVal = cs;
     let diff = 0;
     let is_pending = false;
     let old = null;
     let oldLabel = null;
     let newValue = null;
-    let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+    const csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
 
     if (typeof(cs) !== "string") {
         csVal = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-        newValue = cs["new"]
-        let pending = cs["pending"];
+        newValue = cs["new"];
+        const pending = cs["pending"];
         if (pending) {
             old = csVal;
             csVal = pending;
@@ -2534,8 +2534,8 @@ VCTable.classification = (data, type, row) => {
         }
     }
 
-    let label = csKey.prettyValue(csVal).val;
-    let csClass = `cs-` + (csVal || '').toLowerCase()
+    const label = csKey.prettyValue(csVal).val;
+    const csClass = `cs-` + (csVal || '').toLowerCase();
     let diffHtml = "";
     if (diff) {
         diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
@@ -2561,7 +2561,7 @@ VCTable.classification = (data, type, row) => {
     //         </div>
     //     {% else %}
 
-    let fullDom = $('<div>');
+    const fullDom = $('<div>');
     if (old) {
         fullDom.append($('<div>', {html: $('<del>', {class: 'c-pill cs cs-none no-value', text: oldLabel})}));
     }
@@ -2573,7 +2573,7 @@ VCTable.classification = (data, type, row) => {
     }
 
     if (newValue) {
-        let newLabel = csKey.prettyValue(newValue).val;
+        const newLabel = csKey.prettyValue(newValue).val;
         newHtml = `<span class="c-pill cs" title="This is the classification value at the time the discordance was resolved. This record is now ${newLabel}">Updated <i class="fa-solid fa-circle-exclamation"></i></span>`;
         fullDom.append(newHtml);
     }
@@ -2582,7 +2582,7 @@ VCTable.classification = (data, type, row) => {
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {
-    let csKey = EKeys.cachedKeys.key(key_name);
+    const csKey = EKeys.cachedKeys.key(key_name);
     let span;
     if (data == null) {
         span = $('<span>', {class: 'no-value', text: '-'});
@@ -2597,13 +2597,13 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
     let allele_origin_label = override_text;
     if (!allele_origin_label) {
         if (allele_origin_bucket == "S") {
-            allele_origin_label = "SOMATIC"
+            allele_origin_label = "SOMATIC";
         } else if (allele_origin_bucket == "G") {
-            allele_origin_label = "GERMLINE"
+            allele_origin_label = "GERMLINE";
         } else if (allele_origin_bucket == "U") {
-            allele_origin_label = "UNKNOWN"
+            allele_origin_label = "UNKNOWN";
         } else {
-            allele_origin_label = "???"
+            allele_origin_label = "???";
         }
     }
     return $('<div>', {
@@ -2615,56 +2615,56 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
             })
         ]
     });
-}
+};
 
 VCTable.alleleGroupingIdentifier = (data, type, row) => {
-    let dom = $("div");
-    for (let allele of data.alleles) {
-        dom.append(VCTable.format_hgvs(allele))
+    const dom = $("div");
+    for (const allele of data.alleles) {
+        dom.append(VCTable.format_hgvs(allele));
     }
     return dom;
-}
+};
 
 VCTable.groupIdentifier = (data, type, row) => {
-    let id = data.id;
-    let dirty = data.dirty;
-    let org_name = data.org_name;
-    let lab_name = data.lab_name;
-    let research = data.research;
-    let research_icon = data.research_icon;
-    let shareLevel = data.share_level;
-    let allele_origin_bucket = data.allele_origin_bucket;
+    const id = data.id;
+    const dirty = data.dirty;
+    const org_name = data.org_name;
+    const lab_name = data.lab_name;
+    const research = data.research;
+    const research_icon = data.research_icon;
+    const shareLevel = data.share_level;
+    const allele_origin_bucket = data.allele_origin_bucket;
 
-    let alleleOriginDiv = VCTable.allele_origin_bucket_label(allele_origin_bucket);
+    const alleleOriginDiv = VCTable.allele_origin_bucket_label(allele_origin_bucket);
 
-    let shareInfo = EKeys.shareLevelInfo(shareLevel);
-    let icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
+    const shareInfo = EKeys.shareLevelInfo(shareLevel);
+    const icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
 
-    let classification_count = data.classification_count;
+    const classification_count = data.classification_count;
 
-    let labLine = [
+    const labLine = [
         icon,
         $('<span>', {text: `${org_name} / ${lab_name}`})
     ];
     if (research) {
         labLine.push($('<span>', {class: 'badge badge-info ml-1', title: 'Research lab', text: `${research_icon} Research`}));
     }
-    let dom = $('<div>', {html: labLine});
+    const dom = $('<div>', {html: labLine});
 
     if (dirty) {
-        dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"))
+        dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"));
     } else if (classification_count === 0) {
-        dom.append("-Invalid Record - no Classifications")
+        dom.append("-Invalid Record - no Classifications");
     } else if (classification_count > 1) {
         dom.append($('<div>', {class:'text-muted text-small', text: `${classification_count} records`}));
     }
 
     // matches
     if (data.matches) {
-        let searchTerm = data.search;
-        let match_doms = [];
-        let ekeys = EKeys.cachedKeys;
-        for (let [key, value] of Object.entries(data.matches)) {
+        const searchTerm = data.search;
+        const match_doms = [];
+        const ekeys = EKeys.cachedKeys;
+        for (const [key, value] of Object.entries(data.matches)) {
             match_doms.push($('<div>', {class: 'search-result', html:[
                 $('<span>', { text: ekeys.key(key).label + ' : '}),
                     highlightTextAsDom(searchTerm, value)
@@ -2674,8 +2674,8 @@ VCTable.groupIdentifier = (data, type, row) => {
         dom.append($('<div>', {html: match_doms}));
     }
 
-    let indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
-    let fullDom = $('<div>', {style: 'margin-left: 5px; margin-top: -10px; display:flex; flex-direction:row', html:[
+    const indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
+    const fullDom = $('<div>', {style: 'margin-left: 5px; margin-top: -10px; display:flex; flex-direction:row', html:[
         alleleOriginDiv,
         dom
     ]});
@@ -2685,30 +2685,30 @@ VCTable.groupIdentifier = (data, type, row) => {
     // }
 
     return fullDom;
-}
+};
 
 VCTable.identifier = (data, type, row) => {
-    let id = data.id;
-    let org_name = data.org_name;
-    let lab_name = data.lab_name;
-    let lab_record_id = data.lab_record_id;
-    let shareLevel = data.share_level;
-    let allele_origin_bucket = data.allele_origin_bucket;
+    const id = data.id;
+    const org_name = data.org_name;
+    const lab_name = data.lab_name;
+    const lab_record_id = data.lab_record_id;
+    const shareLevel = data.share_level;
+    const allele_origin_bucket = data.allele_origin_bucket;
 
-    let alleleOriginDiv = VCTable.allele_origin_bucket_label(allele_origin_bucket);
+    const alleleOriginDiv = VCTable.allele_origin_bucket_label(allele_origin_bucket);
 
-    let shareInfo = EKeys.shareLevelInfo(shareLevel);
-    let icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
+    const shareInfo = EKeys.shareLevelInfo(shareLevel);
+    const icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
 
-    let classification_count = data.classification_count;
+    const classification_count = data.classification_count;
 
-    let content = [
+    const content = [
         icon,
         $('<span>', {text: `${org_name} / ${lab_name}`}),
         '<br/>',
         limitLengthSpan(lab_record_id, 30)
     ];
-    let link = $('<a>', {
+    const link = $('<a>', {
         href: Urls.view_classification(id),
         class: 'hover-link',
         html: content
@@ -2716,10 +2716,10 @@ VCTable.identifier = (data, type, row) => {
 
     let dom;
     if (data.matches) {
-        let searchTerm = data.search;
-        let match_doms = [link];
-        let ekeys = EKeys.cachedKeys;
-        for (let [key, value] of Object.entries(data.matches)) {
+        const searchTerm = data.search;
+        const match_doms = [link];
+        const ekeys = EKeys.cachedKeys;
+        for (const [key, value] of Object.entries(data.matches)) {
             match_doms.push($('<div>', {class: 'search-result', html:[
                 $('<span>', { text: ekeys.key(key).label + ' : '}),
                     highlightTextAsDom(searchTerm, value)
@@ -2730,11 +2730,11 @@ VCTable.identifier = (data, type, row) => {
     } else if (link) {
         dom = link;
     } else {
-        dom = $('<div>', {html: content})
+        dom = $('<div>', {html: content});
     }
 
-    let indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
-    let fullDom = $('<div>', {style: 'display:flex; flex-direction:row', html:[
+    const indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
+    const fullDom = $('<div>', {style: 'display:flex; flex-direction:row', html:[
         alleleOriginDiv,
         dom
     ]});
@@ -2744,7 +2744,7 @@ VCTable.identifier = (data, type, row) => {
 VCTable.sample = (sample_name, type, row) => {
     let dom = $('<span/>');
     if (sample_name && row.sample_id) {
-        let link = $('<a>', {
+        const link = $('<a>', {
             href: Urls.view_sample(row.sample_id),
             class: 'hover-link',
             html: [

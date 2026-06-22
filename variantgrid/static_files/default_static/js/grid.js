@@ -3,14 +3,14 @@ function getGrid(nodeId, unique_code) {
 }
 
 function export_grid(analysisId, nodeId, unique_code, export_type, use_canonical_transcripts) {
-	let grid = getGrid(nodeId, unique_code);
-	let gridParam = grid.jqGrid('getGridParam', 'postData');
+	const grid = getGrid(nodeId, unique_code);
+	const gridParam = grid.jqGrid('getGridParam', 'postData');
 	gridParam['rows'] = 0; // no pagination
 	gridParam['export_type'] = export_type;
 	gridParam['use_canonical_transcripts'] = use_canonical_transcripts;
 
-	let querystring = EncodeQueryData(gridParam);
-	let url = Urls.node_grid_export(analysisId) + "?" + querystring;
+	const querystring = EncodeQueryData(gridParam);
+	const url = Urls.node_grid_export(analysisId) + "?" + querystring;
 	window.location = url;
 }
 
@@ -19,17 +19,17 @@ function load_variant_details(variant_id) {
     let variant_details_url = Urls.view_variant(variant_id);
     if (aWin.ANALYSIS_SETTINGS) {
         if (aWin.ANALYSIS_SETTINGS.open_variant_details_in_new_window) {
-            let newWin = aWin.open(variant_details_url, '_blank');
+            const newWin = aWin.open(variant_details_url, '_blank');
             newWin.focus();
             return;
         } else {
-            let annotation_version_id = aWin.ANALYSIS_SETTINGS["annotation_version"];
+            const annotation_version_id = aWin.ANALYSIS_SETTINGS["annotation_version"];
             if (annotation_version_id) {
                 variant_details_url = Urls.variant_details_annotation_version(variant_id, annotation_version_id);
             }
         }
     }
-    let editorContainer = $("#node-editor-container");
+    const editorContainer = $("#node-editor-container");
     editorContainer.html('<div class="editor-loading"><i class="fa fa-spinner"></i> Loading variant details...</div>');
     editorContainer.load(variant_details_url);
 }
@@ -65,7 +65,7 @@ function replaceFilePrefix(replaceDict, bamFiles) {
         for (let i=0 ; i<bamFiles.length ; ++i) {
             let bamFile = bamFiles[i];
             if (bamFile) {
-                for (let fromValue in replaceDict) {
+                for (const fromValue in replaceDict) {
                     const toValue = replaceDict[fromValue];
                     if (bamFile.startsWith(fromValue)) {
                         bamFile = bamFile.replace(fromValue, toValue);
@@ -207,7 +207,7 @@ function createIgvUrl(locus, getBamsFuncString) {
 }
 
 function create_igv_link(locus, getBamsFuncString) {
-    let igvUrl = createIgvUrl(locus, getBamsFuncString);
+    const igvUrl = createIgvUrl(locus, getBamsFuncString);
     if (igvUrl) {
         return createGridLink("Open " + locus + " in IGV", igvUrl, '', [], ['igv-link']);
     }
@@ -224,7 +224,7 @@ function showGridCell(gridColumn) {
 function isNodeVisible(options) {
     // Default to True so that any cached grid data won't be missing new field
     let nodeVisible = true;
-    let analysisNode = options.colModel.analysisNode;
+    const analysisNode = options.colModel.analysisNode;
     if (analysisNode) {
         nodeVisible = analysisNode.visible;
     }
@@ -234,24 +234,24 @@ function isNodeVisible(options) {
 
 function detailsLink(variantId, options, rowData) {
     let nodeVisible = isNodeVisible(options);
-    let kwargs = options.colModel.formatter_kwargs;
+    const kwargs = options.colModel.formatter_kwargs;
     if (kwargs) {
         nodeVisible = kwargs.node_visible;
     }
 
-    let variantBoxes = [];
+    const variantBoxes = [];
     if (nodeVisible) {
-        let variant_selector = "<input type='checkbox' class='variant-select' variant_id=" + variantId + ">";
+        const variant_selector = "<input type='checkbox' class='variant-select' variant_id=" + variantId + ">";
         variantBoxes.push(variant_selector);
     }
 
-    let detailsUrl = "javascript:load_variant_details(" + variantId + ");";
-    let detailsLink = createGridLink('View details', detailsUrl, '', ['variant-link'], ['view-details-link']);
+    const detailsUrl = "javascript:load_variant_details(" + variantId + ");";
+    const detailsLink = createGridLink('View details', detailsUrl, '', ['variant-link'], ['view-details-link']);
     variantBoxes.push(detailsLink);
 
     // ClinVar
     let cvHighestPath = rowData["clinvar__highest_pathogenicity"];
-    let cvClinSig = rowData["clinvar__clinical_significance"];
+    const cvClinSig = rowData["clinvar__clinical_significance"];
 
     let linkUrl = null;
     let extraLinkClasses = ['node-count-legend-C'];
@@ -265,12 +265,12 @@ function detailsLink(variantId, options, rowData) {
         extraIconClasses.push("no-entry");
         cvHighestPath = '';
     }
-    let cvLink = createGridLink(cvTitle, linkUrl, cvHighestPath, extraLinkClasses, extraIconClasses);
+    const cvLink = createGridLink(cvTitle, linkUrl, cvHighestPath, extraLinkClasses, extraIconClasses);
     variantBoxes.push(cvLink);
 
     // Internally Classified
     let intMaxClass = rowData["max_internal_classification"];
-    let intClassified = rowData["internally_classified"];
+    const intClassified = rowData["internally_classified"];
 
     linkUrl = null;
     let icTitle = "Internally Classified: ";
@@ -285,11 +285,11 @@ function detailsLink(variantId, options, rowData) {
         extraIconClasses.push("no-entry");
         intMaxClass = '';
     }
-    let icLink = createGridLink(icTitle, linkUrl, intMaxClass, extraLinkClasses, extraIconClasses);
+    const icLink = createGridLink(icTitle, linkUrl, intMaxClass, extraLinkClasses, extraIconClasses);
     variantBoxes.push(icLink);
 
-    let locus = rowData["locus__contig__name"] + ":" + rowData["locus__position"];
-    let igvLink = create_igv_link(locus, 'getBams');
+    const locus = rowData["locus__contig__name"] + ":" + rowData["locus__position"];
+    const igvLink = create_igv_link(locus, 'getBams');
     variantBoxes.push(igvLink);
     return "<span class='variant_id-container' variant_id=" + variantId + ">" + variantBoxes.join('') + "</span>";
 }
@@ -343,10 +343,10 @@ function _geneSymbolLink(geneSymbolColumn, filterChildLink) {
         const geneSymbolList = geneSymbolColumn.split(",");
         const geneSymbolLinks = [];
         for(let i=0 ; i<geneSymbolList.length ; ++i) {
-            let geneSymbol = geneSymbolList[i];
+            const geneSymbol = geneSymbolList[i];
             let geneLinkString = '';
             if (filterChildLink) {
-                let filterGeneLink = "javascript:createFilterChild(\"gene_symbol\", \"" + geneSymbol + "\");";
+                const filterGeneLink = "javascript:createFilterChild(\"gene_symbol\", \"" + geneSymbol + "\");";
                 geneLinkString = "<a class='grid-link' title='Filter to " + geneSymbol + "' href='" + filterGeneLink + "'><div class='grid-link-icon GeneListNode'></div></a>";
                 geneLinkString += " <a class='left' target='_blank' title='View gene in new window' href='" + Urls.view_gene_symbol(geneSymbol) + "'>" + geneSymbol + "</a> ";
             } else {
@@ -361,7 +361,7 @@ function _geneSymbolLink(geneSymbolColumn, filterChildLink) {
 }
 
 function geneSymbolLink(geneSymbol, options) {
-    let filterChildLink = isNodeVisible(options); // don't create kids for analysis wide tag nodes
+    const filterChildLink = isNodeVisible(options); // don't create kids for analysis wide tag nodes
     return _geneSymbolLink(geneSymbol, filterChildLink);
 }
 
@@ -398,9 +398,9 @@ String.prototype.rsplit = function(sep, maxsplit) {
 
 
 function showTagAutocomplete(variantId) {
-    let container = $("#tag-entry-container-" + variantId);
-    let addTagButton = $(".show-tag-autocomplete", container.parent());
-    let nodeId = container.parents("#node-data-container").attr("node_id");
+    const container = $("#tag-entry-container-" + variantId);
+    const addTagButton = $(".show-tag-autocomplete", container.parent());
+    const nodeId = container.parents("#node-data-container").attr("node_id");
     
     addTagButton.hide();
     container.load(Urls.tag_autocomplete_form(), function() {
@@ -435,7 +435,7 @@ function getVariantTagHtml(variantId, tag, readOnly, tagLabel) {
     if (typeof(tagLabel) === 'undefined') {
         tagLabel = tag;
     }
-    let outerClasses = ["grid-tag", "tagged-" + tag]
+    const outerClasses = ["grid-tag", "tagged-" + tag];
     if (!readOnly) {
         outerClasses.push("grid-tag-deletable");
     }
@@ -446,19 +446,19 @@ function getVariantTagHtml(variantId, tag, readOnly, tagLabel) {
 // This is driven entirely off variantTags (not passed through SQL->JQGrid)
 // This is so we can add/remove tags without wrecking cache  
 function tagsFormatter(tagsCellValue, a, rowData) {
-    let variantId = rowData['id'];
+    const variantId = rowData['id'];
     let tagHtml = "";
-    let aWin = getAnalysisWindow();
+    const aWin = getAnalysisWindow();
 
     if (!aWin.variantTagsReadOnly) {
         tagHtml += "<a class='show-tag-autocomplete' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
         tagHtml += "<span id='tag-entry-container-" + variantId + "'></span>";
     }
 
-    let tagList = aWin.variantTags[variantId];
+    const tagList = aWin.variantTags[variantId];
     if (tagList) {
         for (let i=0 ; i<tagList.length ; ++i) {
-            let tag = tagList[i];
+            const tag = tagList[i];
             tagHtml += getVariantTagHtml(variantId, tag, aWin.variantTagsReadOnly);
         }        
     }
@@ -470,20 +470,20 @@ function tagsGlobalFormatter(value, a, rowData) {
     if (!value) {
         return "";
     }
-    let variantId = rowData['id'];
-    let tags = value.split("|");
-    let tagCounts = {};
+    const variantId = rowData['id'];
+    const tags = value.split("|");
+    const tagCounts = {};
     for (let i=0 ; i<tags.length ; ++i) {
-        let tag = tags[i];
-        let count = tagCounts[tag] || 0;
+        const tag = tags[i];
+        const count = tagCounts[tag] || 0;
         tagCounts[tag] = count + 1;
     }
 
     let tagGlobalHtml = "";
-    let sortedKeys = Object.keys(tagCounts).sort();
+    const sortedKeys = Object.keys(tagCounts).sort();
     for (let i=0 ; i<sortedKeys.length ; ++i) {
-        let tag = sortedKeys[i];
-        let tagCount = tagCounts[tag];
+        const tag = sortedKeys[i];
+        const tagCount = tagCounts[tag];
         let tagLabel = tag;
         if (tagCount > 1) {
             tagLabel = `${tag} x ${tagCount}`;
@@ -495,7 +495,7 @@ function tagsGlobalFormatter(value, a, rowData) {
 
 
 function classifyAndCloseButton(tagId) {
-    let classifyUrl = Urls.create_classification_for_variant_tag(tagId);
+    const classifyUrl = Urls.create_classification_for_variant_tag(tagId);
     window.open(classifyUrl, "_blank");
     $(`#tag-button-${tagId}`).remove();
 }
@@ -505,7 +505,7 @@ function formatVariantTagFirstColumn(variantString, options, rowObject) {
     const variantURL = Urls.view_variant(rowObject["variant__id"]);
     let cellValue = "<a href='" + variantURL + "' target='_blank'>" + variantString + "</a>";
     if (rowObject.tag__id == REQUIRES_CLASSIFICATION) {
-        let tagId = rowObject.id;
+        const tagId = rowObject.id;
         cellValue += `<a id="tag-button-${tagId}" class="btn btn-primary new-classification-button" href="javascript:classifyAndCloseButton(${tagId})"><i class="fas fa-plus-circle"></i> New Classification</a>`;
     }
     return cellValue;
@@ -549,8 +549,8 @@ function gnomadFilteredFormatter(gnomadFilteredCellValue, a, rowData) {
 function formatClinGenAlleleId(cellValue) {
     // warning: doesn't use settings.CLINGEN_ALLELE_REGISTRY_DOMAIN as static JS
     if (cellValue) {
-        let ca_id = cellValue;
-        let url = `http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=${ca_id}`;
+        const ca_id = cellValue;
+        const url = `http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=${ca_id}`;
         cellValue = `<a href="${url}" target="_blank">${ca_id}</a>`;
     } else {
         cellValue = "";
@@ -565,7 +565,7 @@ function splitAndLink(rawValue, split, buildLinkFunc) {
         const raw_value_list = rawValue.split(split);
         const links = [];
         for(let i=0 ; i<raw_value_list.length ; ++i) {
-            let value = raw_value_list[i];
+            const value = raw_value_list[i];
             links.push(buildLinkFunc(value));
         }
         formattedValue = links.join();
@@ -575,7 +575,7 @@ function splitAndLink(rawValue, split, buildLinkFunc) {
 
 function formatDBSNP(dbsnp_rs_ids) {
     function buildDBSNPLink(dbsnp_id) {
-        return "<a title='View dbSNP in new window' target='_blank' href='https://www.ncbi.nlm.nih.gov/snp/" + dbsnp_id + "'>" + dbsnp_id + "</a>"
+        return "<a title='View dbSNP in new window' target='_blank' href='https://www.ncbi.nlm.nih.gov/snp/" + dbsnp_id + "'>" + dbsnp_id + "</a>";
     }
     return splitAndLink(dbsnp_rs_ids, "&", buildDBSNPLink);
 }
@@ -583,7 +583,7 @@ function formatDBSNP(dbsnp_rs_ids) {
 
 function formatPubMed(pubmed) {
     function buildPubMedLink(pubmed_id) {
-        return "<a title='View PubMed article in new window' target='_blank' href='https://pubmed.ncbi.nlm.nih.gov/" + pubmed_id + "'>" + pubmed_id + "</a>"
+        return "<a title='View PubMed article in new window' target='_blank' href='https://pubmed.ncbi.nlm.nih.gov/" + pubmed_id + "'>" + pubmed_id + "</a>";
     }
     return splitAndLink(pubmed, "&", buildPubMedLink);
 }
@@ -591,9 +591,9 @@ function formatPubMed(pubmed) {
 
 function formatOntologyTerms(ontology_terms) {
     function buildOntologyTermLink(ontology_term) {
-        let termSlug = ontology_term.split(" ")[0].replace(":", "_");
-        let url = Urls.ontology_term(termSlug);
-        return "<a title='View Ontology Term in new window' target='_blank' href='" + url + "'>" + ontology_term + "</a>"
+        const termSlug = ontology_term.split(" ")[0].replace(":", "_");
+        const url = Urls.ontology_term(termSlug);
+        return "<a title='View Ontology Term in new window' target='_blank' href='" + url + "'>" + ontology_term + "</a>";
     }
     return splitAndLink(ontology_terms, " | ", buildOntologyTermLink);
 }
@@ -604,7 +604,7 @@ function unitAsPercentFormatter(unitValue) {
     // Allele Frequency missing data passed as "." to match VCF
     // Shows falsey values (eg 0.0) or '.' as blank
     if (unitValue && unitValue !== ".") {
-        let percent = (100.0 * unitValue).toPrecision(3);
+        const percent = (100.0 * unitValue).toPrecision(3);
         percentValue = percent + "%";
     }
     return percentValue;
@@ -613,7 +613,7 @@ function unitAsPercentFormatter(unitValue) {
 
 function formatMasterMindMMID3(value) {
     function buildMasterMindLink(mmid3) {
-        return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>"
+        return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>";
     }
     return splitAndLink(value, "&", buildMasterMindLink);
 }
@@ -729,11 +729,11 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
                         if (data.deleted_nodes) {
                             deleteNodesFromDOM(data.deleted_nodes, []);
                             if (data.message) {
-                                $("#node-editor-container").text(data.message)
+                                $("#node-editor-container").text(data.message);
                             }
                         }
                     }
-                }
+                };
                 // height: auto screws up on firefox
                 if (typeof(data["height"]) === "undefined" || data["height"] === "auto") {
                     data["height"] = null;
@@ -742,7 +742,7 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
                 // You can only have 1 active grid request
                 data["loadBeforeSend"] = function(xhr) {
                     window.activeGridRequestXHR = xhr;
-                }
+                };
                 if (window.activeGridRequestXHR) {
                     window.activeGridRequestXHR.abort();
                     window.activeGridRequestXHR = null;
@@ -765,7 +765,7 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
 			        	{} // view options 
 		        	);
 
-				setRowChangeCallbacks(grid, data["caption"])
+				setRowChangeCallbacks(grid, data["caption"]);
 
                 grid.jqGrid(
 		            'navButtonAdd', pagerId, {
@@ -780,7 +780,7 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
 
                 const aWin = getAnalysisWindow();
                 if (aWin.ANALYSIS_SETTINGS && aWin.ANALYSIS_SETTINGS.canonical_transcript_collection) {
-                    const ctc = aWin.ANALYSIS_SETTINGS.canonical_transcript_collection
+                    const ctc = aWin.ANALYSIS_SETTINGS.canonical_transcript_collection;
                     grid.jqGrid(
                         'navButtonAdd', pagerId, {
                         caption : "Canonical transcript CSV",
