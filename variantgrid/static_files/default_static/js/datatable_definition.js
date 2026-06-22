@@ -1,4 +1,4 @@
-let oldExportAction = function (self, e, dt, button, config) {
+const oldExportAction = function (self, e, dt, button, config) {
     if (button[0].className.indexOf('buttons-csv') >= 0) {
         if ($.fn.dataTable.ext.buttons.csvHtml5.available(dt, config)) {
             $.fn.dataTable.ext.buttons.csvHtml5.action.call(self, e, dt, button, config);
@@ -6,11 +6,11 @@ let oldExportAction = function (self, e, dt, button, config) {
     }
 };
 
-let newExportAction = function (e, dt, button, config) {
+const newExportAction = function (e, dt, button, config) {
     /* Pull all data from Ajax - but don't do the draw
        Code taken from https://stackoverflow.com/a/44635032/295724 */
-    let self = this;
-    let oldStart = dt.settings()[0]._iDisplayStart;
+    const self = this;
+    const oldStart = dt.settings()[0]._iDisplayStart;
 
     dt.one('preXhr', function (e, s, data) {
         // Just this once, load all data from the server...
@@ -41,10 +41,10 @@ let newExportAction = function (e, dt, button, config) {
 };
 
 
-let DataTableDefinition = (function() {
+const DataTableDefinition = (function() {
     "use strict";
 
-    let DataTableDefinition = function(params) {
+    const DataTableDefinition = function(params) {
         this.dom = params.dom;
         this.url = params.url;
         this.data = params.data;
@@ -86,7 +86,7 @@ let DataTableDefinition = (function() {
             this.tableId = tableId;
             this.lengthKey = `datatable_length_${tableId}`;
 
-            let dom = this.dom;
+            const dom = this.dom;
             dom.addClass('table');
             dom.addClass('stripe');
             dom.addClass('dataTable');
@@ -102,22 +102,22 @@ let DataTableDefinition = (function() {
                 definitionData = $.getJSON(this.url + sep + 'dataTableDefinition=1');
                 DataTableDefinition.definitions[this.url] = definitionData;
             }
-            return definitionData.then(data => {this.serverParams = data});
+            return definitionData.then(data => {this.serverParams = data;});
         },
 
         convertDefinition: function() {
-            let defn = this.serverParams;
-            let tableId = this.tableId;
-            let lengthKey = this.lengthKey;
+            const defn = this.serverParams;
+            const tableId = this.tableId;
+            const lengthKey = this.lengthKey;
 
             let lengthValue = 10;
             if (tableId) {
                 lengthValue = parseInt(localStorage.getItem(lengthKey)) || 10;
             }
 
-            let domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}>rt${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il>p><"clear">`;
+            const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}>rt${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il>p><"clear">`;
 
-            let dtParams = {
+            const dtParams = {
                 processing: true,
                 serverSide: true,
                 pageLength: lengthValue,
@@ -142,12 +142,12 @@ let DataTableDefinition = (function() {
                 }
             };
             if (defn.order) {
-                dtParams.orderSequence = defn.orderSequence
+                dtParams.orderSequence = defn.orderSequence;
             }
 
             if (defn.downloadCsvButtonEnabled) {
-                let csvName = defn.csvName || 'export';
-                let dateStr = new Date().toISOString().slice(0, 10);
+                const csvName = defn.csvName || 'export';
+                const dateStr = new Date().toISOString().slice(0, 10);
                 dtParams.buttons = [
                     {
                         extend: 'csvHtml5',
@@ -155,7 +155,7 @@ let DataTableDefinition = (function() {
                         text: "Download as CSV",
                         filename: csvName + '_' + dateStr,
                     }
-                ]
+                ];
             }
 
             if (this.filterCount === 'hide') {
@@ -172,32 +172,32 @@ let DataTableDefinition = (function() {
                 };
             }
 
-            let columnDefs = [];
+            const columnDefs = [];
             dtParams.columnDefs = columnDefs;
 
             let waitOnEKeys = null;
 
             if (!Array.isArray(defn.columns)) {
-                console.log("Invalid TableDefinition")
+                console.log("Invalid TableDefinition");
                 console.log(defn);
                 throw new Error("Received invalid datatable definition");
             }
 
             // GENERATE COLUMNS
-            for (let col of defn.columns) {
-                let columnDef = Object.assign({}, col);
-                let target = columnDefs.length;
+            for (const col of defn.columns) {
+                const columnDef = Object.assign({}, col);
+                const target = columnDefs.length;
                 columnDef.targets = target;
                 columnDefs.push(columnDef);
                 if (col.render) {
-                    let rawRenderer = eval(col.render);
-                    let renderer = (data, type, row) => {
-                        let output = rawRenderer(data, type, row);
+                    const rawRenderer = eval(col.render);
+                    const renderer = (data, type, row) => {
+                        const output = rawRenderer(data, type, row);
                         if (output instanceof jQuery) {
                             return output.prop("outerHTML");
                         }
                         return output;
-                    }
+                    };
                     columnDef.render = renderer;
                     if (col.render.includes('VCTable')) {
                         waitOnEKeys = true;
@@ -221,26 +221,26 @@ let DataTableDefinition = (function() {
         },
 
         setupDom: function() {
-            let dom = this.dom;
+            const dom = this.dom;
             dom.empty();
-            let dtParams = this.dtParams;
+            const dtParams = this.dtParams;
 
-            let tHead = $('<thead/>').appendTo(dom);
-            let tHeadTr = $('<tr/>').appendTo(tHead);
+            const tHead = $('<thead/>').appendTo(dom);
+            const tHeadTr = $('<tr/>').appendTo(tHead);
 
             // GENERATE COLUMNS
-            for (let columnDef of dtParams.columnDefs) {
+            for (const columnDef of dtParams.columnDefs) {
                 $('<th/>', {class: columnDef.classNames, html: columnDef.label}).appendTo(tHeadTr);
             }
 
             dtParams.createdRow = (row, data, dataIndex) => {
-                let row_css = data.row_css;
+                const row_css = data.row_css;
                 if (row_css) {
                     $(row).addClass(row_css);
                 }
-            }
+            };
 
-            let dataTable = dom.DataTable(dtParams);
+            const dataTable = dom.DataTable(dtParams);
             this.dataTable = dataTable;
 
             dom.on('error.dt', function (e, settings, techNote, message ) {
@@ -252,8 +252,8 @@ let DataTableDefinition = (function() {
                 );
             });
 
-            let tableId = this.tableId;
-            let lengthKey = this.lengthKey;
+            const tableId = this.tableId;
+            const lengthKey = this.lengthKey;
 
             $(`select[name=${tableId}_length]`).change(function() {
                 localStorage.setItem(lengthKey, $(this).val());
@@ -267,20 +267,20 @@ let DataTableDefinition = (function() {
                 return;
             }
 
-            let dom = this.dom;
+            const dom = this.dom;
             dom.addClass('expandable');
 
-            let dataTable = this.dataTable;
-            let expandFn = eval(this.serverParams.expandClientRenderer);
-            let expandData = this.expandData;
+            const dataTable = this.dataTable;
+            const expandFn = eval(this.serverParams.expandClientRenderer);
+            const expandData = this.expandData;
 
             dom.on('click', 'tr', function() {
-                let tr = $(this); //.closest('tr');
+                const tr = $(this); //.closest('tr');
                 if (!tr.hasClass('odd') && !tr.hasClass('even')) {
                     // not a regular row
                     return;
                 }
-                let row = dataTable.row( tr );
+                const row = dataTable.row( tr );
                 if ( row.child.isShown() ) {
                     // This row is already open - close it
                     row.child.hide();
@@ -303,7 +303,7 @@ let DataTableDefinition = (function() {
 
                     if (!tr.hasClass('loaded')) {
                         // loading hasn't started yet, load the row
-                        let childHtml = expandFn(row.data());
+                        const childHtml = expandFn(row.data());
                         row.child( childHtml );
                         tr.addClass('loaded');
                     }
@@ -315,15 +315,15 @@ let DataTableDefinition = (function() {
             // PRE-FETCH data
             // if hovering over a single row for 500ms, pre-fetch the client data ready to display
             dom.on('mouseenter', 'tr', function() {
-                let tr = $(this);
+                const tr = $(this);
                 if (!tr.hasClass('odd') && !tr.hasClass('even') || tr.hasClass('loaded')) {
                     return; // either not an odd or even row, or already
                 }
                 window.clearTimeout(expandData.hoverTimeout);
                 expandData.hoverTimeout = window.setTimeout(() => {
                     if (!tr.hasClass('loaded')) { // could have been clicked on
-                        let row = dataTable.row( tr );
-                        let childHtml = expandFn(row.data());
+                        const row = dataTable.row( tr );
+                        const childHtml = expandFn(row.data());
                         row.child( childHtml );
                         tr.addClass('loaded');
                         tr.addClass('pre-fetched'); // in case we ever want to do stats on it
@@ -339,7 +339,7 @@ let DataTableDefinition = (function() {
             if (!this.serverParams.responsive) {
                 return;
             }
-            let dt = this.dataTable;
+            const dt = this.dataTable;
             let lastShown = null;
 
             dt.on('responsive-display', function (e, datatable, row, showHide, update ) {
@@ -385,16 +385,16 @@ let DataTableDefinition = (function() {
 // ******************************************************************************************
 
 
-let TableFormat = (function() {
+const TableFormat = (function() {
     "use strict";
-    let TableFormat = function() {};
+    const TableFormat = function() {};
     TableFormat.prototype = {};
     return TableFormat;
 })();
 
 TableFormat.timestamp = (data, type, row) => {
     if (data) {
-        let timestampStr = convertTimestamp(data);
+        const timestampStr = convertTimestamp(data);
         return $('<span>', {class:'timestamp', text: timestampStr}).prop('outerHTML');
     } else {
         return '';
@@ -403,7 +403,7 @@ TableFormat.timestamp = (data, type, row) => {
 
 TableFormat.timestampSeconds = (data, type, row) => {
     if (data) {
-        let timestampStr = moment(Number(data) * 1000).format(JS_DATE_FORMAT_SECONDS);
+        const timestampStr = moment(Number(data) * 1000).format(JS_DATE_FORMAT_SECONDS);
         return $('<span>', {class:'timestamp', 'text': timestampStr}).prop('outerHTML');
     } else {
         return '';
@@ -412,10 +412,10 @@ TableFormat.timestampSeconds = (data, type, row) => {
 
 TableFormat.timestampMilliseconds = (data, type, row) => {
     if (data) {
-        let momentValue = moment(Number(data) * 1000)
-        let timestampStr = momentValue.format(JS_DATE_FORMAT_SCIENTIFIC);
-        let seconds = momentValue.format("ss")
-        let milliseconds = momentValue.format("SSS")
+        const momentValue = moment(Number(data) * 1000);
+        const timestampStr = momentValue.format(JS_DATE_FORMAT_SCIENTIFIC);
+        const seconds = momentValue.format("ss");
+        const milliseconds = momentValue.format("SSS");
         return $('<span>', {class:'timestamp', 'html': [
                 timestampStr + ":",
                 $('<span>', {class:'seconds', text:seconds}),
@@ -431,7 +431,7 @@ TableFormat.list_codes = (data, type, row) => {
     if (!data) {
         return $("<span>", {text: "-"});
     }
-    let elements = [];
+    const elements = [];
     let isFirst = true;
     for (value of data) {
         if (!isFirst) {
@@ -441,7 +441,7 @@ TableFormat.list_codes = (data, type, row) => {
         elements.push($('<span>', {class: 'text-monospace text-secondary', text: value}));
     }
     return $('<div>', {html: elements});
-}
+};
 
 TableFormat.sizeBytes = (data, type, row) => {
     if (data) {
@@ -452,7 +452,7 @@ TableFormat.sizeBytes = (data, type, row) => {
             unit = 'KB';
             if (value > 1024) {
                 value = value / 1024;
-                unit = 'MB'
+                unit = 'MB';
             }
         }
         value = Math.round(value);
@@ -498,7 +498,7 @@ TableFormat.text = (data, type, row) => {
 
 TableFormat.plain = (data, type, row) => {
     return data;
-}
+};
 
 TableFormat.number = (data, type, row) => {
     if (data === '' || data === null) {
@@ -507,13 +507,13 @@ TableFormat.number = (data, type, row) => {
         // TODO, put in format commas, monospace etc
         return `<span class="text-number">${data.toLocaleString('en-US')}</span>`;
     }
-}
+};
 
 TableFormat.linkUrl = (data, type, row) => {
     if (!data) {
         return '<span class="no-value">-</span>';
     }
-    let text = data.text;
+    const text = data.text;
 
     let textDom;
     if (!text) {
@@ -521,7 +521,7 @@ TableFormat.linkUrl = (data, type, row) => {
     } else {
         textDom = $('<span>', {text: text});
     }
-    let aDom = $('<a>', {href:data.url, html: textDom, class: 'hover-link'});
+    const aDom = $('<a>', {href:data.url, html: textDom, class: 'hover-link'});
 
     return aDom.prop('outerHTML');
 };
@@ -529,7 +529,7 @@ TableFormat.linkUrl = (data, type, row) => {
 TableFormat.preview = (columns, data, type, row) => {
     let dom = $('<div>');
     let hasValue = false;
-    for (let col of columns) {
+    for (const col of columns) {
         let value = data[col] || row[col];
         if (value && value.length) {
             hasValue = true;
@@ -570,7 +570,7 @@ TableFormat.combine = function(formatters, settings, data, type, columns) {
     if (settings === null) {
         settings = {};
     }
-    let dom = $('<div>');
+    const dom = $('<div>');
     formatters.forEach((formatter, index) => {
         let part;
         if (settings.dataMode === "combined") {
@@ -595,14 +595,14 @@ TableFormat.repeat = function(settings, data, type, columns) {
     if (data === null) {
         return "";
     }
-    let subFormatter = eval(settings.formatter);
+    const subFormatter = eval(settings.formatter);
     let cssClass = "repeat";
     if (settings.groupCSS) {
         cssClass = settings.groupCSS;
     }
-    let dom = $('<div>', {"class": cssClass});
+    const dom = $('<div>', {"class": cssClass});
     data.forEach((subData, index) => {
-        let subDom = subFormatter(subData, type, columns);
+        const subDom = subFormatter(subData, type, columns);
         dom.append(subDom);
     });
     return dom;
@@ -634,7 +634,7 @@ TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
             }
         }
 
-        let ajaxDom =
+        const ajaxDom =
             $('<div>', {html:[
                 $('<div>', {style:`text-align: center;color: #888; min-height:${expectedHeight}`, text:'Loading...'})
             ]});
@@ -667,8 +667,8 @@ $(document).on('click', '.dt-delete-row', function() {
     if (!confirm('Are you sure you want to delete this?')) {
         return;
     }
-    let btn = $(this);
-    let url = btn.data('url');
+    const btn = $(this);
+    const url = btn.data('url');
     $.ajax({
         type: 'POST',
         url: url,
@@ -683,8 +683,8 @@ $(document).on('click', '.dt-delete-row', function() {
 });
 
 TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
-    let fieldset = $('<div>', {class:'mt-3'});
-    for (let col of columns) {
+    const fieldset = $('<div>', {class:'mt-3'});
+    for (const col of columns) {
         if (col.hidden) {
             if (col === null || col.data.length === 0) {
                 // pass
@@ -714,18 +714,18 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 
 (function ($) {
 	function calcDisableClasses(oSettings) {
-		var start = oSettings._iDisplayStart;
-		var length = oSettings._iDisplayLength;
-		var visibleRecords = oSettings.fnRecordsDisplay();
-		var all = length === -1;
+		const start = oSettings._iDisplayStart;
+		const length = oSettings._iDisplayLength;
+		const visibleRecords = oSettings.fnRecordsDisplay();
+		const all = length === -1;
 
 		// Gordey Doronin: Re-used this code from main jQuery.dataTables source code. To be consistent.
-		var page = all ? 0 : Math.ceil(start / length);
-		var pages = all ? 1 : Math.ceil(visibleRecords / length);
+		const page = all ? 0 : Math.ceil(start / length);
+		const pages = all ? 1 : Math.ceil(visibleRecords / length);
 
-		let disabledClass = oSettings.oClasses.sPageButtonDisabled;
-		var disableFirstPrevClass = (page > 0 ? '' : disabledClass);
-		var disableNextLastClass = (page < pages - 1 ? '' : disabledClass);
+		const disabledClass = oSettings.oClasses.sPageButtonDisabled;
+		const disableFirstPrevClass = (page > 0 ? '' : disabledClass);
+		const disableNextLastClass = (page < pages - 1 ? '' : disabledClass);
 
 		return {
 			'first': disableFirstPrevClass,
@@ -743,29 +743,29 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 		return Math.ceil(oSettings.fnRecordsDisplay() / oSettings._iDisplayLength);
 	}
 
-	var firstClassName = 'first';
-	var previousClassName = 'previous';
-	var nextClassName = 'next';
-	var lastClassName = 'last';
+	const firstClassName = 'first';
+	const previousClassName = 'previous';
+	const nextClassName = 'next';
+	const lastClassName = 'last';
 
-	var paginateClassName = 'paginate';
-	var paginatePageClassName = 'paginate_page';
-	var paginateInputClassName = 'paginate_input';
-	var paginateTotalClassName = 'paginate_total';
+	const paginateClassName = 'paginate';
+	const paginatePageClassName = 'paginate_page';
+	const paginateInputClassName = 'paginate_input';
+	const paginateTotalClassName = 'paginate_total';
 
 	$.fn.dataTableExt.oPagination.input = {
 		'fnInit': function (oSettings, nPaging, fnCallbackDraw) {
-			var nFirst = document.createElement('span');
-			var nPrevious = document.createElement('span');
-			var nNext = document.createElement('span');
-			var nLast = document.createElement('span');
-			var nInput = document.createElement('input');
-			var nTotal = document.createElement('span');
-			var nInfo = document.createElement('span');
+			const nFirst = document.createElement('span');
+			const nPrevious = document.createElement('span');
+			const nNext = document.createElement('span');
+			const nLast = document.createElement('span');
+			const nInput = document.createElement('input');
+			const nTotal = document.createElement('span');
+			const nInfo = document.createElement('span');
 
-			var language = oSettings.oLanguage.oPaginate;
-			var classes = oSettings.oClasses;
-			var info = language.info || 'Page _INPUT_ of _TOTAL_';
+			const language = oSettings.oLanguage.oPaginate;
+			const classes = oSettings.oClasses;
+			let info = language.info || 'Page _INPUT_ of _TOTAL_';
 
 			nFirst.innerHTML = '<i class="fas fa-fast-backward"></i>'; // language.sFirst;
 			nPrevious.innerHTML = '<i class="fas fa-step-backward"></i>'; //language.sPrevious;
@@ -804,7 +804,7 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 			nPaging.appendChild(nLast);
 
 			$(nFirst).click(function() {
-				var iCurrentPage = calcCurrentPage(oSettings);
+				const iCurrentPage = calcCurrentPage(oSettings);
 				if (iCurrentPage !== 1) {
 					oSettings.oApi._fnPageChange(oSettings, 'first');
 					fnCallbackDraw(oSettings);
@@ -812,7 +812,7 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 			});
 
 			$(nPrevious).click(function() {
-				var iCurrentPage = calcCurrentPage(oSettings);
+				const iCurrentPage = calcCurrentPage(oSettings);
 				if (iCurrentPage !== 1) {
 					oSettings.oApi._fnPageChange(oSettings, 'previous');
 					fnCallbackDraw(oSettings);
@@ -820,7 +820,7 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 			});
 
 			$(nNext).click(function() {
-				var iCurrentPage = calcCurrentPage(oSettings);
+				const iCurrentPage = calcCurrentPage(oSettings);
 				if (iCurrentPage !== calcPages(oSettings)) {
 					oSettings.oApi._fnPageChange(oSettings, 'next');
 					fnCallbackDraw(oSettings);
@@ -828,7 +828,7 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 			});
 
 			$(nLast).click(function() {
-				var iCurrentPage = calcCurrentPage(oSettings);
+				const iCurrentPage = calcCurrentPage(oSettings);
 				if (iCurrentPage !== calcPages(oSettings)) {
 					oSettings.oApi._fnPageChange(oSettings, 'last');
 					fnCallbackDraw(oSettings);
@@ -851,7 +851,7 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 					return;
 				}
 
-				var iNewStart = oSettings._iDisplayLength * (this.value - 1);
+				let iNewStart = oSettings._iDisplayLength * (this.value - 1);
 				if (iNewStart < 0) {
 					iNewStart = 0;
 				}
@@ -869,7 +869,7 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 			$('span', nPaging).bind('selectstart', function() { return false; });
 
 			// If we can't page anyway, might as well not show it.
-			var iPages = calcPages(oSettings);
+			const iPages = calcPages(oSettings);
 			if (iPages <= 1) {
 				$(nPaging).hide();
 			}
@@ -880,17 +880,17 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 				return;
 			}
 
-			var iPages = calcPages(oSettings);
-			var iCurrentPage = calcCurrentPage(oSettings);
+			const iPages = calcPages(oSettings);
+			const iCurrentPage = calcCurrentPage(oSettings);
 
-			var an = oSettings.aanFeatures.p;
+			const an = oSettings.aanFeatures.p;
 			if (iPages <= 1) // hide paging when we can't page
 			{
 				$(an).hide();
 				return;
 			}
 
-			var disableClasses = calcDisableClasses(oSettings);
+			const disableClasses = calcDisableClasses(oSettings);
 
 			$(an).show();
 

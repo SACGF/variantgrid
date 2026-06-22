@@ -498,6 +498,12 @@ class AbstractVariantGrid(JqGridUserRowConfig):
 
     def get_queryset(self, request):
         qs = self._get_base_queryset()
+        # Restrict the variantallele join to this grid's genome build. Some contigs are shared between builds
+        # (e.g. MT / NC_012920 is shared by GRCh37 & GRCh38) so the same Variant has a VariantAllele per build -
+        # without this, grid columns that join through 'variantallele' (e.g. the ClinGen Allele ID) return that
+        # variant once per build (duplicate rows / inflated counts vs the node count, which doesn't make that join).
+        # @see https://github.com/SACGF/variantgrid/issues/1626
+        qs = qs.filter(Q(variantallele__isnull=True) | Q(variantallele__genome_build=self.genome_build))
         # Annotate so we can use global_variant_zygosity in grid columns
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
         qs = self.filter_items(request, qs)  # JQGrid filtering from request

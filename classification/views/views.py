@@ -740,8 +740,7 @@ class CreateClassificationForVariantView(TemplateView):
             raise ValueError(msg)
 
         genome_build = self._get_genome_build()
-        vts = VariantTranscriptSelections(variant, genome_build,
-                                          hide_other_annotation_consortium_transcripts=False)
+        vts = VariantTranscriptSelections(variant, genome_build)
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
         consensuses = ClassificationConsensus.all_consensus_candidates(allele=variant.allele, user=self.request.user)
@@ -968,7 +967,8 @@ def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
 
 
 def view_classification_grouping_detail(request, classification_grouping_id: int):
-    grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
+    grouping = get_object_or_404(ClassificationGrouping.objects.select_related('latest_allele_info'),
+                                 pk=classification_grouping_id)
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
         "classification_grouping": grouping
@@ -976,7 +976,8 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
 
 
 def view_classification_grouping_records_detail(request, classification_grouping_id: int):
-    grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
+    grouping = get_object_or_404(ClassificationGrouping.objects.select_related('latest_allele_info'),
+                                 pk=classification_grouping_id)
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_records_detail.html', {
         "classification_grouping": grouping

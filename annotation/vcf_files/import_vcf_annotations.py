@@ -34,6 +34,11 @@ def import_vcf_annotations(
     infos = header_types["INFO"]
     bulk_inserter = BulkVEPVCFAnnotationInserter(annotation_run, infos, insert_variants)
     if annotation_run.upload_attempts > 1:
+        # Genuine retry of an existing run - clear any scratch files left by the previous attempt so
+        # write_sql_copy_csv doesn't abort on "We don't want to overwrite ...". We deliberately only do
+        # this on a real retry (upload_attempts > 1) - a first attempt that finds existing scratch files
+        # means the import-processing dir is out of sync with the DB (eg moved dump / restored backup),
+        # which the overwrite guard is meant to surface rather than silently delete. See #1596.
         logging.warning(f"Upload attempt {annotation_run.upload_attempts} - deleting data")
         bulk_inserter.remove_processing_files()
 

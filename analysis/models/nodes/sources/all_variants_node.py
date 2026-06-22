@@ -42,7 +42,9 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     def contig_ids(self) -> list[int]:
         if self.pk is None:
             return []
-        qs = self.allvariantsnodecontig_set.order_by("contig__genomebuildcontig__order")
+        qs = self.allvariantsnodecontig_set.filter(
+            contig__genomebuildcontig__genome_build=self.analysis.genome_build
+        ).order_by("contig__genomebuildcontig__order")
         return list(qs.values_list("contig_id", flat=True))
 
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
@@ -88,7 +90,8 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     def get_node_name(self):
         name_lines = []
         if self.contig_ids:
-            contig_names = list(Contig.objects.filter(pk__in=self.contig_ids)
+            contig_names = list(Contig.objects.filter(pk__in=self.contig_ids,
+                                                      genomebuildcontig__genome_build=self.analysis.genome_build)
                                 .order_by("genomebuildcontig__order")
                                 .values_list("name", flat=True))
             name_lines.append(", ".join(contig_names))

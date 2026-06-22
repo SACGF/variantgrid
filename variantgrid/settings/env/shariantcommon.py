@@ -87,11 +87,11 @@ LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes", "ontol
 
 # OIDC SETTINGS
 USE_OIDC = True
+OIDC_STORE_ID_TOKEN = True  # needed so we can pass the token back to keycloak for an automatic logout
 LOGIN_URL = '/oidc_login/'
 OIDC_RP_SIGN_ALGO = 'RS256'
-# TODO, change this then move it to
 OIDC_RP_CLIENT_SECRET = get_secret('OIDC.client_secret')
-KEY_CLOAK_BASE = 'https://shariant.org.au/auth'
+KEY_CLOAK_BASE = 'https://auth.shariant.org.au'
 KEY_CLOAK_REALM = 'agha'
 KEY_CLOAK_PROTOCOL_BASE = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/protocol/openid-connect'
 OIDC_OP_JWKS_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/certs'
@@ -99,8 +99,7 @@ OIDC_OP_AUTHORIZATION_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/auth'
 OIDC_OP_TOKEN_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/token'
 OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
-OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
-
+OIDC_OP_LOGOUT_URL_METHOD = 'oidc_auth.backend.provider_logout'
 # login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
@@ -118,6 +117,13 @@ ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = False  # Only used for analysis opt
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'annotation_scratch')
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
+
+# Stay on the historical annotation config (package default is now latest - see #1625)
+ANNOTATION_VEP_VERSION = "110"
+ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
+ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
+ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
+pin_annotation_to_columns_version_3(ANNOTATION)
 
 ANNOTATION[BUILD_GRCH37].update({
     "annotation_consortium": "RefSeq",

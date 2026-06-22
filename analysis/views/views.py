@@ -61,7 +61,7 @@ from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
-    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Quad, Variant, GenomeBuild
+    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Quad, Variant, GenomeBuild, JobsControl
 from variantgrid.celery import app
 
 
@@ -162,6 +162,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
         "analysis_variables": analysis_variables,
         "has_write_permission": analysis.can_write(request.user),
         "warnings": analysis.get_toolbar_warnings(request.user),
+        "loading_animations": user_settings.grid_loading_animations,
     }
     return render(request, 'analysis/analysis.html', context)
 
@@ -528,13 +529,25 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         }
         return HttpResponseRedirect(reverse("node_load", kwargs=kwargs))
 
+    max_variants = (UserSettings.get_for_user(request.user).node_grid_auto_load_max_variants
+                    or settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS)
+    grid_auto_load = (max_variants is None) or (node.count is not None and node.count < max_variants)
+
+    max_variants_display = None
+    if max_variants is not None:
+        # eg 50000 -> "50k", 50500 -> "50.5k"
+        max_variants_display = f"{max_variants / 1000:g}k" if max_variants >= 1000 else str(max_variants)
+
     context = {
         "analysis_id": analysis_id,
         "analysis_version": analysis_version,
         "node_id": node_id,
         "node_version": node_version,
         "extra_filters": extra_filters,
-        "bams_dict": node.get_bams_dict()
+        "bams_dict": node.get_bams_dict(),
+        "node": node,
+        "grid_auto_load": grid_auto_load,
+        "grid_auto_load_max_variants_display": max_variants_display,
     }
     return render(request, 'analysis/node_data/node_data_grid.html', context)
 
@@ -1052,6 +1065,17 @@ def node_method_description(request, analysis_id, node_id, node_version):
 
 @user_passes_test(is_superuser)
 def view_analysis_issues(request):
+    if request.method == "POST":
+        if "unpause-jobs" in request.POST:
+            JobsControl.resume(by=str(request.user))
+            messages.add_message(request, messages.INFO,
+                                 "Resumed analysis + annotation job dispatch")
+        if "pause-jobs" in request.POST:
+            JobsControl.pause(reason=f"Paused from analysis issues page by {request.user}",
+                              by=str(request.user))
+            messages.add_message(request, messages.WARNING,
+                                 "Paused analysis + annotation job dispatch")
+
     all_nodes = AnalysisNode.objects.all()
     field_counts = get_field_counts(all_nodes, "status")
     summary_data = Counter()
@@ -1060,8 +1084,12 @@ def view_analysis_issues(request):
         summary_data[summary] += count
 
     field_counts = {NodeStatus(k).label: v for k, v in field_counts.items()}
+    # Don't force-create the singleton just by viewing the page
+    jobs_control = JobsControl.objects.filter(pk=JobsControl.SINGLETON_PK).first()
     context = {"nodes_status_summary": summary_data,
-               "field_counts": field_counts}
+               "field_counts": field_counts,
+               "jobs_control": jobs_control,
+               "jobs_paused": bool(jobs_control and jobs_control.paused)}
     return render(request, 'analysis/view_analysis_issues.html', context)
 
 

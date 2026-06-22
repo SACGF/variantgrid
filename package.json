@@ -1,0 +1,16 @@
+{
+  "name": "variantgrid",
+  "version": "1.0.0",
+  "description": "VariantGrid is a database and web application for storing, analysing and classifying variants.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^10.4.1",
+    "globals": "^17.6.0"
+  }
+}

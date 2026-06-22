@@ -46,6 +46,9 @@
         </div>
         <div class="col-6 col-md-5">
             {% crispy_field field %}
+            {% if field.name == 'loading_animations' %}
+                <a class="hover-link" href="{% url 'loading_animations' %}" target="_blank" rel="noopener">Preview loading animations</a>
+            {% endif %}
         </div>
     </div>
 {% endfor %}

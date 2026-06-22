@@ -24,10 +24,13 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals import organization_search
         from snpdb.signals import user_search
         from snpdb.signals import cohort_search
+        from snpdb.signals import trio_search
+        from snpdb.signals import quad_search
         from snpdb.signals import sample_search
         from snpdb.signals import vcf_search
         from snpdb.signals import variant_search
         from snpdb.signals import variant_zygosity_preview_extra
+        from snpdb.signals import jobs_autopause  # registers worker_ready crash-safety auto-pause
         from snpdb.signals import clinvar_export_search
         from snpdb.signals import scv_search
         from snpdb.signals import genomics_search

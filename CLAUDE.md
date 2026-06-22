@@ -114,6 +114,9 @@ Two systems coexist:
 ### Celery task queues
 Four worker queues: `analysis_workers`, `annotation_workers`, `db_workers` (default), `web_workers`, plus `scheduling_single_worker`. Assign tasks to appropriate queues via `@app.task(queue='...')`.
 
+### Manual migrations (management commands on deploy)
+If a new management command needs to be run on existing deployments as part of an upgrade, add a migration containing a `ManualOperation` (from `manual/operations/manual_operations.py`) — the upgrade script surfaces these as required tasks. Use `ManualOperation.task_id_manage(["command_name"])` (or the `operation_manage`/`operation_other` helpers) and pass an optional `test=` callable (receives `apps`) so the task is only registered when the deployment actually has data needing it. Example: `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`.
+
 ### Preview system
 Models implement `PreviewModelMixin` to support hover-card previews. Apps connect to `preview_request_signal` and `preview_extra_signal` (in `library/preview_request.py`) to register their handlers. The `PreviewKeyValue` dataclass carries key/value pairs for the preview.
 

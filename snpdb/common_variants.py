@@ -20,7 +20,12 @@ def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersio
             "clinical_significance_max": cf_data["clinical_significance_max"],
             "genome_build": genome_build,
         }
-        common_filter, created = CohortGenotypeCommonFilterVersion.objects.get_or_create(**kwargs)
+        additional_gnomad_versions = cf_data.get("additional_gnomad_versions", [])
+        common_filter, created = CohortGenotypeCommonFilterVersion.objects.get_or_create(
+            defaults={"additional_gnomad_versions": additional_gnomad_versions}, **kwargs)
+        if not created and common_filter.additional_gnomad_versions != additional_gnomad_versions:
+            common_filter.additional_gnomad_versions = additional_gnomad_versions
+            common_filter.save(update_fields=["additional_gnomad_versions"])
         if created:
             # At this point - no VCFs have been imported, and all future ones will handle current classifications
             # So we can mark all as handled

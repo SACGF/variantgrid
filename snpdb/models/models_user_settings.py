@@ -146,6 +146,21 @@ class UserGridConfig(models.Model):
         return f"{self.user}/{self.grid_name}: {','.join(details)}"
 
 
+class GridLoadingAnimation(models.TextChoices):
+    """ DNA "reading" animations shown (randomly) while a node's variant grid loads.
+        Values are the menu ids - the front end (analysis.js) maps these to VGLoaders ids. """
+    FLOWCELL = "flowcell", "Flowcell"
+    RIPPLE = "ripple", "Ripple"
+    PILEUP = "pileup", "Pileup"
+    MATRIX = "matrix", "Matrix"
+
+
+# Shown when a user hasn't chosen (loading_animations is null/empty)
+DEFAULT_GRID_LOADING_ANIMATIONS = [GridLoadingAnimation.FLOWCELL.value,
+                                   GridLoadingAnimation.RIPPLE.value,
+                                   GridLoadingAnimation.PILEUP.value]
+
+
 class SettingsOverride(models.Model):
     """ We want UserSettings to cascade via Org -> Lab -> User
         Where the later levels override if they are non-null """
@@ -200,6 +215,11 @@ class SettingsOverride(models.Model):
 
     initially_show_zygosity_table = models.BooleanField(null=True, blank=True,
                                                          help_text="Initially expand the zygosity requirements table in Trio/Quad node editors")
+    node_grid_auto_load_max_variants = models.IntegerField(
+        null=True, blank=True,
+        help_text="Analysis nodes with at least this many variants don't auto-load "
+                  "their grid — the user clicks 'Load variants' to run the row query. "
+                  "Blank inherits the next level up.")
 
 
 class GlobalSettings(SettingsOverride):
@@ -239,6 +259,10 @@ class UserSettingsOverride(SettingsOverride):
                                     help_text="Lab used for creating classifications (you can belong to more than 1 lab)")
     # Allows us to store OAuth sub against the user
     oauth_sub = models.TextField(null=True, blank=True)
+    # Personal (not org/lab) preference - which grid loading animations to randomly show.
+    # null/empty = DEFAULT_GRID_LOADING_ANIMATIONS. See GridLoadingAnimation for valid values.
+    loading_animations = models.JSONField(null=True, blank=True,
+                                          help_text="Animations randomly shown while a node's variant grid loads.")
 
     def auto_set_default_lab(self):
         user = self.user
@@ -377,6 +401,7 @@ class UserSettings:
     show_candidates_cross_sample_classification: bool
     show_candidates_classification_evidence_update: bool
     initially_show_zygosity_table: bool
+    node_grid_auto_load_max_variants: Optional[int]
 
     @staticmethod
     def parse_value(field_name: str, value: Any) -> Any:
@@ -394,7 +419,16 @@ class UserSettings:
     default_lab: Optional[Lab]
     oauth_sub: str
     timezone: str
+    loading_animations: Optional[List[str]]
     _settings_overrides: List[SettingsOverride]
+
+    @property
+    def grid_loading_animations(self) -> List[str]:
+        """ The user's chosen grid loading animations, filtered to currently-valid values,
+            falling back to the defaults when nothing valid is set. """
+        valid = set(GridLoadingAnimation.values)
+        chosen = [a for a in (self.loading_animations or []) if a in valid]
+        return chosen or list(DEFAULT_GRID_LOADING_ANIMATIONS)
 
     @property
     def tz(self):

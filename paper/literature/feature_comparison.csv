@@ -1,0 +1,71 @@
+category,feature,variantgrid,varfish,seqr,scout,gemini,vcfminer,opencga,alissa,franklin_varsome,vg_differentiator,vg_evidence_or_note
+LEGEND,"Y=yes N=no P=partial ?=unknown/unverified. VG column source-verified (file refs). Comparator columns from literature in paper/literature/ and may be incomplete — verify before publication.",,,,,,,,,,,
+Deployment,Actively maintained (not discontinued),Y,Y,Y,Y,P,P,Y,N,Y,MOD,"Alissa Interpret END-OF-LIFED (Agilent ~2023, retired end 2024); GEMINI/VCF-Miner largely unmaintained"
+Deployment,Clinically validated / accredited diagnostic production,Y,P,N,Y,N,N,P,Y,Y,MOD,"SA Pathology VG4 clinical-validated release; seqr is research-only (no PHI)"
+Deployment,One codebase reskinned/flag-configured into multiple deployment types,Y,N,N,N,N,N,P,N,N,STRONG,"hostname split-settings + feature flags -> Shariant/RUNX1db/research/clinical from one codebase"
+Deployment,Open source,Y,Y,Y,Y,Y,Y,Y,N,N,PARITY,GPL; public repo
+Deployment,Self-hostable on-premise,Y,Y,P,Y,Y,Y,Y,N,N,MOD,"seqr leans cloud; commercial are SaaS"
+Deployment,No cloud/Kubernetes/big-data cluster required,Y,Y,N,Y,Y,Y,N,?,N,MOD,"vs seqr (GCP/K8s) and OpenCGA (Hadoop/Spark/Solr)"
+Deployment,Docker / container deployment,P,Y,Y,Y,?,?,Y,N,N,PARITY,"VG Docker image planned; stack is heavy (Postgres+Redis+RabbitMQ+Celery+VEP)"
+Deployment,Public no-login instance (interpretation),P,Y,N,N,N,N,N,N,Y,MOD,"VarFish kiosk; VarSome public DB. VG planned cached/capped public instance"
+Deployment,Database backend,PostgreSQL,PostgreSQL,"Hail/ES",MongoDB,SQLite,MongoDB,"Hadoop/Mongo/Solr",proprietary,proprietary,—,Postgres + psqlextra + Redis
+Deployment,REST API,Y,Y,Y,Y,N,?,Y,Y,Y,PARITY,DRF; versioned v1/v2/v3
+Deployment,LIS / external-system integration APIs,Y,?,N,?,Y,N,Y,Y,Y,MOD,"Routine clinical diagnostic use w/ LIS hooks"
+Deployment,Object-level permissions / multi-tenancy,Y,Y,Y,Y,N,?,Y,Y,Y,PARITY,django-guardian
+Deployment,Audit logging,Y,Y,?,Y,N,N,Y,Y,?,PARITY,django-auditlog on analysis nodes + classifications
+Ingestion,Continuous/rolling VCF ingestion,Y,Y,P,Y,P,P,Y,Y,P,MOD,"snpdb/upload; per-analysis callset for seqr/varfish vs always-on for VG"
+Ingestion,VCF normalization,Y,Y,Y,?,P,N,Y,?,?,PARITY,bcftools norm; upload/vcf/vcf_preprocess.py
+Ingestion,Variants from many VCFs linked to ONE allele record,Y,P,N,P,N,N,P,?,P,STRONG,"snpdb/models/models_variant.py Allele/VariantAllele"
+Ingestion,Multi-sample genotype packing for SQL-level filtering,Y,P,?,N,Y,N,Y,N,N,STRONG,"snpdb/models/models_cohort.py CohortGenotype packed TEXT+ARRAY; extends GEMINI into SQL"
+Ingestion,Internal population/allele-frequency database,Y,Y,N,P,Y,N,Y,?,Y,MOD,"snpdb/models/models_zygosity_counts.py VariantZygosityCount"
+Ingestion,Sample-level 'which samples carry this variant' traceback,Y,P,N,P,Y,Y,P,?,N,STRONG,"FilteredRelation zygosity counts per VCF/sample"
+Ingestion,Rare/common AF-based partition (skip common for rare queries),Y,N,N,N,N,N,?,N,N,STRONG,"snpdb/models/models_cohort.py common/uncommon CohortGenotype split"
+Ingestion,Data-archive lifecycle (long-term retention, no active-query cost),Y,?,?,?,N,N,?,?,?,STRONG,snpdb/archive.py DataArchiveMixin
+MultiBuild,Multiple genome builds (GRCh37/38/T2T),Y,P,Y,Y,P,P,Y,Y,Y,MOD,"incl T2T-CHM13v2.0; models_genome.py"
+MultiBuild,Cross-build liftover linking variants to one allele,Y,N,N,N,N,N,?,?,P,STRONG,"bcftools +liftover + ClinGen; LiftoverRun/AlleleLiftover"
+MultiBuild,Cross-build linking of classifications AND tags,Y,N,N,N,N,N,N,N,N,STRONG,"allele-level VariantTag + classification.allele"
+MultiBuild,ClinGen Allele Registry integration,Y,N,P,?,N,N,?,?,Y,MOD,"snpdb/clingen_allele.py full API + caching"
+Annotation,Managed automatic annotation (VEP),Y,Y,Y,Y,P,N,Y,Y,Y,PARITY,"annotation/vep_annotation.py; Ensembl+RefSeq"
+Annotation,User-supplied annotation supported,P,N,N,?,Y,Y,P,?,N,PARITY,"VG manages annotation; VCF-Miner/GEMINI accept user annotation"
+Annotation,On-demand single-variant annotation (search->create),Y,N,N,N,N,N,?,?,Y,MOD,annotation/manual_variant_entry.py
+Annotation,Multiple stored annotation versions simultaneously,Y,N,N,N,N,N,?,N,N,STRONG,"VariantAnnotationVersion NEW/ACTIVE/HISTORICAL"
+Annotation,Database partitioning per annotation version (constant-time),Y,N,N,N,N,N,P,N,N,STRONG,"SubVersionPartition + psqlextra LIST; library/django_utils/django_partition.py"
+Annotation,Annotation-version diffing (transition matrices) for re-analysis,Y,N,N,N,N,N,N,N,N,STRONG,annotation/models/models_version_diff.py
+Annotation,Pin annotation version per analysis/classification,Y,N,N,N,N,N,?,?,N,STRONG,Analysis.annotation_version FK
+Annotation,In-silico predictors (REVEL/CADD/SpliceAI/dbNSFP),Y,Y,Y,Y,P,N,Y,Y,Y,PARITY,VEP plugins
+Annotation,gnomAD / population frequencies (multi-version),Y,Y,Y,Y,P,N,Y,Y,Y,MOD,"stores gnomAD v2/v3/v4 + FAF; future-proofed"
+Analysis,Interactive node-graph (DAG) variant filtering,Y,N,N,N,N,N,N,Y,N,STRONG,"analysis/ django_dag; Alissa is node-based but BATCH"
+Analysis,Live editing with immediate feedback,Y,N,N,N,N,N,N,N,N,STRONG,"queryset_dirty + Celery recompute; Alissa runs batch"
+Analysis,Batch / template pipelines (clinical mode),Y,P,Y,Y,Y,Y,Y,Y,Y,PARITY,AnalysisTemplate / AnalysisTemplateVersion
+Analysis,~20 node types (sources+filters),Y,—,—,—,—,—,—,P,—,STRONG,"analysis/models/nodes/{sources,filters} 20 classes"
+Analysis,Venn / set-operation nodes on variant sets,Y,N,N,N,P,N,?,P,N,STRONG,VennNode INTERSECTION/UNION/DIFFERENCE
+Analysis,Trio / cohort / pedigree / quad analysis,Y,Y,Y,Y,Y,P,Y,Y,Y,PARITY,"Trio/Quad/Pedigree nodes; compound-het"
+Analysis,Auto-launch analysis on VCF import,Y,N,N,N,N,N,?,?,N,STRONG,AutoLaunchAnalysisTemplate + enrichment-kit/regex match
+Analysis,Multi-level result caching,Y,P,?,?,N,N,Y,?,?,MOD,"Redis + DB VariantCollection + NodeCount (3-tier)"
+Analysis,Per-node variant grids,Y,—,—,—,N,Y,?,Y,?,MOD,analysis/grids.py NodeGrid
+Analysis,Node count badges (ClinVar/OMIM/tagged/classified),Y,N,N,N,N,N,N,P,N,STRONG,analysis/models/nodes/node_counts.py FilteredRelation
+Analysis,User-configurable columns (100+),Y,P,P,P,P,P,?,Y,?,MOD,CustomColumnsCollection
+Analysis,Variant tagging within analysis,Y,Y,Y,Y,N,N,?,Y,Y,PARITY,"allele-level VariantTag (cross-build)"
+Analysis,Gene list / PanelApp panel nodes,Y,Y,Y,Y,P,N,?,Y,Y,PARITY,GeneListNode w/ PanelApp confidence levels
+Classification,ACMG/AMP classification workflow,Y,Y,P,Y,N,N,Y,Y,Y,PARITY,classification/ evidence keys + criteria strengths
+Classification,Flexible lab-configurable evidence-key schema,Y,P,N,?,N,N,?,P,P,STRONG,"evidence_key.py pydantic EvidenceKeyOverrides per org/lab"
+Classification,Versioned immutable classification history,Y,P,N,?,N,N,?,Y,P,MOD,"ClassificationModification delta + published snapshot"
+Classification,Somatic AMP-tier classification,Y,N,N,P,N,N,P,Y,Y,MOD,AlleleOriginBucket germline/somatic/unknown
+Classification,Auto-populate evidence from annotation,Y,P,N,?,N,N,?,Y,Y,MOD,"autopopulate_evidence_keys/ 15+ annotation sources"
+Sharing,Multi-lab classification sharing w/ share levels,Y,N,P,P,N,N,?,N,Y,STRONG,"ShareLevel user/lab/org/all/public; publish-up-only"
+Sharing,Automated inter-lab discordance detection,Y,N,N,N,N,N,N,N,P,STRONG,"discordance_models.py bucket-based on shared allele"
+Sharing,Discordance resolution/triage workflow,Y,N,N,N,N,N,N,N,N,STRONG,"DiscordanceReportTriage + 'pending concordance'"
+Sharing,Per-condition clinical grouping for discordance,Y,N,N,N,N,N,N,N,N,STRONG,ClinicalContext per allele+condition
+Sharing,ClinVar submission/export pipeline (batch+SCV),Y,N,P,?,N,N,?,P,Y,MOD,"clinvar_export_models.py batches + SCV polling"
+Sharing,Two-way automated sync to external instances (Shariant),Y,N,N,N,N,N,?,N,N,STRONG,"sync/shariant/ per-modification sync tracking"
+Sharing,Alissa / external LIS sync,Y,N,N,N,N,N,?,—,—,MOD,sync/alissa/ MVL export
+Sharing,Re-classification-over-time (flag/notify on change),Y,P,N,?,N,N,?,?,P,MOD,"signal-based significance_change flags; cf iVar"
+Quality,Flagging system attachable to any object,Y,P,P,Y,N,N,?,?,?,MOD,flags/ FlagType/FlagCollection generic
+Quality,QC plots (relatedness/sex/coverage),P,Y,Y,Y,N,N,Y,?,?,PARITY,seqauto + sample QC; VarFish strong here
+Phenotype,HPO phenotype terms,Y,Y,Y,Y,N,N,Y,Y,Y,PARITY,ontology/ HPO
+Phenotype,Condition free-text -> ontology matching (MONDO/HPO/OMIM),Y,N,N,?,N,N,?,N,N,STRONG,"condition_text_matching.py + ontology_matching.py"
+Phenotype,Phenotype-based prioritization (Exomiser-like ranking),P,Y,P,Y,N,N,Y,Y,Y,BEHIND,"PhenotypeNode filters; not a ranking engine like Exomiser"
+Phenotype,Matchmaker Exchange integration,N,N,Y,Y,N,N,?,N,N,BEHIND,"seqr/Scout integrate MME; VG does internal matching only"
+KnowledgeBase,Variant detail / knowledge-base pages (Variantopedia),Y,P,P,Y,N,N,?,P,Y,MOD,"variantopedia/views.py AlleleCard aggregates multi-lab"
+KnowledgeBase,Variant / HGVS search,Y,Y,Y,Y,Y,Y,Y,Y,Y,PARITY,snpdb/search.py + genes/hgvs/hgvs_matcher.py
+KnowledgeBase,Internal variant matching ('who else has this'),Y,P,N,P,Y,Y,P,?,N,STRONG,"zygosity counts + candidate search; cf Matchmaker (cross-inst)"

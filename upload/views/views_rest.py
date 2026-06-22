@@ -1,6 +1,7 @@
 import os
+from hashlib import md5
 from http import HTTPStatus
-from typing import Optional
+from typing import IO, Optional
 
 from django.conf import settings
 from django.http import JsonResponse
@@ -11,7 +12,6 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 
 from library.log_utils import report_exc_info
-from library.utils import file_or_filename_md5sum
 from upload.models import UploadedFile
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
 from upload.views.views import handle_file_upload
@@ -52,20 +52,38 @@ class APIFileUploadView(APIView):
             report_exc_info(request=request)
             return JsonResponse({"error": "Upload failed"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-    @staticmethod
-    def _get_existing_uploaded_file(user, path, django_uploaded_file) -> Optional[UploadedFile]:
-        if existing_ufs := list(UploadedFile.objects.filter(path=path).order_by("pk")):
-            new_hash = file_or_filename_md5sum(django_uploaded_file)
-            for existing_uf in existing_ufs:
-                existing_uf.check_can_view(user)
-                # Only look at uploaded files that have been successfully processed
-                upload_data = get_upload_data_for_uploaded_file(existing_uf)
-                if upload_data is not None and existing_uf.uploaded_file:
-                    upload_dir = os.path.realpath(settings.UPLOAD_DIR)
-                    file_path = os.path.realpath(existing_uf.uploaded_file.path)
-                    if not file_path.startswith(upload_dir + os.sep):
-                        raise ValueError(f"Uploaded file path '{file_path}' is not within UPLOAD_DIR")
-                    existing_hash = file_or_filename_md5sum(file_path)
-                    if new_hash == existing_hash:
-                        return existing_uf
+    @classmethod
+    def _get_existing_uploaded_file(cls, user, path, django_uploaded_file) -> Optional[UploadedFile]:
+        existing_ufs = list(UploadedFile.objects.filter(path=path).order_by("pk"))
+        if not existing_ufs:
+            return None
+
+        new_hash = cls._md5sum(django_uploaded_file)
+        for existing_uf in existing_ufs:
+            existing_uf.check_can_view(user)
+            # Only look at uploaded files that have been successfully processed
+            upload_data = get_upload_data_for_uploaded_file(existing_uf)
+            if upload_data is not None and existing_uf.uploaded_file:
+                if new_hash == cls._uploaded_file_md5sum(existing_uf):
+                    return existing_uf
         return None
+
+    @classmethod
+    def _uploaded_file_md5sum(cls, uploaded_file: UploadedFile) -> str:
+        """ md5sum of the stored file, ensuring the resolved path stays within UPLOAD_DIR """
+        upload_dir = os.path.realpath(settings.UPLOAD_DIR)
+        file_path = os.path.realpath(uploaded_file.uploaded_file.path)
+        if not file_path.startswith(upload_dir + os.sep):
+            raise ValueError(f"Uploaded file path '{file_path}' is not within UPLOAD_DIR")
+        with open(file_path, "rb") as f:
+            return cls._md5sum(f)
+
+    @staticmethod
+    def _md5sum(f: IO) -> str:
+        # MD5 is used here only as a fast file-equivalency checksum (detecting identical
+        # file contents), NOT for any security/cryptographic purpose, so collision
+        # resistance is not required.
+        m = md5()
+        for chunk in iter(lambda: f.read(8192), b''):
+            m.update(chunk)
+        return m.hexdigest()

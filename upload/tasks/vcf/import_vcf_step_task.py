@@ -54,7 +54,13 @@ class ImportVCFStepTask(Task):
         def load_upload_step():
             return UploadStep.objects.get(pk=upload_step_id)
 
-        upload_step = load_upload_step()
+        try:
+            upload_step = load_upload_step()
+        except UploadStep.DoesNotExist:
+            # UploadStep was deleted while this task was queued/running (retry/delete race) - nothing to do
+            logging.warning("ImportVCFStepTask: UploadStep %s no longer exists (deleted/retried) - aborting",
+                            upload_step_id)
+            return
         upload_pipeline = upload_step.upload_pipeline
         upload_pipeline_qs = UploadPipeline.objects.filter(id=upload_pipeline.pk)
 
@@ -168,7 +174,13 @@ def schedule_pipeline_stage_steps(upload_pipeline_id, pipeline_stage):
     """ Only want to do this once per VCF import, so run in own task on single queue to avoid race conditions.
         May be executed multiple times but will only run jobs the 1st time """
 
-    upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
+    try:
+        upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
+    except UploadPipeline.DoesNotExist:
+        # UploadPipeline was deleted while this task was queued/running (retry/delete race) - nothing to do
+        logging.warning("schedule_pipeline_stage_steps: UploadPipeline %s no longer exists (deleted/retried) - aborting",
+                        upload_pipeline_id)
+        return
 
     try:
         logging.info("schedule_pipeline_stage_steps: %s", pipeline_stage)

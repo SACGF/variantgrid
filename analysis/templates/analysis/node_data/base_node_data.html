@@ -44,11 +44,14 @@
     }
 
 
-	function load_node_editor(node_edit_url) {
+	function load_node_editor(node_edit_url, unique_code) {
 	    $("#node-editor-container").empty();
         $.ajax(node_edit_url, {
             suppressErrors: true,
             success: function(html) {
+                if (unique_code && $("#" + unique_code, "#node-data-container").length === 0) {
+                    return;  // user navigated away; ignore stale response
+                }
                 $("#node-editor-container").html(html);
             },
             error: function(xhr, error) {

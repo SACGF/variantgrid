@@ -117,6 +117,9 @@ def uploadedfile_dict(uploaded_file) -> dict:
 
 
 def get_remaining_annotation_runs(uploaded_vcf, genome_build) -> int:
+    if uploaded_vcf.max_variant_id is None:
+        # VCF not fully imported yet, so highest known variant is unknown - no remaining runs to report
+        return 0
     ar_qs = AnnotationRun.get_active_runs(genome_build)
     return ar_qs.filter(annotation_range_lock__max_variant__lte=uploaded_vcf.max_variant).count()
 

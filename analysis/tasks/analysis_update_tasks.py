@@ -15,9 +15,9 @@ from analysis.models.nodes.analysis_node import NodeCache, NodeVersion
 from analysis.models.nodes.node_utils import get_nodes_by_id
 from analysis.tasks.node_update_tasks import MAX_NODE_ATTEMPTS
 from library.constants import MINUTE_SECS
-from library.log_utils import log_traceback
+from library.log_utils import log_traceback, report_message
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
-from snpdb.models import ProcessingStatus
+from snpdb.models import ProcessingStatus, JobsControl
 
 # A node load that exceeds this is already a problem; reclaiming it (risking duplicate work)
 # is acceptable. There is no heartbeat - the lease is a flat window.
@@ -120,6 +120,8 @@ def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS):
 
         Claims fresh work, reclaims expired leases, and gives up (terminal fail) past
         MAX_NODE_ATTEMPTS. Returns the (node_id, version) tuples now owned by this run. """
+    if JobsControl.is_paused():
+        return []  # operational brake (e.g. crash safety auto-pause) - lease nothing
     now = timezone.now()
     leased = []
     leased_cache_targets = set()
@@ -151,6 +153,23 @@ def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS):
             lease_live = bool(node_task and node_task.lease_expires and node_task.lease_expires >= now)
             if node.status != NodeStatus.DIRTY and lease_live:
                 continue  # someone is actively working it, lease still valid -> leave alone
+
+            # Two kinds of abandoned (non-DIRTY, lease lapsed) work, told apart by the status the
+            # worker durably committed before it vanished:
+            #  - LOADING / LOADING_CACHE: a worker started executing THIS node and never returned
+            #    (hard machine lockup, OOM-killed process, SIGKILL). The node is the prime suspect
+            #    for having killed the worker, so perma-fail it rather than re-dispatching it and
+            #    crashing the next worker too. (An in-process OOM is caught in update_node_task and
+            #    already fails cleanly without reaching here; this is the backstop for hard death.)
+            #  - QUEUED (falls through below): the worker died before it began this node (deploy /
+            #    restart / spot reclaim) - the node never ran, so re-leasing it is correct self-heal.
+            if node.status in (NodeStatus.LOADING, NodeStatus.LOADING_CACHE):
+                msg = (f"Worker lost while loading node {node.pk}/{node.version} "
+                       f"(analysis {analysis_id}) - possible out-of-memory or machine lockup. "
+                       f"Permanently failed to avoid repeatedly crashing workers; restart manually if needed.")
+                _fail_node(node, msg)
+                report_message(msg, level='error')
+                continue
 
             attempts = node_task.attempt_count if node_task else 0
             if attempts >= MAX_NODE_ATTEMPTS:

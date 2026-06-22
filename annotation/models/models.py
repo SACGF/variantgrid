@@ -30,6 +30,8 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     AlphaMissensePrediction, ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.repeat_masker import RepeatMaskerSummary
+from annotation.vep_columns import visible_columns_for
+from annotation.vep_config import VEPConfig
 from annotation.models.models_enums import AnnotationStatus, \
     ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
@@ -1598,6 +1600,16 @@ class VariantAnnotation(AbstractVariantAnnotation):
             self.cadd_phred,
         ))
 
+    @cached_property
+    def show_rankscores(self) -> bool:
+        """ dbNSFP rankscores arrived in columns_version 2. Once raw scores exist (columns_version 4+)
+            they're legacy - shown only when ANNOTATION_SHOW_LEGACY_RANKSCORES is set. columns_version
+            2-3 carry only rankscores (no raw scores), so always show them. """
+        cv = self.version.columns_version
+        if cv < 2:
+            return False
+        return settings.ANNOTATION_SHOW_LEGACY_RANKSCORES or cv < 4
+
     @property
     def has_conservation(self) -> bool:
         """ Thanks to summary stats we can now do this in VEP112 """
@@ -1610,6 +1622,22 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @property
     def has_gnomad(self) -> bool:
         return bool(self.gnomad_af or self.gnomad2_liftover_af)
+
+    @cached_property
+    def visible_columns(self) -> frozenset[str]:
+        """ All VariantGrid columns populated for this annotation's build / pipeline / version / data files.
+            Drives variant detail per-row show/hide (via `labelled visible_fields=`) off the same VEP_COLUMNS
+            table that controls what annotation writes, so the two can't drift (#1148). Passing `vep_config`
+            drops columns whose data file isn't configured - matching the `VariantAnnotationVersion.has_*`
+            flags (e.g. PhastCons/PhyloP mammalian tracks). """
+        return visible_columns_for(
+            vep_config=VEPConfig(self.version.genome_build),
+            genome_build_name=self.version.genome_build.name,
+            pipeline_type=self.annotation_run.pipeline_type,
+            columns_version=self.version.columns_version,
+            vep_version=self.version.vep,
+            gnomad4_minor_version=self.version.gnomad,
+        )
 
     @property
     def has_non_gnomad_population_frequency(self) -> bool:
@@ -1624,28 +1652,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.is_standard_annotation and self.version.columns_version >= 3
 
     @property
-    def has_gnomad_faf(self) -> bool:
-        return self.is_standard_annotation and self.gnomad4_or_later
-
-    @cached_property
-    def has_extended_gnomad_fields(self):
-        """ I grabbed a few new fields but haven't patched back to GRCh37 yet
-            TODO: remove this and if statements in variant_details.html once issue #231 is completed """
-        extended_fields = ["gnomad2_liftover_af", "gnomad_ac", "gnomad_an", "gnomad_popmax_ac",
-                           "gnomad_popmax_an", "gnomad_popmax_hom_alt"]
-        return any(getattr(self, f) is not None for f in extended_fields)
-
-    @property
     def gnomad4_or_later(self) -> bool:
         return self.version.gnomad_major_version >= 4
 
     @property
     def has_hemi(self):
         return self.gnomad4_or_later and self.variant.locus.contig.name == 'X'
-
-    @property
-    def has_mid(self):
-        return self.gnomad4_or_later
 
     @property
     def gnomad_url(self):

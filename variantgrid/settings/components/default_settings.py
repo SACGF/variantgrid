@@ -111,7 +111,7 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 42  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 44  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -196,6 +196,10 @@ MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
 # Use highest TranscriptVersion canonical, set False to use representative transcript (ie VEP pick = variant annotation)
 VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
+# When a variant has more than this many annotated transcripts, only show the top ones (by importance) on
+# the variant details transcript selection table, collapsing the rest behind a toggle. Set None to show all.
+# Important transcripts (selected/representative/canonical/tagged) are always shown regardless of this limit.
+VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN = 8
 
 VARIANT_ZYGOSITY_GLOBAL_COLLECTION = "global"
 # Skip samples from variant zygosity counts when their vcf_sample_name matches this regex (e.g. "^VALIDATION_")
@@ -235,8 +239,11 @@ VCF_IMPORT_COMMON_FILTERS = {
         "clinical_significance_max": "3",
     },
     "GRCh38": {
-        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.0_GRCh38_af_greater_than_5.stripped.vcf.gz",
-        "gnomad_version": "4.0",
+        # Intersection of gnomAD 4.0 and 4.1 AF>5 so the common partition is valid (skippable) under either
+        # version - @see issue #1582. "additional_gnomad_versions" lists the extra versions beyond "gnomad_version".
+        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.0_and_4.1_GRCh38_af_greater_than_5.intersection.stripped.vcf.gz",
+        "gnomad_version": "4.1",
+        "additional_gnomad_versions": ["4.0"],
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
     },
@@ -356,6 +363,10 @@ ANALYSIS_NODE_CACHE_Q = True
 # single-parent nodes and MergeNode inputs. 0 disables the substitution.
 ANALYSIS_NODE_STORE_ID_SIZE_MAX = 1000
 ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
+# Fallback when no Global/Org/Lab/User override is set. None = always auto-load.
+# Analysis nodes with at least this many variants don't auto-load their grid - the user clicks
+# "Load variants" to run the row query.
+ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_SHOW_CANONICAL_HGVS = True
