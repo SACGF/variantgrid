@@ -16,7 +16,7 @@ from celery.canvas import Signature
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import FieldError
-from django.db import connection, models
+from django.db import connection, models, transaction
 from django.db.models import Value, IntegerField, QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
@@ -1008,6 +1008,15 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def save(self, *args, **kwargs):
         """ To avoid race conditions, don't use save() in a celery task (unless running in scheduling_single_worker)
             instead use update() method above """
+        with transaction.atomic():
+            # Lock the analysis row first so concurrent node-tree saves serialize in a consistent order.
+            # Saving a node cascades version bumps to its children (see below), and each NodeVersion insert
+            # takes a FOR KEY SHARE lock on the referenced analysisnode row. Without this, two concurrent
+            # saves over overlapping subtrees grab those row locks in opposite orders and deadlock.
+            Analysis.objects.select_related(None).select_for_update().get(pk=self.analysis_id)
+            return self._save(*args, **kwargs)
+
+    def _save(self, *args, **kwargs):
         # logging.debug("save: pk=%s kwargs=%s", self.pk, str(kwargs))
         super_save = super().save
 

@@ -696,7 +696,8 @@ function gridCompleteExtra() {
 
 
 
-function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridComplete, gridLoadError, on_error_function) {
+function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridComplete, gridLoadError, on_error_function, autoLoad) {
+    if (typeof autoLoad === "undefined") { autoLoad = true; }
 	$(function () {
     	$.getJSON(config_url, function(data) {
             const errors = data["errors"];
@@ -745,6 +746,13 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
                 if (window.activeGridRequestXHR) {
                     window.activeGridRequestXHR.abort();
                     window.activeGridRequestXHR = null;
+                }
+
+                // Remember the server datatype so a deferred load can flip back to it.
+                window.nodeGridServerDatatype = window.nodeGridServerDatatype || {};
+                window.nodeGridServerDatatype[nodeId] = data["datatype"] || "json";
+                if (!autoLoad) {
+                    data["datatype"] = "local";  // build colModel/pager/nav, fetch no rows
                 }
 
                 const grid = getGrid(nodeId, unique_code);
@@ -800,6 +808,13 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
 	});
 }
 
+// Fire the deferred row query (phase 2) for a node whose grid was config-loaded only.
+function loadNodeGridData(nodeId, unique_code) {
+    const grid = getGrid(nodeId, unique_code);
+    const datatype = (window.nodeGridServerDatatype || {})[nodeId] || "json";
+    grid.jqGrid('setGridParam', {datatype: datatype}).trigger('reloadGrid');
+}
+
 function gridLoadError(jqXHR, textStatus, errorThrown) {
     if (errorThrown == "abort") {
         console.log("task aborted...");
@@ -818,5 +833,8 @@ function gridLoadError(jqXHR, textStatus, errorThrown) {
     ec.html("<ul class='messages'><li class='error'>Grid failed to load due to: " + errorMessage + "</li></ul>");
     $("#node-data-container").empty();
     hideLoadingOverlay();
+    if (typeof hideGridLoadingOverlay === 'function') {
+        hideGridLoadingOverlay();  // clear the grid-only overlay from a deferred "Show grid" load
+    }
 }
 

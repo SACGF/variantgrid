@@ -14,14 +14,15 @@
         var map = ZYGOSITY_MAP[mode];
         if (!map) return;
 
-        var requireZyg = $("#id_require_zygosity").is(":checked");
+        var requireZyg = $("#id_require_parent_zygosity").is(":checked");
+        var requireSiblingZyg = $("#id_require_sibling_zygosity").is(":checked");
 
-        function memberZyg(key, affected) {
+        function memberZyg(key, affected, require) {
             var affectedKey = key + (affected ? '_affected' : '_unaffected');
             var val = (affectedKey in map) ? map[affectedKey] : map[key];
             if (val === undefined || val === null) return '';
             if (!val) return '--';
-            if (!requireZyg && key !== 'proband') val += ', ?';
+            if (!require && key !== 'proband') val += ', ?';
             return val;
         }
 
@@ -29,10 +30,10 @@
             return map['other_filters_' + key] || '';
         }
 
-        $(".zyg-mother").text(memberZyg('mother', motherAffected));
-        $(".zyg-father").text(memberZyg('father', fatherAffected));
-        $(".zyg-proband").text(memberZyg('proband', false));
-        $(".zyg-sibling").text(memberZyg('sibling', siblingAffected));
+        $(".zyg-mother").text(memberZyg('mother', motherAffected, requireZyg));
+        $(".zyg-father").text(memberZyg('father', fatherAffected, requireZyg));
+        $(".zyg-proband").text(memberZyg('proband', false, true));
+        $(".zyg-sibling").text(memberZyg('sibling', siblingAffected, requireSiblingZyg));
         $(".other-mother").text(otherFilters('mother'));
         $(".other-father").text(otherFilters('father'));
         $(".other-proband").text(otherFilters('proband'));
@@ -79,7 +80,8 @@
     }
     $("#id_quad").change(changeQuad);
     $("#id_inheritance").change(updateZygosityTable);
-    $("#id_require_zygosity").change(updateZygosityTable);
+    $("#id_require_parent_zygosity").change(updateZygosityTable);
+    $("#id_require_sibling_zygosity").change(updateZygosityTable);
 
     function setDominantSelectAvailable(one_affected) {
         var inheritance_select = $("#id_inheritance", quadForm);
@@ -130,7 +132,8 @@
             </div>
             <div>
     		  <b>Inheritance:</b> {{ form.inheritance }}{{ form.inheritance.errors }}
-              <b>Require Parent Zygosity Calls:</b> {{ form.require_zygosity }}{{ form.require_zygosity.errors }}
+              <b>Require Parent Zygosity Calls:</b> {{ form.require_parent_zygosity }}{{ form.require_parent_zygosity.errors }}
+              <b>Require Sibling Zygosity Calls:</b> {{ form.require_sibling_zygosity }}{{ form.require_sibling_zygosity.errors }}
             </div>
             {{ zygosity_table_data|json_script:"zygosity-data" }}
             <div>

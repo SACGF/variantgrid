@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from guardian.shortcuts import get_objects_for_user
+from rest_framework.exceptions import ParseError
 from threadlocals.threadlocals import get_current_request
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
@@ -473,7 +474,13 @@ class ClassificationFilter:
         # just for debugging purposes allows us to download a single allele
         allele: Optional[int] = None
         if allele_str := request.query_params.get('allele'):
-            allele = int(allele_str)
+            # Accept the "a" allele shortcut used in search (eg "a9678" - see ALLELE_ID_SEARCH_PATTERN),
+            # as well as a bare numeric id, rather than 500ing on a non-numeric value.
+            allele_id_str = allele_str[1:] if allele_str[:1].lower() == 'a' else allele_str
+            try:
+                allele = int(allele_id_str)
+            except ValueError:
+                raise ParseError(f"Invalid 'allele' parameter: '{allele_str}' - expected an allele id (eg 9678 or a9678)")
 
         ## Have removed the ability to provide record filters in general from_request
         # record_filters: Optional[str] = None

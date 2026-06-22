@@ -24,6 +24,9 @@ ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", A
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
 ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
 
+# Stay on the historical annotation config (package default is now latest - see #1625)
+pin_annotation_to_columns_version_3(ANNOTATION)
+
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 SLACK['emoji'] = ':mouse:'
 

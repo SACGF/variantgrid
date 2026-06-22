@@ -115,6 +115,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         self.gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
         user_settings = UserSettings.get_for_user(user)
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build = genome_build
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)

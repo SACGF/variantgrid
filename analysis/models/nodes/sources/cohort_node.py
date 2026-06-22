@@ -52,7 +52,13 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         cohort = self._get_cohort()
         cgc = cohort.cohort_genotype_collection
 
-        array_indicies = [cgc.get_array_index_for_sample_id(sample_id) for sample_id in self.get_sample_ids()]
+        # get_sample_ids() returns all ancestor samples - for a compound het Trio/Quad (the only
+        # mode that takes a parent input) this includes samples from the parent node that aren't in
+        # this node's cohort. The per-sample quality filters only apply to samples in this cohort's
+        # genotype array, so restrict to those (avoids KeyError in get_array_index_for_sample_id).
+        packed_index_by_sample_id = cgc.get_packed_index_by_sample_id
+        array_indicies = [packed_index_by_sample_id[sample_id] for sample_id in self.get_sample_ids()
+                          if sample_id in packed_index_by_sample_id]
         for field, cg_path, q_op in self.COHORT_GENOTYPE_FIELD_MAPPINGS:
             value = getattr(self, field)
             if value:

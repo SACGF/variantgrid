@@ -17,7 +17,7 @@ from classification.models import Classification, CreateNoClassificationForbidde
 from genes.hgvs import HGVSMatcher, VariantResolvingError, HgvsOriginallyNormalized
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.models import MissingTranscript, MANE, TranscriptVersion, BadTranscript
-from genes.models_enums import AnnotationConsortium
+from genes.models_enums import AnnotationConsortium, MANEStatus
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
@@ -211,6 +211,15 @@ def allele_search(search_input: SearchInputInstance):
 def _sv_alt_description(v: Union[Variant, VariantCoordinate]) -> str:
     return f"{v.alt}/SVLEN={v.svlen}"
 
+
+def _alt_description(v: Union[Variant, VariantCoordinate]) -> str:
+    """Describe the alt of a Variant or VariantCoordinate. Handles both Variant.alt (a Sequence) and
+       VariantCoordinate.alt (a str) - str() abbreviates a Sequence, while Sequence.abbreviate handles the str."""
+    if v.is_symbolic:
+        return _sv_alt_description(v)
+    return Sequence.abbreviate(str(v.alt))
+
+
 def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, variant_qs,
                                              variant_coordinate: VariantCoordinate,
                                              search_messages: list[SearchMessage]) -> Iterable[SearchResult]:
@@ -220,18 +229,12 @@ def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, va
                                                  variant_string=variant_string):
         yield SearchResult(cmv, messages=search_messages)
 
-    if variant_coordinate.is_symbolic:
-        original_alt_desc = _sv_alt_description(variant_coordinate)
-    else:
-        original_alt_desc = Sequence.abbreviate(variant_coordinate.alt)
+    original_alt_desc = _alt_description(variant_coordinate)
 
     # search for alt alts
     alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate, any_alt=True)
     for alternative_variant in alts:
-        if alternative_variant.is_symbolic:
-            alt_alt_desc = _sv_alt_description(alternative_variant)
-        else:
-            alt_alt_desc = Sequence.abbreviate(alternative_variant.alt)
+        alt_alt_desc = _alt_description(alternative_variant)
 
         alt_messages = search_messages + [
             SearchMessage(f'No results for alt "{original_alt_desc}", but found this using alt "{alt_alt_desc}"',
@@ -392,33 +395,30 @@ def _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string) -
 
 
 def _search_hgvs_using_gene_symbol(
-        transcript_versions,
-        mane_status_by_transcript,
-        hgvs_matcher: HGVSMatcher,
+        candidates: dict[str, Optional[str]],
+        allele: str,
         search_messages: list[SearchMessage],
-        hgvs_string: str,
         user: User,
         genome_build: GenomeBuild,
         variant_qs: QuerySet) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
+    """ candidates: {transcript_accession: mane_status_or_None}, best-first, sourced from cdot.
+        Each accession + allele is searched via the standard _search_hgvs path (which
+        resolves the transcript version), and hits are grouped/deduped by variant. """
 
     # Group results + hgvs by result.identifier
     results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
     transcript_accessions_by_variant_identifier: dict[str, list] = defaultdict(list)
     transcript_accessions_by_exception: dict[str, list] = defaultdict(list)
-    hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
-    hgvs_variant.gene = None
 
-    # TODO: Sort transcript_versions somehow
-    for transcript_version in transcript_versions:
-        hgvs_variant.transcript = transcript_version.accession
-        transcript_hgvs = hgvs_variant.format()
-        tv_message = str(transcript_version.accession)
-        if mane_status := mane_status_by_transcript.get(transcript_version.accession):
+    for accession, mane_status in candidates.items():
+        transcript_hgvs = f"{accession}:{allele}"
+        tv_message = accession
+        if mane_status:
             tv_message += f" ({mane_status})"
         try:
             for result in _search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
                 if isinstance(result, SearchResult):
-                    result.preview.annotation_consortia = [AnnotationConsortium(transcript_version.annotation_consortium)]
+                    result.preview.annotation_consortia = [AnnotationConsortium.get_from_transcript_accession(accession)]
                     if result.preview.category == "Variant":
                         variant_identifier = result.preview.identifier
                         results_by_variant_identifier[variant_identifier].append(result)
@@ -470,30 +470,43 @@ def _search_hgvs_using_gene_symbol(
         # In some special cases, add in special messages for no result
         messages_as_strs = [str(message) for message in search_messages]
         if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
-            message = "\n".join(messages_as_strs + [f"Only searched MANE transcripts: {', '.join(mane_status_by_transcript)}"])
+            message = "\n".join(messages_as_strs + [f"Only searched MANE transcripts: {', '.join(candidates)}"])
             yield SearchMessageOverall(message)
 
         elif not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
             yield SearchMessageOverall("\n".join(messages_as_strs))
 
 
-def _get_search_hgvs_gene_symbol_transcripts(gene_symbol, genome_build):
-    transcript_versions = set()
-    mane_status_by_transcript = {}
-    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE:
-        # There can be multiple MANE entries (MANE Plus Clinical and MANE Select)
-        for mane in MANE.objects.filter(symbol=gene_symbol):
-            for ac in AnnotationConsortium:
-                if tv := mane.get_transcript_version(ac):
-                    transcript_versions.add(tv)
-                    mane_status_by_transcript[tv.accession] = mane.get_status_display()
-    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
-        for gene in gene_symbol.genes:
-            tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
-            # Take latest version for each transcript
-            for tv in tv_qs.order_by("transcript_id", "-version").distinct("transcript_id"):
-                transcript_versions.add(tv)
-    return transcript_versions, mane_status_by_transcript
+# cdot MANE tag spellings -> MANEStatus display strings (for per-transcript messages)
+_CDOT_TAG_TO_MANE_DISPLAY = {
+    "MANE_Select": MANEStatus.MANE_SELECT.label,
+    "MANE_Plus_Clinical": MANEStatus.MANE_PLUS_CLINICAL.label,
+}
+
+
+def _get_search_hgvs_gene_symbol_transcripts(hgvs_matcher: HGVSMatcher, gene_symbol_str: str):
+    """ Source candidate transcripts for a gene symbol from cdot's ranking
+        (MANE/canonical tags), honouring VG's MANE / all-transcripts settings.
+
+        Returns (candidates, has_non_mane_transcripts) where candidates is a list of
+        (transcript_accession, mane_status_or_None) best-first (cdot's versionless
+        accessions), and has_non_mane_transcripts is True if the gene has non-MANE
+        transcripts that were not included (used to warn they may resolve differently). """
+    candidates = []
+    has_non_mane_transcripts = False
+
+    ranked, _warnings = hgvs_matcher.rank_gene_symbol_transcripts(gene_symbol_str)
+    for tx_ac, _tags, matched_tag in ranked:
+        mane_status = _CDOT_TAG_TO_MANE_DISPLAY.get(matched_tag)
+        is_mane = mane_status is not None
+        include = settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS or \
+            (is_mane and settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE)
+        if not include:
+            if not is_mane:
+                has_non_mane_transcripts = True
+            continue
+        candidates.append((tx_ac, mane_status))
+    return candidates, has_non_mane_transcripts
 
 
 @search_receiver(
@@ -619,21 +632,18 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
                 gene_aliases_to_mane_symbols = set()
                 genes_with_non_mane_transcripts = set()
-                transcript_versions = set()
-                mane_status_by_transcript = {}
+                # {accession: mane_status} best-first, deduped across aliases
+                candidates: dict[str, Optional[str]] = {}
                 for mane, alias in mane_and_aliases:
                     if alias:
                         gene_aliases_to_mane_symbols.add(f"{alias.gene_symbol} ({alias.get_source_display()})")
 
-                    gene_tvs, gene_mane_status = _get_search_hgvs_gene_symbol_transcripts(mane.symbol, genome_build)
-                    transcript_versions.update(gene_tvs)
-                    mane_status_by_transcript.update(gene_mane_status)
+                    gene_candidates, has_non_mane = _get_search_hgvs_gene_symbol_transcripts(
+                        hgvs_matcher, str(mane.symbol))
+                    for accession, mane_status in gene_candidates:
+                        candidates.setdefault(accession, mane_status)
 
-                    tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
-                                                             gene_version__gene__in=mane.symbol.genes)
-                    transcripts = [tv.transcript for tv in transcript_versions]
-
-                    if tv_qs.exclude(transcript__in=transcripts).distinct("transcript_id").exists():
+                    if has_non_mane:
                         # We want to make the messages the same for both genome builds, so they are collected into 1
                         genes_with_non_mane_transcripts.add(str(mane.symbol))
 
@@ -660,9 +670,10 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 yield SearchMessageOverall(msg_hgvs_gene_search, severity=LogLevel.INFO)
 
                 try:
-                    for result in _search_hgvs_using_gene_symbol(transcript_versions, mane_status_by_transcript,
-                                                                 hgvs_matcher, search_messages,
-                                                                 hgvs_string, user, genome_build, variant_qs):
+                    # gene-only HGVS is "SYMBOL:allele" - swap each cdot transcript in for the symbol
+                    allele = hgvs_string.split(":", 1)[1]
+                    for result in _search_hgvs_using_gene_symbol(candidates, allele, search_messages,
+                                                                 user, genome_build, variant_qs):
                         if isinstance(result, SearchResult):
                             # don't count SearchMessageOverall as a result
                             has_results = True
@@ -696,28 +707,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             yield SearchMessageOverall(raw_message)
             return
 
-        report_parts = []
         if match := HGVSMatcher.HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT.match(hgvs_string):
-            # if transcript := match.group("transcript_value"):
-            #     if transcript_version := match.group("transcript_version"):
-            #         report_parts.append(["Transcript", f"{transcript}.{transcript_version}"])
-            #
-            # if gene_symbol := match.group("gene_symbol"):
-            #     report_parts.append(["Gene Symbol", gene_symbol])
-            #
-            # report_parts.append(["HGVS Allele", f"{match.group('letter')}.{match.group('nomen')}"])
-            #
-            # flattened_parts = []
-            # for part in report_parts:
-            #     label, value = part
-            #     entry = ""
-            #     if label:
-            #         entry = f"{label}: "
-            #     entry += f"\"{value}\""
-            #     flattened_parts.append(entry)
-            # flattened_parts_str = ", ".join(flattened_parts)
             yield SearchMessageOverall(f"Invalid HGVS cDNA allele : \"{match.group('letter')}.{match.group('nomen')}\"")  # {hgvs_ex}
-
         else:
             yield SearchMessageOverall(f"Invalid HGVS cDNA allele \"{hgvs_string}\"")  # {hgvs_ex}
 

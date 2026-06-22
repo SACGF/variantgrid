@@ -1,7 +1,7 @@
 from enum import Enum, auto
 from functools import cached_property
 from typing import TypedDict, Optional, Tuple
-
+import json
 import requests
 from django.conf import settings
 from django.db import transaction
@@ -57,6 +57,8 @@ class ClinVarRequestException(Exception):
         elif self.exception_type == ClinVarRequestExceptionType.RESPONSE_MISSING_KEY_DATA:
             return self.message
         elif self.exception_type == ClinVarRequestExceptionType.NOT_SUPPORTED_YET:
+            return self.message
+        else:
             return self.message
 
     @staticmethod
@@ -298,6 +300,18 @@ class ClinVarExportSync:
         try:
             ClinVarRequestException.raise_for_status_code(clinvar_request.response_status_code)
         except ClinVarRequestException as clinvar_except:
+            response_body_str = ""
+            if response_json := clinvar_request.response_json:
+                response_body_str = json.dumps(response_json)
+            report_message(
+                f"Clinvar server error code",
+                level='error',
+                extra_data={
+                    "target": f"Error code {clinvar_request.response_status_code}",
+                    "response_body": response_body_str
+                }
+            )
+
             if clinvar_except.exception_type == ClinVarRequestExceptionType.OUR_DATA_ISSUE:
                 submission_batch = clinvar_request.submission_batch
                 submission_batch.status = ClinVarExportBatchStatus.REJECTED

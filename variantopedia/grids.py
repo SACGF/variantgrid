@@ -75,6 +75,7 @@ class AllVariantsGrid(AbstractVariantGrid):
     def __init__(self, user, genome_build_name, **kwargs):
         user_settings = UserSettings.get_for_user(user)
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build = genome_build
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
@@ -263,6 +264,7 @@ class TaggedVariantGrid(AbstractVariantGrid):
 
     def __init__(self, user, genome_build_name, extra_filters=None):
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build = genome_build
         tag_ids = []
         if extra_filters:
             if tag_id := extra_filters.get("tag"):

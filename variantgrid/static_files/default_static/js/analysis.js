@@ -475,12 +475,14 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
         }
 
         dataContainer.attr("node_url", load_node_url);
+        removeGridLoadingOverlay();  // tear down any in-progress grid overlay from the previous node
         $("#node-editor-container", gridAndEditorContainer).empty();
         showLoadingOverlay();
         dataContainer.load(load_node_url, function() {
             $(this).attr('node_id', nodeId);
         });
     } else {
+        removeGridLoadingOverlay();
         $("#node-editor-container", gridAndEditorContainer).html("Please select a node");
         dataContainer.empty();
     }
@@ -540,6 +542,97 @@ function hideLoadingOverlay() {
         $("#animation-container", this).empty();
         window.showingLoadOverlay = false;
     });
+}
+
+
+// Loading overlay scoped to a single container (e.g. the grid section) so the rest of the node
+// (the editor) stays visible and usable. Builds its own double-helix inside the container rather
+// than reparenting the shared #overlay-container - which flashed over the whole panel before
+// snapping into place.
+function showGridLoadingOverlay(container) {
+    if ($("#grid-loading-overlay").length) {
+        return;
+    }
+    const $container = $(container);
+    // Guarantee the container is the positioning context so the absolute overlay fills only it
+    // (not a wider ancestor like #right-panel), and that it has room for the helix even when the
+    // grid is still empty mid-load. Don't rely on the CSS rule alone - the panel HTML can be
+    // served from browser cache without it.
+    if ($container.css("position") === "static") {
+        $container.css("position", "relative");
+    }
+    if ($container.height() < 200) {
+        $container.css("min-height", "200px");
+    }
+    const overlay = $("<div>", {id: "grid-loading-overlay"});
+    // Pin the overlay to the visible grid area (panel height minus the editor above it). A fixed
+    // height keeps the centred helix from jumping down as rows load and the container grows.
+    const available = $("#right-panel").height() - $("#node-editor-container").outerHeight(true);
+    if (available > 200) {
+        overlay.css("height", available + "px");
+    }
+    $container.append(overlay);
+
+    // Show one of the user's chosen full-size DNA "reading" effects (dark-mode glyphs on a clear
+    // background, over the overlay's white), picked at random. ANALYSIS_LOADING_ANIMATIONS holds the
+    // user's menu ids; map them to VGLoaders ids here. Fall back to the double-helix if the loaders
+    // aren't available.
+    const LOADER_IDS = {flowcell: "flowcell", ripple: "base-fx-ripple", pileup: "pileup", matrix: "base-fx-matrix"};
+    let menu = [];
+    if (typeof VGLoaders !== "undefined") {
+        const prefs = (typeof ANALYSIS_LOADING_ANIMATIONS !== "undefined" && ANALYSIS_LOADING_ANIMATIONS) || [];
+        menu = prefs.filter(a => LOADER_IDS[a]);
+        if (!menu.length) {
+            menu = ["flowcell", "ripple", "pileup"];  // safety default if prefs are empty/unknown
+        }
+    }
+
+    if (menu.length) {
+        const choice = menu[Math.floor(Math.random() * menu.length)];
+        const stage = $("<div>", {class: "grid-loading-stage"});
+        stage.css({position: "absolute", top: 0, left: 0, right: 0, bottom: 0});
+        overlay.append(stage);
+        overlay.data("stopLoader", VGLoaders.start(LOADER_IDS[choice], stage[0], {theme: "dark", clearBackground: true}));
+    } else {
+        // Fallback: classic double-helix.
+        const canvas = $("<canvas />", {class: 'node-load-animation'});
+        canvas.attr({width: 50, height: 180});
+        canvas.css('opacity', 0.35);
+        canvas.DoubleHelix({fps: 20, spinSpeed: 4});
+        overlay.append(canvas);
+    }
+}
+
+function hideGridLoadingOverlay() {
+    // Fade out (like the original hideLoadingOverlay) so the loaded grid eases in rather than jumping.
+    const overlay = $("#grid-loading-overlay");
+    const stopLoader = overlay.data("stopLoader");
+    overlay.fadeOut(function() {
+        if (typeof stopLoader === "function") {
+            stopLoader();  // stop the ripple/flowcell animation
+        }
+        $(this).find('canvas.node-load-animation').each(function() {
+            this.active = false;  // stop the helix animation before removing (fallback)
+        });
+        $(this).remove();
+    });
+}
+
+// Synchronous teardown (no fade) for when we abandon a load - e.g. switching to another node
+// before the grid finished. Stops the animation loop so it doesn't keep running detached.
+function removeGridLoadingOverlay() {
+    const overlay = $("#grid-loading-overlay");
+    if (!overlay.length) {
+        return;
+    }
+    const stopLoader = overlay.data("stopLoader");
+    if (typeof stopLoader === "function") {
+        stopLoader();  // cancel the ripple/flowcell requestAnimationFrame
+    }
+    overlay.find('canvas.node-load-animation').each(function() {
+        this.active = false;  // stop the helix animation (fallback)
+    });
+    overlay.remove();
 }
 
 

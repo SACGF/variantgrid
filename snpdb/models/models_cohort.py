@@ -399,14 +399,24 @@ class CohortGenotypeCommonFilterVersion(TimeStampedModel):
 
         For utilities on this method, see "common_variants.py" """
     gnomad_version = models.TextField()
+    # Extra gnomAD versions (beyond gnomad_version) this partition is also valid for. This is provenance of the
+    # data on disk - fixed when the partition is built/migrated - not config, so it can't be derived from settings.
+    additional_gnomad_versions = ArrayField(models.TextField(), default=list, blank=True)
     gnomad_af_min = models.FloatField()
     # This value is from classification.enums.classification_enums.ClinicalSignificance
     # but don't want to bring dependency in from classification
     clinical_significance_max = models.CharField(max_length=1, null=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
+    @property
+    def gnomad_versions(self) -> set[str]:
+        """ Every gnomAD version this common filter is valid for. A variant only lives in the 'common' partition
+            if it is AF > gnomad_af_min in ALL of these versions (intersection), so the common partition can be
+            safely skipped when filtering for rare variants under any of them. @see issue #1582 """
+        return {self.gnomad_version, *self.additional_gnomad_versions}
+
     def __str__(self):
-        description = f"gnomAD: {self.gnomad_version} AF>{self.gnomad_af_min}"
+        description = f"gnomAD: {'/'.join(sorted(self.gnomad_versions))} AF>{self.gnomad_af_min}"
         if self.clinical_significance_max:
             description += f" and classification <= {self.clinical_significance_max}"
         return description
@@ -518,13 +528,14 @@ class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
                 include_common = kwargs.get("common_variants", True)
                 if not include_common:
                     # The common partition optimization (skipping common variants) is only valid when
-                    # the gnomAD version used for partitioning matches the analysis annotation version.
-                    # If they differ, we must include all variants and let the AF filter handle it.
+                    # the analysis annotation's gnomAD version is one the partition was built for.
+                    # If it isn't, we must include all variants and let the AF filter handle it.
                     # @see https://github.com/SACGF/variantgrid/issues/1119
+                    # @see https://github.com/SACGF/variantgrid/issues/1582 (multiple versions)
                     annotation_gnomad_version = kwargs.get("annotation_gnomad_version")
                     if annotation_gnomad_version:
                         common_filter = self.common_collection.common_filter
-                        if common_filter and common_filter.gnomad_version != annotation_gnomad_version:
+                        if common_filter and annotation_gnomad_version not in common_filter.gnomad_versions:
                             include_common = True
                 if include_common:
                     collections.append(self.common_collection_id)
@@ -753,7 +764,7 @@ class CohortGenotype(models.Model):
         unique_together = ("collection", "variant")
 
 
-class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+class Trio(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
         and karyomapping """
     name = models.TextField(blank=True)
@@ -768,6 +779,18 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     @classmethod
     def get_permission_class(cls):
         return Cohort
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-people-roof"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "trios"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(identifier=str(self))
 
     def get_permission_object(self):
         # Trio permissions based on cohort
@@ -811,7 +834,7 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
         return self.name or f"Trio {self.pk}"
 
 
-class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+class Quad(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     """Mother + Father + Proband + Sibling.
 
     Extends the Trio concept to 4 family members. The sibling (typically
@@ -832,6 +855,18 @@ class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     @classmethod
     def get_permission_class(cls):
         return Cohort
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-people-roof"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "quads"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(identifier=str(self))
 
     def get_permission_object(self):
         return self.cohort

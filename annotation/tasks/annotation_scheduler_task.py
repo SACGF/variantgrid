@@ -17,7 +17,7 @@ from annotation.models import AnnotationRun, AnnotationStatus, VariantAnnotation
 from annotation.models.models import AnnotationVersion, AnnotationRangeLock
 from annotation.tasks.annotate_variants import annotate_variants
 from library.log_utils import log_traceback
-from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF, Variant
+from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF, Variant, JobsControl
 
 
 @celery.shared_task(queue='scheduling_single_worker')
@@ -126,6 +126,8 @@ def dispatch_annotation_runs(variant_annotation_version_id=None):
 
         With no id, sweeps every ACTIVE VAV (beat safety-net / no-arg signal entry point). All lease
         writes happen here on scheduling_single_worker so they serialise - no row-lock gymnastics. """
+    if JobsControl.is_paused():
+        return  # operational brake (e.g. crash safety auto-pause) - don't launch annotation runs
     try:
         if variant_annotation_version_id is not None:
             vav = VariantAnnotationVersion.objects.get(pk=variant_annotation_version_id)

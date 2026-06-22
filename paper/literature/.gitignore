@@ -1,0 +1,5 @@
+# Raw literature inputs — bulky and copyrighted (published papers).
+# Provenance is tracked in paywalled_articles.md / references.bib; text/ is
+# regenerable from pdfs/ via convert.py. Kept locally, out of git.
+pdfs/
+text/

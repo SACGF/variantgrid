@@ -996,3 +996,15 @@ def for_variant_grid_column(vgc_id: str, *, vep_config: Optional[VEPConfig] = No
 
 def all_variant_grid_column_ids() -> frozenset[str]:
     return frozenset(vgc for c in VEP_COLUMNS for vgc in c.variant_grid_columns)
+
+
+def visible_columns_for(**kwargs) -> frozenset[str]:
+    """ All VariantGrid column names populated for the given build / pipeline / version / data files
+        (see `filter_for` for the kwargs - pass `vep_config` so missing data files drop their columns).
+        The variant detail page drives per-row show/hide off this (via `labelled visible_fields=`) so the
+        display can't drift from what annotation actually wrote (#1148). """
+    return frozenset(
+        vgc
+        for c in filter_for(**kwargs)
+        for vgc in c.variant_grid_columns
+    )

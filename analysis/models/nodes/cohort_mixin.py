@@ -186,10 +186,15 @@ class CohortMixin:
 
         filters = []
         cgc = self.cohort_genotype_collection
+        packed_index_by_sample_id = cgc.get_packed_index_by_sample_id
 
         for sample in self.get_samples():
+            # get_samples() includes ancestor samples (eg a compound het Trio/Quad's parent node)
+            # that may not be in this cohort's genotype array - skip those.
+            if sample.pk not in packed_index_by_sample_id:
+                continue
             # Indexes are handled by cohortgenotype (sub cohorts etc)
-            array_index = cgc.get_array_index_for_sample_id(sample.pk)
+            array_index = packed_index_by_sample_id[sample.pk]
             # https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#index-transforms
             allele_frequency_column = f"{cgc.cohortgenotype_alias}__samples_allele_frequency__{array_index}"
             q = naff.get_q(allele_frequency_column, sample.vcf.allele_frequency_percent)

@@ -80,6 +80,20 @@
 /* Grid keeps getting cut off, make a bottom margin size of top bar */
 #node-grid-container {
     margin-bottom: 50px;
+    position: relative; /* so a grid-only loading overlay fills just this section, leaving the editor usable */
+    min-height: 200px;  /* keep the grid area (and its loading overlay/helix) from collapsing while a deferred grid loads */
+}
+#grid-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    min-height: 200px;  /* JS sets an explicit height to the visible grid area; this is the fallback */
+    z-index: 10000;
+    background-color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>
 <div id="grid-and-editor-container">
