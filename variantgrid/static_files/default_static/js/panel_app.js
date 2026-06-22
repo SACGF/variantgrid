@@ -65,7 +65,10 @@ function getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceRes
     if (panelAppEvidenceResultsList.length) {
         const confidenceCount = {};
         for (let i=0 ; i<panelAppEvidenceResultsList.length ; ++i) {
-            const evidence = panelAppEvidenceResultsList[i];
+            let evidence = panelAppEvidenceResultsList[i];
+            if (!evidence) {
+                continue;
+            }
             addGeneEvidence(geneSymbol, evidence, newDiv);
 
             const panel = evidence["panel"];
