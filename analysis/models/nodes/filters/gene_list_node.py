@@ -8,7 +8,9 @@ from django.db.models import Q
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
+from rest_framework.exceptions import NotFound
 
+from analysis.exceptions import NodeConfigurationException
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
@@ -57,7 +59,10 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
             lambda: [self.custom_text_gene_list.gene_list],
             lambda: [self.sample_gene_list.gene_list] if self.sample_gene_list else [],
             lambda: [self.pathology_test_version.gene_list] if self.pathology_test_version else [],
-            lambda: [gln_pap.gene_list for gln_pap in self.genelistnodepanelapppanel_set.all()],
+            # Skip soft-deleted PanelApp panels (issue #405) — they have no cache and
+            # accessing .gene_list would re-hit PanelApp and raise NotFound, 500ing the editor view.
+            lambda: [gln_pap.gene_list for gln_pap in
+                     self.genelistnodepanelapppanel_set.filter(panel_app_panel__deleted=False)],
         ]
         getter = GENE_LISTS[int(self.accordion_panel)]
         return [gl for gl in getter() if gl is not None]
@@ -204,8 +209,18 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         self.sample_gene_list = sample_gene_list
 
     def _load(self):
+        deleted_panels = []
         for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache__isnull=True):
-            _ = gln_pap.gene_list  # Lazy loading
+            try:
+                _ = gln_pap.gene_list  # Lazy loading
+            except NotFound:
+                # PanelApp has deleted this panel (issue #405). _get_panel_app_panel_api_json
+                # marked it deleted; report as a configuration error rather than a 500.
+                gln_pap.panel_app_panel.refresh_from_db()
+                deleted_panels.append(gln_pap.panel_app_panel)
+
+        if deleted_panels:
+            raise NodeConfigurationException()
 
         if self.use_custom_gene_list:
             create_custom_text_gene_list(self.custom_text_gene_list, self.analysis.user.username, hidden=True)
@@ -217,6 +232,15 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         if self.pk:
             gene_lists_to_validate = []
             if self.accordion_panel == self.PANEL_APP_GENE_LIST:
+                # PanelApp panels deleted upstream surface as a config error (issue #405)
+                deleted_qs = self.genelistnodepanelapppanel_set.filter(panel_app_panel__deleted=True)
+                for gln_pap in deleted_qs.select_related("panel_app_panel"):
+                    pap = gln_pap.panel_app_panel
+                    errors.append(
+                        f"PanelApp panel '{pap.name}' (id={pap.panel_id}) has been deleted from PanelApp. "
+                        f"Remove it from this node — see {pap.web_url}"
+                    )
+
                 # May not have got local cache of PanelApp yet
                 for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache__isnull=False):
                     gene_lists_to_validate.append(gln_pap.gene_list)

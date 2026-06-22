@@ -169,7 +169,8 @@ def ui_register_tab_embedded(parser, token):
         admin_only=kwargs.get('admin_only'),
         badge=kwargs.get('badge'),
         badge_status=kwargs.get('badge_status'),
-        tab_status=kwargs.get('tab_status')
+        tab_status=kwargs.get('tab_status'),
+        active=kwargs.get('active'),
     )
 
 
@@ -181,7 +182,8 @@ class LocalTabContent(template.Node):
                  admin_only: FilterExpression,
                  badge: FilterExpression,
                  badge_status: FilterExpression,
-                 tab_status: FilterExpression):
+                 tab_status: FilterExpression,
+                 active: Optional[FilterExpression] = None):
         self.nodelist = nodelist
         self.tab_set = tab_set
         self.label = label
@@ -189,6 +191,7 @@ class LocalTabContent(template.Node):
         self.badge = badge
         self.badge_status = badge_status
         self.tab_status = tab_status
+        self.active = active
 
     def render(self, context):
         admin_only = TagUtils.value_bool(context, self.admin_only)
@@ -197,6 +200,7 @@ class LocalTabContent(template.Node):
         badge = TagUtils.value_int(context, self.badge)
         badge_status = TagUtils.value_str(context, self.badge_status)
         tab_status = TagUtils.value_str(context, self.tab_status)
+        active = TagUtils.value_bool(context, self.active) if self.active is not None else False
         if not tab_set:
             raise ValueError("UI Tab requires a value for 'tab_set'")
         if not label:
@@ -216,7 +220,7 @@ class LocalTabContent(template.Node):
         if admin_only and not context.request.user.is_superuser:
             return
 
-        if check_active_tab(tab_set, tab_id, context.request, context):
+        if active or check_active_tab(tab_set, tab_id, context.request, context):
             builder.active_tab = tab_number
 
         if content.startswith('/'):

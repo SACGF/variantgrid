@@ -23,6 +23,7 @@ from pydantic import field_validator
 
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
@@ -252,7 +253,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                 * <INS> symbolic structural variant alleles: POS + length of REF allele − 1.
                 * <DEL>, <DUP>, <INV>, and <CNV> symbolic structural variant alleles:, POS + SVLEN
         """
-        if self.is_symbolic():
+        if self.is_symbolic:
             # We don't support <INV> so don't need to worry about it
             return self.position + abs(self.svlen)
         return self.position + len(self.ref) - 1
@@ -272,6 +273,18 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             return f"{self.chrom}:{self.position}-{range_end} {self.alt}"
         else:
             return f"{self.chrom}:{self.position} {self.ref}>{self.alt}"
+
+    def format_short(self, max_seq_length: int = 20) -> str:
+        """ Format with truncated ref/alt sequences, suitable for logging """
+        if Sequence.allele_is_symbolic(self.alt):
+            return self.format()
+
+        def _truncate(seq: str) -> str:
+            if len(seq) <= max_seq_length:
+                return seq
+            return f"{seq[:max_seq_length]}...({len(seq)}bp)"
+
+        return f"{self.chrom}:{self.position} {_truncate(self.ref)}>{_truncate(self.alt)}"
 
     @staticmethod
     def from_variant_match(match, genome_build: Optional[GenomeBuild] = None):
@@ -325,8 +338,18 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             raise ValueError("Must pass 'svlen' when using symbolic alt")
         return VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt)
 
+    @property
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
+
+    @property
+    def can_be_made_explicit(self) -> bool:
+        """ <CNV> (copy-number-variable region) and <INS> have no unambiguous explicit ref/alt
+            expansion (cf. Variant.can_make_g_hgvs), so as_external_explicit() will raise for them.
+            Their external VCF representation stays symbolic. """
+        if not self.is_symbolic:
+            return True
+        return self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
 
     def calculated_reference(self, genome_build) -> str:
         contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
@@ -336,7 +359,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def as_external_explicit(self, genome_build) -> 'VariantCoordinate':
         """ explicit ref/alt """
-        if self.is_symbolic():
+        if self.is_symbolic:
             if self.svlen is None:
                 raise ValueError(f"{self} has 'svlen' = None")
 
@@ -366,7 +389,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     @property
     def max_sequence_length(self) -> int:
-        if self.is_symbolic():
+        if self.is_symbolic:
             return abs(self.svlen)
         else:
             return max(len(self.ref), len(self.alt))
@@ -376,7 +399,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         """ Internal format - alt can be <DEL> or <DUP>
             Uses our internal reference representation
         """
-        if self.is_symbolic():
+        if self.is_symbolic:
             return self
 
         ref = self.ref
@@ -421,7 +444,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         vc_symbolic = self.as_internal_symbolic(genome_build)
         if vc_symbolic.svlen and abs(vc_symbolic.svlen) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
             vc = vc_symbolic
-        elif self.is_symbolic():
+        elif self.is_symbolic and self.can_be_made_explicit:
             vc = self.as_external_explicit(genome_build)
         else:
             vc = self
@@ -480,10 +503,12 @@ class Sequence(models.Model):
     def allele_is_symbolic(seq: Union[str, 'Sequence']) -> bool:
         return seq.startswith("<") and seq.endswith(">")
 
+    @property
     def is_standard_sequence(self) -> bool:
         """ only contains G/A/T/C/N """
         return not re.match(r"[^GATCN]", self.seq)
 
+    @property
     def is_symbolic(self) -> bool:
         return self.allele_is_symbolic(self.seq)
 
@@ -589,7 +614,7 @@ class Variant(PreviewModelMixin, models.Model):
         try:
             contig = genome_build.chrom_contig_mappings[chrom]
             position = int(position)
-            if not (0 < position < contig.length):
+            if not (0 < position <= contig.length):
                 errors.append(f'position "{position}" is outside contig "{contig}" length={contig.length}')
         except KeyError:
             errors.append(f"Chromsome/contig '{chrom}' not a valid in genome build {genome_build}")
@@ -658,7 +683,7 @@ class Variant(PreviewModelMixin, models.Model):
     def is_standard_variant(self) -> bool:
         """ Variant alt sequence is standard [GATCN] (ie not special or reference) """
         # locus.ref should always be standard...
-        return self.alt.is_standard_sequence()
+        return self.alt.is_standard_sequence
 
     @property
     def is_indel(self) -> bool:
@@ -674,11 +699,11 @@ class Variant(PreviewModelMixin, models.Model):
     def is_deletion(self) -> bool:
         if self.alt.is_symbolic:
             return self.alt.seq == VCFSymbolicAllele.DEL
-        return self.alt.seq != Variant.REFERENCE_ALT and len(self.locus.ref) > len(self.alt.seq)
+        return self.alt.seq != Variant.REFERENCE_ALT and len(self.locus.ref.seq) > len(self.alt.seq)
 
     @property
     def is_symbolic(self) -> bool:
-        return self.locus.ref.is_symbolic() or self.alt.is_symbolic()
+        return self.locus.ref.is_symbolic or self.alt.is_symbolic
 
     @property
     def can_make_g_hgvs(self) -> bool:
@@ -696,7 +721,7 @@ class Variant(PreviewModelMixin, models.Model):
             if self.alt.seq == VCFSymbolicAllele.DUP:
                 allele_size *= 2
         else:
-            allele_size = len(self.locus.ref) + len(self.alt)
+            allele_size = len(self.locus.ref.seq) + len(self.alt.seq)
         return allele_size
 
     def clingen_allele_skip_reason(self) -> Optional[str]:
@@ -720,11 +745,12 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_c_hgvs(self) -> bool:
-        return self.can_have_annotation and self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH
+        return self.can_have_annotation and (self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH)
 
     def as_tuple(self) -> tuple[str, int, str, str, int]:
         return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen
 
+    @property
     def is_abbreviated(self):
         return str(self) != self.full_string
 
@@ -847,7 +873,7 @@ class VariantAllele(TimeStampedModel):
         return s
 
 
-class VariantCollection(RelatedModelsPartitionModel):
+class VariantCollection(DataArchiveMixin, RelatedModelsPartitionModel):
     """ A set of variants - usually used as a cached result """
 
     RECORDS_BASE_TABLE_NAMES = ["snpdb_variantcollectionrecord"]
@@ -866,6 +892,9 @@ class VariantCollection(RelatedModelsPartitionModel):
         return {self.variant_collection_alias: FilteredRelation('variantcollectionrecord', condition=vcr_condition)}
 
     def get_arg_q_dict(self) -> dict[Optional[str], set[Q]]:
+        if self.data_archived:
+            from snpdb.archive import DataArchivedError
+            raise DataArchivedError(self)
         if self.status != ProcessingStatus.SUCCESS:
             raise ValueError(f"{self}: status {self.get_status_display()} != SUCCESS")
 
@@ -1010,7 +1039,6 @@ class AlleleLiftover(models.Model):
     error = models.JSONField(null=True)  # Only set on error - uses ERROR_JSON_MESSAGE_KEY key in dict
 
     def set_info(self, info: dict):
-        print(f"Setting AlleleLiftover({self.pk}): {info=}")
         data = self.data or {}
         data[self._get_data_key()] = info
         self.data = data

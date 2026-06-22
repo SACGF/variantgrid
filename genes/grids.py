@@ -6,7 +6,7 @@ from typing import Any, Optional
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, TextField, QuerySet
+from django.db.models import Count, TextField, QuerySet, OuterRef, Subquery, IntegerField
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -51,7 +51,12 @@ class GeneListColumns(DatatableConfig[GeneList]):
     def get_initial_queryset(self) -> QuerySet[GeneList]:
         qs = GeneList.filter_for_user(self.user, success_only=False)
         qs = qs.filter(category__isnull=True)  # only show non-special ones
-        return qs.annotate(num_genes=Count("genelistgenesymbol"))
+        qs = qs.select_related("user")  # 'user__username' column - avoid a query per row
+        # Count genes via a subquery rather than Count() + GROUP BY: the GROUP BY makes DataTables'
+        # unfiltered .count() aggregate every gene list's symbols just to count the lists themselves.
+        num_genes_qs = GeneListGeneSymbol.objects.filter(gene_list=OuterRef("pk")) \
+            .order_by().values("gene_list").annotate(c=Count("pk")).values("c")
+        return qs.annotate(num_genes=Subquery(num_genes_qs, output_field=IntegerField()))
 
     def filter_queryset(self, qs: QuerySet[GeneList]) -> QuerySet[GeneList]:
         if gene_symbol_id := self.get_query_param('gene_symbol'):  # This is on gene page
@@ -110,6 +115,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         self.gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
         user_settings = UserSettings.get_for_user(user)
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build = genome_build
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)

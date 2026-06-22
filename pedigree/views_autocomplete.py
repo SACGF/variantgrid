@@ -13,4 +13,5 @@ class PedigreeAutocompleteView(GenomeBuildAutocompleteView):
 
     def get_user_queryset(self, user):
         qs = Pedigree.filter_for_user(user, success_status_only=True)
+        qs = self.exclude_archived_if_forwarded(qs, "cohort__vcf__data_archived_date")
         return self.filter_to_genome_build(qs, "cohort__genome_build")

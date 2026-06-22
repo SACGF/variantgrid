@@ -6,10 +6,11 @@ from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q, CASCADE, SET_NULL
 
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from genes.models import GeneSymbol
 from snpdb.models import Variant, VariantZygosityCountCollection
+from snpdb.models.models_genome import Contig
 
 
 class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
@@ -37,10 +38,22 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
             annotation_kwargs.update(vzcc.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
+    @cached_property
+    def contig_ids(self) -> list[int]:
+        if self.pk is None:
+            return []
+        qs = self.allvariantsnodecontig_set.filter(
+            contig__genomebuildcontig__genome_build=self.analysis.genome_build
+        ).order_by("contig__genomebuildcontig__order")
+        return list(qs.values_list("contig_id", flat=True))
+
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         """ Restrict to analysis genome build """
 
-        q_contigs = Variant.get_contigs_q(self.analysis.genome_build)
+        if self.contig_ids:
+            q_contigs = reduce(operator.or_, [Q(locus__contig_id=c) for c in self.contig_ids])
+        else:
+            q_contigs = Variant.get_contigs_q(self.analysis.genome_build)
         q_dict = {
             str(q_contigs): q_contigs,
         }
@@ -76,6 +89,12 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
 
     def get_node_name(self):
         name_lines = []
+        if self.contig_ids:
+            contig_names = list(Contig.objects.filter(pk__in=self.contig_ids,
+                                                      genomebuildcontig__genome_build=self.analysis.genome_build)
+                                .order_by("genomebuildcontig__order")
+                                .values_list("name", flat=True))
+            name_lines.append(", ".join(contig_names))
         if self.gene_symbol:
             name_lines.append(self.gene_symbol_id)
 
@@ -119,6 +138,13 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
             errors.append("Not Saved")
         return errors
 
+    def save_clone(self):
+        contig_ids = self.contig_ids  # Save before clone
+        copy = super().save_clone()
+        for contig_id in contig_ids:
+            copy.allvariantsnodecontig_set.create(contig_id=contig_id)
+        return copy
+
     @cached_property
     def db_counts(self):
         return VariantZygosityCountCollection.get_global_germline_counts()
@@ -160,4 +186,20 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         return self.db_counts.non_ref_call_alias
 
 
+class AllVariantsNodeContig(NodeAuditLogMixin, models.Model):
+    """ Stores multi-select contig values """
+    all_variants_node = models.ForeignKey(AllVariantsNode, on_delete=CASCADE)
+    contig = models.ForeignKey(Contig, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ("all_variants_node", "contig")
+
+    def _get_node(self):
+        return self.all_variants_node
+
+    def __str__(self):
+        return f"AllVariantsNodeContig {self.all_variants_node_id}: {self.contig}"
+
+
 auditlog.register(AllVariantsNode)
+auditlog.register(AllVariantsNodeContig)

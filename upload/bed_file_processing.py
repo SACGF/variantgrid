@@ -12,6 +12,11 @@ from library.utils.file_utils import mk_path
 
 def process_bed_file(bed_file, processed_file, has_chr):
     """ formats chromosome, sorts and merges (so it can be used for bed tools intersections) """
+    if not os.path.isabs(bed_file):
+        msg = f"bed_file must be an absolute path: '{bed_file}'"
+        raise ValueError(msg)
+    # Resolve symlinks so a poisoned UploadedFile.path can't redirect the subprocess at an unrelated file.
+    bed_file = os.path.realpath(bed_file)
     if not os.path.exists(bed_file):
         msg = f"'{bed_file}' does not exist"
         raise IOError(msg)

@@ -6,6 +6,8 @@
 
 import logging
 import os
+import resource
+import sys
 from time import sleep
 
 import celery
@@ -70,6 +72,23 @@ app.conf.beat_schedule['notify-server-status'] = {
     'schedule': crontab(hour=19, minute=0),
 }
 
+# Analysis node scheduler safety-net (issue #346): reclaims leases abandoned by dead workers
+# and re-dispatches DIRTY nodes whose backoff window has elapsed. Discovery only - it kicks the
+# single-worker dispatcher, which does the actual reclaim / re-lease / terminal-fail.
+# Note (see comment above): crontab has timezone issues here, raw seconds works.
+app.conf.beat_schedule['reschedule-stalled-analyses'] = {
+    'task': 'analysis.tasks.node_update_tasks.reschedule_stalled_analyses',
+    'schedule': MINUTE_SECS,
+}
+
+# Annotation dispatcher safety-net (issue #2667): no-arg sweep of all ACTIVE VAVs. Reclaims leases
+# abandoned by dead annotation workers and launches any pending work that freed capacity can now take
+# (merged into bigger batches under load). Cheap fast-exit when nothing is dispatchable.
+app.conf.beat_schedule['dispatch-annotation-runs'] = {
+    'task': 'annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs',
+    'schedule': MINUTE_SECS,
+}
+
 
 # send update emails once a day (if there has been activity)
 if settings.DISCORDANCE_EMAIL:
@@ -119,6 +138,42 @@ def celery_base_data_hook(request, data):
 
 
 rollbar.BASE_DATA_HOOK = celery_base_data_hook
+
+
+def _celery_worker_queues() -> set:
+    """ Queues this worker serves, parsed from the -Q/--queues argv it was started with (inherited
+        by forked pool children). Empty set => none specified, i.e. the worker serves all queues. """
+    queues = set()
+    argv = sys.argv
+    for i, arg in enumerate(argv):
+        if arg in ("-Q", "--queues") and i + 1 < len(argv):
+            queues.update(q for q in argv[i + 1].split(",") if q)
+        elif arg.startswith("--queues="):
+            queues.update(q for q in arg.split("=", 1)[1].split(",") if q)
+    return queues
+
+
+@celery.signals.worker_process_init.connect
+def limit_worker_address_space(**kwargs):
+    """ Cap a worker process's virtual address space (RLIMIT_AS) so a runaway allocation raises a
+        catchable MemoryError in Python (update_node_task -> perma-fail + Rollbar) instead of the OS
+        OOM-killer locking up the box. Per-queue via CELERY_WORKER_ADDRESS_SPACE_LIMIT_GB, and
+        applied ONLY to workers dedicated to capped queues - so a worker that also runs uncapped work
+        (e.g. VEP bulk inserts on annotation_workers) is never throttled. {} / unset => no limit.
+        RLIMIT_AS caps VSZ (virtual), which overcounts RSS, so the limit must sit well above the
+        worker's baseline or it MemoryErrors on warmup. """
+    limits_gb = getattr(settings, "CELERY_WORKER_ADDRESS_SPACE_LIMIT_GB", None) or {}
+    queues = _celery_worker_queues()
+    if not limits_gb or not queues or not queues.issubset(limits_gb):
+        return  # no limits, an all-queues worker, or a worker that also serves uncapped queues
+    limit_gb = min(limits_gb[q] for q in queues)
+    soft_limit = int(limit_gb * 1024 ** 3)
+    _, hard = resource.getrlimit(resource.RLIMIT_AS)
+    if hard != resource.RLIM_INFINITY:
+        soft_limit = min(soft_limit, hard)
+    resource.setrlimit(resource.RLIMIT_AS, (soft_limit, hard))
+    logging.info("Worker RLIMIT_AS soft limit set to %.1f GB (queues=%s)",
+                 soft_limit / 1024 ** 3, sorted(queues))
 
 
 @celery.signals.task_failure.connect

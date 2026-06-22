@@ -10,6 +10,7 @@ from unidecode import unidecode
 from classification.models import Overlap
 from classification.services.overlaps_services import OverlapServices
 from snpdb import models
+from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
 from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_list_column, \
     admin_action
 from snpdb.liftover import liftover_alleles
@@ -222,7 +223,8 @@ def make_code_friendly(text: str) -> str:
 class LabAdmin(ModelAdminBasics):
     list_per_page = 200
     list_display = ('name', 'group_name', 'organization', 'state', 'country',
-                    'external', 'clinvar_key', 'upload_location', 'classification_config')
+                    'external', 'research', 'clinvar_key', 'upload_location', 'classification_config')
+    list_filter = ('external', 'research')
     search_fields = ('organization__name', 'name')
 
     fieldsets = (
@@ -231,7 +233,7 @@ class LabAdmin(ModelAdminBasics):
         ('Contact', {'fields': ('url', 'contact_name', 'contact_email', 'contact_phone')}),
         ('Notifications', {'fields': ('email', 'slack_webhook')}),
         ('Uploads', {'fields': ('upload_location', 'upload_automatic', 'upload_instructions')}),
-        ('Submissions', {'fields': ('classification_config', 'external', 'clinvar_key', 'consolidates_variant_classifications')})
+        ('Submissions', {'fields': ('classification_config', 'external', 'research', 'clinvar_key', 'consolidates_variant_classifications')})
     )
 
     def is_readonly_field(self, f) -> bool:
@@ -381,7 +383,14 @@ class SiteMessagesAdmin(ModelAdminBasics):
 
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.Cohort, ModelAdminBasics)
-admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)
+
+
+@admin.register(models.CohortGenotypeCollection)
+class CohortGenotypeCollectionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "cohort", "cohort_version", "num_samples", "data_archived_date")
+    list_filter = ("data_archived_date",)
+
+
 admin.site.register(models.CohortSample, ModelAdminBasics)
 admin.site.register(models.CustomColumn, ModelAdminBasics)
 admin.site.register(models.CustomColumnsCollection, ModelAdminBasics)
@@ -395,7 +404,24 @@ admin.site.register(models.SampleTag, ModelAdminBasics)
 admin.site.register(models.SettingsInitialGroupPermission, ModelAdminBasics)
 admin.site.register(models.Tag, ModelAdminBasics)
 admin.site.register(models.Trio, ModelAdminBasics)
-admin.site.register(models.VCF, GuardedModelAdminBasics)
+@admin.register(models.VCF)
+class VCFAdmin(GuardedModelAdminBasics):
+    list_display = ("pk", "name", "date", "genome_build", "import_status", "data_archived_date")
+    list_filter = ("import_status", "genome_build", "data_archived_date")
+
+
 admin.site.register(models.VCFSourceSettings, ModelAdminBasics)
 admin.site.register(models.VCFTag, ModelAdminBasics)
 admin.site.register(models.VariantGridColumn, ModelAdminBasics)
+
+
+@admin.register(models.VariantCollection)
+class VariantCollectionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "name", "count", "status", "data_archived_date")
+    list_filter = ("status", "data_archived_date")
+
+
+@admin.register(models.VariantZygosityCountCollection)
+class VariantZygosityCountCollectionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBasics):
+    list_display = ("pk", "name", "data_archived_date")
+    list_filter = ("data_archived_date",)

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from rest_framework import serializers
 
 from annotation.models import AnnotationStatus
@@ -32,19 +34,19 @@ class ManualVariantEntryCollectionSerializer(serializers.ModelSerializer):
         model = ManualVariantEntryCollection
         fields = '__all__'
 
-    def get_first_entry_text(self, obj: ManualVariantEntryCollection):
+    def get_first_entry_text(self, obj: ManualVariantEntryCollection) -> Optional[str]:
         entry_text = None
         if mve := obj.first_entry:
             entry_text = mve.entry_text
         return entry_text
 
-    def get_first_variant_id(self, obj: ManualVariantEntryCollection):
+    def get_first_variant_id(self, obj: ManualVariantEntryCollection) -> Optional[int]:
         variant_id = None
         if variant := obj.first_variant:
             variant_id = variant.pk
         return variant_id
 
-    def get_first_variant_annotation_status(self, obj: ManualVariantEntryCollection):
+    def get_first_variant_annotation_status(self, obj: ManualVariantEntryCollection) -> str:
         annotation_status = "Creating Variant"
         if obj.first_variant:
             annotation_status = "Variant Created"
@@ -53,7 +55,7 @@ class ManualVariantEntryCollectionSerializer(serializers.ModelSerializer):
             annotation_status = ar.get_status_display()
         return annotation_status
 
-    def get_is_ready(self, obj: ManualVariantEntryCollection):
+    def get_is_ready(self, obj: ManualVariantEntryCollection) -> bool:
         ready = False
         if variant := obj.first_variant:
             if variant.is_reference:

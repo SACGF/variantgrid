@@ -1,6 +1,6 @@
 import logging
 from functools import cached_property
-from typing import Union
+from typing import Union, Optional
 
 import celery
 from django.contrib.auth.models import User, Group
@@ -20,6 +20,7 @@ from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 
 from library.django_utils import SortByPKMixin
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
@@ -27,9 +28,9 @@ from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
-from snpdb.models.models_enums import ImportStatus, CohortGenotypeCollectionType
+from snpdb.models.models_enums import ImportStatus, CohortGenotypeCollectionType, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_variant import Variant
+from snpdb.models.models_variant import Variant, VariantCollection
 from snpdb.models.models_vcf import VCF, Sample
 
 
@@ -53,6 +54,13 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     # Deal with parent_cohort delete in snpdb.signals.signal_handlers.pre_delete_cohort
     parent_cohort = models.ForeignKey("self", null=True, related_name="sub_cohort_set", on_delete=DO_NOTHING)
     sample_count = models.IntegerField(null=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Version-keyed caches (eg sub-cohort any-sample-called VariantCollection) FK to CohortVersion
+        # with on_delete=CASCADE - ensure a row exists for the current version. increment_version()
+        # calls save() so version bumps create new rows here too. @see issue #1551
+        CohortVersion.objects.get_or_create(cohort=self, version=self.version)
 
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
         """ Also uses VCF permission """
@@ -89,6 +97,17 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         if self.vcf:
             return self.vcf.has_genotype
         return True  # Created cohorts must contain genotype
+
+    @property
+    def data_archived(self) -> bool:
+        """ True when underlying data is archived. Custom (multi-VCF) cohorts copy data
+            into their own CGC at build time, so they aren't gated by parent VCF archive.
+            Sub-cohorts inherit the archive state of their parent VCF cohort. """
+        if self.vcf and self.vcf.data_archived:
+            return True
+        if self.parent_cohort and self.parent_cohort.data_archived:
+            return True
+        return False
 
     def increment_version(self):
         # Check if any samples not in parent cohort (can no longer be a sub cohort)
@@ -182,11 +201,46 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     @cached_property
     def cohort_genotype_collection(self):
         """ This is used to get the alias - which is either UNCOMMON if doing a rare filter, or BOTH common/uncommon
-            if not doing rare pop filter """
+            if not doing rare pop filter.
+
+            Raises DataArchivedError when the underlying VCF is archived (the
+            CohortGenotype partition has been dropped). Sub-cohorts inherit
+            the parent VCF via get_base_cohort() so this also covers them.
+        """
         cohort = self.get_base_cohort()
-        return CohortGenotypeCollection.objects.get(cohort=cohort,
-                                                    cohort_version=cohort.version,
-                                                    collection_type=CohortGenotypeCollectionType.UNCOMMON)
+        if cohort.vcf and cohort.vcf.data_archived:
+            from snpdb.archive import DataArchivedError
+            raise DataArchivedError(cohort.vcf)
+        cgc = CohortGenotypeCollection.objects.get(cohort=cohort,
+                                                   cohort_version=cohort.version,
+                                                   collection_type=CohortGenotypeCollectionType.UNCOMMON)
+        if cgc.data_archived:
+            from snpdb.archive import DataArchivedError
+            raise DataArchivedError(cgc)
+        return cgc
+
+    def get_any_sample_called_variant_collection(self) -> Optional[VariantCollection]:
+        """ Pre-computed VariantCollection of variants where at least one sub-cohort sample is
+            called (non-missing), used to turn the analysis EXCLUDE filter into a hash join instead of a
+            regex seq-scan against samples_zygosity. Returns the SUCCESS-status collection built
+            for the current (cohort version, parent CGC); else None so callers fall back to the
+            runtime regex. @see snpdb build_sub_cohort_any_sample_called_vc_task / issue #1551 """
+        from snpdb.archive import DataArchivedError  # Inline: snpdb.archive imports snpdb.models
+
+        if not self.is_sub_cohort:
+            return None
+        try:
+            cgc = self.cohort_genotype_collection
+        except (CohortGenotypeCollection.DoesNotExist, DataArchivedError):
+            return None
+        link = (SubCohortVariantCollection.objects
+                .filter(cohort_version__cohort=self,
+                        cohort_version__version=self.version,
+                        parent_cohort_genotype_collection=cgc,
+                        variant_collection__status=ProcessingStatus.SUCCESS)
+                .select_related("variant_collection")
+                .first())
+        return link.variant_collection if link else None
 
     def get_vcf(self):
         return self.get_base_cohort().vcf
@@ -216,6 +270,10 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             field_index = sample_index[sample]
             CohortSample.objects.create(cohort=sub_cohort, sample=sample,
                                         cohort_genotype_packed_field_index=field_index, sort_order=i)
+        # One-shot finalisation - pre-compute the any-sample-called VariantCollection (issue #1551).
+        # Inline import breaks the models <-> snpdb.tasks circular dependency.
+        from snpdb.tasks.sub_cohort_tasks import enqueue_sub_cohort_any_sample_called_vc
+        enqueue_sub_cohort_any_sample_called_vc(sub_cohort)
         return sub_cohort
 
     @classmethod
@@ -341,14 +399,24 @@ class CohortGenotypeCommonFilterVersion(TimeStampedModel):
 
         For utilities on this method, see "common_variants.py" """
     gnomad_version = models.TextField()
+    # Extra gnomAD versions (beyond gnomad_version) this partition is also valid for. This is provenance of the
+    # data on disk - fixed when the partition is built/migrated - not config, so it can't be derived from settings.
+    additional_gnomad_versions = ArrayField(models.TextField(), default=list, blank=True)
     gnomad_af_min = models.FloatField()
     # This value is from classification.enums.classification_enums.ClinicalSignificance
     # but don't want to bring dependency in from classification
     clinical_significance_max = models.CharField(max_length=1, null=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
+    @property
+    def gnomad_versions(self) -> set[str]:
+        """ Every gnomAD version this common filter is valid for. A variant only lives in the 'common' partition
+            if it is AF > gnomad_af_min in ALL of these versions (intersection), so the common partition can be
+            safely skipped when filtering for rare variants under any of them. @see issue #1582 """
+        return {self.gnomad_version, *self.additional_gnomad_versions}
+
     def __str__(self):
-        description = f"gnomAD: {self.gnomad_version} AF>{self.gnomad_af_min}"
+        description = f"gnomAD: {'/'.join(sorted(self.gnomad_versions))} AF>{self.gnomad_af_min}"
         if self.clinical_significance_max:
             description += f" and classification <= {self.clinical_significance_max}"
         return description
@@ -363,7 +431,7 @@ class CommonVariantClassified(TimeStampedModel):
         unique_together = ('variant', 'common_filter')
 
 
-class CohortGenotypeCollection(RelatedModelsPartitionModel):
+class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
     """ A collection of Multiple-genotype records for a set of variants, for fast multi-sample zygosity queries.
         Storing genotypes individually per sample requires lots of joins when doing trios/cohorts
 
@@ -460,13 +528,14 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
                 include_common = kwargs.get("common_variants", True)
                 if not include_common:
                     # The common partition optimization (skipping common variants) is only valid when
-                    # the gnomAD version used for partitioning matches the analysis annotation version.
-                    # If they differ, we must include all variants and let the AF filter handle it.
+                    # the analysis annotation's gnomAD version is one the partition was built for.
+                    # If it isn't, we must include all variants and let the AF filter handle it.
                     # @see https://github.com/SACGF/variantgrid/issues/1119
+                    # @see https://github.com/SACGF/variantgrid/issues/1582 (multiple versions)
                     annotation_gnomad_version = kwargs.get("annotation_gnomad_version")
                     if annotation_gnomad_version:
                         common_filter = self.common_collection.common_filter
-                        if common_filter and common_filter.gnomad_version != annotation_gnomad_version:
+                        if common_filter and annotation_gnomad_version not in common_filter.gnomad_versions:
                             include_common = True
                 if include_common:
                     collections.append(self.common_collection_id)
@@ -503,6 +572,13 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         """ sample_zygosities = {sample : zygosities_set}
             sample_require_zygosity = {sample : True/False} - defaults to True
             exclude - invert query (not equals)
+
+        Uses regex on samples_zygosity. Benchmarking showed SUBSTRING+IN is faster for
+        small numbers of constrained samples but regex wins for larger cohorts (PG
+        planning time on substring predicates grows ~quadratically). Sample-level uses
+        substring (Sample.get_annotation_kwargs); cohort-level stays on regex. The
+        threshold-based dispatch (substring for trios, regex for wider) is tracked in
+        #1494; the structural GIN-indexed-int[] fix is #1546.
         """
         if all(not v for v in sample_zygosities.values()):
             # nothing selected
@@ -548,6 +624,54 @@ def cohort_genotype_collection_post_delete_handler(sender, instance, **kwargs): 
         if instance.common_collection:
             instance.common_collection.delete()
     except CohortGenotypeCollection.DoesNotExist:
+        pass
+
+
+class CohortVersion(TimeStampedModel):
+    """ One row per (cohort, version). Version-specific caches FK here with on_delete=CASCADE, so
+        cleanup happens by deleting stale version rows (delete_old_cohort_versions), not by matching
+        tuples at query time. Mirrors analysis.models.NodeVersion. @see issue #1551 """
+    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
+    version = models.IntegerField(null=False)
+
+    class Meta:
+        unique_together = ("cohort", "version")
+
+    @staticmethod
+    def get(cohort: 'Cohort') -> 'CohortVersion':
+        return CohortVersion.objects.get(cohort=cohort, version=cohort.version)
+
+    def __str__(self):
+        return f"CohortVersion({self.cohort_id} v{self.version})"
+
+
+class SubCohortVariantCollection(models.Model):
+    """ Cached any-sample-called VariantCollection for a sub-cohort.
+
+        Two staleness axes, each handled by CASCADE:
+          - cohort_version: deletes when the sub-cohort version row is GC'd (increment_version()
+            creates a new CohortVersion; delete_old_cohort_versions drops superseded rows).
+          - parent_cohort_genotype_collection: deletes when the parent CGC is dropped (parent VCF
+            re-import / parent cohort delete).
+        @see issue #1551 """
+    cohort_version = models.OneToOneField(CohortVersion, on_delete=CASCADE,
+                                          related_name="sub_cohort_variant_collection")
+    parent_cohort_genotype_collection = models.ForeignKey(CohortGenotypeCollection, on_delete=CASCADE)
+    variant_collection = models.OneToOneField(VariantCollection, on_delete=CASCADE)
+
+    def __str__(self):
+        return f"SubCohortVariantCollection({self.cohort_version}: {self.variant_collection})"
+
+
+@receiver(post_delete, sender=SubCohortVariantCollection)
+def post_delete_sub_cohort_variant_collection(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    """ Drop the orphaned VariantCollection partition when a link row is removed (directly or via
+        CASCADE from either staleness axis). Mirrors analysis.models.post_delete_node_cache. """
+    try:
+        if instance.variant_collection:
+            instance.variant_collection.delete_related_objects()
+            instance.variant_collection.delete()
+    except VariantCollection.DoesNotExist:
         pass
 
 
@@ -640,7 +764,7 @@ class CohortGenotype(models.Model):
         unique_together = ("collection", "variant")
 
 
-class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+class Trio(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
         and karyomapping """
     name = models.TextField(blank=True)
@@ -656,6 +780,18 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     def get_permission_class(cls):
         return Cohort
 
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-people-roof"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "trios"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(identifier=str(self))
+
     def get_permission_object(self):
         # Trio permissions based on cohort
         return self.cohort
@@ -667,6 +803,10 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     @property
     def genome_build(self):
         return self.cohort.genome_build
+
+    @property
+    def data_archived(self) -> bool:
+        return self.cohort.data_archived
 
     def get_cohort_samples(self):
         return [self.mother, self.father, self.proband]
@@ -694,7 +834,7 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
         return self.name or f"Trio {self.pk}"
 
 
-class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+class Quad(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     """Mother + Father + Proband + Sibling.
 
     Extends the Trio concept to 4 family members. The sibling (typically
@@ -716,6 +856,18 @@ class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     def get_permission_class(cls):
         return Cohort
 
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-people-roof"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "quads"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(identifier=str(self))
+
     def get_permission_object(self):
         return self.cohort
 
@@ -726,6 +878,10 @@ class Quad(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedMo
     @property
     def genome_build(self):
         return self.cohort.genome_build
+
+    @property
+    def data_archived(self) -> bool:
+        return self.cohort.data_archived
 
     def get_cohort_samples(self):
         return [self.mother, self.father, self.proband, self.sibling]

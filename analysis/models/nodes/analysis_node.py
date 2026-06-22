@@ -16,7 +16,7 @@ from celery.canvas import Signature
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import FieldError
-from django.db import connection, models
+from django.db import connection, models, transaction
 from django.db.models import Value, IntegerField, QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
@@ -35,7 +35,7 @@ from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
-from library.constants import DAY_SECS
+from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event, log_traceback
 from library.utils import format_percent, add_exception_note
@@ -262,10 +262,10 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             node_cache, created = NodeCache.get_or_create_for_node(self)
             if created:
                 task_args_set.add((self.NODE_CACHE_TASK, (self.pk, self.version)))
-            else:
-                # Cache has been launched already, we just need to make sure it's ready, so launch a task
-                # waiting on it, to be used as a dependency
-                task_args_set.add((self.WAIT_FOR_CACHE_TASK, (node_cache.pk, )))
+            # else: cache is already being built by another node - do NOT add WAIT_FOR_CACHE_TASK.
+            #       The scheduler's dependency gate (_node_ready_to_lease) holds this node back while
+            #       that cache is actively building (PROCESSING); node_cache_task re-triggers the
+            #       dispatcher on completion (issue #346).
         return task_args_set
 
     def get_parent_subclasses_and_errors(self):
@@ -333,6 +333,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             if parent.count == 0:
                 q_none = self.q_none()
                 arg_q_dict[None] = {str(q_none): q_none}
+            elif (small_arg_q_dict := AnalysisNode.get_small_parent_arg_q_dict(parent)) is not None:
+                arg_q_dict = small_arg_q_dict
             else:
                 arg_q_dict = parent.get_arg_q_dict()
         else:
@@ -526,6 +528,33 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.node_cache:
             arg_q_dict = self.node_cache.variant_collection.get_arg_q_dict()
         return arg_q_dict
+
+    @staticmethod
+    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda p: (p.pk, p.version))
+    def get_parent_pks(parent) -> list:
+        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
+        if parent.count is None or parent.count > max_size:
+            raise ValueError(
+                f"get_parent_pks: refusing to cache {parent} PKs "
+                f"(count={parent.count}, max={max_size})"
+            )
+        return list(parent.get_queryset().values_list("pk", flat=True))
+
+    @staticmethod
+    def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
+        """ Issue #546 explicit-PK substitution. When the parent holds only a small number of
+            variants, materialise its PKs once (cached) and substitute its contribution with a
+            literal Q(pk__in=[...]) so Postgres plans a tight bitmap-or over the variant PK index
+            instead of re-running the parent's full filter chain wrapped in pk IN (subquery).
+
+            Returns None when the parent is not eligible (count unknown or above the ceiling), in
+            which case callers fall back to parent.get_arg_q_dict(). """
+        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
+        if max_size and parent.count is not None and parent.count <= max_size:
+            variant_ids = AnalysisNode.get_parent_pks(parent)
+            q = Q(pk__in=variant_ids)
+            return {None: {q: q}}
+        return None
 
     def _get_node_q(self) -> Optional[Q]:
         return None
@@ -979,6 +1008,15 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def save(self, *args, **kwargs):
         """ To avoid race conditions, don't use save() in a celery task (unless running in scheduling_single_worker)
             instead use update() method above """
+        with transaction.atomic():
+            # Lock the analysis row first so concurrent node-tree saves serialize in a consistent order.
+            # Saving a node cascades version bumps to its children (see below), and each NodeVersion insert
+            # takes a FOR KEY SHARE lock on the referenced analysisnode row. Without this, two concurrent
+            # saves over overlapping subtrees grab those row locks in opposite orders and deadlock.
+            Analysis.objects.select_related(None).select_for_update().get(pk=self.analysis_id)
+            return self._save(*args, **kwargs)
+
+    def _save(self, *args, **kwargs):
         # logging.debug("save: pk=%s kwargs=%s", self.pk, str(kwargs))
         super_save = super().save
 
@@ -1026,7 +1064,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         db_pid = cursor.db.connection.get_backend_pid()
         self.update(status=status)
 
-        NodeTask.objects.filter(node=self, version=self.version).update(celery_task=celery_task, db_pid=db_pid)
+        NodeTask.objects.filter(node_version__node=self, node_version__version=self.version) \
+            .update(celery_task=celery_task, db_pid=db_pid)
 
     def adjust_cloned_parents(self, old_new_map):
         """ If you need to do something with old/new parents """
@@ -1108,19 +1147,28 @@ class AnalysisEdge(NodeAuditLogMixin, edge_factory(AnalysisNode, concrete=False)
 
 
 class NodeTask(TimeStampedModel):
-    """ Used to track/lock celery update tasks for nodes (uses DB constraints to ensure 1 per node/version) """
+    """ Tracks/locks the celery update task for a single node-version, and acts as the lease
+        record for the state-driven scheduler (issue #346, mocha-style): the row is claimed by a
+        dispatcher (lease_ready_nodes), stamped with a lease_expires, and reclaimed if the owning
+        worker dies.
 
-    node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
-    version = models.IntegerField(null=False)
+        OneToOne against NodeVersion so it shares that row's lifecycle - the (node, version)
+        identity comes from the NodeVersion, and stale tasks are cleaned up automatically when old
+        versions are deleted (delete_analysis_old_node_versions cascades). """
+
+    node_version = models.OneToOneField("NodeVersion", on_delete=CASCADE)
     analysis_update_uuid = models.UUIDField()
     celery_task = models.CharField(max_length=36, null=True)
     db_pid = models.IntegerField(null=True)
-
-    class Meta:
-        unique_together = ("node", "version")
+    # Lease + backoff fields (mocha lease record):
+    leased_by = models.CharField(max_length=64, null=True)
+    lease_expires = models.DateTimeField(null=True)
+    attempt_count = models.IntegerField(default=0)
+    last_attempt = models.DateTimeField(null=True)
+    run_after = models.DateTimeField(null=True)  # backoff gate: not leasable before this
 
     def __str__(self):
-        return f"NodeTask: {self.analysis_update_uuid} - {self.node.pk}/{self.version}"
+        return f"NodeTask: {self.analysis_update_uuid} - {self.node_version}"
 
 
 class NodeWiki(Wiki):
@@ -1153,7 +1201,7 @@ class AnalysisNodeAlleleSource(AlleleSource):
                      extra_data={'node_id': self.node_id, 'allele_count': self.get_allele_qs().count()})
 
 
-class NodeVersion(models.Model):
+class NodeVersion(TimeStampedModel):
     """ This will be deleted once a node updates, so make all version specific caches cascade delete from this """
     node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
     version = models.IntegerField(null=False)
@@ -1204,7 +1252,7 @@ def post_delete_node_cache(sender, instance, **kwargs):  # pylint: disable=unuse
         pass
 
 
-class NodeCount(models.Model):
+class NodeCount(TimeStampedModel):
     node_version = models.ForeignKey(NodeVersion, on_delete=CASCADE)
     label = models.CharField(max_length=100)
     count = models.IntegerField(null=False)

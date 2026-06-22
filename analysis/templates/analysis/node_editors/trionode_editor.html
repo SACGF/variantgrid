@@ -25,10 +25,16 @@
             return val;
         }
 
+        function otherFilters(key) {
+            return map['other_filters_' + key] || '';
+        }
+
         $(".zyg-mother").text(memberZyg('mother', motherAffected));
         $(".zyg-father").text(memberZyg('father', fatherAffected));
         $(".zyg-proband").text(memberZyg('proband', false));
-        $("#zygosity-note").text(map.note || '');
+        $(".other-mother").text(otherFilters('mother'));
+        $(".other-father").text(otherFilters('father'));
+        $(".other-proband").text(otherFilters('proband'));
     }
 
     function displayTrioInfo(data) {
@@ -130,15 +136,14 @@
                      id="zygosity-table-collapse">
                     <table class="table table-sm table-bordered mt-1" id="zygosity-table">
                         <thead>
-                            <tr><th>Member</th><th>Expected Zygosity</th></tr>
+                            <tr><th>Member</th><th>Expected Zygosity</th><th>Other Filters</th></tr>
                         </thead>
                         <tbody>
-                            <tr><td>Mother</td><td class="zyg-mother"></td></tr>
-                            <tr><td>Father</td><td class="zyg-father"></td></tr>
-                            <tr><td>Proband</td><td class="zyg-proband"></td></tr>
+                            <tr><td>Mother</td><td class="zyg-mother" style="white-space: pre-line"></td><td class="other-mother"></td></tr>
+                            <tr><td>Father</td><td class="zyg-father" style="white-space: pre-line"></td><td class="other-father"></td></tr>
+                            <tr><td>Proband</td><td class="zyg-proband" style="white-space: pre-line"></td><td class="other-proband"></td></tr>
                         </tbody>
                     </table>
-                    <div id="zygosity-note" class="text-muted small"></div>
                 </div>
             </div>
             <div>

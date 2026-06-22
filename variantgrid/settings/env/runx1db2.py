@@ -27,6 +27,11 @@ ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
+# Stay on the historical annotation config (package default is now latest - see #1625).
+# The GRCh37 overrides below then pin this deployment further back to columns_version 1.
+ANNOTATION_VEP_VERSION = "110"
+pin_annotation_to_columns_version_3(ANNOTATION)
+
 ANNOTATION[BUILD_GRCH37].update({
     "columns_version": 1,
     "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),

@@ -1,4 +1,4 @@
-function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches) {
+function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches, excludeString) {
     function compareByStart(a,b) {
       if (a.offset_start < b.offset_start)
         return -1;
@@ -9,6 +9,20 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     
     phenotypeMatches = phenotypeMatches.sort(compareByStart);
     let overlapping_matches = [];
+    let ambiguousAcronymCandidates = {};  // acronym -> [{accession, name}, ...]
+    const realMatches = [];
+    for (let k = 0; k < phenotypeMatches.length; ++k) {
+        const pm = phenotypeMatches[k];
+        const acronym = pm.ambiguous_alias;
+        if (acronym) {
+            if (!(acronym in ambiguousAcronymCandidates)) {
+                ambiguousAcronymCandidates[acronym] = pm.ambiguous_alias_candidates || [];
+            }
+            continue;  // warning-only; not a real match - skip highlighting/grid
+        }
+        realMatches.push(pm);
+    }
+    phenotypeMatches = realMatches;
 
     const phenoLen = phenotypeText.length;
     let phenotypeHTML = '';
@@ -60,20 +74,43 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
         }
     }
     
+    if (excludeString) {
+        const escapedRegex = excludeString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedText = excludeString.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const tooltip = "This string prevents the phenotype term from being officially matched and used. Remove it to signal human approval";
+        phenotypeHTML = phenotypeHTML.replace(new RegExp(escapedRegex, 'g'),
+            `<span class="phenotype-exclude-marker" title="${tooltip}">${escapedText}</span>`);
+    }
+
     descriptionBox.html(phenotypeHTML);
     $(".term-match-ontology-service", descriptionBox);
 
-    if (Object.keys(ambiguous).length > 0) {
+    const ambiguousAcronyms = Object.keys(ambiguousAcronymCandidates);
+    if (Object.keys(ambiguous).length > 0 || ambiguousAcronyms.length > 0) {
         let phenoMessages = $("<div/>").addClass("phenotype-messages");
         let messageContainer = $("<ul/>").addClass("messages");
         phenoMessages.append(messageContainer);
 
-        let msg;
         for (const [text, termSet] of Object.entries(ambiguous)) {
             const terms = Array.from(termSet).join(', ');
-            msg = `Phenotype: ${text}' was ambiguous (matched >=2 times in the same ontology service): ${terms}. Please resolve by being more specific`;
+            const msg = `Phenotype: ${text}' was ambiguous (matched >=2 times in the same ontology service): ${terms}. Please resolve by being more specific`;
             let listElement = $("<li/>").addClass("warning");
             listElement.text(msg);
+            messageContainer.append(listElement);
+        }
+        for (const acronym of ambiguousAcronyms) {
+            const candidates = ambiguousAcronymCandidates[acronym];
+            let listElement = $("<li/>").addClass("warning");
+            listElement.text(`'${acronym}' is an ambiguous acronym (it matches multiple distinct ontology concepts) and has been excluded from gene-list matching. Please type the full term name or an HPO/OMIM/MONDO ID.`);
+            if (candidates && candidates.length) {
+                let intro = $("<div/>").text("Possible matches:");
+                let candList = $("<ul/>").addClass("ambiguous-candidates");
+                for (const c of candidates) {
+                    $("<li/>").text(`${c.accession} — ${c.name}`).appendTo(candList);
+                }
+                listElement.append(intro);
+                listElement.append(candList);
+            }
             messageContainer.append(listElement);
         }
         let clearDiv = descriptionBox.siblings("div.clear")
@@ -88,6 +125,9 @@ function phenotypeMatchesToJqGridData(phenotypeMatches) {
     const accessionSet = new Set(); // unique terms only
     for (let i=0 ; i<phenotypeMatches.length ; ++i) {
         const pm = phenotypeMatches[i];
+        if (pm.ambiguous_alias) {
+            continue;  // warning-only entry, not a real match
+        }
         if (!accessionSet.has(pm.accession)) {
             const row = {
                 'ontology_service': pm.ontology_service,

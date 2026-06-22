@@ -29,7 +29,7 @@ from library.enums.log_level import LogLevel
 from library.log_utils import report_message, report_exc_info
 from library.utils import file_sha256sum
 from library.utils.file_utils import mk_path
-from seqauto.models import VCFFile, SampleSheetCombinedVCFFile, get_samples_by_sequencing_sample, VariantCaller
+from seqauto.models import SingleSampleVCF, JointCalledVCF, get_samples_by_sequencing_sample, VariantCaller
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild, VariantCoordinate
 from snpdb.models.models_enums import ImportSource, ProcessingStatus, ImportStatus
@@ -41,6 +41,7 @@ from variantgrid.celery import app
 
 
 class UploadedFile(TimeStampedModel):
+    # Ownership-based permissions (creator + superuser); not a Guardian object-level perms model.
     path = models.TextField(null=True)
     uploaded_file = models.FileField(storage=PrivateUploadStorage(),
                                      max_length=256, null=True)
@@ -78,12 +79,25 @@ class UploadedFile(TimeStampedModel):
             return user_or_group.is_superuser or self.user == user_or_group
         return False
 
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        # The creator (or a superuser) may delete their upload via the group_permissions delete view.
+        # Defined here directly as UploadedFile is ownership-based rather than a Guardian model.
+        return True
+
     def get_file(self):
         return open(self.get_filename(), "rb")
 
     def get_filename(self):
         if self.import_source == ImportSource.WEB_UPLOAD:
             filename = self.uploaded_file.path
+            # WEB_UPLOAD files are written by Django via PrivateUploadStorage rooted at UPLOAD_DIR.
+            # Resolve symlinks so a poisoned DB row pointing at a symlink can't escape that root.
+            upload_root = os.path.realpath(settings.UPLOAD_DIR)
+            resolved = os.path.realpath(filename)
+            if not (resolved == upload_root or resolved.startswith(upload_root + os.sep)):
+                raise PermissionDenied(f"UploadedFile pk={self.pk} resolves outside UPLOAD_DIR")
+            filename = resolved
         else:
             filename = self.path
         return filename
@@ -443,7 +457,7 @@ class UploadedVCF(models.Model):
         return self.vcf
 
     def get_upload_context(self) -> dict:
-        """ Dict for displaying JFU upload widget """
+        """ Dict for displaying upload widget """
         context = {}
         if self.vcf:
             context["import_status"] = self.vcf.import_status
@@ -496,20 +510,20 @@ class UploadedVCFPendingAnnotation(models.Model):
 class BackendVCF(models.Model):
     """ Link between UploadedVCF (upload) and Filesystem VCF (SeqAuto) """
     uploaded_vcf = models.OneToOneField(UploadedVCF, on_delete=CASCADE)
-    vcf_file = models.OneToOneField(VCFFile, null=True, on_delete=CASCADE)
-    combo_vcf = models.OneToOneField(SampleSheetCombinedVCFFile, null=True, on_delete=CASCADE)
+    single_sample_vcf = models.OneToOneField(SingleSampleVCF, null=True, on_delete=CASCADE)
+    joint_called_vcf = models.OneToOneField(JointCalledVCF, null=True, on_delete=CASCADE)
 
     @property
     def filesystem_vcf(self):
-        vcfs = [self.combo_vcf, self.vcf_file]
+        vcfs = [self.joint_called_vcf, self.single_sample_vcf]
         if all(vcfs):
-            msg = f"{self} has both vcf_file and combo_vcf set"
+            msg = f"{self} has both single_sample_vcf and joint_called_vcf set"
             raise ValueError(msg)
-        if self.vcf_file:
-            return self.vcf_file
-        if self.combo_vcf:
-            return self.combo_vcf
-        raise ValueError(f"{self} has neither 'vcf_file' or 'combo_vcf' set")
+        if self.single_sample_vcf:
+            return self.single_sample_vcf
+        if self.joint_called_vcf:
+            return self.joint_called_vcf
+        raise ValueError(f"{self} has neither 'single_sample_vcf' or 'joint_called_vcf' set")
 
     @property
     def sample_sheet(self):
@@ -525,14 +539,14 @@ class BackendVCF(models.Model):
 
     @property
     def variant_caller(self) -> VariantCaller:
-        record = self.vcf_file or self.combo_vcf
+        record = self.single_sample_vcf or self.joint_called_vcf
         return record.variant_caller
 
     def get_samples_by_sequencing_sample(self):
         return get_samples_by_sequencing_sample(self.filesystem_vcf.sample_sheet, self.vcf)
 
     def __str__(self):
-        backend = self.vcf_file or self.combo_vcf or 'None'
+        backend = self.single_sample_vcf or self.joint_called_vcf or 'None'
         return f"BackendVCF: backend: {backend}, uploaded_vcf: {self.uploaded_vcf}"
 
 

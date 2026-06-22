@@ -30,6 +30,8 @@ def settings_context_processor(request):
     context = {
         'form_helper': FORM_HELPER_HELPER,
         'discordance_enabled': settings.DISCORDANCE_ENABLED,
+        'classification_distinguish_research': settings.CLASSIFICATION_DISTINGUISH_RESEARCH,
+        'research_icon': settings.RESEARCH_ICON,
         'classifications_new_grouping': settings.CLASSIFICATION_NEW_GROUPING,
         'help_url': settings.HELP_URL,
         'inbox_enabled': settings.INBOX_ENABLED,
@@ -42,6 +44,7 @@ def settings_context_processor(request):
         'site': Site.objects.get_current(),
         'site_messages': SiteMessage.get_site_messages(),
         'site_name': settings.SITE_NAME,
+        'site_description': settings.SITE_DESCRIPTION,
         'timezone': settings.TIME_ZONE,
         'top_right_search_form': SearchForm(search_allow_blank=True),
         'url_name_visible': get_visible_url_names(),

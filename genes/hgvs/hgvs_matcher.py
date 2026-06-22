@@ -2,25 +2,27 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Optional, Union
 
+from cdot.hgvs import clean_hgvs as cdot_clean_hgvs, rank_transcript_versions, \
+    rank_transcripts_for_gene, VersionStrategy, warning_messages
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
 from django.utils.timezone import now
 
 from genes.hgvs import HGVSVariant, CHGVS, HGVSImplementationException, HGVSNomenclatureException
+from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele, HGVSConverter, HgvsOriginallyNormalized
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
 from genes.models import TranscriptVersion, Transcript, LRGRefSeqGene, BadTranscript, \
     NoTranscript, TranscriptParts
-from genes.models_enums import HGVSKind
-from genes.transcripts_utils import transcript_is_lrg, looks_like_transcript, looks_like_hgvs_prefix
+from genes.transcripts_utils import transcript_is_lrg
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
-from library.utils import clean_string
 from snpdb.clingen_allele import get_clingen_allele_from_hgvs, \
     ClinGenAlleleServerException, ClinGenAlleleAPIException, get_clingen_allele_for_variant_coordinate, \
     clingen_check_variant_length
@@ -70,16 +72,15 @@ class VariantCoordinateAndDetails:
 class ClinGenHGVSConverter(BioCommonsHGVSConverter):
     @classmethod
     def build_supported(cls, genome_build) -> bool:
-        return genome_build in cls.supported_builds
+        return genome_build in cls.supported_builds()
 
     @classmethod
-    @property
     def supported_builds(cls) -> list[GenomeBuild]:
         return [GenomeBuild.grch37(), GenomeBuild.grch38()]
 
     def __init__(self, genome_build, local_resolution=False, clingen_resolution=True):
         if not self.build_supported(genome_build):
-            supported_builds = ", ".join([str(gb) for gb in self.supported_builds])
+            supported_builds = ", ".join([str(gb) for gb in self.supported_builds()])
             raise ValueError(f"ClinGen: unsupported {genome_build=}, {supported_builds=}")
 
         super().__init__(genome_build,
@@ -139,34 +140,12 @@ class VariantResolvingError(ValueError):
 class HGVSMatcher:
     # "NR", "NM", "NC", "ENST", "LRG_", "XR"}
 
-    TRANSCRIPT_PREFIX = re.compile(r"^(NR|NM|NC|ENST|LRG|XR)", re.IGNORECASE)
-    TRANSCRIPT_NO_UNDERSCORE = re.compile(r"^(NM|NC)(\d+)")
-    TRANSCRIPT_UNDERSCORE_REPLACE = r"\g<1>_\g<2>"
-    # noinspection RegExpSingleCharAlternation
-    HGVS_CLEAN_PATTERN = re.compile(
-        r"^(?P<transcript_prefix>:NR|NM|NC|ENST|LRG|XR)(?P<transcript_value>[0-9_]*)(\.(?P<transcript_version>[0-9]+))?([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
-        re.IGNORECASE
-    )
+    # Lenient pattern used by variant_search.py to extract the c./g. allele from an
+    # unparseable HGVS string for error reporting. The transcript is optional.
     HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT = re.compile(
         r"^((?P<transcript_prefix>:NR|NM|NC|ENST|LRG|XR)(?P<transcript_value>[0-9_]*)(\.(?P<transcript_version>[0-9]+))?)?([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
         re.IGNORECASE
     )
-    # HGVS_CLEAN_PATTERN_NO_TRANSCRIPT = re.compile(
-    #     r"^([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
-    #     re.IGNORECASE
-    # )
-    # Only try to fix things with the sloppy pattern if the clean pattern doesn't match
-    # Replace is now done with lambda instead of regex so we can lowercase c,g,n,p
-    HGVS_TRANSCRIPT_NO_CDOT = re.compile(r"^(NM_|ENST)\d+.*:\d+")
-    HGVS_CONTIG_NO_GDOT = re.compile(r"^NC_\d+.*:\d+")
-
-    C_DOT_REF_ALT_NUC = re.compile("(?P<ref>[gatc]+)>(?P<alt>[gatc=]+)$", re.IGNORECASE)
-
-    C_DOT_REF_DEL_INS_DUP_NUC = re.compile(r"(del(?P<del>[gatc]+))?(?P<op>ins|dup|del)(?P<ins>[gatc]*)$")
-    # captures things in teh form of delG, insG, dupG & delGinsC
-    # the del pattern at the start is only for delins, as otherwise the op del is captured
-
-    P_HGVS_REMOVAL = re.compile(r"^(?P<main>.*?) (p.*|[(]p.*[)])$")
 
     HGVS_METHOD_INTERNAL_LIBRARY = "Internally converted using library"
     # External calls to ClinGen
@@ -291,37 +270,11 @@ class HGVSMatcher:
         return vcd.variant_coordinate
 
     @staticmethod
-    def _get_sort_key_transcript_version_and_methods(version, prefer_local=True, closest=False):
-        def get_sort_key(item):
-            tv, method = item
-
-            if version:
-                # Ask for 3, have [1, 2, 3, 4, 5, 6]
-                # Closest:           4, 5, 3, 6, 2, 1
-                # Up then down:      4, 5, 6, 3, 2, 1
-                version_distance = abs(version-tv.version)
-                prefer_later = tv.version < version
-                if closest:
-                    sort_keys = [version_distance, prefer_later]
-                else:
-                    sort_keys = [prefer_later, version_distance]
-            else:
-                # Latest to earliest
-                sort_keys = [-tv.version]
-
-            if method == HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY:
-                method_sort = 1
-            else:
-                method_sort = 2
-
-            if prefer_local:
-                sort_keys.insert(0, method_sort)
-            else:
-                sort_keys.append(method_sort)
-
-            return tuple(sort_keys)
-
-        return get_sort_key
+    def _version_strategy(version, closest=False) -> VersionStrategy:
+        """ Map VG's version/closest flags onto cdot's VersionStrategy. """
+        if not version:
+            return VersionStrategy.LATEST
+        return VersionStrategy.CLOSEST if closest else VersionStrategy.UP_THEN_DOWN
 
     def create_hgvs_variant(self, hgvs_string) -> HGVSVariant:
         return self.hgvs_converter.create_hgvs_variant(hgvs_string)
@@ -383,7 +336,30 @@ class HGVSMatcher:
                 tv_and_converter_type.append((transcript_version, HGVSConverterType.CLINGEN_ALLELE_REGISTRY))
 
         # TODO: Maybe we should filter transcript versions that have the same length
-        sort_key = self._get_sort_key_transcript_version_and_methods(version, prefer_local=prefer_local, closest=closest)
+        return self._sort_transcript_converter_types(tv_and_converter_type, version,
+                                                     prefer_local=prefer_local, closest=closest)
+
+    @staticmethod
+    def _sort_transcript_converter_types(tv_and_converter_type, version, prefer_local=True, closest=False):
+        """ Order (TranscriptVersion, HGVSConverterType) candidates best-first.
+
+            Version-distance ordering is delegated to cdot.rank_transcript_versions (it
+            was ported from this function); VG layers its converter-type (method)
+            priority on top - internal/local resolution before the external ClinGen
+            Allele Registry. """
+        candidate_versions = sorted({tv.version for tv, _ in tv_and_converter_type})
+        strategy = HGVSMatcher._version_strategy(version, closest=closest)
+        ranked_versions = rank_transcript_versions(version or 0, candidate_versions, strategy)
+        rank_by_version = {v: i for i, v in enumerate(ranked_versions)}
+
+        def sort_key(item):
+            tv, method = item
+            method_sort = 2 if method == HGVSConverterType.CLINGEN_ALLELE_REGISTRY else 1
+            version_rank = rank_by_version[tv.version]
+            # prefer_local -> method dominates, version breaks ties (old insert(0, ...))
+            # else         -> version dominates, method breaks ties (old append(...))
+            return (method_sort, version_rank) if prefer_local else (version_rank, method_sort)
+
         return sorted(tv_and_converter_type, key=sort_key)
 
     def get_latest_cdot_data_version(self) -> str:
@@ -660,136 +636,39 @@ class HGVSMatcher:
             report_exc_info()
         return None
 
-    def clean_hgvs(self, hgvs_string: str) -> tuple[str, list[str]]:
-        search_messages = []
-        if p_hgvs_remove_match := HGVSMatcher.P_HGVS_REMOVAL.match(hgvs_string):
-            hgvs_string = p_hgvs_remove_match.group("main")
-
-        cleaned_hgvs = clean_string(hgvs_string)  # remove non-printable characters
-        cleaned_hgvs = cleaned_hgvs.replace(" ", "")  # No whitespace in HGVS
-        cleaned_hgvs = cleaned_hgvs.replace("::", ":")  # Fix double colon
-        cleaned_hgvs = cleaned_hgvs.replace("__", "_")  # fix double underscore
-
-        # Fix double kind (eg c.c.)
-        for kind in HGVSKind:
-            cleaned_hgvs = cleaned_hgvs.replace(f"{kind}.{kind}.", f"{kind}.")
-
-        if cleaned_hgvs[0:2].upper() in ("M_", "C_", "R_"):
-            cleaned_hgvs = "N" + cleaned_hgvs
-        # Lowercase mutation types, e.g. NM_032638:c.1126_1133DUP - won't matter if also changes gene name as that's
-        # case-insensitive
-        MUTATION_TYPES = ["ins", "del", "dup", "inv"]  # Will also handle delins and del...ins
-        for mt in MUTATION_TYPES:
-            cleaned_hgvs = cleaned_hgvs.replace(mt.upper(), mt)
-
-        # Handle unbalanced brackets or >1 of each type
-        open_bracket = cleaned_hgvs.count("(")
-        close_bracket = cleaned_hgvs.count(")")
-        if open_bracket - close_bracket or open_bracket > 1 or close_bracket > 1:
-            # Best bet is to just strip all of them
-            cleaned_hgvs = cleaned_hgvs.replace("(", "").replace(")", "")
-
-        # if transcript_prefix_match := self.TRANSCRIPT_PREFIX.search(cleaned_hgvs):
-        #     transcript_prefix = transcript_prefix_match.group(0)
-        #     if transcript_prefix != transcript_prefix.upper():
-        #         cleaned_hgvs = self.TRANSCRIPT_PREFIX.sub(transcript_prefix.upper(), cleaned_hgvs)
-
-        cleaned_hgvs = self.TRANSCRIPT_NO_UNDERSCORE.sub(self.TRANSCRIPT_UNDERSCORE_REPLACE, cleaned_hgvs)
-        # r"\g<1>:\g<2>.\g<3>"
-
-        if match := self.HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT.match(cleaned_hgvs):
-            c_nomen = ":" + match.group("letter").lower() + "." + match.group("nomen")
-            gene_symbol = match.group("gene_symbol")
-
-            if transcript_prefix := match.group("transcript_prefix"):
-                transcript_value = match.group("transcript_value")
-                cleaned_text = f"{transcript_prefix.upper()}{transcript_value}"
-                if transcript_version := match.group("transcript_version"):
-                    cleaned_text += "." + transcript_version
-
-                # has transcript
-                if gene_symbol:
-                    cleaned_text += f"({gene_symbol})"
-                cleaned_text += c_nomen
-                cleaned_hgvs = cleaned_text
-            elif gene_symbol:
-                # transcript-less we don't put brackets around the gene symbol
-                cleaned_hgvs = f"{gene_symbol}{c_nomen}"
-            # otherwise we don't have a transcript or a gene symbol, very little to clean
-
-        def fix_ref_alt(m):
-            return m.group('ref').upper() + '>' + m.group('alt').upper()
-
-        def fix_del_ins(m):
-            parts = []
-            if del_nucs := m.group('del'):
-                parts.append(f"del{del_nucs.upper()}")
-            parts.append(m.group('op'))
-            parts.append(m.group('ins').upper())
-            return "".join(parts)
-
-        cleaned_hgvs = self.C_DOT_REF_ALT_NUC.sub(fix_ref_alt, cleaned_hgvs)
-        cleaned_hgvs = self.C_DOT_REF_DEL_INS_DUP_NUC.sub(fix_del_ins, cleaned_hgvs)
-
-        # If it contains a transcript and a colon, but no "c." then add it
-        if self.HGVS_TRANSCRIPT_NO_CDOT.match(cleaned_hgvs):
-            cleaned_hgvs = cleaned_hgvs.replace(":", ":c.")
-        elif self.HGVS_CONTIG_NO_GDOT.match(cleaned_hgvs):
-            cleaned_hgvs = cleaned_hgvs.replace(":", ":g.")
-
-        if hgvs_string != cleaned_hgvs:
-            # WARNING, THIS GETS IGNORED IN SEARCH, calling code just checks itself if there's been any difference
-            search_messages.append(f'Cleaned "{hgvs_string}" =>"{cleaned_hgvs}"')
-
-        fixed_hgvs, fixed_messages = self.fix_gene_transcript(cleaned_hgvs)
-        if fixed_hgvs != cleaned_hgvs:
-            search_messages.extend(fixed_messages)
-            cleaned_hgvs = fixed_hgvs
-        return cleaned_hgvs, search_messages
-
     @staticmethod
-    def fix_gene_transcript(hgvs_string: str) -> tuple[str, list[str]]:
-        """ Fix common case of 'GATA2(NM_032638.5):c.1082G>C' and lower case transcript IDs """
+    def clean_hgvs(hgvs_string: str) -> tuple[str, list[str]]:
+        """ Thin wrapper over cdot.hgvs.clean_hgvs().
 
-        fixed_messages = []
+            cdot returns (cleaned_str, list[HGVSFix]); we keep VG's historical
+            (cleaned_str, list[str]) signature. We surface only WARNING fixes as
+            messages (the "what we changed" notes); ERROR-level fixes are left for
+            downstream resolution to raise with a more specific message, matching
+            today's best-effort behaviour where clean_hgvs never raises. """
+        cleaned, fixes = cdot_clean_hgvs(hgvs_string)
+        return cleaned, warning_messages(fixes)
 
-        try:
-            prefix, allele = hgvs_string.split(":")
-        except ValueError:
-            return hgvs_string, []  # Can't do anything here
+    @cached_property
+    def _gene_symbol_data_provider(self) -> DjangoTranscriptDataProvider:
+        """ cdot data provider used for gene-symbol -> transcript resolution.
+            Reuse the converter's provider when it has one (BioCommons/ClinGen),
+            otherwise build one for this genome build (e.g. PyHGVS converter). """
+        hdp = getattr(self.hgvs_converter, "hdp", None)
+        if isinstance(hdp, DjangoTranscriptDataProvider):
+            return hdp
+        return DjangoTranscriptDataProvider(self.genome_build)
 
-        if m := re.match(r"(.+)\((.*)\)", prefix):  # Both provided
-            transcript_accession, gene_symbol = m.groups()
-        else:
-            transcript_accession = prefix
-            gene_symbol = None
+    def rank_gene_symbol_transcripts(self, gene_symbol: str) -> tuple[list[tuple[str, list[str], Optional[str]]], list[str]]:
+        """ Rank a gene symbol's transcripts best-first via cdot (MANE/canonical tags).
 
-        transcript_ok = looks_like_transcript(transcript_accession)
-        if not transcript_ok and gene_symbol:
-            # fix gene/transcript swap and lower case separately to get separate warnings.
-            uc_gene = gene_symbol.upper()
-            if looks_like_transcript(uc_gene):  # Need to upper here
-                transcript_accession, gene_symbol = gene_symbol, transcript_accession
-                if gene_symbol:
-                    fixed_messages.append("Swapped gene/transcript")
-                transcript_ok = looks_like_transcript(transcript_accession)
-            elif looks_like_hgvs_prefix(uc_gene):
-                gene_symbol = uc_gene
-                fixed_messages.append("Upper cased HGVS prefix")
-
-        if not transcript_ok:
-            if transcript_accession:
-                uc_transcript = transcript_accession.upper()
-                if looks_like_transcript(uc_transcript):
-                    transcript_accession = uc_transcript
-                    fixed_messages.append("Upper cased transcript")
-
-        if gene_symbol:
-            prefix = f"{transcript_accession}({gene_symbol})"
-        else:
-            prefix = transcript_accession
-        fixed_hgvs_string = f"{prefix}:{allele}"
-        return fixed_hgvs_string, fixed_messages
+            Returns (ranked, warning_messages) where ranked is
+            [(tx_ac, tags, matched_tag_or_None), ...] best-first. tx_ac is a
+            versionless transcript accession (VG stores versions separately).
+            prefer_consortium=None considers both RefSeq and Ensembl, matching VG. """
+        ranked, fixes = rank_transcripts_for_gene(
+            gene_symbol, self._gene_symbol_data_provider, self.genome_build.name,
+            prefer_consortium=None)
+        return ranked, warning_messages(fixes)
 
     def get_gene_symbol_if_no_transcript(self, hgvs_string: str) -> Optional[str]:
         """ If HGVS uses gene symbol instead of transcript, return symbol """

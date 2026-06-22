@@ -8,7 +8,8 @@ from django.db.models.enums import IntegerChoices
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
-from annotation.models import ClinVarRecord, EffectiveDate
+from annotation.models import ClinVarRecord
+from annotation.models.data_enums import EffectiveDate
 from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.enums.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \

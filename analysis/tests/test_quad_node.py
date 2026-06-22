@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
@@ -60,6 +62,14 @@ class TestQuadNodeInheritance(TestCase):
         cls.control_v = slowly_create_test_variant("3", 4000, "A", "T", cls.grch37)
         cls._make_cg(cls.cgc, cls.control_v, "RRRR")
 
+        # Unknown-father autosomal variant: proband=HOM_ALT, mother=HET, father=UNKNOWN, sibling=HOM_REF
+        cls.unknown_father_v = slowly_create_test_variant("3", 7000, "A", "T", cls.grch37)
+        cls._make_cg(cls.cgc, cls.unknown_father_v, "OEUR")
+
+        # X-linked with unknown mother: proband=HOM_ALT, mother=UNKNOWN, father=any, sibling=HOM_REF
+        cls.xlinked_unknown_mother_v = slowly_create_test_variant("X", 2000, "A", "T", cls.grch37)
+        cls._make_cg(cls.cgc, cls.xlinked_unknown_mother_v, "OURR")
+
         # ── Quad with affected sibling ────────────────────────────────────────
         cls.quad_aff = create_fake_quad(user, cls.grch37, sibling_affected=True)
         cls.cgc_aff = CohortGenotypeCollection.objects.get(cohort=cls.quad_aff.cohort)
@@ -71,6 +81,24 @@ class TestQuadNodeInheritance(TestCase):
         # Same pattern as unaffected-sibling recessive — sibling has HOM_REF, not HAS_VARIANT
         cls.recessive_sib_ref_v = slowly_create_test_variant("3", 6000, "A", "T", cls.grch37)
         cls._make_cg(cls.cgc_aff, cls.recessive_sib_ref_v, "OEER")
+
+        # Proband-only variant (only proband has it): proband=HET, others HOM_REF
+        cls.proband_only_v = slowly_create_test_variant("3", 8000, "A", "T", cls.grch37)
+        cls._make_cg(cls.cgc_aff, cls.proband_only_v, "ERRR")
+
+        # Sibling-only variant: proband=HOM_REF, mother=HOM_REF, father=HOM_REF, sibling=HET
+        cls.sibling_only_v = slowly_create_test_variant("3", 8100, "A", "T", cls.grch37)
+        cls._make_cg(cls.cgc_aff, cls.sibling_only_v, "RRRE")
+
+        # Mother-only variant: proband=HOM_REF, mother=HET, father=HOM_REF, sibling=HOM_REF
+        cls.mother_only_v = slowly_create_test_variant("3", 8200, "A", "T", cls.grch37)
+        cls._make_cg(cls.cgc_aff, cls.mother_only_v, "RERR")
+
+        # Recessive w/ unknown sibling: proband=HOM_ALT, parents=HET, sibling=UNKNOWN.
+        # On the affected-sibling quad the sibling must HAS_VARIANT, so this only passes
+        # when sibling zygosity is not required.
+        cls.recessive_sib_unknown_v = slowly_create_test_variant("3", 8300, "A", "T", cls.grch37)
+        cls._make_cg(cls.cgc_aff, cls.recessive_sib_unknown_v, "OEEU")
 
     @classmethod
     def _make_cg(cls, cgc, variant, samples_zygosity):
@@ -167,6 +195,26 @@ class TestQuadNodeInheritance(TestCase):
         ids = self._filter_variants(node)
         self.assertIn(self.recessive_v.pk, ids)  # sibling='R' (HOM_REF) is allowed
 
+    # ── require_sibling_zygosity ──────────────────────────────────────────────
+
+    def test_require_sibling_zygosity_true_excludes_unknown_sibling(self):
+        """Default (require_sibling_zygosity=True) excludes a sibling with no genotype call."""
+        node = self._make_node(QuadInheritance.RECESSIVE, quad=self.quad_aff,
+                               require_sibling_zygosity=True)
+        self.assertNotIn(self.recessive_sib_unknown_v.pk, self._filter_variants(node))
+
+    def test_require_sibling_zygosity_false_includes_unknown_sibling(self):
+        """With require_sibling_zygosity=False, a no-call sibling is allowed through."""
+        node = self._make_node(QuadInheritance.RECESSIVE, quad=self.quad_aff,
+                               require_sibling_zygosity=False)
+        self.assertIn(self.recessive_sib_unknown_v.pk, self._filter_variants(node))
+
+    def test_require_sibling_zygosity_independent_of_parent_toggle(self):
+        """Requiring sibling zygosity but not parent zygosity still excludes a no-call sibling."""
+        node = self._make_node(QuadInheritance.RECESSIVE, quad=self.quad_aff,
+                               require_parent_zygosity=False, require_sibling_zygosity=True)
+        self.assertNotIn(self.recessive_sib_unknown_v.pk, self._filter_variants(node))
+
     # ── Validation ────────────────────────────────────────────────────────────
 
     def test_dominant_no_affected_parent_raises_error(self):
@@ -189,6 +237,24 @@ class TestQuadNodeInheritance(TestCase):
         self.assertEqual(node.min_inputs, 1)
         self.assertEqual(node.max_inputs, 1)
 
+    def test_quality_filter_ignores_foreign_ancestor_samples(self):
+        """Regression: COMPOUND_HET is the only mode with a parent input, so get_sample_ids()
+        includes ancestor samples that may not belong to this node's cohort. Per-sample quality
+        filters must skip those rather than raising KeyError in get_array_index_for_sample_id."""
+        node = self._make_node(QuadInheritance.COMPOUND_HET, min_dp=30)
+
+        quad_sample_ids = list(self.quad.cohort.get_sample_ids())
+        # A sample from the *other* quad's cohort - simulates a parent node feeding a foreign sample
+        foreign_sample_id = self.quad_aff.proband.sample_id
+        self.assertNotIn(foreign_sample_id, quad_sample_ids)
+
+        with patch.object(node, "get_sample_ids", return_value=quad_sample_ids + [foreign_sample_id]):
+            cohort, arg_q_dict = node.get_cohort_and_arg_q_dict()  # Must not raise KeyError
+
+        self.assertEqual(cohort, self.quad.cohort)
+        # min_dp filter is still applied (to the quad's own samples)
+        self.assertIn(self.cgc.cohortgenotype_alias, arg_q_dict)
+
     def test_simple_modes_are_source_nodes(self):
         for mode in [QuadInheritance.RECESSIVE, QuadInheritance.DENOVO,
                      QuadInheritance.DOMINANT, QuadInheritance.XLINKED_RECESSIVE]:
@@ -201,3 +267,122 @@ class TestQuadNodeInheritance(TestCase):
         node = self._make_node(QuadInheritance.RECESSIVE)
         clone = node.save_clone()
         self.assertEqual(self._filter_variants(node), self._filter_variants(clone))
+
+    # ── ALL_RECESSIVE (AR ∪ XLR) ──────────────────────────────────────────────
+
+    def test_all_recessive_matches_autosomal_recessive_variant(self):
+        node = self._make_node(QuadInheritance.ALL_RECESSIVE)
+        self.assertIn(self.recessive_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_matches_xlinked_variant(self):
+        node = self._make_node(QuadInheritance.ALL_RECESSIVE)
+        self.assertIn(self.xlinked_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_excludes_unrelated_variants(self):
+        node = self._make_node(QuadInheritance.ALL_RECESSIVE)
+        ids = self._filter_variants(node)
+        self.assertNotIn(self.denovo_v.pk, ids)
+        self.assertNotIn(self.control_v.pk, ids)
+
+    def test_all_recessive_require_parent_zygosity_excludes_unknown_father_on_autosome(self):
+        node = self._make_node(QuadInheritance.ALL_RECESSIVE, require_parent_zygosity=True)
+        self.assertNotIn(self.unknown_father_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_no_require_parent_zygosity_includes_unknown_father_on_autosome(self):
+        node = self._make_node(QuadInheritance.ALL_RECESSIVE, require_parent_zygosity=False)
+        self.assertIn(self.unknown_father_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_require_parent_zygosity_excludes_unknown_mother_on_xlr(self):
+        node = self._make_node(QuadInheritance.ALL_RECESSIVE, require_parent_zygosity=True)
+        self.assertNotIn(self.xlinked_unknown_mother_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_no_require_parent_zygosity_includes_unknown_mother_on_xlr(self):
+        node = self._make_node(QuadInheritance.ALL_RECESSIVE, require_parent_zygosity=False)
+        self.assertIn(self.xlinked_unknown_mother_v.pk, self._filter_variants(node))
+
+    def test_all_recessive_is_source_node(self):
+        node = self._make_node(QuadInheritance.ALL_RECESSIVE)
+        self.assertEqual(node.max_inputs, 0)
+
+    def test_zygosity_table_all_recessive_two_line_cells(self):
+        data = QuadNode.get_zygosity_table_data()
+        self.assertIn('AR:', data[QuadInheritance.ALL_RECESSIVE]['mother'])
+        self.assertIn('XLR:', data[QuadInheritance.ALL_RECESSIVE]['mother'])
+        self.assertIn('AR:', data[QuadInheritance.ALL_RECESSIVE]['sibling'])
+
+    def test_zygosity_table_all_recessive_other_filters_mentions_chr_x(self):
+        data = QuadNode.get_zygosity_table_data()
+        self.assertIn('Chr X', data[QuadInheritance.ALL_RECESSIVE]['other_filters_mother'])
+
+    # ── ANY_AFFECTED ──────────────────────────────────────────────────────────
+
+    def test_any_affected_sibling_affected_includes_proband_only_variant(self):
+        # quad_aff has sibling_affected=True
+        node = self._make_node(QuadInheritance.ANY_AFFECTED, quad=self.quad_aff)
+        self.assertIn(self.proband_only_v.pk, self._filter_variants(node))
+
+    def test_any_affected_sibling_affected_includes_sibling_only_variant(self):
+        node = self._make_node(QuadInheritance.ANY_AFFECTED, quad=self.quad_aff)
+        self.assertIn(self.sibling_only_v.pk, self._filter_variants(node))
+
+    def test_any_affected_sibling_affected_excludes_mother_only_variant(self):
+        # mother is unaffected on quad_aff
+        node = self._make_node(QuadInheritance.ANY_AFFECTED, quad=self.quad_aff)
+        self.assertNotIn(self.mother_only_v.pk, self._filter_variants(node))
+
+    def test_any_affected_sibling_unaffected_excludes_sibling_only_variant(self):
+        # cls.quad has sibling_affected=False
+        # sibling_only_v lives in cgc_aff; create one in the unaffected quad's cgc
+        sib_only_unaff_v = slowly_create_test_variant("3", 9000, "A", "T", self.grch37)
+        self._make_cg(self.cgc, sib_only_unaff_v, "RRRE")
+        node = self._make_node(QuadInheritance.ANY_AFFECTED, quad=self.quad)
+        self.assertNotIn(sib_only_unaff_v.pk, self._filter_variants(node))
+
+    def test_any_affected_sibling_unaffected_includes_proband_only_variant(self):
+        proband_only_unaff_v = slowly_create_test_variant("3", 9100, "A", "T", self.grch37)
+        self._make_cg(self.cgc, proband_only_unaff_v, "ERRR")
+        node = self._make_node(QuadInheritance.ANY_AFFECTED, quad=self.quad)
+        self.assertIn(proband_only_unaff_v.pk, self._filter_variants(node))
+
+    def test_any_affected_with_affected_mother_includes_mother_only(self):
+        self.quad_aff.mother_affected = True
+        self.quad_aff.save()
+        try:
+            node = self._make_node(QuadInheritance.ANY_AFFECTED, quad=self.quad_aff)
+            ids = self._filter_variants(node)
+            self.assertIn(self.mother_only_v.pk, ids)
+        finally:
+            self.quad_aff.mother_affected = False
+            self.quad_aff.save()
+
+    def test_any_affected_is_source_node(self):
+        node = self._make_node(QuadInheritance.ANY_AFFECTED)
+        self.assertEqual(node.max_inputs, 0)
+
+    def test_any_affected_always_valid_no_errors(self):
+        errors = QuadNode.get_quad_inheritance_errors(self.quad, QuadInheritance.ANY_AFFECTED)
+        self.assertEqual(errors, [])
+
+    def test_zygosity_table_any_affected_proband_has_variant(self):
+        data = QuadNode.get_zygosity_table_data()
+        proband_value = data[QuadInheritance.ANY_AFFECTED]['proband']
+        self.assertTrue(proband_value)
+
+    # ── Zygosity table "Other Filters" column ─────────────────────────────────
+
+    def test_zygosity_table_xlinked_has_chr_x_other_filter(self):
+        data = QuadNode.get_zygosity_table_data()
+        self.assertEqual(data[QuadInheritance.XLINKED_RECESSIVE]['other_filters_mother'], "Chr X only")
+
+    def test_zygosity_table_recessive_has_no_other_filter_keys(self):
+        data = QuadNode.get_zygosity_table_data()
+        keys = [k for k in data[QuadInheritance.RECESSIVE] if k.startswith('other_filters_')]
+        self.assertEqual(keys, [])
+
+    def test_zygosity_table_compound_het_has_gene_constraint_in_other_filters(self):
+        data = QuadNode.get_zygosity_table_data()
+        self.assertIn("gene", data[QuadInheritance.COMPOUND_HET]['other_filters_mother'])
+
+    def test_zygosity_table_compound_het_has_no_note_key(self):
+        data = QuadNode.get_zygosity_table_data()
+        self.assertNotIn('note', data[QuadInheritance.COMPOUND_HET])

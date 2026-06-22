@@ -112,3 +112,12 @@ SEQAUTO_SAMPLE_SHEET_EXTRA_COLUMNS = []
 
 SEQAUTO_COVERAGE_ENRICHMENT_KITS = []
 SEQAUTO_FAKE_SAMPLE_ENRICHMENT_KITS_DF = None  # Used to be able to load gake test data - leave None to load from system
+
+# Links from a SequencingRun page out to external systems (e.g. QC dashboards). Each entry is a dict with:
+#   label: short link text to display (e.g. "RAVEN")
+#   url_pattern: %()s template formatted with SequencingRun.get_params() — supports %(sequencing_run)s,
+#                %(original_sequencing_run)s, %(flowcell_id)s, %(enrichment_kit)s, %(experiment)s
+#   min_date: optional ISO date string "YYYY-MM-DD" — runs with no date or an earlier date are skipped
+#   exclude_enrichment_kits: optional list of enrichment kit names (case-insensitive exact match);
+#                            if the run's enrichment_kit name matches any, the link is skipped
+SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS = []

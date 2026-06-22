@@ -15,6 +15,7 @@ framework.
 """
 import os
 
+from django.conf import settings
 from django.core.wsgi import get_wsgi_application
 from django.db.backends.signals import connection_created
 from django.dispatch import receiver
@@ -41,6 +42,7 @@ def setup_postgres(connection, **kwargs):  # pylint: disable=unused-argument
     if connection.vendor != 'postgresql':
         return
 
-    # Timeout statements after 10 minutes.
+    # Global statement timeout backstop for all connections (see DATABASE_STATEMENT_TIMEOUT_SECONDS)
+    timeout_ms = settings.DATABASE_STATEMENT_TIMEOUT_SECONDS * 1000
     with connection.cursor() as cursor:
-        cursor.execute("SET statement_timeout TO 600000;")
+        cursor.execute("SET statement_timeout TO %s;", [timeout_ms])

@@ -5,6 +5,12 @@ from django.db import migrations, models
 from manual.operations.manual_operations import ManualOperation
 
 
+def _has_classification_modifications(apps):
+    # Only populates the sort column on existing modifications - none on a fresh install
+    ClassificationModification = apps.get_model("classification", "ClassificationModification")
+    return ClassificationModification.objects.exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -19,5 +25,5 @@ class Migration(migrations.Migration):
         ),
         ManualOperation(task_id=ManualOperation.task_id_manage(
             ["classification_populate_sort_orders"]
-        ))
+        ), test=_has_classification_modifications)
     ]

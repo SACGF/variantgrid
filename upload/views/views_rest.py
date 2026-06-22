@@ -6,6 +6,8 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 
 from library.log_utils import report_exc_info
@@ -18,6 +20,12 @@ from upload.views.views import handle_file_upload
 @method_decorator(csrf_exempt, name='dispatch')
 class APIFileUploadView(APIView):
     """ Re-implemented uploads in DRF so we can use API tokens for all client work """
+
+    @extend_schema(
+        summary="Upload a file (multipart form field 'file'), returning the uploaded file ID",
+        request=OpenApiTypes.BINARY,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request, *args, **kwargs):
         try:
             django_uploaded_file = request.FILES['file']

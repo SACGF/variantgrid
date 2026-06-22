@@ -19,6 +19,7 @@ from analysis.tasks.analysis_grid_export_tasks import export_cohort_to_downloada
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from library.constants import WEEK_SECS
+from library.django_utils.major_operation import major_operation, TooManyMajorOperationsError
 from library.utils.hash_utils import sha256sum_str
 from snpdb.models import Sample, Cohort, CachedGeneratedFile
 from snpdb.models.models_variant import Variant
@@ -66,7 +67,13 @@ class NodeGridHandler(NodeJSONViewMixin):
         if cache.add(lock_id, "true", LOCK_EXPIRE):  # Acquire lock
             try:
                 logging.info("Got the lock...")
-                response = self.get_response(request, *args, **kwargs)
+                # Cap concurrent expensive queries per-user (distinct nodes bypass the per-node lock above)
+                with major_operation(request.user, "node_grid"):
+                    response = self.get_response(request, *args, **kwargs)
+            except TooManyMajorOperationsError:
+                logging.info("Too many major operations - going to sleep then retry...")
+                time.sleep(2)
+                response = HttpResponseRedirect(url)
             finally:
                 cache.delete(lock_id)  # release lock
         else:
@@ -91,6 +98,9 @@ class NodeGridHandler(NodeJSONViewMixin):
         return ret
 
     def _get_data(self, request, node, **kwargs):
+        # Don't build queryset if invalid (stale q-dict cache)
+        if errors := node.get_errors(flat=True):
+            return {"errors": errors, "rows": [], "records": 0, "page": 1, "total": 0}
         grid = _variant_grid_from_request(request, node)
         return grid.get_data(request)
 

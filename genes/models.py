@@ -41,8 +41,11 @@ from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAlias
 from library.cache import timed_cache
 from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS, DAY_SECS
 from library.django_utils import SortByPKMixin
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
+from snpdb.archive import DataArchivedError
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
     add_public_group_read_permission
 from library.log_utils import log_traceback
@@ -1731,7 +1734,7 @@ class GeneListCategory(models.Model):
         return self.name
 
 
-class GeneList(TimeStampedModel):
+class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     """ Stores a gene/transcript list (to be used as a filter) """
 
     category = models.ForeignKey(GeneListCategory, null=True, blank=True, on_delete=CASCADE)
@@ -1753,12 +1756,19 @@ class GeneList(TimeStampedModel):
     def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: list['GeneList']):
         """ For GeneList node, we need to get query for multiple lists - and it's much faster to build the merged
             query here, than via joining separate queryset """
-        rgs_qs = ReleaseGeneSymbol.objects.filter(release=release, gene_symbol__genelistgenesymbol__gene_list__in=gene_lists)
+        # Route the gene-list symbols through a subquery rather than joining GeneListGeneSymbol via GeneSymbol.
+        # The join-through-GeneSymbol path makes Postgres scan every ReleaseGeneSymbol for the release (~47k rows)
+        # and hash-join; the subquery lets it use the (release_id, gene_symbol_id) unique index instead.
+        symbols_qs = GeneListGeneSymbol.objects.filter(gene_list__in=gene_lists).values_list("gene_symbol_id", flat=True)
+        rgs_qs = ReleaseGeneSymbol.objects.filter(release=release, gene_symbol__in=symbols_qs)
         return rgs_qs.values_list("releasegenesymbolgene__gene", flat=True)
 
     def get_genes(self, release: GeneAnnotationRelease):
         """ Get Genes (from a release) for symbols in this gene list """
-        rgs_qs = ReleaseGeneSymbol.objects.filter(release=release, gene_symbol__genelistgenesymbol__gene_list=self)
+        # Route symbols through a subquery rather than joining GeneListGeneSymbol via GeneSymbol, so Postgres
+        # uses the ReleaseGeneSymbol (release_id, gene_symbol_id) unique index instead of scanning the release.
+        symbols_qs = self.genelistgenesymbol_set.values_list("gene_symbol_id", flat=True)
+        rgs_qs = ReleaseGeneSymbol.objects.filter(release=release, gene_symbol__in=symbols_qs)
         return Gene.objects.filter(releasegenesymbolgene__release_gene_symbol__in=rgs_qs)
 
     def get_gene_names(self):
@@ -1788,13 +1798,16 @@ class GeneList(TimeStampedModel):
             # logging.info("GeneList: assign_permission_to_user_and_groups")
             assign_permission_to_user_and_groups(self.user, self)
 
-    def can_view(self, user_or_group: Union[User, Group]) -> bool:
-        read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
-        return user_or_group.has_perm(read_perm, self)
+    # can_view() uses Guardian object-level perms (provided by GuardianPermissionsMixin).
 
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
+        # As mixin's can_write(), but a locked GeneList can't be written to by anyone
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
         return user_or_group.has_perm(write_perm, self) and not self.locked
+
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        return True  # User-created list; deletable via the group_permissions delete view
 
     def get_warnings(self, release: GeneAnnotationRelease) -> list[str]:
         counts = {"unmatched symbols": self.unmatched_gene_symbols.count(),
@@ -2033,15 +2046,19 @@ class PanelAppServer(models.Model):
 
 
 class PanelAppPanel(TimeStampedModel):
-    """ Populated from PanelApp cached web resource task, updated to latest version
-        It's not clear how PanelApp removes panels, so we don't do that. """
+    """ Populated from PanelApp cached web resource task, updated to latest version.
+        Soft-deleted when PanelApp returns 404/Not found for the panel — see issue #405. """
     server = models.ForeignKey(PanelAppServer, on_delete=CASCADE)
     panel_id = models.IntegerField()
     disease_group = models.TextField()
     disease_sub_group = models.TextField()
     name = models.TextField()
+    # Mirrors PanelApp's own panel status: "public", "internal", "promoted", "retired"
     status = models.TextField()
     current_version = models.TextField()
+    # PanelApp doesn't expose a "deleted" status — once a panel is removed upstream the API
+    # just starts returning 404 (see issue #405), so we track that locally.
+    deleted = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('server', 'panel_id')
@@ -2049,6 +2066,10 @@ class PanelAppPanel(TimeStampedModel):
     @property
     def url(self) -> str:
         return f"{self.server.url}/api/v1/panels/{self.panel_id}"
+
+    @property
+    def web_url(self) -> str:
+        return f"{self.server.url}/panels/{self.panel_id}/"
 
     @property
     def cache_valid(self) -> bool:
@@ -2181,7 +2202,7 @@ class CanonicalTranscript(models.Model):
     original_transcript = models.TextField()
 
 
-class GeneCoverageCollection(RelatedModelsPartitionModel):
+class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
     """ Note both GeneCoverage and GeneCoverageCanonicalTranscript point off same collection object """
     RECORDS_BASE_TABLE_NAMES = ["genes_genecoverage", "genes_genecoveragecanonicaltranscript"]
     RECORDS_FK_FIELD_TO_THIS_MODEL = "gene_coverage_collection_id"
@@ -2313,6 +2334,8 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
         return warnings
 
     def get_uncovered_gene_symbols(self, gene_symbols, min_coverage):
+        if self.data_archived:
+            raise DataArchivedError(self)
         # Do as inner query to ensure we restrict to gene coverage partition
         covered_qs = GeneCoverageCanonicalTranscript.objects.filter(gene_coverage_collection=self,
                                                                     min__gte=min_coverage)

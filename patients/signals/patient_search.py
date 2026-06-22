@@ -15,14 +15,17 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HA
     search_type=Patient,
     pattern=HAS_3_ANY,
     example=SearchExample(
-        note="3 or more characters in patient's name",
+        note="3 or more characters in patient's name or patient code",
         examples=["Smith Alvin"]
     )
 )
 def patient_search(search_input: SearchInputInstance):
-    yield Patient.objects.annotate(
+    qs = Patient.objects.annotate(
         combined_name=Concat('first_name', Value(' '), 'last_name', output_field=CharField())
-    ).filter(search_input.q_words('combined_name')).order_by(Lower('last_name'), Lower('first_name'))
+    )
+    name_q = search_input.q_words('combined_name')
+    code_q = search_input.q_words('patient_code')
+    yield qs.filter(name_q | code_q).order_by(Lower('last_name'), Lower('first_name'))
 
 
 @receiver(preview_extra_signal, sender=OntologyTerm)

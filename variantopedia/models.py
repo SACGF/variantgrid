@@ -18,9 +18,11 @@ class SearchTypes:
     ORG = "Organisation"
     PATIENT = "Patient"
     PEDIGREE = "Pedigree"
+    QUAD = "Quad"
     SAMPLE = "Sample"
     SEQUENCING_RUN = 'SequencingRun'
     TRANSCRIPT = "Transcript"
+    TRIO = "Trio"
     UNKNOWN = "No known format"
     VARIANT = "Variant"
     VCF = "VCF"

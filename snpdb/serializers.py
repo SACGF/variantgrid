@@ -58,7 +58,7 @@ class VariantSerializer(serializers.ModelSerializer):
 class ClinGenAlleleSerializer(serializers.ModelSerializer):
     id = serializers.SerializerMethodField()
 
-    def get_id(self, obj):
+    def get_id(self, obj) -> str:
         return str(obj)
 
     class Meta:
@@ -74,7 +74,7 @@ class AlleleSerializer(serializers.ModelSerializer):
         model = Allele
         fields = ('id', 'clingen_allele', "build_names", "__str__")
 
-    def get___str__(self, obj):
+    def get___str__(self, obj) -> str:
         return str(obj)
 
 
@@ -89,10 +89,10 @@ class VariantAlleleSerializer(serializers.ModelSerializer):
         model = VariantAllele
         fields = '__all__'
 
-    def get_origin(self, obj):
+    def get_origin(self, obj) -> str:
         return obj.get_origin_display()
 
-    def get_allele_linking_tool(self, obj):
+    def get_allele_linking_tool(self, obj) -> str:
         return obj.get_allele_linking_tool_display()
 
     @staticmethod
@@ -113,13 +113,13 @@ class TrioSerializer(serializers.ModelSerializer):
         model = Trio
         fields = '__all__'
 
-    def get_mother(self, obj):
+    def get_mother(self, obj) -> str:
         return obj.mother.name
 
-    def get_father(self, obj):
+    def get_father(self, obj) -> str:
         return obj.father.name
 
-    def get_proband(self, obj):
+    def get_proband(self, obj) -> str:
         return obj.proband.name
 
 
@@ -133,16 +133,16 @@ class QuadSerializer(serializers.ModelSerializer):
         model = Quad
         fields = '__all__'
 
-    def get_mother(self, obj):
+    def get_mother(self, obj) -> str:
         return obj.mother.name
 
-    def get_father(self, obj):
+    def get_father(self, obj) -> str:
         return obj.father.name
 
-    def get_proband(self, obj):
+    def get_proband(self, obj) -> str:
         return obj.proband.name
 
-    def get_sibling(self, obj):
+    def get_sibling(self, obj) -> str:
         return obj.sibling.name
 
 

@@ -79,6 +79,8 @@ urlpatterns = [
          name='analysis_settings_template_tab'),
     path('<int:analysis_id>/settings_audit_log_tab/', views.analysis_settings_audit_log_tab,
          name='analysis_settings_audit_log_tab'),
+    path('<int:analysis_id>/settings_benchmark_tab/', views.analysis_settings_benchmark_tab,
+         name='analysis_settings_benchmark_tab'),
     path('<int:analysis_id>/reload/', views_json.analysis_reload, name='analysis_reload'),
     path('<int:analysis_id>/input_samples/', views.analysis_input_samples, name='analysis_input_samples'),
     path('sample_patient_gene_disease/<int:sample_id>', views_json.sample_patient_gene_disease, name='sample_patient_gene_disease'),

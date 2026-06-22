@@ -1,0 +1,74 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% block submenu %}{% menu_bar_annotations %}{% endblock %}
+{% block title %}Pathogenicity Thresholds{% endblock title %}
+
+{% block content %}
+    <div class="container">
+        <h3>Pathogenicity Thresholds</h3>
+
+        <p>
+            VariantGrid filters and colours missense pathogenicity prediction scores using the
+            ClinGen-calibrated <b>PP3</b> (pathogenic supporting) and <b>BP4</b> (benign supporting) raw-score
+            cutoffs below. A score <b>&ge;</b> the PP3 threshold supports pathogenic; a score <b>&le;</b> the
+            BP4 threshold supports benign; values in between are indeterminate. Tools without a published
+            ClinGen calibration use the author-recommended cutoff (single threshold) or, where noted, have no
+            calibrated threshold.
+        </p>
+        <p class="text-muted">
+            These thresholds drive the colour bands on the analysis Effect (Damage) node sliders and the
+            Pathogenicity card on the variant details page.
+        </p>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Tool</th>
+                            <th class="text-monospace">Raw range</th>
+                            <th class="text-monospace">BP4-supporting (benign) &le;</th>
+                            <th class="text-monospace">PP3-supporting (pathogenic) &ge;</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in tools %}
+                            <tr>
+                                <th>{{ t.name }}</th>
+                                <td class="text-monospace">{{ t.raw_min }} &ndash; {{ t.raw_max }}</td>
+                                <td class="text-monospace">
+                                    {% if t.raw_max_benign_threshold is not None %}
+                                        <span class="threshold threshold-low">{{ t.raw_max_benign_threshold }}</span>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td class="text-monospace">
+                                    {% if t.raw_pathogenic_threshold is not None %}
+                                        <span class="threshold threshold-high">{{ t.raw_pathogenic_threshold }}</span>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td>
+                                    {% if t.source_url %}
+                                        <a class="hover-link" href="{{ t.source_url }}" target="_blank" title="{{ t.source_detail }}">{{ t.source }}</a>
+                                    {% else %}
+                                        {{ t.source }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <h5 class="mt-4">References</h5>
+        <ul>
+            {% for detail, url in references.items %}
+                <li>
+                    {{ detail }}
+                    {% if url %}<a class="hover-link" href="{{ url }}" target="_blank">{{ url }}</a>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock content %}

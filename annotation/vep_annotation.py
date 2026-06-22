@@ -2,14 +2,16 @@ import logging
 import os
 import re
 import uuid
-from copy import deepcopy
 from shlex import shlex
+from typing import Optional
 
 from django.conf import settings
 
+from annotation import vep_columns
 from annotation.fake_annotation import get_fake_vep_version
-from annotation.models.models import ColumnVEPField
 from annotation.models.models_enums import VEPPlugin, VEPCustom, VariantAnnotationPipelineType
+from annotation.vep_columns import VEPColumnDef
+from annotation.vep_config import VEPConfig, parse_gnomad_version_from_filename
 from genes.models_enums import AnnotationConsortium
 from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
@@ -20,40 +22,18 @@ class VEPVersionMismatchError(ValueError):
     pass
 
 
-class VEPConfig:
-
-    def __init__(self, genome_build: GenomeBuild):
-        self.annotation_consortium = genome_build.annotation_consortium
-        self.genome_build = genome_build
-        self.vep_version = int(settings.ANNOTATION_VEP_VERSION)
-
-        # We'll strip out any config - anything left is files/data
-        vep_config = deepcopy(genome_build.settings["vep_config"])
-        self.use_sift = vep_config.pop("sift", False)
-        self.cache_version = vep_config.pop("cache_version", self.vep_version)
-
-        self.vep_data = vep_config
-        self.columns_version = genome_build.settings["columns_version"]
-
-    def __getitem__(self, key):
-        """ Throws KeyError if missing """
-        value = self.vep_data[key]  # All callers need to catch KeyError
-        if value is None:
-            raise KeyError(key)
-        return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
-
-
 def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
-    """ Build from ColumnVEPField.source_field where vep_plugin = DBNSFP """
+    """ Build from VEPColumnDef.source_field where vep_plugin = DBNSFP """
 
     dbnsfp_data_path = vc["dbnsfp"]
-    q = ColumnVEPField.get_columns_version_q(vc.columns_version)
-    fields = ColumnVEPField.get_source_fields(genome_build, q, vep_plugin=VEPPlugin.DBNSFP)
-    joined_columns = ",".join(fields)
-    return f"dbNSFP,{dbnsfp_data_path},{joined_columns}"
+    fields = vep_columns.source_fields_for(
+        vep_config=vc,
+        vep_plugin=VEPPlugin.DBNSFP,
+    )
+    return f"dbNSFP,{dbnsfp_data_path},{','.join(fields)}"
 
 
-def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -> list:
+def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path) -> list:
     """ All our deployments are VEP >= 110 so we can use key/value pairs """
     int_vep_version = int(settings.ANNOTATION_VEP_VERSION)
     if int_vep_version < 110:
@@ -118,7 +98,8 @@ def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -
 
 
 def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
-                    pipeline_type: VariantAnnotationPipelineType):
+                    pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True,
+                    variant_annotation_version=None):
     vc = VEPConfig(genome_build)
     vep_cmd = os.path.join(settings.ANNOTATION_VEP_CODE_DIR, "vep")
 
@@ -134,7 +115,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         # Need to provide VEP a fasta rather than use the default - https://github.com/Ensembl/VEP_plugins/issues/708
         "--fasta", vc["fasta"],
         "--assembly", genome_build.name,
-        "--offline", "--use_given_ref", "--vcf", "--compress_output", "gzip",
+        "--offline", "--use_given_ref", "--vcf",
         "--force_overwrite", "--flag_pick", "--exclude_predicted", "--no_stats",
         "--check_existing",  # COSMIC ids
         "--no_escape",  # Don't URI escape HGVS strings
@@ -154,6 +135,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--variant_class",
     ]
 
+    if compress_output:
+        cmd.extend(["--compress_output", "gzip"])
+
     if vc.use_sift:
         cmd.extend(["--sift", "b"])
 
@@ -161,8 +145,12 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
         cmd.extend(["--pick_order", settings.ANNOTATION_VEP_PICK_ORDER])
 
-    if settings.ANNOTATION_VEP_DISTANCE is not None:
-        cmd.extend(["--distance", str(settings.ANNOTATION_VEP_DISTANCE)])
+    if variant_annotation_version is not None:
+        if variant_annotation_version.distance is not None:
+            cmd.extend(["--distance", str(variant_annotation_version.distance)])
+        if (annotation_consortium == AnnotationConsortium.ENSEMBL
+                and variant_annotation_version.gencode_subset):
+            cmd.append(f"--gencode_{variant_annotation_version.gencode_subset}")
 
     if max_sv_size := settings.ANNOTATION_VEP_SV_MAX_SIZE:
         vep_default_max_sv_size = 10_000_000
@@ -224,21 +212,23 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     else:
         plugin_data_func = {}  # No plugins for SVs
 
-    # Custom
-    for vep_custom, prefix in dict(VEPCustom.choices).items():
-        try:
-            q = ColumnVEPField.get_q(genome_build, vc.vep_version, vc.columns_version, pipeline_type)
-            if cvf_list := list(ColumnVEPField.get(genome_build, q, vep_custom=vep_custom)):
-                prefix_lc = prefix.lower()
-                if cfg := vc[prefix_lc]:  # annotation settings are lower case
-                    cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg))
-                else:
-                    logging.info("Skipping due to settings.ANNOTATION[%s][vep_config][%s] = None",
-                                 genome_build.name, prefix_lc)
-        except Exception as e:
-            logging.warning(e)
-            # Not all annotations available for all builds - ok to just warn
-            logging.warning("Skipped custom annotation: %s", prefix)
+    # Custom - filter_for(vep_config=vc) drops anything whose data file isn't configured,
+    # so we don't need to probe vc[prefix_lc] separately.
+    for vep_custom in VEPCustom:
+        prefix = vep_custom.label
+        # Match original ColumnVEPField.get(): distinct source_field, ordered by source_field
+        # (postgres default collation = case-insensitive).
+        cvf_list = sorted(
+            {c.source_field: c for c in vep_columns.filter_for(
+                vep_config=vc,
+                pipeline_type=pipeline_type,
+                vep_custom=vep_custom,
+            )}.values(),
+            key=lambda c: (c.source_field or "").lower(),
+        )
+        if cvf_list:
+            cfg = vc[prefix.lower()]
+            cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg))
 
     for vep_plugin, plugin_arg_func in plugin_data_func.items():
         try:
@@ -251,10 +241,13 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
 
 
 def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
-            pipeline_type: VariantAnnotationPipelineType):
+            pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True,
+            variant_annotation_version=None):
     """ executes VEP command. Returns (command_line, code, stdout, stderr) """
 
-    cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium, pipeline_type)
+    cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium, pipeline_type,
+                          compress_output=compress_output,
+                          variant_annotation_version=variant_annotation_version)
     return execute_cmd(cmd, shell=False)
 
 
@@ -283,6 +276,28 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
     vep_version = get_vep_version_from_vcf(output_filename)
     os.remove(output_filename)
     return vep_version
+
+
+def _spliceai_label(spliceai_filename: str) -> str:
+    flavour = "masked" if "masked" in os.path.basename(spliceai_filename).lower() else "raw"
+    version = _spliceai_version_from_vcf_header(spliceai_filename)
+    if version:
+        return f"{flavour} {version}"
+    return flavour
+
+
+def _spliceai_version_from_vcf_header(spliceai_filename: str) -> Optional[str]:
+    try:
+        with open_handle_gzip(spliceai_filename, "rt") as f:
+            for line in f:
+                if not line.startswith("#"):
+                    break
+                if "ID=SpliceAI" in line:
+                    if m := re.search(r"SpliceAIv(\d+(?:\.\d+)*)", line):
+                        return m.group(1)
+    except OSError:
+        logging.warning("Could not read SpliceAI VCF header: %s", spliceai_filename)
+    return None
 
 
 def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: dict) -> dict:
@@ -341,6 +356,9 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
         distance = 5000
     kwargs["distance"] = distance
 
+    if vep_config.annotation_consortium == AnnotationConsortium.ENSEMBL:
+        kwargs["gencode_subset"] = getattr(settings, "ANNOTATION_VEP_ENSEMBL_GENCODE", None)
+
     # Plugins are optional
     try:
         dbnsfp_path = vep_config["dbnsfp"]  # KeyError if not set in settings
@@ -353,18 +371,21 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
         pass
 
     # we use our own gnomAD custom annotation, not the default VEP one
-    q_cvf = ColumnVEPField.get_columns_version_q(vep_config.columns_version)
-    if cvf := ColumnVEPField.objects.filter(q_cvf, variant_grid_column='gnomad_af', genome_build=genome_build).first():
+    candidates = [c for c in vep_columns.for_variant_grid_column('gnomad_af')
+                  if genome_build.name in c.genome_builds
+                  and c.applies_to(columns_version=vep_config.columns_version)]
+    if candidates:
+        cvf = candidates[0]
         try:
             # annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz
             # gnomad3.1_GRCh38_merged.vcf.bgz
-            gnomad_filename = vep_config[cvf.get_vep_custom_display().lower()]
+            gnomad_filename = vep_config[cvf.vep_custom.label.lower()]
             if os.path.exists(gnomad_filename):
-                gnomad_basename = os.path.basename(gnomad_filename)
-                if m := re.match(r"^gnomad(.*?)_(GRCh37|GRCh38|hg19|hg38|T2T-CHM13v2.0)", gnomad_basename, flags=re.IGNORECASE):
-                    kwargs["gnomad"] = m.group(1)
+                gnomad_version = parse_gnomad_version_from_filename(gnomad_filename)
+                if gnomad_version is not None:
+                    kwargs["gnomad"] = gnomad_version
                 else:
-                    msg = f"Couldn't determine gnomAD version from file: {gnomad_basename}"
+                    msg = f"Couldn't determine gnomAD version from file: {os.path.basename(gnomad_filename)}"
                     raise ValueError(msg)
         except KeyError:
             pass  # Will just use VEP values
@@ -376,6 +397,42 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
             cosmic_basename = os.path.basename(cosmic_filename)
             if m := re.match(r"^Cosmic.*_v(\d{2,})_.*.vcf.gz", cosmic_basename):
                 kwargs["cosmic"] = int(m.group(1))
+    except KeyError:
+        pass
+
+    try:
+        spliceai_snv_filename = vep_config["spliceai_snv"]
+        if spliceai_snv_filename and os.path.exists(spliceai_snv_filename):
+            kwargs["spliceai"] = _spliceai_label(spliceai_snv_filename)
+    except KeyError:
+        pass
+
+    try:
+        # MaveDB is GRCh38 only - filename encodes the dataset date,
+        # e.g. annotation_data/GRCh38/MaveDB_variants_2023-11-29.tsv.gz
+        mave_filename = vep_config["mave"]
+        if mave_filename and os.path.exists(mave_filename):
+            mave_basename = os.path.basename(mave_filename)
+            if m := re.match(r"^MaveDB_variants_(\d{4}-\d{2}-\d{2})\.tsv\.gz$", mave_basename):
+                kwargs["mave_db"] = m.group(1)
+            else:
+                msg = f"Couldn't determine MaveDB version from file: {mave_basename}"
+                raise ValueError(msg)
+    except KeyError:
+        pass
+
+    try:
+        # denovo-db is GRCh37/38 only
+        denovo_db_filename = vep_config["denovo_db"]
+        if denovo_db_filename and os.path.exists(denovo_db_filename):
+            denovo_db_basename = os.path.basename(denovo_db_filename)
+            # e.g. denovo-db.variants.v.1.6.1.GRCh37.vcf.gz
+            if m := re.match(r"^denovo-db\.variants\.v\.(?P<version>[\d.]+)\.(GRCh37|GRCh38)\.vcf\.gz$",
+                             denovo_db_basename):
+                kwargs["denovo_db"] = m.group("version")
+            else:
+                msg = f"Couldn't determine denovo-db version from file: {denovo_db_basename}"
+                raise ValueError(msg)
     except KeyError:
         pass
 

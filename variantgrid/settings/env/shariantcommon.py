@@ -118,6 +118,13 @@ _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded an
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'annotation_scratch')
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
+# Stay on the historical annotation config (package default is now latest - see #1625)
+ANNOTATION_VEP_VERSION = "110"
+ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
+ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
+ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
+pin_annotation_to_columns_version_3(ANNOTATION)
+
 ANNOTATION[BUILD_GRCH37].update({
     "annotation_consortium": "RefSeq",
 })
@@ -126,6 +133,7 @@ ANNOTATION[BUILD_GRCH38].update({
     "annotation_consortium": "RefSeq",
 })
 
+SITE_DESCRIPTION = "Shariant - Australian Genomics Variant Curation sharing project."
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
@@ -212,8 +220,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "upload_pipeline_modified_variants_grid": False,
     "view_upload_stats_detail": False,
     "accept_vcf_import_info_tag": False,
-    "jfu_upload": False,
-    "jfu_delete": False,
+    "upload_file": False,
+    "upload_file_delete": False,
     "download_uploaded_file": False,
 
     # discordance

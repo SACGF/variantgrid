@@ -33,10 +33,11 @@ class ClassificationAttachment(models.Model):
             size = 0
 
         return {
+            'pk': self.pk,
             'name': basename,
             'size': size,
             'url': image_url,
-            'thumbnailUrl': thumb_url,  # If thumbnail set, JFU displays in gallery
+            'thumbnailUrl': thumb_url,  # rendered as a poster thumbnail via file-poster
             'deleteUrl': reverse('classification_file_delete', kwargs={'pk': self.pk}),
             'deleteType': 'POST',
         }

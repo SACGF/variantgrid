@@ -161,6 +161,15 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                 self.annotation_version.validate()
         except InvalidAnnotationVersionError as ve:
             errors.append(str(ve))
+
+        if av := self.annotation_version:
+            if vav := av.variant_annotation_version:
+                if vav.data_archived:
+                    errors.append(
+                        f"Annotation data archived: VariantAnnotationVersion {vav.pk} was archived on "
+                        f"{vav.data_archived_date:%Y-%m-%d}. "
+                        "It is possible to restore this, please contact your administrator."
+                    )
         return errors
 
     def get_warnings(self) -> list[str]:
@@ -173,6 +182,13 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                                     f"for build is : {latest_av}.")
             except InvalidAnnotationVersionError as e:
                 warnings.append(str(e))
+
+            vav = self.annotation_version.variant_annotation_version
+            if vav and vav.data_archived:
+                warnings.append(
+                    f"VariantAnnotationVersion {vav.pk} archived on {vav.data_archived_date:%Y-%m-%d}. "
+                    "It is possible to restore this, please contact your administrator."
+                )
         return warnings
 
     @property
@@ -434,6 +450,7 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
             EXTRA_PROVIDED_TYPES = {
                 'snpdb.Sample': {'genes.SampleGeneList'},
                 'snpdb.Trio': {'snpdb.Sample'},
+                'snpdb.Quad': {'snpdb.Sample'},
             }
 
             if extra_types := EXTRA_PROVIDED_TYPES.get(class_name):
@@ -477,7 +494,7 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if not analysis_variables.exists():
             error = "You have not configured any analysis variables."
         else:
-            required_fields = ["pedigree", "trio", "cohort", "sample"]
+            required_fields = ["pedigree", "trio", "quad", "cohort", "sample"]
             if not analysis_variables.filter(field__in=required_fields).exists():
                 error = f"You need at at least one analysis variable of: {', '.join(required_fields)}"
 
@@ -634,8 +651,8 @@ class AnalysisTemplateRun(TimeStampedModel):
         for arg in self.analysistemplaterunargument_set.all():
             params[arg.variable.field] = arg.value
 
-        # Do trio before sample so it's used first (trio sets proband as sample)
-        for field in ["pedigree", "trio", "cohort", "sample"]:
+        # Do trio/quad before sample so it's used first (trio/quad set proband as sample)
+        for field in ["pedigree", "trio", "quad", "cohort", "sample"]:
             if field in params:
                 params["input"] = params[field]
                 break

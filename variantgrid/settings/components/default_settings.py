@@ -29,6 +29,7 @@ JS_REVERSE_OUTPUT_PATH = './variantgrid/static_files/default_static/django_js_re
 UPLOAD_RELATIVE_PATH = "data/uploads"  # Needed for FileSystemStorage
 UPLOAD_DIR = os.path.join(BASE_DIR, UPLOAD_RELATIVE_PATH)
 UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg if out of disk)
+# Request body / upload size is bounded by nginx (client_max_body_size); no Django-side cap needed.
 
 # Absolute filesystem path to the directory that will hold GLOBALLY VISIBLE user-uploaded files.
 # Example: "/var/www/example.com/media/"
@@ -52,6 +53,9 @@ CONTACT_US_ENABLED = False
 ACCOUNTS_EMAIL = None
 # If you change this value you should run 'recalc' for all ClinicalContexts in admin
 DISCORDANCE_ENABLED = False
+# Only applies when DISCORDANCE_ENABLED is True. When False, classifications from
+# labs flagged as research (Lab.research) do not participate in discordance detection.
+DISCORDANCE_RESEARCH_ENABLED = True
 
 ALLELE_ORIGIN_NOT_PROVIDED_BUCKET = "U"
 # If allele origin isn't provided, what bucket do we group it in
@@ -94,10 +98,20 @@ DATABASES = {
     }
 }
 
+# DB load / DOS protection - see variantgrid_private #1502
+# Global statement_timeout applied to every connection (see variantgrid/wsgi.py)
+DATABASE_STATEMENT_TIMEOUT_SECONDS = 10 * 60
+# "Major operations" are expensive requests (eg analysis node grids). We cap how many a single
+# user can run concurrently, and bound each one's DB query time, to stop accidental/malicious DOS.
+MAJOR_OPERATION_LIMITS_ENABLED = True
+MAJOR_OPERATION_MAX_CONCURRENT_PER_USER = 20
+MAJOR_OPERATION_STATEMENT_TIMEOUT_SECONDS = 5 * 60
+MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request frees its slot
+
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 41  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 44  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -182,8 +196,14 @@ MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
 # Use highest TranscriptVersion canonical, set False to use representative transcript (ie VEP pick = variant annotation)
 VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
+# When a variant has more than this many annotated transcripts, only show the top ones (by importance) on
+# the variant details transcript selection table, collapsing the rest behind a toggle. Set None to show all.
+# Important transcripts (selected/representative/canonical/tagged) are always shown regardless of this limit.
+VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN = 8
 
 VARIANT_ZYGOSITY_GLOBAL_COLLECTION = "global"
+# Skip samples from variant zygosity counts when their vcf_sample_name matches this regex (e.g. "^VALIDATION_")
+VARIANT_ZYGOSITY_COUNT_EXCLUDE_SAMPLE_NAME_REGEX = None
 
 PREFER_ALLELE_LINKS = False
 
@@ -219,8 +239,11 @@ VCF_IMPORT_COMMON_FILTERS = {
         "clinical_significance_max": "3",
     },
     "GRCh38": {
-        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.0_GRCh38_af_greater_than_5.stripped.vcf.gz",
-        "gnomad_version": "4.0",
+        # Intersection of gnomAD 4.0 and 4.1 AF>5 so the common partition is valid (skippable) under either
+        # version - @see issue #1582. "additional_gnomad_versions" lists the extra versions beyond "gnomad_version".
+        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.0_and_4.1_GRCh38_af_greater_than_5.intersection.stripped.vcf.gz",
+        "gnomad_version": "4.1",
+        "additional_gnomad_versions": ["4.0"],
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
     },
@@ -245,8 +268,17 @@ HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT = 200_000
 HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE = False  # Biocommons only - attempt to retrieve transcript sequence (slower)
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
+# If set, patient phenotype text containing this string is treated as unreviewed:
+# matched ontology terms will not be persisted to the DB (PatientTextPhenotype / TextPhenotypeMatch).
+# Users can still see live preview matches on the patient page along with a warning.
+# Set to None / empty to disable.
+PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
+
+# Where partition dump files are written when an archivable model (VAV, ClinVarVersion, CohortGenotypeCollection, ...)
+# is archived via the pre-drop archival pipeline (#1537).
+PARTITION_ARCHIVE_DIR = "/data/database/partition_dumps/"
 
 # @see https://github.com/SACGF/variantgrid/wiki/Liftover
 LIFTOVER_CLASSIFICATIONS = True
@@ -326,8 +358,15 @@ ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True
-ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
+# #546: when a parent node's count is <= this, substitute its contribution to a child/sibling's
+# query with a literal Q(pk__in=[...]) instead of re-running its full filter chain. Applies to all
+# single-parent nodes and MergeNode inputs. 0 disables the substitution.
+ANALYSIS_NODE_STORE_ID_SIZE_MAX = 1000
 ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
+# Fallback when no Global/Org/Lab/User override is set. None = always auto-load.
+# Analysis nodes with at least this many variants don't auto-load their grid - the user clicks
+# "Load variants" to run the row query.
+ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_SHOW_CANONICAL_HGVS = True
@@ -357,6 +396,8 @@ CLASSIFICATION_GRID_SHOW_SAMPLE = True
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
 CLASSIFICATION_NEW_GROUPING = False
+CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where Lab.research=True
+RESEARCH_ICON = "🔬"  # alt: "⚗️"
 
 # Require people to click "my sample's not here" (ie encourage them to find it)
 CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE = True
@@ -402,6 +443,7 @@ USER_SETTINGS_SHOW_GROUPS = True
 SQL_BATCH_INSERT_SIZE = 50000
 SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
+SITE_DESCRIPTION = "VariantGrid - genomic variant curation and classification platform"
 
 # TODO instead of make settings for admin and non-admin enabled searches, have a search value that can be
 # DISABLED, ADMIN_ONLY, ENABLED
@@ -415,6 +457,9 @@ SEARCH_USER_ADMIN_ONLY = False
 SEARCH_COSMIC_ENABLED = True
 SEARCH_COSMIC_TRANSCRIPT_MESSAGES = False
 SEARCH_CONTIG_GENOME_BUILD_ADMIN_ONLY = False
+
+# Max length used when reflecting user-supplied strings (e.g. search terms) back in page content
+MAX_STRING_DISPLAY_LENGTH = 1000
 
 SILENCED_SYSTEM_CHECKS = [
     'models.E006',  # 'captcha.recaptcha_test_key_error'
@@ -564,7 +609,7 @@ FINISH_IMPORT_VCF_STEP_TASKS_CLASSES = []
 CACHE_GENERATED_FILES = True
 
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 
     # NOTE: Middleware is run first - so GlobalLoginRequiredMiddleware will reject tokens w/o logins
     # before DRF even sees it. You need to add your APIs to PUBLIC_PATHS
@@ -579,6 +624,26 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'rollbar.contrib.django_rest_framework.post_exception_handler'
     #    'PAGE_SIZE': 10,
     #    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+}
+
+# drf-spectacular OpenAPI schema / Swagger docs (served at /api/schema and /api/docs)
+# The docs pages are public (see PUBLIC_PATHS) but the API endpoints themselves still require auth
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'VariantGrid API',
+    'DESCRIPTION': 'REST API for VariantGrid - variant database, annotation and classification platform. '
+                   'Authenticate with a session, HTTP basic auth, or a token from your user profile page.',
+    'VERSION': '4.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SERVE_PUBLIC': True,  # list all endpoints in the schema regardless of viewer permissions
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
+    # Serve Swagger UI/ReDoc assets from drf-spectacular-sidecar via staticfiles instead of a CDN
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
+    # Several predictors share the same Tolerated/Damaging choice set - use one canonical enum name
+    'ENUM_NAME_OVERRIDES': {
+        'ToleratedDamagingPredictionEnum': 'annotation.models.damage_enums.ToleratedDamagingPrediction.CHOICES',
+    },
 }
 
 AUTHENTICATION_BACKENDS = (
@@ -628,12 +693,13 @@ INSTALLED_APPS = [
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
-    'jfu',
     'leaflet',
     'martor',
     "psqlextra",
     'rest_framework',
     'rest_framework.authtoken',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
     'termsandconditions',
     'crispy_forms',  # used to make bootstrap compatible forms
     'crispy_bootstrap4',
@@ -762,6 +828,7 @@ LOGGING = {
 PUBLIC_PATHS = [
     r'^/accounts/.*',  # allow public access to all django registration views,
     r'^/oidc/.*',  # all oidc URLs
+    r'^/api/.*',  # OpenAPI schema + Swagger/ReDoc docs pages (drf-spectacular)
     r'^/classification/api/.*',  # REST framework used by command line tools
     r'^/seqauto/api/.*',
     r'^/upload/api/.*',

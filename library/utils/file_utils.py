@@ -55,6 +55,9 @@ def file_to_array(filename, comment: Optional[str] = None, max_lines: Optional[i
 
 
 def file_or_filename_md5sum(file_or_filename: Union[IO, str]) -> str:
+    # MD5 is used here only as a fast file-equivalency checksum (detecting identical
+    # file contents), NOT for any security/cryptographic purpose, so collision
+    # resistance is not required.
     m = md5()
     f: IO
     if hasattr(file_or_filename, "read"):
@@ -144,7 +147,7 @@ def add_permissions_to_file(filename: str, add_stat: int):
     try:
         os.chmod(filename, st.st_mode | add_stat)
     except Exception as e:
-        logging.error("Path '%s' stat is %s", filename, st)
+        logging.debug("Path '%s' stat is %s", filename, st)
         raise e
 
 

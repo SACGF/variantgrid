@@ -2,9 +2,9 @@ from rest_framework import serializers
 
 from genes.serializers import SampleGeneListSerializer, GeneCoverageCollectionSerializer
 from seqauto.models import IlluminaFlowcellQC, QCGeneList, QC, QCGeneCoverage, QCExecSummary, FastQC, SequencingSample, \
-    SampleSheet, SequencingRun, VCFFile
+    SampleSheet, SequencingRun, SingleSampleVCF
 from seqauto.serializers.sequencing_serializers import SampleSheetLookupSerializer, FastqSerializer, \
-    BamFilePathSerializer, VCFFilePathSerializer, SequencingSampleLookupSerializer
+    BamFilePathSerializer, SingleSampleVCFPathSerializer, SequencingSampleLookupSerializer
 from snpdb.models import DataState
 
 
@@ -30,7 +30,7 @@ class QCSerializer(serializers.ModelSerializer):
     # assume we're using the latest ones associated with that
     sequencing_sample = SequencingSampleLookupSerializer()
     bam_file = BamFilePathSerializer()
-    vcf_file = VCFFilePathSerializer()
+    vcf_file = SingleSampleVCFPathSerializer()
 
     class Meta:
         model = QC
@@ -57,9 +57,9 @@ class QCSerializer(serializers.ModelSerializer):
             "bam_file__unaligned_reads__sequencing_sample": sequencing_sample
 
         }
-        vcf_file = VCFFile.objects.filter(**vcf_file_kwargs).first()
+        vcf_file = SingleSampleVCF.objects.filter(**vcf_file_kwargs).first()
         if not vcf_file:
-            raise VCFFile.DoesNotExist(f"No vcf file for {vcf_file_kwargs=}")
+            raise SingleSampleVCF.DoesNotExist(f"No vcf file for {vcf_file_kwargs=}")
 
         defaults = {}
         qc_path = data.get("path")

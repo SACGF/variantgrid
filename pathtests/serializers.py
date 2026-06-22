@@ -33,9 +33,9 @@ class PathologyTestVersionSerializer(serializers.ModelSerializer):
         model = PathologyTestVersion
         fields = '__all__'
 
-    def get_is_active_test(self, obj):
+    def get_is_active_test(self, obj) -> bool:
         active_test = obj.pathology_test.get_active_test_version()
         return obj == active_test
 
-    def get___str__(self, obj):
+    def get___str__(self, obj) -> str:
         return str(obj)

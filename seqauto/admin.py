@@ -67,8 +67,8 @@ class FlagstatsAdmin(ModelAdminBasics):
     pass
 
 
-@admin.register(models.VCFFile)
-class VCFFileAdmin(ModelAdminBasics):
+@admin.register(models.SingleSampleVCF)
+class SingleSampleVCFAdmin(ModelAdminBasics):
     pass
 
 

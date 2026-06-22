@@ -1,20 +1,24 @@
 import logging
+import operator
 import os
 import subprocess
+from functools import cached_property, reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
+from django.db.models import CASCADE
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from genes.hgvs import get_hgvs_variant
 from snpdb.models import GenomicIntervalsCollection, GenomicInterval, Sample, \
     VCFBedIntersection, Cohort, VariantCollection
+from snpdb.models.models_genome import Contig
 from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 
@@ -24,6 +28,7 @@ class IntersectionNode(AnalysisNode):
     CUSTOM_INTERVAL = 1
     HGVS = 2
     BACKEND_ENRICHMENT_KIT = 3
+    CONTIG = 4
 
     genomic_intervals_collection = models.ForeignKey(GenomicIntervalsCollection, null=True, blank=True, on_delete=SET_NULL)
     genomic_interval = models.OneToOneField(GenomicInterval, null=True, on_delete=SET_NULL)
@@ -33,6 +38,15 @@ class IntersectionNode(AnalysisNode):
     left = models.IntegerField(default=0)
     right = models.IntegerField(default=0)
     accordion_panel = models.IntegerField(default=0)
+
+    @cached_property
+    def contig_ids(self) -> list[int]:
+        if self.pk is None:
+            return []
+        qs = self.intersectionnodecontig_set.filter(
+            contig__genomebuildcontig__genome_build=self.analysis.genome_build
+        ).order_by("contig__genomebuildcontig__order")
+        return list(qs.values_list("contig_id", flat=True))
 
     def valid_custom_genomic_interval(self):
         return self.accordion_panel == self.CUSTOM_INTERVAL and self.genomic_interval
@@ -47,11 +61,15 @@ class IntersectionNode(AnalysisNode):
         pbi, _ = self.get_vcf_bed_intersection_and_enrichment_kit()
         return self.accordion_panel == self.BACKEND_ENRICHMENT_KIT and pbi is not None
 
+    def valid_contig(self):
+        return self.accordion_panel == self.CONTIG and bool(self.contig_ids)
+
     def modifies_parents(self):
         return any([self.valid_custom_genomic_interval(),
                     self.valid_selected_genomic_intervals_collection(),
                     self.valid_hgvs(),
-                    self.valid_backend_enrichment_kit()])
+                    self.valid_backend_enrichment_kit(),
+                    self.valid_contig()])
 
     @property
     def use_cache(self):
@@ -74,6 +92,11 @@ class IntersectionNode(AnalysisNode):
             # if hgvs_variant doesn't exist - then it's not in the system - so will always be nothing
             if self.hgvs_variant:
                 q = Q(pk=self.hgvs_variant_id)
+            else:
+                q = self.q_none()
+        elif self.accordion_panel == self.CONTIG:
+            if self.contig_ids:
+                q = reduce(operator.or_, [Q(locus__contig_id=c) for c in self.contig_ids])
             else:
                 q = self.q_none()
         else:
@@ -132,7 +155,16 @@ class IntersectionNode(AnalysisNode):
             elif self.accordion_panel == self.BACKEND_ENRICHMENT_KIT:
                 _, enrichment_kit = self.get_vcf_bed_intersection_and_enrichment_kit()
                 method_summary = f"Filtering to enrichment_kit {enrichment_kit}"
+            elif self.accordion_panel == self.CONTIG:
+                method_summary = f"Filtering to contigs {self._get_contig_names()}"
         return method_summary
+
+    def _get_contig_names(self) -> str:
+        contig_names = list(Contig.objects.filter(pk__in=self.contig_ids,
+                                                  genomebuildcontig__genome_build=self.analysis.genome_build)
+                            .order_by("genomebuildcontig__order")
+                            .values_list("name", flat=True))
+        return ", ".join(contig_names)
 
     def get_node_name(self):
         name = ''
@@ -144,6 +176,8 @@ class IntersectionNode(AnalysisNode):
             elif self.accordion_panel == self.BACKEND_ENRICHMENT_KIT:
                 _, enrichment_kit = self.get_vcf_bed_intersection_and_enrichment_kit()
                 name = f"Enrichment Kit: {enrichment_kit}"
+            elif self.accordion_panel == self.CONTIG:
+                name = self._get_contig_names()
         return name
 
     @staticmethod
@@ -162,6 +196,7 @@ class IntersectionNode(AnalysisNode):
 
     def save_clone(self):
         orig_genomic_interval = self.genomic_interval
+        contig_ids = self.contig_ids  # Save before clone
 
         # genomic_interval is a 1-to-1 field, so don't want to copy it in super().save_clone()
         if self.genomic_interval:
@@ -169,6 +204,8 @@ class IntersectionNode(AnalysisNode):
 
         copy = super().save_clone()
         self.genomic_interval = orig_genomic_interval
+        for contig_id in contig_ids:
+            copy.intersectionnodecontig_set.create(contig_id=contig_id)
         return copy
 
     def write_cache(self, variant_collection: VariantCollection):
@@ -193,6 +230,21 @@ class IntersectionNode(AnalysisNode):
         return "Intervals intersection"
 
 
+class IntersectionNodeContig(NodeAuditLogMixin, models.Model):
+    """ Stores multi-select contig values """
+    intersection_node = models.ForeignKey(IntersectionNode, on_delete=CASCADE)
+    contig = models.ForeignKey(Contig, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ("intersection_node", "contig")
+
+    def _get_node(self):
+        return self.intersection_node
+
+    def __str__(self):
+        return f"IntersectionNodeContig {self.intersection_node_id}: {self.contig}"
+
+
 @receiver(post_delete, sender=IntersectionNode)
 def post_delete_intersection_node(sender, instance, **kwargs):  # pylint: disable=unused-argument
     if instance.genomic_interval is not None:
@@ -200,3 +252,4 @@ def post_delete_intersection_node(sender, instance, **kwargs):  # pylint: disabl
 
 
 auditlog.register(IntersectionNode)
+auditlog.register(IntersectionNodeContig)

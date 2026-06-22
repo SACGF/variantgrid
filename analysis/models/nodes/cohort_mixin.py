@@ -9,7 +9,8 @@ from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from patients.models_enums import Zygosity
-from snpdb.models import VCFFilter, Cohort, Sample
+from snpdb.archive import DataArchivedError
+from snpdb.models import VCFFilter, Cohort, Sample, CohortGenotypeCollection
 from upload.models import UploadedVCF
 
 
@@ -27,18 +28,30 @@ class CohortMixin:
         return vcf
 
     def _get_cache_key(self) -> str:
-        """ Use cohort genotype in the key, as that can change if a VCF is reloaded """
+        """ Use cohort genotype in the key, as that can change if a VCF is reloaded.
+            Also include the sub-cohort any-sample-called VariantCollection pk so the cache invalidates
+            when a VC build completes (or is dropped) under the same CGC. @see issue #1551 """
         cache_key = super()._get_cache_key()
         cgc_id = 0
+        vc_id = 0
         if cgc := self.cohort_genotype_collection:
             cgc_id = cgc.pk
-        return "_".join((cache_key, str(cgc_id)))
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort:
+            if vc := cohort.get_any_sample_called_variant_collection():
+                vc_id = vc.pk
+        return "_".join((cache_key, str(cgc_id), str(vc_id)))
 
     @property
     def cohort_genotype_collection(self):
         cohort = self._get_cohort()
         if cohort:
-            cdc = cohort.cohort_genotype_collection
+            try:
+                cdc = cohort.cohort_genotype_collection
+            except DataArchivedError:
+                # Surface via _get_configuration_errors → ERROR_CONFIGURATION;
+                # keep node-internal "no source" code paths working.
+                cdc = None
         else:
             cdc = None
         return cdc
@@ -47,6 +60,12 @@ class CohortMixin:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if cgc := self.cohort_genotype_collection:
             annotation_kwargs.update(cgc.get_annotation_kwargs(**kwargs))
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort:
+            # Register the pre-computed any-sample-called VC alias so get_cohort_and_arg_q_dict can join
+            # to it instead of running the EXCLUDE regex. @see issue #1551
+            if vc := cohort.get_any_sample_called_variant_collection():
+                annotation_kwargs.update(vc.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
     def _get_cohorts_and_sample_visibility(self):
@@ -62,11 +81,10 @@ class CohortMixin:
     def count_column_prefix(self):
         cohort = self._get_cohort()
         if cohort and cohort.is_sub_cohort:
-            column_prefix = f"sub_cohort_{cohort.pk}_"
-        else:
-            cgc = self.cohort_genotype_collection
-            column_prefix = f"{cgc.cohortgenotype_alias}__"
-        return column_prefix
+            return f"sub_cohort_{cohort.pk}_"
+        if cgc := self.cohort_genotype_collection:
+            return f"{cgc.cohortgenotype_alias}__"
+        return None
 
     @property
     def non_ref_call_count_annotation_arg(self):
@@ -136,10 +154,17 @@ class CohortMixin:
             cgc = self.cohort_genotype_collection
             q_and = []
             if cohort.is_sub_cohort:
-                missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
-                sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
-                q_sub = cgc.get_zygosity_q(sample_zygosities_dict, exclude=True)
-                q_and.append(q_sub)
+                if vc := cohort.get_any_sample_called_variant_collection():
+                    # Pre-computed any-sample-called set => hash join instead of regex seq-scan (#1551).
+                    # Keyed under the VC alias (registered in _get_annotation_kwargs_for_node) so it's
+                    # filtered after its own annotate, not the cohortgenotype one.
+                    q_vc = Q(**{f"{vc.variant_collection_alias}__isnull": False})
+                    arg_q_dict[vc.variant_collection_alias] = {str(q_vc): q_vc}
+                else:
+                    missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
+                    sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
+                    q_sub = cgc.get_zygosity_q(sample_zygosities_dict, exclude=True)
+                    q_and.append(q_sub)
             q_and.extend(self._get_q_and_list())
             if q_and:
                 q = reduce(operator.and_, q_and)
@@ -161,10 +186,15 @@ class CohortMixin:
 
         filters = []
         cgc = self.cohort_genotype_collection
+        packed_index_by_sample_id = cgc.get_packed_index_by_sample_id
 
         for sample in self.get_samples():
+            # get_samples() includes ancestor samples (eg a compound het Trio/Quad's parent node)
+            # that may not be in this cohort's genotype array - skip those.
+            if sample.pk not in packed_index_by_sample_id:
+                continue
             # Indexes are handled by cohortgenotype (sub cohorts etc)
-            array_index = cgc.get_array_index_for_sample_id(sample.pk)
+            array_index = packed_index_by_sample_id[sample.pk]
             # https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#index-transforms
             allele_frequency_column = f"{cgc.cohortgenotype_alias}__samples_allele_frequency__{array_index}"
             q = naff.get_q(allele_frequency_column, sample.vcf.allele_frequency_percent)
@@ -233,17 +263,16 @@ class CohortMixin:
 
         extra_columns = []
         if self.has_filters:
-            cgc = self.cohort_genotype_collection
-            extra_columns.append(f"{cgc.cohortgenotype_alias}__filters")
+            if cgc := self.cohort_genotype_collection:
+                extra_columns.append(f"{cgc.cohortgenotype_alias}__filters")
 
         return extra_columns
 
     def _get_node_extra_colmodel_overrides(self):
         extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
-        if self.has_filters:
+        if self.has_filters and (cgc := self.cohort_genotype_collection):
             vcf = self._get_vcf()
             server_side_formatter = VCFFilter.get_formatter(vcf)
-            cgc = self.cohort_genotype_collection
             filters_column = f"{cgc.cohortgenotype_alias}__filters"
             extra_colmodel_overrides[filters_column] = {
                 'name': filters_column,
@@ -256,6 +285,13 @@ class CohortMixin:
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
+        if cohort := self._get_cohort():
+            try:
+                _ = cohort.cohort_genotype_collection
+            except CohortGenotypeCollection.DoesNotExist:
+                errors.append("Source data missing: underlying genotype data is no longer available")
+            except DataArchivedError as e:
+                errors.append(str(e))
         if vcf := self._get_vcf():
             try:
                 uv: UploadedVCF = vcf.uploadedvcf

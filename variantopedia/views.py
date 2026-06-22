@@ -11,6 +11,7 @@ from typing import Any, Optional
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
@@ -22,10 +23,11 @@ from django.views.decorators.http import require_POST
 from analysis.models import VariantTag
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
     VariantAnnotationVersion, VariantAnnotation, AnnotationStatus, ClinVarRecordCollection
+from annotation.manual_variant_entry import check_can_create_variants
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
-    EvidenceKeyMap, ClassificationGroupingEntry, Overlap, OverlapType
+    EvidenceKeyMap, ClassificationGroupingEntry
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -55,6 +57,7 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
+from snpdb.utils import get_genome_build_or_404
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.models import ModifiedImportedVariant
 from upload.upload_stats import get_vcf_variant_upload_stats
@@ -362,8 +365,10 @@ def database_statistics(request):
 def variant_tag_detail(request, variant_id, tag):
     """ Loaded via tags grid on variant page """
 
-    variant = Variant.objects.get(pk=variant_id)
+    variant = get_object_or_404(Variant, pk=variant_id)
     tag = get_object_or_404(Tag, pk=tag)
+    if not VariantTag.filter_for_user(request.user).filter(variant=variant, tag=tag).exists():
+        raise PermissionDenied
     context = {
         "variant": variant,
         "tag": tag,
@@ -379,7 +384,7 @@ def view_variant(request, variant_id, genome_build_name=None):
     in_multiple_genome_builds = len(variant.genome_builds) > 1
     genome_build = None
     if genome_build_name:
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        genome_build = get_genome_build_or_404(genome_build_name)
         if genome_build not in variant.genome_builds:
             return redirect(reverse('view_variant', kwargs={'variant_id': variant_id}))
     else:
@@ -506,78 +511,77 @@ class ShareLevelRecordCounts:
     # record_count: int
 
 
-# @dataclass
-# class AlleleOriginGroupingDescription:
-#     allele_origin_grouping: AlleleOriginGrouping
-#     discordance_report: Optional[DiscordanceReport]
-#     overlap_status: OverlapStatus
-#     shared_counts: int
-#     unshared_counts: int
-#
-#     @property
-#     def get_overlap_status_display(self):
-#         return OverlapStatus(self.overlap_status).label
-#
-#     @property
-#     def should_show_diffs(self):
-#         return self.shared_counts + self.unshared_counts > 1
-#
-#     @staticmethod
-#     def describe(allele_origin_grouping: AlleleOriginGrouping, for_user: User) -> 'AlleleOriginGroupingDescription':
-#         discordance_report: Optional[DiscordanceReport] = None
-#
-#         allele = allele_origin_grouping.allele_grouping.allele
-#         if allele_origin_grouping.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
-#             for cc in allele.clinicalcontext_set.all():
-#                 if dr := DiscordanceReport.latest_report(cc):
-#                     if dr.is_active:
-#                         discordance_report = dr
-#
-#         # shared_counts = allele_origin_grouping.classificationgrouping_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
-#         # unshared_counts = (
-#         #     ClassificationGrouping.filter_for_user(for_user, allele_origin_grouping.classificationgrouping_set.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)).count())
-#         #
-#         # overlap_status: OverlapStatus
-#         # if shared_counts == 0:
-#         #     overlap_status = OverlapStatus.NO_SHARED_RECORDS
-#         # elif shared_counts == 1:
-#         #     overlap_status = OverlapStatus.SINGLE_SUBMITTER
-#         # elif allele_origin_grouping.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
-#         #     overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
-#         # else:
-#         #     # TODO right now it's lookiung at every classification in the grouping
-#         #     # In future, only look at the latest
-#         #     classification_groups = allele_origin_grouping.classificationgrouping_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('pk', flat=True)
-#         #     classification_groups_classes = ClassificationGroupingEntry.objects.filter(grouping__in=classification_groups).values_list('classification_id', flat=True)
-#         #     classification_values = set(ClassificationModification.objects.filter(is_last_published=True, classification_id__in=classification_groups_classes).values_list(f'published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value', flat=True).all())
-#         #
-#         #     # now see if we're agreement, confidence or discordant
-#         #     bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
-#         #     buckets = {bucket_mapping.get(class_value) for class_value in classification_values}
-#         #     if None in buckets:
-#         #         buckets.remove(None)
-#         #
-#         #     if len(buckets) > 1:
-#         #         # discordant
-#         #         if "P" in classification_values or "LP" in classification_values:
-#         #             overlap_status = OverlapStatus.DISCORDANCE_MEDICALLY_SIGNIFICANT
-#         #         else:
-#         #             overlap_status = OverlapStatus.DISCORDANCE
-#         #     else:
-#         #         if len(classification_values) > 1:
-#         #             overlap_status = OverlapStatus.CONFIDENCE
-#         #         else:
-#         #             # complete agreement
-#         #             overlap_status = OverlapStatus.AGREEMENT
-#
-#         # TODO grab all this from the
-#         return AlleleOriginGroupingDescription(
-#             allele_origin_grouping=allele_origin_grouping,
-#             discordance_report=discordance_report,
-#             overlap_status=OverlapStatus.NO_COUNTING_CONTRIBUTIONS,
-#             shared_counts=1,
-#             unshared_counts=1,
-#         )
+@dataclass
+class AlleleOriginGroupingDescription:
+    allele_origin_grouping: AlleleOriginGrouping
+    discordance_report: Optional[DiscordanceReport]
+    overlap_status: OverlapStatus
+    shared_counts: int
+    unshared_counts: int
+
+    @property
+    def get_overlap_status_display(self):
+        return OverlapStatus(self.overlap_status).label
+
+    @property
+    def should_show_diffs(self):
+        return self.shared_counts + self.unshared_counts > 1
+
+    @staticmethod
+    def describe(allele_origin_grouping: AlleleOriginGrouping, for_user: User) -> 'AlleleOriginGroupingDescription':
+        discordance_report: Optional[DiscordanceReport] = None
+
+        allele = allele_origin_grouping.allele_grouping.allele
+        if allele_origin_grouping.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+            for cc in allele.clinicalcontext_set.all():
+                if dr := DiscordanceReport.latest_report(cc):
+                    if dr.is_active:
+                        discordance_report = dr
+
+        shared_counts = allele_origin_grouping.classificationgrouping_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
+        unshared_counts = (
+            ClassificationGrouping.filter_for_user(for_user, allele_origin_grouping.classificationgrouping_set.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)).count())
+
+        overlap_status: OverlapStatus
+        if shared_counts == 0:
+            overlap_status = OverlapStatus.NO_SHARED_RECORDS
+        elif shared_counts == 1:
+            overlap_status = OverlapStatus.SINGLE_SUBMITTER
+        elif allele_origin_grouping.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+            overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
+        else:
+            # TODO right now it's lookiung at every classification in the grouping
+            # In future, only look at the latest
+            classification_groups = allele_origin_grouping.classificationgrouping_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('pk', flat=True)
+            classification_groups_classes = ClassificationGroupingEntry.objects.filter(grouping__in=classification_groups).values_list('classification_id', flat=True)
+            classification_values = set(ClassificationModification.objects.filter(is_last_published=True, classification_id__in=classification_groups_classes).values_list(f'published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value', flat=True).all())
+
+            # now see if we're agreement, confidence or discordant
+            bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
+            buckets = {bucket_mapping.get(class_value) for class_value in classification_values}
+            if None in buckets:
+                buckets.remove(None)
+
+            if len(buckets) > 1:
+                # discordant
+                if "P" in classification_values or "LP" in classification_values:
+                    overlap_status = OverlapStatus.DISCORDANCE_MEDICALLY_SIGNIFICANT
+                else:
+                    overlap_status = OverlapStatus.DISCORDANCE
+            else:
+                if len(classification_values) > 1:
+                    overlap_status = OverlapStatus.CONFIDENCE
+                else:
+                    # complete agreement
+                    overlap_status = OverlapStatus.AGREEMENT
+
+        return AlleleOriginGroupingDescription(
+            allele_origin_grouping=allele_origin_grouping,
+            discordance_report=discordance_report,
+            overlap_status=overlap_status,
+            shared_counts=shared_counts,
+            unshared_counts=unshared_counts,
+        )
 
 
 def view_allele(request, allele_id: int):
@@ -587,27 +591,19 @@ def view_allele(request, allele_id: int):
 
     # Filter on classification grouping first, so we can find all unique AlleleGroupings
     # that the user has access to
-    # aog_qs = AlleleOriginGrouping.objects.filter(pk__in=\
-    #     ClassificationGrouping.filter_for_user(
-    #         request.user,
-    #         ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping__allele=allele_id)
-    #     ).values_list("allele_origin_grouping")
-    # )
-    # aogs = [AlleleOriginGroupingDescription.describe(aog, request.user) for aog in sorted(aog_qs.all())]
-    #
-    # show_overall_diff = len(aogs) > 1
+    aog_qs = AlleleOriginGrouping.objects.filter(pk__in=\
+        ClassificationGrouping.filter_for_user(
+            request.user,
+            ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping__allele=allele_id)
+        ).values_list("allele_origin_grouping")
+    )
+    aogs = [AlleleOriginGroupingDescription.describe(aog, request.user) for aog in sorted(aog_qs.all())]
 
-    overlaps = Overlap.objects.filter(allele=allele, overlap_type=OverlapType.SINGLE_CONTEXT, valid=True, overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)
-    overlaps = list(sorted(overlaps, key=lambda overlap: (overlap.testing_contexts_objs[0], overlap.value_type)))
-
-    cross_overlaps = Overlap.objects.filter(allele=allele, overlap_type=OverlapType.CROSS_CONTEXT, valid=True, overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)
-    cross_overlaps = list(sorted(cross_overlaps, key=lambda overlap: (overlap.testing_contexts_objs[0], overlap.value_type)))
+    show_overall_diff = len(aogs) > 1
 
     context = {
-        # "allele_origin_groupings_desc": aogs,
-        "overlaps": overlaps,
-        "cross_overlaps": cross_overlaps,
-        # "show_overall_diff": show_overall_diff,
+        "allele_origin_groupings_desc": aogs,
+        "show_overall_diff": show_overall_diff,
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'
@@ -619,7 +615,7 @@ def export_classifications_allele(request, allele_id: int):
     """
     CSV export of what is currently filtered into the classification grid
     """
-    allele = Allele.objects.get(pk=allele_id)
+    allele = get_object_or_404(Allele, pk=allele_id)
     return ClassificationExportFormatterCSV(
         ClassificationFilter(
             user=request.user,
@@ -634,8 +630,9 @@ def export_classifications_allele(request, allele_id: int):
 @require_POST
 def create_variant_for_allele(request, allele_id, genome_build_name):
     """ Shortcut to create manual variant, but as a POST """
+    check_can_create_variants(request.user)
     allele = get_object_or_404(Allele, pk=allele_id)
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    genome_build = get_genome_build_or_404(genome_build_name)
     non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
     if variant_allele := allele.variantallele_set.filter(origin__in=non_liftover_origin).first():
         create_liftover_pipelines(admin_bot(), [allele], ImportSource.WEB, variant_allele.genome_build, [genome_build])
@@ -666,7 +663,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                                        extra_context: dict = None):
     """ Main Variant Details page """
     variant = get_object_or_404(Variant, pk=variant_id)
-    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
     genome_build = annotation_version.genome_build
     latest_annotation_version = AnnotationVersion.latest(genome_build)
     variant_annotation = None
@@ -737,6 +734,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
+        "visible_fields": variant_annotation.visible_columns if variant_annotation else frozenset(),
         "vts": vts,
     }
     if extra_context:
@@ -746,7 +744,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
 def variant_sample_information(request, variant_id, genome_build_name):
     variant = get_object_or_404(Variant, pk=variant_id)
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    genome_build = get_genome_build_or_404(genome_build_name)
     vsi = VariantSampleInformation(request.user, variant, genome_build)
     other_loci_variants_by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(variant)
     g_hgvs = VariantAnnotation.get_hgvs_g(variant)
@@ -793,7 +791,7 @@ def nearby_variants_tab(request, variant_id, annotation_version_id):
 
 def nearby_variants(request, variant_id, annotation_version_id):
     variant = get_object_or_404(Variant, pk=variant_id)
-    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
 
     variant_annotation_version = annotation_version.variant_annotation_version
     variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()

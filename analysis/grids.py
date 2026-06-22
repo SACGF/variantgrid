@@ -53,6 +53,7 @@ class VariantGrid(AbstractVariantGrid):
         if af_show_in_percent is None:
             af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
 
+        self.genome_build = node.analysis.genome_build
         self.cohorts, self.visibility = node.get_cohorts_and_sample_visibility()
         self.fields, override = self._get_fields_and_overrides(node, af_show_in_percent)
         super().__init__(user)  # Need to call init after setting fields

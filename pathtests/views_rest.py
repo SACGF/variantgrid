@@ -1,3 +1,5 @@
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import RetrieveAPIView, get_object_or_404
 from rest_framework.response import Response
@@ -19,6 +21,14 @@ class PathologyTestLatestVersionView(APIView):
     """ Retrieves the last *confirmed* pathology test version for a pathology test """
 
     #@method_decorator(cache_page(WEEK_SECS))
+    @extend_schema(
+        summary="Retrieve the latest confirmed version of a pathology test by name",
+        parameters=[
+            OpenApiParameter("name", OpenApiTypes.STR, OpenApiParameter.PATH,
+                             description="Pathology test name"),
+        ],
+        responses=PathologyTestVersionSerializer,
+    )
     def get(self, request, *args, **kwargs):
         name = self.kwargs['name']
 

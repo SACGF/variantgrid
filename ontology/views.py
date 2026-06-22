@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import TemplateView
 
@@ -11,7 +12,10 @@ from ontology.panel_app_ontology import update_gene_relations
 
 def ontology_term_text(request, ontology_service, name):
     """ Occasionally we have service + name but not the ID - this is a way of building an URL for that """
-    ontology_service = OntologyService(ontology_service)  # Ensure valid
+    try:
+        ontology_service = OntologyService(ontology_service)
+    except ValueError:
+        raise Http404
     term = get_object_or_404(OntologyTerm, name=name, ontology_service=ontology_service)
     return redirect(term)
 

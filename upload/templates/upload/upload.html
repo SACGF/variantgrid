@@ -8,6 +8,9 @@
 <script type="text/javascript" src="{% static 'js/lib/d3.v2.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/samplenode.js' %}"></script>
 <link href="{% static 'css/nodes.css' %}" rel="stylesheet">
+<link href="{% static 'js/lib/filepond/4.32.12/filepond.min.css' %}" rel="stylesheet">
+<link href="{% static 'js/lib/filepond/filepond-overrides.css' %}" rel="stylesheet">
+<script src="{% static 'js/lib/filepond/4.32.12/filepond.min.js' %}"></script>
 <style>
 {% if not user.is_superuser %}
 td.upload-user {
@@ -15,29 +18,28 @@ td.upload-user {
 }
 {% endif %}
 
-/* Stop input growing down outside of button and receiving clicks */ 
-span.fileinput-button input {
-	height: 100%;
+#upload-files-table {
+    width: 90%;
+    word-wrap: break-word;
 }
 
-.field-name {
-	font-weight: bold;
+#upload-files-table tr {
+    margin: 5px 0px 5px 0px;
 }
 
-.fileupload-buttonbar button.start {
-	display: none;
+/* Hide FilePond's own UI on this page - the historical table below is the
+   canonical view; FilePond runs headless and pushes rows in via JS events. */
+#filepond-container .filepond--root {
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    overflow: hidden;
 }
 
-form#fileupload .fileupload-progress {
-	display: none;
-}
-
-#fileupload {
-	word-wrap: break-word;
-}
-
-#fileupload p.name {
-	width: 240px;
+#upload-files-table .progress {
+    height: 6px;
+    width: 200px;
+    margin-top: 4px;
 }
 
 #instructions-headline {
@@ -156,23 +158,6 @@ img.thumbnail {
 </style>
 
 <script>
-	window.fileupload_ready = function() {
-        const $form = $('#fileupload');
-        {% if existing_files %}
-		const existingFiles = {{ existing_files | jsonify }};
-		$form.fileupload('option', 'done').call($form, $.Event('done'), {result: {files: existingFiles}});
-	{% endif %}
-
-    {%  if not upload_enabled %}
-        $(".fileinput-button").button("disable");
-        $(document).bind('drop dragover', function (e) {
-            e.preventDefault();
-        });
-    {%  endif %}
-
-		$form.fileupload({ success : update_uploads });
-	};
-
     const INITIAL_UPDATE_SECS = 1;
     const MAX_UPDATE_SECS = 16;
     let update_secs = INITIAL_UPDATE_SECS;
@@ -191,14 +176,68 @@ img.thumbnail {
 		});
 	}
 
+	function ensure_upload_row(ufd) {
+        const uploaded_file_id = ufd['uploaded_file_id'];
+        if ($("td.upload-name[uploaded_file_id=" + uploaded_file_id + "]").length) {
+            return;
+        }
+        const tbody = $("#upload-files-table tbody");
+        const fileTypeCode = ufd['file_type_code'] || '';
+        const row = $('<tr/>');
+        row.append('<td><span class="status-icon"></span></td>');
+        const nameTd = $('<td/>').addClass('upload-name').attr('uploaded_file_id', uploaded_file_id);
+        nameTd.append($('<div/>').addClass('file_type_icon file-type-' + fileTypeCode));
+        const details = $('<div/>').addClass('uploaded-file-details');
+        details.append($('<div/>').addClass('name').text(ufd['name'] || ''));
+        details.append($('<div/>').addClass('file-type'));
+        nameTd.append(details);
+        row.append(nameTd);
+        row.append($('<td/>').addClass('upload-user').attr('uploaded_file_id', uploaded_file_id));
+        row.append($('<td/>').addClass('upload-date').attr('uploaded_file_id', uploaded_file_id));
+        const deleteTd = $('<td/>').addClass('upload-delete');
+        deleteTd.append(
+            $('<a/>', {href: '#', class: 'upload-delete-link', title: 'Delete', 'data-uploaded-file-id': uploaded_file_id})
+                .append($('<i/>').addClass('fas fa-trash text-danger'))
+        );
+        row.append(deleteTd);
+        // Prepend so newest appears at the top
+        tbody.prepend(row);
+    }
+
+    function delete_upload(uploadedFileId) {
+        return fetch("/upload/upload_file_delete/" + uploadedFileId, {
+            method: 'DELETE',
+            headers: {'X-CSRFToken': getCookie('csrftoken')},
+        }).then((resp) => {
+            if (!resp.ok) {
+                throw new Error('Delete failed');
+            }
+        });
+    }
+
+    $(document).on('click', '.upload-delete-link', function(e) {
+        e.preventDefault();
+        const link = $(this);
+        const uploadedFileId = link.attr('data-uploaded-file-id');
+        if (!uploadedFileId) {
+            return;
+        }
+        delete_upload(uploadedFileId).then(() => {
+            link.closest('tr').remove();
+        }).catch(() => {
+            alert("Could not delete the file.");
+        });
+    });
+
 	function process_upload_status(uploaded_file_dicts) {
         let needsUpdate = false;
         for (let i=0 ; i<uploaded_file_dicts.length ; ++i) {
             const ufd = uploaded_file_dicts[i];
+            ensure_upload_row(ufd);
             update_upload_status(ufd);
             const status = ufd['processing_status'];
             if (!(status == 'S' || status == 'E')) {
-				needsUpdate = true;			
+				needsUpdate = true;
 			}
 		}
 		if (needsUpdate) {
@@ -361,10 +400,144 @@ img.thumbnail {
 		</div>
 	</form>
 
-	<div id="jfu-container">
-			{% load jfutags %}
-			{% jfu 'upload/jfu_upload_form.html' %}
+	<div id="filepond-container">
+		{% if upload_enabled %}
+		<button type="button" id="upload-file-browse" class="btn btn-success mb-2">Add files...</button>
+		<input type="file" id="upload-file" name="filepond" multiple>
+		{% endif %}
+
+		<table id="upload-files-table" class="mt-3">
+			<tbody>
+			{% for ufd in existing_files %}
+				<tr>
+					<td>
+						<span class="status-icon">
+							{% if ufd.status_icon and ufd.status_icon.icon %}
+								<i class="fas {{ ufd.status_icon.icon }} {{ ufd.status_icon.css }}" title="{{ ufd.status_icon.title }}"></i>
+							{% endif %}
+						</span>
+					</td>
+					<td class="upload-name" uploaded_file_id="{{ ufd.uploaded_file_id }}">
+						<div title="{{ ufd.file_type }}" class="file_type_icon file-type-{{ ufd.file_type_code }}"></div>
+						<div class="uploaded-file-details">
+							<div class="name" file_type="{{ ufd.file_type }}">
+								{% if ufd.url %}
+									<a href="{{ ufd.url }}" title="View upload processing of '{{ ufd.name }}'">{{ ufd.name }}</a>
+								{% else %}
+									<span>{{ ufd.name }}</span>
+								{% endif %}
+							</div>
+							<div class="file-type">
+								{% if ufd.processing_status == 'S' and ufd.data_url %}
+									<a href="{{ ufd.data_url }}">{{ ufd.file_type }}</a>
+								{% else %}
+									{{ ufd.file_type|default_if_none:"" }}
+								{% endif %}
+								{% if ufd.genome_build %}
+									<i>({{ ufd.genome_build }})</i>
+								{% endif %}
+							</div>
+							{% if ufd.error %}
+								<div><span class="label label-danger">Error</span> {{ ufd.error }}</div>
+							{% endif %}
+						</div>
+					</td>
+					<td class="upload-user" uploaded_file_id="{{ ufd.uploaded_file_id }}">{{ ufd.user }}</td>
+					<td class="upload-date" uploaded_file_id="{{ ufd.uploaded_file_id }}">{{ ufd.time_since }}</td>
+					<td class="upload-delete">
+						<a href="#" class="upload-delete-link" data-uploaded-file-id="{{ ufd.uploaded_file_id }}" title="Delete"><i class="fas fa-trash text-danger"></i></a>
+					</td>
+				</tr>
+			{% endfor %}
+			</tbody>
+		</table>
 	</div>
+
+	{% if upload_enabled %}
+	<script>
+		(function() {
+			const inputElement = document.querySelector('#upload-file');
+			if (!inputElement) {
+				return;
+			}
+			const csrftoken = getCookie('csrftoken');
+
+			const pond = FilePond.create(inputElement, {
+				allowMultiple: true,
+				credits: false,
+				dropOnPage: true,
+				dropOnElement: false,
+				server: {
+					process: {
+						url: "{% url 'upload_file' %}",
+						method: 'POST',
+						headers: {'X-CSRFToken': csrftoken},
+					},
+					revert: (uniqueFileId, load, error) => {
+						fetch("/upload/upload_file_delete/" + uniqueFileId, {
+							method: 'DELETE',
+							headers: {'X-CSRFToken': csrftoken},
+						}).then((resp) => {
+							if (resp.ok) {
+								load();
+								update_uploads();
+							} else {
+								error('Could not revert');
+							}
+						}).catch(() => error('Could not revert'));
+					},
+				},
+			});
+
+			function stubRowId(fileId) {
+				return 'upload-stub-' + fileId.replace(/[^a-zA-Z0-9_-]/g, '');
+			}
+
+			pond.on('addfile', (error, file) => {
+				if (error) {
+					return;
+				}
+				const tbody = $("#upload-files-table tbody");
+				const tr = $('<tr/>', {id: stubRowId(file.id)});
+				tr.append('<td><span class="status-icon"><i class="fas fa-spinner fa-spin" title="Uploading"></i></span></td>');
+				const nameTd = $('<td/>').addClass('upload-name');
+				nameTd.append($('<div/>').addClass('file_type_icon'));
+				const details = $('<div/>').addClass('uploaded-file-details');
+				details.append($('<div/>').addClass('name').text(file.filename));
+				const progress = $('<div/>').addClass('progress')
+					.append($('<div/>').addClass('progress-bar bg-success').css('width', '0%'));
+				details.append(progress);
+				nameTd.append(details);
+				tr.append(nameTd);
+				tr.append($('<td/>').addClass('upload-user'));
+				tr.append($('<td/>').addClass('upload-date').text('just now'));
+				tbody.prepend(tr);
+			});
+
+			pond.on('processfileprogress', (file, progress) => {
+				$('#' + stubRowId(file.id)).find('.progress-bar').css('width', (progress * 100) + '%');
+			});
+
+			pond.on('processfile', (error, file) => {
+				$('#' + stubRowId(file.id)).remove();
+				if (!error) {
+					pond.removeFile(file.id);
+					update_uploads();
+				}
+			});
+
+			pond.on('processfileabort', (file) => {
+				$('#' + stubRowId(file.id)).remove();
+				update_uploads();
+			});
+
+			const browseButton = document.querySelector('#upload-file-browse');
+			if (browseButton) {
+				browseButton.addEventListener('click', () => pond.browse());
+			}
+		})();
+	</script>
+	{% endif %}
 
     <div id="error-dialog">
     </div>

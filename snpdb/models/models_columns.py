@@ -46,9 +46,10 @@ class VariantGridColumn(models.Model):
 
     @cached_property
     def columns_version_description(self) -> str:
-        q = Q(min_columns_version__isnull=False) | Q(max_columns_version__isnull=False)
-        if cvf := self.columnvepfield_set.filter(q).first():
-            return cvf.columns_version_description
+        from annotation.vep_columns import for_variant_grid_column
+        for c in for_variant_grid_column(self.pk):
+            if c.min_columns_version is not None or c.max_columns_version is not None:
+                return c.columns_version_description
         return ""
 
     @property

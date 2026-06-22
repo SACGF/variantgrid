@@ -459,7 +459,10 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
     @property
     def classifications_qs(self) -> QuerySet[Classification]:
-        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
+        qs = self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
+        if not settings.DISCORDANCE_RESEARCH_ENABLED:
+            qs = qs.exclude(lab__research=True)
+        return qs
 
     @property
     def classifications_associated_qs(self) -> QuerySet[Classification]:

@@ -10,7 +10,7 @@ from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCollection, TranscriptVersion
 from seqauto.models import SequencerModel, Sequencer, SequencingRun, SampleSheet, \
     SequencingRunCurrentSampleSheet, SequencingSample, Fastq, UnalignedReads, Aligner, \
-    BamFile, VCFFile, QC, VariantCaller, EnrichmentKit, QCGeneCoverage
+    BamFile, SingleSampleVCF, QC, VariantCaller, EnrichmentKit, QCGeneCoverage
 from seqauto.models.models_enums import DataGeneration
 from seqauto.tasks.gold_summary_tasks import calculate_gold_summary
 from snpdb.models import Manufacturer, GenomeBuild, DataState
@@ -51,8 +51,8 @@ class TestSeqAutoModels(TestCase):
         bam_file, _ = BamFile.objects.get_or_create(unaligned_reads=unaligned_reads,
                                                     aligner=aligner)
         variant_caller, _ = VariantCaller.objects.get_or_create(name="Fake Caller")
-        vcf_file, _ = VCFFile.objects.get_or_create(bam_file=bam_file,
-                                                    variant_caller=variant_caller)
+        vcf_file, _ = SingleSampleVCF.objects.get_or_create(bam_file=bam_file,
+                                                            variant_caller=variant_caller)
         path = os.path.join(TestSeqAutoModels.TEST_DATA,
                             "idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/4_QC/exec_stats/hiseq_sample1_stats.txt")
         qc, _ = QC.objects.get_or_create(bam_file=bam_file, vcf_file=vcf_file,

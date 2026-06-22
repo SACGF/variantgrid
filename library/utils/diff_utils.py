@@ -189,7 +189,7 @@ class MultiDiffOutput:
         #     return SafeString(f"<span class='diff-text'>{escape(self.input.text)}</span>")
         # else:
         return SafeString("<span class='diff-text'>" + "".join(
-            f"<span class='diff-text-{diff.operation_name}'>{escape(diff.text)}</span>" for diff in self.diffs
+            f"<span class='diff-text-{escape(diff.operation_name)}'>{escape(diff.text)}</span>" for diff in self.diffs
         ) + "</span>")
 
     def append(self, op: str, segment: str) -> 'MultiDiffOutput':

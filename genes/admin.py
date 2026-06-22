@@ -1,12 +1,13 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db.models import QuerySet, TextField
 from django.db.models.functions import Cast
 from django.utils.safestring import SafeString
 from guardian.admin import GuardedModelAdmin
 
 from genes import models
-from genes.models import GeneSymbol
+from genes.models import GeneSymbol, GeneCoverageCollection
 from snpdb.admin_utils import ModelAdminBasics, admin_list_column, admin_action
+from snpdb.archive import ArchivePreconditionError
 
 
 @admin.register(models.GeneList)
@@ -78,3 +79,30 @@ class PanelAppPanelLocalCacheAdmin(ModelAdminBasics):
 @admin.register(models.SampleGeneList)
 class SampleGeneListAdmin(ModelAdminBasics):
     pass
+
+
+@admin.register(models.GeneCoverageCollection)
+class GeneCoverageCollectionAdmin(ModelAdminBasics):
+    list_display = ("pk", "path", "data_state", "genome_build", "data_archived_date")
+    list_filter = ("data_state", "genome_build", "data_archived_date")
+    actions = ["archive_selected", "restore_selected"]
+
+    @admin_action("Archive selected")
+    def archive_selected(self, request, queryset: QuerySet[GeneCoverageCollection]):
+        from genes.archive import archive_gene_coverage_collection
+        for gcc in queryset:
+            try:
+                archive_gene_coverage_collection(gcc, request.user, reason="Admin action")
+                messages.info(request, f"Archived GCC pk={gcc.pk}")
+            except ArchivePreconditionError as e:
+                messages.error(request, f"GCC pk={gcc.pk}: {e}")
+
+    @admin_action("Restore selected")
+    def restore_selected(self, request, queryset: QuerySet[GeneCoverageCollection]):
+        from genes.archive import restore_gene_coverage_collection
+        for gcc in queryset:
+            try:
+                restore_gene_coverage_collection(gcc, request.user)
+                messages.info(request, f"Restore queued for GCC pk={gcc.pk}")
+            except ValueError as e:
+                messages.error(request, f"GCC pk={gcc.pk}: {e}")

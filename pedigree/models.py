@@ -29,6 +29,10 @@ class PedFile(GuardianPermissionsMixin, models.Model):
     def get_absolute_url(self):
         return reverse('view_ped_file', kwargs={"ped_file_id": self.pk})
 
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        return True  # User-uploaded file; deletable via the group_permissions delete view
+
 
 class PedFileFamily(models.Model):
     """ Collects records together by family/pedigree (1st column)
@@ -140,6 +144,10 @@ class Pedigree(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortB
     @property
     def genome_build(self):
         return self.cohort.genome_build
+
+    @property
+    def data_archived(self) -> bool:
+        return self.cohort.data_archived
 
     def get_absolute_url(self):
         return reverse('view_pedigree', kwargs={"pedigree_id": self.pk})

@@ -85,6 +85,9 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,
     sort_cmd_str = " ".join(sort_cmd)
     cmd_str = " | ".join((liftover_cmd_str, sort_cmd_str))
     logging.info(cmd_str)
+    # shell=True is required to pipe liftover output into sort. All components are
+    # server-side and trusted: the "bcftools" literal plus settings-derived/validated
+    # fasta, chain and pipeline VCF paths - no user-supplied input reaches the command.
     return_code, std_out, std_err = execute_cmd([cmd_str], env=env, shell=True)
     logging.info("return_code: %s", return_code)
     if std_out:

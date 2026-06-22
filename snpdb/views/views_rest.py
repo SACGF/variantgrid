@@ -1,6 +1,8 @@
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import permissions, viewsets
 from rest_framework.generics import RetrieveAPIView, get_object_or_404
 from rest_framework.response import Response
@@ -17,6 +19,10 @@ from snpdb.serializers import QuadSerializer, TrioSerializer, VariantAlleleSeria
 class VariantZygosityForSampleView(APIView):
     """ Returns Zygosity for variant/sample ("." if missing) """
 
+    @extend_schema(
+        summary="Get zygosity for a variant in a sample",
+        responses=OpenApiTypes.OBJECT,
+    )
     def get(self, request, *args, **kwargs):
         variant_id = self.kwargs['variant_id']
         sample_id = self.kwargs['sample_id']
@@ -54,7 +60,16 @@ class QuadView(RetrieveAPIView):
 
 
 class VariantAlleleForVariantView(APIView):
+    """ Returns the VariantAllele for a variant in a genome build, with variant link data """
 
+    @extend_schema(
+        summary="Get VariantAllele (with link data) for a variant in a genome build",
+        responses=VariantAlleleSerializer,
+        parameters=[
+            OpenApiParameter("genome_build_name", OpenApiTypes.STR, OpenApiParameter.PATH,
+                             description='Genome build name or alias, e.g. "GRCh37" or "GRCh38"'),
+        ],
+    )
     def get(self, request, *args, **kwargs):
         variant = get_object_or_404(Variant, pk=self.kwargs['variant_id'])
         genome_build = GenomeBuild.get_name_or_alias(self.kwargs['genome_build_name'])

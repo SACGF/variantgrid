@@ -146,6 +146,108 @@
 
     {% else %}
        <div class="card mt-4">
+            <div class="card-header">12 June 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#1621 - Intersection / All Varaints - filter by contig option</li>
+                    <li>#1618 - QuadNode - "require affected sibling zygosity" option</li>
+                    <li>#1561- QuadNode refinements - "Combine recessive filter", "Any affected"</li>
+                    <li>#51 - Node editor doesn't wait for grid. Don't auto-load grid for large nodes (>50k default)</li>
+                </ul>
+                <h4>Annotation</h4>
+                <ul>
+                    <li>#2667 - Merge annotation runs into larger + more efficient batches</li>
+                </ul>
+                <h4>Search</h4>
+                <ul>
+                    <li>#1623 - Search for Trios and Quads</li>
+                </ul>
+                <h4>Variant Details</h4>
+                <ul>
+                    <li>#1573 - Initially show max 8 transcripts</li>
+                    <li>#1148 - Cleanup of fields, shrink search </li>
+                </ul>
+            </div>
+       </div>
+
+       <div class="card mt-4">
+            <div class="card-header">5 June 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#1550 - New Quad analysis type</li>
+                    <li>#1561, #1563 - Trio/Quad node - zygosity options (All Recessive, Any Affected, other filters)</li>
+                    <li>#1560 - All Variants node - chromosome/contig filter</li>
+                    <li>#1543 - DamageNode/EffectNode - support new pathogenicity scores</li>
+                    <li>#1545 - Fix related data quad/pedigree mixup</li>
+                    <li>#853, #1038 - SampleStats improvements (should improve CohortNode load times)</li>
+                    <li>sacgf/variantgrid_com#22 - If VCF data is deleted, sample node handles it better</li>
+                    <li>#1494, #1551, #51, #1552, #1547 - Node performance optimisations / benchmarking</li>
+                    <li>#346 - Analysis worker launching refactor</li>
+                    <li>Cohort node - handle errors better (still brings up editor)</li>
+                </ul>
+
+                <h4>Annotation (need new annotation to run before these can be used)</h4>
+                <ul>
+                    <li>#1386 - gnomAD 4.1</li>
+                    <li>#1131 - dbNSFP 5.3.1 - new columns</li>
+                    <li>#1533 - AnnotSV - new fields, improved issue reporting</li>
+                    <li>#1531, #1708 - denovoDB integration (paths, non-control count)</li>
+                    <li>#574, #720, #1532 - Splice AI run as command to catch indels</li>
+                    <li>#410 - SpliceAI raw scores now show a warning</li>
+                    <li>#1271 - Structural Variant gene overlaps</li>
+                    <li>#1541 - Updated MaveDB data</li>
+                    <li>#1058 - Don't fail on annotation mismatch checks</li>
+                </ul>
+
+                <h4>Classification</h4>
+                <ul>
+                    <li>#299 - Setting for highlighting research classifications</li>
+                </ul>
+
+                <h4>Genes</h4>
+                <ul>
+                    <li>#1476 - Gene list bulk create - error message when a record is too large</li>
+                    <li>#405 - Handle PanelApp panels being deleted</li>
+                    <li>#1527 - Gene List create improvements (faster grid, readonly/spinner upon create, copy/paste genes)</li>
+                </ul>
+
+                <h4>Patients / Phenotype</h4>
+                <ul>
+                    <li>#230 - Patient code improvements</li>
+                    <li>Patients user filter</li>
+                    <li>#1412 - Phenotype term mappings - show ambiguous matches</li>
+                    <li>#400 - Be able to skip / disable auto-matched phenotype terms</li>
+                    <li>#1557 - Speed up bulk phenotype matching</li>
+                </ul>
+
+                <h4>Search</h4>
+                <ul>
+                    <li>#1546 - Search engine optimisation</li>
+                </ul>
+
+                <h4>Variant Details</h4>
+                <ul>
+                    <li>#1045 - Show a message when there's no dbNSFP data / hide empty fields</li>
+                    <li>#1580 - Collapse RepeatMasker down into classes</li>
+                </ul>
+
+                <h4>Data / Upload</h4>
+                <ul>
+                    <li>#1536 - Data archive ability - can dump VCF data w/o deleting metadata / previous analyses etc</li>
+                    <li>#1566 - Replace jQuery File Upload with Filepond (file upload widget) - this had been abandoned - needed to upgrade for security reasons</li>
+                </ul>
+
+                <h4>QC</h4>
+                <ul>
+                    <li>#401 - Link to other sites</li>
+                </ul>
+            </div>
+        </div>
+
+
+       <div class="card mt-4">
             <div class="card-header">10 April 2026</div>
             <div class="card-body">
                 <h4>Analysis</h4>

@@ -28,19 +28,34 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
                                               "test", str(uuid4()))
 
     TEST_ANNOTATION = copy.deepcopy(settings.ANNOTATION)
-    # I didn't have the phasCons/phyloP data on my laptop when I generated the test VCFs, so need to disable
-    TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
-        "phastcons100way": None,
-        "phastcons46way": None,
-        "phylop100way": None,
-        "phylop46way": None,
-    })
-    TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
-        "phastcons100way": None,
-        "phastcons30way": None,
-        "phylop100way": None,
-        "phylop30way": None,
-    })
+    # phastCons/phyloP custom tracks: v1-v3 fixtures were generated without the bigwig data,
+    # so disable to keep importer bindings clean. v4 fixtures include them.
+    if columns_version < 4:
+        TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
+            "phastcons100way": None,
+            "phastcons46way": None,
+            "phylop100way": None,
+            "phylop46way": None,
+        })
+        TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
+            "phastcons100way": None,
+            "phastcons30way": None,
+            "phylop100way": None,
+            "phylop30way": None,
+        })
+
+    # columns_version 4 fixtures were generated against gnomAD 4.1 (the FILTER column shifts
+    # VEPConfig.gnomad4_minor_version, which gates which gnomAD CSQ fields apply); earlier
+    # fixtures used gnomAD 4.0. Plugin/version-only data files (denovo_db, mave, etc.) are
+    # gated through vep_columns column-defs (min_columns_version), so we don't need to null
+    # them out per-version here.
+    if columns_version >= 4:
+        gnomad4_path = "annotation_data/GRCh38/gnomad4.1_GRCh38_contigs.vcf.gz"
+    else:
+        gnomad4_path = "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz"
+
+    # Pin gnomAD so a developer's local override doesn't shift VEP CSQ fields and break fixture parsing.
+    TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"]["gnomad4"] = gnomad4_path
 
     ANNOTATION_COLUMNS = copy.deepcopy(TEST_ANNOTATION)
     ANNOTATION_COLUMNS[settings.BUILD_GRCH37]["columns_version"] = columns_version
@@ -102,15 +117,25 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                                               "gene_annotation_import": gene_annotation_import,
                                                                           })[0]
 
-    vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
-    vav_kwargs["gene_annotation_release"] = gene_annotation_release
-    variant_annotation_version = VariantAnnotationVersion.objects.create(**vav_kwargs)
     create_ontology_test_data()
     ontology_version = create_test_ontology_version()
 
+    # GeneAnnotationVersion must exist before VariantAnnotationVersion: VAV.save() triggers
+    # AnnotationVersion.new_sub_version which raises InvalidAnnotationVersionError if VAV's
+    # gene_annotation_release has no matching GeneAnnotationVersion yet.
     gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
                                                                           ontology_version=ontology_version,
                                                                           gnomad_import_date=timezone.now())[0]
+
+    vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
+    vav_kwargs["gene_annotation_release"] = gene_annotation_release
+    vav_defaults = {k: vav_kwargs.pop(k) for k in list(vav_kwargs) if k != "genome_build"}
+    vav_defaults["status"] = VariantAnnotationVersion.Status.ACTIVE
+    variant_annotation_version, _ = VariantAnnotationVersion.objects.get_or_create(
+        genome_build=genome_build,
+        status=VariantAnnotationVersion.Status.ACTIVE,
+        defaults=vav_defaults,
+    )
     clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
                                                            sha256_hash="not_a_real_hash",
                                                            genome_build=genome_build)[0]

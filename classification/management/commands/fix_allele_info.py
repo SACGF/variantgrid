@@ -33,7 +33,7 @@ class Command(BaseCommand):
     @staticmethod
     def get_imported_allele_info_liftover_builds_and_qs() -> list[tuple[GenomeBuild, QuerySet[ImportedAlleleInfo]]]:
         builds_and_liftover = []
-        for genome_build in ImportedAlleleInfo.supported_genome_builds:
+        for genome_build in ImportedAlleleInfo.supported_genome_builds():
             field = ImportedAlleleInfo._genome_build_to_attr(genome_build)
             kwargs = {
                 f"{field}__isnull": True,

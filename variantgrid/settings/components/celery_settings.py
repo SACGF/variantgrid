@@ -59,9 +59,20 @@ CELERY_TASK_ROUTES = {
     'analysis.tasks.karyomapping_tasks.create_genome_karyomapping_for_trio': ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.update_node_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.node_cache_task": ANALYSIS_WORKERS,
+    # Venn equivalent of node_cache_task - chained ahead of the Venn node's update. Keep it on the
+    # analysis pool (not the default db_workers) so cache building scales with the rest of the
+    # pipeline rather than starving on db_workers and triggering lease-expiry re-dispatch churn.
+    "analysis.models.nodes.filters.venn_node.venn_cache_count": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_cache_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.delete_analysis_old_node_versions": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_node": ANALYSIS_WORKERS,
+    # Periodic safety-net sweep (issue #346). Deliberately NOT on ANALYSIS_WORKERS: it exists to
+    # recover stuck/dead node-load workers, so it must not queue behind the very backlog it's meant
+    # to rescue - it would be starved exactly when needed. It's also not node work: it only runs a
+    # discovery query and enqueues create_and_launch_analysis_tasks (which lands on the single
+    # worker, where the actual reclaim/lease happens). DB_WORKERS is a separate pool that keeps
+    # ticking when analysis_workers are saturated.
+    "analysis.tasks.node_update_tasks.reschedule_stalled_analyses": DB_WORKERS,
     # Annotation
     "annotation.tasks.annotate_variants.delete_annotation_run": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.delete_annotation_run_uploaded_data": ANNOTATION_WORKERS,
@@ -94,8 +105,14 @@ CELERY_TASK_ROUTES = {
 
     # Scheduling single worker
     'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,
+    # #2667: single-authority annotation dispatcher - all run leasing/merge serialises here
+    'annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
+
+    # Partition archive
+    'snpdb.tasks.partition_archive_tasks.perform_partition_archive': DB_WORKERS,
+    "snpdb.tasks.sub_cohort_tasks.build_sub_cohort_any_sample_called_vc_task": DB_WORKERS,
 }
 
 CELERY_IMPORTS = (
@@ -105,6 +122,7 @@ CELERY_IMPORTS = (
     'analysis.tasks.node_update_tasks',
     'analysis.tasks.reanalysis_tasks',
     'annotation.tasks.annotate_variants',
+    'annotation.tasks.annotation_scheduler_task',
     'annotation.tasks.calculate_sample_stats',
     'annotation.tasks.cohort_sample_gene_damage_counts',
     'annotation.tasks.import_clinvar_vcf_task',
@@ -118,7 +136,9 @@ CELERY_IMPORTS = (
     'snpdb.models',
     'snpdb.tasks.clingen_tasks',
     'snpdb.tasks.cohort_genotype_tasks',
+    'snpdb.tasks.sub_cohort_tasks',
     'snpdb.tasks.graph_generation_task',
+    'snpdb.tasks.partition_archive_tasks',
     'snpdb.tasks.soft_delete_tasks',
     'snpdb.tasks.vcf_bed_file_task',
     'snpdb.tasks.vcf_zygosity_count_tasks',
@@ -140,3 +160,21 @@ CELERY_IMPORTS = (
 
 CELERY_TASK_ALWAYS_EAGER = False  # True to execute in http server process (or Eclipse)
 CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
+
+# Per-queue cap on a worker process's virtual address space (GB, RLIMIT_AS) so a runaway allocation
+# raises a catchable MemoryError in Python (update_node_task perma-fails the node + reports to
+# Rollbar) instead of the OS OOM-killer locking up the whole box. {} = no limit.
+# A worker is capped only if EVERY queue it serves (its -Q list) is listed here, so a worker that
+# also runs uncapped work (e.g. VEP bulk inserts on annotation_workers) is never throttled.
+# RLIMIT_AS caps VSZ (virtual, overcounts RSS) so set generously above the worker's baseline - too
+# low and the worker MemoryErrors on warmup. Tune per deployment.
+CELERY_WORKER_ADDRESS_SPACE_LIMIT_GB = {
+    "analysis_workers": 8,
+}
+
+# Crash safety brake: after a host reboot (low /proc/uptime) the worker auto-pauses the analysis +
+# annotation job dispatchers once per boot, so jobs that may have crashed the box don't immediately
+# re-launch and crash it again. An admin resumes with 'manage.py jobs_control resume'. Turn this OFF
+# on ephemeral / autoscaled hosts, where a fresh boot is routine rather than a crash signal.
+JOBS_AUTOPAUSE_ON_REBOOT = True
+JOBS_AUTOPAUSE_ON_REBOOT_UPTIME_SECS = 600  # uptime under this on worker start => treat as a reboot

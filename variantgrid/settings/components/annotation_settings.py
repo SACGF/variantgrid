@@ -29,8 +29,20 @@ ANNOTATION_VEP_BUFFER_SIZE = {
 # The variant table is usually ~55% alt variants but may be different due to data or if you've deleted records
 ANNOTATION_VEP_BATCH_MIN = 5000  # Dont' set too low due to overhead of running pipeline etc
 ANNOTATION_VEP_BATCH_MAX = 25_000  # Set to None to do all in 1 job (probably want to set FORK higher)
+
+# Annotation dispatcher (#2667). The dispatcher launches at most as many runs as there are free
+# annotation_workers slots, keeping the rest as pending DB state it can merge into bigger batches.
+# Worker-slot count is derived live from the annotation_workers pool (annotation.celery_utils);
+# this fallback is only used when celery inspection sees no workers (eg headless/cron, no pool up).
+ANNOTATION_WORKER_SLOTS_FALLBACK = 2
+# Lease reclaims (dead-worker re-dispatch) allowed before a run is failed to ERROR.
+ANNOTATION_MAX_RUN_ATTEMPTS = 3
+# Lease window. Must exceed the worst-case single-run time so a live worker is never reclaimed
+# under us. A run is capped at BATCH_MAX (25k ~= 45 min); prod runs ~1.5 h / 50k. 16200 = 4.5 h
+# is a deliberately generous 3x margin - reclaim is the rare dead-worker path so erring long is cheap.
+ANNOTATION_RUN_LEASE_SECONDS = 16200
 ANNOTATION_VEP_ARGS = []
-ANNOTATION_VEP_VERSION = "110"
+ANNOTATION_VEP_VERSION = "115"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
 ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
@@ -40,7 +52,12 @@ ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
 # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
 ANNOTATION_VEP_PICK_ORDER = None
 ANNOTATION_VEP_DISTANCE = 5000  # VEP --distance arg (default=5000) - how far up/downstream to assign to a transcript
-ANNOTATION_VEP_COLUMNS_VERSION = 1  # 1 = original version, 2 = May 2022
+# Read at VAV creation only and snapshotted onto the VariantAnnotationVersion. Existing VAVs are unaffected by changes here.
+# Values: "primary" -> --gencode_primary, "basic" -> --gencode_basic, None -> full Ensembl set. Ignored for RefSeq VAVs.
+ANNOTATION_VEP_ENSEMBL_GENCODE = "primary"
+# columns version is used to drive config in vep_columns.py
+# Default is the latest (see pin_annotation_to_columns_version_3() to stay on historical config). #1625
+ANNOTATION_VEP_COLUMNS_VERSION = 4  # 1 = original version, 2 = May 2022, 3 = 2024, 4 = 2025 (dbNSFP 5, raw scores)
 ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE = True  # Only 'dup' for dups, false is all SVs overlap
 ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD = "lowest_af"  # "greatest_overlap", "lowest_af", "exact_or_lowest_af"
 ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION = 0.8
@@ -48,6 +65,12 @@ ANNOTATION_VEP_SV_MAX_SIZE = 10_000_000  # VEP default = 10M
 
 ANNOTATION_MAX_BENIGN_RANKSCORE = 0.15
 ANNOTATION_MIN_PATHOGENIC_RANKSCORE = 0.85
+
+# dbNSFP rankscores are legacy (replaced by raw scores at columns_version >= 4). New deployments hide
+# them so nobody filters/views by them going forward. Deployments that previously used rankscores set
+# this True (see env/vgaws.py, env/vgtest.py). A value that was already set is always shown/applied
+# regardless of this flag.
+ANNOTATION_SHOW_LEGACY_RANKSCORES = False
 
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
@@ -63,7 +86,7 @@ ANNOTATION = {
     BUILD_GRCH37: {
         "enabled": True,
         "annotation_consortium": "Ensembl",
-        "columns_version": 3,
+        "columns_version": 4,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
@@ -78,8 +101,9 @@ ANNOTATION = {
         "vep_config": {
             "sift": True,
             "cosmic": "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz",
-            "dbnsfp": "annotation_data/GRCh37/dbNSFP4.5a.grch37.stripped.gz",
+            "dbnsfp": "annotation_data/GRCh37/dbNSFP5.3.1a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
+            "denovo_db": "annotation_data/GRCh37/denovo-db.variants.v.1.6.1.GRCh37.vcf.gz",
             "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
             # We use gnomAD SV VCF with --custom twice
             "gnomad_sv": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
@@ -96,8 +120,8 @@ ANNOTATION = {
             'phylop46way': "annotation_data/GRCh37/hg19.phyloP46way.placental.bw",
             'phylop30way': None,  # n/a for GRCh37
             "repeatmasker": "annotation_data/GRCh37/repeatmasker_hg19.bed.gz",
-            "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.hg19.vcf.gz",
-            "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.hg19.vcf.gz",
+            "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.masked.snv.hg19.vcf.gz",
+            "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.masked.indel.hg19.vcf.gz",
             "topmed": "annotation_data/GRCh37/TOPMED_GRCh37.vcf.gz",
             "transcript_blocklist": None,
             "uk10k": "annotation_data/GRCh37/UK10K_COHORT.20160215.sites.vcf.gz",
@@ -107,7 +131,7 @@ ANNOTATION = {
         # Only 37 is enabled by default - overwrite "enabled" in your server settings to use following builds
         "enabled": False,
         "annotation_consortium": "Ensembl",
-        "columns_version": 3,
+        "columns_version": 4,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
@@ -122,18 +146,19 @@ ANNOTATION = {
         "vep_config": {
             "sift": True,
             "cosmic": "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz",
-            "dbnsfp": "annotation_data/GRCh38/dbNSFP4.5a.grch38.stripped.gz",
+            "dbnsfp": "annotation_data/GRCh38/dbNSFP5.3.1a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
+            "denovo_db": "annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz",
             # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
             "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.toplevel.fa.gz"),
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
-            "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",
+            "gnomad4": "annotation_data/GRCh38/gnomad4.1_GRCh38_contigs.vcf.gz",
             # We use gnomAD SV VCF with --custom twice
             "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
-            "mave": "annotation_data/GRCh38/MaveDB_variants.tsv.gz",
+            "mave": "annotation_data/GRCh38/MaveDB_variants_2026-04-30.tsv.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh38/hg38.phastCons100way.bw",
             'phastcons46way': None,  # n/a for GRCh38
@@ -142,8 +167,8 @@ ANNOTATION = {
             "phylop46way": None,  # n/a for GRCh38
             'phylop30way': "annotation_data/GRCh38/hg38.phyloP30way.bw",
             "repeatmasker": "annotation_data/GRCh38/repeatmasker_hg38.bed.gz",
-            "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.hg38.vcf.gz",
-            "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.hg38.vcf.gz",
+            "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.masked.snv.hg38.vcf.gz",
+            "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.masked.indel.hg38.vcf.gz",
             "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
             "transcript_blocklist": "annotation_data/GRCh38/blocklist_brca1_new_transcripts.txt",
             "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
@@ -167,6 +192,7 @@ ANNOTATION = {
             "cosmic": None,  # N/A
             "dbnsfp": None,
             "dbscsnv": None,
+            "denovo_db": None,  # N/A
             "gnomad4": "annotation_data/T2T-CHM13v2.0/gnomad4.1.t2t_liftover_T2T-CHM13v2.0_combined_af.vcf.bgz",
             "gnomad_sv": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
@@ -191,10 +217,56 @@ ANNOTATION = {
     },
 }
 
+def pin_annotation_to_columns_version_3(annotation):
+    """Restore the historical (pre-#1625) columns_version 3 annotation config.
+
+    The package default ANNOTATION now ships the latest annotation data (columns_version 4 -
+    dbNSFP 5.x raw scores, masked SpliceAI, gnomAD 4.1, denovo-db, ...) so a fresh deployment
+    gets latest without hunting for config. Existing deployments that haven't loaded the newer
+    annotation data files call this from their env settings file to stay on the previous config.
+    Note the caller is also responsible for keeping ANNOTATION_VEP_VERSION on its historical value.
+    """
+    annotation[BUILD_GRCH37]["columns_version"] = 3
+    annotation[BUILD_GRCH37]["vep_config"].update({
+        "denovo_db": None,
+        "dbnsfp": "annotation_data/GRCh37/dbNSFP4.5a.grch37.stripped.gz",
+        "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.hg19.vcf.gz",
+        "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.hg19.vcf.gz",
+    })
+    annotation[BUILD_GRCH38]["columns_version"] = 3
+    annotation[BUILD_GRCH38]["vep_config"].update({
+        "denovo_db": None,
+        "dbnsfp": "annotation_data/GRCh38/dbNSFP4.5a.grch38.stripped.gz",
+        "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",
+        "mave": "annotation_data/GRCh38/MaveDB_variants_2023-11-29.tsv.gz",
+        "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.hg38.vcf.gz",
+        "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.hg38.vcf.gz",
+    })
+
+
 ANNOTATION_VCF_DUMP_DIR = os.path.join(PRIVATE_DATA_ROOT, 'annotation_dump')
+
+# AnnotSV (post-VEP stage on the STRUCTURAL_VARIANT pipeline). Strictly opt-in:
+# leaving ANNOTATION_ANNOTSV_ENABLED=False means no AnnotSV invocation, no version
+# pin populated on VariantAnnotationVersion, and no reannotation triggered. Deployments
+# enable this in their per-host settings file once the binary + bundle are installed.
+ANNOTATION_ANNOTSV_ENABLED = False
+ANNOTATION_ANNOTSV_BIN = "/data/annotation/AnnotSV/bin/AnnotSV"
+ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/AnnotSV/share/AnnotSV/Annotations_Human"
+# Map our genome build name -> AnnotSV's -genomeBuild value
+ANNOTATION_ANNOTSV_GENOME_BUILD = {
+    BUILD_GRCH37: "GRCh37",
+    BUILD_GRCH38: "GRCh38",
+}
+# Annotations bundle has no version stamp file; admin sets this to the bundle release
+# string they installed (eg "3.5.8"). Compared against VariantAnnotationVersion.annotsv_bundle.
+ANNOTATION_ANNOTSV_BUNDLE_VERSION = None
+ANNOTATION_ANNOTSV_EXTRA_ARGS: list[str] = []
+ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60
 # Admin email used in PubMed queries to contact before throttling/banning
 ANNOTATION_ENTREZ_EMAIL = get_secret("ENTREZ.email")  # Automatically set in in annotation.apps.AnnotationConfig
 ANNOTATION_ENTREZ_API_KEY = get_secret("ENTREZ.api_key")
+
 ANNOTATION_PUBMED_GENE_SYMBOL_COUNT_CACHE_DAYS = 30
 ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED = False
 
@@ -214,6 +286,10 @@ CACHED_WEB_RESOURCE_REFSEQ_GENE_INFO = "RefSeq Gene Info"
 CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO = "RefSeq Sequence Info"
 CACHED_WEB_RESOURCE_REFSEQ_GENE_PUBMED_COUNTS = "RefSeq Gene PubMed Counts"
 CACHED_WEB_RESOURCE_UNIPROT = "UniProt"
+
+DISABLED_CACHED_WEB_RESOURCES = {
+    CACHED_WEB_RESOURCE_PFAM: "https://github.com/SACGF/variantgrid/issues/1554",
+}
 
 ANNOTATION_CACHED_WEB_RESOURCES = [
     CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,

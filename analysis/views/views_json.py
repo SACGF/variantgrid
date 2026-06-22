@@ -15,7 +15,7 @@ from analysis.models import AnalysisVariable, AnalysisTemplate, NodeCount, Varia
     CandidateStatus
 from analysis.models.enums import TagLocation
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, AnalysisNode
+from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, AnalysisNode, NodeTask
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
@@ -337,7 +337,8 @@ def sample_patient_gene_disease(request, sample_id, ontology_version_id):
 @require_POST
 def analysis_reload(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
-    node_utils.reload_analysis_nodes(analysis.pk)
+    only_errors = json.loads(request.POST.get("only_errors", "false"))
+    node_utils.reload_analysis_nodes(analysis.pk, only_errors=only_errors)
     return JsonResponse({})
 
 
@@ -377,9 +378,13 @@ def nodes_tasks(request, analysis_id):
         active_jobs = {a["id"] for a in active[NODE_NAME]}
 
         summary = Counter()
-        node_qs = analysis.analysisnode_set.filter(visible=True, status__in=NodeStatus.LOADING_STATUSES,
-                                                   nodetask__version=F("version"))
-        for celery_task in node_qs.values_list("nodetask__celery_task", flat=True):
+        # Current-version NodeTasks for this analysis's visible, still-loading nodes
+        node_task_qs = NodeTask.objects.filter(
+            node_version__node__analysis=analysis,
+            node_version__node__visible=True,
+            node_version__node__status__in=NodeStatus.LOADING_STATUSES,
+            node_version__version=F("node_version__node__version"))
+        for celery_task in node_task_qs.values_list("celery_task", flat=True):
             status = "QUEUED"
             if celery_task:
                 if celery_task in active_jobs:

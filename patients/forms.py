@@ -19,12 +19,13 @@ class PatientForm(forms.ModelForm):
 
     class Meta:
         model = Patient
-        fields = ['first_name', 'last_name', 'family_code',
+        fields = ['first_name', 'last_name', 'family_code', 'patient_code',
                   'date_of_birth', 'date_of_death', 'sex',
                   'consanguineous', 'affected', 'phenotype']
         widgets = {'first_name': TextInput(attrs={'placeholder': 'First Name'}),
                    'last_name': TextInput(attrs={'placeholder': 'Last Name'}),
                    'family_code': TextInput(attrs={'placeholder': 'Family Code'}),
+                   'patient_code': TextInput(attrs={'placeholder': 'Patient Code (de-identified)'}),
                    'date_of_birth': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Date of Birth'}),
                    'date_of_death': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Date of Death'})}
 

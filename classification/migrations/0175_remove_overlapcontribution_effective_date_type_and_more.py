@@ -5,7 +5,7 @@ import classification.models.overlaps_model
 import library.utils.database_utils
 from django.db import migrations
 
-from annotation.models import EffectiveDate
+from annotation.models.data_enums import EffectiveDate
 from classification.models import TriageComment, TriageState
 
 

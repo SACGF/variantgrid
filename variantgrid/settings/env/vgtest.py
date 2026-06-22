@@ -8,6 +8,9 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 WEB_HOSTNAME = 'test.variantgrid.com'
 WEB_IP = '129.127.16.255'
 
+# This deployment used dbNSFP rankscores before raw scores - keep them visible (see annotation_settings.py)
+ANNOTATION_SHOW_LEGACY_RANKSCORES = True
+
 ALLOWED_HOSTS = ["localhost", WEB_HOSTNAME, WEB_IP]
 
 # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
@@ -20,6 +23,9 @@ ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
 ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
 ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
+
+# Stay on the historical annotation config (package default is now latest - see #1625)
+pin_annotation_to_columns_version_3(ANNOTATION)
 
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 SLACK['emoji'] = ':mouse:'

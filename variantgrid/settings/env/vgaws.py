@@ -12,16 +12,32 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 # import all the base settings #
 SITE_ID = 3  # vg.com
 
+SITE_DESCRIPTION = (
+    "VariantGrid is an open source web platform for storing, annotating, analysing and "
+    "classifying human variants."
+)
+
 WEB_HOSTNAME = 'variantgrid.com'
 WEB_IP = '3.104.38.188'
 
 DEBUG = False
 
+PARTITION_ARCHIVE_DIR = "/data/database_dumps/partition_dumps/"
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
+
+# This deployment used dbNSFP rankscores before raw scores - keep them visible (see annotation_settings.py)
+ANNOTATION_SHOW_LEGACY_RANKSCORES = True
 
 _BIG_DISK_BASE_DIR = "/data"
 ANNOTATION_REFERENCE_BASE_DIR = os.path.join(_BIG_DISK_BASE_DIR, "annotation")
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.expanduser("~/perlbrew_runner.sh")
+
+# Stay on the historical annotation config (package default is now latest - see #1625)
+ANNOTATION_VEP_VERSION = "110"
+ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
+ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
+ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
+pin_annotation_to_columns_version_3(ANNOTATION)
 
 ANNOTATION[BUILD_GRCH38]["enabled"] = True
 ANNOTATION[BUILD_T2TV2]["enabled"] = True

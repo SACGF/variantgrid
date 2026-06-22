@@ -173,7 +173,9 @@ def render_labelled(parser, token):
                             row_css=kwargs.get('row_css'),
                             help=kwargs.get('help'),
                             admin_only=kwargs.get('admin_only'),
-                            errors=kwargs.get('errors')
+                            errors=kwargs.get('errors'),
+                            visible_fields=kwargs.get('visible_fields'),
+                            show_if=kwargs.get('show_if'),
                             )
 
 
@@ -189,7 +191,9 @@ class LabelledValueTag(template.Node):
                  row_css: FilterExpression = None,
                  help: FilterExpression = None,
                  admin_only: FilterExpression = None,
-                 errors: FilterExpression = None):
+                 errors: FilterExpression = None,
+                 visible_fields: FilterExpression = None,
+                 show_if: FilterExpression = None):
         self.row_id = row_id
         self.id_prefix = id_prefix
         self.nodelist = nodelist
@@ -202,6 +206,8 @@ class LabelledValueTag(template.Node):
         self.help = help
         self.admin_only = admin_only
         self.errors = errors
+        self.visible_fields = visible_fields
+        self.show_if = show_if
 
     id_regex = re.compile(r"id=[\"|'](.*?)[\"|']")
     big_zero = re.compile(r"^0([.]0+)?$")
@@ -212,6 +218,15 @@ class LabelledValueTag(template.Node):
         complete_id = value_id
         if prefix_id and value_id:
             complete_id = f"{prefix_id}-{value_id}"
+
+        # Hide the whole row when a `visible_fields` collection is given and this row's key
+        # (`show_if`, defaulting to the value id) isn't in it - lets callers drive show/hide
+        # off a single set of available fields instead of wrapping each row in an {% if %}.
+        visible_fields = TagUtils.value(context, self.visible_fields)
+        if visible_fields is not None:
+            show_if = TagUtils.value_str(context, self.show_if) or value_id
+            if show_if not in visible_fields:
+                return ""
 
         label = TagUtils.value_str(context, self.label, (value_id.replace('_', ' ') if value_id else ""))
         if TagUtils.value_bool(context, self.admin_only):  # if admin only

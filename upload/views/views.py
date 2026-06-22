@@ -9,19 +9,19 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import Q
-from django.http.response import HttpResponseRedirect, JsonResponse
+from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timesince import timesince
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django_downloadview import PathDownloadView
-from jfu.http import upload_receive, UploadResponse, JFUResponse
 
 from annotation.models import AnnotationRun
 from annotation.views import get_build_contigs
 from eventlog.models import create_event
+from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
 from library.utils.django_utils import render_ajax_view
@@ -62,7 +62,7 @@ def _get_basic_uploaded_file_context(uploaded_file) -> dict:
     if upload_data:
         try:
             data["upload_data"] = upload_data.get_upload_context()
-        except:
+        except Exception:
             pass
     return data
 
@@ -70,7 +70,7 @@ def _get_basic_uploaded_file_context(uploaded_file) -> dict:
 def uploadedfile_dict(uploaded_file) -> dict:
     try:
         size = uploaded_file.uploaded_file.size
-    except:
+    except Exception:
         size = None
 
     time_since = timesince(uploaded_file.created)
@@ -81,7 +81,7 @@ def uploadedfile_dict(uploaded_file) -> dict:
         'size': size,
         'user': uploaded_file.user.get_full_name(),
         'time_since': f"{time_since} ago",
-        'deleteUrl': reverse('jfu_delete', kwargs={'pk': uploaded_file.pk}),
+        'deleteUrl': reverse('upload_file_delete', kwargs={'pk': uploaded_file.pk}),
         'deleteType': 'POST',
     }
     data.update(_get_basic_uploaded_file_context(uploaded_file))
@@ -101,12 +101,12 @@ def uploadedfile_dict(uploaded_file) -> dict:
                         data['remaining_annotation_runs'] = get_remaining_annotation_runs(uploaded_vcf, upload_pipeline.genome_build)
                     except ObjectDoesNotExist:
                         pass
-        except:
+        except Exception:
             pass  # Genome build is optional
 
         status = upload_pipeline.status
         url = reverse('view_upload_pipeline', kwargs={'upload_pipeline_id': upload_pipeline.pk})
-    except:
+    except Exception:
         status = ProcessingStatus.ERROR
         url = reverse('view_uploaded_file', kwargs={'uploaded_file_id': uploaded_file.pk})
 
@@ -117,6 +117,9 @@ def uploadedfile_dict(uploaded_file) -> dict:
 
 
 def get_remaining_annotation_runs(uploaded_vcf, genome_build) -> int:
+    if uploaded_vcf.max_variant_id is None:
+        # VCF not fully imported yet, so highest known variant is unknown - no remaining runs to report
+        return 0
     ar_qs = AnnotationRun.get_active_runs(genome_build)
     return ar_qs.filter(annotation_range_lock__max_variant__lte=uploaded_vcf.max_variant).count()
 
@@ -140,48 +143,40 @@ def handle_file_upload(user, django_uploaded_file, path=None) -> UploadedFile:
     return uploaded_file
 
 @require_POST
-def jfu_upload(request):
-    # The assumption here is that jQuery File Upload
-    # has been configured to send files one at a time.
-    # If multiple files can be uploaded simulatenously,
-    # 'file' may be a list of files.
-
+def upload_file(request):
+    """ FilePond ``process`` endpoint: receive one file and start the import pipeline. """
     if not settings.UPLOAD_ENABLED:
         raise PermissionDenied("Uploads are currently disabled (settings.UPLOAD_ENABLED=False)")
 
     try:
-        message = "jfu_upload POST had empty FILES - this is often due to running out of disk space for Nginx temp file storage."
-        if not request.FILES:
-            create_event(request.user, message, severity=LogLevel.ERROR)
-            raise ValueError(message)
+        try:
+            django_uploaded_file = filepond_upload_receive(request)
+        except ValueError as e:
+            create_event(request.user, str(e), severity=LogLevel.ERROR)
+            raise
 
-        django_uploaded_file = upload_receive(request)
         uploaded_file = handle_file_upload(request.user, django_uploaded_file)
-
-        file_dict = uploadedfile_dict(uploaded_file)
     except Exception as e:
         logging.error(e)
         log_traceback()
-        file_dict = {"error": str(e)}
+        return HttpResponse("Upload failed. Please try again or contact support.", status=500)
 
-    logging.debug("views.upload() END")
-    return UploadResponse(request, file_dict)
+    return filepond_process_response(uploaded_file.pk)
 
 
-@require_POST
-def jfu_upload_delete(request, pk):
+@require_http_methods(["DELETE", "POST"])
+def upload_file_delete(request, pk):
+    """ FilePond ``revert`` endpoint (also used by table-row delete on already-processed files). """
     try:
         instance = UploadedFile.objects.get(pk=pk)
-        if not (request.user.is_superuser or request.user == instance.user):
-            msg = f"You don't own uploaded file {pk}"
-            raise PermissionDenied(msg)
-
-        data = {'uploaded_file_id': instance.pk}
-        instance.delete()
     except UploadedFile.DoesNotExist:
-        data = False
+        return HttpResponse(status=404)
 
-    return JFUResponse(request, data)
+    if not (request.user.is_superuser or request.user == instance.user):
+        raise PermissionDenied(f"You don't own uploaded file {pk}")
+
+    instance.delete()
+    return HttpResponse(status=200)
 
 
 def get_file_dicts_list(upload_settings):
@@ -202,7 +197,7 @@ def get_file_dicts_list(upload_settings):
     file_dicts = []
     for uploaded_file in qs:
         file_dicts.append(uploadedfile_dict(uploaded_file))
-    file_dicts = list(reversed(file_dicts))  # JFU adds most recent at the end
+    file_dicts = list(reversed(file_dicts))  # render newest-first
     return file_dicts
 
 

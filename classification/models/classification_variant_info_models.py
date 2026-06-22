@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Any, TypedDict, Literal, Tuple
@@ -13,7 +14,7 @@ from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
 from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff, HGVSConverterType, chgvs_diff_description
-from genes.models import TranscriptVersion, GeneSymbol, Transcript
+from genes.models import TranscriptVersion, GeneSymbol, Transcript, NoTranscript
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
@@ -178,6 +179,11 @@ class ResolvedVariantInfo(TimeStampedModel):
             self.transcript_version = c_hgvs_resolution.transcript_version
             self.gene_symbol = c_hgvs_resolution.gene_symbol
             self.c_hgvs_converter_data_version = c_hgvs_resolution.c_hgvs_converter_data_version
+        except NoTranscript as nt:
+            # Transcript missing/invalid in our DB — data issue, not a bug. See #1478.
+            self.error = str(nt)
+            logging.warning("Could not resolve c.HGVS for variant %s (%s, transcript %s): %s",
+                            variant, self.genome_build.name, self.allele_info.get_transcript, nt)
         except Exception as exception:
             self.error = str(exception)
             report_exc_info(extra_data={
@@ -194,8 +200,6 @@ class ResolvedVariantInfo(TimeStampedModel):
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
         hgvs_matcher = HGVSMatcher(genome_build=genome_build) #
-        # hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
-        # version = hgvs_matcher.hgvs_converter.get_version()
 
         result = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
         c_hgvs = result.hgvs_variant.format()
@@ -211,7 +215,7 @@ class ResolvedVariantInfo(TimeStampedModel):
                                                           used_converter_type=result.converter_info.used_converter_type)
         return CHGVSResolution(
                 c_hgvs=c_hgvs,
-                c_hgvs_compatible=result.hgvs_variant.format(use_compat=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
+                c_hgvs_compatible=result.hgvs_variant.format(use_delins_for_inv=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
                 c_hgvs_converter_version=c_hgvs_converter_version,
                 c_hgvs_converter_data_version=data_version,
                 transcript_version=transcript_version,
@@ -516,7 +520,6 @@ class ImportedAlleleInfo(TimeStampedModel):
         return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
 
     @classmethod
-    @property
     def supported_genome_builds(cls) -> set:
         """ While we have hardcoded genome builds, we can only use these. Eventually can remove this and/or
             just return all annotated builds here """
@@ -898,7 +901,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         if self.dirty_message != new_dirty_message:
             self.dirty_message = new_dirty_message
-            print(f"Found {new_dirty_message}")
+            logging.info("Found %s", new_dirty_message)
             self.save()
 
     def update_status(self):

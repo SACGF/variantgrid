@@ -5,7 +5,8 @@ from snpdb.models.models import Tag, CachedGeneratedFile, Company, Manufacturer,
     LabProject, SiteMessage
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_cohort import Cohort, CohortSample, CohortGenotypeTaskVersion, \
-    CohortGenotypeCommonFilterVersion, CommonVariantClassified, CohortGenotypeCollection, CohortGenotype, Trio
+    CohortGenotypeCommonFilterVersion, CommonVariantClassified, CohortGenotypeCollection, CohortGenotype, Trio, \
+    CohortVersion, SubCohortVariantCollection
 from snpdb.models.models_columns import VariantGridColumn, ColumnVCFInfo, CustomColumnsCollection, CustomColumn
 from snpdb.models.models_dbsnp import DbSNP
 from snpdb.models.models_genome import GenomeBuild, GenomeBuildPatchVersion, Contig, GenomeBuildContig, GenomeFasta, \
@@ -19,6 +20,7 @@ from snpdb.models.models_user_settings import UserDataPrefix, TagColorsCollectio
 from snpdb.models.models_variant import Allele, AlleleMergeLog, Sequence, Locus, Variant, VariantWiki, VariantAllele, \
     VariantCollection, VariantCollectionRecord, AlleleSource, VariantAlleleSource, VariantAlleleCollectionSource, \
     VariantAlleleCollectionRecord, LiftoverRun, AlleleLiftover
+from snpdb.models.models_cohort_stats import CohortGenotypeStats
 from snpdb.models.models_vcf import Project, VCF, VCFFilter, VCFTag, Sample, SampleFilePath, SampleTag, VCFAlleleSource, \
     SampleStatsCodeVersion, SampleStats, SampleStatsPassingFilter, SampleLocusCount, SampleLabProject, \
     VCFSourceSettings, VCFBedIntersection

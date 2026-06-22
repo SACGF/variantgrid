@@ -7,10 +7,20 @@
     
     {% if annotation_version.variant_annotation_version %}
         <h3>Variant Annotation Details</h3>
-        
+
         <p>
         See <a target="_blank" href="{% url 'view_annotation_descriptions' %}">Annotation Descriptions</a> for details on how VEP fields are mapped to columns.
         </p>
+
+        {% if annotation_version.variant_annotation_version.uses_raw_spliceai %}
+            <div class="alert alert-warning">
+                SpliceAI scores on this annotation version are from the <strong>raw</strong> precomputed file
+                (<code>{{ annotation_version.variant_annotation_version.spliceai }}</code>).
+                Illumina <a target="_blank" href="https://github.com/Illumina/SpliceAI">recommends the masked file for variant interpretation</a>:
+                the raw file also reports strengthening of annotated splice sites and weakening of unannotated ones,
+                which are typically much less pathogenic.
+            </div>
+        {% endif %}
 
         <table class="table as_table">
         {{ annotation_version.variant_annotation_version | as_table | safe }}

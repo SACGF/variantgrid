@@ -36,10 +36,10 @@ class EnrichmentKitSerializer(serializers.ModelSerializer):
     def get_from_data(data):
         return EnrichmentKit.objects.get(name=data["name"], version=data["version"])
 
-    def get_enrichment_kit_type(self, obj):
+    def get_enrichment_kit_type(self, obj) -> str:
         return obj.get_enrichment_kit_type_display()
 
-    def get___str__(self, obj):
+    def get___str__(self, obj) -> str:
         return str(obj)
 
 
@@ -53,8 +53,8 @@ class EnrichmentKitSummarySerializer(serializers.ModelSerializer):
         model = EnrichmentKit
         fields = ('pk', 'name', 'version', 'enrichment_kit_type', 'manufacturer', '__str__')
 
-    def get_enrichment_kit_type(self, obj):
+    def get_enrichment_kit_type(self, obj) -> str:
         return obj.get_enrichment_kit_type_display()
 
-    def get___str__(self, obj):
+    def get___str__(self, obj) -> str:
         return str(obj)
