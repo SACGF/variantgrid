@@ -67,7 +67,7 @@ pandas
 ped_parser
 pronto>=2.4.7
 psycopg2
-pypdf
+pypdf>=6.13.3
 pysam
 python_dateutil
 pyyaml
