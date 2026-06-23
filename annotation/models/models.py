@@ -2070,6 +2070,9 @@ class AnnotationVersion(models.Model):
             return False
 
     def validate(self):
+        if not settings.VARIANT_ANNOTATION_VALIDATE:
+            return True
+
         missing_sub_annotations = []
         for field in self.sub_annotations:
             field_fk = f"{field}_id"  # Avoid fetching related data

@@ -192,7 +192,7 @@ MUTATIONAL_SIGNATURE_DATA_DIR = os.path.join(_VARIANTGRID_REPO_REFERENCE_DIR, "m
 MUTATIONAL_SIGNATURE_DATA_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "signatures_probabilities.sorted.txt")
 MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "signature_analysis_data.formatted.txt")
 
-
+VARIANT_ANNOTATION_VALIDATE = True  # only turn off in dev environments
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
 # Use highest TranscriptVersion canonical, set False to use representative transcript (ie VEP pick = variant annotation)
 VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
