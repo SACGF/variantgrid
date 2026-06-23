@@ -101,7 +101,7 @@ class ClassificationGroupingExportFilter:
 
         groupings = groupings.select_related(
             "allele_origin_grouping",
-            "allele_origin_grouping__allele_grouping__allele",
+            "allele_origin_grouping__allele",
             "latest_classification_modification__classification"
         )
 
