@@ -16,7 +16,7 @@ register = Library()
 
 
 @register.inclusion_tag("uicore/tags/help.html")
-def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3"):
+def page_help(page_id: Optional[str] = None, title=None, show_title=True, header_tag="h3"):
     """
     Best to use page_help_embedded now so help can be dynamic.
 
@@ -34,15 +34,19 @@ def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3")
 
     help_url = settings.HELP_URL
     page_help_html = None
-    page_help_path = f"page_help/{page_id}.html"
-    page_help_filename = finders.find(page_help_path)
-    file_exists = False
-    if page_help_filename and os.path.exists(page_help_filename):
-        with open(page_help_filename, encoding="utf-8") as ph:
-            file_exists = True
-            page_help_html = ph.read()
-    if not file_exists:
-        report_message(f"Could not find help for {page_help_path}")
+    if page_id:
+        if '..' in page_id:
+            report_message(f".. in page_id '{page_id}'")
+        else:
+            page_help_path = f"page_help/{page_id}.html"
+            page_help_filename = finders.find(page_help_path)
+            file_exists = False
+            if page_help_filename and os.path.exists(page_help_filename):
+                with open(page_help_filename, encoding="utf-8") as ph:
+                    file_exists = True
+                    page_help_html = ph.read()
+            if not file_exists:
+                report_message(f"Could not find help for {page_help_path}")
 
     return {
         'page_id': html_id_safe(page_id),
@@ -80,6 +84,7 @@ class PageHelpContent(template.Node):
 
         title = TagUtils.value_str(context, self.title)
         page_id = html_id_safe(title)
+
         help_url = TagUtils.value_str(context, self.help_url)
         content = self.nodelist.render(context).strip()
 
