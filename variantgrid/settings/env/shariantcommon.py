@@ -89,6 +89,8 @@ LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes", "ontol
 USE_OIDC = True
 OIDC_STORE_ID_TOKEN = True  # needed so we can pass the token back to keycloak for an automatic logout
 LOGIN_URL = '/oidc_login/'
+OIDC_USE_PKCE = True
+OIDC_PKCE_CODE_CHALLENGE_METHOD = 'S256'
 OIDC_RP_SIGN_ALGO = 'RS256'
 OIDC_RP_CLIENT_SECRET = get_secret('OIDC.client_secret')
 KEY_CLOAK_BASE = 'https://auth.shariant.org.au'
@@ -111,7 +113,9 @@ EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'
 
 DEBUG = False
 ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS=['https://test.shariant.org.au', 'https://shariant.org.au', 'https://www.shariant.org.au', 'https://demo.shariant.org.au']
+# Allowed Hosts set to wildcard as Shariant environments are accessed via tunneled services in AWS
+
+CSRF_TRUSTED_ORIGINS=['https://test.shariant.org.au', 'https://test2.shariant.org.au', 'https://shariant.org.au', 'https://www.shariant.org.au', 'https://demo.shariant.org.au']
 
 ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = False  # Only used for analysis optimisation
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)

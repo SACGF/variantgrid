@@ -1,13 +1,23 @@
 from urllib.parse import urlencode
-
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
+from django.core.validators import EmailValidator
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from mozilla_django_oidc.utils import import_from_settings
-
 from library.log_utils import report_message
 from snpdb.models import UserSettingsOverride
+from django.core.exceptions import SuspiciousOperation, ValidationError
+import re
+
+
+_email_validator = EmailValidator()
+_CONTROL_CHAR_RE = re.compile(r'[\x00-\x1f\x7f]')
+
+
+def _sanitize_claim_str(value, max_length):
+    """Strip control characters and enforce max length on a claim string."""
+    return _CONTROL_CHAR_RE.sub('', value)[:max_length]
 
 
 class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
@@ -42,12 +52,19 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         if missing_claims:
             report_message(f"Missing claims {missing_claims}", level='error')
 
+        email = claims.get('email', '')
+        try:
+            _email_validator(email)
+        except ValidationError:
+            raise SuspiciousOperation(f"Invalid email in OIDC claims: {email!r}")
+        email = _sanitize_claim_str(email, 254)
+
         # Copy over basic details from open ID connect
         # Assume there will be no user-name clashes
-        user.username = claims.get('preferred_username')
-        user.email = claims.get('email', '')
-        user.first_name = claims.get('given_name', '')
-        user.last_name = claims.get('family_name', '')
+        user.username = _sanitize_claim_str(claims.get('preferred_username'), 254)
+        user.email = email
+        user.first_name = _sanitize_claim_str(claims.get('given_name', ''), 150)
+        user.last_name = _sanitize_claim_str(claims.get('family_name', ''), 150)
         sub = claims.get('sub', None)
 
         # Work out what groups the user has joined/left since their last login
@@ -76,6 +93,8 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
                 if group in all_claim_groups:
                     allowed_environment_list.append(message)
 
+            # Note that the user has provided a correct username and password from our system, but tried to log into the wrong account
+            # No security issue reflecting their email back to them
             message = f"This account <i>{user.email}</i> is not authorised for this environment."
             for allowed_environment in allowed_environment_list:
                 message += "<br/>" + allowed_environment
@@ -97,7 +116,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             # raise ValueError(f'Could not find any valid groups in {str_groups}')
 
         # everyone with a login is considered part of the public group
-        groups = set()
+        groups: set[str] = set()
         groups.add(settings.PUBLIC_GROUP_NAME)
         groups.add(settings.LOGGED_IN_USERS_GROUP_NAME)
 
@@ -120,7 +139,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             if is_tester:
                 # testers are allowed to login during maintenance mode
                 pass
-            elif not is_super_user or is_bot:
+            elif (not is_super_user) or is_bot:
                 # don't want bots logging in during maintenance mode
                 messages.add_message(self.request, messages.ERROR, "Non-administrator logins have temporary been disabled.")
                 return None
@@ -141,19 +160,20 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             for i in range(len(assoc) + 1):
                 parts = assoc[0:i]
                 assoc_groups.add('/'.join(parts))
-                #might want to check if valid lab before adding?
                 groups.update(assoc_groups)
 
         removed_groups = django_groups.difference(groups)
         added_groups = groups.difference(django_groups)
 
         for removed_group in removed_groups:
-            # print("removing from group %s" % removed_group)
             group = Group.objects.get(name=removed_group)
             user.groups.remove(group)
 
         for added_group in added_groups:
-            # print("adding to group %s" % added_group)
+            # note that we trust the OIDC connector as it can already make admins
+            # and sometimes group permissions are setup in KeyCloak before they are in the app
+            # so happy for this to make users
+            # Groups have already been verified to be inside variantgrid/ or associations/
             group, _ = Group.objects.get_or_create(name=added_group)
             user.groups.add(group)
 
