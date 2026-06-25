@@ -410,14 +410,14 @@ $(document).ready(function() {
             error: function() {
                 console.log("Error retrieving allele");
                 // Can't retrieve, just show basics
-                let variantString = "{{ variant|safe }}";
+                let variantString = "{{ variant|escapejs }}";
                 let linkData = {variant_string: variantString, variant_coordinate: variantString};
                 populateVariantAllele({link_data: linkData});
             }
         });
     }
 
-    handlePubMedLinks("{{ variant_annotation.pubmed|default_if_none:''|safe }}");
+    handlePubMedLinks("{{ variant_annotation.pubmed|default_if_none:''|escapejs }}");
     let dbSNP = $("#dbsnp_rs_id").text();
     if (dbSNP && dbSNP !== '-') {
         formatField($("#dbsnp_rs_id"), formatDBSNP);

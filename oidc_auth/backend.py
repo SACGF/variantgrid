@@ -166,8 +166,9 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         added_groups = groups.difference(django_groups)
 
         for removed_group in removed_groups:
-            group = Group.objects.get(name=removed_group)
-            user.groups.remove(group)
+            # Group may have been deleted out-of-band between logins - skip if gone
+            if group := Group.objects.filter(name=removed_group).first():
+                user.groups.remove(group)
 
         for added_group in added_groups:
             # note that we trust the OIDC connector as it can already make admins
