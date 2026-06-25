@@ -278,6 +278,20 @@ class TestHGVS(TestCase):
         lib_hgvs_string = matcher.hgvs_converter.variant_coordinate_to_g_hgvs(vc)
         self.assertTrue("m." in str(lib_hgvs_string), "HGVS library conversion")
 
+    def test_biocommons_mitochondria_hgvs_on_nuclear_contig_rejected(self):
+        return self._test_mitochondria_hgvs_on_nuclear_contig_rejected(HGVSConverterType.BIOCOMMONS_HGVS)
+
+    def test_pyhgvs_mitochondria_hgvs_on_nuclear_contig_rejected(self):
+        return self._test_mitochondria_hgvs_on_nuclear_contig_rejected(HGVSConverterType.PYHGVS)
+
+    def _test_mitochondria_hgvs_on_nuclear_contig_rejected(self, hgvs_converter_type: HGVSConverterType):
+        """ 'm.' on a nuclear contig must be rejected rather than silently resolved as 'g.'
+            - see SACGF/variantgrid#1632 """
+        matcher = HGVSMatcher(GenomeBuild.grch37(), hgvs_converter_type=hgvs_converter_type)
+        # NC_000001.10 is GRCh37 chr1 (nuclear), so 'm.' is invalid against it
+        hgvs_string = "NC_000001.10:m.100000A>G"
+        self.assertRaises(HGVSException, lambda: matcher.get_variant_coordinate(hgvs_string))
+
     def test_biocommons_invalid_trailing_int(self):
         return self._test_invalid_trailing_int(HGVSConverterType.BIOCOMMONS_HGVS)
 
