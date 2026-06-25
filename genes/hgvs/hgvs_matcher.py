@@ -27,6 +27,7 @@ from snpdb.clingen_allele import get_clingen_allele_from_hgvs, \
     ClinGenAlleleServerException, ClinGenAlleleAPIException, get_clingen_allele_for_variant_coordinate, \
     clingen_check_variant_length
 from snpdb.models import Variant, ClinGenAllele
+from snpdb.models.models_enums import AssemblyMoleculeType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
 
@@ -450,7 +451,8 @@ class HGVSMatcher:
                 else:
                     raise ValueError(f"\"{transcript_accession}\": No transcripts found")
         else:
-            # g. HGVS
+            # g. / m. HGVS
+            self._validate_genomic_kind(hgvs_variant)
             method = self.hgvs_converter.description(describe_fallback=False)
             variant_coordinate, matches_reference, originally_normalized = self.hgvs_converter.hgvs_to_variant_coordinate_reference_match_and_normalized(hgvs_string, None)
             converter_info = HGVSConverterInfo(used_converter_type=self.hgvs_converter.get_hgvs_converter_type(),
@@ -464,6 +466,21 @@ class HGVSMatcher:
             matches_reference=matches_reference,
             originally_normalized=originally_normalized,
         )
+
+    def _validate_genomic_kind(self, hgvs_variant: HGVSVariant):
+        """ 'm.' (mitochondrial) HGVS is only valid on the mitochondrial contig.
+
+            pyhgvs/biocommons treat the 'm' kind like 'g' (coordinates resolved against
+            whichever reference the accession names), so without this an m. on a nuclear
+            contig is silently resolved as g. - see SACGF/variantgrid#1632. """
+        if hgvs_variant.kind != 'm':
+            return
+        contig_accession = hgvs_variant.contig_accession
+        contig = self.genome_build.chrom_contig_mappings.get(contig_accession)
+        if contig is None or contig.molecule_type != AssemblyMoleculeType.MITOCHONDRION:
+            raise HGVSNomenclatureException(
+                f"'m.' (mitochondrial) HGVS requires the mitochondrial reference, "
+                f"but '{contig_accession}' is not the mitochondrion for {self.genome_build}")
 
     def get_transcript_accession(self, hgvs_string: str) -> str:
         return self.hgvs_converter.get_transcript_accession(hgvs_string)
