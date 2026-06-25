@@ -38,6 +38,46 @@
             </div>
         </form>
 
+        {% if cleaned_hgvs is not None %}
+            <div class="card mt-3">
+                <div class="card-header">HGVS Fixes</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-2">Original</dt>
+                        <dd class="col-sm-10"><span class="variant-coordinate">{{ original_hgvs }}</span></dd>
+                        <dt class="col-sm-2">Cleaned</dt>
+                        <dd class="col-sm-10"><span class="variant-coordinate">{{ cleaned_hgvs }}</span></dd>
+                    </dl>
+                    {% if hgvs_fixes %}
+                        <table class="table table-sm mt-2 mb-0">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Code</th>
+                                    <th>Message</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for fix in hgvs_fixes %}
+                                    <tr>
+                                        <td>{{ fix.severity | severity_icon }}</td>
+                                        <td><code>{{ fix.code }}</code></td>
+                                        <td>{{ fix.message }}</td>
+                                        <td><span class="variant-coordinate">{{ fix.original|dash_if_empty }}</span></td>
+                                        <td><span class="variant-coordinate">{{ fix.fixed|dash_if_empty }}</span></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="text-secondary mb-0">No fixes applied — input was already clean.</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
         {% if outputs %}
             <table class="table">
                 <thead>
