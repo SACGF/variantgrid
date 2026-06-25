@@ -1,10 +1,9 @@
 import re
 import uuid
-from html import escape
 from typing import Optional
 
 from bs4 import BeautifulSoup
-from django.utils.safestring import SafeString
+from django.utils.html import format_html
 
 
 def html_id_safe(text: str) -> str:
@@ -86,10 +85,9 @@ class IconWithTooltip:
         self.tooltip = tooltip
 
     def __str__(self):
-        title = ""
-        if tooltip := self.tooltip:
-            title = f'title="{escape(tooltip)}"'
-        return SafeString(f'<i class="{escape(self.icon)}" {title}></i>')
+        if self.tooltip:
+            return format_html('<i class="{}" title="{}"></i>', self.icon, self.tooltip)
+        return format_html('<i class="{}"></i>', self.icon)
 
     def as_json(self) -> dict:
         return {
