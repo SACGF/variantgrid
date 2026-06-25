@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from cdot.hgvs import clean_hgvs as cdot_clean_hgvs, HGVSFixSeverity
 from django import forms
 from django.http import HttpRequest
 from django.shortcuts import render
@@ -16,6 +17,7 @@ from snpdb.models import GenomeBuild, VariantCoordinate
 class HgvsResolutionForm(forms.Form):
     genome_build = forms.ChoiceField(widget=forms.RadioSelect)
     hgvs = forms.CharField(label="HGVS")
+    fix_hgvs = forms.BooleanField(label="Fix HGVS before resolving", required=False)
     display_clingen_separately = forms.BooleanField(required=False)
 
     def __init__(self, *args, **kwargs):
@@ -84,7 +86,27 @@ def hgvs_resolution_tool(request: HttpRequest):
         genome_build = GenomeBuild.get_name_or_alias(data.get("genome_build"))
         hgvs_str = data.get("hgvs")
 
-        all_output = MatcherOutputs(genome_build=genome_build, hgvs=hgvs_str)
+        # Optionally clean/fix the HGVS up front and resolve with the fixed string.
+        # We call cdot directly (rather than HGVSMatcher.clean_hgvs) so we can surface
+        # the full structured HGVSFix records - severity, code, and before/after values.
+        resolve_hgvs = hgvs_str
+        if data.get("fix_hgvs"):
+            cleaned, fixes = cdot_clean_hgvs(hgvs_str)
+            resolve_hgvs = cleaned
+            context["original_hgvs"] = hgvs_str
+            context["cleaned_hgvs"] = cleaned
+            context["hgvs_fixes"] = [
+                {
+                    "severity": "E" if fix.severity == HGVSFixSeverity.ERROR else "W",
+                    "code": fix.code.value,
+                    "message": fix.message,
+                    "original": fix.original,
+                    "fixed": fix.fixed,
+                }
+                for fix in fixes
+            ]
+
+        all_output = MatcherOutputs(genome_build=genome_build, hgvs=resolve_hgvs)
         context["outputs"] = all_output
 
         # check for existing
@@ -125,7 +147,7 @@ def hgvs_resolution_tool(request: HttpRequest):
 
             try:
                 variant_coordinate: Optional[VariantCoordinate] = None
-                if vcd := matcher.get_variant_coordinate_and_details(hgvs_str):
+                if vcd := matcher.get_variant_coordinate_and_details(resolve_hgvs):
                     variant_coordinate = vcd.variant_coordinate
                     output.variant_coordinate = variant_coordinate
                     output.used_converter_type = vcd.converter_info.used_converter_type.name
