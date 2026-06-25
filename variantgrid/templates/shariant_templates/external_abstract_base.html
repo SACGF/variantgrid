@@ -49,7 +49,7 @@
             window.location = '{% url 'oidc_authentication_init' %}'
         }
         function logout() {
-            window.location = '{% url 'auth_logout' %}';
+            postUrl('{% url 'auth_logout' %}');
         }
         {% endif %}
         function resume() {
