@@ -35,5 +35,5 @@
     </form>
     <a href="#" onclick="logout()" class="nav-link">Logout <i class="fas fa-sign-out-alt"></i></a>
 {% else %}
-    {% menu_item 'auth_logout' title="Logout <i class='fas fa-sign-out-alt'></i>" css_class='logout' %}
+    {% menu_item 'auth_logout' title="Logout <i class='fas fa-sign-out-alt'></i>" css_class='logout' method='post' %}
 {% endif %}

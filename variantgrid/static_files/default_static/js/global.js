@@ -750,6 +750,21 @@ function getCookie(name) {
     return null;
 }
 
+/* Navigate to url via a POST (rather than a GET link), including the CSRF token.
+   Used for state-changing actions like logout that must be POST under Django 5. */
+function postUrl(url) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'csrfmiddlewaretoken';
+    input.value = getCookie('csrftoken');
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+}
+
 function setCrossLink(link_selector, urlFunc, pk) {
 	if (pk) {
 		link_selector.attr("href", urlFunc(pk));
