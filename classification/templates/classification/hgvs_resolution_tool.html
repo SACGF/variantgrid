@@ -115,10 +115,12 @@
                             <td><div class="variant-coordinate">{{ output.transcript_version|dash_if_empty }}</div></td>
                             <td><div class="variant-coordinate">{% c_hgvs output.hgvs %}</div></td>
                             <td><div class="variant-coordinate">
-                                {% if output.is_error %}
-                                    {{ 'E' | severity_icon }} <span style="white-space: pre-line">{{ output.message }}</span>
-                                {% elif output.message %}
-                                    <span class="text-secondary">{{ output.message }}</span>
+                                {% if output.message %}
+                                    {% if output.is_error %}
+                                        {{ 'E' | severity_icon }} <span style="white-space: pre-line">{{ output.message }}</span>
+                                    {% else %}
+                                        <span class="text-secondary">{{ output.message }}</span>
+                                    {% endif %}
                                 {% endif %}
                             </div>
                             </td>
