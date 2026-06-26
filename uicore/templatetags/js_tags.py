@@ -29,9 +29,9 @@ def dal_media():
     return mark_safe(str(ModelSelect2(url='').media))
 
 
-def jsonify_for_js(json_me, pretty=False) -> Union[str, Any]:
+def jsonify_for_js(json_me, pretty=False) -> Union[SafeString, bool, int, float]:
     if isinstance(json_me, str):
-        json_me = json_me.replace('"', '\"')
+        json_me = json_me.replace('"', '\"').replace('</script>', '<\\/script>')
         return mark_safe(f"\"{json_me}\"")
     if isinstance(json_me, bool):
         if json_me:
@@ -49,12 +49,12 @@ def jsonify_for_js(json_me, pretty=False) -> Union[str, Any]:
 
 
 @register.filter
-def jsonify(json_me) -> Union[str, Any]:
+def jsonify(json_me) -> Union[SafeString, bool, int, float]:
     return jsonify_for_js(json_me)
 
 
 @register.filter
-def jsonify_pretty(json_me) -> Union[str, float]:
+def jsonify_pretty(json_me) -> Union[SafeString, bool, int, float]:
     return jsonify_for_js(json_me, pretty=True)
 
 
@@ -63,12 +63,14 @@ def query_unquote(query_string):
     return urllib.parse.unquote(query_string)
 
 
-@register.filter
-def jsstring(text):
-    if text:
-        text = text.replace('\\', '\\\\').replace('`', '\\`').replace('</script>', '<\\/script>')
-        return mark_safe(text)
-    return ''
+# @register.filter
+# def jsstring(text):
+#     if text:
+#         text = text.replace('\\', '\\\\').replace('`', '\\`').replace('</script>', '<\\/script>')
+#         return mark_safe(text)
+#     return ''
+# use jsonify instead
+
 
 @register.filter
 def js_symbol(value):
