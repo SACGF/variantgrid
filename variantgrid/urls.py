@@ -39,7 +39,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('authenticated', views.authenticated, name='authenticated'),
     path('martor/', include('martor.urls')),
-    path('messages/', include('django_messages.urls')),
     path('external_help', views.external_help, name='external_help'),
     path('system/version', views.version, name='version'),
     path('system/changelog', views.changelog, name='changelog'),
@@ -50,6 +49,9 @@ urlpatterns = [
     path('api/docs', SpectacularSwaggerView.as_view(url_name='openapi-schema'), name='api-docs'),
     path('api/redoc', SpectacularRedocView.as_view(url_name='openapi-schema'), name='api-redoc'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if settings.INBOX_ENABLED:
+    urlpatterns += [path('messages/', include('django_messages.urls'))]
 
 if settings.DEBUG:
     if 'debug_toolbar' in settings.INSTALLED_APPS:
