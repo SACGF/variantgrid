@@ -23,7 +23,7 @@ from seqauto.models import (
 )
 from seqauto.models.models_enums import DataGeneration, PairedEnd
 from seqauto.serializers.sequencing_serializers import JointCalledVCFSerializer
-from snpdb.models import VCF, Sample, DataState
+from snpdb.models import VCF, Sample
 from upload.models import BackendVCF, UploadedFile, UploadedVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
 
@@ -41,7 +41,6 @@ def _make_sample_sheet(sequencing_run, sample_names, sheet_hash="SHA1"):
         sequencing_run=sequencing_run,
         path=f"/data/{sequencing_run.name}/SampleSheet.csv",
         hash=sheet_hash,
-        data_state=DataState.COMPLETE,
     )
     SequencingRunCurrentSampleSheet.objects.create(sequencing_run=sequencing_run,
                                                    sample_sheet=sample_sheet)
@@ -161,7 +160,6 @@ class LinkSamplesJointCallPreservedTests(TestCase):
             sample_sheet=self.sample_sheet,
             variant_caller=self.caller,
             path=path,
-            data_state=DataState.COMPLETE,
         )
         backend = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                             joint_called_vcf=joint_called_vcf,
@@ -176,7 +174,6 @@ class LinkSamplesJointCallPreservedTests(TestCase):
                                      sequencing_sample=seq_sample,
                                      name=f"{sample_name}.fastq.gz",
                                      read=PairedEnd.R1,
-                                     data_state=DataState.COMPLETE,
                                      sequencing_run=self.sequencing_run)
         unaligned = UnalignedReads.objects.create(sequencing_sample=seq_sample,
                                                   fastq_r1=fastq)
@@ -185,13 +182,11 @@ class LinkSamplesJointCallPreservedTests(TestCase):
                                           name=f"{sample_name}.bam",
                                           sequencing_run=self.sequencing_run,
                                           unaligned_reads=unaligned,
-                                          aligner=aligner,
-                                          data_state=DataState.COMPLETE)
+                                          aligner=aligner)
         single_sample_vcf = SingleSampleVCF.objects.create(path=path,
                                                            sequencing_run=self.sequencing_run,
                                                            bam_file=bam_file,
-                                                           variant_caller=self.caller,
-                                                           data_state=DataState.COMPLETE)
+                                                           variant_caller=self.caller)
         backend = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                             joint_called_vcf=None,
                                             single_sample_vcf=single_sample_vcf)

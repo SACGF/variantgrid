@@ -16,7 +16,7 @@ class IlluminaFlowcellQCGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.objects.filter(data_state='C')
+        queryset = self.model.objects.all()
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("illumina_flowcell_qc_grid", kwargs={"op": JQGridViewOp.DOWNLOAD})
         self.extra_config.update({'sortname': 'sample_sheet__sequencing_run__name',
@@ -32,7 +32,7 @@ class FastQCGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.objects.filter(data_state='C')
+        queryset = self.model.objects.all()
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("fastqc_grid", kwargs={"op": JQGridViewOp.DOWNLOAD})
         self.extra_config.update({'sortname': 'fastq__sequencing_sample__sample_sheet__sequencing_run__name',
@@ -49,7 +49,7 @@ class FlagstatsGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.objects.filter(data_state='C')
+        queryset = self.model.objects.all()
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("flagstats_grid", kwargs={"op": JQGridViewOp.DOWNLOAD})
         self.extra_config.update({'sortname': 'bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name',
@@ -70,7 +70,7 @@ class QCExecSummaryGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.objects.filter(data_state='C')
+        queryset = self.model.objects.all()
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("qc_exec_summary_grid", kwargs={"op": JQGridViewOp.DOWNLOAD})
         self.extra_config.update({'sortname': 'qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name',

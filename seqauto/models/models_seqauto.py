@@ -1,6 +1,5 @@
 import logging
 import os
-import pathlib
 import re
 from datetime import datetime
 from functools import cached_property
@@ -33,7 +32,7 @@ from seqauto.models.models_enums import DataGeneration, SequencerRead, PairedEnd
 from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
-from snpdb.models import VCF, Sample, GenomeBuild, DataState, InheritanceManager, Wiki
+from snpdb.models import VCF, Sample, GenomeBuild, InheritanceManager, Wiki
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -44,32 +43,9 @@ class SeqAutoRecord(TimeStampedModel):
     # Everything is derived from a SequencingRun so just keep this around to simplify traversing models
     # Need to keep this nullable so we can make a SequencingRun before assigning FK to itself
     sequencing_run = models.ForeignKey("SequencingRun", null=True, on_delete=CASCADE)
-    # Stores stat st_mtime - time of last modification - only used for classes that can reload
+    # Stores stat st_mtime - time of last modification. Sent up via the API for records that can reload
     file_last_modified = models.FloatField(default=0.0)
     hash = models.TextField(blank=True)  # Not used for everything
-    is_valid = models.BooleanField(default=False)  # Set in save
-    # data_state was used to create 'expected' objects ie vcfs for bam files
-    # that was then set based on whether the file turned up. If it disappeared it would be set to DELETED
-    # But with API - we assume anything sent to us is COMPLETED
-    # We will probably remove this field in the future as we go API only
-    data_state = models.CharField(max_length=1, choices=DataState.choices)
-
-    def save(self, *args, **kwargs):
-        self.validate()
-        self.is_valid = True
-        super().save(*args, **kwargs)
-
-    def validate(self) -> bool:
-        return True
-
-    @property
-    def last_modified_datetime(self):
-        return make_aware(datetime.fromtimestamp(self.file_last_modified))
-
-    @staticmethod
-    def get_file_last_modified(filename):
-        path = pathlib.Path(filename)
-        return path.stat().st_mtime
 
 
 class SequencingRun(PreviewModelMixin, SeqAutoRecord):
@@ -481,7 +457,7 @@ class FastQC(SeqAutoRecord):
         return params
 
     def __str__(self):
-        return f"FastQC ({self.get_data_state_display()}) for {self.fastq}"
+        return f"FastQC for {self.fastq}"
 
 
 class UnalignedReads(models.Model):
@@ -513,36 +489,13 @@ class UnalignedReads(models.Model):
         params.update(fastq_params)
         return params
 
-    @property
-    def data_state(self):
-        r1_ds = self.fastq_r1.data_state
-
-        if self.fastq_r2 is None:
-            return r1_ds
-
-        r2_ds = self.fastq_r2.data_state
-
-        if r1_ds == r2_ds:  # Same - easy
-            return r1_ds
-        OVERWRITE_OTHER = [DataState.ERROR, DataState.SKIPPED, DataState.DELETED, DataState.NON_EXISTENT]
-        for o in OVERWRITE_OTHER:
-            if o in (r1_ds, r2_ds):
-                return o
-
-        msg = f"Unaligned reads {self} don't know how to get data_state from r1/r2"
-        raise ValueError(msg)
-
     @staticmethod
     def get_for_old_sample_sheets(sequencing_run):
         old_sample_sheets = sequencing_run.get_old_sample_sheets()
         return UnalignedReads.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
 
     def __str__(self):
-        if self.fastq_r2 and self.fastq_r1.data_state != self.fastq_r2.data_state:
-            data_state = f"R1: {self.fastq_r1.get_data_state_display()}, R2: {self.fastq_r2.get_data_state_display()}"
-        else:
-            data_state = self.fastq_r1.get_data_state_display()
-        return f"UnalignedReads from sample {self.sequencing_sample} ({data_state})"
+        return f"UnalignedReads from sample {self.sequencing_sample}"
 
 
 class BamFile(SeqAutoRecord):
@@ -580,7 +533,7 @@ class BamFile(SeqAutoRecord):
         return aligner
 
     def __str__(self):
-        return f"BAM: {self.unaligned_reads.sequencing_sample} ({self.get_data_state_display()})"
+        return f"BAM: {self.unaligned_reads.sequencing_sample}"
 
 
 class Flagstats(SeqAutoRecord):
@@ -605,7 +558,7 @@ class Flagstats(SeqAutoRecord):
         return self.bam_file.get_params()
 
     def __str__(self):
-        return f"Flagstats ({self.get_data_state_display()}) for {self.bam_file}"
+        return f"Flagstats for {self.bam_file}"
 
 
 def get_seqauto_user():
@@ -642,7 +595,7 @@ class SingleSampleVCF(SeqAutoRecord):
         return self.bam_file.unaligned_reads.sequencing_sample.sample_sheet
 
     def __str__(self):
-        return f"VCF {self.name} ({self.get_data_state_display()})"
+        return f"VCF {self.name}"
 
 
 class JointCalledVCF(SeqAutoRecord):
@@ -741,7 +694,7 @@ class QC(SeqAutoRecord):
         return os.path.abspath(qc_path)
 
     def __str__(self):
-        return f"QC {name_from_filename(self.path)} ({self.get_data_state_display()})"
+        return f"QC {name_from_filename(self.path)}"
 
 
 class QCGeneList(SeqAutoRecord):
@@ -870,7 +823,7 @@ class QCExecSummary(SeqAutoRecord):
         return "qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run"
 
     def __str__(self):
-        return f"QCExecSummary ({self.data_state}) for {self.qc}"
+        return f"QCExecSummary for {self.qc}"
 
 
 class ExecSummaryReferenceRange(models.Model):

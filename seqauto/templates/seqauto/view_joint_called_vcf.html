@@ -1,7 +1,6 @@
 {% extends "seqauto/menu_sequencing_data_base.html" %}
 {% load static %}
 {% load ui_utils %}
-{% load seqauto_record_tags %}
 {% block title %}{{ joint_called_vcf }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
@@ -35,8 +34,6 @@
     {% endlabelled %}
     </div>
 
-
-	{% record_data_state_helper joint_called_vcf %}
 
 	<div>
 		<h3>Input</h3>

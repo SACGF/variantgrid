@@ -1,6 +1,5 @@
 {% load static %}
 {% load model_helpers %}
-{% load seqauto_record_tags %}
 <link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
 <script src="{% static 'js/cached_generated_files.js' %}"></script>
@@ -57,6 +56,6 @@ $(document).ready(function() {
 		</tr>
 	</table>
 {% else %}
-	{% record_data_state_helper illumina_qc %}
+	No stats available.
 {% endif %}
 </div>

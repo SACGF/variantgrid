@@ -45,7 +45,6 @@ class Command(BaseCommand):
 
                         qc_gene_coverage = QCGeneCoverage.objects.create(path=other_qc_path,
                                                                          qc=qc,
-                                                                         data_state=DataState.COMPLETE,
                                                                          gene_coverage_collection=gcc)
 
                     gene_coverage_collection = qc_gene_coverage.gene_coverage_collection

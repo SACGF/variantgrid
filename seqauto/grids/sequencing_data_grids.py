@@ -5,14 +5,13 @@ from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import TextField, QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
-from django.db.models.query_utils import Q
 from django.utils.html import format_html_join, mark_safe
 
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonDataType
 from seqauto.models import SequencingRun, BamFile, UnalignedReads, SingleSampleVCF, QC, Experiment, EnrichmentKit, \
     EnrichmentKitType
-from snpdb.models import UserGridConfig, DataState
+from snpdb.models import UserGridConfig
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
@@ -38,12 +37,11 @@ class ExperimentColumns(DatatableConfig[Experiment]):
 class SequencingRunListGrid(JqGridUserRowConfig):
     model = SequencingRun
     caption = 'SequencingRuns'
-    fields = ["date", "name", "is_valid", "sequencer__sequencer_model__model", "sequencer__name",
+    fields = ["date", "name", "sequencer__sequencer_model__model", "sequencer__name",
               "experiment__name", "enrichment_kit__name", "enrichment_kit__version",
               "gold_standard", "legacy", "hidden", "bad", "path"]
     colmodel_overrides = {
         'name': {'width': 260, 'formatter': 'viewSequencingRunLink'},
-        "is_valid": {'label': 'Validated', 'formatter': 'formatSequencingRunValid'},
         'sequencer__name': {'width': 60, 'label': 'Sequencer'},
         'sequencer__sequencer_model__model': {'width': 70, 'label': 'Model'},
         'experiment__name': {'label': 'Experiment', 'width': 120},
@@ -126,20 +124,13 @@ class SequencingRunListGrid(JqGridUserRowConfig):
 class UnalignedReadsListGrid(JqGridUserRowConfig):
     model = UnalignedReads
     caption = 'UnalignedReads'
-    fields = ["id", "sequencing_sample__sample_sheet__sequencing_run__name", "sequencing_sample__sample_id",
-              "fastq_r1__data_state", "fastq_r2__data_state"]
+    fields = ["id", "sequencing_sample__sample_sheet__sequencing_run__name", "sequencing_sample__sample_id"]
     colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewUnalignedReadsLink'},
-                          'sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'},
-                          "fastq_r1__data_state": {'label': 'R1 state'},
-                          "fastq_r2__data_state": {'label': 'R2 state'}}
+                          'sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}}
 
     def __init__(self, user, **kwargs):
         super().__init__(user)
         queryset = self.model.objects.all()
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        if not user_grid_config.show_incomplete_data:
-            both_exist = Q(fastq_r1__data_state=DataState.COMPLETE) & Q(fastq_r2__data_state=DataState.COMPLETE)
-            queryset = queryset.filter(both_exist)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
@@ -149,11 +140,10 @@ class BamFileListGrid(JqGridUserRowConfig):
     model = BamFile
     caption = 'BamFiles'
     fields = [
-        "id", "data_state", "unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
+        "id", "unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
         "unaligned_reads__sequencing_sample__sample_id", "path", "aligner__name"]
     colmodel_overrides = {
         'id': {'width': 20, 'formatter': 'viewBamFileLink'},
-        'data_state': {'width': 40},
         'unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'},
         'aligner__name': {'label': 'Aligner', "hidden": True}  # Hide as always "Fake Aligner" currently
     }
@@ -161,9 +151,6 @@ class BamFileListGrid(JqGridUserRowConfig):
     def __init__(self, user, **kwargs):
         super().__init__(user)
         queryset = self.model.objects.all()
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        if not user_grid_config.show_incomplete_data:
-            queryset = queryset.filter(data_state=DataState.COMPLETE)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
@@ -172,7 +159,7 @@ class BamFileListGrid(JqGridUserRowConfig):
 class SingleSampleVCFListGrid(JqGridUserRowConfig):
     model = SingleSampleVCF
     caption = 'SingleSampleVCFs'
-    fields = ["id", "data_state", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
+    fields = ["id", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
               "bam_file__unaligned_reads__sequencing_sample__sample_id", "path", "variant_caller"]
     colmodel_overrides = {
         'id': {'width': 20, 'formatter': 'viewVCFFileLink'},
@@ -182,9 +169,6 @@ class SingleSampleVCFListGrid(JqGridUserRowConfig):
     def __init__(self, user, **kwargs):
         super().__init__(user)
         queryset = self.model.objects.all()
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        if not user_grid_config.show_incomplete_data:
-            queryset = queryset.filter(data_state=DataState.COMPLETE)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
@@ -193,7 +177,7 @@ class SingleSampleVCFListGrid(JqGridUserRowConfig):
 class QCFileListGrid(JqGridUserRowConfig):
     model = QC
     caption = 'QC'
-    fields = ["id", "data_state", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
+    fields = ["id", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
               "bam_file__unaligned_reads__sequencing_sample__sample_id", "path"]
     colmodel_overrides = {
         'id': {'width': 20, 'formatter': 'viewQCLink'},
@@ -203,9 +187,6 @@ class QCFileListGrid(JqGridUserRowConfig):
     def __init__(self, user, **kwargs):
         super().__init__(user)
         queryset = self.model.objects.all()
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        if not user_grid_config.show_incomplete_data:
-            queryset = queryset.filter(data_state=DataState.COMPLETE)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})

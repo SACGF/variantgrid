@@ -6,7 +6,7 @@ from seqauto.models import Sequencer, Experiment, VariantCaller, SequencingRun, 
     SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, JointCalledVCF, SingleSampleVCF, \
     BamFile, Fastq, Aligner, PairedEnd
 from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
-from snpdb.models import Manufacturer, DataState
+from snpdb.models import Manufacturer
 
 
 class ManufacturerSerializer(serializers.ModelSerializer):
@@ -239,7 +239,6 @@ class SampleSheetSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         sequencing_samples_data = validated_data.pop('sequencingsample_set')
-        validated_data["data_state"] = DataState.COMPLETE
         sequencing_run = validated_data["sequencing_run"]
         sample_sheet, created = SampleSheet.objects.update_or_create(
             sequencing_run=sequencing_run,
@@ -275,8 +274,7 @@ class FastqSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         path = validated_data["path"]
         validated_data["name"] = os.path.basename(path)
-        fastq, _created = Fastq.objects.update_or_create(**validated_data,
-                                                         defaults={"data_state": DataState.COMPLETE})
+        fastq, _created = Fastq.objects.update_or_create(**validated_data)
         return fastq
 
 
@@ -308,7 +306,7 @@ class UnalignedReadsSerializer(serializers.ModelSerializer):
         else:
             unaligned_reads_kwargs["fastq_r2"] = None  # Be able to blank it out
 
-        # Unaligned reads isn't a file so doesn't have 'data_state'
+        # UnalignedReads is a joiner, not a file, so it's not a SeqAutoRecord
         instance, _created = UnalignedReads.objects.update_or_create(sequencing_sample=sequencing_sample,
                                                                      defaults=unaligned_reads_kwargs)
         return instance
@@ -349,11 +347,9 @@ class BamFileSerializer(serializers.ModelSerializer):
                                                        sequencing_run=unaligned_reads.sequencing_run,
                                                        unaligned_reads=unaligned_reads,
                                                        aligner=aligner,
-                                                       name=name,
-                                                       defaults={"data_state": DataState.COMPLETE})
+                                                       name=name)
 
         if flagstats_data:
-            flagstats_data["data_state"] = DataState.COMPLETE
             Flagstats.objects.create(bam_file=bam_file, **flagstats_data)
 
         return bam_file
@@ -425,7 +421,7 @@ class SingleSampleVCFSerializer(serializers.ModelSerializer):
         validate_unique_vcf_path(SingleSampleVCF, path, **kwargs)
         single_sample_vcf, _ = SingleSampleVCF.objects.update_or_create(
             **kwargs,
-            defaults={"path": path, "data_state": DataState.COMPLETE},
+            defaults={"path": path},
         )
         return single_sample_vcf
 
@@ -507,6 +503,6 @@ class JointCalledVCFSerializer(serializers.ModelSerializer):
         validate_unique_vcf_path(JointCalledVCF, path, **kwargs)
         joint_called_vcf, _ = JointCalledVCF.objects.update_or_create(
             path=path,
-            defaults={**kwargs, "data_state": DataState.COMPLETE},
+            defaults={**kwargs},
         )
         return joint_called_vcf
