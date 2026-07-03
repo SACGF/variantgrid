@@ -483,6 +483,14 @@ def vep_parse_version_line(line):
 
 
 def _vep_check_version_match(variant_annotation_version, vep_version_kwargs: dict, vep_version_desc: str):
+    # 'gencode_subset' and 'distance' are settings-snapshot fields: they are read from settings at VAV
+    # creation and stored on the VAV, and are not recorded in the VEP annotated VCF header. Both check
+    # callers re-derive them from live settings (see vep_dict_to_variant_annotation_version_kwargs), so
+    # comparing them here can only produce false mismatches when a setting changes after the VAV was
+    # created - exclude them from every version-match check.
+    vep_version_kwargs = dict(vep_version_kwargs)
+    for snapshot_field in ("gencode_subset", "distance"):
+        vep_version_kwargs.pop(snapshot_field, None)
     for k, v in vep_version_kwargs.items():
         version_value = getattr(variant_annotation_version, k)
         if version_value != v:
@@ -505,10 +513,4 @@ def vep_check_command_line_version_match(variant_annotation_version):
     vep_config = VEPConfig(variant_annotation_version.genome_build)
     vep_version = get_vep_version(variant_annotation_version.genome_build, vep_config.annotation_consortium)
     vep_version_kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version)
-    # 'gencode_subset' and 'distance' are settings-snapshot fields: they are read from settings at VAV
-    # creation and stored on the VAV, but the actual command line is built from the VAV's stored values
-    # (see get_vep_command). Re-deriving them from live settings here can only produce false mismatches
-    # when a setting changes after the VAV was created, so exclude them from the command-line check.
-    for snapshot_field in ("gencode_subset", "distance"):
-        vep_version_kwargs.pop(snapshot_field, None)
     _vep_check_version_match(variant_annotation_version, vep_version_kwargs, "VEP command line")
