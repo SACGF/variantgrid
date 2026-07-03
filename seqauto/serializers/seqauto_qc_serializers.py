@@ -5,7 +5,6 @@ from seqauto.models import IlluminaFlowcellQC, QCGeneList, QC, QCGeneCoverage, Q
     SampleSheet, SequencingRun, SingleSampleVCF
 from seqauto.serializers.sequencing_serializers import SampleSheetLookupSerializer, FastqSerializer, \
     BamFilePathSerializer, SingleSampleVCFPathSerializer, SequencingSampleLookupSerializer
-from snpdb.models import DataState
 
 
 class FastQCSerializer(serializers.ModelSerializer):
@@ -75,8 +74,6 @@ class QCSerializer(serializers.ModelSerializer):
             vcf_file=vcf_file,
             defaults=defaults
         )
-        qc.data_state = DataState.COMPLETE
-        qc.save()
         return qc
 
 
@@ -114,7 +111,6 @@ class QCGeneListCreateSerializer(serializers.ModelSerializer):
         custom_text_gene_list = QCGeneList.create_gene_list(gene_list_text,
                                                             sequencing_sample=qc.sequencing_sample)
         defaults = {
-            "data_state": DataState.COMPLETE,
             "custom_text_gene_list": custom_text_gene_list,
         }
         instance, _created = QCGeneList.objects.update_or_create(qc=qc,
@@ -166,7 +162,6 @@ class QCGeneCoverageSerializer(serializers.ModelSerializer):
 
 class QCExecSummarySerializer(serializers.ModelSerializer):
     qc = QCSerializer()
-    data_state = serializers.CharField(read_only=True)
 
     class Meta:
         model = QCExecSummary
@@ -175,7 +170,6 @@ class QCExecSummarySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         qc_data = validated_data.pop("qc")
         qc = QCSerializer.get_object(qc_data)
-        validated_data["data_state"] = DataState.COMPLETE
         validated_data["sequencing_run"] = qc.sequencing_run
         instance, _created = QCExecSummary.objects.update_or_create(qc=qc,
                                                                     defaults=validated_data)

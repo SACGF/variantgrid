@@ -4,7 +4,6 @@ import os
 from collections import defaultdict
 
 from django.conf import settings
-from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
@@ -35,7 +34,7 @@ from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, get_qc_exec
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from seqauto.sequencing_files.sample_sheet import assign_old_sample_sheet_data_to_current_sample_sheet
 from snpdb.graphs import graphcache
-from snpdb.models import Sample, UserSettings, DataState
+from snpdb.models import Sample, UserSettings
 
 
 def sequencing_data(request):
@@ -79,7 +78,7 @@ def view_experiment(request, experiment_id):
 def get_illumina_qc_and_show_stats_for_sample_sheet(sample_sheet):
     try:
         illumina_qc = sample_sheet.illuminaflowcellqc
-        show_stats = illumina_qc.data_state == 'C'
+        show_stats = True
     except Exception:
         illumina_qc = None
         show_stats = False
@@ -105,12 +104,6 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
                 #                                         message=message)
 
             sequencing_run = sequencing_run_form.save()
-
-    if not sequencing_run.is_valid:  # Had errors
-        sequencing_run.save()  # Try again now
-        if sequencing_run.is_valid:
-            message = "SequencingRun had errors but they appear to have been resolved. Setting is_valid=True"
-            messages.add_message(request, messages.WARNING, message)
 
     vcf_types = {
         "Joint Called VCF": Q(vcf__uploadedvcf__backendvcf__joint_called_vcf__isnull=False),
@@ -459,8 +452,6 @@ def qc_column_graph(request, qc_column_id, use_percent):
     logging.info("Using %s", qc_column)
     use_percent = json.loads(use_percent)  # Boolean
 
-    data_state = qc_column.qc_type.qc_object_path + "__data_state"
-
     SEQUENCING_SAMPLE_PATH = 'bam_file__unaligned_reads__sequencing_sample'
     ENRICHMENT_KIT_PATH = SEQUENCING_SAMPLE_PATH + '__enrichment_kit'
 
@@ -468,8 +459,7 @@ def qc_column_graph(request, qc_column_id, use_percent):
         return qc_column.qc_type.qc_object_path + "__" + f
 
     path = get_field(qc_column.field)
-    qs = QC.objects.filter(**{data_state: DataState.COMPLETE})
-    qs = qs.filter(**{path + "__isnull": False})
+    qs = QC.objects.filter(**{path + "__isnull": False})
     qs = qs.order_by(ENRICHMENT_KIT_PATH)  # want dict eventually sorted by kit
 
     total_field = None

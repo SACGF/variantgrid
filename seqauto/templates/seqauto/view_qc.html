@@ -2,7 +2,6 @@
 {% load static %}
 {% load jqgrid_tags %}
 {% load help_tags %}
-{% load seqauto_record_tags %}
 {% load crispy_forms_tags %}
 
 {% block title %}{{ qc }}{% endblock %}
@@ -23,7 +22,6 @@
 
 	<h2>{{ qc }}</h2>
 
-{% if qc.data_state == 'C' %}
 	<div id="qc-tabs">
 		<ul>
 	    	<li><a href="{% url 'view_qc_exec_summary_tab' qc.pk %}">Exec Summary</a></li>
@@ -41,12 +39,7 @@
 			</form>
 		</div>
 	<div>
-{% else %}
 
-	{% record_data_state_helper qc %}
-	
-{% endif %}	
-	
 		<h3>Input</h3>
 		<ul>
 		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' qc.sequencing_run.pk %}">{{ qc.sequencing_run }}</a></li>

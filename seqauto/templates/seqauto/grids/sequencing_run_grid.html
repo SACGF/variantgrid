@@ -24,13 +24,6 @@
 			const URL = Urls.view_sequencing_run(sequencingRunId);
 	    	return "<a class='sequencing-run-link' href='" + URL + "'>" + sequencingRunId + "</a>";
 		},
-        formatSequencingRunValid: function(is_valid) {
-            let value = "Pass";
-            if (!is_valid) {
-                value = `<span class="error">Fail</span>`;
-            }
-            return value;
-        },
         formatSequencingRunVCF : function(vcfIds, options, rowObject) {
             if (!vcfIds) {
                 return "";

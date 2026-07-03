@@ -24,7 +24,7 @@ table th.num, table td.num {
 </style>
 <script src="{% static 'js/cached_generated_files.js' %}"></script>
 <script>
-{% if qc.data_state == 'C' and exec_summary.data_state == 'C' %}
+{% if exec_summary %}
     EXEC_SUMMARY_ID = {{ exec_summary.pk }};
 
 	function loadQCExecSummaryGraph() {
@@ -48,7 +48,7 @@ table th.num, table td.num {
 {% endif %}
 
     $(document).ready(function() {
-    	{% if qc.data_state == 'C' and exec_summary %}
+    	{% if exec_summary %}
     	loadQCExecSummaryGraph();
     	$('#id_compare_against', "#exec-summary").change(loadQCExecSummaryGraph);
         $('#id_graph_type', "#exec-summary").change(loadQCExecSummaryGraph);
@@ -58,7 +58,7 @@ table th.num, table td.num {
 </script>
 
 <div id="exec-summary">
-    {% if qc.data_state == 'C' and exec_summary.data_state == 'C' %}
+    {% if exec_summary %}
         {% crispy graph_form form_helper.horizontal %}
 		<div id='qc-exec-summary-graph' class='generated-graph'></div>
 
@@ -66,11 +66,7 @@ table th.num, table td.num {
             {{ exec_summary | as_table | safe }}
         </table>
     {% else %}
-        {% if exec_summary %}
-            Exec summary is not ready (status={{ exec_summary.get_data_state_display }})
-        {% else %}
-            Exec summary not available.
-        {% endif %}
+        Exec summary not available.
 	{% endif %}
 				
 </div>
