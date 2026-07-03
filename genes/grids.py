@@ -329,7 +329,7 @@ class QCGeneCoverageGrid(JqGridUserRowConfig):
             gene_list_ids = gene_list_id_list.split("/")
             if gene_list_ids:
                 for gene_list_id in gene_list_ids:
-                    gene_list = get_object_or_404(GeneList, pk=gene_list_id)
+                    gene_list = GeneList.get_for_user(user, gene_list_id, success_only=False)
                     gene_symbols.update(gene_list.get_gene_names())
 
         q = self.get_coverage_q(gene_coverage_collection, gene_symbols)
