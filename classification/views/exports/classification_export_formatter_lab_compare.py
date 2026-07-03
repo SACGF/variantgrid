@@ -36,9 +36,9 @@ class ClassificationLab(ExportRow):
                 value_set.add(value_tuple)
         if value_set:
             value_set_strs = []
-            for vs in sorted(value_set, key=lambda vs: tuple(v or "" for v in vs)):
+            for vs in value_set:
                 value_set_strs.append(" ".join(v or "#" for v in vs))
-            return "\n".join(value_set_strs)
+            return "\n".join(sorted(value_set_strs))
 
     @export_column("Record Count")
     def record_count(self):
