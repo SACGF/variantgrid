@@ -57,10 +57,6 @@ $(document).ready(function() {
 		</tr>
 	</table>
 {% else %}
-	{% if sequencing_run.can_generate_qc %}
-		{% record_data_state_helper illumina_qc %}
-	{% else %}
-	    Can't generate QC for this SequencingRun due to missing metrics files.
-	{% endif %} 
+	{% record_data_state_helper illumina_qc %}
 {% endif %}
 </div>

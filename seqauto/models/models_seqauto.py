@@ -2,21 +2,19 @@ import logging
 import os
 import pathlib
 import re
-import shutil
 from datetime import datetime
 from functools import cached_property
 from typing import Optional
 
 from cache_memoize import cache_memoize
 from django.conf import settings
-from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import DecimalRangeField
 from django.core.cache import cache
 from django.db import models
-from django.db.models import Value, When, Case, IntegerField, Max
+from django.db.models import Max
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
-from django.db.models.signals import post_delete, pre_delete
+from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils.timezone import make_aware
@@ -25,87 +23,18 @@ from django_extensions.db.models import TimeStampedModel
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
     Transcript, GeneSymbol, SampleGeneList, TranscriptVersion, GeneCoverageCanonicalTranscript, ActiveSampleGeneList
 from library.constants import DAY_SECS
-from library.enums.log_level import LogLevel
 from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
-from library.log_utils import get_traceback, log_traceback
 from library.preview_request import PreviewModelMixin
 from library.utils import sorted_nicely
-from library.utils.file_utils import name_from_filename, remove_gz_if_exists
+from library.utils.file_utils import name_from_filename
 from patients.models import FakeData, Patient
-from seqauto.illumina import illuminate_report
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
-from seqauto.models.models_enums import DataGeneration, SequencerRead, PairedEnd, \
-    SequencingFileType, JobScriptStatus, SeqAutoRunStatus
+from seqauto.models.models_enums import DataGeneration, SequencerRead, PairedEnd
 from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
 from seqauto.models.models_software import Aligner, VariantCaller
-from seqauto.qc.exec_summary import load_exec_summary
-from seqauto.qc.fastqc_parser import read_fastqc_data
-from seqauto.qc.flag_stats import load_flagstats
-from seqauto.qc.qc_utils import meta_data_file
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
 from snpdb.models import VCF, Sample, GenomeBuild, DataState, InheritanceManager, Wiki
-from snpdb.models.models_enums import ImportStatus, ImportSource
-from variantgrid.celery import app
-
-
-class SeqAutoRun(TimeStampedModel):
-    """ Represents a scan and loading of data from backend system """
-
-    status = models.CharField(max_length=1, choices=SeqAutoRunStatus.choices, default=SeqAutoRunStatus.CREATED)
-    task_id = models.CharField(max_length=36, null=True)
-    scan_start = models.DateTimeField(null=True)
-    create_models_start = models.DateTimeField(null=True)
-    scripts_and_jobs_start = models.DateTimeField(null=True)
-    job_launch_script_filename = models.TextField(null=True)
-    finish_date = models.DateTimeField(null=True)
-    error_exception = models.TextField(null=True)
-    fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
-
-    class Meta:
-        permissions = (('seqauto_scan_initiate', 'SeqAuto scan initiate'),)
-
-    def save(self, *args, **kwargs):
-        self.status = self.get_status()
-        super().save(*args, **kwargs)
-
-    def get_status(self):
-        status = SeqAutoRunStatus.CREATED
-        if self.error_exception:
-            status = SeqAutoRunStatus.ERROR
-        else:
-            if self.scan_start:
-                status = SeqAutoRunStatus.SCANNING_FILES
-            if self.create_models_start:
-                status = SeqAutoRunStatus.CREATE_MODELS
-            if self.scripts_and_jobs_start:
-                status = SeqAutoRunStatus.SCRIPTS_AND_JOBS
-            if self.finish_date:
-                status = SeqAutoRunStatus.FINISHED
-        return status
-
-    def get_scan_resources_dir(self):
-        return os.path.join(settings.SEQAUTO_SCAN_RESOURCES_DIR, f"seqauto_run_{self.pk}")
-
-    def get_job_scripts_dir(self):
-        return os.path.join(settings.SEQAUTO_JOB_SCRIPTS_DIR, f"seqauto_run_{self.pk}")
-
-    def remove_scan_resources_dir(self):
-        scan_resources_dir = self.get_scan_resources_dir()
-        logging.info("*** Deleting files for SeqAutoRun %d - '%s'", self.pk, scan_resources_dir)
-        shutil.rmtree(scan_resources_dir)
-
-    @staticmethod
-    def get_last_success_datetime():
-        successful_runs = SeqAutoRun.objects.filter(status=SeqAutoRunStatus.FINISHED)
-        most_recently_finished_seqauto_run = successful_runs.order_by("finish_date").last()
-        if most_recently_finished_seqauto_run:
-            finish_date = most_recently_finished_seqauto_run.finish_date
-        else:
-            finish_date = None
-        return finish_date
-
-    def __str__(self):
-        return f"AnnotationRun: {self.created} ({self.status})"
+from snpdb.models.models_enums import ImportStatus
 
 
 class SeqAutoRecord(TimeStampedModel):
@@ -127,61 +56,20 @@ class SeqAutoRecord(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.validate()
-        if self.pk:
-            valid = not SeqAutoMessage.objects.filter(record=self, open=True, severity=LogLevel.ERROR).exists()
-        else:
-            valid = True  # No messages will exist yet
-        self.is_valid = valid
+        self.is_valid = True
         super().save(*args, **kwargs)
 
     def validate(self) -> bool:
-        """ Creates SeqAutoMessage of severity=ERROR - or closes any that no longer apply """
         return True
 
     @property
     def last_modified_datetime(self):
         return make_aware(datetime.fromtimestamp(self.file_last_modified))
 
-    def _close_messages_with_code(self, *args):
-        SeqAutoMessage.objects.filter(record=self, code__in=args).update(open=False)
-
     @staticmethod
     def get_file_last_modified(filename):
         path = pathlib.Path(filename)
         return path.stat().st_mtime
-
-    def add_messages(self, request):
-        qs = SeqAutoMessage.objects.filter(record=self, open=True).annotate(
-            priority=Case(
-                When(severity=LogLevel.ERROR, then=Value(1)),
-                When(severity=LogLevel.WARNING, then=Value(2)),
-                When(severity=LogLevel.INFO, then=Value(3)),
-                When(severity=LogLevel.DEBUG, then=Value(4)),
-                output_field=IntegerField(),
-            )
-        ).order_by("priority")
-        for sa_message in qs:
-            messages.add_message(request, sa_message.level, sa_message.message)
-
-
-class SeqAutoMessage(TimeStampedModel):
-    # TODO: Remember we can bump to latest SeqAutoRun as we go
-    # At least one of seqauto_run/record should be set
-    seqauto_run = models.ForeignKey(SeqAutoRun, null=True, on_delete=CASCADE)
-    record = models.ForeignKey(SeqAutoRecord, null=True, on_delete=CASCADE)
-    severity = models.CharField(max_length=1, choices=LogLevel.CHOICES)
-    code = models.TextField(null=True)  # A code you can use to close messages after resolving
-    message = models.TextField()
-    open = models.BooleanField(default=True)
-
-    @property
-    def level(self):
-        """ Convert from LogLevel to Django Messages constants """
-        return messages.constants.DEFAULT_LEVELS[self.get_severity_display()]
-
-    def __str__(self):
-        record = SeqAutoRecord.objects.get_subclass(pk=self.record)
-        return f"{self.seqauto_run} {self.get_severity_display()} {record}: {self.message}"
 
 
 class SequencingRun(PreviewModelMixin, SeqAutoRecord):
@@ -207,43 +95,6 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
     @classmethod
     def preview_enabled(cls) -> bool:
         return settings.SEQAUTO_ENABLED
-
-    def _validate(self):
-        sample_sheet_changed_code = "sample_sheet_changed"
-
-        if self.is_data_out_of_date_from_current_sample_sheet:
-            SeqAutoMessage.objects.update_or_create(record=self, severity=LogLevel.ERROR,
-                                                    code=sample_sheet_changed_code,
-                                                    message="SampleSheet has changed, please confirm in 'Admin' tab",
-                                                    defaults={"open": True})
-        else:
-            self._close_messages_with_code(sample_sheet_changed_code)
-
-        sample_sheet_data_state = "sample_sheet_data_state"
-        sample_sheet_missing = "sample_sheet_missing"
-        sample_sheet_qc_exception = "sample_sheet_qc_exception"
-        try:
-            illumina_qc = self.sequencingruncurrentsamplesheet.sample_sheet.illuminaflowcellqc
-            self._close_messages_with_code(sample_sheet_missing, sample_sheet_qc_exception)
-
-            if illumina_qc.data_state != DataState.COMPLETE:
-                SeqAutoMessage.objects.update_or_create(record=self, severity=LogLevel.ERROR,
-                                                        code=sample_sheet_data_state,
-                                                        message=f"QC data state={illumina_qc.get_data_state_display()}",
-                                                        defaults={"open": True})
-            else:
-                self._close_messages_with_code(sample_sheet_data_state)
-
-        except SequencingRunCurrentSampleSheet.DoesNotExist:
-            SeqAutoMessage.objects.update_or_create(record=self, severity=LogLevel.ERROR,
-                                                    code=sample_sheet_missing,
-                                                    message="No Current SampleSheet set",
-                                                    defaults={"open": True})
-        except Exception as e:
-            SeqAutoMessage.objects.update_or_create(record=self, severity=LogLevel.ERROR,
-                                                    code=sample_sheet_qc_exception,
-                                                    message=f"QC not loaded: {e}",
-                                                    defaults={"open": True})
 
     def get_current_sample_sheet(self):
         try:
@@ -309,28 +160,6 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         else:
             enrichment_kit_name = 'Unknown EnrichmentKit'
         return enrichment_kit_name
-
-    def check_basecalls_dir(self):
-        basecalls_dir = os.path.join(self.path, "Data", "Intensities", "BaseCalls")
-        has_basecall_data = False
-        if os.path.exists(basecalls_dir):
-            for f in os.listdir(basecalls_dir):
-                if os.path.isdir(os.path.join(basecalls_dir, f)) and f.startswith("L00"):
-                    has_basecall_data = True
-        return has_basecall_data
-
-    def check_interop_dir(self):
-        interop_dir = os.path.join(self.path, settings.SEQAUTO_SEQUENCING_RUN_INTEROP_SUB_DIR)
-        has_quality = os.path.exists(os.path.join(interop_dir, "QMetricsOut.bin"))
-        has_index = os.path.exists(os.path.join(interop_dir, "IndexMetricsOut.bin"))
-        has_tile = os.path.exists(os.path.join(interop_dir, "TileMetricsOut.bin"))
-        return has_quality and has_index and has_tile
-
-    def can_basecall(self):
-        return self.has_basecalls
-
-    def can_generate_qc(self):
-        return self.data_state != DataState.DELETED and self.has_interop
 
     def get_old_sample_sheets(self):
         current_sample_sheet = self.get_current_sample_sheet()
@@ -425,28 +254,23 @@ class SampleSheet(SeqAutoRecord):
         qs = self.sequencingsample_set.filter(enrichment_kit__isnull=False)
         return EnrichmentKit.objects.filter(pk__in=qs.values_list("enrichment_kit", flat=True))
 
-    @staticmethod
-    def get_path_from_sequencing_run(sequencing_run):
-        sample_sheet = os.path.join(sequencing_run.path, SampleSheet.SAMPLE_SHEET)
-        return os.path.abspath(sample_sheet)
-
     def get_version_string(self):
         date = "TODO"
         return f"{self.hash}/{date}"
 
-    def set_as_current_sample_sheet(self, sequencing_run, created=False, seqauto_run=None):
+    def set_as_current_sample_sheet(self, sequencing_run, created=False):
         if created:
             sequencing_run_sample_sheet_created_signal.send(sender=os.path.basename(__file__),
                                                             sample_sheet=self)
 
-        # Make sure SequencingRunCurrentSampleSheet is set to what we found on disk
+        # Make sure SequencingRunCurrentSampleSheet is set to what the API sent us
         try:
             # Update existing
             current_ss = sequencing_run.sequencingruncurrentsamplesheet
             on_disk_not_current = current_ss.sample_sheet != self
             if on_disk_not_current:
-                from seqauto.sequencing_files.create_resource_models import current_sample_sheet_changed
-                current_sample_sheet_changed(seqauto_run, current_ss, self)
+                from seqauto.sequencing_files.sample_sheet import current_sample_sheet_changed
+                current_sample_sheet_changed(current_ss, self)
 
         except SequencingRunCurrentSampleSheet.DoesNotExist:
             # Create new
@@ -604,15 +428,6 @@ class IlluminaFlowcellQC(SeqAutoRecord):
         params['illuminate_qc'] = self.path
         return params
 
-    def load_from_file(self, seqauto_run, **kwargs):
-        illuminate_report.load_from_file(seqauto_run, self)
-
-    @staticmethod
-    def get_path_from_sequencing_run(sequencing_run):
-        illuminate_dir = settings.SEQAUTO_ILLUMINATE_QC_DIR_PATTERN % sequencing_run.get_params()  # this may fail if
-        # sa path signals haven't handled enrichment kit
-        return os.path.join(illuminate_dir, "illuminate_report.txt")
-
     @staticmethod
     def get_sequencing_run_path():
         return 'sample_sheet__sequencing_run'
@@ -646,80 +461,10 @@ class Fastq(SeqAutoRecord):
     name = models.TextField()  # from path
     read = models.CharField(max_length=2, choices=PairedEnd.choices)
 
-    def get_common_pair_name_and_read(self):
-        """ Need a way to group R1/R2 FastQs together (using globally unique key - ie shared path prefix)  """
-        regex_pattern = "(.+)_(R[12])(_001)?.fastq.gz"
-        m = re.match(regex_pattern, self.path)
-        if not m:
-            msg = f"FastQ path '{self.path}' does not match regex pattern '{regex_pattern}'"
-            raise ValueError(msg)
-        pair_name = m.group(1)
-        read = m.group(2)
-        return pair_name, read
-
     def get_params(self):
         params = self.sequencing_sample.get_params()
         params['fastq'] = self.path
         return params
-
-    @staticmethod
-    def get_pair_paths_from_sequencing_sample(sequencing_sample):
-        """ The 1st value returned must be what will be generated given current pipelines
-            (ie old naming conventions come after) """
-
-        # Old code had FastQ names auto-generated by Illumina basecalling:
-        # sequencer_model = sequencing_sample.sample_sheet.sequencing_run.sequencer.sequencer_model
-        # patterns = ["%(full_sample_name)s_L%(lane)03d_R%(read)d_001.fastq.gz"]
-        #
-        # if sequencer_model.data_naming_convention == DataGeneration.HISEQ:
-        #     patterns.append("%(sample_id)s_R%(read)d.fastq.gz")  # SACGF style naming convention
-        # elif sequencer_model.data_naming_convention == DataGeneration.MISEQ:
-        #     patterns.extend(["%(sample_name)s_S%(sample_number)d_R%(read)d_001.fastq.gz",
-        #                      "%(sample_name_underscores)s_S%(sample_number)d_L%(lane)03d_R%(read)d_001.fastq.gz",
-        #                      "%(sample_name_underscores)s_S%(sample_number)d_R%(read)d_001.fastq.gz"])
-        # else:
-        #     msg = f"Unknown sequencer_model.data_naming_convention '{sequencer_model.data_naming_convention}'"
-        #     raise ValueError(msg)
-
-        # New Diagnostic pipeline all FastQs have this simple format
-        patterns = [
-            "%(sample_id)s_%(flowcell_id)s_%(index)s-%(index2)s_%(lane_code)s_%(read)s.fastq.gz",
-            "%(sample_id)s_R%(read)d.fastq.gz",
-        ]
-
-        params = sequencing_sample.get_params()
-        r1_params = {"read": 1}
-        r1_params.update(params)
-        r2_params = {"read": 2}
-        r2_params.update(params)
-
-        unaligned_dir_patterns = []
-        if sequencing_sample.sample_project:
-            fastq_subdirs = ["%(sequencing_run_dir)s/Data/Intensities/BaseCalls/%(sample_project)s",
-                             "%(sequencing_run_dir)s/Data/Intensities/BaseCalls/%(sample_project)s/%(sample_id)s"]
-            unaligned_dir_patterns.extend(fastq_subdirs)
-        unaligned_dir_patterns.append("%(sequencing_run_dir)s/Data/Intensities/BaseCalls")
-        unaligned_dir_patterns.append(settings.SEQAUTO_FASTQ_DIR_PATTERN % sequencing_sample.get_params())
-
-        pair_paths = []
-        for unaligned_dir_pattern in unaligned_dir_patterns:
-            try:
-                pattern = unaligned_dir_pattern
-                fastq_dir = pattern % params
-
-                for pattern in patterns:
-                    name1 = pattern % r1_params
-                    name2 = pattern % r2_params
-
-                    fastq_r1 = os.path.abspath(os.path.join(fastq_dir, name1))
-                    fastq_r2 = os.path.abspath(os.path.join(fastq_dir, name2))
-                    pair_paths.append((fastq_r1, fastq_r2))
-            except KeyError as ke:
-                logging.error("Cannot populate old style string formatting: '%s', params: %s: %s",
-                              pattern, params, ke)
-                raise
-
-        return pair_paths
 
     def __str__(self):
         return f"FastQ {self.name} ({self.read}) from sample {self.sequencing_sample}"
@@ -734,22 +479,6 @@ class FastQC(SeqAutoRecord):
     def get_params(self):
         params = self.fastq.get_params()
         return params
-
-    def load_from_file(self, seqauto_run, **kwargs):
-        fastqc_data = read_fastqc_data(self.path)
-        basic_stats = fastqc_data['Basic Statistics']
-
-        self.total_sequences = basic_stats["Total Sequences"]
-        self.filtered_sequences = basic_stats['Sequences flagged as poor quality']
-        self.gc = basic_stats["GC"]
-
-    @staticmethod
-    def get_path_from_fastq(fastq):
-        base_dir = os.path.dirname(fastq.path)
-        name = remove_gz_if_exists(fastq.path)
-        fastqc_dir = f"{name_from_filename(name)}_fastqc"
-        path = os.path.join(base_dir, "FastQC", fastqc_dir, "fastqc_data.txt")
-        return os.path.abspath(path)
 
     def __str__(self):
         return f"FastQC ({self.get_data_state_display()}) for {self.fastq}"
@@ -875,18 +604,6 @@ class Flagstats(SeqAutoRecord):
     def get_params(self):
         return self.bam_file.get_params()
 
-    def load_from_file(self, seqauto_run, **kwargs):
-        flagstats_data = load_flagstats(self.path)
-        self.total = flagstats_data["total"]
-        self.read1 = flagstats_data["read1"]
-        self.read2 = flagstats_data["read2"]
-        self.mapped = flagstats_data["mapped"]
-        self.properly_paired = flagstats_data["properly paired"]
-
-    @staticmethod
-    def get_path_from_bam_file(bam_file):
-        return meta_data_file(bam_file.path, f"flagstats/%s{Flagstats.FLAGSTATS_EXTENSION}")
-
     def __str__(self):
         return f"Flagstats ({self.get_data_state_display()}) for {self.bam_file}"
 
@@ -898,18 +615,6 @@ def get_seqauto_user():
             seqauto_group = Group.objects.get_or_create(name=settings.SEQAUTO_GROUP)
             user.groups.add(seqauto_group)
     return user
-
-
-def import_filesystem_vcf(path, name, import_source):
-    seqauto_user = get_seqauto_user()
-
-    CELERY_PROCESS_VCF_TASK = 'upload.tasks.vcf.import_vcf_tasks.process_vcf_file_task'
-    logging.info("Executing: %s", CELERY_PROCESS_VCF_TASK)
-    app.send_task(CELERY_PROCESS_VCF_TASK, args=[path, name, seqauto_user.pk, import_source])  # @UndefinedVariable
-
-
-class DontAutoLoadException(Exception):
-    pass
 
 
 class SingleSampleVCF(SeqAutoRecord):
@@ -935,24 +640,6 @@ class SingleSampleVCF(SeqAutoRecord):
     @property
     def sample_sheet(self) -> SampleSheet:
         return self.bam_file.unaligned_reads.sequencing_sample.sample_sheet
-
-    def load_from_file(self, seqauto_run, **kwargs):
-        if not settings.SEQAUTO_IMPORT_VCF:
-            raise DontAutoLoadException()
-
-        import_filesystem_vcf(self.path, self.name, ImportSource.SEQAUTO)
-
-    @staticmethod
-    def get_path_from_bam(bam):
-        bam_params = bam.get_params()
-        vcf_pattern = None
-        if enrichment_kit_name := bam_params.get("enrichment_kit"):
-            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT.get(enrichment_kit_name)
-        if vcf_pattern is None:
-            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT["default"]
-        pattern = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, vcf_pattern)
-        vcf_path = pattern % bam_params
-        return os.path.abspath(vcf_path)
 
     def __str__(self):
         return f"VCF {self.name} ({self.get_data_state_display()})"
@@ -998,28 +685,6 @@ class JointCalledVCF(SeqAutoRecord):
             return None
         return count == self.sample_sheet.sequencingsample_set.count()
 
-    def load_from_file(self, seqauto_run, **kwargs):
-        if not settings.SEQAUTO_IMPORT_COMBO_VCF:
-            raise DontAutoLoadException()
-
-        if self.vcf:
-            # Already exists! Make sure it's linked but don't reload
-            try:
-                from upload.models import UploadedVCF
-                from upload.vcf.vcf_import import create_backend_vcf_links
-
-                uploaded_vcf = UploadedVCF.objects.get(uploaded_file__path=self.path)
-                create_backend_vcf_links(uploaded_vcf)
-            except Exception:
-                log_traceback()
-
-            # Re-linking SequencingRun / backend VCF will be done manually in view_sequencing_run
-            # "Assign data to most recent sample sheet" button
-            logging.info("Skipping loading of %s as vcf named already exists!", self.path)
-            raise DontAutoLoadException()
-
-        import_filesystem_vcf(self.path, self.name, ImportSource.SEQAUTO)
-
     def needs_to_be_linked(self):
         try:
             _ = self.backendvcf  # if no exception we can link it
@@ -1030,25 +695,6 @@ class JointCalledVCF(SeqAutoRecord):
         except Exception:
             pass
         return False
-
-    @staticmethod
-    def get_paths_from_sample_sheet(sample_sheet) -> list[str]:
-        ss_params = sample_sheet.get_params()
-        pattern_list = None
-        if enrichment_kit_name := ss_params.get("enrichment_kit"):
-            sequencing_run_name = ss_params["sequencing_run"]
-            if "ffpe" not in enrichment_kit_name.lower() and "_FFPE_" in sequencing_run_name:
-                enrichment_kit_name += "_ffpe"
-            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(enrichment_kit_name)
-
-        if pattern_list is None:
-            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT["default"]
-
-        paths = []
-        for pattern in pattern_list:
-            combo_path = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, pattern) % sample_sheet.get_params()
-            paths.append(os.path.abspath(combo_path))
-        return paths
 
     def __str__(self):
         num_samples = self.sample_sheet.sequencingsample_set.count()
@@ -1094,15 +740,6 @@ class QC(SeqAutoRecord):
         qc_path = pattern % vcf.get_params()
         return os.path.abspath(qc_path)
 
-    @staticmethod
-    def get_tsv_path_from_vcf(vcf):
-        pattern = os.path.join(settings.SEQAUTO_QC_DIR_PATTERN, settings.SEQAUTO_QC_EXEC_SUMMARY_TSV_PATTERN)
-        qc_path = pattern % vcf.get_params()
-        return os.path.abspath(qc_path)
-
-    def load_from_file(self, seqauto_run, **kwargs):
-        QCExecSummary.load_for_qc(seqauto_run, self, **kwargs)
-
     def __str__(self):
         return f"QC {name_from_filename(self.path)} ({self.get_data_state_display()})"
 
@@ -1144,24 +781,6 @@ class QCGeneList(SeqAutoRecord):
         custom_text_gene_list.gene_list.locked = True
         custom_text_gene_list.gene_list.save()
         return custom_text_gene_list
-
-    def load_from_file(self, seqauto_run, **kwargs):
-        with open(self.path, encoding="utf-8") as f:
-            custom_gene_list_text = f.read()
-            custom_text_gene_list = self.create_gene_list(custom_gene_list_text, self.sequencing_sample)
-            if custom_text_gene_list.gene_list.import_status != ImportStatus.SUCCESS:
-                message = f"Problem importing QC Gene List {self.path}\n"
-                message += f"Contents: {custom_gene_list_text}"
-                message += f"Error: {custom_text_gene_list.gene_list.error_message}"
-                SeqAutoMessage.objects.create(seqauto_run=seqauto_run,
-                                              record=self,
-                                              message=message,
-                                              severity=LogLevel.ERROR)
-
-            self.custom_text_gene_list = custom_text_gene_list
-            self.save()
-
-        self.link_samples_if_exist()
 
     def link_samples_if_exist(self, force_active=False):
         # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
@@ -1238,29 +857,6 @@ class QCExecSummary(SeqAutoRecord):
 
         return columns
 
-    @staticmethod
-    def load_for_qc(_seqauto_run, qc, **kwargs):
-        exec_summary_filename = QC.get_tsv_path_from_vcf(qc.vcf_file)
-        exec_summary_data = load_exec_summary(QCExecSummary, exec_summary_filename)
-
-        # Sanity check sample names match
-        # TODO: Better name or way of storing this info than "aligned_pattern"?
-        params = qc.get_params()
-        expected_sample_name = params['sample_name']
-        sample = exec_summary_data["sample"]
-        if sample != expected_sample_name:
-            msg = f"Exec summary file '{qc.path}' had sample name of '{sample}' while we expected '{expected_sample_name}'"
-            raise ValueError(msg)
-
-        exec_data = exec_summary_data["exec_data"]
-        exec_summary = QCExecSummary.objects.create(qc=qc, sequencing_run=qc.sequencing_run,
-                                                    data_state=DataState.COMPLETE, **exec_data)
-
-        reference_range = exec_summary_data["reference_range"]
-        if reference_range:
-            reference_range["exec_summary"] = exec_summary
-            ExecSummaryReferenceRange.objects.create(**reference_range)
-
     @property
     def sequencing_sample(self):
         return self.qc.sequencing_sample
@@ -1307,29 +903,6 @@ class QCGeneCoverage(SeqAutoRecord):
     def get_path_from_qc(qc):
         pattern = os.path.join(settings.SEQAUTO_QC_DIR_PATTERN, settings.SEQAUTO_QC_GENE_COVERAGE_PATTERN)
         return pattern % qc.get_params()
-
-    def load_from_file(self, seqauto_run, **kwargs):
-        enrichment_kit = None
-        if self.qc:  # SeqAuto
-            enrichment_kit = self.qc.sequencing_sample.enrichment_kit
-
-        gene_coverage_collection = GeneCoverageCollection.objects.create(path=self.path,
-                                                                         genome_build=self.qc.genome_build)
-        self.gene_coverage_collection = gene_coverage_collection
-        self.data_state = DataState.RUNNING
-        self.save()
-
-        try:
-            warnings = gene_coverage_collection.load_from_file(enrichment_kit, **kwargs)
-            if seqauto_run:
-                for w in warnings:
-                    SeqAutoMessage.objects.update_or_create(record=self, message=w, severity=LogLevel.WARNING,
-                                                            defaults={"seqauto_run": seqauto_run})
-            self.data_state = DataState.COMPLETE
-        except FileNotFoundError:
-            self.data_state = DataState.DELETED
-
-        self.save()
 
 
 @receiver(pre_delete, sender=QCGeneCoverage)
@@ -1422,62 +995,6 @@ class QCColumn(models.Model):
 
     def __str__(self):
         return self.name
-
-
-class JobScript(SeqAutoRecord):
-    # Attach the SampleSheet/bam/vcf/qc via record so delete will cascade through
-    seqauto_run = models.ForeignKey(SeqAutoRun, on_delete=CASCADE)
-    out_file = models.TextField(null=True)
-    file_type = models.CharField(max_length=1, choices=SequencingFileType.choices)
-    record = models.ForeignKey(SeqAutoRecord, on_delete=CASCADE, related_name="+")
-    job_id = models.TextField(null=True)
-    job_status = models.CharField(max_length=1, choices=JobScriptStatus.choices, default=JobScriptStatus.CREATED)
-    return_code = models.IntegerField(null=True)
-
-    def get_record(self) -> SeqAutoRecord:
-        return SeqAutoRecord.objects.get_subclass(pk=self.record_id)
-
-    def get_variable_name(self):
-        return f"{self.file_type}_{self.pk}"
-
-    def job_complete(self):
-        self.job_status = JobScriptStatus.FINISHED
-        self.save()
-        error_exception = None
-        record = self.get_record()
-
-        # TODO: Hmmm, maybe this is a bit dodgy. Perhaps make a new DataState which is
-        # Unprocessed, and during save() check if that, then do loading and set to complete?
-        if self.return_code:
-            logging.error("JobScript %s returned %d", self, self.return_code)
-            data_state = DataState.ERROR
-        else:
-            if hasattr(record, 'load_from_file'):
-                try:
-                    record.load_from_file(self.seqauto_run)
-                    data_state = DataState.COMPLETE
-                except Exception:
-                    error_exception = get_traceback()
-                    data_state = DataState.ERROR
-            else:
-                data_state = DataState.COMPLETE
-
-        record.error_exception = error_exception
-        record.data_state = data_state
-        record.save()
-
-    def __str__(self):
-        record = self.get_record()
-        record_pk = record.pk if record else 'N/A'
-        return f"{self.file_type}: {record_pk!r}"
-
-
-@receiver(post_delete, sender=JobScript)
-def post_delete_job_script(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    try:
-        os.remove(instance.path)
-    except Exception:
-        pass
 
 
 def get_samples_by_sequencing_sample(sample_sheet, vcf):

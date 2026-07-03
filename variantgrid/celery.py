@@ -44,20 +44,6 @@ if SYNC_DETAILS and any(sd["enabled"] for sd in SYNC_DETAILS.values()):
         'schedule': HOUR_SECS,
     }
 
-# TODO - move this into settings???
-if all([settings.SEQAUTO_ENABLED, settings.SEQAUTO_SCAN_DISKS, settings.SEQAUTO_SCAN_SCHEDULED_TASK, settings.UPLOAD_ENABLED]):
-    scan_run_jobs = 'seqauto.tasks.scan_run_jobs.scan_run_jobs'
-    app.conf.beat_schedule.update({
-        'seqauto-scan-06': {
-            'task': scan_run_jobs,
-            'schedule': crontab(hour=6, minute=0),
-        },
-        'seqauto-scan-19': {
-            'task': scan_run_jobs,
-            'schedule': crontab(hour=19, minute=0),
-        },
-    })
-
 SAPATH_ENABLED = any((a.startswith("sapath") for a in settings.INSTALLED_APPS))
 if SAPATH_ENABLED:
     helix_user = getattr(settings, "SAPATH_HELIX_USER", None)

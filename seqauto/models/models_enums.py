@@ -32,12 +32,6 @@ class SequencingFileType(models.TextChoices):
     DATA_MIGRATION = 'M', "Data Migration"
 
 
-class JobScriptStatus(models.TextChoices):
-    CREATED = 'C', 'Created'
-    SUBMITTED = 'S', 'Submitted'
-    FINISHED = 'F', 'Finished'
-
-
 class DataGeneration(models.TextChoices):
     HISEQ = 'H', 'HiSeq'
     MISEQ = 'M', 'MiSeq'
@@ -53,17 +47,6 @@ class SequencerRead(models.TextChoices):
     R2 = "R2"
     I1 = "I1"
     I2 = "I2"
-
-
-class SeqAutoRunStatus(models.TextChoices):
-    CREATED = 'c', "Created"
-    SCANNING_FILES = 's', "Scanning Files"
-    CREATE_MODELS = 'm', "Create Models"
-    SCRIPTS_AND_JOBS = 'j', "Scripts and Jobs"
-    FINISHED = 'F', "Finished"
-    ERROR = 'E', "Error"
-
-    COMPLETED_STATES = Constant([FINISHED[0], ERROR[0]])
 
 
 class EnrichmentKitType(models.TextChoices):

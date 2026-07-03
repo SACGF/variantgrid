@@ -148,8 +148,6 @@ def server_status(request):
         worker_names = settings.CELERY_WORKER_NAMES.copy()
         if settings.URLS_APP_REGISTER["analysis"]:
             worker_names.extend(settings.CELERY_ANALYSIS_WORKER_NAMES)
-        if settings.SEQAUTO_ENABLED:
-            worker_names.extend(settings.CELERY_SEQAUTO_WORKER_NAMES)
 
         i = app.control.inspect()
         ping = strip_celery_from_keys(i.ping())

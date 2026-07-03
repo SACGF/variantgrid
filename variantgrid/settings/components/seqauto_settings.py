@@ -1,40 +1,11 @@
 import os
 
-from variantgrid.settings.components.default_settings import BASE_DIR, MANAGE_COMMAND, PRIVATE_DATA_ROOT
+from variantgrid.settings.components.default_settings import BASE_DIR
 
 SEQAUTO_ENABLED = False
-SEQAUTO_SCAN_DISKS = True
-SEQAUTO_SCAN_SCHEDULED_TASK = False
-SEQAUTO_SCAN_PERMISSION = 'seqauto.seqauto_scan_initiate'
 SEQAUTO_DIR = os.path.join(BASE_DIR, "seqauto")
-SEQAUTO_SCRIPTS_DIR = os.path.join(SEQAUTO_DIR, "scripts", "test")
-SEQAUTO_SCAN_RESOURCES_DIR = os.path.join(PRIVATE_DATA_ROOT, 'scan_resources')
 SEQAUTO_USER = 'seqauto'
 SEQAUTO_GROUP = None
-
-TAU_DIR = os.path.expanduser('~/localwork/tau')
-SEQAUTO_VIRTUALENV_RUNNER = None
-SEQAUTO_SCRIPT_PARAMS = {"virtualenv_runner": SEQAUTO_VIRTUALENV_RUNNER or '',
-                         "tau_pipeline_dir": os.path.join(TAU_DIR, "scripts"),
-                         "tau_scripts_dir": os.path.join(TAU_DIR, "archive"),
-                         "pythonpath": TAU_DIR}
-
-SEQAUTO_SCAN_RUN_SCRIPTS = False
-SEQAUTO_FLOWCELL_SCRIPT = 'find_flowcells.sh'
-SEQAUTO_FASTQ_SCRIPT = 'find_fastqs.sh'
-SEQAUTO_FASTQC_SCRIPT = 'find_fastqc.sh'
-SEQAUTO_ILLUMINATE_QC = 'find_illuminate_qc.sh'
-SEQAUTO_BAM_SCRIPT = 'find_bams.sh'
-SEQAUTO_FLAGSTATS_SCRIPT = None  # Don't do this anymore 'find_flagstats.sh'
-SEQAUTO_VCF_SCRIPT = 'find_vcfs.sh'
-SEQAUTO_QC_SCRIPT = 'find_qc.sh'
-
-# Speed up to execute on host not VM
-# The ones that read eg 'find_flowcells.txt we DON'T want to run on other system as those files won't be there
-SEQAUTO_SCRIPT_RUNNER = {
-    SEQAUTO_FLOWCELL_SCRIPT: "ssh_runner.sh",
-}
-
 
 SEQAUTO_SKIP_FLOWCELLS_FILE = None
 SEQAUTO_SKIP_FLOWCELLS_PATTERNS = []
@@ -78,31 +49,6 @@ SEQAUTO_QC_GENE_COVERAGE_PATTERN = "bam_stats/samples/%(sample_name)s.per_gene_c
 
 SEQAUTO_QC_GENE_COVERAGE_STORE_ALL = False
 SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL = True
-
-SEQAUTO_JOB_SCRIPTS_BASE_DIR = os.path.join(PRIVATE_DATA_ROOT, "job_scripts")
-SEQAUTO_JOB_SCRIPTS_OUT_DIR = os.path.join(SEQAUTO_JOB_SCRIPTS_BASE_DIR, "out")
-SEQAUTO_JOB_SCRIPTS_DIR = os.path.join(SEQAUTO_JOB_SCRIPTS_BASE_DIR, "scripts")
-
-# PBS related
-SEQAUTO_USE_PBS = False
-SEQAUTO_PBS_QUEUE = None
-SEQAUTO_PBS_EMAIL = None
-
-TAU_PYTHON_COMMAND = "python"
-
-SEQAUTO_LAUNCH_SCRIPT_PATHS_LIST = None
-manage_command_str = " ".join(MANAGE_COMMAND)
-SEQAUTO_JOB_SUBMITTED = f"{manage_command_str} job_script_submitted"
-SEQAUTO_JOB_COMPLETE = f"{manage_command_str} job_script_complete"
-SEQAUTO_SAMPLE_SHEET_COMMAND = "%(tau_scripts_dir)s/basecall_sample_sheet.sh %(sequencing_run_dir)s %(sample_sheet)s"
-SEQAUTO_ILLUMINA_FLOWCELL_QC_COMMAND = "%(virtualenv_runner)s %(base_dir)s/seqauto/scripts/illuminate_qc.sh %(sequencing_run_dir)s"
-SEQAUTO_FASTQC_COMMAND = "%(tau_scripts_dir)s/fastqc.sh %(fastq)s"
-SEQAUTO_BAM_COMMAND = TAU_PYTHON_COMMAND + ' %(tau_pipeline_dir)s/BWA_2_hap.py -r "%(sequencing_run)s" -p "%(enrichment_kit)s" -s "%(full_sample_name)s"'
-SEQAUTO_FLAGSTATS_COMMAND = "%(tau_scripts_dir)s/bam_index_flagstats.sh %(bam)s"
-SEQAUTO_VCF_COMMAND = None  # Done as part of BAM script
-SEQAUTO_COMBINED_VCF_COMMAND = TAU_PYTHON_COMMAND + ' %(tau_pipeline_dir)s/hap_2_VCF.py -r "%(sequencing_run)s" -p "%(enrichment_kit)s"'
-SEQAUTO_QC_COMMAND = TAU_PYTHON_COMMAND + ' %(tau_pipeline_dir)s/single_sample_QC.py -r "%(sequencing_run)s" -p "%(enrichment_kit)s" -s "%(full_sample_name)s" -c -u'
-SEQAUTO_MIGRATE_COMMAND = TAU_PYTHON_COMMAND + ' %(tau_scripts_dir)s/delete_temp_and_archive.py -r "%(sequencing_run)s" -p "%(enrichment_kit)s"'
 
 SEQAUTO_IMPORT_VCF = False
 SEQAUTO_IMPORT_COMBO_VCF = True
