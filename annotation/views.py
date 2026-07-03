@@ -477,6 +477,7 @@ def variant_annotation_runs(request):
     return render(request, "annotation/variant_annotation_runs.html", context)
 
 
+@require_superuser
 def view_annotation_run(request, annotation_run_id):
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
 
@@ -499,6 +500,7 @@ def view_annotation_run(request, annotation_run_id):
     return render(request, "annotation/view_annotation_run.html", context)
 
 
+@require_superuser
 @require_POST
 def retry_annotation_run(request, annotation_run_id, upload_only=False):
     """ Deletes - then re-tries using annotation lock """
@@ -513,11 +515,13 @@ def retry_annotation_run(request, annotation_run_id, upload_only=False):
     return redirect(annotation_run)
 
 
+@require_superuser
 @require_POST
 def retry_annotation_run_upload(request, annotation_run_id):
     return retry_annotation_run(request, annotation_run_id, upload_only=True)
 
 
+@require_superuser
 @require_POST
 def subdivide_annotation_run(request, annotation_run_id):
     """ Sometimes runs fail w/out of memory etc (perhaps due to too many transcripts) - be able to subdivide """

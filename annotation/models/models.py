@@ -1949,13 +1949,21 @@ class ManualVariantEntryCollection(models.Model):
                 annotation_run = AnnotationRun.get_for_variant(variant, mve.genome_build)
         return annotation_run
 
-    @staticmethod
-    def get_for_user(user, mvec_id):
-        mvec = ManualVariantEntryCollection.objects.get(pk=mvec_id)
-        if not (user.is_staff or user == mvec.user):
+    @classmethod
+    def filter_for_user(cls, user):
+        """ Superusers see all collections, other users only their own """
+        qs = cls.objects.all()
+        if not user.is_superuser:
+            qs = qs.filter(user=user)
+        return qs
+
+    @classmethod
+    def get_for_user(cls, user, mvec_id):
+        try:
+            return cls.filter_for_user(user).get(pk=mvec_id)
+        except cls.DoesNotExist:
             msg = f"User {user} doesn't have permission to access mvec_id={mvec_id}"
             raise PermissionDenied(msg)
-        return mvec
 
     def __str__(self):
         status = self.get_import_status_display()
