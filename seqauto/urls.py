@@ -5,7 +5,7 @@ from library.django_utils.jqgrid_view import JQGridView
 from seqauto import views, views_autocomplete, views_rest
 from seqauto.grids.qc_data_grids import IlluminaFlowcellQCGrid, FastQCGrid, FlagstatsGrid, \
     QCExecSummaryGrid
-from seqauto.grids.seqauto_grids import SeqAutoRunsGrid, EnrichmentKitGeneCoverageGrid, \
+from seqauto.grids.seqauto_grids import EnrichmentKitGeneCoverageGrid, \
     GoldCoverageSummaryGrid, SequencingSamplesGrid, SequencingSamplesHistoricalGrid
 from seqauto.grids.sequencing_data_grids import SequencingRunListGrid, \
     UnalignedReadsListGrid, BamFileListGrid, SingleSampleVCFListGrid, QCFileListGrid, \
@@ -24,7 +24,6 @@ from variantgrid.perm_path import path
 
 urlpatterns = [
     path('', views.sequencing_data, name='sequencing_data'),
-    path('seqauto_runs', views.seqauto_runs, name='seqauto_runs'),
     path('experiments', views.experiments, name='experiments'),
     path('sequencing_runs', views.sequencing_runs, name='sequencing_runs'),
     path('unaligned_reads', views.unaligned_reads, name='unaligned_reads'),
@@ -32,7 +31,6 @@ urlpatterns = [
     path('vcf_files', views.vcf_files, name='vcf_files'),
     path('qcs', views.qcs, name='qcs'),
     path('view_experiment/<experiment_id>', views.view_experiment, name='view_experiment'),
-    path('software_pipeline', views.software_pipeline, name='software_pipeline'),
 
     path('enrichment_kits_list', views.enrichment_kits_list, name='enrichment_kits_list'),
     path('enrichment_kit/<int:pk>', views.view_enrichment_kit, name='view_enrichment_kit'),
@@ -49,7 +47,6 @@ urlpatterns = [
     path('graphs/qc_exec_summary_graph/<qc_exec_summary_id>/<qc_compare_type>', views.qc_exec_summary_graph, name='qc_exec_summary_graph'),
     path('graphs/qc_exec_summary_json_graph/<qc_exec_summary_id>/<qc_compare_type>', views.qc_exec_summary_json_graph, name='qc_exec_summary_json_graph'),
 
-    path('view_seqauto_run/<int:seqauto_run_id>', views.view_seqauto_run, name='view_seqauto_run'),
     path('view_sequencing_run/<sequencing_run_id>/tab/<int:tab_id>', views.view_sequencing_run, name='view_sequencing_run_tab'),
     path('view_sequencing_run_stats_tab/<sequencing_run_id>', views.view_sequencing_run_stats_tab, name='view_sequencing_run_stats_tab'),
     path('view_sequencing_run/<sequencing_run_id>', views.view_sequencing_run, name='view_sequencing_run'),
@@ -74,7 +71,6 @@ urlpatterns = [
     path('view_gold_coverage_summary/<int:pk>', views.view_gold_coverage_summary, name='view_gold_coverage_summary'),
 
     # Grids
-    path('seqauto_runs/grid/<slug:op>/', JQGridView.as_view(grid=SeqAutoRunsGrid), name='seqauto_runs_grid'),
     path('experiments/grid/', DatabaseTableView.as_view(column_class=ExperimentColumns),
          name='experiments_datatable'),
     path('sequencing_run/grid/<slug:op>/', JQGridView.as_view(grid=SequencingRunListGrid), name='sequencing_run_grid'),

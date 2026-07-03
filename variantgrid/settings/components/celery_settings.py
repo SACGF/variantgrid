@@ -29,7 +29,6 @@ CELERY_TASK_QUEUES = (
     Queue('web_workers', Exchange('web_workers'), routing_key='web_workers'),
     Queue('scheduling_single_worker', Exchange('scheduling_single_worker'), routing_key='scheduling_single_worker'),
     Queue('variant_id_single_worker', Exchange('variant_id_single_worker'), routing_key='variant_id_single_worker'),
-    Queue('seqauto_single_worker', Exchange('seqauto_single_worker'), routing_key='seqauto_single_worker'),
 )
 
 ANALYSIS_WORKERS = {'queue': 'analysis_workers', 'routing_key': 'analysis_workers'}
@@ -45,12 +44,9 @@ VARIANT_ID_SINGLE_WORKER = {'queue': 'variant_id_single_worker', 'routing_key': 
 # 1 worker, use this to schedule tasks and avoid race conditions
 SCHEDULING_SINGLE_WORKER = {'queue': 'scheduling_single_worker', 'routing_key': 'scheduling_single_worker'}
 
-SEQAUTO_SINGLE_WORKERS = {'queue': 'seqauto_single_worker', 'routing_key': 'seqauto_single_worker'}
-
 CELERY_WORKER_NAMES = ['annotation_workers', 'db_workers', 'web_workers',
                        'scheduling_single_worker', 'variant_id_single_worker']
 CELERY_ANALYSIS_WORKER_NAMES = ['analysis_workers']
-CELERY_SEQAUTO_WORKER_NAMES = ['seqauto_single_worker']
 
 CELERY_TASK_ROUTES = {
     # Analysis
@@ -132,7 +128,6 @@ CELERY_IMPORTS = (
     'genes.tasks.gene_coverage_tasks',
     'pedigree.models',
     'seqauto.tasks.gold_summary_tasks',
-    'seqauto.tasks.scan_run_jobs',
     'snpdb.models',
     'snpdb.tasks.clingen_tasks',
     'snpdb.tasks.cohort_genotype_tasks',
