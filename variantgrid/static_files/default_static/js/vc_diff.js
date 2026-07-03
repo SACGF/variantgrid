@@ -305,7 +305,7 @@ const Diff = (function() {
                 }
                 let content = null;
 
-                clinSigText = [];
+                const clinSigText = [];
 
                 const clin_sig_key = this.eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
                 const clin_sig = clin_sig_key.prettyValue((v.clinical_significance || {}).value);
@@ -532,7 +532,7 @@ const Diff = (function() {
                                 diffBreakdown.push(`${hasBlank} <span style="color:#888;font-size:smaller">x</span> <span style="color:#888">blank</span>`);
                             }
                         }
-                        valueCounts = Object.values(uniqueValues);
+                        const valueCounts = Object.values(uniqueValues);
                         valueCounts.sort((vc1,vc2) => {
                             if (vc1.count !== vc2.count) {
                                 return vc1.count - vc2.count;

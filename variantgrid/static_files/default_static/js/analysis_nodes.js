@@ -178,7 +178,7 @@ function setupHideInvalidConnectionsOnDrag() {
 			const endpoint = getEndpoint(id, 'target');
 			if (endpoint) {
 				for (let i=0 ; i<endpoint.connections.length ; ++i) {
-					source = endpoint.connections[i].sourceId;
+					const source = endpoint.connections[i].sourceId;
 					ancestors = ancestors.concat(getAncestors(source));
 				}
 			}

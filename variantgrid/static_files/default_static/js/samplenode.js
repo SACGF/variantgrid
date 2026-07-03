@@ -1,5 +1,5 @@
-SIDE_LENGTH = 60;
-DEFAULT_SHADOW_COLOR = "#aaa";
+const SIDE_LENGTH = 60;
+const DEFAULT_SHADOW_COLOR = "#aaa";
 
 
 function maleSVG(svg, sideLength) {
