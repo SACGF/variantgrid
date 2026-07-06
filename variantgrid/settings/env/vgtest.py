@@ -40,11 +40,7 @@ HGVS_DEFAULT_METHOD = "biocommons_hgvs"
 
 
 
-ANNOTATION[BUILD_GRCH37].update({
-    "annotation_consortium": "RefSeq",
-})
 ANNOTATION[BUILD_GRCH38].update({
-    "annotation_consortium": "RefSeq",
     "enabled": True,
 })
 
