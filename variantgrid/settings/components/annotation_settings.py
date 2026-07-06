@@ -122,8 +122,8 @@ ANNOTATION = {
             "topmed": "annotation_data/GRCh37/TOPMED_GRCh37.vcf.gz",
             "transcript_blocklist": None,
             "uk10k": "annotation_data/GRCh37/UK10K_COHORT.20160215.sites.vcf.gz",
-            # columns_version 5 plugins (#1638) - set per-deployment to activate
-            "protvar": None,  # set per-deployment, e.g. "annotation_data/all_builds/ProtVar_data.db"
+            # columns_version 5 plugins (#1638) - see pin_annotation_to_columns_version_4() to disable
+            "protvar": "annotation_data/all_builds/ProtVar_data.db",
             "open_targets": None,  # n/a for GRCh37 (Open Targets data is GRCh38)
             "eve": None,  # n/a for GRCh37 (GRCh38 only)
             "popeve": None,  # n/a for GRCh37 (GRCh38 only)
@@ -175,12 +175,12 @@ ANNOTATION = {
             "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
             "transcript_blocklist": "annotation_data/GRCh38/blocklist_brca1_new_transcripts.txt",
             "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
-            # columns_version 5 plugins (#1638) - set per-deployment to activate
-            "protvar": None,  # set per-deployment, e.g. "annotation_data/all_builds/ProtVar_data.db"
-            "open_targets": None,  # set per-deployment, e.g. "annotation_data/GRCh38/open_targets_26.03_vep.tsv.bgz"
-            "eve": None,  # set per-deployment, e.g. "annotation_data/GRCh38/eve_merged.vcf.gz" (VEP >= 116)
-            "popeve": None,  # set per-deployment, e.g. "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz" (VEP >= 116)
-            "promoter_ai": None,  # set per-deployment, e.g. "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz" (VEP >= 116)
+            # columns_version 5 plugins (#1638) - see pin_annotation_to_columns_version_4() to disable
+            "protvar": "annotation_data/all_builds/ProtVar_data.db",
+            "open_targets": "annotation_data/GRCh38/open_targets_26.03_vep.tsv.bgz",
+            "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",  # VEP >= 116
+            "popeve": "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz",  # VEP >= 116
+            "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",  # VEP >= 116
         }
     },
     BUILD_T2TV2: {
@@ -222,8 +222,8 @@ ANNOTATION = {
             "topmed": None,
             "transcript_blocklist": None,
             "uk10k": None,
-            # columns_version 5 plugins (#1638) - set per-deployment to activate
-            "protvar": None,  # set per-deployment, e.g. "annotation_data/all_builds/ProtVar_data.db"
+            # columns_version 5 plugins (#1638) - inactive here (this build is pinned to columns_version 3)
+            "protvar": None,
             "open_targets": None,  # n/a (Open Targets data is GRCh38)
             "eve": None,  # n/a (GRCh38 only)
             "popeve": None,  # n/a (GRCh38 only)
@@ -232,15 +232,45 @@ ANNOTATION = {
     },
 }
 
+def _disable_columns_version_5_plugins(annotation):
+    """Clear the columns_version 5 VEP plugin data keys (#1638) to None across all builds.
+
+    The package default points these at real data files (ProtVar on all builds; OpenTargets / EVE /
+    popEVE / PromoterAI on GRCh38). Deployments pinned below columns_version 5 haven't installed that
+    plugin data (or VEP 116), so clear the keys - vep_columns.has_data_files then drops the plugin
+    columns and get_vep_command skips the matching --plugin invocations.
+    """
+    for build_settings in annotation.values():
+        vep_config = build_settings["vep_config"]
+        for plugin_key in ("protvar", "open_targets", "eve", "popeve", "promoter_ai"):
+            if plugin_key in vep_config:
+                vep_config[plugin_key] = None
+
+
+def pin_annotation_to_columns_version_4(annotation):
+    """Restore the columns_version 4 annotation config (pre-#1638, no VEP 116 plugins).
+
+    columns_version 5 (#1638) layered VEP 116 + the ProtVar / OpenTargets / EVE / PromoterAI plugins
+    on top of the v4 data (dbNSFP 5.x raw scores, masked SpliceAI, gnomAD 4.1, denovo-db, ...).
+    Deployments that have the v4 data but haven't installed VEP 116 + the plugin data call this from
+    their env settings file to stay on v4. The caller is also responsible for keeping
+    ANNOTATION_VEP_VERSION on its historical value.
+    """
+    annotation[BUILD_GRCH37]["columns_version"] = 4
+    annotation[BUILD_GRCH38]["columns_version"] = 4
+    _disable_columns_version_5_plugins(annotation)
+
+
 def pin_annotation_to_columns_version_3(annotation):
     """Restore the historical (pre-#1625) columns_version 3 annotation config.
 
-    The package default ANNOTATION now ships the latest annotation data (columns_version 4 -
-    dbNSFP 5.x raw scores, masked SpliceAI, gnomAD 4.1, denovo-db, ...) so a fresh deployment
-    gets latest without hunting for config. Existing deployments that haven't loaded the newer
-    annotation data files call this from their env settings file to stay on the previous config.
+    The package default ANNOTATION now ships the latest annotation data (columns_version 5 - VEP 116
+    plugins on top of dbNSFP 5.x raw scores, masked SpliceAI, gnomAD 4.1, denovo-db, ...) so a fresh
+    deployment gets latest without hunting for config. Existing deployments that haven't loaded the
+    newer annotation data files call this from their env settings file to stay on the previous config.
     Note the caller is also responsible for keeping ANNOTATION_VEP_VERSION on its historical value.
     """
+    _disable_columns_version_5_plugins(annotation)
     annotation[BUILD_GRCH37]["columns_version"] = 3
     annotation[BUILD_GRCH37]["vep_config"].update({
         "denovo_db": None,
