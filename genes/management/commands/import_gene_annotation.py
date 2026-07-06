@@ -2,6 +2,7 @@ import json
 import logging
 import time
 
+import ijson
 from django.core.management.base import BaseCommand
 from django.db.models import Max
 from django.db.models.functions import Upper
@@ -64,17 +65,23 @@ class Command(BaseCommand):
         annotation_consortium = ac_dict[annotation_consortium_name]
 
         json_file = options["json_file"]
-        with open_handle_gzip(json_file) as f:
-            cdot_data = json.load(f)
-            cdot_version = cdot_data.get("cdot_version")
-            if cdot_version is None:
-                raise ValueError("JSON does not contain 'cdot_version' key")
-            print(f"JSON uses cdot version {cdot_version}")
-
         if release_version := options["release"]:
+            # A release needs random access / multiple passes over the data, so load it all in
+            with open_handle_gzip(json_file, "rb") as f:
+                cdot_data = json.load(f)
+                cdot_version = cdot_data.get("cdot_version")
+                if cdot_version is None:
+                    raise ValueError("JSON does not contain 'cdot_version' key")
+                print(f"JSON uses cdot version {cdot_version}")
             self._create_release(genome_build, annotation_consortium, release_version, cdot_data, cdot_version)
         else:
-            self.import_cdot_data(genome_build, annotation_consortium, cdot_data, cdot_version)
+            # Stream the file (genes then transcripts) so we never hold the whole thing in RAM
+            with open_handle_gzip(json_file, "rb") as f:
+                cdot_version = self.read_cdot_version(f)
+                if cdot_version is None:
+                    raise ValueError("JSON does not contain 'cdot_version' key")
+                print(f"JSON uses cdot version {cdot_version}")
+                self.import_cdot_data_file(genome_build, annotation_consortium, f, cdot_version)
 
         if options["clear_obsolete"]:
             # These were really old json format (before cdot schema change)
@@ -182,8 +189,45 @@ class Command(BaseCommand):
         print("Or to create GeneAnnotationVersions for all latest AnnotationVersions missing one, run: "
               "python3 manage.py gene_annotation --missing")
 
+    # How many transcript versions to hold in memory before flushing to the DB. Bounds peak RAM
+    # when importing large streamed files (see import_cdot_data_file).
+    CDOT_CHUNK_SIZE = 10000
+
+    @classmethod
+    def read_cdot_version(cls, file_obj) -> str:
+        """ Stream just the top-level 'cdot_version' scalar out of a cdot JSON(.gz) file handle
+            (opened in binary mode) without loading the whole file. """
+        file_obj.seek(0)
+        for value in ijson.items(file_obj, "cdot_version"):
+            return value
+        return None
+
     @classmethod
     def import_cdot_data(cls, genome_build: GenomeBuild, annotation_consortium, cdot_data: dict, cdot_version):
+        """ Import from an already loaded cdot dict. For large files prefer import_cdot_data_file,
+            which streams from disk to keep memory down. """
+        cls._import_cdot_data(genome_build, annotation_consortium, cdot_version,
+                              genes_iter=lambda: iter(cdot_data["genes"].items()),
+                              transcripts_iter=lambda: iter(cdot_data["transcripts"].items()))
+
+    @classmethod
+    def import_cdot_data_file(cls, genome_build: GenomeBuild, annotation_consortium, file_obj, cdot_version):
+        """ Stream genes/transcripts out of a seekable cdot JSON(.gz) file handle (binary mode) via
+            ijson so we never hold the whole file in RAM. Genes are read first (transcripts link to
+            them), then we seek back to the start and stream the transcripts. """
+        def genes_iter():
+            file_obj.seek(0)
+            return ijson.kvitems(file_obj, "genes")
+
+        def transcripts_iter():
+            file_obj.seek(0)
+            return ijson.kvitems(file_obj, "transcripts")
+
+        cls._import_cdot_data(genome_build, annotation_consortium, cdot_version, genes_iter, transcripts_iter)
+
+    @classmethod
+    def _import_cdot_data(cls, genome_build: GenomeBuild, annotation_consortium, cdot_version,
+                          genes_iter, transcripts_iter):
         print(f"importing {genome_build}/{annotation_consortium}")
 
         start = time.time()
@@ -214,7 +258,7 @@ class Command(BaseCommand):
                 _gene_accession = Gene.FAKE_GENE_ID_PREFIX + _gene_accession[1:]
             return _gene_accession
 
-        for gene_accession, gv_data in cdot_data["genes"].items():
+        for gene_accession, gv_data in genes_iter():
             gene_accession = fix_accession(gene_accession)
             gene_id, version = GeneVersion.get_gene_id_and_version(gene_accession)
             if version is None:
@@ -290,8 +334,33 @@ class Command(BaseCommand):
         new_transcript_ids = set()
         new_transcript_versions = []
         modified_transcript_versions = []
+        totals = {"new_transcripts": 0, "new_transcript_versions": 0, "modified_transcript_versions": 0}
 
-        for transcript_accession, tv_data in cdot_data["transcripts"].items():
+        def flush_transcripts():
+            """ Write the pending batch to the DB and free it - keeps peak memory bounded when
+                streaming a large file (rather than holding every transcript version at once) """
+            if new_transcript_ids:
+                new_transcripts = [Transcript(identifier=t_id, annotation_consortium=annotation_consortium)
+                                   for t_id in new_transcript_ids]
+                Transcript.objects.bulk_create(new_transcripts, batch_size=cls.BATCH_SIZE)
+                known_transcript_ids.update(new_transcript_ids)
+                totals["new_transcripts"] += len(new_transcript_ids)
+                new_transcript_ids.clear()
+
+            # No need to update known after insert as there won't be duplicate transcript versions in the merged data
+            if new_transcript_versions:
+                TranscriptVersion.objects.bulk_create(new_transcript_versions, batch_size=cls.BATCH_SIZE)
+                totals["new_transcript_versions"] += len(new_transcript_versions)
+                new_transcript_versions.clear()
+
+            if modified_transcript_versions:
+                TranscriptVersion.objects.bulk_update(modified_transcript_versions,
+                                                      ["gene_version_id", "import_source", "biotype", "data", "contig"],
+                                                      batch_size=cls.BATCH_SIZE)
+                totals["modified_transcript_versions"] += len(modified_transcript_versions)
+                modified_transcript_versions.clear()
+
+        for transcript_accession, tv_data in transcripts_iter():
             transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
             if version is None:
                 # cdot has some fake transcripts - ok to skip these
@@ -324,28 +393,13 @@ class Command(BaseCommand):
             else:
                 new_transcript_versions.append(transcript_version)
 
-        if new_transcript_ids:
-            logging.info("Creating %d new transcripts", len(new_transcript_ids))
-            new_transcripts = [Transcript(identifier=transcript_id, annotation_consortium=annotation_consortium)
-                               for transcript_id in new_transcript_ids]
+            if len(new_transcript_versions) + len(modified_transcript_versions) >= cls.CDOT_CHUNK_SIZE:
+                flush_transcripts()
 
-            Transcript.objects.bulk_create(new_transcripts, batch_size=cls.BATCH_SIZE)
-            known_transcript_ids.update(new_transcript_ids)
-
-        del new_transcript_ids
-
-        # No need to update known after insert as there won't be duplicate transcript versions in the merged data
-        if new_transcript_versions:
-            logging.info("Creating %d new transcript versions", len(new_transcript_versions))
-            TranscriptVersion.objects.bulk_create(new_transcript_versions, batch_size=cls.BATCH_SIZE)
-        del new_transcript_versions
-
-        if modified_transcript_versions:
-            logging.info("Updating %d transcript versions", len(modified_transcript_versions))
-            TranscriptVersion.objects.bulk_update(modified_transcript_versions,
-                                                  ["gene_version_id", "import_source", "biotype", "data", "contig"],
-                                                  batch_size=cls.BATCH_SIZE)
-        del modified_transcript_versions
+        flush_transcripts()  # Final partial batch
+        logging.info("Created %d new transcripts, created %d / updated %d transcript versions",
+                     totals["new_transcripts"], totals["new_transcript_versions"],
+                     totals["modified_transcript_versions"])
 
         if has_new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
             print("Created new RefSeq genes - retrieving gene summaries via API")

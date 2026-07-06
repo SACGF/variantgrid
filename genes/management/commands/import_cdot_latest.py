@@ -1,6 +1,6 @@
 import gzip
-import json
 import logging
+import tempfile
 
 import requests
 from cdot.data_release import get_latest_combo_file_urls, get_latest_data_release_tag_name, _get_version_from_tag_name
@@ -81,8 +81,17 @@ class Command(BaseCommand):
                 combo_file_url = get_single_element(combo_files)
                 logging.info(f"%s/%s - downloading: %s",
                              genome_build, annotation_consortium.label, combo_file_url)
-                response = requests.get(combo_file_url, stream=True, timeout=2 * MINUTE_SECS)
-                with gzip.GzipFile(fileobj=response.raw) as fz:
-                    cdot_data = json.load(fz)
-                    cdot_version = cdot_data.get("cdot_version")
-                    GeneAnnotationCommand.import_cdot_data(genome_build, annotation_consortium, cdot_data, cdot_version)
+                # Stream the (compressed) file to a seekable temp file on disk rather than loading it
+                # all into RAM - the importer reads it twice (genes then transcripts) so it needs to
+                # be seekable, but it doesn't need to live in memory (avoids OOM on large builds).
+                with requests.get(combo_file_url, stream=True, timeout=2 * MINUTE_SECS) as response:
+                    response.raise_for_status()
+                    with tempfile.NamedTemporaryFile(suffix=".json.gz") as tmp:
+                        for chunk in response.iter_content(chunk_size=1 << 20):
+                            tmp.write(chunk)
+                        tmp.flush()
+                        tmp.seek(0)
+                        with gzip.GzipFile(fileobj=tmp) as fz:
+                            cdot_version = GeneAnnotationCommand.read_cdot_version(fz)
+                            GeneAnnotationCommand.import_cdot_data_file(genome_build, annotation_consortium,
+                                                                       fz, cdot_version)
