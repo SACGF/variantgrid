@@ -688,6 +688,10 @@ function applyVariantValues() {
                         {% if variant_annotation.has_dbnsfp %}
                             {% labelled id='interpro_domain' label='InterPro' help=annotation_description.interpro_domain hint="tiny" %}{% endlabelled %}
                         {% endif %}
+                        {% if variant_annotation.has_protvar %}
+                            {% labelled id='protvar_pocket' visible_fields=visible_fields label='ProtVar pocket' help=annotation_description.protvar_pocket hint="tiny" %}{{ variant_annotation.protvar_pocket }}{% endlabelled %}
+                            {% labelled id='protvar_int' visible_fields=visible_fields label='ProtVar interface' help=annotation_description.protvar_int hint="tiny" %}{{ variant_annotation.protvar_int }}{% endlabelled %}
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -747,6 +751,18 @@ function applyVariantValues() {
                                     {% labelled id='vest4_rankscore' visible_fields=visible_fields label='VEST4 rankscore' help=annotation_description.vest4_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.vest4_rankscore }}{% endlabelled %}
                                 </div>
                             {% endif %}
+                        {% endif %}
+                        {% if variant_annotation.has_protvar %}
+                            {% labelled id='protvar_stability' visible_fields=visible_fields label='ProtVar ddG stability' help=annotation_description.protvar_stability hint="tiny" value_css="text-monospace" %}{{ variant_annotation.protvar_stability }}{% endlabelled %}
+                        {% endif %}
+                        {% if variant_annotation.has_eve %}
+                            {% labelled id='eve_score' visible_fields=visible_fields label='EVE' help=annotation_description.eve_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.eve_score }}{% endlabelled %}
+                            {% labelled id='eve_class' visible_fields=visible_fields label='EVE class' help=annotation_description.eve_class hint="tiny" value_css="text-monospace" %}{{ variant_annotation.eve_class }}{% endlabelled %}
+                            {% labelled id='popeve_score' visible_fields=visible_fields label='popEVE' help=annotation_description.popeve_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.popeve_score }}{% endlabelled %}
+                        {% endif %}
+                        {% if variant_annotation.has_promoter_ai %}
+                            {% labelled id='promoter_ai_score' visible_fields=visible_fields label='PromoterAI' help=annotation_description.promoter_ai_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.promoter_ai_score }}{% endlabelled %}
+                            {% labelled id='promoter_ai_tss_pos' visible_fields=visible_fields label='PromoterAI TSS pos' help=annotation_description.promoter_ai_tss_pos hint="tiny" value_css="text-monospace" %}{{ variant_annotation.promoter_ai_tss_pos }}{% endlabelled %}
                         {% endif %}
                         <div class="text-right mt-2"><a class="hover-link text-small" href="{% url 'pathogenicity_thresholds' %}" target="_blank">PP3/BP4 thresholds &amp; sources</a></div>
                     </div>
@@ -1119,6 +1135,29 @@ function applyVariantValues() {
                     </div>
                 </div>
             </div>
+
+            {% if variant_annotation.has_open_targets %}
+            <div class="col-md-6 mt-4">
+                <div class="card">
+                    <div class="card-header">Open Targets</div>
+                    <div class="card-body">
+                        {% labelled id='open_targets_gwas_l2g_score' visible_fields=visible_fields label='GWAS L2G score' help=annotation_description.open_targets_gwas_l2g_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_gwas_l2g_score }}{% endlabelled %}
+                        {% labelled id='open_targets_gwas_gene_id' visible_fields=visible_fields label='GWAS gene' help=annotation_description.open_targets_gwas_gene_id hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_gwas_gene_id }}{% endlabelled %}
+                        {% labelled id='open_targets_gwas_diseases' visible_fields=visible_fields label='GWAS diseases' help=annotation_description.open_targets_gwas_diseases hint="tiny" %}{{ variant_annotation.open_targets_gwas_diseases }}{% endlabelled %}
+                        {% labelled id='open_targets_study_type' visible_fields=visible_fields label='Study type' help=annotation_description.open_targets_study_type hint="tiny" %}{{ variant_annotation.open_targets_study_type }}{% endlabelled %}
+                        {% labelled id='open_targets_qtl_gene_id' visible_fields=visible_fields label='QTL gene' help=annotation_description.open_targets_qtl_gene_id hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_qtl_gene_id }}{% endlabelled %}
+                        {% labelled id='open_targets_qtl_biosample' visible_fields=visible_fields label='QTL biosample' help=annotation_description.open_targets_qtl_biosample hint="tiny" %}{{ variant_annotation.open_targets_qtl_biosample }}{% endlabelled %}
+                        {% if variant_annotation.open_targets_variant_id %}
+                            {% labelled id='open_targets_variant_id' visible_fields=visible_fields label='Variant' help=annotation_description.open_targets_variant_id hint="tiny" %}<a target="_blank" class='hover-link' href="https://platform.opentargets.org/variant/{{ variant_annotation.open_targets_variant_id }}">{{ variant_annotation.open_targets_variant_id }}</a>{% endlabelled %}
+                        {% endif %}
+                        {% if variant_annotation.open_targets_study_id %}
+                            {% labelled id='open_targets_study_id' visible_fields=visible_fields label='Study' help=annotation_description.open_targets_study_id hint="tiny" %}<a target="_blank" class='hover-link' href="https://platform.opentargets.org/study/{{ variant_annotation.open_targets_study_id }}">{{ variant_annotation.open_targets_study_id }}</a>{% endlabelled %}
+                        {% endif %}
+                        <div class="text-right mt-2"><i class="text-secondary">Source: <a target="_blank" class='hover-link' href="https://platform.opentargets.org/">Open Targets</a></i></div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 

@@ -69,3 +69,49 @@ class GetVepCommandTests(TestCase):
         self.assertNotIn("--distance", cmd)
         self.assertNotIn("--gencode_primary", cmd)
         self.assertNotIn("--gencode_basic", cmd)
+
+
+def _v5_settings(vep_version: str) -> dict:
+    """ columns_version 5 with the #1638 plugin data files configured on GRCh38. """
+    d = get_fake_annotation_settings_dict(columns_version=5)
+    grch38_cfg = d["ANNOTATION"]["GRCh38"]["vep_config"]
+    grch38_cfg.update({
+        "protvar": "annotation_data/all_builds/ProtVar_data.db",
+        "open_targets": "annotation_data/GRCh38/open_targets_26.03_vep.tsv.bgz",
+        "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",
+        "popeve": "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz",
+        "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",
+    })
+    d["ANNOTATION_VEP_VERSION"] = vep_version
+    return d
+
+
+class GetVepCommandColumnsVersion5Tests(TestCase):
+    """ #1638 - ProtVar / OpenTargets / EVE / PromoterAI plugin wiring at columns_version 5. """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+
+    def _plugins(self):
+        cmd = get_vep_command(
+            "in.vcf", "out.vcf", self.grch38, AnnotationConsortium.ENSEMBL,
+            VariantAnnotationPipelineType.STANDARD,
+        )
+        return [cmd[i + 1] for i, x in enumerate(cmd) if x == "--plugin"]
+
+    def test_vep116_includes_all_four_plugins(self):
+        with override_settings(**_v5_settings(vep_version="116")):
+            plugins = self._plugins()
+        self.assertTrue(any(p.startswith("ProtVar,db=") for p in plugins))
+        self.assertTrue(any(p.startswith("OpenTargets,file=") and "cols=all" in p for p in plugins))
+        self.assertTrue(any(p.startswith("EVE,file=") and "popeve_file=" in p for p in plugins))
+        self.assertTrue(any(p.startswith("PromoterAI,file=") for p in plugins))
+
+    def test_vep115_omits_eve_and_promoterai(self):
+        with override_settings(**_v5_settings(vep_version="115")):
+            plugins = self._plugins()
+        self.assertTrue(any(p.startswith("ProtVar,db=") for p in plugins))
+        self.assertTrue(any(p.startswith("OpenTargets,file=") for p in plugins))
+        self.assertFalse(any(p.startswith("EVE,file=") for p in plugins))
+        self.assertFalse(any(p.startswith("PromoterAI,file=") for p in plugins))

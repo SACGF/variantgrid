@@ -103,12 +103,16 @@ class ColumnAnnotationCategory(models.TextChoices):
 class VEPPlugin(models.TextChoices):
     DBNSFP = 'd', 'dbNSFP'
     DBSCSNV = 'v', 'dbscSNV'
+    EVE = 'E', 'EVE'
     GRANTHAM = 'g', 'Grantham'
     LOFTOOL = 'l', 'LoFtool'
     MASTERMIND = 'n', 'Mastermind'
     MAVEDB = 'V', "MaveDb"
     MAXENTSCAN = 'm', 'MaxEntScan'
     NMD = "N", 'NMD'
+    OPEN_TARGETS = 'O', 'OpenTargets'
+    PROMOTER_AI = 'A', 'PromoterAI'
+    PROTVAR = 'p', 'ProtVar'
     SPLICEAI = 'a', 'SpliceAI'
     SPLICEREGION = 's', 'SpliceRegion'
 

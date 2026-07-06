@@ -209,6 +209,18 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                 VEPPlugin.MAVEDB: lambda: f"MaveDB,file={vc['mave']},single_aminoacid_changes=0,transcript_match=0 ",
             })
 
+        if vc.columns_version >= 5:
+            plugin_data_func.update({
+                VEPPlugin.PROTVAR: lambda: f"ProtVar,db={vc['protvar']}",
+                VEPPlugin.OPEN_TARGETS: lambda: f"OpenTargets,file={vc['open_targets']},cols=all",
+            })
+            # EVE and PromoterAI are only available in VEP >= 116
+            if vc.vep_version >= 116:
+                plugin_data_func.update({
+                    VEPPlugin.EVE: lambda: f"EVE,file={vc['eve']},popeve_file={vc['popeve']}",
+                    VEPPlugin.PROMOTER_AI: lambda: f"PromoterAI,file={vc['promoter_ai']}",
+                })
+
     else:
         plugin_data_func = {}  # No plugins for SVs
 
@@ -432,6 +444,34 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
                 kwargs["denovo_db"] = m.group("version")
             else:
                 msg = f"Couldn't determine denovo-db version from file: {denovo_db_basename}"
+                raise ValueError(msg)
+    except KeyError:
+        pass
+
+    try:
+        # Open Targets - filename encodes the release, e.g.
+        # annotation_data/GRCh38/open_targets_26.03_vep.tsv.bgz
+        open_targets_filename = vep_config["open_targets"]
+        if open_targets_filename and os.path.exists(open_targets_filename):
+            open_targets_basename = os.path.basename(open_targets_filename)
+            if m := re.match(r"^open_targets_(?P<version>[\d.]+)_vep\.tsv\.b?gz$", open_targets_basename):
+                kwargs["open_targets"] = m.group("version")
+            else:
+                msg = f"Couldn't determine Open Targets version from file: {open_targets_basename}"
+                raise ValueError(msg)
+    except KeyError:
+        pass
+
+    try:
+        # popEVE - filename encodes the dataset date, e.g.
+        # annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz
+        popeve_filename = vep_config["popeve"]
+        if popeve_filename and os.path.exists(popeve_filename):
+            popeve_basename = os.path.basename(popeve_filename)
+            if m := re.search(r"(?P<version>\d{8})\.vcf\.gz$", popeve_basename):
+                kwargs["popeve"] = m.group("version")
+            else:
+                msg = f"Couldn't determine popEVE version from file: {popeve_basename}"
                 raise ValueError(msg)
     except KeyError:
         pass
