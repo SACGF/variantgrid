@@ -82,7 +82,7 @@ ANNOTATION = {
 
     BUILD_GRCH37: {
         "enabled": True,
-        "annotation_consortium": "Ensembl",
+        "annotation_consortium": "RefSeq",
         "columns_version": 5,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
@@ -133,7 +133,7 @@ ANNOTATION = {
     BUILD_GRCH38: {
         # Only 37 is enabled by default - overwrite "enabled" in your server settings to use following builds
         "enabled": False,
-        "annotation_consortium": "Ensembl",
+        "annotation_consortium": "RefSeq",
         "columns_version": 5,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
