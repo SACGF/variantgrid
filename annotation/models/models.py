@@ -667,6 +667,8 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     dbnsfp = models.TextField(blank=True, null=True)  # 37/38 only
     denovo_db = models.TextField(blank=True, null=True)  # 37/38 only
     mave_db = models.TextField(blank=True, null=True)  # GRCh38 only - date string parsed from MaveDB filename
+    open_targets = models.TextField(blank=True, null=True)  # release parsed from Open Targets filename
+    popeve = models.TextField(blank=True, null=True)  # GRCh38 only - date string parsed from popEVE filename
     spliceai = models.TextField(blank=True, null=True)
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
@@ -821,7 +823,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
                 'mutation_taster_pred_most_damaging': lambda d: d in MutationTasterPrediction.get_damage_or_greater_levels(),
                 'polyphen2_hvar_pred_most_damaging': lambda d: d in Polyphen2Prediction.get_damage_or_greater_levels(),
             }
-        if self.columns_version in (2, 3, 4):
+        if self.columns_version in (2, 3, 4, 5):
             pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
             pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
                                              'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
@@ -1419,6 +1421,27 @@ class VariantAnnotation(AbstractVariantAnnotation):
     denovo_db_primary_phenotypes = models.TextField(null=True, blank=True)
     denovo_db_case_count = models.IntegerField(null=True, blank=True)
     denovo_db_control_count = models.IntegerField(null=True, blank=True)
+    # ProtVar (columns_version >= 5) - https://www.ebi.ac.uk/ProtVar/
+    # ddG protein stability (>2 likely destabilising); pocket/int are '&'-joined compound blobs
+    protvar_stability = models.FloatField(null=True, blank=True)  # ProtVar_stability (ddG)
+    protvar_pocket = models.TextField(null=True, blank=True)  # id&score&MpLDDT&energy&buriedness&RoG&residues
+    protvar_int = models.TextField(null=True, blank=True)  # protein_id&pDockQ
+    # Open Targets (columns_version >= 5, GRCh38) - https://platform.opentargets.org/
+    open_targets_gwas_l2g_score = models.FloatField(null=True, blank=True)  # Locus-to-gene score
+    open_targets_gwas_gene_id = models.TextField(null=True, blank=True)  # Ensembl gene id
+    open_targets_gwas_diseases = models.TextField(null=True, blank=True)
+    open_targets_study_type = models.TextField(null=True, blank=True)
+    open_targets_study_id = models.TextField(null=True, blank=True)  # external lookup key
+    open_targets_variant_id = models.TextField(null=True, blank=True)  # external lookup key
+    open_targets_qtl_gene_id = models.TextField(null=True, blank=True)  # Ensembl gene id
+    open_targets_qtl_biosample = models.TextField(null=True, blank=True)
+    # EVE / popEVE (columns_version >= 5, GRCh38, VEP >= 116) - https://evemodel.org/
+    eve_score = models.FloatField(null=True, blank=True)
+    eve_class = models.TextField(null=True, blank=True)  # Benign / Uncertain / Pathogenic
+    popeve_score = models.FloatField(null=True, blank=True)
+    # PromoterAI (columns_version >= 5, GRCh38, VEP >= 116)
+    promoter_ai_score = models.FloatField(null=True, blank=True)
+    promoter_ai_tss_pos = models.IntegerField(null=True, blank=True)
     pubmed = models.TextField(null=True, blank=True)
     # Mastermind Cited Variants Reference. @see https://www.genomenon.com/cvr/
     mastermind_count_1_cdna = models.IntegerField(null=True, blank=True)
@@ -1650,6 +1673,31 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @property
     def has_mavedb(self) -> bool:
         return self.is_standard_annotation and self.version.columns_version >= 3
+
+    @property
+    def has_protvar(self) -> bool:
+        """ ProtVar (columns_version >= 5) - any of stability / pocket / interface present. """
+        return any(v is not None for v in (self.protvar_stability, self.protvar_pocket, self.protvar_int))
+
+    @property
+    def has_open_targets(self) -> bool:
+        """ Open Targets (columns_version >= 5, GRCh38) - any GWAS / QTL field present. """
+        return any(v is not None for v in (
+            self.open_targets_gwas_l2g_score, self.open_targets_gwas_gene_id,
+            self.open_targets_gwas_diseases, self.open_targets_study_type,
+            self.open_targets_study_id, self.open_targets_variant_id,
+            self.open_targets_qtl_gene_id, self.open_targets_qtl_biosample,
+        ))
+
+    @property
+    def has_eve(self) -> bool:
+        """ EVE / popEVE (columns_version >= 5, GRCh38, VEP >= 116) - missense only. """
+        return any(v is not None for v in (self.eve_score, self.eve_class, self.popeve_score))
+
+    @property
+    def has_promoter_ai(self) -> bool:
+        """ PromoterAI (columns_version >= 5, GRCh38, VEP >= 116). """
+        return self.promoter_ai_score is not None
 
     @property
     def gnomad4_or_later(self) -> bool:

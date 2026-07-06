@@ -42,7 +42,7 @@ ANNOTATION_MAX_RUN_ATTEMPTS = 3
 # is a deliberately generous 3x margin - reclaim is the rare dead-worker path so erring long is cheap.
 ANNOTATION_RUN_LEASE_SECONDS = 16200
 ANNOTATION_VEP_ARGS = []
-ANNOTATION_VEP_VERSION = "115"
+ANNOTATION_VEP_VERSION = "116"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
 ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
@@ -125,6 +125,12 @@ ANNOTATION = {
             "topmed": "annotation_data/GRCh37/TOPMED_GRCh37.vcf.gz",
             "transcript_blocklist": None,
             "uk10k": "annotation_data/GRCh37/UK10K_COHORT.20160215.sites.vcf.gz",
+            # columns_version 5 plugins (#1638) - set per-deployment to activate
+            "protvar": None,  # set per-deployment, e.g. "annotation_data/all_builds/ProtVar_data.db"
+            "open_targets": None,  # n/a for GRCh37 (Open Targets data is GRCh38)
+            "eve": None,  # n/a for GRCh37 (GRCh38 only)
+            "popeve": None,  # n/a for GRCh37 (GRCh38 only)
+            "promoter_ai": None,  # n/a for GRCh37 (GRCh38 only)
         }
     },
     BUILD_GRCH38: {
@@ -172,6 +178,12 @@ ANNOTATION = {
             "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
             "transcript_blocklist": "annotation_data/GRCh38/blocklist_brca1_new_transcripts.txt",
             "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
+            # columns_version 5 plugins (#1638) - set per-deployment to activate
+            "protvar": None,  # set per-deployment, e.g. "annotation_data/all_builds/ProtVar_data.db"
+            "open_targets": None,  # set per-deployment, e.g. "annotation_data/GRCh38/open_targets_26.03_vep.tsv.bgz"
+            "eve": None,  # set per-deployment, e.g. "annotation_data/GRCh38/eve_merged.vcf.gz" (VEP >= 116)
+            "popeve": None,  # set per-deployment, e.g. "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz" (VEP >= 116)
+            "promoter_ai": None,  # set per-deployment, e.g. "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz" (VEP >= 116)
         }
     },
     BUILD_T2TV2: {
@@ -213,6 +225,12 @@ ANNOTATION = {
             "topmed": None,
             "transcript_blocklist": None,
             "uk10k": None,
+            # columns_version 5 plugins (#1638) - set per-deployment to activate
+            "protvar": None,  # set per-deployment, e.g. "annotation_data/all_builds/ProtVar_data.db"
+            "open_targets": None,  # n/a (Open Targets data is GRCh38)
+            "eve": None,  # n/a (GRCh38 only)
+            "popeve": None,  # n/a (GRCh38 only)
+            "promoter_ai": None,  # n/a (GRCh38 only)
         }
     },
 }
