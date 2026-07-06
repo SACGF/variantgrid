@@ -95,9 +95,9 @@ def annotate_variants(annotation_run_id):
     try:
         # Reload to get updated task_id
         annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
-        if annotation_run.variant_annotation_version.gene_annotation_release is None:
+        if blocker := annotation_run.variant_annotation_version.get_annotation_run_blocker():
             # We need this so that transcript/versions are in DB so FKs link
-            msg = f"{annotation_run.variant_annotation_version} missing GeneAnnotationRelease"
+            msg = f"{annotation_run.variant_annotation_version} {blocker}"
             raise InvalidAnnotationVersionError(msg)
         annotation_run.task_id = annotate_variants.request.id
         annotation_run.set_task_log("start", timezone.now())

@@ -786,6 +786,15 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             return f"{e} {remediation}"
         return None
 
+    def get_annotation_run_blocker(self) -> Optional[str]:
+        """ Reason annotation runs against this VAV will fail at pipeline time, or None if OK. Without a
+            GeneAnnotationRelease we can't get transcript/versions into the DB for FK linking, so every
+            AnnotationRun errors (see annotation.tasks.annotate_variants). Surfaced as a warning on the
+            annotation runs page so a misconfigured VAV is caught before pipelines are run. """
+        if self.gene_annotation_release_id is None:
+            return "missing GeneAnnotationRelease"
+        return None
+
     @transaction.atomic
     def promote_to_active(self):
         """ Demote prior ACTIVE for this genome_build → HISTORICAL, set self → ACTIVE. """

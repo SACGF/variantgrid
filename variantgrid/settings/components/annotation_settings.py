@@ -55,9 +55,6 @@ ANNOTATION_VEP_DISTANCE = 5000  # VEP --distance arg (default=5000) - how far up
 # Read at VAV creation only and snapshotted onto the VariantAnnotationVersion. Existing VAVs are unaffected by changes here.
 # Values: "primary" -> --gencode_primary, "basic" -> --gencode_basic, None -> full Ensembl set. Ignored for RefSeq VAVs.
 ANNOTATION_VEP_ENSEMBL_GENCODE = "primary"
-# columns version is used to drive config in vep_columns.py
-# Default is the latest (see pin_annotation_to_columns_version_3() to stay on historical config). #1625
-ANNOTATION_VEP_COLUMNS_VERSION = 4  # 1 = original version, 2 = May 2022, 3 = 2024, 4 = 2025 (dbNSFP 5, raw scores)
 ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE = True  # Only 'dup' for dups, false is all SVs overlap
 ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD = "lowest_af"  # "greatest_overlap", "lowest_af", "exact_or_lowest_af"
 ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION = 0.8
@@ -86,7 +83,7 @@ ANNOTATION = {
     BUILD_GRCH37: {
         "enabled": True,
         "annotation_consortium": "Ensembl",
-        "columns_version": 4,
+        "columns_version": 5,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
@@ -137,7 +134,7 @@ ANNOTATION = {
         # Only 37 is enabled by default - overwrite "enabled" in your server settings to use following builds
         "enabled": False,
         "annotation_consortium": "Ensembl",
-        "columns_version": 4,
+        "columns_version": 5,
         "cytoband": os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,

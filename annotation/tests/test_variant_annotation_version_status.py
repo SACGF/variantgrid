@@ -91,6 +91,26 @@ class VariantAnnotationVersionStatusTests(TestCase):
         new_vav.refresh_from_db()
         self.assertEqual(new_vav.status, VariantAnnotationVersion.Status.NEW)
 
+    def test_annotation_run_blocker_when_missing_gene_annotation_release(self):
+        """ A VAV without a GeneAnnotationRelease can't run annotation pipelines - the page warns instead of
+            letting every AnnotationRun fail at pipeline time. """
+        vav = _make_vav(self.grch37)
+        blocker = vav.get_annotation_run_blocker()
+        self.assertIsNotNone(blocker)
+        self.assertIn("GeneAnnotationRelease", blocker)
+
+    def test_annotation_run_blocker_none_when_gene_annotation_release_set(self):
+        gene_annotation_import = GeneAnnotationImport.objects.create(
+            annotation_consortium=AnnotationConsortium.ENSEMBL, genome_build=self.grch37, url="http://fake/gtf")
+        gar = GeneAnnotationRelease.objects.create(
+            version="test", annotation_consortium=AnnotationConsortium.ENSEMBL,
+            genome_build=self.grch37, gene_annotation_import=gene_annotation_import)
+        vav = _make_vav(self.grch37)
+        # Assign after creation - creating with it set while no GeneAnnotationVersion exists raises in new_sub_version
+        vav.gene_annotation_release = gar
+        vav.save(update_fields=["gene_annotation_release"])
+        self.assertIsNone(vav.get_annotation_run_blocker())
+
     def test_latest_default_returns_active_only(self):
         _make_vav(self.grch37, status=VariantAnnotationVersion.Status.NEW)
         active = _make_vav(self.grch37, status=VariantAnnotationVersion.Status.ACTIVE)

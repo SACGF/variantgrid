@@ -140,6 +140,14 @@
                             {% for vav, field_counts in vav_field_counts.items %}
                                 {% ui_register_tab_embedded tab_set=build_name label=vav.short_string|add:" ["|add:vav.get_status_display|add:"]" active=vav.is_active %}
                                     <div class="card-body">
+                                        {% with run_blocker=vav.get_annotation_run_blocker %}
+                                            {% if run_blocker %}
+                                                <div class="alert alert-warning" role="alert">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    <strong>{{ vav.short_string }}</strong> {{ run_blocker }} — annotation runs against this version will fail. Assign a GeneAnnotationRelease before running pipelines.
+                                                </div>
+                                            {% endif %}
+                                        {% endwith %}
                                         <div id="build-{{ build_name }}-{{ vav.pk }}-summary-graph"></div>
                                         {% for field, count in field_counts.items %}
                                             {% labelled label=field %}{{ count }}{% endlabelled %}
