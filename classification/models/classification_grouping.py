@@ -180,9 +180,9 @@ class ClassificationGrouping(TimeStampedModel):
             str(self.lab),
             "Shared" if self.share_level_obj.is_discordant_level else "Not-shared",
         ]
-        if classification := self.latest_cached_summary.get("pathogenicity").get("classification"):
+        if classification := self.latest_cached_summary_obj.pathogenicity.classification:
             parts.append(f"Class({classification})")
-        if clin_sig := self.latest_cached_summary.get("somatic").get("clin_sig"):
+        if clin_sig := self.latest_cached_summary_obj.somatic.clinical_significance:
             parts.append(f"ClinSig({clin_sig})")
         return " ".join(parts)
 
