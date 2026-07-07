@@ -5,9 +5,9 @@
 #   2. Edit config.yaml so the paths point at THIS machine's VEP install + annotation data.
 #   3. snakemake --cores <N>
 #
-# Work is discovered by globbing the dumped *.meta.json sidecars in dump_dir; each input VCF is annotated
-# with the exact VEP command VariantGrid would have run (server paths swapped for config.yaml values), so
-# the resulting ##VEP= header matches when the annotated VCFs are re-imported.
+# Work is discovered by globbing the dumped *.meta.json sidecars in dump_dir; each input {sample}.vcf.gz is
+# annotated with the exact VEP command VariantGrid would have run (server paths swapped for config.yaml
+# values), so the resulting ##VEP= header matches when the annotated VCFs are re-imported.
 import glob
 import os
 import shlex
@@ -42,7 +42,7 @@ rule all:
 
 rule vep:
     input:
-        vcf=os.path.join(DUMP_DIR, "{sample}.vcf"),
+        vcf=os.path.join(DUMP_DIR, "{sample}.vcf.gz"),
         meta=os.path.join(DUMP_DIR, "{sample}.meta.json"),
     output:
         vcf=os.path.join(OUTPUT_DIR, "{sample}" + ANNOTATED_SUFFIX),
