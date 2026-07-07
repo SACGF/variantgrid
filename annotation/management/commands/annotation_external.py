@@ -37,10 +37,11 @@ class Command(BaseCommand):
         parser.add_argument("--pipeline-type", default=VariantAnnotationPipelineType.STANDARD,
                             choices=[VariantAnnotationPipelineType.STANDARD],
                             help="v1 supports STANDARD (small variant) only; SV stays on the in-VM pipeline")
-        parser.add_argument("--vav-status", default=VariantAnnotationVersion.Status.ACTIVE,
+        parser.add_argument("--vav-status", default=VariantAnnotationVersion.Status.NEW,
                             choices=[VariantAnnotationVersion.Status.NEW, VariantAnnotationVersion.Status.ACTIVE],
                             help="--dump-existing: status of the VariantAnnotationVersion whose CREATED runs to "
-                                 "adopt (default ACTIVE - the version the scheduler is annotating)")
+                                 "adopt (default NEW - runs created by 'Run scheduler against NEW', which the "
+                                 "dispatcher won't touch; use ACTIVE to offload the version being annotated)")
         parser.add_argument("--leave", type=int, default=0,
                             help="--dump-existing: leave this many lowest-id CREATED runs on the in-VM pipeline "
                                  "(so annotation can be parallelised across machines)")

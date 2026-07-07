@@ -54,13 +54,18 @@ def variant_annotation_version_identity(variant_annotation_version: VariantAnnot
     return identity
 
 
-def build_dump_metadata(annotation_run: AnnotationRun) -> dict:
+def build_dump_metadata(annotation_run: AnnotationRun, identity: dict = None) -> dict:
     """ Self-describing sidecar metadata for an external annotation dump (#1568).
         Drives import-time matching (version identity + range coordinate strings) and the §6a variant-id
         alignment check. annotation_run_pk is recorded for human/debug only - it is NOT a cross-DB handle
-        (range locks/versions can be created in a different order on a clone). """
+        (range locks/versions can be created in a different order on a clone).
+
+        `identity` is variant_annotation_version_identity() for this run's VAV; every run in a dump shares
+        the same VAV so callers compute it once and pass it in (it runs VEP - see that function). """
     annotation_range_lock = annotation_run.annotation_range_lock
     variant_annotation_version = annotation_run.variant_annotation_version
+    if identity is None:
+        identity = variant_annotation_version_identity(variant_annotation_version)
     return {
         "schema": DUMP_METADATA_SCHEMA_VERSION,
         "site_name": settings.SITE_NAME,
@@ -70,7 +75,7 @@ def build_dump_metadata(annotation_run: AnnotationRun) -> dict:
         "annotation_consortium": variant_annotation_version.annotation_consortium,
         "variant_annotation_version": {
             "pk": variant_annotation_version.pk,
-            **variant_annotation_version_identity(variant_annotation_version),
+            **identity,
         },
         "range": {
             "min_variant": str(annotation_range_lock.min_variant.coordinate),
@@ -85,12 +90,13 @@ def build_dump_metadata(annotation_run: AnnotationRun) -> dict:
     }
 
 
-def write_dump_metadata(annotation_run: AnnotationRun, dump_dir=None) -> str:
-    """ Write the sidecar metadata JSON next to the dump VCF, returning its path (#1568). """
+def write_dump_metadata(annotation_run: AnnotationRun, dump_dir=None, identity: dict = None) -> str:
+    """ Write the sidecar metadata JSON next to the dump VCF, returning its path (#1568).
+        Pass a precomputed `identity` (see build_dump_metadata) to avoid re-running VEP per run. """
     meta_filename = annotation_run.get_dump_metadata_filename(dump_dir=dump_dir)
     mk_path_for_file(meta_filename)
     with open(meta_filename, "w") as f:
-        json.dump(build_dump_metadata(annotation_run), f, indent=2)
+        json.dump(build_dump_metadata(annotation_run, identity=identity), f, indent=2)
     return meta_filename
 
 
@@ -115,6 +121,9 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
         clone would produce (§3) - external parallelism comes from forks/concurrency across runs, never larger
         locks. """
     os.makedirs(output_dir, exist_ok=True)
+    # Every run in this dump shares the same VAV, so compute the version identity (which runs VEP) once,
+    # lazily on the first run so a no-op dump never invokes VEP.
+    identity = None
     annotation_runs = []
     while True:
         range_lock, _unannotated_count = get_annotation_range_lock_and_unannotated_count(
@@ -125,7 +134,9 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock,
                                                       pipeline_type=pipeline_type, external=True)
         dump_count = dump_variants(annotation_run, dump_dir=output_dir)
-        meta_filename = write_dump_metadata(annotation_run, dump_dir=output_dir)
+        if identity is None:
+            identity = variant_annotation_version_identity(variant_annotation_version)
+        meta_filename = write_dump_metadata(annotation_run, dump_dir=output_dir, identity=identity)
         logging.info("Dumped external AnnotationRun %s: %d variants -> %s (meta %s)",
                      annotation_run.pk, dump_count, annotation_run.vcf_dump_filename, meta_filename)
         annotation_runs.append(annotation_run)
@@ -170,6 +181,9 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
     logging.info("dump_existing: %d dispatchable run(s); leaving %d on the in-VM pipeline, dumping %d",
                  len(kept) + len(candidate_ids), len(kept), len(candidate_ids))
 
+    # Every run in this dump shares the same VAV, so compute the version identity (which runs VEP) once,
+    # lazily on the first claimed run so a no-op dump never invokes VEP.
+    identity = None
     annotation_runs = []
     for pk in candidate_ids:
         # Atomically claim as external only while still dispatchable (same filter as the dispatcher) so we
@@ -188,7 +202,9 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
 
         annotation_run = AnnotationRun.objects.get(pk=pk)
         dump_count = dump_variants(annotation_run, dump_dir=output_dir)
-        meta_filename = write_dump_metadata(annotation_run, dump_dir=output_dir)
+        if identity is None:
+            identity = variant_annotation_version_identity(variant_annotation_version)
+        meta_filename = write_dump_metadata(annotation_run, dump_dir=output_dir, identity=identity)
         logging.info("Dumped existing AnnotationRun %s: %d variants -> %s (meta %s)",
                      annotation_run.pk, dump_count, annotation_run.vcf_dump_filename, meta_filename)
         annotation_runs.append(annotation_run)
