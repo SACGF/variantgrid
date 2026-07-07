@@ -10,7 +10,8 @@ from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation
 from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
-from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
+from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter, \
+    get_clean_and_pick_single_value_func, EMPTY_VALUES
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import vep_parse_version_line, get_vep_version_from_vcf, \
     vep_dict_to_variant_annotation_version_kwargs, VEPVersionMismatchError, VEPConfig
@@ -455,6 +456,18 @@ class TestVEP(TestCase):
                 vep_parse_version_line(line)
             except Exception:
                 self.fail(f"vep_parse_version_line died on line: {line}")
+
+    def test_open_targets_l2g_score_na(self):
+        """ OpenTargets emits "NA" for missing and &-joins multiple GWAS entries (e.g. "NA&NA").
+            The l2g score FloatField formatter must null those out and pick the highest real value. """
+        format_l2g = get_clean_and_pick_single_value_func(max, float, empty_values=EMPTY_VALUES | {"NA"})
+        self.assertIsNone(format_l2g("NA&NA"))
+        self.assertIsNone(format_l2g("."))
+        self.assertIsNone(format_l2g(""))
+        self.assertEqual(format_l2g("0.85"), 0.85)
+        self.assertEqual(format_l2g("0.85&NA"), 0.85)
+        self.assertEqual(format_l2g("NA&0.42"), 0.42)
+        self.assertEqual(format_l2g("0.1&0.9&NA"), 0.9)
 
     def test_aloft_pick_single(self):
         aloft_data = {

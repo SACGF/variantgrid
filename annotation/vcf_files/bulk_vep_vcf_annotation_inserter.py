@@ -210,6 +210,10 @@ class BulkVEPVCFAnnotationInserter:
         format_pick_lowest_float = get_clean_and_pick_single_value_func(min, float,
                                                                         empty_values=empty_mave_float_values)
         format_pick_highest_float = get_clean_and_pick_single_value_func(max, float)
+        # OpenTargets emits "NA" for missing and &-joins multiple GWAS entries (e.g. "NA&NA") - treat
+        # "NA"/empty as null and take the highest (most confident) locus-to-gene score.
+        format_pick_highest_float_na = get_clean_and_pick_single_value_func(max, float,
+                                                                            empty_values=empty_mave_float_values)
         format_pick_highest_int = get_clean_and_pick_single_value_func(max, int)
         format_sum_int = get_clean_and_pick_single_value_func(sum, int)
         remove_empty_multiples = get_clean_and_pick_single_value_func(join_uniq)
@@ -252,6 +256,7 @@ class BulkVEPVCFAnnotationInserter:
             "mutation_taster_pred_most_damaging": get_most_damaging_func(MutationTasterPrediction),
             "mavedb_score": format_pick_lowest_float,
             "nmd_escaping_variant": format_nmd_escaping_variant,
+            "open_targets_gwas_l2g_score": format_pick_highest_float_na,
             # conservation fields are from BigWig, which can return multiple entries
             # for deletions. Higher = more conserved, so for rare disease filtering taking max makes sense
             "phastcons_100_way_vertebrate": format_pick_highest_float,
