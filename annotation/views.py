@@ -429,8 +429,10 @@ def variant_annotation_runs(request):
             genome_build_field_counts[genome_build.pk][vav] = {as_display[k]: v for k, v in field_counts.items()}
 
     current_variant_annotation_versions = VariantAnnotationVersion.latest_for_all_builds()
-    current_pks = current_variant_annotation_versions.values_list("pk", flat=True)
-    historical_variant_annotation_versions = VariantAnnotationVersion.objects.exclude(pk__in=current_pks)
+    new_variant_annotation_versions = VariantAnnotationVersion.objects.filter(
+        status=VariantAnnotationVersion.Status.NEW).order_by("genome_build__name", "annotation_date")
+    historical_variant_annotation_versions = VariantAnnotationVersion.objects.filter(
+        status=VariantAnnotationVersion.Status.HISTORICAL).order_by("genome_build__name", "-annotation_date")
 
     genome_build_status_panel = {}
     for genome_build in GenomeBuild.builds_with_annotation():
@@ -468,6 +470,7 @@ def variant_annotation_runs(request):
         "genome_build_summary": dict(genome_build_summary),
         "genome_build_field_counts": dict(genome_build_field_counts),
         "current_variant_annotation_versions": current_variant_annotation_versions,
+        "new_variant_annotation_versions": new_variant_annotation_versions,
         "historical_variant_annotation_versions": historical_variant_annotation_versions,
         "genome_build_status_panel": genome_build_status_panel,
         "any_new_vav": any_new_vav,

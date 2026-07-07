@@ -194,25 +194,41 @@
         </div>
 
         <div class="mt-4">
-            {% labelled label="Current Version" %}
+            {% labelled label="Version" %}
             <div class="btn-group btn-group-toggle" data-toggle="buttons">
                 <label class="btn btn-outline-primary">
                     <input class="table-filter" type="radio" name="variant_annotation_version_filter" value="" autocomplete="off" checked> Current / Active
                 </label>
+
+                {% if new_variant_annotation_versions %}
+                    <label class="p-3">New</label>
+                    {% for vav in new_variant_annotation_versions %}
+                        <label class="btn btn-outline-info">
+                            <input class="table-filter" type="radio" name="variant_annotation_version_filter" value="{{ vav.pk }}" autocomplete="off"> {{ vav.short_string }} ({{ vav.genome_build }})
+                        </label>
+                    {% endfor %}
+                {% endif %}
+
+                <label class="p-3">Current</label>
                 {% for vav in current_variant_annotation_versions %}
                     <label class="btn btn-outline-primary">
                         <input class="table-filter" type="radio" name="variant_annotation_version_filter" value="{{ vav.pk }}" autocomplete="off"> {{ vav.short_string }} ({{ vav.genome_build }})
                     </label>
                 {% endfor %}
 
-            {% if historical_variant_annotation_versions %}
-                <label class="p-3">Historical</label>
-                {% for vav in historical_variant_annotation_versions %}
-                    <label class="btn btn-outline-primary">
-                        <input class="table-filter" type="radio" name="variant_annotation_version_filter" value="{{ vav.pk }}" autocomplete="off"> {{ vav.short_string }} ({{ vav.genome_build }})
-                    </label>
-                {% endfor %}
-            {% endif %}
+                {% if historical_variant_annotation_versions %}
+                    <button type="button" class="btn btn-link ml-2" data-toggle="collapse" data-target="#historical-vavs" aria-expanded="false">
+                        Show historical…
+                    </button>
+                    <span id="historical-vavs" class="collapse">
+                        <label class="p-3">Historical</label>
+                        {% for vav in historical_variant_annotation_versions %}
+                            <label class="btn btn-outline-secondary">
+                                <input class="table-filter" type="radio" name="variant_annotation_version_filter" value="{{ vav.pk }}" autocomplete="off"> {{ vav.short_string }} ({{ vav.genome_build }})
+                            </label>
+                        {% endfor %}
+                    </span>
+                {% endif %}
             </div>
             {% endlabelled %}
 
