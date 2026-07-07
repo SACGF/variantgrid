@@ -1,3 +1,4 @@
+import gzip
 import json
 import os
 import tempfile
@@ -79,6 +80,16 @@ class ExternalAnnotationMetadataTests(TestCase):
         dump_filename = annotation_run.get_dump_filename()
         meta_filename = annotation_run.get_dump_metadata_filename()
         self.assertEqual(meta_filename, os.path.splitext(dump_filename)[0] + ".meta.json")
+
+    def test_external_dump_filename_is_gzipped(self):
+        annotation_run, _, _ = self._make_run()
+        annotation_run.external = True
+        annotation_run.save()
+        dump_filename = annotation_run.get_dump_filename()
+        self.assertTrue(dump_filename.endswith(".vcf.gz"))
+        # Sidecar shares the stem (no .vcf/.gz) so the Snakefile derives sample -> {stem}.vcf.gz
+        meta_filename = annotation_run.get_dump_metadata_filename()
+        self.assertEqual(dump_filename, meta_filename[:-len(".meta.json")] + ".vcf.gz")
 
     def test_get_dump_metadata_contents(self):
         annotation_run, min_variant, max_variant = self._make_run()
@@ -205,8 +216,11 @@ class ExternalAnnotationDumpTests(TestCase):
                 annotation_run.refresh_from_db()
                 self.assertTrue(annotation_run.external)
                 self.assertEqual(annotation_run.status, AnnotationStatus.EXTERNAL_DUMP_COMPLETED)
-                # VCF + sidecar metadata written into output_dir
+                # VCF + sidecar metadata written into output_dir - external dumps are gzipped
                 self.assertTrue(os.path.exists(annotation_run.vcf_dump_filename))
+                self.assertTrue(annotation_run.vcf_dump_filename.endswith(".vcf.gz"))
+                with gzip.open(annotation_run.vcf_dump_filename, "rt") as f:
+                    self.assertTrue(f.readline().startswith("#"))  # valid gzip + VCF header
                 self.assertEqual(os.path.dirname(annotation_run.vcf_dump_filename), output_dir)
                 meta_filename = annotation_run.get_dump_metadata_filename(dump_dir=output_dir)
                 self.assertTrue(os.path.exists(meta_filename))
