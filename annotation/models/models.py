@@ -1041,6 +1041,9 @@ class AnnotationRun(TimeStampedModel):
     vep_warnings = models.TextField(null=True)
     vcf_dump_filename = models.TextField(null=True)
     vcf_annotated_filename = models.TextField(null=True)
+    # #1646: variants to process, pre-counted off-thread by count_annotation_run (null until counted;
+    # 0 finishes an empty run without a dump). Reset to null when a merge grows the range lock.
+    count = models.IntegerField(null=True)
     dump_count = models.IntegerField(null=True)
     annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
@@ -1125,7 +1128,11 @@ class AnnotationRun(TimeStampedModel):
 
     def is_dispatchable(self, now=None) -> bool:
         """ #2667: Ready for the dispatcher to lease + launch - pending state with no live lease.
-            External runs (#1568) are operator-managed and never auto-dispatched. """
+            External runs (#1568) are operator-managed and never auto-dispatched.
+
+            #1646: strictly CREATED - a resume-upload run (is_upload_resumable) is dispatched via a
+            separate lane. Keeping this CREATED-only means merge (_range_lock_is_dispatchable) never
+            grows a lock whose run already owns committed VEP output for its exact range. """
         if self.external:
             return False
         if self.task_id is not None:
@@ -1134,11 +1141,45 @@ class AnnotationRun(TimeStampedModel):
             return False
         return not self._lease_is_live(now)
 
+    @property
+    def is_empty_finished(self) -> bool:
+        """ #1646: a run the count task found empty (no variants of its pipeline_type in range) and
+            finished without a dump. Owns no annotation rows, so a merge that grows its range lock can
+            safely reopen it (_absorb_range_lock) for a re-count over the larger range. """
+        return self.status == AnnotationStatus.FINISHED and self.dump_count == 0
+
+    def reopen_to_created(self):
+        """ #1646: return an empty-finished run to an un-counted CREATED state so it is re-counted over
+            a now-larger range (a merge grew its lock). Only valid for empty runs - they own no rows. """
+        self.dump_start = None
+        self.dump_end = None
+        self.dump_count = None
+        self.count = None
+        self.save()  # get_status() -> CREATED
+
+    def is_upload_resumable(self, now=None) -> bool:
+        """ #1646: a stalled run that already has an annotated VCF (past VEP) and only needs the quick
+            DB upload. reclaim_stalled_annotation_runs keeps the annotated file and scrubs partial upload
+            rows, leaving status ANNOTATION_COMPLETED; the dispatcher re-launches it upload-only and
+            annotate_variants skips straight to import_vcf_annotations. """
+        if self.external:
+            return False
+        if self.task_id is not None:
+            return False
+        if self.status != AnnotationStatus.ANNOTATION_COMPLETED:
+            return False
+        if not self.vcf_annotated_filename:
+            return False
+        return not self._lease_is_live(now)
+
     def is_in_flight(self, now=None) -> bool:
         """ #2667: A run that currently occupies a worker slot - live lease, holding the task_id
             execution lock, or part-way through the pipeline (a running, non-completed status). A
             completed run never occupies a slot even if its lease has not been cleared yet. """
         if self.status in AnnotationStatus.get_completed_states():
+            return False
+        # #1646: a reclaimed resume-upload run waits for the dispatcher - it holds no worker slot.
+        if self.is_upload_resumable(now):
             return False
         if self._lease_is_live(now):
             return True

@@ -113,9 +113,16 @@ def get_annotation_range_lock_and_unannotated_count(variant_annotation_version: 
 def _range_lock_is_dispatchable(range_lock: AnnotationRangeLock, now=None) -> bool:
     """ A range lock is mergeable only while all of its runs are still pending (#2667):
         CREATED, un-leased, no task_id and not external. A lock with no runs yet (orphaned mid-create)
-        is pure metadata and safe to merge too. """
-    runs = list(range_lock.annotationrun_set.all())
-    return all(run.is_dispatchable(now) for run in runs)
+        is pure metadata and safe to merge too.
+
+        #1646: empty-finished runs (the count task found no variants of that pipeline type in range) are
+        ignored - they own no annotation rows and are reopened by _absorb_range_lock when the range
+        grows, so they must not block their lock from merging. A lock with no non-empty runs (fully done,
+        or all empty-finished) is not a merge participant. """
+    non_empty = [run for run in range_lock.annotationrun_set.all() if not run.is_empty_finished]
+    if not non_empty:
+        return False
+    return all(run.is_dispatchable(now) for run in non_empty)
 
 
 def _absorb_range_lock(survivor: AnnotationRangeLock, absorbed: AnnotationRangeLock):
@@ -137,8 +144,23 @@ def _absorb_range_lock(survivor: AnnotationRangeLock, absorbed: AnnotationRangeL
         locked_survivor.count = new_count
         locked_survivor.save()
         locked_absorbed.delete()  # cascades its CREATED runs
+        _reset_run_counts_after_extend(locked_survivor)
     survivor.max_variant_id = new_max_variant_id
     survivor.count = new_count
+
+
+def _reset_run_counts_after_extend(range_lock: AnnotationRangeLock):
+    """ #1646: the range grew, so each run's pre-computed `count` is stale. Reopen empty-finished runs
+        to CREATED (the larger range may now hold variants of their pipeline type) and null every run's
+        count. The scheduler's next count sweep (_trigger_counts_for_uncounted_runs) re-counts them; an
+        un-recounted reopened run is still correct - it just dumps over the new range like any CREATED
+        run. """
+    for run in range_lock.annotationrun_set.all():
+        if run.is_empty_finished:
+            run.reopen_to_created()  # -> CREATED, count=None
+        elif run.count is not None:
+            run.count = None
+            run.save()
 
 
 def merge_pending_range_locks(variant_annotation_version: VariantAnnotationVersion, batch_max=None) -> int:
