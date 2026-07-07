@@ -5,7 +5,7 @@ from datetime import timedelta
 import celery
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import F, Q
+from django.db.models import Case, F, IntegerField, Q, Value, When
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
@@ -50,6 +50,10 @@ def annotation_scheduler(status: str = None):
                         range_lock = _handle_variant_annotation_version(variant_annotation_version)
                         if range_lock is None:
                             break
+                    # #1646: fire off-thread count tasks for pending runs not yet counted (fills `count`
+                    # and finishes empties). Also re-counts runs a merge reopened. After the lock-creating
+                    # loop so a broker hiccup can't interrupt the essential scheduling work.
+                    _trigger_counts_for_uncounted_runs(variant_annotation_version)
                     # #2667: scheduler only creates pending state - the dispatcher decides what launches
                     # (capacity-limited, merging the backlog first). Kick it for this VAV.
                     dispatch_annotation_runs.si(variant_annotation_version.pk).apply_async()
@@ -80,6 +84,57 @@ def _handle_range_lock(range_lock, pipeline_type=None):
             continue
         # #2667: the run is left pending (CREATED, un-leased). dispatch_annotation_runs launches it
         # when there is worker capacity, merging the backlog into bigger batches first.
+
+
+@celery.shared_task(queue='annotation_workers')
+def count_annotation_run(annotation_run_id):
+    """ #1646 stage 2: count the variants a pending run will process (its pipeline_type, in range) and
+        store it on `count`. If empty, finish the run without a dump/dispatch. Runs on the annotation
+        pool so the potentially-slow count never blocks the single scheduling worker.
+
+        The write is a guarded update: it only lands if the run is still an un-counted, un-leased,
+        un-launched CREATED run, so it can never clobber a run the dispatcher has since picked up (in
+        which case the real dump computes the count anyway). """
+    annotation_run = AnnotationRun.objects.filter(pk=annotation_run_id).first()
+    if annotation_run is None or annotation_run.external:
+        return
+    if annotation_run.status != AnnotationStatus.CREATED or annotation_run.count is not None:
+        return  # already counted, or already leased/launched/finished
+    annotation_version = annotation_run.variant_annotation_version.get_any_annotation_version()
+    range_lock = annotation_run.annotation_range_lock
+    count = get_variants_qs_for_annotation(annotation_version, pipeline_type=annotation_run.pipeline_type,
+                                           min_variant_id=range_lock.min_variant_id,
+                                           max_variant_id=range_lock.max_variant_id).count()
+    update = {"count": count}
+    if count == 0:
+        # Empty - finish without a dump. dump_count=0 keeps get_status() consistent (-> FINISHED).
+        now = timezone.now()
+        update.update(status=AnnotationStatus.FINISHED, dump_count=0, dump_start=now, dump_end=now)
+    updated = AnnotationRun.objects.filter(
+        pk=annotation_run_id,
+        status=AnnotationStatus.CREATED,
+        task_id__isnull=True,
+        lease_expires__isnull=True,
+        count__isnull=True,
+    ).update(**update)
+    if updated and count == 0:
+        logging.info("Finished empty AnnotationRun %s (%s) via count task", annotation_run_id,
+                     annotation_run.pipeline_type)
+
+
+def _trigger_counts_for_uncounted_runs(vav: VariantAnnotationVersion):
+    """ #1646: kick count_annotation_run for every pending (CREATED, un-leased) run of this VAV that
+        has no `count` yet - freshly created runs, and runs a merge reopened. Idempotent: the count
+        task's guarded update no-ops on a run that got counted or picked up in the meantime. """
+    run_ids = AnnotationRun.objects.filter(
+        annotation_range_lock__version=vav,
+        external=False,
+        status=AnnotationStatus.CREATED,
+        task_id__isnull=True,
+        count__isnull=True,
+    ).values_list("pk", flat=True)
+    for run_id in run_ids:
+        count_annotation_run.apply_async((run_id,))  # @UndefinedVariable
 
 
 def _handle_variant_annotation_version(variant_annotation_version):
@@ -167,10 +222,17 @@ def _dispatch_for_vav(vav: VariantAnnotationVersion):
         # before leasing. With free capacity for everything, we skip this and launch as-is (low latency).
         merge_pending_range_locks(vav, settings.ANNOTATION_VEP_BATCH_MAX)
 
-    # Launch lowest-pk-first so the 'lowest unannotated id' watermark keeps moving and waiting VCF
+    # #1646: launch the cheap jobs first so slots free up faster. Two tiers:
+    #   0 - resume upload-only runs (past VEP, just the quick DB upload)
+    #   1 - the heavy CREATED dump+VEP+upload runs
+    # Empty runs never reach here - the count task (stage 2) finishes them without a dispatch. Within
+    # each tier, lowest-pk-first so the 'lowest unannotated id' watermark keeps moving and waiting VCF
     # pipelines unblock in order.
     worker_id = f"dispatch:{dispatch_annotation_runs.request.id or 'sync'}"
-    dispatchable = _dispatchable_runs_qs(vav, now).order_by("annotation_range_lock__min_variant_id")
+    dispatchable = _dispatchable_runs_qs(vav, now).annotate(
+        dispatch_priority=Case(When(status=AnnotationStatus.ANNOTATION_COMPLETED, then=Value(0)),
+                               default=Value(1), output_field=IntegerField())
+    ).order_by("dispatch_priority", "annotation_range_lock__min_variant_id")
     launched = 0
     for annotation_run in dispatchable:
         if launched >= capacity:
@@ -181,27 +243,37 @@ def _dispatch_for_vav(vav: VariantAnnotationVersion):
 
 
 def _dispatchable_runs_qs(vav: VariantAnnotationVersion, now):
-    """ Runs ready to lease + launch: pending (CREATED), un-leased, no task_id, not external. """
+    """ Runs ready to lease + launch, un-leased, no task_id, not external. Two lanes (#1646):
+        pending (CREATED) runs get the full dump+VEP+upload; resume-upload runs (past VEP - annotation
+        complete with an annotated VCF present) get re-launched upload-only. """
+    created = Q(status=AnnotationStatus.CREATED)
+    resume = Q(status=AnnotationStatus.ANNOTATION_COMPLETED, vcf_annotated_filename__isnull=False)
     return AnnotationRun.objects.filter(
         annotation_range_lock__version=vav,
         external=False,
         task_id__isnull=True,
-        status=AnnotationStatus.CREATED,
-    ).filter(Q(lease_expires__isnull=True) | Q(lease_expires__lt=now))
+    ).filter(created | resume).filter(Q(lease_expires__isnull=True) | Q(lease_expires__lt=now))
 
 
 def _in_flight_runs_qs(vav: VariantAnnotationVersion, now):
     """ Runs occupying a worker slot: live lease, holding task_id, or a running status. A completed
         run (FINISHED/ERROR) never occupies a slot, even if its lease hasn't been cleared yet - so it
-        is excluded regardless, otherwise stale leases on finished runs would shrink capacity. """
+        is excluded regardless, otherwise stale leases on finished runs would shrink capacity.
+
+        #1646: a reclaimed resume-upload run (ANNOTATION_COMPLETED, annotated VCF present, un-leased,
+        no task_id) is waiting for the dispatcher, not running - exclude it so it doesn't shrink
+        capacity while also appearing in _dispatchable_runs_qs. """
     completed = AnnotationStatus.get_completed_states()
     settled = [AnnotationStatus.CREATED] + list(completed)
     live_lease = Q(lease_expires__gte=now)
     has_task = Q(task_id__isnull=False)
     running = ~Q(status__in=settled)
+    resume_ready = Q(status=AnnotationStatus.ANNOTATION_COMPLETED, vcf_annotated_filename__isnull=False,
+                     task_id__isnull=True) & (Q(lease_expires__isnull=True) | Q(lease_expires__lt=now))
     return AnnotationRun.objects.filter(annotation_range_lock__version=vav, external=False) \
         .filter(live_lease | has_task | running) \
-        .exclude(status__in=completed)
+        .exclude(status__in=completed) \
+        .exclude(resume_ready)
 
 
 def _lease_and_launch_run(annotation_run: AnnotationRun, worker_id: str, now):
@@ -246,11 +318,26 @@ def _fail_stalled_run(annotation_run: AnnotationRun):
 
 
 def _reset_run_for_redispatch(annotation_run: AnnotationRun):
-    """ Return a stalled run to a clean CREATED state so the dispatcher can re-launch it. Clears the
-        lease/task lock; if the dead worker had made pipeline progress, also clears that progress
-        (incl. on-disk dumps and any partially-imported rows) so a re-dump won't collide. """
-    if annotation_run.status != AnnotationStatus.CREATED:
-        # Worker got part-way before dying - scrub partial output (a CREATED run has none).
+    """ Return a stalled run to a dispatchable state so the dispatcher can re-launch it. Always clears
+        the lease/task lock. Two flavours of pipeline progress:
+
+        #1646 resume-upload: the run is already past VEP (annotated VCF present on disk) and only the
+        quick DB upload remains. Keep the expensive VEP output - just scrub any partially-imported rows
+        and reset the upload markers, leaving status ANNOTATION_COMPLETED so the dispatcher re-launches
+        it upload-only (annotate_variants skips dump+VEP straight to import_vcf_annotations). This avoids
+        throwing away minutes of VEP per stalled run.
+
+        Otherwise (pre-VEP progress): scrub all partial output (on-disk dumps + partial rows) back to a
+        clean CREATED state so a re-dump won't collide. """
+    annotated_filename = annotation_run.vcf_annotated_filename
+    if annotated_filename and os.path.exists(annotated_filename):
+        # Past VEP - resume upload-only. Scrub partially-imported rows; keep dump/VEP/AnnotSV artifacts.
+        annotation_run.delete_related_objects()
+        annotation_run.upload_start = None
+        annotation_run.upload_end = None
+        annotation_run.annotsv_imported = False  # re-import re-updates the recreated rows (idempotent)
+    elif annotation_run.status != AnnotationStatus.CREATED:
+        # Worker got part-way before dying (pre-VEP) - scrub partial output (a CREATED run has none).
         annotation_run.delete_related_objects()
         for filename in (annotation_run.vcf_dump_filename, annotation_run.vcf_annotated_filename):
             if filename and os.path.exists(filename):
@@ -268,7 +355,7 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
     annotation_run.leased_by = None
     annotation_run.lease_expires = None
     annotation_run.error_exception = None
-    annotation_run.save()  # get_status() -> CREATED
+    annotation_run.save()  # get_status() -> CREATED, or ANNOTATION_COMPLETED for a resume-upload run
 
 
 def subdivide_annotation_range_lock(arl: AnnotationRangeLock,

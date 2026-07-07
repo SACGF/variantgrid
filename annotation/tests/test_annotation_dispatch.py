@@ -8,6 +8,8 @@ into bigger batches when (and only when) workers are saturated.
 annotate_variants.apply_async and annotation_worker_slots are mocked so we assert dispatch decisions
 without running VEP or inspecting a live celery pool.
 """
+import os
+import tempfile
 from contextlib import ExitStack
 from datetime import timedelta
 from unittest import mock
@@ -20,10 +22,12 @@ from django.utils import timezone
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import AnnotationRangeLock, AnnotationRun, AnnotationVersion, VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
-from annotation.annotation_versions import merge_pending_range_locks
+from annotation.annotation_versions import _absorb_range_lock, merge_pending_range_locks
 from annotation.tasks import annotation_scheduler_task
 from annotation.tasks.annotation_scheduler_task import (
     _handle_range_lock,
+    _trigger_counts_for_uncounted_runs,
+    count_annotation_run,
     dispatch_annotation_runs,
     reclaim_stalled_annotation_runs,
 )
@@ -276,3 +280,179 @@ class AnnotationDispatchTestCase(TestCase):
         reclaim_stalled_annotation_runs(self.vav)
         run.refresh_from_db()
         self.assertNotEqual(run.status, AnnotationStatus.ERROR)
+
+    # ================================================================== #1646 Part 1: count + finish empties
+    def test_count_task_finishes_empty_run(self):
+        # The fixture holds only SNVs, so an SV run's range is empty - the count task finishes it (no dump).
+        sv_run = self._make_lock(0, 0, count=100, pipeline_types=(STRUCTURAL,)).annotationrun_set.first()
+        count_annotation_run(sv_run.pk)
+        sv_run.refresh_from_db()
+        self.assertEqual(sv_run.count, 0)
+        self.assertEqual(sv_run.status, AnnotationStatus.FINISHED)
+        self.assertTrue(sv_run.is_empty_finished)
+
+    def test_count_task_fills_nonempty_count(self):
+        std_run = self._make_lock(0, 2, count=100, pipeline_types=(STANDARD,)).annotationrun_set.first()
+        count_annotation_run(std_run.pk)
+        std_run.refresh_from_db()
+        self.assertEqual(std_run.count, 3)  # variants 0,1,2 in range
+        self.assertEqual(std_run.status, AnnotationStatus.CREATED)  # non-empty - stays pending
+
+    def test_count_task_skips_leased_run(self):
+        # Guarded update: a run the dispatcher already leased must not be touched by a late count task.
+        sv_run = self._make_lock(0, 0, count=100, pipeline_types=(STRUCTURAL,)).annotationrun_set.first()
+        self._lease(sv_run)
+        count_annotation_run(sv_run.pk)
+        sv_run.refresh_from_db()
+        self.assertIsNone(sv_run.count)
+        self.assertEqual(sv_run.status, AnnotationStatus.CREATED)
+
+    def test_scheduler_sweep_kicks_counts_for_uncounted_runs_only(self):
+        uncounted = self._make_lock(0, 0, count=100).annotationrun_set.first()
+        counted = self._make_lock(1, 1, count=100).annotationrun_set.first()
+        counted.count = 5
+        counted.save()
+        with mock.patch.object(count_annotation_run, "apply_async") as kick:
+            _trigger_counts_for_uncounted_runs(self.vav)
+        kicked = {c.args[0][0] for c in kick.call_args_list}
+        self.assertEqual(kicked, {uncounted.pk})
+
+    def test_empty_finished_run_not_dispatched(self):
+        lock = self._make_lock(0, 0, count=100, pipeline_types=(STANDARD, STRUCTURAL))
+        count_annotation_run(lock.annotationrun_set.get(pipeline_type=STRUCTURAL).pk)  # SV -> empty finished
+        launch = self._dispatch(slots=4, merge_noop=True)
+        launch.assert_called_once()  # only the STANDARD run launches
+        self.assertEqual(launch.call_args_list[0].args[0][0],
+                         lock.annotationrun_set.get(pipeline_type=STANDARD).pk)
+
+    def test_merge_combines_locks_with_empty_finished_sv_runs(self):
+        # Mergeability ignores empty-finished SV runs - locks still combine on their live STANDARD runs.
+        locks = [self._make_lock(i, i, count=100, pipeline_types=(STANDARD, STRUCTURAL)) for i in range(3)]
+        for lock in locks:
+            count_annotation_run(lock.annotationrun_set.get(pipeline_type=STRUCTURAL).pk)
+        merged = merge_pending_range_locks(self.vav, batch_max=1000)
+        self.assertEqual(merged, 2)  # 3 -> 1
+        survivor = AnnotationRangeLock.objects.get(version=self.vav)
+        self.assertEqual(survivor.annotationrun_set.get(pipeline_type=STANDARD).status,
+                         AnnotationStatus.CREATED)
+        # absorb reopened the survivor's empty SV run (range grew) - now an un-counted CREATED run
+        sv = survivor.annotationrun_set.get(pipeline_type=STRUCTURAL)
+        self.assertEqual(sv.status, AnnotationStatus.CREATED)
+        self.assertIsNone(sv.count)
+
+    def test_merge_skips_lock_with_finished_data_run(self):
+        # A lock whose STANDARD run genuinely FINISHED with data is done - not a merge participant.
+        a = self._make_lock(0, 0, count=100)
+        b = self._make_lock(1, 1, count=100)
+        c = self._make_lock(2, 2, count=100)
+        run_a = a.annotationrun_set.get(pipeline_type=STANDARD)
+        run_a.dump_start = run_a.dump_end = timezone.now()
+        run_a.dump_count = 100
+        run_a.annotation_start = run_a.annotation_end = timezone.now()
+        run_a.upload_start = run_a.upload_end = timezone.now()
+        run_a.save()  # FINISHED with data (dump_count > 0) -> not is_empty_finished
+        self.assertFalse(run_a.is_empty_finished)
+        merged = merge_pending_range_locks(self.vav, batch_max=25000)
+        self.assertEqual(merged, 1)  # b absorbs c; a left alone
+        remaining = list(AnnotationRangeLock.objects.filter(version=self.vav).order_by("min_variant_id"))
+        self.assertEqual([lock.pk for lock in remaining], [a.pk, b.pk])
+        self.assertEqual(remaining[1].max_variant_id, self.variants[2].pk)
+
+    def test_absorb_reopens_empty_finished_run_and_nulls_counts(self):
+        survivor = self._make_lock(0, 0, count=100, pipeline_types=(STANDARD, STRUCTURAL))
+        std_run = survivor.annotationrun_set.get(pipeline_type=STANDARD)
+        std_run.count = 1  # counted non-empty
+        std_run.save()
+        count_annotation_run(survivor.annotationrun_set.get(pipeline_type=STRUCTURAL).pk)  # SV -> empty finished
+        absorbed = self._make_lock(1, 1, count=100, pipeline_types=(STANDARD, STRUCTURAL))
+        _absorb_range_lock(survivor, absorbed)
+        sv_run = survivor.annotationrun_set.get(pipeline_type=STRUCTURAL)
+        std_run.refresh_from_db()
+        self.assertEqual(sv_run.status, AnnotationStatus.CREATED)  # empty run reopened
+        self.assertIsNone(sv_run.count)
+        self.assertIsNone(std_run.count)  # stale count nulled for re-count
+
+    # ================================================================== #1646 Part 2: resume upload-only
+    def _make_past_vep_run(self, lo_idx=0, annotated_filename="/tmp/fake.vep_annotated.vcf.gz"):
+        """ A run that has completed VEP (annotated VCF present) but not yet uploaded. """
+        lock = self._make_lock(lo_idx, lo_idx, count=100)
+        run = lock.annotationrun_set.first()
+        run.dump_start = run.dump_end = timezone.now()
+        run.dump_count = 100
+        run.annotation_start = run.annotation_end = timezone.now()
+        run.vcf_annotated_filename = annotated_filename
+        run.save()
+        return run
+
+    def test_reclaim_resumes_upload_only_for_past_vep_run(self):
+        with tempfile.NamedTemporaryFile(suffix=".vcf.gz", delete=False) as tf:
+            annotated_filename = tf.name
+        self.addCleanup(lambda: os.path.exists(annotated_filename) and os.remove(annotated_filename))
+
+        run = self._make_past_vep_run(annotated_filename=annotated_filename)
+        run.upload_start = timezone.now()  # died mid-upload -> UPLOAD_STARTED
+        run.save()
+        self._lease(run, attempt_count=1, expires_in=-1)  # expired lease
+        self.assertEqual(run.status, AnnotationStatus.UPLOAD_STARTED)
+
+        with mock.patch.object(AnnotationRun, "delete_related_objects") as dro:
+            reclaim_stalled_annotation_runs(self.vav)
+        dro.assert_called_once()  # partial upload rows scrubbed
+        run.refresh_from_db()
+        self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
+        self.assertEqual(run.vcf_annotated_filename, annotated_filename)
+        self.assertTrue(os.path.exists(annotated_filename))  # VEP output kept
+        self.assertIsNone(run.upload_start)
+        self.assertIsNone(run.lease_expires)
+        self.assertIsNone(run.task_id)
+        self.assertTrue(run.is_upload_resumable())
+        self.assertFalse(run.is_in_flight())
+
+    def test_resume_run_dispatched_before_created(self):
+        # A resume-upload run and a pending CREATED run, one free slot: the cheap resume run goes first.
+        resume_run = self._make_past_vep_run(lo_idx=1)
+        self.assertTrue(resume_run.is_upload_resumable())
+        self._make_lock(0, 0, count=100)  # pending CREATED, lower pk
+        launch = self._dispatch(slots=1, merge_noop=True)
+        launch.assert_called_once()
+        self.assertEqual(launch.call_args_list[0].args[0][0], resume_run.pk)
+
+    def test_resume_run_not_counted_as_in_flight(self):
+        # The resume run must not consume the only slot as 'in-flight' - the pending run still launches.
+        self._make_past_vep_run(lo_idx=0)
+        pending_run = self._make_lock(1, 1, count=100).annotationrun_set.first()
+        # in-flight excludes the resume run, so capacity remains for both; with 1 slot the resume run
+        # launches first. Give 2 slots so both launch, proving the resume run didn't shrink capacity.
+        launch = self._dispatch(slots=2, merge_noop=True)
+        self.assertEqual(launch.call_count, 2)
+        launched = {c.args[0][0] for c in launch.call_args_list}
+        self.assertIn(pending_run.pk, launched)
+
+    def test_annotate_variants_resumes_upload_only(self):
+        run = self._make_past_vep_run()
+        self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
+        with mock.patch("annotation.tasks.annotate_variants.dump_and_annotate_variants") as dump_mock, \
+             mock.patch("annotation.tasks.annotate_variants.import_vcf_annotations") as import_mock, \
+             mock.patch.object(VariantAnnotationVersion, "get_annotation_run_blocker", return_value=None), \
+             mock.patch("annotation.tasks.annotate_variants.annotation_run_complete_signal"), \
+             mock.patch("annotation.tasks.annotate_variants._trigger_dispatch"):
+            annotate_variants.apply((run.pk,)).get()
+        dump_mock.assert_not_called()  # VEP not re-run
+        import_mock.assert_called_once()  # straight to upload
+
+    def test_reclaim_full_scrub_when_no_annotated_file(self):
+        # Pre-VEP progress (no annotated VCF): existing behaviour - full scrub back to CREATED.
+        lock = self._make_lock(0, 0, count=100)
+        run = lock.annotationrun_set.first()
+        run.dump_start = timezone.now()
+        run.dump_count = 100
+        run.vcf_dump_filename = None
+        run.save()
+        self._lease(run, attempt_count=1, expires_in=-1)
+        with mock.patch.object(AnnotationRun, "delete_related_objects"):
+            reclaim_stalled_annotation_runs(self.vav)
+        run.refresh_from_db()
+        self.assertEqual(run.status, AnnotationStatus.CREATED)
+        self.assertIsNone(run.dump_start)
+        self.assertIsNone(run.dump_count)
+        self.assertTrue(run.is_dispatchable())
