@@ -19,6 +19,10 @@ from annotation.tasks.annotate_variants import annotate_variants
 from library.log_utils import log_traceback
 from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF, Variant, JobsControl
 
+# #1646: max count_annotation_run tasks the dispatcher kicks per cycle, so creating a new annotation
+# version (thousands of runs at once) doesn't burst the count queue - the rest drain over later cycles.
+COUNT_KICK_BATCH = 500
+
 
 @celery.shared_task(queue='scheduling_single_worker')
 def annotation_scheduler(status: str = None):
@@ -50,12 +54,9 @@ def annotation_scheduler(status: str = None):
                         range_lock = _handle_variant_annotation_version(variant_annotation_version)
                         if range_lock is None:
                             break
-                    # #1646: fire off-thread count tasks for pending runs not yet counted (fills `count`
-                    # and finishes empties). Also re-counts runs a merge reopened. After the lock-creating
-                    # loop so a broker hiccup can't interrupt the essential scheduling work.
-                    _trigger_counts_for_uncounted_runs(variant_annotation_version)
                     # #2667: scheduler only creates pending state - the dispatcher decides what launches
-                    # (capacity-limited, merging the backlog first). Kick it for this VAV.
+                    # (capacity-limited, merging the backlog first). Kick it for this VAV. The dispatcher
+                    # also fires the #1646 count tasks, so it is the single place that keeps counts moving.
                     dispatch_annotation_runs.si(variant_annotation_version.pk).apply_async()
             finally:
                 logging.info("Releasing lock")
@@ -86,11 +87,13 @@ def _handle_range_lock(range_lock, pipeline_type=None):
         # when there is worker capacity, merging the backlog into bigger batches first.
 
 
-@celery.shared_task(queue='annotation_workers')
+@celery.shared_task(queue='db_workers')
 def count_annotation_run(annotation_run_id):
     """ #1646 stage 2: count the variants a pending run will process (its pipeline_type, in range) and
-        store it on `count`. If empty, finish the run without a dump/dispatch. Runs on the annotation
-        pool so the potentially-slow count never blocks the single scheduling worker.
+        store it on `count`. If empty, finish the run without a dump/dispatch. Runs on the db_workers
+        pool: it is a DB query (not VEP), so keeping it off annotation_workers means it is never
+        starved by running VEP jobs and never occupies a VEP slot - empties close promptly and the
+        dispatcher's re-kick can't build up a backlog of count tasks stuck behind VEP.
 
         The write is a guarded update: it only lands if the run is still an un-counted, un-leased,
         un-launched CREATED run, so it can never clobber a run the dispatcher has since picked up (in
@@ -123,16 +126,19 @@ def count_annotation_run(annotation_run_id):
 
 
 def _trigger_counts_for_uncounted_runs(vav: VariantAnnotationVersion):
-    """ #1646: kick count_annotation_run for every pending (CREATED, un-leased) run of this VAV that
-        has no `count` yet - freshly created runs, and runs a merge reopened. Idempotent: the count
-        task's guarded update no-ops on a run that got counted or picked up in the meantime. """
+    """ #1646: kick count_annotation_run (db_workers) for pending (CREATED, un-leased) runs of this VAV
+        with no `count` yet - freshly created runs, and runs a merge reopened. Lowest-pk-first (counted
+        before they'd be dispatched) and capped per call so a fresh backlog of thousands doesn't burst
+        the queue in one go - the remainder is picked up on following dispatch cycles. Idempotent: the
+        count task's guarded update no-ops on a run that got counted or picked up in the meantime, and
+        the count__isnull filter drops runs once counted, so re-kicking does not build up. """
     run_ids = AnnotationRun.objects.filter(
         annotation_range_lock__version=vav,
         external=False,
         status=AnnotationStatus.CREATED,
         task_id__isnull=True,
         count__isnull=True,
-    ).values_list("pk", flat=True)
+    ).order_by("annotation_range_lock__min_variant_id").values_list("pk", flat=True)[:COUNT_KICK_BATCH]
     for run_id in run_ids:
         count_annotation_run.apply_async((run_id,))  # @UndefinedVariable
 
@@ -208,6 +214,11 @@ def _active_variant_annotation_versions() -> list[VariantAnnotationVersion]:
 def _dispatch_for_vav(vav: VariantAnnotationVersion):
     now = timezone.now()
     reclaim_stalled_annotation_runs(vav, now)
+    # #1646: fill `count` (and finish empties) off-thread before we consider dispatching. Fired every
+    # cycle - this is the reliable driver, since the scheduler only runs on VCF import / manual trigger
+    # while the dispatcher runs on every completion. Runs even when capacity is 0 so a saturated
+    # system still closes empty runs (on db_workers, not competing with VEP).
+    _trigger_counts_for_uncounted_runs(vav)
 
     slots = annotation_worker_slots()
     in_flight = _in_flight_runs_qs(vav, now).count()

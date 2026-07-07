@@ -72,11 +72,13 @@ class AnnotationDispatchTestCase(TestCase):
 
     def _dispatch(self, slots, merge_noop=False):
         """ Run the dispatcher with a fixed pool size; optionally stub merge to isolate leasing.
-            Returns the annotate_variants.apply_async mock for assertions. """
+            Returns the annotate_variants.apply_async mock for assertions; the count_annotation_run
+            kick mock is stored on self.count_kick. """
         with ExitStack() as stack:
             stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
                                                   return_value=slots))
             launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
+            self.count_kick = stack.enter_context(mock.patch.object(count_annotation_run, "apply_async"))
             if merge_noop:
                 stack.enter_context(mock.patch.object(annotation_scheduler_task,
                                                       "merge_pending_range_locks", return_value=0))
@@ -307,7 +309,7 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertIsNone(sv_run.count)
         self.assertEqual(sv_run.status, AnnotationStatus.CREATED)
 
-    def test_scheduler_sweep_kicks_counts_for_uncounted_runs_only(self):
+    def test_count_kick_targets_uncounted_runs_only(self):
         uncounted = self._make_lock(0, 0, count=100).annotationrun_set.first()
         counted = self._make_lock(1, 1, count=100).annotationrun_set.first()
         counted.count = 5
@@ -316,6 +318,14 @@ class AnnotationDispatchTestCase(TestCase):
             _trigger_counts_for_uncounted_runs(self.vav)
         kicked = {c.args[0][0] for c in kick.call_args_list}
         self.assertEqual(kicked, {uncounted.pk})
+
+    def test_dispatcher_kicks_counts_even_at_zero_capacity(self):
+        # The dispatcher is the reliable count driver - it must fire even when saturated (capacity 0),
+        # on db_workers, so a busy system still closes empty runs.
+        uncounted = self._make_lock(0, 0, count=100).annotationrun_set.first()
+        self._dispatch(slots=0, merge_noop=True)
+        kicked = {c.args[0][0] for c in self.count_kick.call_args_list}
+        self.assertIn(uncounted.pk, kicked)
 
     def test_empty_finished_run_not_dispatched(self):
         lock = self._make_lock(0, 0, count=100, pipeline_types=(STANDARD, STRUCTURAL))

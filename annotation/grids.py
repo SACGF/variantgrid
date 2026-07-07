@@ -45,6 +45,7 @@ class AnnotationRunColumns(DatatableConfig):
             RichColumn(key="pipeline_type", orderable=True, renderer=self.pipeline_type),
             RichColumn(key="annotation_range_lock__version__genome_build__name", label='Build', orderable=True, client_renderer='TableFormat.number'),
             RichColumn(key="annotation_range_lock__version__id", label='Version', orderable=True, client_renderer='TableFormat.number'),
+            RichColumn(key="count", label='Count', order_sequence=[SortOrder.DESC, SortOrder.ASC], client_renderer='TableFormat.number'),
             RichColumn(key="dump_count", label='VCF Count', order_sequence=[SortOrder.DESC, SortOrder.ASC], client_renderer='TableFormat.number'),
             RichColumn(key="vep_skipped_count", label="VEP Skipped", orderable=True, client_renderer='TableFormat.number'),
             RichColumn(key="annotation_range_lock__min_variant__id", label="Min Var", order_sequence=[SortOrder.DESC, SortOrder.ASC], client_renderer='TableFormat.number'),
