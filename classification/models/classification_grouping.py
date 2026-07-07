@@ -433,7 +433,7 @@ class ClassificationGrouping(TimeStampedModel):
                 if term_stubs:
                     all_term_stubs += [ts.to_search_term(grouping=self) for ts in term_stubs]
             ClassificationGroupingSearchTerm.objects.filter(grouping=self).delete()
-            ClassificationGroupingSearchTerm.objects.bulk_create(all_term_stubs)
+            ClassificationGroupingSearchTerm.objects.bulk_create(all_term_stubs, ignore_conflicts=True, unique_fields=["grouping", "term", "term_type"])
 
             if previous_summary and previous_summary != new_summary:
                 classification_grouping_summary_signal.send(sender=ClassificationGrouping, instance=self, old_summary=previous_summary, new_summary=new_summary)
