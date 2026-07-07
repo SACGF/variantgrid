@@ -4,9 +4,12 @@ External annotation runs (#1568): dump/import helpers shared by the annotation_e
 The heavy VEP step can be run off-VM and the resulting annotated VCFs re-imported, and reused between a
 database and its own clone for identical annotation runs. See claude/plans/1568_external_annotation_runs_plan.md.
 """
+import glob
 import json
 import logging
 import os
+import shutil
+from typing import Optional
 
 from django.conf import settings
 from django.db.models import Q
@@ -15,13 +18,17 @@ from django.utils import timezone
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
-from annotation.tasks.annotate_variants import dump_variants
-from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
+from annotation.tasks.annotate_variants import annotation_run_retry, dump_variants
+from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
 from library.utils.file_utils import mk_path_for_file
-from snpdb.models import Variant
+from snpdb.models import GenomeBuild, Variant
 
 # Bump if the dump metadata layout (build_dump_metadata) changes incompatibly (#1568)
 DUMP_METADATA_SCHEMA_VERSION = 1
+
+# Suffix the Snakemake bundle appends to each dump stem for the annotated VCF; import discovers annotated
+# files alongside their .meta.json sidecar by this suffix (#1568).
+ANNOTATED_VCF_SUFFIX = ".vep_annotated.vcf.gz"
 
 
 class VariantIdAlignmentError(ValueError):
@@ -123,6 +130,7 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
                      annotation_run.pk, dump_count, annotation_run.vcf_dump_filename, meta_filename)
         annotation_runs.append(annotation_run)
 
+    write_snakemake_bundle(output_dir, variant_annotation_version, pipeline_type=pipeline_type)
     logging.info("Dumped %d external annotation run(s) for %s into %s",
                  len(annotation_runs), variant_annotation_version, output_dir)
     return annotation_runs
@@ -185,6 +193,7 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
                      annotation_run.pk, dump_count, annotation_run.vcf_dump_filename, meta_filename)
         annotation_runs.append(annotation_run)
 
+    write_snakemake_bundle(output_dir, variant_annotation_version, pipeline_type=pipeline_type)
     logging.info("Dumped %d existing annotation run(s) for %s into %s",
                  len(annotation_runs), variant_annotation_version, output_dir)
     return annotation_runs
@@ -222,3 +231,277 @@ def verify_annotated_vcf_variant_ids(annotation_run: AnnotationRun, meta: dict):
                 f"AnnotationRun {annotation_run.pk}: range {endpoint} local variant {local_variant_id} is "
                 f"{local_coordinate} but annotated file recorded {expected_coordinate} - produced against a "
                 f"different/diverged database (id past the split?). Skipping this run; re-run it normally.")
+
+
+# --------------------------------------------------------------------------------------------------------
+# Snakemake bundle generation (#1568 §4.3): emitted into the dump dir so the operator copies the whole
+# directory to a compute box, edits config.yaml, and runs `snakemake` to produce annotated VCFs. Reusing
+# get_vep_command() verbatim keeps the external run byte-identical to the in-VM run (so the ##VEP= header
+# check passes on import). Every server path in the command is rewritten to a config.yaml placeholder so the
+# compute box can install VEP + annotation data at different paths.
+# --------------------------------------------------------------------------------------------------------
+
+def _vep_command_config_roots() -> list[tuple[str, str]]:
+    """ (config_key, server_path) roots used to rewrite absolute server paths in the VEP command into
+        config.yaml placeholders. Everything VEP reads lives under these; annotation data + the fasta sit
+        under annotation_base_dir. Longest server path first so nested dirs (cache/plugins/code) win over
+        the base dir when both are prefixes of a token. """
+    roots = [
+        ("vep_code_dir", settings.ANNOTATION_VEP_CODE_DIR),
+        ("vep_cache_dir", settings.ANNOTATION_VEP_CACHE_DIR),
+        ("vep_plugins_dir", settings.ANNOTATION_VEP_PLUGINS_DIR),
+        ("annotation_base_dir", settings.ANNOTATION_BASE_DIR),
+    ]
+    if settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT:
+        roots.append(("perlbrew_runner", settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT))
+    roots = [(key, value) for key, value in roots if value]
+    roots.sort(key=lambda kv: len(kv[1]), reverse=True)
+    return roots
+
+
+def _templatize_scalar(template: list[str], flag: str, config_key: str) -> list[str]:
+    """ Make a scalar VEP flag (e.g. --fork/--buffer_size) overridable from config: replace its value with a
+        {config_key} placeholder, injecting the flag if get_vep_command() omitted it (fork==1). """
+    template = list(template)
+    placeholder = "{" + config_key + "}"
+    if flag in template:
+        index = template.index(flag)
+        if index + 1 < len(template):
+            template[index + 1] = placeholder
+    else:
+        template.extend([flag, placeholder])
+    return template
+
+
+def build_vep_command_template(variant_annotation_version: VariantAnnotationVersion,
+                               pipeline_type=VariantAnnotationPipelineType.STANDARD) -> list[str]:
+    """ The real VEP command (get_vep_command) with input/output as {input}/{output} and every server path
+        rewritten to a {config-key} placeholder - rendered against config.yaml on the compute box (#1568). """
+    genome_build = variant_annotation_version.genome_build
+    annotation_consortium = variant_annotation_version.annotation_consortium
+    cmd = get_vep_command("{input}", "{output}", genome_build, annotation_consortium, pipeline_type,
+                          variant_annotation_version=variant_annotation_version)
+
+    roots = _vep_command_config_roots()
+    template = []
+    for token in cmd:
+        for config_key, server_path in roots:
+            if server_path in token:
+                token = token.replace(server_path, "{" + config_key + "}")
+        template.append(token)
+
+    template = _templatize_scalar(template, "--fork", "vep_fork")
+    template = _templatize_scalar(template, "--buffer_size", "vep_buffer_size")
+    return template
+
+
+def build_snakemake_config(pipeline_type=VariantAnnotationPipelineType.STANDARD) -> dict:
+    """ config.yaml defaults - server paths the operator edits to point at the compute box (#1568). """
+    config = {
+        "dump_dir": ".",
+        "output_dir": "annotated",
+        "vep_code_dir": settings.ANNOTATION_VEP_CODE_DIR,
+        "vep_cache_dir": settings.ANNOTATION_VEP_CACHE_DIR,
+        "vep_plugins_dir": settings.ANNOTATION_VEP_PLUGINS_DIR,
+        "annotation_base_dir": settings.ANNOTATION_BASE_DIR,
+        "vep_fork": settings.ANNOTATION_VEP_FORK or 1,
+        "vep_buffer_size": settings.ANNOTATION_VEP_BUFFER_SIZE.get(pipeline_type) or 1000,
+    }
+    if settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT:
+        config["perlbrew_runner"] = settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT
+    return config
+
+
+def _yaml_kv(key: str, value) -> str:
+    if isinstance(value, int):
+        return f"{key}: {value}"
+    return f'{key}: "{value}"'
+
+
+def _render_config_yaml(config: dict) -> str:
+    lines = [
+        "# VariantGrid external annotation config (#1568) - generated by `annotation_external --dump`.",
+        "#",
+        "# Edit the paths below to point at THIS compute box's VEP install + annotation data, then run:",
+        "#     snakemake --cores <N>",
+        "#",
+        "# The directory tree under these roots must mirror the VariantGrid server's layout (VEP cache,",
+        "# plugins, fasta and plugin data files all live under annotation_base_dir).",
+        "",
+        "# Dumped input VCFs + *.meta.json, and where to write annotated output (relative to this file or absolute):",
+        _yaml_kv("dump_dir", config["dump_dir"]),
+        _yaml_kv("output_dir", config["output_dir"]),
+        "",
+        "# VEP install + annotation data roots (server defaults shown - change to local paths):",
+        _yaml_kv("vep_code_dir", config["vep_code_dir"]),
+        _yaml_kv("vep_cache_dir", config["vep_cache_dir"]),
+        _yaml_kv("vep_plugins_dir", config["vep_plugins_dir"]),
+        _yaml_kv("annotation_base_dir", config["annotation_base_dir"]),
+    ]
+    if "perlbrew_runner" in config:
+        lines.append(_yaml_kv("perlbrew_runner", config["perlbrew_runner"]))
+    lines += [
+        "",
+        "# Compute knobs - tune for this box (more forks = more cores/RAM):",
+        _yaml_kv("vep_fork", config["vep_fork"]),
+        _yaml_kv("vep_buffer_size", config["vep_buffer_size"]),
+        "",
+    ]
+    return "\n".join(lines)
+
+
+# Self-contained Snakefile template (no VariantGrid imports so it runs standalone on the compute box). The
+# VEP command template + annotated suffix are substituted for the __TEMPLATE_JSON__/__ANNOTATED_SUFFIX__
+# sentinels at generation time; {input}/{output}/{config-key} braces are resolved by render_vep_command()
+# at Snakemake runtime.
+_SNAKEFILE_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates_external", "Snakefile.template")
+
+
+def render_snakefile(vep_command_template: list[str]) -> str:
+    with open(_SNAKEFILE_TEMPLATE_PATH) as f:
+        template = f.read()
+    return (template
+            .replace("__TEMPLATE_JSON__", json.dumps(vep_command_template, indent=4))
+            .replace("__ANNOTATED_SUFFIX__", ANNOTATED_VCF_SUFFIX))
+
+
+def write_snakemake_bundle(output_dir: str,
+                           variant_annotation_version: VariantAnnotationVersion,
+                           pipeline_type=VariantAnnotationPipelineType.STANDARD) -> tuple[str, str]:
+    """ Write Snakefile + config.yaml into output_dir so the dumped VCFs can be annotated off-VM (#1568). """
+    os.makedirs(output_dir, exist_ok=True)
+    template = build_vep_command_template(variant_annotation_version, pipeline_type=pipeline_type)
+    config = build_snakemake_config(pipeline_type=pipeline_type)
+
+    config_path = os.path.join(output_dir, "config.yaml")
+    with open(config_path, "w") as f:
+        f.write(_render_config_yaml(config))
+
+    snakefile_path = os.path.join(output_dir, "Snakefile")
+    with open(snakefile_path, "w") as f:
+        f.write(render_snakefile(template))
+
+    logging.info("Wrote Snakemake bundle: %s + %s", snakefile_path, config_path)
+    return snakefile_path, config_path
+
+
+# --------------------------------------------------------------------------------------------------------
+# Import mode (#1568 §4.4): match annotated VCFs back to local EXTERNAL_DUMP_COMPLETED runs by version
+# identity + range coordinate strings, run the §6a alignment pre-flight, then reuse the existing upload-only
+# path. Per-run failure (bad match / §6a mismatch) never aborts the whole import - the run is skipped and
+# falls back to a normal VEP run.
+# --------------------------------------------------------------------------------------------------------
+
+def _matchable_identity(identity: dict) -> dict:
+    """ Version identity with the settings-snapshot fields excluded: distance/gencode_subset are re-derived
+        from live settings and not in the ##VEP= header, so matching on them would produce false misses when
+        a setting drifted after VAV creation (mirrors _vep_check_version_match). """
+    return {key: value for key, value in identity.items() if key not in ("distance", "gencode_subset")}
+
+
+def find_matching_variant_annotation_version(meta: dict) -> Optional[VariantAnnotationVersion]:
+    """ Local VariantAnnotationVersion whose identity equals the annotated file's meta (#1568 §4.4). """
+    genome_build = GenomeBuild.get_name_or_alias(meta["genome_build"])
+    annotation_consortium = meta["annotation_consortium"]
+    expected = _matchable_identity({key: value for key, value in meta["variant_annotation_version"].items()
+                                    if key != "pk"})
+    for variant_annotation_version in VariantAnnotationVersion.objects.filter(
+            genome_build=genome_build, annotation_consortium=annotation_consortium):
+        if _matchable_identity(variant_annotation_version_identity(variant_annotation_version)) == expected:
+            return variant_annotation_version
+    return None
+
+
+def find_matching_annotation_run(meta: dict, variant_annotation_version: VariantAnnotationVersion,
+                                 pipeline_type=VariantAnnotationPipelineType.STANDARD) -> Optional[AnnotationRun]:
+    """ Local external run still awaiting annotation whose range-lock min/max coordinate strings exactly equal
+        the meta's (#1568 §3). Range locks are disjoint per version so at most one matches; annotation_run_pk
+        is NOT used (it differs between a DB and its clone). """
+    meta_range = meta["range"]
+    candidates = AnnotationRun.objects.filter(
+        annotation_range_lock__version=variant_annotation_version,
+        pipeline_type=pipeline_type,
+        external=True,
+        vcf_annotated_filename__isnull=True,
+    )
+    for annotation_run in candidates:
+        annotation_range_lock = annotation_run.annotation_range_lock
+        if (str(annotation_range_lock.min_variant.coordinate) == meta_range["min_variant"]
+                and str(annotation_range_lock.max_variant.coordinate) == meta_range["max_variant"]):
+            return annotation_run
+    return None
+
+
+def find_annotated_vcf(meta_path: str) -> Optional[str]:
+    """ The annotated VCF sitting alongside a .meta.json sidecar (written by the Snakemake bundle) - None if
+        it has not been annotated/copied back yet (#1568). """
+    directory = os.path.dirname(meta_path)
+    stem = os.path.basename(meta_path)[:-len(".meta.json")]
+    for suffix in (ANNOTATED_VCF_SUFFIX, ".vep_annotated.vcf"):
+        candidate = os.path.join(directory, stem + suffix)
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def _import_annotated_annotation_run(annotation_run: AnnotationRun, annotated_vcf: str):
+    """ Point the run at the annotated VCF (copied into ANNOTATION_VCF_DUMP_DIR) and kick the existing
+        upload-only path, which runs the ##VEP= header check + inserts rows, setting upload_* -> FINISHED. """
+    dest = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, os.path.basename(annotated_vcf))
+    mk_path_for_file(dest)
+    if os.path.abspath(annotated_vcf) != os.path.abspath(dest):
+        shutil.copy(annotated_vcf, dest)
+    annotation_run.vcf_annotated_filename = dest
+    annotation_run.save()
+    annotation_run_retry(annotation_run, upload_only=True)
+
+
+def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
+                                    pipeline_type=VariantAnnotationPipelineType.STANDARD,
+                                    dry_run: bool = False) -> dict:
+    """ Match every annotated VCF in input_dir back to a local run and import it (#1568 §4.4). Returns a
+        report of categorised outcomes; a per-file failure marks only that run and continues. """
+    report = {"imported": [], "matched": [], "unmatched": [], "missing_annotated": [], "id_mismatch": []}
+    for meta_path in sorted(glob.glob(os.path.join(input_dir, "*.meta.json"))):
+        meta = parse_dump_metadata(meta_path)
+        if meta.get("genome_build") != genome_build.name or meta.get("pipeline_type") != pipeline_type:
+            continue
+
+        variant_annotation_version = find_matching_variant_annotation_version(meta)
+        if variant_annotation_version is None:
+            report["unmatched"].append(
+                f"{os.path.basename(meta_path)}: no local VariantAnnotationVersion matches version identity")
+            continue
+
+        annotation_run = find_matching_annotation_run(meta, variant_annotation_version, pipeline_type)
+        if annotation_run is None:
+            report["unmatched"].append(
+                f"{os.path.basename(meta_path)}: no local run awaiting annotation for range "
+                f"{meta['range']['min_variant']}..{meta['range']['max_variant']}")
+            continue
+
+        annotated_vcf = find_annotated_vcf(meta_path)
+        if annotated_vcf is None:
+            report["missing_annotated"].append(
+                f"{os.path.basename(meta_path)}: no annotated VCF alongside (not yet annotated?)")
+            continue
+
+        try:
+            verify_annotated_vcf_variant_ids(annotation_run, meta)
+        except VariantIdAlignmentError as e:
+            annotation_run.error_exception = str(e)
+            annotation_run.save()
+            report["id_mismatch"].append(str(e))
+            continue
+
+        if dry_run:
+            report["matched"].append(
+                f"{os.path.basename(annotated_vcf)} -> AnnotationRun {annotation_run.pk} "
+                f"({variant_annotation_version})")
+            continue
+
+        _import_annotated_annotation_run(annotation_run, annotated_vcf)
+        report["imported"].append(
+            f"{os.path.basename(annotated_vcf)} -> AnnotationRun {annotation_run.pk}")
+
+    return report

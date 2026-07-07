@@ -2,20 +2,31 @@ import json
 import os
 import tempfile
 
+from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
+from unittest.mock import patch
+
 from annotation.external_annotation import (
+    ANNOTATED_VCF_SUFFIX,
     DUMP_METADATA_SCHEMA_VERSION,
     VariantIdAlignmentError,
     build_dump_metadata,
+    build_snakemake_config,
+    build_vep_command_template,
     dump_external_annotation_runs,
+    find_annotated_vcf,
+    find_matching_annotation_run,
+    find_matching_variant_annotation_version,
+    import_external_annotation_runs,
     parse_dump_metadata,
     verify_annotated_vcf_variant_ids,
     write_dump_metadata,
+    write_snakemake_bundle,
 )
 from annotation.fake_annotation import (
     create_fake_variants,
@@ -285,3 +296,166 @@ class ExternalAnnotationVariantIdCheckTests(TestCase):
         with self.assertRaises(VariantIdAlignmentError) as cm:
             verify_annotated_vcf_variant_ids(annotation_run, meta)
         self.assertIn(str(annotation_run.pk), str(cm.exception))
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=2))
+class ExternalAnnotationSnakemakeTests(TestCase):
+    """ Step 6 (#1568 §4.3): the --dump command emits a self-contained Snakemake bundle. """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.annotation_version = get_fake_annotation_version(cls.genome_build)
+        cls.variant_annotation_version = cls.annotation_version.variant_annotation_version
+        create_fake_variants(cls.genome_build)
+
+    def test_command_template_uses_config_placeholders(self):
+        template = build_vep_command_template(self.variant_annotation_version)
+        joined = " ".join(template)
+        # input/output are wildcards; server paths are rewritten to config placeholders
+        self.assertIn("{input}", template)
+        self.assertIn("{output}", template)
+        self.assertIn("{annotation_base_dir}", joined)
+        self.assertIn("{vep_code_dir}", joined)
+        # fork + buffer_size are overridable from config even if the server ran fork=1
+        self.assertIn("{vep_fork}", joined)
+        self.assertIn("{vep_buffer_size}", joined)
+        # No raw server path leaks through (everything under the base dir became a placeholder)
+        self.assertNotIn(settings.ANNOTATION_BASE_DIR, joined)
+
+    def test_write_snakemake_bundle(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            snakefile_path, config_path = write_snakemake_bundle(output_dir, self.variant_annotation_version)
+            self.assertTrue(os.path.exists(snakefile_path))
+            self.assertTrue(os.path.exists(config_path))
+
+            with open(snakefile_path) as f:
+                snakefile = f.read()
+            self.assertIn('configfile: "config.yaml"', snakefile)
+            self.assertIn("rule vep:", snakefile)
+            self.assertIn("rule all:", snakefile)
+            self.assertIn(ANNOTATED_VCF_SUFFIX, snakefile)
+            # The embedded template must be valid JSON referencing input/output
+            self.assertIn("{input}", snakefile)
+            self.assertIn("{output}", snakefile)
+
+            with open(config_path) as f:
+                config_yaml = f.read()
+            for key in ("dump_dir", "output_dir", "annotation_base_dir", "vep_code_dir",
+                        "vep_fork", "vep_buffer_size"):
+                self.assertIn(key, config_yaml)
+
+    def test_dump_helper_emits_bundle(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            dump_external_annotation_runs(self.variant_annotation_version, output_dir)
+            self.assertTrue(os.path.exists(os.path.join(output_dir, "Snakefile")))
+            self.assertTrue(os.path.exists(os.path.join(output_dir, "config.yaml")))
+
+    def test_template_renders_against_config(self):
+        # Simulate what the Snakefile does at runtime: token.format(**config, input=, output=). Every
+        # placeholder must resolve, leaving no stray braces (which would crash str.format on the compute box).
+        template = build_vep_command_template(self.variant_annotation_version)
+        config = build_snakemake_config()
+        fmt = dict(config)
+        fmt["input"] = "in.vcf"
+        fmt["output"] = "out.vcf.gz"
+        rendered = [token.format(**fmt) for token in template]
+        self.assertIn("in.vcf", rendered)
+        self.assertIn("out.vcf.gz", rendered)
+        leftover = [token for token in rendered if "{" in token or "}" in token]
+        self.assertEqual(leftover, [])
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=2))
+class ExternalAnnotationImportTests(TestCase):
+    """ Step 5 (#1568 §4.4): match annotated VCFs back to local runs, §6a pre-flight, upload-only import. """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.annotation_version = get_fake_annotation_version(cls.genome_build)
+        cls.variant_annotation_version = cls.annotation_version.variant_annotation_version
+        create_fake_variants(cls.genome_build)
+
+    def _dump_with_annotated_placeholders(self, output_dir):
+        """ Dump external runs, then drop a placeholder annotated VCF next to each sidecar (as the compute
+            box + operator would after running VEP and copying results back). """
+        annotation_runs = dump_external_annotation_runs(self.variant_annotation_version, output_dir)
+        for annotation_run in annotation_runs:
+            meta_path = annotation_run.get_dump_metadata_filename(dump_dir=output_dir)
+            stem = os.path.basename(meta_path)[:-len(".meta.json")]
+            annotated = os.path.join(output_dir, stem + ANNOTATED_VCF_SUFFIX)
+            with open(annotated, "w") as f:
+                f.write("##fileformat=VCFv4.1\n")
+        return annotation_runs
+
+    def test_matching_helpers(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            annotation_runs = self._dump_with_annotated_placeholders(output_dir)
+            annotation_run = annotation_runs[0]
+            meta_path = annotation_run.get_dump_metadata_filename(dump_dir=output_dir)
+            meta = parse_dump_metadata(meta_path)
+
+            vav = find_matching_variant_annotation_version(meta)
+            self.assertEqual(vav, self.variant_annotation_version)
+
+            matched_run = find_matching_annotation_run(meta, vav)
+            self.assertEqual(matched_run, annotation_run)
+
+            self.assertIsNotNone(find_annotated_vcf(meta_path))
+
+    def test_dry_run_matches_without_importing(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            annotation_runs = self._dump_with_annotated_placeholders(output_dir)
+            report = import_external_annotation_runs(self.genome_build, output_dir, dry_run=True)
+
+            self.assertEqual(len(report["matched"]), len(annotation_runs))
+            self.assertFalse(report["imported"])
+            self.assertFalse(report["id_mismatch"])
+            # Runs untouched - still awaiting external annotation
+            for annotation_run in annotation_runs:
+                annotation_run.refresh_from_db()
+                self.assertEqual(annotation_run.status, AnnotationStatus.EXTERNAL_DUMP_COMPLETED)
+
+    def test_missing_annotated_reported(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            # Dump but write NO annotated files - operator hasn't run VEP yet
+            dump_external_annotation_runs(self.variant_annotation_version, output_dir)
+            report = import_external_annotation_runs(self.genome_build, output_dir, dry_run=True)
+            self.assertTrue(report["missing_annotated"])
+            self.assertFalse(report["matched"])
+
+    def test_id_mismatch_marks_run_and_continues(self):
+        # A genuine divergence is caught by coordinate matching first (matching + §6a both check the range
+        # endpoints), so exercise the orchestration's §6a-failure branch by forcing the check to raise: the
+        # matched run must be marked ERROR + reported, without aborting the whole import.
+        with tempfile.TemporaryDirectory() as output_dir:
+            annotation_runs = self._dump_with_annotated_placeholders(output_dir)
+            with patch("annotation.external_annotation.verify_annotated_vcf_variant_ids",
+                       side_effect=VariantIdAlignmentError("forced divergence")):
+                report = import_external_annotation_runs(self.genome_build, output_dir, dry_run=True)
+
+            self.assertEqual(len(report["id_mismatch"]), len(annotation_runs))
+            self.assertFalse(report["matched"])
+            for annotation_run in annotation_runs:
+                annotation_run.refresh_from_db()
+                self.assertEqual(annotation_run.status, AnnotationStatus.ERROR)
+
+    def test_import_copies_and_kicks_upload_only(self):
+        with tempfile.TemporaryDirectory() as output_dir, tempfile.TemporaryDirectory() as dump_dir:
+            annotation_runs = self._dump_with_annotated_placeholders(output_dir)
+            with override_settings(ANNOTATION_VCF_DUMP_DIR=dump_dir):
+                with patch("annotation.external_annotation.annotation_run_retry") as mock_retry:
+                    report = import_external_annotation_runs(self.genome_build, output_dir)
+
+            self.assertEqual(len(report["imported"]), len(annotation_runs))
+            self.assertEqual(mock_retry.call_count, len(annotation_runs))
+            for _, kwargs in mock_retry.call_args_list:
+                self.assertTrue(kwargs["upload_only"])
+
+            for annotation_run in annotation_runs:
+                annotation_run.refresh_from_db()
+                self.assertIsNotNone(annotation_run.vcf_annotated_filename)
+                # Copied into ANNOTATION_VCF_DUMP_DIR
+                self.assertEqual(os.path.dirname(annotation_run.vcf_annotated_filename), dump_dir)
+                self.assertTrue(os.path.exists(annotation_run.vcf_annotated_filename))

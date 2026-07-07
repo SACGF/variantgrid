@@ -9,9 +9,12 @@ touch a NEW version's range locks.
 
 See claude/plans/1568_external_annotation_runs_plan.md.
 """
+import os
+
 from django.core.management.base import BaseCommand, CommandError
 
-from annotation.external_annotation import dump_external_annotation_runs, dump_existing_annotation_runs
+from annotation.external_annotation import dump_external_annotation_runs, dump_existing_annotation_runs, \
+    import_external_annotation_runs
 from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from snpdb.models.models_genome import GenomeBuild
@@ -96,4 +99,30 @@ class Command(BaseCommand):
             f"{variant_annotation_version} into {output_dir} (left {leave} on the in-VM pipeline)")
 
     def _run_import(self, genome_build, options):
-        raise CommandError("--import is implemented in a later build step (#1568)")
+        input_dir = options.get("input_dir")
+        if not input_dir:
+            raise CommandError("--import requires --input-dir")
+        if not os.path.isdir(input_dir):
+            raise CommandError(f"--input-dir {input_dir!r} is not a directory")
+
+        pipeline_type = options["pipeline_type"]
+        dry_run = options["dry_run"]
+        report = import_external_annotation_runs(genome_build, input_dir,
+                                                 pipeline_type=pipeline_type, dry_run=dry_run)
+
+        for line in report["matched"]:
+            self.stdout.write(f"[dry-run match] {line}")
+        for line in report["imported"]:
+            self.stdout.write(f"[import] {line}")
+        for line in report["missing_annotated"]:
+            self.stdout.write(self.style.WARNING(f"[skip] {line}"))
+        for line in report["unmatched"]:
+            self.stdout.write(self.style.WARNING(f"[skip] {line}"))
+        for line in report["id_mismatch"]:
+            self.stdout.write(self.style.ERROR(f"[error] {line}"))
+
+        verb = "would import" if dry_run else "imported"
+        self.stdout.write(
+            f"External annotation import: {verb} {len(report['matched']) + len(report['imported'])}, "
+            f"skipped {len(report['unmatched']) + len(report['missing_annotated'])}, "
+            f"id-mismatch {len(report['id_mismatch'])}")
