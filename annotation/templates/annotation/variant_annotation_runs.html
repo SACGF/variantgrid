@@ -29,7 +29,7 @@
             let summary_and_colors = [
                 ["Queued", 'rgb(50, 50, 50)'],
                 ["Running", 'rgb(50,171, 96)'],
-                ["Awaiting external annotation", 'rgb(70, 130, 180)'],
+                ["External", 'rgb(70, 130, 180)'],
                 ["Error", 'rgb(170, 50, 50)'],
                 ["Finished", 'rgb(35, 110, 80)'],
             ];
@@ -158,6 +158,8 @@
                                                 {% labelled label=field %}{{ count }}{% endlabelled %}
                                             {% endfor %}
                                         {% endfor %}
+
+                                        <hr class="my-3"/>
 
                                         {% if vav.status == 'NEW' %}
                                             {% with panel=genome_build_status_panel|get_item:build_name %}
