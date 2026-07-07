@@ -10,8 +10,8 @@ from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation
 from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
-from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter, \
-    get_clean_and_pick_single_value_func, EMPTY_VALUES
+from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
+from annotation.vep_field_formatters import get_clean_and_pick_single_value_func, EMPTY_VALUES
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import vep_parse_version_line, get_vep_version_from_vcf, \
     vep_dict_to_variant_annotation_version_kwargs, VEPVersionMismatchError, VEPConfig

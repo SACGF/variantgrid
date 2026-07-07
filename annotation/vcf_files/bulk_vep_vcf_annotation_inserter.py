@@ -10,10 +10,6 @@ import intervaltree
 from django.conf import settings
 
 from annotation import vep_columns as vep_columns_registry
-from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
-    MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
-    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction, \
-    MetaRNNPrediction, PrimateAIPrediction
 from annotation.models.models import VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
 from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
@@ -21,20 +17,18 @@ from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
+from annotation.vep_field_formatters import VEP_SEPARATOR, EMPTY_VALUES
 from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
 from library.genomics import overlap_fraction, Range, parse_gnomad_coord
-from library.genomics.vcf_enums import VariantClass
 from library.log_utils import log_traceback
-from library.utils import invert_dict, split_dict_multi_values
-from snpdb.models import GenomeBuild, VariantCoordinate
+from library.utils import split_dict_multi_values
+from snpdb.models import VariantCoordinate
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
-VEP_SEPARATOR = '&'
-EMPTY_VALUES = {'', '.'}
 DELIMITER = '\t'
 EXTENSIONS = {",": "csv",
               "\t": "tsv"}
@@ -205,111 +199,18 @@ class BulkVEPVCFAnnotationInserter:
         return columns
 
     def _add_vep_field_handlers(self, cvf_list):
-        # TOPMED and 1k genomes can return multiple values - take highest
-        empty_mave_float_values = EMPTY_VALUES | {"NA"}
-        format_pick_lowest_float = get_clean_and_pick_single_value_func(min, float,
-                                                                        empty_values=empty_mave_float_values)
-        format_pick_highest_float = get_clean_and_pick_single_value_func(max, float)
-        # OpenTargets emits "NA" for missing and &-joins multiple GWAS entries (e.g. "NA&NA") - treat
-        # "NA"/empty as null and take the highest (most confident) locus-to-gene score.
-        format_pick_highest_float_na = get_clean_and_pick_single_value_func(max, float,
-                                                                            empty_values=empty_mave_float_values)
-        format_pick_highest_int = get_clean_and_pick_single_value_func(max, int)
-        format_sum_int = get_clean_and_pick_single_value_func(sum, int)
-        remove_empty_multiples = get_clean_and_pick_single_value_func(join_uniq)
-        # COSMIC v90 (5/9/2019) switched to COSV (build independent identifiers)
-        extract_cosmic = get_extract_existing_variation("COSV")
-        extract_dbsnp = get_extract_existing_variation("rs")
-        format_empty_as_none = get_format_empty_as_none(empty_values=EMPTY_VALUES)
-
-        # Some annotations return multiple results e.g. 2 frequencies e.g. "0.6764&0.2433"
-        # Need to work out what to do (eg pick max)
+        # Per-column value cleaners now live on the VEPColumnDefs (annotation.vep_columns),
+        # so build the destination-column -> formatter map straight from the active defs.
+        # cvf_list is already filtered through vep_config (build / columns_version / vep_version /
+        # gnomad minor), so the correct formatter for this version falls out automatically -
+        # including gnomad_filtered (FILTER-sourced defs only) and the columns_version >= 4
+        # dbNSFP score / pred fields.
         self.field_formatters = {
-            "af_1kg": format_pick_highest_float,
-            "af_uk10k": format_pick_highest_float,
-            # ALoFT comes as multiple values, so "." won't have already been ignored, so need to handle
-            "aloft_prob_tolerant": format_empty_as_none,
-            "aloft_prob_recessive": format_empty_as_none,
-            "aloft_prob_dominant": format_empty_as_none,
-            "aloft_pred": get_choice_formatter_func(ALoFTPrediction.choices, empty_values=["."]),
-            "aloft_high_confidence": format_aloft_high_confidence,
-            "aloft_ensembl_transcript": format_empty_as_none,
-            "alphamissense_class": get_format_alphamissense_class_func(),
-            "canonical": format_canonical,
-            "cosmic_count": format_pick_highest_int,
-            "cosmic_id": extract_cosmic,
-            "cosmic_legacy_id": remove_empty_multiples,
-            "dbsnp_rs_id": extract_dbsnp,
-            "denovo_db_case_count": format_sum_int,
-            "denovo_db_control_count": format_sum_int,
-            "fathmm_pred_most_damaging": get_most_damaging_func(FATHMMPrediction),
-            "gnomad2_liftover_af": format_pick_highest_float,
-            "gnomad_popmax": str.upper,  # nfe -> NFE
-            "gnomad_non_par": format_empty_as_none,
-            "hgnc_id": format_hgnc_id,
-            "impact": get_choice_formatter_func(PathogenicityImpact.CHOICES),
-            "interpro_domain": remove_empty_multiples,
-            "mastermind_count_1_cdna": get_clean_and_pick_single_value_func(operator.itemgetter(0), int),
-            "mastermind_count_2_cdna_prot": get_clean_and_pick_single_value_func(operator.itemgetter(1), int),
-            "mastermind_count_3_aa_change": get_clean_and_pick_single_value_func(operator.itemgetter(2), int),
-            "mutation_assessor_pred_most_damaging": get_most_damaging_func(MutationAssessorPrediction),
-            "mutation_taster_pred_most_damaging": get_most_damaging_func(MutationTasterPrediction),
-            "mavedb_score": format_pick_lowest_float,
-            "nmd_escaping_variant": format_nmd_escaping_variant,
-            "open_targets_gwas_l2g_score": format_pick_highest_float_na,
-            # conservation fields are from BigWig, which can return multiple entries
-            # for deletions. Higher = more conserved, so for rare disease filtering taking max makes sense
-            "phastcons_100_way_vertebrate": format_pick_highest_float,
-            "phastcons_30_way_mammalian": format_pick_highest_float,
-            "phastcons_46_way_mammalian": format_pick_highest_float,
-            "phylop_100_way_vertebrate": format_pick_highest_float,
-            "phylop_30_way_mammalian": format_pick_highest_float,
-            "phylop_46_way_mammalian": format_pick_highest_float,
-            "polyphen2_hvar_pred_most_damaging": get_most_damaging_func(Polyphen2Prediction),
-            "sift": format_vep_sift_to_choice,
-            "somatic": format_vep_somatic,
-            "topmed_af": format_pick_highest_float,
-            "variant_class": get_choice_formatter_func(VariantClass.choices),
+            vgc: cvf.formatter
+            for cvf in cvf_list
+            for vgc in cvf.variant_grid_columns
+            if cvf.formatter is not None
         }
-
-        # gnomad3 wasn't combined using gnomad_data.py so just uses FILTER
-        # while combined exome/genomes use "gnomad_filtered=1" (which should auto-convert bool).
-        # gnomAD 4.1 is joint-called by gnomAD with the filter signal in the VCF FILTER column.
-        needs_filter_text_parse = (
-            self.genome_build == GenomeBuild.grch38() and self.vep_config.columns_version <= 2
-        ) or self.vep_config.gnomad4_minor_version == "4.1"
-        if needs_filter_text_parse:
-            self.field_formatters["gnomad_filtered"] = gnomad_filtered_func
-
-        # columns_version >= 4 adds dbNSFP score / pred fields beyond the existing rankscores.
-        # Some are per-transcript (parallel to Ensembl_transcriptid: AlphaMissense_*, REVEL_score,
-        # VEST4_score, VARITY_*, MetaRNN_*, MutPred2_*, MPC_score) — those are picked upstream by
-        # _pick_dbnsfp_per_transcript_values; the formatters here handle either the single picked
-        # value, OR the residual &-array if the resolver couldn't find a match.
-        # Others (BayesDel_noAF_score, CADD_phred, CADD_raw, ClinPred_score, PrimateAI_*) are
-        # variant-level so usually single values, but dbNSFP can still emit &-joined values when
-        # a variant matches multiple dbNSFP rows — formatters here keep parsing safe (no-op on
-        # single values). AlphaMissense_pred additionally needs B/LB/A/LP/P -> code mapping.
-        if self.vep_config.columns_version >= 4:
-            self.field_formatters.update({
-                "alphamissense_pred": format_alphamissense_pred,
-                "alphamissense_score": format_pick_highest_float,
-                "bayesdel_noaf_score": format_pick_highest_float,
-                "cadd_phred": format_pick_highest_float,
-                "cadd_raw": format_pick_highest_float,
-                "clinpred_score": format_pick_highest_float,
-                "metarnn_pred": get_most_damaging_func(MetaRNNPrediction),
-                "metarnn_score": format_pick_highest_float,
-                "mpc_score": format_pick_highest_float,
-                "mutpred2_score": format_pick_highest_float,
-                "mutpred2_top5_mechanisms": remove_empty_multiples,
-                "primateai_pred": get_most_damaging_func(PrimateAIPrediction),
-                "primateai_score": format_pick_highest_float,
-                "revel_score": format_pick_highest_float,
-                "varity_er_score": format_pick_highest_float,
-                "varity_r_score": format_pick_highest_float,
-                "vest4_score": format_pick_highest_float,
-            })
 
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
@@ -869,151 +770,6 @@ class BulkVEPVCFAnnotationInserter:
 def empty_to_none(it):
     return [v if v not in EMPTY_VALUES else None
             for v in it]
-
-
-# Field formatters
-def gnomad_filtered_func(raw_value):
-    """ We use FILTER in Gnomad3 (GRCh38 only) - need to convert back to bool
-        In the combined exomes/genomes (gnomad2, gnomad4) we use gnomad_filtered=1
-        So don't need to format this etc
-    """
-    return raw_value not in (None, "PASS")
-
-
-def format_hgnc_id(raw_value):
-    """ VEP GRCh37 returns 55 while GRCh38 returns "HGNC:55" """
-    return int(raw_value.replace("HGNC:", ""))
-
-
-def format_vep_sift_to_choice(vep_sift):
-    """ we ignore the low_confidence calls to make it simpler """
-    if vep_sift.startswith("deleterious"):
-        return SIFTPrediction.DAMAGING
-    elif vep_sift.startswith("tolerated"):
-        return SIFTPrediction.TOLERATED
-    raise ValueError(f"Unknown SIFT value: '{vep_sift}'")
-
-def get_format_alphamissense_class_func():
-    """ GRCh37 has 'benign' while GRCh38 has 'likely_benign'
-        @see https://github.com/Ensembl/VEP_plugins/issues/668
-    """
-    cff = get_choice_formatter_func(AlphaMissensePrediction.choices)
-    def _format_alphamissense_class(alphamissense_class):
-        if alphamissense_class == "benign":
-            alphamissense_class = "likely_benign"
-        return cff(alphamissense_class)
-    return _format_alphamissense_class
-
-def get_extract_existing_variation(prefix):
-    def format_vep_existing_variation(vep_existing_variation):
-        ev_list = vep_existing_variation.split(VEP_SEPARATOR)
-        cosmic_ids = [ev for ev in ev_list if ev.startswith(prefix)]
-        return VEP_SEPARATOR.join(sorted(set(cosmic_ids)))
-
-    return format_vep_existing_variation
-
-
-def format_vep_somatic(raw_value):
-    return "1" in raw_value
-
-
-def get_choice_formatter_func(choices, empty_values=None):
-    lookup = invert_dict(dict(choices))
-
-    def format_choice(raw_value):
-        if empty_values is not None:
-            if raw_value in empty_values:
-                return None
-        return lookup[raw_value]
-
-    return format_choice
-
-
-def get_clean_and_pick_single_value_func(pick_single_value_func, cast_func=None, empty_values=None):
-    """ Returns a function to clean and pick single value.
-        casting is performed before calling pick_single_value_func so you can call min/max """
-
-    if empty_values is None:
-        empty_values = EMPTY_VALUES
-
-    def _clean_and_pick_single_value_func(raw_value):
-        it = (tm for tm in raw_value.split(VEP_SEPARATOR) if tm != '')
-        # Handle '.'
-        if cast_func:
-            values = [cast_func(v) for v in it if v not in empty_values]
-        else:
-            values = [v for v in it if v not in empty_values]
-        value = None
-        if values:
-            value = pick_single_value_func(values)
-        return value
-
-    return _clean_and_pick_single_value_func
-
-
-def join_uniq(multiple_values):
-    return VEP_SEPARATOR.join(set(multiple_values))
-
-
-# Field Processors
-def get_most_damaging_func(klass):
-    def get_most_damaging(multiple_values):
-        prediction_list = multiple_values.split(VEP_SEPARATOR)
-        return klass.get_most_damaging(prediction_list)
-
-    return get_most_damaging
-
-
-def get_format_empty_as_none(empty_values: set):
-    def format_empty_as_none(val):
-        if val in empty_values:
-            val = None
-        return val
-    return format_empty_as_none
-
-
-def format_nmd_escaping_variant(value) -> bool:
-    return value == "NMD_escaping_variant"
-
-
-def format_aloft_high_confidence(value) -> bool:
-    high_confidence = None
-    if value == "High":
-        high_confidence = True
-    elif value == "Low":
-        high_confidence = False
-    return high_confidence
-
-
-def format_canonical(value) -> bool:
-    return value == "YES"
-
-
-# dbNSFP 5.3.1a (columns_version >= 4) emits AlphaMissense_pred as 'B'/'LB'/'A'/'LP'/'P',
-# optionally as &-separated arrays parallel to Ensembl_transcriptid. Map to the
-# AlphaMissensePrediction code and pick the most-pathogenic value across the array.
-_ALPHAMISSENSE_PRED_MAP = {
-    "B": AlphaMissensePrediction.BENIGN,
-    "LB": AlphaMissensePrediction.LIKELY_BENIGN,
-    "A": AlphaMissensePrediction.AMBIGUOUS,
-    "LP": AlphaMissensePrediction.LIKELY_PATHOGENIC,
-    "P": AlphaMissensePrediction.PATHOGENIC,
-}
-_ALPHAMISSENSE_PRED_ORDER = [
-    AlphaMissensePrediction.PATHOGENIC,
-    AlphaMissensePrediction.LIKELY_PATHOGENIC,
-    AlphaMissensePrediction.AMBIGUOUS,
-    AlphaMissensePrediction.LIKELY_BENIGN,
-    AlphaMissensePrediction.BENIGN,
-]
-
-
-def format_alphamissense_pred(raw_value):
-    seen = {_ALPHAMISSENSE_PRED_MAP[v] for v in raw_value.split(VEP_SEPARATOR) if v in _ALPHAMISSENSE_PRED_MAP}
-    for code in _ALPHAMISSENSE_PRED_ORDER:
-        if code in seen:
-            return code
-    return None
 
 
 class SVOverlapProcessor:

@@ -1,6 +1,17 @@
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
+from annotation import vep_field_formatters as fmt
+from annotation.models.damage_enums import (
+    ALoFTPrediction,
+    FATHMMPrediction,
+    MetaRNNPrediction,
+    MutationAssessorPrediction,
+    MutationTasterPrediction,
+    PathogenicityImpact,
+    Polyphen2Prediction,
+    PrimateAIPrediction,
+)
 from annotation.models.models_enums import (
     ColumnAnnotationCategory,
     VariantAnnotationPipelineType,
@@ -8,6 +19,7 @@ from annotation.models.models_enums import (
     VEPPlugin,
 )
 from annotation.vep_config import VEPConfig
+from library.genomics.vcf_enums import VariantClass
 
 
 @dataclass(frozen=True)
@@ -30,6 +42,7 @@ class VEPColumnDef:
     gnomad4_minor_version: Optional[str] = None
     summary_stats: Optional[str] = None
     source_field_processing_description: Optional[str] = None
+    formatter: Optional[Callable] = None   # value -> value cleaning for this column
 
     @property
     def vep_info_field(self) -> Optional[str]:
@@ -95,6 +108,22 @@ _ALOFT_DESC = 'Most damaging transcript prediction chosen, and Ensembl transcrip
 _GNOMAD2_AF_DESC = '(exome_AC+genome_AC)/(exome_AN+genome_AN)'
 _INDEL_MAX_DESC = 'max() for indels'
 
+# Choice / most-damaging formatters that need a damage enum as argument. The simpler
+# shared factory instances (format_pick_highest_float etc.) live in vep_field_formatters.
+_format_impact = fmt.get_choice_formatter_func(PathogenicityImpact.CHOICES)
+_format_variant_class = fmt.get_choice_formatter_func(VariantClass.choices)
+_format_aloft_pred = fmt.get_choice_formatter_func(ALoFTPrediction.choices, empty_values=["."])
+
+# Per-vgc ALoFT formatters, shared by the v2-3 (_aloft) and v4 (_aloft_v4) families.
+_ALOFT_FORMATTERS: dict[str, Callable] = {
+    'aloft_prob_tolerant': fmt.format_empty_as_none,
+    'aloft_prob_recessive': fmt.format_empty_as_none,
+    'aloft_prob_dominant': fmt.format_empty_as_none,
+    'aloft_pred': _format_aloft_pred,
+    'aloft_high_confidence': fmt.format_aloft_high_confidence,
+    'aloft_ensembl_transcript': fmt.format_empty_as_none,
+}
+
 
 def _to_vgc_tuple(vgc: Union[str, tuple[str, ...]]) -> tuple[str, ...]:
     return (vgc,) if isinstance(vgc, str) else tuple(vgc)
@@ -129,12 +158,14 @@ def _dbnsfp_v1_most_damaging(source_field: str, vgc, **overrides) -> VEPColumnDe
 
 
 def _aloft(source_field: str, vgc, **overrides) -> VEPColumnDef:
+    overrides.setdefault("formatter", _ALOFT_FORMATTERS[vgc])
     return _dbnsfp_v2(source_field, vgc, source_field_processing_description=_ALOFT_DESC, **overrides)
 
 
 def _dbnsfp_v4(source_field: str, vgc, **overrides) -> VEPColumnDef:
     """ DBNSFP plugin, GRCh37/38/T2T, columns_version >= 4 (dbNSFP 5.3.1a),
-        pathogenicity bucket. """
+        pathogenicity bucket. Defaults to the numeric-collapse formatter shared by the
+        *_score family; pred / rankscore rows override with formatter= (None for rankscores). """
     return VEPColumnDef(**{
         "source_field": source_field,
         "variant_grid_columns": _to_vgc_tuple(vgc),
@@ -143,12 +174,14 @@ def _dbnsfp_v4(source_field: str, vgc, **overrides) -> VEPColumnDef:
         "genome_builds": GRCH37_38_T2T,
         "pipeline_types": STANDARD,
         "min_columns_version": 4,
+        "formatter": fmt.format_pick_highest_float,
         **overrides,
     })
 
 
 def _aloft_v4(source_field: str, vgc) -> VEPColumnDef:
-    return _dbnsfp_v4(source_field, vgc, source_field_processing_description=_ALOFT_DESC)
+    return _dbnsfp_v4(source_field, vgc, source_field_processing_description=_ALOFT_DESC,
+                      formatter=_ALOFT_FORMATTERS[vgc])
 
 
 def _gnomad4(source_field: str, vgc, **overrides) -> VEPColumnDef:
@@ -229,10 +262,14 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     _dbnsfp_v2('VEST4_rankscore',         'vest4_rankscore',         max_columns_version=3),
 
     # ---------- DBNSFP "Most damaging" (columns_version == 1) --------------
-    _dbnsfp_v1_most_damaging('FATHMM_pred',           'fathmm_pred_most_damaging'),
-    _dbnsfp_v1_most_damaging('MutationAssessor_pred', 'mutation_assessor_pred_most_damaging'),
-    _dbnsfp_v1_most_damaging('MutationTaster_pred',   'mutation_taster_pred_most_damaging'),
-    _dbnsfp_v1_most_damaging('Polyphen2_HVAR_pred',   'polyphen2_hvar_pred_most_damaging'),
+    _dbnsfp_v1_most_damaging('FATHMM_pred',           'fathmm_pred_most_damaging',
+                             formatter=fmt.get_most_damaging_func(FATHMMPrediction)),
+    _dbnsfp_v1_most_damaging('MutationAssessor_pred', 'mutation_assessor_pred_most_damaging',
+                             formatter=fmt.get_most_damaging_func(MutationAssessorPrediction)),
+    _dbnsfp_v1_most_damaging('MutationTaster_pred',   'mutation_taster_pred_most_damaging',
+                             formatter=fmt.get_most_damaging_func(MutationTasterPrediction)),
+    _dbnsfp_v1_most_damaging('Polyphen2_HVAR_pred',   'polyphen2_hvar_pred_most_damaging',
+                             formatter=fmt.get_most_damaging_func(Polyphen2Prediction)),
 
     # ---------- DBNSFP misc (no helper fits) -------------------------------
     VEPColumnDef(
@@ -268,6 +305,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
         max_columns_version=3,
+        formatter=fmt.remove_empty_multiples,
     ),
 
     # ---------- DBNSFP v4 (dbNSFP 5.3.1a, GRCh37/38/T2T, columns_version >= 4) ----------
@@ -279,29 +317,32 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     _aloft_v4('Aloft_prob_Recessive', 'aloft_prob_recessive'),
     _aloft_v4('Aloft_prob_Tolerant',  'aloft_prob_tolerant'),
 
-    # Rankscores carried forward
-    _dbnsfp_v4('AlphaMissense_rankscore', 'alphamissense_rankscore'),
-    _dbnsfp_v4('BayesDel_noAF_rankscore', 'bayesdel_noaf_rankscore'),
-    _dbnsfp_v4('CADD_raw_rankscore',      'cadd_raw_rankscore'),
-    _dbnsfp_v4('ClinPred_rankscore',      'clinpred_rankscore'),
-    _dbnsfp_v4('MetaLR_rankscore',        'metalr_rankscore'),
-    _dbnsfp_v4('REVEL_rankscore',         'revel_rankscore'),
-    _dbnsfp_v4('VEST4_rankscore',         'vest4_rankscore'),
+    # Rankscores carried forward - no formatter (rankscores are stored raw)
+    _dbnsfp_v4('AlphaMissense_rankscore', 'alphamissense_rankscore', formatter=None),
+    _dbnsfp_v4('BayesDel_noAF_rankscore', 'bayesdel_noaf_rankscore', formatter=None),
+    _dbnsfp_v4('CADD_raw_rankscore',      'cadd_raw_rankscore',      formatter=None),
+    _dbnsfp_v4('ClinPred_rankscore',      'clinpred_rankscore',      formatter=None),
+    _dbnsfp_v4('MetaLR_rankscore',        'metalr_rankscore',        formatter=None),
+    _dbnsfp_v4('REVEL_rankscore',         'revel_rankscore',         formatter=None),
+    _dbnsfp_v4('VEST4_rankscore',         'vest4_rankscore',         formatter=None),
 
-    # Raw scores + predictions newly extracted at v4
-    _dbnsfp_v4('AlphaMissense_pred',         'alphamissense_pred'),
+    # Raw scores + predictions newly extracted at v4 (scores inherit format_pick_highest_float;
+    # pred rows override with their choice / most-damaging formatter).
+    _dbnsfp_v4('AlphaMissense_pred',         'alphamissense_pred', formatter=fmt.format_alphamissense_pred),
     _dbnsfp_v4('AlphaMissense_score',        'alphamissense_score'),
     _dbnsfp_v4('BayesDel_noAF_score',        'bayesdel_noaf_score'),
     _dbnsfp_v4('CADD_phred',                 'cadd_phred'),
     _dbnsfp_v4('CADD_raw',                   'cadd_raw'),
-    _dbnsfp_v4('ClinPred_pred',              'clinpred_pred'),
+    _dbnsfp_v4('ClinPred_pred',              'clinpred_pred', formatter=None),
     _dbnsfp_v4('ClinPred_score',             'clinpred_score'),
     _dbnsfp_v4('MPC_score',                  'mpc_score'),
-    _dbnsfp_v4('MetaRNN_pred',               'metarnn_pred'),
+    _dbnsfp_v4('MetaRNN_pred',               'metarnn_pred',
+               formatter=fmt.get_most_damaging_func(MetaRNNPrediction)),
     _dbnsfp_v4('MetaRNN_score',              'metarnn_score'),
     _dbnsfp_v4('MutPred2_score',             'mutpred2_score'),
-    _dbnsfp_v4('MutPred2_top5_mechanisms',   'mutpred2_top5_mechanisms'),
-    _dbnsfp_v4('PrimateAI_pred',             'primateai_pred'),
+    _dbnsfp_v4('MutPred2_top5_mechanisms',   'mutpred2_top5_mechanisms', formatter=fmt.remove_empty_multiples),
+    _dbnsfp_v4('PrimateAI_pred',             'primateai_pred',
+               formatter=fmt.get_most_damaging_func(PrimateAIPrediction)),
     _dbnsfp_v4('PrimateAI_score',            'primateai_score'),
     _dbnsfp_v4('REVEL_score',                'revel_score'),
     _dbnsfp_v4('VARITY_ER_score',            'varity_er_score'),
@@ -326,6 +367,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=GRCH37_38_T2T,
         pipeline_types=STANDARD,
         min_columns_version=4,
+        formatter=fmt.remove_empty_multiples,
     ),
 
     # ---------- gnomAD v4 (GRCh38 + T2T, columns_version >= 3) -------------
@@ -340,16 +382,19 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     _gnomad4('faf99',               'gnomad_faf99',           genome_builds=GRCH38),
     _gnomad4('fafmax_faf95_max',    'gnomad_fafmax_faf95_max'),
     _gnomad4('fafmax_faf99_max',    'gnomad_fafmax_faf99_max'),
+    # gnomad_filtered=1 auto-converts to bool; the FILTER-sourced def needs text parsing.
     _gnomad4('gnomad_filtered',     'gnomad_filtered',        gnomad4_minor_version='4.0'),
-    _gnomad4('FILTER',              'gnomad_filtered',        gnomad4_minor_version='4.1'),
+    _gnomad4('FILTER',              'gnomad_filtered',        gnomad4_minor_version='4.1',
+             formatter=fmt.gnomad_filtered_func),
     _gnomad4('AF_fin',              'gnomad_fin_af'),
     _gnomad4('nhomalt',             'gnomad_hom_alt'),
     _gnomad4('AF_mid',              'gnomad_mid_af'),
     _gnomad4('AF_nfe',              'gnomad_nfe_af'),
     _gnomad4('non_par',             'gnomad_non_par',
-             source_field_processing_description='nonpar from genomes'),
+             source_field_processing_description='nonpar from genomes',
+             formatter=fmt.format_empty_as_none),
     _gnomad4('AF_remaining',        'gnomad_oth_af'),
-    _gnomad4('grpmax',              'gnomad_popmax'),
+    _gnomad4('grpmax',              'gnomad_popmax',          formatter=str.upper),
     _gnomad4('AC_grpmax',           'gnomad_popmax_ac'),
     _gnomad4('AF_grpmax',           'gnomad_popmax_af'),
     _gnomad4('AN_grpmax',           'gnomad_popmax_an'),
@@ -366,12 +411,12 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     _gnomad3('AF-amr',              'gnomad_amr_af'),
     _gnomad3('AF-asj',              'gnomad_asj_af'),
     _gnomad3('AF-eas',              'gnomad_eas_af'),
-    _gnomad3('FILTER',              'gnomad_filtered'),
+    _gnomad3('FILTER',              'gnomad_filtered',        formatter=fmt.gnomad_filtered_func),
     _gnomad3('AF-fin',              'gnomad_fin_af'),
     _gnomad3('nhomalt',             'gnomad_hom_alt'),
     _gnomad3('AF-nfe',              'gnomad_nfe_af'),
     _gnomad3('AF-oth',              'gnomad_oth_af'),
-    _gnomad3('popmax',              'gnomad_popmax'),
+    _gnomad3('popmax',              'gnomad_popmax',          formatter=str.upper),
     _gnomad3('AC_popmax',           'gnomad_popmax_ac'),
     _gnomad3('AF_popmax',           'gnomad_popmax_af'),
     _gnomad3('AN_popmax',           'gnomad_popmax_an'),
@@ -391,9 +436,10 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     _gnomad2_grch37('AF_fin',       'gnomad_fin_af', desc=_GNOMAD2_AF_DESC),
     _gnomad2_grch37('nhomalt',      'gnomad_hom_alt', desc='exome_nhomalt + genome_nhomalt'),
     _gnomad2_grch37('AF_nfe',       'gnomad_nfe_af', desc=_GNOMAD2_AF_DESC),
-    _gnomad2_grch37('nonpar',       'gnomad_non_par', desc='nonpar from genomes'),
+    _gnomad2_grch37('nonpar',       'gnomad_non_par', desc='nonpar from genomes',
+                    formatter=fmt.format_empty_as_none),
     _gnomad2_grch37('AF_oth',       'gnomad_oth_af'),
-    _gnomad2_grch37('popmax',       'gnomad_popmax'),
+    _gnomad2_grch37('popmax',       'gnomad_popmax', formatter=str.upper),
     _gnomad2_grch37('AC_popmax',    'gnomad_popmax_ac',
                     desc='Sum of exome AC_popmax + genome AC_popmax'),
     _gnomad2_grch37('AF_popmax',    'gnomad_popmax_af',
@@ -414,6 +460,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field_has_custom_prefix=True,
         genome_builds=GRCH38,
         pipeline_types=STANDARD,
+        formatter=fmt.format_pick_highest_float,
     ),
 
     # ---------- gnomAD SV (structural-variant pipeline) --------------------
@@ -553,6 +600,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
         source_field_processing_description='MMCNT1',
+        formatter=fmt.format_mastermind_count_1,
     ),
     VEPColumnDef(
         source_field='Mastermind_counts',
@@ -562,6 +610,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
         source_field_processing_description='MMCNT2',
+        formatter=fmt.format_mastermind_count_2,
     ),
     VEPColumnDef(
         source_field='Mastermind_counts',
@@ -571,6 +620,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
         source_field_processing_description='MMCNT3',
+        formatter=fmt.format_mastermind_count_3,
     ),
     VEPColumnDef(
         source_field='Mastermind_MMID3',
@@ -590,6 +640,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
         max_vep_version=111,
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='max',
@@ -600,6 +651,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='phastCons30way_mammalian',
@@ -610,6 +662,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
         max_vep_version=111,
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='max',
@@ -621,6 +674,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='phastCons46way_mammalian',
@@ -631,6 +685,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
         max_vep_version=111,
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='max',
@@ -642,6 +697,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='phyloP100way_vertebrate',
@@ -651,6 +707,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
         max_vep_version=111,
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='max',
@@ -661,6 +718,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='phyloP30way_mammalian',
@@ -671,6 +729,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
         max_vep_version=111,
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='max',
@@ -682,6 +741,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='phyloP46way_mammalian',
@@ -692,6 +752,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
         max_vep_version=111,
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='max',
@@ -703,12 +764,13 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
+        formatter=fmt.format_pick_highest_float,
     ),
 
     # ---------- Plain VEP CSQ (no plugin / no custom) ----------------------
-    VEPColumnDef(source_field='AF',              variant_grid_columns=('af_1kg',),        category=ColumnAnnotationCategory.FREQUENCY_DATA),
+    VEPColumnDef(source_field='AF',              variant_grid_columns=('af_1kg',),        category=ColumnAnnotationCategory.FREQUENCY_DATA, formatter=fmt.format_pick_highest_float),
     VEPColumnDef(source_field='Amino_acids',     variant_grid_columns=('amino_acids',),   category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
-    VEPColumnDef(source_field='CANONICAL',       variant_grid_columns=('canonical',),     category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
+    VEPColumnDef(source_field='CANONICAL',       variant_grid_columns=('canonical',),     category=ColumnAnnotationCategory.GENE_ANNOTATIONS, formatter=fmt.format_canonical),
     VEPColumnDef(source_field='Codons',          variant_grid_columns=('codons',),        category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
     VEPColumnDef(source_field='Consequence',     variant_grid_columns=('consequence',),   category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
     VEPColumnDef(
@@ -716,22 +778,24 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         variant_grid_columns=('cosmic_id',),
         category=ColumnAnnotationCategory.EXTERNAL_ID,
         source_field_processing_description='Extract COSMIC IDs',
+        formatter=fmt.extract_cosmic,
     ),
     VEPColumnDef(
         source_field='Existing_variation',
         variant_grid_columns=('dbsnp_rs_id',),
         category=ColumnAnnotationCategory.EXTERNAL_ID,
         source_field_processing_description='Extract rsIDs',
+        formatter=fmt.extract_dbsnp,
     ),
     VEPColumnDef(source_field='DISTANCE',        variant_grid_columns=('distance',),      category=ColumnAnnotationCategory.NEARBY_FEATURES),
     VEPColumnDef(source_field='DOMAINS',         variant_grid_columns=('domains',),       category=ColumnAnnotationCategory.PROTEIN_DOMAINS),
     VEPColumnDef(source_field='ENSP',            variant_grid_columns=('ensembl_protein',), category=ColumnAnnotationCategory.EXTERNAL_ID),
     VEPColumnDef(source_field='EXON',            variant_grid_columns=('exon',),          category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
     VEPColumnDef(source_field='FLAGS',           variant_grid_columns=('flags',),         category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
-    VEPColumnDef(source_field='HGNC_ID',         variant_grid_columns=('hgnc_id',),       category=ColumnAnnotationCategory.EXTERNAL_ID),
+    VEPColumnDef(source_field='HGNC_ID',         variant_grid_columns=('hgnc_id',),       category=ColumnAnnotationCategory.EXTERNAL_ID, formatter=fmt.format_hgnc_id),
     VEPColumnDef(source_field='HGVSc',           variant_grid_columns=('hgvs_c',),        category=ColumnAnnotationCategory.HGVS),
     VEPColumnDef(source_field='HGVSp',           variant_grid_columns=('hgvs_p',),        category=ColumnAnnotationCategory.HGVS),
-    VEPColumnDef(source_field='IMPACT',          variant_grid_columns=('impact',),        category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS),
+    VEPColumnDef(source_field='IMPACT',          variant_grid_columns=('impact',),        category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS, formatter=_format_impact),
     VEPColumnDef(source_field='INTRON',          variant_grid_columns=('intron',),        category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
     VEPColumnDef(source_field='Protein_position', variant_grid_columns=('protein_position',), category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
     VEPColumnDef(source_field='PUBMED',          variant_grid_columns=('pubmed',),        category=ColumnAnnotationCategory.LITERATURE),
@@ -740,15 +804,17 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         variant_grid_columns=('sift',),
         category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS,
         genome_builds=GRCH37_38,
+        formatter=fmt.format_vep_sift_to_choice,
     ),
     VEPColumnDef(
         source_field='SOMATIC',
         variant_grid_columns=('somatic',),
         category=ColumnAnnotationCategory.EXTERNAL_ID,
         source_field_processing_description='Any values present',
+        formatter=fmt.format_vep_somatic,
     ),
     VEPColumnDef(source_field='SYMBOL',          variant_grid_columns=('symbol',),        category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
-    VEPColumnDef(source_field='VARIANT_CLASS',   variant_grid_columns=('variant_class',), category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
+    VEPColumnDef(source_field='VARIANT_CLASS',   variant_grid_columns=('variant_class',), category=ColumnAnnotationCategory.GENE_ANNOTATIONS, formatter=_format_variant_class),
 
     # ---------- Other custom tracks ----------------------------------------
     VEPColumnDef(
@@ -758,6 +824,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.UK10K,
         source_field_has_custom_prefix=True,
         pipeline_types=STANDARD,
+        formatter=fmt.format_pick_highest_float,
     ),
     VEPColumnDef(
         source_field='CNT',
@@ -766,6 +833,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.COSMIC,
         source_field_has_custom_prefix=True,
         pipeline_types=STANDARD,
+        formatter=fmt.format_pick_highest_int,
     ),
     VEPColumnDef(
         source_field='LEGACY_ID',
@@ -774,6 +842,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.COSMIC,
         source_field_has_custom_prefix=True,
         pipeline_types=STANDARD,
+        formatter=fmt.remove_empty_multiples,
     ),
     VEPColumnDef(
         source_field='REPEAT_MASKER',
@@ -788,6 +857,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.TOPMED,
         source_field_has_custom_prefix=True,
         pipeline_types=STANDARD,
+        formatter=fmt.format_pick_highest_float,
     ),
 
     # ---------- denovo-db (custom VCF, GRCh37/38, columns_version >= 4) ----
@@ -830,6 +900,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
         min_columns_version=4,
+        formatter=fmt.format_sum_int,
     ),
     VEPColumnDef(
         source_field='CONTROL_CT',
@@ -840,6 +911,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
         min_columns_version=4,
+        formatter=fmt.format_sum_int,
     ),
 
     # ---------- Other plugins ----------------------------------------------
@@ -874,6 +946,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=GRCH38,
         pipeline_types=STANDARD,
         min_columns_version=3,
+        formatter=fmt.format_pick_lowest_float,
     ),
     VEPColumnDef(
         source_field='MaveDB_urn',
@@ -891,6 +964,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_plugin=VEPPlugin.NMD,
         pipeline_types=STANDARD,
         min_columns_version=2,
+        formatter=fmt.format_nmd_escaping_variant,
     ),
     VEPColumnDef(
         source_field='SpliceRegion',
@@ -935,6 +1009,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         genome_builds=GRCH38,
         pipeline_types=STANDARD,
         min_columns_version=5,
+        formatter=fmt.format_pick_highest_float_na,
     ),
     VEPColumnDef(
         source_field='OpenTargets_gwasGeneId',
