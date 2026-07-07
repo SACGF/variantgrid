@@ -51,6 +51,8 @@ class Command(BaseCommand):
                 else:
                     fix = data.get("fix")
                     msg = f"{check_type=} {k} INVALID. Fix: {fix}"
+                    if fix and "wget" in fix:
+                        msg += " (or run 'python manage.py download_annotation_data' to get everything)"
                     if die_if_invalid:
                         raise ValueError(msg)
                     else:
