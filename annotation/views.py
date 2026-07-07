@@ -355,6 +355,7 @@ def variant_annotation_runs(request):
 
     genome_build_field_counts = defaultdict(dict)
     genome_build_summary = defaultdict(dict)
+    genome_build_summary_combined = defaultdict(dict)
 
     if request.method == "POST":
         if "unpause-jobs" in request.POST:
@@ -418,15 +419,27 @@ def variant_annotation_runs(request):
 
     for genome_build in GenomeBuild.builds_with_annotation():
         for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date"):
-            qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
-            field_counts = get_field_counts(qs, "status")
-            summary_data = Counter()
-            for field, count in field_counts.items():
-                summary = AnnotationStatus.get_summary_state(field)
-                summary_data[summary] += count
+            base_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
+            # Split by pipeline type so standard-variant work (the bottleneck) is shown separately from
+            # structural-variant runs (mostly empty/instant). Only include types that have runs.
+            summary_by_type = {}
+            field_counts_by_type = {}
+            combined_summary = Counter()  # across pipeline types - drives the per-VAV action buttons
+            for pipeline_type in VariantAnnotationPipelineType:
+                field_counts = get_field_counts(base_qs.filter(pipeline_type=pipeline_type), "status")
+                if not field_counts:
+                    continue
+                summary_data = Counter()
+                for field, count in field_counts.items():
+                    summary = AnnotationStatus.get_summary_state(field)
+                    summary_data[summary] += count
+                    combined_summary[summary] += count
+                summary_by_type[pipeline_type.value] = summary_data
+                field_counts_by_type[pipeline_type.value] = {as_display[k]: v for k, v in field_counts.items()}
 
-            genome_build_summary[genome_build.pk][vav.pk] = summary_data
-            genome_build_field_counts[genome_build.pk][vav] = {as_display[k]: v for k, v in field_counts.items()}
+            genome_build_summary[genome_build.pk][vav.pk] = summary_by_type
+            genome_build_summary_combined[genome_build.pk][vav.pk] = combined_summary
+            genome_build_field_counts[genome_build.pk][vav] = field_counts_by_type
 
     current_variant_annotation_versions = VariantAnnotationVersion.latest_for_all_builds()
     new_variant_annotation_versions = VariantAnnotationVersion.objects.filter(
@@ -468,7 +481,9 @@ def variant_annotation_runs(request):
 
     context = {
         "genome_build_summary": dict(genome_build_summary),
+        "genome_build_summary_combined": dict(genome_build_summary_combined),
         "genome_build_field_counts": dict(genome_build_field_counts),
+        "pipeline_type_labels": dict(VariantAnnotationPipelineType.choices),
         "current_variant_annotation_versions": current_variant_annotation_versions,
         "new_variant_annotation_versions": new_variant_annotation_versions,
         "historical_variant_annotation_versions": historical_variant_annotation_versions,
