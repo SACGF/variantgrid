@@ -9,10 +9,12 @@ import logging
 import os
 
 from django.conf import settings
+from django.db.models import Q
+from django.utils import timezone
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.tasks.annotate_variants import dump_variants
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
 from library.utils.file_utils import mk_path_for_file
@@ -122,6 +124,68 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
         annotation_runs.append(annotation_run)
 
     logging.info("Dumped %d external annotation run(s) for %s into %s",
+                 len(annotation_runs), variant_annotation_version, output_dir)
+    return annotation_runs
+
+
+def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationVersion,
+                                  output_dir: str,
+                                  pipeline_type=VariantAnnotationPipelineType.STANDARD,
+                                  leave: int = 0) -> list[AnnotationRun]:
+    """ Adopt AnnotationRuns that already exist for `variant_annotation_version` in CREATED state (created by
+        the normal scheduler but not yet annotated), marking them external and dumping each VCF + sidecar
+        metadata into output_dir (#1568). Unlike dump_external_annotation_runs (which creates every run up
+        front for a NEW version), this leaves the existing range locks untouched and only claims runs the
+        dispatcher has not already leased.
+
+        `leave` keeps that many of the lowest-min-variant CREATED runs on the normal in-VM pipeline so
+        annotation can be parallelised: the local VM keeps chewing through the low end (moving the unannotated
+        watermark) while the dumped remainder is annotated off-VM. """
+    if leave < 0:
+        raise ValueError(f"leave must be >= 0, got {leave}")
+
+    os.makedirs(output_dir, exist_ok=True)
+    now = timezone.now()
+    # Mirror the dispatcher's dispatchable filter (annotation_scheduler_task._dispatchable_runs_qs) and its
+    # lowest-min-variant-first order, so we adopt exactly the runs it would otherwise launch.
+    dispatchable = AnnotationRun.objects.filter(
+        annotation_range_lock__version=variant_annotation_version,
+        pipeline_type=pipeline_type,
+        external=False,
+        task_id__isnull=True,
+        status=AnnotationStatus.CREATED,
+    ).filter(Q(lease_expires__isnull=True) | Q(lease_expires__lt=now)) \
+        .order_by("annotation_range_lock__min_variant_id")
+
+    candidate_ids = list(dispatchable.values_list("pk", flat=True))
+    kept, candidate_ids = candidate_ids[:leave], candidate_ids[leave:]
+    logging.info("dump_existing: %d dispatchable run(s); leaving %d on the in-VM pipeline, dumping %d",
+                 len(kept) + len(candidate_ids), len(kept), len(candidate_ids))
+
+    annotation_runs = []
+    for pk in candidate_ids:
+        # Atomically claim as external only while still dispatchable (same filter as the dispatcher) so we
+        # never adopt a run it just leased. If we lose the race (0 rows updated) skip it; if we win, the run
+        # is external and annotate_variants no-ops even if the dispatcher launches it.
+        claimed = AnnotationRun.objects.filter(
+            pk=pk,
+            external=False,
+            task_id__isnull=True,
+            status=AnnotationStatus.CREATED,
+        ).filter(Q(lease_expires__isnull=True) | Q(lease_expires__lt=now)).update(external=True)
+        if claimed != 1:
+            logging.warning("Skipping AnnotationRun %s - no longer dispatchable (leased/launched by the "
+                            "scheduler?)", pk)
+            continue
+
+        annotation_run = AnnotationRun.objects.get(pk=pk)
+        dump_count = dump_variants(annotation_run, dump_dir=output_dir)
+        meta_filename = write_dump_metadata(annotation_run, dump_dir=output_dir)
+        logging.info("Dumped existing AnnotationRun %s: %d variants -> %s (meta %s)",
+                     annotation_run.pk, dump_count, annotation_run.vcf_dump_filename, meta_filename)
+        annotation_runs.append(annotation_run)
+
+    logging.info("Dumped %d existing annotation run(s) for %s into %s",
                  len(annotation_runs), variant_annotation_version, output_dir)
     return annotation_runs
 
