@@ -29,6 +29,7 @@
             let summary_and_colors = [
                 ["Queued", 'rgb(50, 50, 50)'],
                 ["Running", 'rgb(50,171, 96)'],
+                ["Awaiting external annotation", 'rgb(70, 130, 180)'],
                 ["Error", 'rgb(170, 50, 50)'],
                 ["Finished", 'rgb(35, 110, 80)'],
             ];
@@ -79,9 +80,11 @@
         for (let buildName in genomeBuildSummaryJSON) {
             let buildData = genomeBuildSummaryJSON[buildName];
             for (let vavId in buildData) {
-                let buildVersionName = buildName + "-" + vavId;
-                let vavData = buildData[vavId];
-                showSummaryGraph(buildVersionName, vavData);
+                let vavData = buildData[vavId];  // { pipelineType: {summaryState: count} }
+                for (let pipelineType in vavData) {
+                    let selectorKey = buildName + "-" + vavId + "-" + pipelineType;
+                    showSummaryGraph(selectorKey, vavData[pipelineType]);
+                }
             }
         }
 
@@ -148,9 +151,12 @@
                                                 </div>
                                             {% endif %}
                                         {% endwith %}
-                                        <div id="build-{{ build_name }}-{{ vav.pk }}-summary-graph"></div>
-                                        {% for field, count in field_counts.items %}
-                                            {% labelled label=field %}{{ count }}{% endlabelled %}
+                                        {% for pt_value, type_field_counts in field_counts.items %}
+                                            <h6 class="mt-3">{{ pipeline_type_labels|get_item:pt_value }}</h6>
+                                            <div id="build-{{ build_name }}-{{ vav.pk }}-{{ pt_value }}-summary-graph"></div>
+                                            {% for field, count in type_field_counts.items %}
+                                                {% labelled label=field %}{{ count }}{% endlabelled %}
+                                            {% endfor %}
                                         {% endfor %}
 
                                         {% if vav.status == 'NEW' %}
@@ -166,7 +172,7 @@
                                             {% endwith %}
                                         {% endif %}
 
-                                        {% with vav_summary=genome_build_summary|get_item:build_name|get_item:vav.pk panel=genome_build_status_panel|get_item:build_name %}
+                                        {% with vav_summary=genome_build_summary_combined|get_item:build_name|get_item:vav.pk panel=genome_build_status_panel|get_item:build_name %}
                                             <div class="btn-toolbar">
                                                 {% if vav_summary|get_item:'Running' or vav_summary|get_item:'Queued' %}
                                                     <button name="set-non-finished-to-error-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger">Set non-finished runs to Error</button>
