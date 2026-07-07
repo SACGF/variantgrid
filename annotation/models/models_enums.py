@@ -51,7 +51,7 @@ class AnnotationStatus(models.TextChoices):
     @classmethod
     def get_summary_state(cls, annotation_status):
         SUMMARY_STATES = {cls.CREATED: "Queued",
-                          cls.EXTERNAL_DUMP_COMPLETED: "Awaiting external annotation",
+                          cls.EXTERNAL_DUMP_COMPLETED: "External",
                           cls.FINISHED: "Finished",
                           cls.ERROR: "Error"}
         return SUMMARY_STATES.get(annotation_status, "Running")
