@@ -100,6 +100,27 @@ class OntologyService(models.TextChoices):
         MeSH[0]
     })
 
+    # External sources (e.g. the Monarch search API) and users spell some prefixes differently
+    # from our canonical OntologyService values. Map the uppercased alias to the enum value.
+    PREFIX_ALIASES: dict[str, str] = Constant({
+        "ORPHANET": ORPHANET[0],
+        "MIM": OMIM[0],
+        "MEDGEN": MEDGEN[0],
+        "MESH": MeSH[0],
+        "HPO": HPO[0],
+    })
+
+    @classmethod
+    def resolve_prefix(cls, prefix: str) -> Optional['OntologyService']:
+        """ Map a (possibly aliased or differently-cased) prefix to a supported OntologyService,
+            or None if it isn't one we support (e.g. MPATH from the external Monarch search). """
+        upper = prefix.strip().upper()
+        canonical = cls.PREFIX_ALIASES.get(upper, upper)
+        try:
+            return cls(canonical)
+        except ValueError:
+            return None
+
     @staticmethod
     def index_to_id(ontology_service: 'OntologyService', index: Union[int|str]):
         num_part = str(index)
@@ -294,22 +315,15 @@ class OntologyIdNormalized:
         if len(parts) != 2:
             raise ValueError(f"Can not convert {dirty_id} to a proper id")
 
-        prefix = parts[0].strip().upper()
+        raw_prefix = parts[0].strip()
         postfix = parts[1].strip()
 
-        if prefix in ("ORPHA", "ORPHANET"):  # Orphanet is the one ontology (so far) where the standard is sentance case
-            prefix = "ORPHA"
-        elif prefix.upper() == "MIM":
-            prefix = "OMIM"
-        elif prefix.upper() == "MEDGEN":
-            prefix = "MedGen"
+        if raw_prefix.upper() in ("MEDGEN", "MESH"):  # MedGen/MeSH postfixes are upper-cased letters
             postfix = postfix.upper()
-        elif prefix.upper() == "MESH":
-            prefix = "MeSH"
-            postfix = postfix.upper()
-        elif prefix.upper() == "HPO":
-            prefix = "HP"
-        prefix = OntologyService(prefix)
+
+        prefix = OntologyService.resolve_prefix(raw_prefix)
+        if prefix is None:
+            raise ValueError(f"'{raw_prefix}' is not a valid OntologyService")
 
         try:
             if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:

@@ -1,7 +1,9 @@
+import re
+
 import requests
 
 from library.constants import MINUTE_SECS
-from ontology.models import OntologyTerm
+from ontology.models import OntologyService, OntologyTerm
 
 
 def condition_text_search(search_text: str, row_limit: int = 10) -> list[OntologyTerm]:
@@ -21,10 +23,13 @@ def condition_text_search(search_text: str, row_limit: int = 10) -> list[Ontolog
 
     terms: list[OntologyTerm] = []
     for result in results:
-        try:
-            terms.append(OntologyTerm.get_or_stub(result.get("id")))
-        except ValueError:
-            # The Monarch search can return terms from ontologies we don't support
-            # (e.g. MPATH), whose prefix isn't a member of OntologyService - skip those
+        term_id = result.get("id") or ""
+        parts = re.split("[:|_]", term_id)
+        prefix = parts[0] if len(parts) == 2 else None
+        if prefix is not None and OntologyService.resolve_prefix(prefix) is None:
+            # Monarch can return terms from ontologies we don't support (e.g. MPATH) - skip those.
+            # Anything else (e.g. a malformed id) falls through to get_or_stub so a genuine problem
+            # isn't silently hidden as if it were just an unsupported ontology.
             continue
+        terms.append(OntologyTerm.get_or_stub(term_id))
     return terms
