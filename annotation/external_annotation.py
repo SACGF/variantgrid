@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import shutil
+import time
 from typing import Optional
 
 from django.conf import settings
@@ -29,6 +30,14 @@ DUMP_METADATA_SCHEMA_VERSION = 1
 # Suffix the Snakemake bundle appends to each dump stem for the annotated VCF; import discovers annotated
 # files alongside their .meta.json sidecar by this suffix (#1568).
 ANNOTATED_VCF_SUFFIX = ".vep_annotated.vcf.gz"
+
+# How often import_external_annotation_runs emits a running-progress line for large (e.g. 1k-run) imports.
+IMPORT_PROGRESS_INTERVAL_SECONDS = 10
+
+
+def _import_progress_line(processed: int, total: int, report: dict) -> str:
+    tallies = " ".join(f"{key}={len(value)}" for key, value in report.items())
+    return f"External annotation import: {processed}/{total} meta files ({tallies})"
 
 
 class VariantIdAlignmentError(ValueError):
@@ -478,7 +487,16 @@ def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
     """ Match every annotated VCF in input_dir back to a local run and import it (#1568 §4.4). Returns a
         report of categorised outcomes; a per-file failure marks only that run and continues. """
     report = {"imported": [], "matched": [], "unmatched": [], "missing_annotated": [], "id_mismatch": []}
-    for meta_path in sorted(glob.glob(os.path.join(input_dir, "*.meta.json"))):
+    meta_paths = sorted(glob.glob(os.path.join(input_dir, "*.meta.json")))
+    total = len(meta_paths)
+    logging.info("External annotation import: %d meta file(s) in %s%s",
+                 total, input_dir, " (dry-run)" if dry_run else "")
+    last_progress = time.monotonic()
+    for processed, meta_path in enumerate(meta_paths, start=1):
+        now = time.monotonic()
+        if now - last_progress >= IMPORT_PROGRESS_INTERVAL_SECONDS:
+            logging.info(_import_progress_line(processed - 1, total, report))
+            last_progress = now
         meta = parse_dump_metadata(meta_path)
         if meta.get("genome_build") != genome_build.name or meta.get("pipeline_type") != pipeline_type:
             continue
@@ -520,4 +538,5 @@ def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
         report["imported"].append(
             f"{os.path.basename(annotated_vcf)} -> AnnotationRun {annotation_run.pk}")
 
+    logging.info(_import_progress_line(total, total, report))
     return report
