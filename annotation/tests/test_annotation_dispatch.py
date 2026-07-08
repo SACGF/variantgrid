@@ -144,6 +144,44 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertEqual(new_run.attempt_count, 1)
         self.assertIsNotNone(new_run.lease_expires)
 
+    def test_sweep_launches_uploads_before_created_across_versions(self):
+        """ Global uploads-first: the no-arg sweep launches an upload-only (resume) run on ANY version
+            before a full-VEP CREATED run on ANOTHER version. A CREATED run on a version iterated FIRST
+            must not take the only slot ahead of an upload-only run on a version iterated later - a cheap
+            DB import should never wait behind a VEP dump on another build (shared worker pool). """
+        # NEW version (iterated before ACTIVE on the same build) carries only a CREATED VEP run.
+        new_kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.REFSEQ, 2)
+        new_kwargs["status"] = VariantAnnotationVersion.Status.NEW
+        new_vav = VariantAnnotationVersion.objects.create(**new_kwargs)
+        AnnotationVersion.objects.create(genome_build=self.grch37, variant_annotation_version=new_vav)
+        created_lock = AnnotationRangeLock.objects.create(version=new_vav, min_variant=self.variants[0],
+                                                          max_variant=self.variants[1], count=100)
+        created_run = AnnotationRun.objects.create(annotation_range_lock=created_lock, pipeline_type=STANDARD)
+
+        # ACTIVE version (cls.vav, iterated after NEW) carries an upload-only run (past VEP).
+        upload_lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.variants[2],
+                                                         max_variant=self.variants[3], count=100)
+        upload_run = AnnotationRun.objects.create(annotation_range_lock=upload_lock, pipeline_type=STANDARD)
+        upload_run.dump_count = 100
+        upload_run.annotation_start = timezone.now()
+        upload_run.annotation_end = timezone.now()
+        upload_run.vcf_annotated_filename = "/tmp/fake_annotated.vcf.gz"
+        upload_run.save()
+        self.assertEqual(upload_run.status, AnnotationStatus.ANNOTATION_COMPLETED)
+
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
+                                                  return_value=1))  # only one slot - forces the choice
+            launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
+            stack.enter_context(mock.patch.object(count_annotation_run, "apply_async"))
+            stack.enter_context(mock.patch.object(annotation_scheduler_task,
+                                                  "merge_pending_range_locks", return_value=0))
+            dispatch_annotation_runs()  # no arg -> global sweep
+
+        launched = {c.args[0][0] for c in launch.call_args_list}
+        self.assertIn(upload_run.pk, launched)       # upload-only won the slot
+        self.assertNotIn(created_run.pk, launched)   # CREATED VEP waited, despite its version coming first
+
     def test_dispatch_launches_lowest_pk_first(self):
         locks = [self._make_lock(i, i, count=100) for i in range(4)]
         launch = self._dispatch(slots=2, merge_noop=True)

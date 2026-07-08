@@ -193,8 +193,7 @@ def dispatch_annotation_runs(variant_annotation_version_id=None):
             vav = VariantAnnotationVersion.objects.get(pk=variant_annotation_version_id)
             _dispatch_for_vav(vav)
         else:
-            for vav in _dispatchable_variant_annotation_versions():
-                _dispatch_for_vav(vav)
+            _dispatch_sweep()
     except:
         log_traceback()
 
@@ -220,6 +219,63 @@ def _dispatchable_variant_annotation_versions() -> list[VariantAnnotationVersion
                     seen.add(vav.pk)
                     vavs.append(vav)
     return vavs
+
+
+def _dispatch_sweep():
+    """ No-arg beat sweep across every dispatchable version. Differs from the single-version path in two
+        ways that matter when a build is bulk-annotating a NEW version:
+
+        1. ONE global worker-capacity budget shared across versions (the worker pool is shared, so a
+           per-version budget over-commits - each version would see the full pool minus only its own
+           in-flight, and collectively lease far more than the pool can run).
+        2. Upload-only (resume) runs on EVERY version are launched before ANY full-VEP CREATED run on ANY
+           version. A resume run is just a quick DB import of an already-annotated VCF; it must never wait
+           behind a ~30-min VEP dump on another build. The per-version priority (_dispatch_for_vav) only
+           orders within a version, which isn't enough when e.g. build A has 900 imported uploads waiting
+           while build B has hundreds of CREATED VEP runs. """
+    now = timezone.now()
+    vavs = _dispatchable_variant_annotation_versions()
+    for vav in vavs:
+        reclaim_stalled_annotation_runs(vav, now)
+        # #1646: fill `count` (and finish empties) off-thread before we consider dispatching.
+        _trigger_counts_for_uncounted_runs(vav)
+
+    slots = annotation_worker_slots()
+    in_flight = sum(_in_flight_runs_qs(vav, now).count() for vav in vavs)
+    capacity = slots - in_flight
+    logging.info("dispatch sweep: slots=%d in_flight=%d capacity=%d", slots, in_flight, capacity)
+    if capacity <= 0:
+        return
+
+    worker_id = f"dispatch:{dispatch_annotation_runs.request.id or 'sync'}"
+    # Phase 1: upload-only runs across all versions. Phase 2: heavy CREATED dump+VEP runs, with whatever
+    # capacity phase 1 left. Both share the same budget so we never lease more than the pool can run.
+    capacity = _lease_across_vavs(vavs, AnnotationStatus.ANNOTATION_COMPLETED, capacity, worker_id, now)
+    if capacity > 0:
+        _lease_across_vavs(vavs, AnnotationStatus.CREATED, capacity, worker_id, now)
+
+
+def _lease_across_vavs(vavs, status, capacity, worker_id, now) -> int:
+    """ Lease + launch up to `capacity` dispatchable runs of the given status across the versions, lowest
+        min-variant-id first within each version. Returns remaining capacity. CREATED backlog is merged
+        into bigger VEP batches (as in _dispatch_for_vav) when it exceeds the capacity left for it. """
+    for vav in vavs:
+        if capacity <= 0:
+            break
+        qs = _dispatchable_runs_qs(vav, now).filter(status=status)
+        if status == AnnotationStatus.CREATED and qs.count() > capacity:
+            merge_pending_range_locks(vav, settings.ANNOTATION_VEP_BATCH_MAX)
+            qs = _dispatchable_runs_qs(vav, now).filter(status=status)
+        launched = 0
+        for annotation_run in qs.order_by("annotation_range_lock__min_variant_id"):
+            if capacity <= 0:
+                break
+            _lease_and_launch_run(annotation_run, worker_id, now)
+            capacity -= 1
+            launched += 1
+        if launched:
+            logging.info("dispatch sweep(%s): launched %d %s run(s)", vav, launched, status)
+    return capacity
 
 
 def _dispatch_for_vav(vav: VariantAnnotationVersion):
@@ -314,13 +370,15 @@ def reclaim_stalled_annotation_runs(vav: VariantAnnotationVersion, now=None):
         retried forever. attempt_count is bumped at lease time (_lease_and_launch_run). """
     if now is None:
         now = timezone.now()
-    expired_qs = AnnotationRun.objects.filter(
-        annotation_range_lock__version=vav,
-        external=False,
-        lease_expires__lt=now,
-    ).exclude(status__in=AnnotationStatus.get_completed_states())
+    # A run occupies a worker slot (per _in_flight_runs_qs) via a live lease, a held task_id, or a
+    # running status. Reclaim every such run that has NO live lease - its worker is gone. Keying only
+    # on `lease_expires < now` missed orphans left with a task_id / running status but a NULL lease
+    # (e.g. a worker SIGKILLed mid-run before the annotate_variants `finally` could clear task_id):
+    # a NULL lease is never < now, so those held slots forever and starved the dispatcher of capacity.
+    stalled_qs = _in_flight_runs_qs(vav, now).filter(
+        Q(lease_expires__isnull=True) | Q(lease_expires__lt=now))
 
-    for annotation_run in expired_qs:
+    for annotation_run in stalled_qs:
         if annotation_run.attempt_count >= settings.ANNOTATION_MAX_RUN_ATTEMPTS:
             logging.warning("Failing AnnotationRun %s - lease expired after %d attempts",
                             annotation_run.pk, annotation_run.attempt_count)
