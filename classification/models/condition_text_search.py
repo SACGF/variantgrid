@@ -22,9 +22,9 @@ def condition_text_search(search_text: str, row_limit: int = 10) -> list[Ontolog
     terms: list[OntologyTerm] = []
     for result in results:
         term_id = result.get("id") or ""
-        if OntologyService.is_unsupported_id(term_id):
-            # Monarch can return terms from ontologies we don't support (e.g. MPATH) - skip those.
-            # A malformed id still falls through to get_or_stub so a genuine problem isn't hidden.
+        if not OntologyService.is_supported_id(term_id):
+            # Monarch can return ids from ontologies we don't support (e.g. MPATH) or the odd
+            # malformed id - skip rather than letting one bad result abort the whole search.
             continue
         terms.append(OntologyTerm.get_or_stub(term_id))
     return terms

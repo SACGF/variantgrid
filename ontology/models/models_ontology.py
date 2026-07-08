@@ -122,14 +122,14 @@ class OntologyService(models.TextChoices):
             return None
 
     @classmethod
-    def is_unsupported_id(cls, term_id: str) -> bool:
-        """ True when term_id has a well-formed prefix that isn't a supported ontology (e.g. MPATH,
-            which the external Monarch search can return). A malformed id returns False so it surfaces
-            through normal id parsing rather than being silently skipped as an unsupported ontology. """
+    def is_supported_id(cls, term_id: str) -> bool:
+        """ True when term_id is a well-formed <prefix>:<postfix> id whose prefix is a supported
+            OntologyService. Unsupported ontologies (e.g. MPATH from the external Monarch search)
+            and malformed ids both return False. """
         parts = re.split("[:|_]", term_id or "")
         if len(parts) != 2:
             return False
-        return cls.resolve_prefix(parts[0]) is None
+        return cls.resolve_prefix(parts[0]) is not None
 
     @staticmethod
     def index_to_id(ontology_service: 'OntologyService', index: Union[int|str]):

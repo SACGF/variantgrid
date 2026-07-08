@@ -38,12 +38,14 @@ class ConditionTextSearchTestCase(TestCase):
         self.assertEqual(["ORPHA:12345"], [term.id for term in terms])
 
     @patch("classification.models.condition_text_search.requests.get")
-    def test_malformed_id_is_not_silently_skipped(self, mock_get):
-        """ A malformed id is a genuine problem, not an unsupported ontology - it should surface
-        (get_or_stub raises) rather than being swallowed like an MPATH skip. """
+    def test_malformed_id_is_skipped_without_aborting(self, mock_get):
+        """ A malformed id from Monarch must not abort the whole search - it's skipped like any other
+        id we can't turn into a supported ontology term, and valid results around it survive. """
         mock_get.return_value = _mock_response(json_data={"items": [
             {"id": "not-a-valid-id"},
+            {"id": "MONDO:0000001"},
         ]})
 
-        with self.assertRaises(ValueError):
-            condition_text_search("anything")
+        terms = condition_text_search("anything")
+
+        self.assertEqual(["MONDO:0000001"], [term.id for term in terms])
