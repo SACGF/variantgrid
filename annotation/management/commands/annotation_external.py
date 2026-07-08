@@ -108,19 +108,22 @@ class Command(BaseCommand):
 
         pipeline_type = options["pipeline_type"]
         dry_run = options["dry_run"]
-        report = import_external_annotation_runs(genome_build, input_dir,
-                                                 pipeline_type=pipeline_type, dry_run=dry_run)
 
-        for line in report["matched"]:
-            self.stdout.write(f"[dry-run match] {line}")
-        for line in report["imported"]:
-            self.stdout.write(f"[import] {line}")
-        for line in report["missing_annotated"]:
-            self.stdout.write(self.style.WARNING(f"[skip] {line}"))
-        for line in report["unmatched"]:
-            self.stdout.write(self.style.WARNING(f"[skip] {line}"))
-        for line in report["id_mismatch"]:
-            self.stdout.write(self.style.ERROR(f"[error] {line}"))
+        def emit(category, message):
+            # Stream each file's outcome + reason as it's decided, rather than batching to the end of a
+            # potentially very long (~1k file) run.
+            if category == "matched":
+                self.stdout.write(f"[dry-run match] {message}")
+            elif category == "imported":
+                self.stdout.write(f"[import] {message}")
+            elif category in ("missing_annotated", "unmatched"):
+                self.stdout.write(self.style.WARNING(f"[skip] {message}"))
+            elif category == "id_mismatch":
+                self.stdout.write(self.style.ERROR(f"[error] {message}"))
+            self.stdout.flush()
+
+        report = import_external_annotation_runs(genome_build, input_dir,
+                                                 pipeline_type=pipeline_type, dry_run=dry_run, emit=emit)
 
         verb = "would import" if dry_run else "imported"
         self.stdout.write(

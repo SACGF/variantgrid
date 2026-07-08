@@ -17,7 +17,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion
+from annotation.models.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.tasks.annotate_variants import annotation_run_retry, dump_variants
 from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
@@ -495,6 +495,49 @@ def find_matching_annotation_run(meta: dict, variant_annotation_version: Variant
     return None
 
 
+def explain_unmatched_annotation_run(meta: dict, variant_annotation_version: VariantAnnotationVersion,
+                                     pipeline_type=VariantAnnotationPipelineType.STANDARD) -> str:
+    """ Human-readable reason no external run awaiting annotation matched the file's range (#1568).
+        Distinguishes the benign cases (the in-VM pipeline already annotated the range, or is still
+        chewing on it, or it was already imported) from the real problem (no local range lock has this
+        range at all - the file was produced against a different/diverged database), so an operator can
+        tell a "nothing to do" skip apart from a genuine mismatch. """
+    meta_range = meta["range"]
+    min_coordinate, max_coordinate = meta_range["min_variant"], meta_range["max_variant"]
+    matching_locks = [
+        annotation_range_lock
+        for annotation_range_lock in AnnotationRangeLock.objects.filter(version=variant_annotation_version)
+        .select_related("min_variant", "max_variant")
+        if str(annotation_range_lock.min_variant.coordinate) == min_coordinate
+        and str(annotation_range_lock.max_variant.coordinate) == max_coordinate
+    ]
+    if not matching_locks:
+        return (f"no local range lock for {variant_annotation_version} has range "
+                f"{min_coordinate}..{max_coordinate} - range boundaries differ (produced against a "
+                f"different/diverged database?)")
+
+    runs = list(AnnotationRun.objects.filter(annotation_range_lock__in=matching_locks))
+
+    def describe(annotation_run: AnnotationRun) -> str:
+        state = "annotated" if annotation_run.vcf_annotated_filename else f"status={annotation_run.status}"
+        return (f"run {annotation_run.pk} (external={annotation_run.external}, "
+                f"pipeline_type={annotation_run.pipeline_type}, {state})")
+
+    same_pipeline = [r for r in runs if r.pipeline_type == pipeline_type]
+    for annotation_run in same_pipeline:
+        if annotation_run.external and annotation_run.vcf_annotated_filename:
+            return f"already imported - external {describe(annotation_run)}"
+    for annotation_run in same_pipeline:
+        if not annotation_run.external and annotation_run.vcf_annotated_filename:
+            return (f"range already annotated by the in-VM pipeline - {describe(annotation_run)}; "
+                    f"nothing to import")
+    for annotation_run in same_pipeline:
+        if not annotation_run.external:
+            return f"range is on the in-VM pipeline, not offloaded - {describe(annotation_run)}"
+    return ("no matching-pipeline external run awaiting annotation for this range; found "
+            + ", ".join(describe(annotation_run) for annotation_run in runs))
+
+
 def find_annotated_vcf(meta_path: str) -> Optional[str]:
     """ The annotated VCF sitting alongside a .meta.json sidecar (written by the Snakemake bundle) - None if
         it has not been annotated/copied back yet (#1568). """
@@ -521,10 +564,20 @@ def _import_annotated_annotation_run(annotation_run: AnnotationRun, annotated_vc
 
 def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
                                     pipeline_type=VariantAnnotationPipelineType.STANDARD,
-                                    dry_run: bool = False) -> dict:
+                                    dry_run: bool = False, emit=None) -> dict:
     """ Match every annotated VCF in input_dir back to a local run and import it (#1568 §4.4). Returns a
-        report of categorised outcomes; a per-file failure marks only that run and continues. """
+        report of categorised outcomes; a per-file failure marks only that run and continues.
+
+        `emit`, if given, is called emit(category, message) the moment each file's outcome is decided (the
+        same category/message that lands in the report), so a caller can stream per-file progress + reasons
+        live rather than waiting for the whole - potentially very long - run to finish. """
     report = {"imported": [], "matched": [], "unmatched": [], "missing_annotated": [], "id_mismatch": []}
+
+    def record(category: str, message: str):
+        report[category].append(message)
+        if emit is not None:
+            emit(category, message)
+
     meta_paths = sorted(glob.glob(os.path.join(input_dir, "*.meta.json")))
     total = len(meta_paths)
     logging.info("External annotation import: %d meta file(s) in %s%s",
@@ -541,27 +594,22 @@ def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
 
         variant_annotation_version = find_matching_variant_annotation_version(meta)
         if variant_annotation_version is None:
-            report["unmatched"].append(
-                f"{os.path.basename(meta_path)}: no local VariantAnnotationVersion matches version identity - "
-                f"{explain_unmatched_variant_annotation_version(meta)}")
+            record("unmatched",
+                   f"{os.path.basename(meta_path)}: no local VariantAnnotationVersion matches version "
+                   f"identity - {explain_unmatched_variant_annotation_version(meta)}")
             continue
 
         annotation_run = find_matching_annotation_run(meta, variant_annotation_version, pipeline_type)
         if annotation_run is None:
-            awaiting = AnnotationRun.objects.filter(
-                annotation_range_lock__version=variant_annotation_version, pipeline_type=pipeline_type,
-                external=True, vcf_annotated_filename__isnull=True).count()
-            report["unmatched"].append(
-                f"{os.path.basename(meta_path)}: matched VAV {variant_annotation_version.pk} but no external run "
-                f"awaiting annotation has range {meta['range']['min_variant']}..{meta['range']['max_variant']} "
-                f"({awaiting} external run(s) still awaiting annotation for this VAV - already imported, or "
-                f"range boundaries differ)")
+            record("unmatched",
+                   f"{os.path.basename(meta_path)}: matched VAV {variant_annotation_version.pk} but "
+                   f"{explain_unmatched_annotation_run(meta, variant_annotation_version, pipeline_type)}")
             continue
 
         annotated_vcf = find_annotated_vcf(meta_path)
         if annotated_vcf is None:
-            report["missing_annotated"].append(
-                f"{os.path.basename(meta_path)}: no annotated VCF alongside (not yet annotated?)")
+            record("missing_annotated",
+                   f"{os.path.basename(meta_path)}: no annotated VCF alongside (not yet annotated?)")
             continue
 
         try:
@@ -569,18 +617,18 @@ def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
         except VariantIdAlignmentError as e:
             annotation_run.error_exception = str(e)
             annotation_run.save()
-            report["id_mismatch"].append(str(e))
+            record("id_mismatch", str(e))
             continue
 
         if dry_run:
-            report["matched"].append(
-                f"{os.path.basename(annotated_vcf)} -> AnnotationRun {annotation_run.pk} "
-                f"({variant_annotation_version})")
+            record("matched",
+                   f"{os.path.basename(annotated_vcf)} -> AnnotationRun {annotation_run.pk} "
+                   f"({variant_annotation_version})")
             continue
 
         _import_annotated_annotation_run(annotation_run, annotated_vcf)
-        report["imported"].append(
-            f"{os.path.basename(annotated_vcf)} -> AnnotationRun {annotation_run.pk}")
+        record("imported",
+               f"{os.path.basename(annotated_vcf)} -> AnnotationRun {annotation_run.pk}")
 
     logging.info(_import_progress_line(total, total, report))
     return report
