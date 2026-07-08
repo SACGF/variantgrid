@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import uuid
+from functools import lru_cache
 from shlex import shlex
 from typing import Optional
 
@@ -263,8 +264,14 @@ def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation
     return execute_cmd(cmd, shell=False)
 
 
+@lru_cache
 def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
-    """ returns dictionary of VEP and database versions """
+    """ returns dictionary of VEP and database versions.
+
+        Runs a full VEP invocation on a fake VCF (cache load + startup) purely to read the ##VEP= header,
+        so it's expensive. The installed VEP is a function of (genome_build, annotation_consortium) only -
+        there is one VEP install per box and its version can't change under a running process - so we memoize
+        for the process lifetime (restart workers after a VEP upgrade). """
 
     vcf_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, "fake.vcf")
     if not os.path.exists(vcf_filename):
