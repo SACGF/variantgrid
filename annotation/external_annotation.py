@@ -19,7 +19,8 @@ from django.utils import timezone
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.models.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
-from annotation.tasks.annotate_variants import annotation_run_retry, dump_variants
+from annotation.tasks.annotate_variants import dump_variants
+from annotation.tasks.annotation_scheduler_task import dispatch_annotation_runs
 from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
 from library.utils.file_utils import mk_path_for_file
 from snpdb.models import GenomeBuild, Variant
@@ -551,15 +552,35 @@ def find_annotated_vcf(meta_path: str) -> Optional[str]:
 
 
 def _import_annotated_annotation_run(annotation_run: AnnotationRun, annotated_vcf: str):
-    """ Point the run at the annotated VCF (copied into ANNOTATION_VCF_DUMP_DIR) and kick the existing
-        upload-only path, which runs the ##VEP= header check + inserts rows, setting upload_* -> FINISHED. """
+    """ Copy the annotated VCF into ANNOTATION_VCF_DUMP_DIR and hand the run to the normal single-authority
+        dispatcher as a resume upload-only run (#1568). The off-VM VEP step is done, so the run rejoins the
+        in-VM pipeline past VEP: we clear `external` (the dispatcher and its lease/reclaim system filter
+        external=False, so an external run is invisible to them) and stamp the annotation start/end dates so
+        get_status() -> ANNOTATION_COMPLETED - the dispatcher's priority-0 upload-only lane
+        (_dispatchable_runs_qs resume clause). annotate_variants then skips dump+VEP straight to
+        import_vcf_annotations, which runs the ##VEP= header check + inserts rows, setting upload_* -> FINISHED.
+
+        We deliberately do NOT apply_async the upload ourselves: a raw queued celery job bypasses the
+        dispatcher's capacity accounting + lease/reclaim (#2667/#1646), so it competes with the in-VM pipeline
+        for worker slots and is lost for good on a worker restart. Routing through the dispatcher means a
+        stalled upload is reclaimed and re-launched like any other run. """
     dest = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, os.path.basename(annotated_vcf))
     mk_path_for_file(dest)
     if os.path.abspath(annotated_vcf) != os.path.abspath(dest):
         shutil.copy(annotated_vcf, dest)
+
+    now = timezone.now()
     annotation_run.vcf_annotated_filename = dest
-    annotation_run.save()
-    annotation_run_retry(annotation_run, upload_only=True)
+    annotation_run.external = False  # VEP done off-VM - rejoin the in-VM pipeline for the DB upload
+    annotation_run.annotation_start = now
+    annotation_run.annotation_end = now
+    annotation_run.upload_start = None
+    annotation_run.upload_end = None
+    annotation_run.error_exception = None
+    annotation_run.task_id = None
+    annotation_run.leased_by = None
+    annotation_run.lease_expires = None
+    annotation_run.save()  # get_status() -> ANNOTATION_COMPLETED (dispatcher upload-only lane)
 
 
 def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
@@ -572,6 +593,7 @@ def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
         same category/message that lands in the report), so a caller can stream per-file progress + reasons
         live rather than waiting for the whole - potentially very long - run to finish. """
     report = {"imported": [], "matched": [], "unmatched": [], "missing_annotated": [], "id_mismatch": []}
+    dispatched_vav_ids = set()
 
     def record(category: str, message: str):
         report[category].append(message)
@@ -627,8 +649,16 @@ def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
             continue
 
         _import_annotated_annotation_run(annotation_run, annotated_vcf)
+        dispatched_vav_ids.add(variant_annotation_version.pk)
         record("imported",
                f"{os.path.basename(annotated_vcf)} -> AnnotationRun {annotation_run.pk}")
+
+    # Kick the single-authority dispatcher for each version we fed upload-only runs into. Offloaded runs live
+    # on a NEW VariantAnnotationVersion, which the beat safety-net (ACTIVE-only) never sweeps - so without this
+    # initial kick nothing would launch them. Once launched, each completion re-kicks the dispatcher for the
+    # same version (annotate_variants._trigger_dispatch), draining the rest as worker slots free up.
+    for vav_id in sorted(dispatched_vav_ids):
+        dispatch_annotation_runs.si(vav_id).apply_async()
 
     logging.info(_import_progress_line(total, total, report))
     return report

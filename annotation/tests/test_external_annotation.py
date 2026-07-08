@@ -456,20 +456,26 @@ class ExternalAnnotationImportTests(TestCase):
                 annotation_run.refresh_from_db()
                 self.assertEqual(annotation_run.status, AnnotationStatus.ERROR)
 
-    def test_import_copies_and_kicks_upload_only(self):
+    def test_import_copies_and_dispatches_upload_only(self):
         with tempfile.TemporaryDirectory() as output_dir, tempfile.TemporaryDirectory() as dump_dir:
             annotation_runs = self._dump_with_annotated_placeholders(output_dir)
             with override_settings(ANNOTATION_VCF_DUMP_DIR=dump_dir):
-                with patch("annotation.external_annotation.annotation_run_retry") as mock_retry:
+                with patch("annotation.external_annotation.dispatch_annotation_runs") as mock_dispatch:
                     report = import_external_annotation_runs(self.genome_build, output_dir)
 
             self.assertEqual(len(report["imported"]), len(annotation_runs))
-            self.assertEqual(mock_retry.call_count, len(annotation_runs))
-            for _, kwargs in mock_retry.call_args_list:
-                self.assertTrue(kwargs["upload_only"])
+            # Dispatcher kicked once for the (single) version we imported into, not once per run
+            mock_dispatch.si.assert_called_once_with(self.variant_annotation_version.pk)
+            mock_dispatch.si.return_value.apply_async.assert_called_once_with()
 
             for annotation_run in annotation_runs:
                 annotation_run.refresh_from_db()
+                # Cleared external + stamped annotation dates -> dispatcher's upload-only lane
+                self.assertFalse(annotation_run.external)
+                self.assertEqual(annotation_run.status, AnnotationStatus.ANNOTATION_COMPLETED)
+                self.assertIsNotNone(annotation_run.annotation_start)
+                self.assertIsNotNone(annotation_run.annotation_end)
+                self.assertIsNone(annotation_run.task_id)
                 self.assertIsNotNone(annotation_run.vcf_annotated_filename)
                 # Copied into ANNOTATION_VCF_DUMP_DIR
                 self.assertEqual(os.path.dirname(annotation_run.vcf_annotated_filename), dump_dir)
