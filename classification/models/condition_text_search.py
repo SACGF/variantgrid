@@ -1,7 +1,7 @@
 import requests
 
 from library.constants import MINUTE_SECS
-from ontology.models import OntologyTerm
+from ontology.models import OntologyService, OntologyTerm
 
 
 def condition_text_search(search_text: str, row_limit: int = 10) -> list[OntologyTerm]:
@@ -17,6 +17,14 @@ def condition_text_search(search_text: str, row_limit: int = 10) -> list[Ontolog
             "limit": row_limit
         }, timeout=MINUTE_SECS).json()
 
-    results = response.get("items")
+    results = response.get("items") or []
 
-    return [OntologyTerm.get_or_stub(result.get("id")) for result in results]
+    terms: list[OntologyTerm] = []
+    for result in results:
+        term_id = result.get("id") or ""
+        if not OntologyService.is_supported_id(term_id):
+            # Monarch can return ids from ontologies we don't support (e.g. MPATH) or the odd
+            # malformed id - skip rather than letting one bad result abort the whole search.
+            continue
+        terms.append(OntologyTerm.get_or_stub(term_id))
+    return terms

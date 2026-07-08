@@ -100,6 +100,39 @@ class OntologyService(models.TextChoices):
         MeSH[0]
     })
 
+    # Alternate external spellings that differ from our canonical value (e.g. Monarch returns
+    # "Orphanet" for "ORPHA"). These can't be derived from the enum, so they're listed here.
+    # Prefixes that only differ by case are handled automatically by iterating the enum.
+    PREFIX_ALIASES: dict[str, str] = Constant({
+        "ORPHANET": ORPHANET[0],
+        "MIM": OMIM[0],
+        "HPO": HPO[0],
+    })
+
+    @classmethod
+    def resolve_prefix(cls, prefix: str) -> Optional['OntologyService']:
+        """ Map a (possibly aliased or differently-cased) prefix to a supported OntologyService,
+            or None if it isn't one we support (e.g. MPATH from the external Monarch search). """
+        upper = prefix.strip().upper()
+        # Canonical values matched case-insensitively - derived from the enum so a newly added
+        # OntologyService is recognised without touching PREFIX_ALIASES.
+        by_value = {service.value.upper(): service for service in cls}
+        if service := by_value.get(upper):
+            return service
+        if canonical := cls.PREFIX_ALIASES.get(upper):
+            return cls(canonical)
+        return None
+
+    @classmethod
+    def is_supported_id(cls, term_id: str) -> bool:
+        """ True when term_id is a well-formed <prefix>:<postfix> id whose prefix is a supported
+            OntologyService. Unsupported ontologies (e.g. MPATH from the external Monarch search)
+            and malformed ids both return False. """
+        parts = re.split("[:|_]", term_id or "")
+        if len(parts) != 2:
+            return False
+        return cls.resolve_prefix(parts[0]) is not None
+
     @staticmethod
     def index_to_id(ontology_service: 'OntologyService', index: Union[int|str]):
         num_part = str(index)
@@ -294,22 +327,15 @@ class OntologyIdNormalized:
         if len(parts) != 2:
             raise ValueError(f"Can not convert {dirty_id} to a proper id")
 
-        prefix = parts[0].strip().upper()
+        raw_prefix = parts[0].strip()
         postfix = parts[1].strip()
 
-        if prefix in ("ORPHA", "ORPHANET"):  # Orphanet is the one ontology (so far) where the standard is sentance case
-            prefix = "ORPHA"
-        elif prefix.upper() == "MIM":
-            prefix = "OMIM"
-        elif prefix.upper() == "MEDGEN":
-            prefix = "MedGen"
+        if raw_prefix.upper() in ("MEDGEN", "MESH"):  # MedGen/MeSH postfixes are upper-cased letters
             postfix = postfix.upper()
-        elif prefix.upper() == "MESH":
-            prefix = "MeSH"
-            postfix = postfix.upper()
-        elif prefix.upper() == "HPO":
-            prefix = "HP"
-        prefix = OntologyService(prefix)
+
+        prefix = OntologyService.resolve_prefix(raw_prefix)
+        if prefix is None:
+            raise ValueError(f"'{raw_prefix}' is not a valid OntologyService")
 
         try:
             if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
