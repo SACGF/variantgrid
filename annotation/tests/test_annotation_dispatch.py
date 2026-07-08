@@ -112,6 +112,38 @@ class AnnotationDispatchTestCase(TestCase):
         # Remaining 3 still pending, un-leased
         self.assertEqual(AnnotationRun.objects.filter(lease_expires__isnull=True).count(), 3)
 
+    def test_no_arg_sweep_services_new_versions(self):
+        """ beat: the no-arg sweep dispatches NEW versions too, not just ACTIVE. A new annotation version
+            is actively built on a NEW VAV (external upload-only runs land there), so without a heartbeat
+            here it only advances on discrete kicks and a stalled dispatch never self-recovers. """
+        # cls.vav is ACTIVE on grch37. Add a NEW version on the same build with one pending run.
+        new_kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.REFSEQ, 2)
+        new_kwargs["status"] = VariantAnnotationVersion.Status.NEW
+        new_vav = VariantAnnotationVersion.objects.create(**new_kwargs)
+        AnnotationVersion.objects.create(genome_build=self.grch37, variant_annotation_version=new_vav)
+        new_lock = AnnotationRangeLock.objects.create(version=new_vav, min_variant=self.variants[0],
+                                                      max_variant=self.variants[1], count=100)
+        new_run = AnnotationRun.objects.create(annotation_range_lock=new_lock, pipeline_type=STANDARD)
+
+        dispatchable_pks = {v.pk for v in
+                            annotation_scheduler_task._dispatchable_variant_annotation_versions()}
+        self.assertIn(new_vav.pk, dispatchable_pks)   # NEW is swept
+        self.assertIn(self.vav.pk, dispatchable_pks)  # ACTIVE still swept
+
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
+                                                  return_value=2))
+            launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
+            stack.enter_context(mock.patch.object(count_annotation_run, "apply_async"))
+            stack.enter_context(mock.patch.object(annotation_scheduler_task,
+                                                  "merge_pending_range_locks", return_value=0))
+            dispatch_annotation_runs()  # no arg -> beat sweep over all dispatchable versions
+
+        launch.assert_any_call((new_run.pk,))
+        new_run.refresh_from_db()
+        self.assertEqual(new_run.attempt_count, 1)
+        self.assertIsNotNone(new_run.lease_expires)
+
     def test_dispatch_launches_lowest_pk_first(self):
         locks = [self._make_lock(i, i, count=100) for i in range(4)]
         launch = self._dispatch(slots=2, merge_noop=True)

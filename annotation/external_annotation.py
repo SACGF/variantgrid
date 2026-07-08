@@ -653,10 +653,11 @@ def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
         record("imported",
                f"{os.path.basename(annotated_vcf)} -> AnnotationRun {annotation_run.pk}")
 
-    # Kick the single-authority dispatcher for each version we fed upload-only runs into. Offloaded runs live
-    # on a NEW VariantAnnotationVersion, which the beat safety-net (ACTIVE-only) never sweeps - so without this
-    # initial kick nothing would launch them. Once launched, each completion re-kicks the dispatcher for the
-    # same version (annotate_variants._trigger_dispatch), draining the rest as worker slots free up.
+    # Kick the single-authority dispatcher for each version we fed upload-only runs into, so the imported runs
+    # launch immediately rather than waiting for the next 60s beat. Offloaded runs live on a NEW
+    # VariantAnnotationVersion; the beat safety-net now sweeps NEW versions too
+    # (_dispatchable_variant_annotation_versions), and each completion re-kicks the dispatcher for the same
+    # version (annotate_variants._trigger_dispatch), draining the rest as worker slots free up.
     for vav_id in sorted(dispatched_vav_ids):
         dispatch_annotation_runs.si(vav_id).apply_async()
 
