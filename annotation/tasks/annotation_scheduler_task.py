@@ -183,8 +183,9 @@ def dispatch_annotation_runs(variant_annotation_version_id=None):
         kicks in once all workers are busy and a backlog has formed - then a freed worker picks up one
         efficient merged batch instead of many tiny runs.
 
-        With no id, sweeps every ACTIVE VAV (beat safety-net / no-arg signal entry point). All lease
-        writes happen here on scheduling_single_worker so they serialise - no row-lock gymnastics. """
+        With no id, sweeps every dispatchable VAV - the latest NEW and latest ACTIVE per build (see
+        _dispatchable_variant_annotation_versions). All lease writes happen here on
+        scheduling_single_worker so they serialise - no row-lock gymnastics. """
     if JobsControl.is_paused():
         return  # operational brake (e.g. crash safety auto-pause) - don't launch annotation runs
     try:
@@ -192,20 +193,32 @@ def dispatch_annotation_runs(variant_annotation_version_id=None):
             vav = VariantAnnotationVersion.objects.get(pk=variant_annotation_version_id)
             _dispatch_for_vav(vav)
         else:
-            for vav in _active_variant_annotation_versions():
+            for vav in _dispatchable_variant_annotation_versions():
                 _dispatch_for_vav(vav)
     except:
         log_traceback()
 
 
-def _active_variant_annotation_versions() -> list[VariantAnnotationVersion]:
+def _dispatchable_variant_annotation_versions() -> list[VariantAnnotationVersion]:
+    """ Versions the no-arg beat sweep dispatches: the latest NEW and latest ACTIVE per build (never
+        HISTORICAL). NEW is included because that is where a new annotation version is actively being
+        built - it carries the bulk of the pending runs (including the external upload-only runs imported
+        onto it), so without a heartbeat here it only ever advances on discrete kicks (VCF import /
+        manual / per-completion re-kick) and a stalled dispatch never self-recovers (stale leases go
+        unreclaimed, freed capacity unused). Safe to include: the dispatcher already filters external=False
+        and annotate_variants no-ops external runs awaiting an off-VM VCF, and get_annotation_run_blocker()
+        still guards a not-yet-ready version. """
+    statuses = [VariantAnnotationVersion.Status.NEW, VariantAnnotationVersion.Status.ACTIVE]
     vavs = []
+    seen = set()
     for genome_build in GenomeBuild.builds_with_annotation():
-        annotation_version = AnnotationVersion.latest(genome_build,
-                                                      status=VariantAnnotationVersion.Status.ACTIVE,
-                                                      validate=False)
-        if annotation_version is not None:
-            vavs.append(annotation_version.variant_annotation_version)
+        for status in statuses:
+            annotation_version = AnnotationVersion.latest(genome_build, status=status, validate=False)
+            if annotation_version is not None:
+                vav = annotation_version.variant_annotation_version
+                if vav.pk not in seen:
+                    seen.add(vav.pk)
+                    vavs.append(vav)
     return vavs
 
 
