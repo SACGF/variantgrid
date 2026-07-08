@@ -424,17 +424,55 @@ def _matchable_identity(identity: dict) -> dict:
     return {key: value for key, value in identity.items() if key not in ("distance", "gencode_subset")}
 
 
+def _expected_matchable_identity(meta: dict) -> dict:
+    return _matchable_identity({key: value for key, value in meta["variant_annotation_version"].items()
+                                if key != "pk"})
+
+
+def _identity_diff(expected: dict, actual: dict) -> dict:
+    """ field -> (dump_value, local_value) for every key that differs or is absent on one side. """
+    diff = {}
+    for key in set(expected) | set(actual):
+        dump_value = expected.get(key, "<absent>")
+        local_value = actual.get(key, "<absent>")
+        if dump_value != local_value:
+            diff[key] = (dump_value, local_value)
+    return diff
+
+
 def find_matching_variant_annotation_version(meta: dict) -> Optional[VariantAnnotationVersion]:
     """ Local VariantAnnotationVersion whose identity equals the annotated file's meta (#1568 §4.4). """
     genome_build = GenomeBuild.get_name_or_alias(meta["genome_build"])
     annotation_consortium = meta["annotation_consortium"]
-    expected = _matchable_identity({key: value for key, value in meta["variant_annotation_version"].items()
-                                    if key != "pk"})
+    expected = _expected_matchable_identity(meta)
     for variant_annotation_version in VariantAnnotationVersion.objects.filter(
             genome_build=genome_build, annotation_consortium=annotation_consortium):
         if _matchable_identity(variant_annotation_version_identity(variant_annotation_version)) == expected:
             return variant_annotation_version
     return None
+
+
+def explain_unmatched_variant_annotation_version(meta: dict) -> str:
+    """ Human-readable reason no local VariantAnnotationVersion matched the file's version identity (#1568):
+        the closest local VAV (fewest differing fields) plus the dump-vs-local values of each field that
+        differs, so an operator can see exactly which annotation version is missing/misconfigured. """
+    genome_build = GenomeBuild.get_name_or_alias(meta["genome_build"])
+    annotation_consortium = meta["annotation_consortium"]
+    expected = _expected_matchable_identity(meta)
+    best = None  # (variant_annotation_version, diff)
+    for variant_annotation_version in VariantAnnotationVersion.objects.filter(
+            genome_build=genome_build, annotation_consortium=annotation_consortium):
+        actual = _matchable_identity(variant_annotation_version_identity(variant_annotation_version))
+        diff = _identity_diff(expected, actual)
+        if best is None or len(diff) < len(best[1]):
+            best = (variant_annotation_version, diff)
+    if best is None:
+        return f"no local VariantAnnotationVersion exists for {genome_build}/{annotation_consortium}"
+    variant_annotation_version, diff = best
+    fields = "; ".join(f"{key}: dump={dump_value!r} local={local_value!r}"
+                       for key, (dump_value, local_value) in sorted(diff.items()))
+    return (f"closest local VAV {variant_annotation_version.pk} ({variant_annotation_version}) "
+            f"differs on {len(diff)} field(s): {fields}")
 
 
 def find_matching_annotation_run(meta: dict, variant_annotation_version: VariantAnnotationVersion,
@@ -504,14 +542,20 @@ def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
         variant_annotation_version = find_matching_variant_annotation_version(meta)
         if variant_annotation_version is None:
             report["unmatched"].append(
-                f"{os.path.basename(meta_path)}: no local VariantAnnotationVersion matches version identity")
+                f"{os.path.basename(meta_path)}: no local VariantAnnotationVersion matches version identity - "
+                f"{explain_unmatched_variant_annotation_version(meta)}")
             continue
 
         annotation_run = find_matching_annotation_run(meta, variant_annotation_version, pipeline_type)
         if annotation_run is None:
+            awaiting = AnnotationRun.objects.filter(
+                annotation_range_lock__version=variant_annotation_version, pipeline_type=pipeline_type,
+                external=True, vcf_annotated_filename__isnull=True).count()
             report["unmatched"].append(
-                f"{os.path.basename(meta_path)}: no local run awaiting annotation for range "
-                f"{meta['range']['min_variant']}..{meta['range']['max_variant']}")
+                f"{os.path.basename(meta_path)}: matched VAV {variant_annotation_version.pk} but no external run "
+                f"awaiting annotation has range {meta['range']['min_variant']}..{meta['range']['max_variant']} "
+                f"({awaiting} external run(s) still awaiting annotation for this VAV - already imported, or "
+                f"range boundaries differ)")
             continue
 
         annotated_vcf = find_annotated_vcf(meta_path)
