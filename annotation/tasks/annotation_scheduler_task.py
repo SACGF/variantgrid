@@ -89,22 +89,20 @@ def _handle_range_lock(range_lock, pipeline_type=None):
 
 @celery.shared_task(queue='db_workers')
 def count_annotation_run(annotation_run_id):
-    """ #1646 stage 2: count the variants a pending run will process (its pipeline_type, in range) and
-        store it on `count`. If empty, finish the run without a dump/dispatch. Runs on the db_workers
-        pool: it is a DB query (not VEP), so keeping it off annotation_workers means it is never
-        starved by running VEP jobs and never occupies a VEP slot - empties close promptly and the
-        dispatcher's re-kick can't build up a backlog of count tasks stuck behind VEP.
+    """ count variants a pending run will process and store in count
+        If empty, finish without requiring a full dump/dispatch
 
-        The write is a guarded update: it only lands if the run is still an un-counted, un-leased,
-        un-launched CREATED run, so it can never clobber a run the dispatcher has since picked up (in
-        which case the real dump computes the count anyway). """
+        We don't do this on scheduling queue as that has to be light/fast """
     annotation_run = AnnotationRun.objects.filter(pk=annotation_run_id).first()
     if annotation_run is None or annotation_run.external:
         return
     if annotation_run.status != AnnotationStatus.CREATED or annotation_run.count is not None:
         return  # already counted, or already leased/launched/finished
-    annotation_version = annotation_run.variant_annotation_version.get_any_annotation_version()
     range_lock = annotation_run.annotation_range_lock
+    if range_lock is None:
+        # Something else cleared this - this job is just a way to have a quick exit skipping is fine
+        return
+    annotation_version = range_lock.version.get_any_annotation_version()
     count = get_variants_qs_for_annotation(annotation_version, pipeline_type=annotation_run.pipeline_type,
                                            min_variant_id=range_lock.min_variant_id,
                                            max_variant_id=range_lock.max_variant_id).count()
