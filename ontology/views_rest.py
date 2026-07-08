@@ -37,7 +37,8 @@ class SearchMondoText(APIView):
     )
     def get(self, request, **kwargs) -> Response:
 
-        search_term = request.GET.get('search_term') or ''
+        # Cap the length of free text forwarded to the external Monarch search API
+        search_term = (request.GET.get('search_term') or '')[:200]
         gene_symbol = request.GET.get('gene_symbol')
 
         selected = [term.strip() for term in (request.GET.get('selected') or '').split(",") if term.strip()]
