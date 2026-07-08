@@ -100,13 +100,12 @@ class OntologyService(models.TextChoices):
         MeSH[0]
     })
 
-    # External sources (e.g. the Monarch search API) and users spell some prefixes differently
-    # from our canonical OntologyService values. Map the uppercased alias to the enum value.
+    # Alternate external spellings that differ from our canonical value (e.g. Monarch returns
+    # "Orphanet" for "ORPHA"). These can't be derived from the enum, so they're listed here.
+    # Prefixes that only differ by case are handled automatically by iterating the enum.
     PREFIX_ALIASES: dict[str, str] = Constant({
         "ORPHANET": ORPHANET[0],
         "MIM": OMIM[0],
-        "MEDGEN": MEDGEN[0],
-        "MESH": MeSH[0],
         "HPO": HPO[0],
     })
 
@@ -115,11 +114,14 @@ class OntologyService(models.TextChoices):
         """ Map a (possibly aliased or differently-cased) prefix to a supported OntologyService,
             or None if it isn't one we support (e.g. MPATH from the external Monarch search). """
         upper = prefix.strip().upper()
-        canonical = cls.PREFIX_ALIASES.get(upper, upper)
-        try:
+        # Canonical values matched case-insensitively - derived from the enum so a newly added
+        # OntologyService is recognised without touching PREFIX_ALIASES.
+        by_value = {service.value.upper(): service for service in cls}
+        if service := by_value.get(upper):
+            return service
+        if canonical := cls.PREFIX_ALIASES.get(upper):
             return cls(canonical)
-        except ValueError:
-            return None
+        return None
 
     @classmethod
     def is_supported_id(cls, term_id: str) -> bool:
