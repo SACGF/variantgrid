@@ -2,6 +2,7 @@ import logging
 import operator
 import os
 import subprocess
+from io import TextIOWrapper
 from functools import cached_property, reduce
 from typing import Optional
 
@@ -220,7 +221,11 @@ class IntersectionNode(AnalysisNode):
             with subprocess.Popen(args, stdin=subprocess.PIPE) as intercept_bed_pipe:
                 parent_node = self.get_single_parent()
                 parent_queryset = parent_node.get_queryset()
-                write_qs_to_vcf_file_sort_alphabetically(parent_queryset, intercept_bed_pipe.stdin)
+                # VCF is written as text; wrap the binary pipe so encoding happens at the handle
+                text_stdin = TextIOWrapper(intercept_bed_pipe.stdin, encoding="utf-8", write_through=True)
+                write_qs_to_vcf_file_sort_alphabetically(parent_queryset, text_stdin)
+                text_stdin.flush()
+                text_stdin.detach()
                 intercept_bed_pipe.communicate()
         else:
             super().write_cache(variant_collection)

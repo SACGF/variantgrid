@@ -1,12 +1,7 @@
-import csv
 import operator
 import re
 from collections import Counter
-from io import StringIO
 from typing import Iterator, Optional
-
-from vcf import Writer, Reader
-from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
 
 from analysis.grids import ExportVariantGrid
 from analysis.models import AnalysisNode
@@ -14,6 +9,7 @@ from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
 from library.django_utils.jqgrid_view import grid_export_csv
+from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile
 from patients.models_enums import Zygosity
 from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes
@@ -89,24 +85,16 @@ def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by
 
     use_accession = False
     info_dict = _get_colmodel_info_dict(colmodels)
-    vcf_template_file = _colmodels_to_vcf_header(genome_build, info_dict, samples, use_accession=use_accession)
-    vcf_reader = Reader(vcf_template_file, strict_whitespace=True)
+    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession)
 
     pseudo_buffer = StashFile()
-
-    vcf_writer = Writer(pseudo_buffer, vcf_reader)
-    # Need to pass escapechar
-    vcf_writer.writer = csv.writer(
-        pseudo_buffer,
-        delimiter="\t",
-        lineterminator="\n",
-        quoting=csv.QUOTE_NONE,
-        escapechar="\\",
-    )
+    writer = VCFWriter(pseudo_buffer, header_lines)
+    yield pseudo_buffer.value  # header
 
     for obj in items:
-        record = _grid_item_to_vcf_record(info_dict, obj, sample_ids, samples, use_accession=use_accession)
-        vcf_writer.write_record(record)
+        chrom, pos, vcf_id, ref, alt, info, fmt, sample_calls = \
+            _grid_item_to_vcf_row(info_dict, obj, sample_ids, samples, use_accession=use_accession)
+        writer.write_record(chrom, pos, ref, alt, vcf_id=vcf_id, info=info, fmt=fmt, sample_calls=sample_calls)
         yield pseudo_buffer.value
 
 
@@ -134,55 +122,60 @@ def _get_colmodel_info_dict(colmodels):
     return info_dict
 
 
-def _colmodels_to_vcf_header(genome_build, info_dict, samples, use_accession=True):
-    """ returns file which contains header """
+VCF_INFO_REPLACE = {
+    ";": ",:",  # semi-colon used as INFO delimiter
+    ",": "|",  # commas forbidden except as list
+}
 
-    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession)
-    return StringIO('\n'.join(header_lines))
+VCF_SAMPLE_FORMAT = ['GT', 'AD', 'AF', 'PL', 'DP', 'GQ']
 
 
-def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names, use_accession=True):
+def _vcf_info_encode(val):
+    if isinstance(val, str):
+        for old, new in VCF_INFO_REPLACE.items():
+            val = val.replace(old, new)
+    return val
+
+
+def _format_sample_value(value):
+    """ Mirror how the value is rendered in a sample column ('.' for missing) """
+    if value is None:
+        return "."
+    return str(value)
+
+
+def _format_sample_call(gt, ad, af, pl, dp, gq) -> str:
+    # GT leads whenever present; the remaining fields follow VCF_SAMPLE_FORMAT order
+    parts = [gt] if gt else []
+    parts.extend(_format_sample_value(v) for v in (ad, af, pl, dp, gq))
+    return ":".join(parts)
+
+
+def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accession=True):
     if use_accession:
-        CHROM = obj.get("locus__contig__refseq_accession", ".")
+        chrom = obj.get("locus__contig__refseq_accession", ".")
     else:
-        CHROM = obj.get("locus__contig__name", ".")
+        chrom = obj.get("locus__contig__name", ".")
 
-    POS = obj.get("locus__position", ".")
-    ID = obj.get("variantannotation__dbsnp_rs_id")
-    REF = obj.get("locus__ref__seq", ".")
-    ALT = obj.get("alt__seq", ".")
-    QUAL = '.'  # QUAL = obj.get("annotation__quality", ".")
-    FILTER = None
-    INFO = {}
+    pos = obj.get("locus__position", ".")
+    vcf_id = obj.get("variantannotation__dbsnp_rs_id")
+    if vcf_id is None:
+        vcf_id = "."
+    ref = obj.get("locus__ref__seq", ".")
+    alt = obj.get("alt__seq", ".")
 
-    INFO_REPLACE = {
-        ";": ",:",  # semi-colon used as INFO delimiter
-        ",": "|",  # commas forbidden except as list
-    }
-
+    info = {}
     for info_id, data in info_dict.items():
         col = data['column__variant_column']
         if val := obj.get(col):
-            if isinstance(val, str):
-                for old, new in INFO_REPLACE.items():
-                    val = val.replace(old, new)
-            INFO[info_id] = val
+            info[info_id] = _vcf_info_encode(val)
 
-    FORMAT = None
-    MY_FORMAT = ['GT', 'AD', 'AF', 'PL', 'DP', 'GQ']
-    CallData = make_calldata_tuple(MY_FORMAT)
-    sample_indexes = {}
-    samples = []
-
+    fmt = None
+    sample_calls = None
     if sample_ids:
-        FORMAT = ':'.join(MY_FORMAT)
-
-    alts = [_Substitution(ALT)]
-    ALT = alts
-    record = _Record(CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, sample_indexes)
-
-    if sample_ids:
-        for i, (sample_id, sample) in enumerate(zip(sample_ids, sample_names)):
+        fmt = ':'.join(VCF_SAMPLE_FORMAT)
+        sample_calls = []
+        for sample_id in sample_ids:
             sample_prefix = f"sample_{sample_id}_samples"
             ad = obj[f"{sample_prefix}_allele_depth"]
             zygosity = obj[f"{sample_prefix}_zygosity"]
@@ -190,25 +183,11 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names, use_acces
             dp = obj[f"{sample_prefix}_read_depth"]
             af = obj[f"{sample_prefix}_allele_frequency"]
             # GQ/PL/FT are optional now
-            # TODO: Ideally, we'd not write them out
             pl = obj.get(f"{sample_prefix}_phred_likelihood", ".")
             gq = obj.get(f"{sample_prefix}_genotype_quality", ".")
-            # These are all number=1
-            data_args = {'AD': [ad],
-                         'GT': gt,
-                         'PL': [pl],
-                         'DP': [dp],
-                         'GQ': [gq],
-                         'AF': [af]}
+            sample_calls.append(_format_sample_call(gt, ad, af, pl, dp, gq))
 
-            data = CallData(**data_args)
-            call = _Call(record, sample, data)
-            samples.append(call)
-            sample_indexes[sample] = i
-
-        record.samples = samples
-
-    return record
+    return chrom, pos, vcf_id, ref, alt, info or None, fmt, sample_calls
 
 
 def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] = None):

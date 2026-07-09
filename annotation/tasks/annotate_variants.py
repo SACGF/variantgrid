@@ -360,9 +360,9 @@ def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_
 
     # External dumps are written .vcf.gz (see AnnotationRun.get_dump_filename) - gzip on the way out
     if vcf_filename.endswith(".gz"):
-        f = gzip.open(vcf_filename, "wb", compresslevel=6)
+        f = gzip.open(vcf_filename, "wt", compresslevel=6)
     else:
-        f = open(vcf_filename, "wb")
+        f = open(vcf_filename, "wt")
     with f:
         return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=info_dict,
                                                       use_accession=use_accession)
