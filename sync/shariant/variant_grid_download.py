@@ -1,3 +1,4 @@
+import re
 import time
 from typing import Optional
 
@@ -31,12 +32,20 @@ class VariantGridDownloadSyncer(SyncRunner):
                   'type': 'json',
                   'build': required_build}
 
+        _safe_identifier = re.compile(r'^[\w\-]+$')
+
         exclude_labs = config.get('exclude_labs', None)
         if exclude_labs:
+            for lab in exclude_labs:
+                if not _safe_identifier.match(str(lab)):
+                    raise ValueError(f"exclude_labs contains unsafe value: {lab!r}")
             params['exclude_labs'] = ','.join(exclude_labs)
 
         exclude_orgs = config.get('exclude_orgs', None)
         if exclude_orgs:
+            for org in exclude_orgs:
+                if not _safe_identifier.match(str(org)):
+                    raise ValueError(f"exclude_orgs contains unsafe value: {org!r}")
             params['exclude_orgs'] = ','.join(exclude_orgs)
 
         if not sync_run_instance.full_sync:
@@ -92,12 +101,18 @@ class VariantGridDownloadSyncer(SyncRunner):
                 return None
 
             if not lab:
+                _lab_group_name_re = re.compile(r'^[\w\-]+/[\w\-]+$')
+                if not _lab_group_name_re.match(lab_group_name):
+                    raise ValueError(f"lab_group_name has unexpected format: {lab_group_name!r}")
                 parts = lab_group_name.split('/')
+                lab_name = meta.get('lab_name') or parts[1]
+                if not isinstance(lab_name, str) or len(lab_name) > 255:
+                    raise ValueError(f"lab_name is invalid: {lab_name!r}")
                 org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
                 australia, _ = Country.objects.get_or_create(name='Australia')
                 Lab.objects.create(
                     group_name=lab_group_name,
-                    name=meta.get('lab_name'),
+                    name=lab_name,
                     organization=org,
                     city='Unknown',
                     country=australia,
