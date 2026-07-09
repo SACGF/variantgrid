@@ -37,7 +37,6 @@ django_termsandconditions
 djangorestframework
 easy_thumbnails
 fontawesomefree==6.4.0
-git+https://github.com/davmlaw/django-starfield#egg=django_starfield
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
 git+https://github.com/biocommons/hgvs#egg=hgvs
 git+https://github.com/dridk/PyVCF3#egg=pyvcf3
