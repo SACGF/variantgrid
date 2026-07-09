@@ -672,6 +672,11 @@ class Lab(models.Model, PreviewModelMixin, LabLike):
         group_names = list(user.groups.values_list('name', flat=True))
         return Lab.objects.select_related('organization').filter(group_name__in=group_names).order_by('name')
 
+    @staticmethod
+    def has_active_lab(user: User, admin_check=False) -> bool:
+        """ Whether the user has access to any lab belonging to an active organization """
+        return Lab.valid_labs_qs(user=user, admin_check=admin_check).filter(organization__active=True).exists()
+
     """
     # these methods have been superseeded by having full classification activity by lab
     def classifications_activity(self, time_period: timedelta):
