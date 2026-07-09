@@ -37,7 +37,7 @@
 </style>
 <script>
     function setupClinVarStars(bifSelect) {
-        let starsContainer = $("#django-starfield-clinvar_stars_min");
+        let starsContainer = $("#stars-clinvar_stars_min");
 
         // We need to add a zero radio input, because it doesn't save to DB when none are selected.
         let inputZero = $("<input/>", {
@@ -80,7 +80,7 @@
     }
 
     function getStarsRadioInputs() {
-        let starsContainer = $("#django-starfield-clinvar_stars_min");
+        let starsContainer = $("#stars-clinvar_stars_min");
         return $('input[type="radio"]', starsContainer);
     }
 

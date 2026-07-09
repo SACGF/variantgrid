@@ -687,7 +687,6 @@ INSTALLED_APPS = [
     'user_messages',
     'django_dag',
     'django_js_reverse',
-    'django_starfield',
     'django_extensions',
     'djgeojson',
     'easy_thumbnails',

@@ -5,7 +5,6 @@ from django import forms
 from django.forms.models import fields_for_model
 from django.forms.widgets import TextInput, HiddenInput
 from django.utils.text import slugify
-from django_starfield import Stars
 
 from analysis import models
 from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis, MOINode
@@ -35,7 +34,7 @@ from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_coordinate, get_hgvs_variant, HGVSException
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
-from library.forms import NumberInput
+from library.forms import NumberInput, StarsWidget
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
@@ -223,7 +222,7 @@ class BuiltInFilterNodeForm(BaseNodeForm):
     class Meta:
         model = models.BuiltInFilterNode
         fields = ("built_in_filter", "clinvar_stars_min", "cosmic_count_min")
-        widgets = {"clinvar_stars_min": Stars(stars=4),
+        widgets = {"clinvar_stars_min": StarsWidget(stars=4),
                    "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1})}
 
 

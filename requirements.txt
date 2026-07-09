@@ -119,7 +119,6 @@ django==6.0.6
     #   django-model-utils
     #   django-postgres-extra
     #   django-recaptcha
-    #   django-starfield
     #   django-storages
     #   django-termsandconditions
     #   djangorestframework
@@ -180,8 +179,6 @@ django-postgres-extra==2.0.4
 django-recaptcha==4.1.0
     # via -r requirements.in
 django-registration-redux==2.13
-    # via -r requirements.in
-django-starfield @ git+https://github.com/davmlaw/django-starfield@a7bb433bb645a989cc0f01b4543bde5e5ce210a7#egg=django_starfield
     # via -r requirements.in
 django-storages==1.14.6
     # via -r requirements.in
