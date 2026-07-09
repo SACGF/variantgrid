@@ -11,8 +11,8 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
 <script>
-    let baseUriApi = `{{ base_url | jsstring }}`;
-    let baseUriRedirect = `{{ base_url_redirect | jsstring }}`;
+    let baseUriApi = `{{ base_url | jsonify }}`;
+    let baseUriRedirect = `{{ base_url_redirect | jsonify }}`;
     let paramString = '';
     let errorString = null;
     let lastFormat = null;
