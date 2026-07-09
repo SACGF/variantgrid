@@ -225,9 +225,6 @@
                 {% endfor %}
 
                 {% if historical_variant_annotation_versions %}
-                    <button type="button" class="btn btn-link ml-2" data-toggle="collapse" data-target="#historical-vavs" aria-expanded="false">
-                        Show historical…
-                    </button>
                     <span id="historical-vavs" class="collapse">
                         <label class="p-3">Historical</label>
                         {% for vav in historical_variant_annotation_versions %}
@@ -238,6 +235,11 @@
                     </span>
                 {% endif %}
             </div>
+            {% if historical_variant_annotation_versions %}
+                <button type="button" class="btn btn-link ml-2" data-toggle="collapse" data-target="#historical-vavs" aria-expanded="false">
+                    Show historical…
+                </button>
+            {% endif %}
             {% endlabelled %}
 
             {% labelled label="Status" %}
