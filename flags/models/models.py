@@ -163,7 +163,7 @@ class Flag(TimeStampedModel):
         if resolution is not None:
             if permission_check:
                 if current_permission < self.flag_type.permission_enum:
-                    raise PermissionError(f"User does not have permission to {resolution.label} flag")
+                    raise PermissionError("Insufficient permissions to change flag resolution")
 
             # don't need to save the flag on creation as it will be created with the correct resolution
             if not first_comment:
@@ -509,11 +509,11 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         if permission_check:
             if flag_type.context_id != self.context_id:
-                raise PermissionError(f"Flag type {flag_type.id} not available in flag context {self.context.label}")
+                raise PermissionError("Flag type not available in this context")
             current_level = self.permission_level(user)
             required_level = flag_type.raise_permission
             if current_level < required_level:
-                raise PermissionError(f"User does not have {required_level} permissions on flag collection")
+                raise PermissionError("Insufficient permissions to raise this flag type")
 
         if resolution is None:
             resolution = flag_type.default_resolution()
