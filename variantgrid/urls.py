@@ -51,7 +51,7 @@ urlpatterns = [
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.INBOX_ENABLED:
-    urlpatterns += [path('messages/', include('django_messages.urls'))]
+    urlpatterns += [path('messages/', include('user_messages.urls'))]
 
 if settings.DEBUG:
     if 'debug_toolbar' in settings.INSTALLED_APPS:

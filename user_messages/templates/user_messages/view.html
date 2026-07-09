@@ -1,0 +1,18 @@
+{% extends "user_messages/base.html" %}
+{% load ui_utils %}
+{% load i18n %}
+{% block content %}
+    <div class="container">
+        <h3>{% trans "View Message" %}</h3>
+        {% labelled label="Subject" %}<strong>{{ message.subject }}</strong>{% endlabelled %}
+        {% labelled label="Sender" %}{{ message.sender }}{% endlabelled %}
+        {% labelled label="Date" %}{{ message.sent_at|date:_("DATETIME_FORMAT")}}{% endlabelled %}
+        {% labelled label="Recipient" %}{{ message.recipient }}{% endlabelled %}
+
+        <div class="message-body mt-3">{{ message.body_html }}</div>
+
+        <div class="btn-toolbar">
+            <a class="btn btn-outline-danger" href="{% url 'messages_delete' message.id %}">{% trans "Delete" %}</a>
+        </div>
+    </div>
+{% endblock %}

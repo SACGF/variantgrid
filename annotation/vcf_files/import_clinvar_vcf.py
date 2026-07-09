@@ -4,7 +4,7 @@ import os
 import cyvcf2
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django_messages.admin import User
+from django.contrib.auth.models import User
 
 from annotation.models import ClinVarReviewStatus, Variant
 from annotation.models.models import ClinVar, ClinVarVersion

@@ -3,6 +3,7 @@ import uuid
 from html import escape
 from typing import Optional
 
+import bleach
 from bs4 import BeautifulSoup
 from django.utils.safestring import SafeString
 
@@ -45,6 +46,31 @@ def cautious_attempt_html_to_text(text: str, whitelist: set[str] = None) -> str:
         if tag.name.lower() not in whitelist:
             return text
     return bs.get_text()
+
+
+# Tags/attributes/protocols allowed when displaying untrusted text that may contain HTML
+# (e.g. user-to-user inbox messages). Keeps basic formatting and links, escapes everything else.
+SANITIZE_HTML_ALLOWED_TAGS = {'a', 'b', 'i', 'u', 'strong', 'em', 'sup', 'sub', 'br', 'p',
+                              'ul', 'ol', 'li', 'span', 'div'}
+SANITIZE_HTML_ALLOWED_ATTRIBUTES = {'a': ['href', 'title']}
+SANITIZE_HTML_ALLOWED_PROTOCOLS = ['http', 'https', 'mailto']
+
+
+def sanitize_html(text: str) -> SafeString:
+    """
+    Sanitize untrusted text that may contain HTML so it is safe to render unescaped.
+    A small whitelist of formatting tags and links is preserved; any other tags/attributes
+    (e.g. <script>, onerror=, javascript: hrefs) are escaped or stripped.
+    :param text: Untrusted text that may contain HTML
+    :return: A SafeString containing only whitelisted HTML
+    """
+    if not text:
+        return SafeString("")
+    cleaned = bleach.clean(text,
+                           tags=SANITIZE_HTML_ALLOWED_TAGS,
+                           attributes=SANITIZE_HTML_ALLOWED_ATTRIBUTES,
+                           protocols=SANITIZE_HTML_ALLOWED_PROTOCOLS)
+    return SafeString(cleaned)
 
 
 def html_to_text(html_str: str, preserve_lines: bool = False) -> Optional[str]:

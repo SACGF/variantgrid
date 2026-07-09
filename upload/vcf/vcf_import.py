@@ -10,7 +10,7 @@ from django.conf import settings
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django.utils import timezone
-from django_messages.models import Message
+from user_messages.models import Message
 
 from library.genomics.vcf_enums import VCFConstant
 from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, cyvcf2_get_contig_lengths_dict
@@ -425,7 +425,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
 def create_import_success_message(vcf):
     subject = f"VCF '{vcf.name}' import complete"
     url = reverse('view_vcf', kwargs={'vcf_id': vcf.pk})
-    body = f"VCF {vcf.name} imported as <a href='{url}'>vcf #{vcf.pk}</a>"
+    body = f"VCF {vcf.name} imported as [vcf #{vcf.pk}]({url})"
 
     user = vcf.user
     user_settings = UserSettings.get_for_user(user)

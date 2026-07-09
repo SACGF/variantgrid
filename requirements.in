@@ -39,7 +39,6 @@ drf-spectacular
 drf-spectacular-sidecar
 easy_thumbnails
 fontawesomefree==6.4.0
-git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/davmlaw/django-starfield#egg=django_starfield
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
 git+https://github.com/biocommons/hgvs#egg=hgvs
