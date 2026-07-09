@@ -10,6 +10,7 @@ import vcf
 from django.conf import settings
 
 from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.genomics.vcf_writer import VCFInfoHeader, build_header_lines, symbolic_alt_info, VCFWriter
 from library.utils import open_handle_gzip, open_file_or_filename
 from snpdb.models import Variant, Sequence, GenomeFasta, SequenceRole, VariantCoordinate
 
@@ -56,30 +57,25 @@ def write_vcf_from_variant_coordinates(file_or_filename: Union[str, IO], variant
     vc_and_ids = sorted(vc_and_ids, key=operator.itemgetter(0))
 
     info = [
-        '##INFO=<ID=END,Number=.,Type=Integer,Description="Stop position of the interval">',
-        '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Difference in length between REF and ALT alleles">',
-        '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">',
+        VCFInfoHeader(id="END", type="Integer", number=".", description="Stop position of the interval"),
+        VCFInfoHeader(id="SVLEN", type="Integer", description="Difference in length between REF and ALT alleles"),
+        VCFInfoHeader(id="SVTYPE", type="String", description="Type of structural variant"),
     ]
-    columns = "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"])
-    header = "\n".join(["##fileformat=VCFv4.1", "##source=VariantGrid"] + info + header_lines + ["#" + columns])
+    # Caller-supplied header_lines slot in just before the #CHROM line (the contig_lines slot)
+    built_header_lines = build_header_lines(meta_lines=["##source=VariantGrid"], info=info,
+                                            contig_lines=header_lines)
     with open_file_or_filename(file_or_filename, mode="wt", encoding="utf-8") as f:
-        f.write(header + "\n")
+        writer = VCFWriter(f, built_header_lines)
         for variant_coordinate, vcf_id in vc_and_ids:
             (chrom, position, ref, alt, svlen) = variant_coordinate
-            if Sequence.allele_is_symbolic(alt):
-                svtype = alt[1:-1]  # Strip off brackets
-                info_dict = {
-                    "SVLEN": svlen,
-                    "SVTYPE": svtype,
-                    "END": variant_coordinate.end,
-                }
-                record_info = ";".join([f"{k}={v}" for k,v in info_dict.items()])
-            else:
-                record_info = "."
-                if alt == Variant.REFERENCE_ALT:
-                    alt = "."
-            line = "\t".join((chrom, str(position), str(vcf_id), ref, alt, ".", ".", record_info))
-            f.write(line + "\n")
+            record_info = symbolic_alt_info(alt, svlen=svlen, end=variant_coordinate.end)
+            if record_info:
+                # Preserve historical INFO ordering for this writer: SVLEN;SVTYPE;END
+                record_info = {"SVLEN": record_info["SVLEN"], "SVTYPE": record_info["SVTYPE"],
+                               "END": record_info["END"]}
+            elif alt == Variant.REFERENCE_ALT:
+                alt = "."
+            writer.write_record(chrom, position, ref, alt, vcf_id=vcf_id, info=record_info or None)
 
 
 def vcf_to_variant_coordinates_and_records(filename: str) -> Iterable[tuple[VariantCoordinate, cyvcf2.Variant]]:
