@@ -4,12 +4,22 @@ from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _
 
 from user_messages.forms import ComposeForm
 from user_messages.models import Message
 
 User = get_user_model()
+
+
+def _safe_next(request):
+    """ Returns the validated ``next`` redirect target, falling back to the inbox for untrusted URLs. """
+    next_url = request.GET.get('next')
+    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()},
+                                                    require_https=request.is_secure()):
+        return next_url
+    return reverse('messages_inbox')
 
 
 def inbox(request):
@@ -37,7 +47,7 @@ def compose(request, recipient=None):
         if form.is_valid():
             form.save(sender=request.user)
             messages.info(request, _("Message successfully sent."))
-            return HttpResponseRedirect(request.GET.get('next') or reverse('messages_inbox'))
+            return HttpResponseRedirect(_safe_next(request))
     else:
         form = ComposeForm(initial={"subject": request.GET.get("subject", "")})
         if recipient is not None:
@@ -65,7 +75,7 @@ def delete(request, message_id):
     if deleted:
         message.save()
         messages.info(request, _("Message successfully deleted."))
-        return HttpResponseRedirect(request.GET.get('next') or reverse('messages_inbox'))
+        return HttpResponseRedirect(_safe_next(request))
     raise Http404
 
 
@@ -83,7 +93,7 @@ def undelete(request, message_id):
     if undeleted:
         message.save()
         messages.info(request, _("Message successfully recovered."))
-        return HttpResponseRedirect(request.GET.get('next') or reverse('messages_inbox'))
+        return HttpResponseRedirect(_safe_next(request))
     raise Http404
 
 
