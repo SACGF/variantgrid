@@ -35,6 +35,11 @@ ANNOTATION_VEP_BATCH_MAX = 25_000  # Set to None to do all in 1 job (probably wa
 # Worker-slot count is derived live from the annotation_workers pool (annotation.celery_utils);
 # this fallback is only used when celery inspection sees no workers (eg headless/cron, no pool up).
 ANNOTATION_WORKER_SLOTS_FALLBACK = 2
+# The annotation DB-upload phase (import_annotation_run) runs on db_workers, not the throttled
+# annotation_workers (VEP) pool - #1649. This is its own dispatch budget, sized to match the
+# db_workers pool (--concurrency=4 in the reference config) so imports can use the full pool and
+# drain fast. Deployments that raise db_workers --concurrency should raise this to match.
+ANNOTATION_UPLOAD_WORKER_SLOTS = 4
 # Lease reclaims (dead-worker re-dispatch) allowed before a run is failed to ERROR.
 ANNOTATION_MAX_RUN_ATTEMPTS = 3
 # Lease window. Must exceed the worst-case single-run time so a live worker is never reclaimed

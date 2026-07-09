@@ -48,6 +48,14 @@ def _trigger_dispatch(variant_annotation_version_id):
     sig.apply_async(countdown=3)
 
 
+def _dispatch_trigger_sig(variant_annotation_version_id) -> Signature:
+    """ Immutable by-name dispatcher kick, for chaining after a retry's cleanup task so the dispatcher
+        only re-picks the run once the cleanup has committed (a retry must not race its own scrub). The
+        run then routes by status - upload-only stays ANNOTATION_COMPLETED (import lane), a full retry is
+        a fresh CREATED run (VEP lane). #1649 """
+    return Signature(DISPATCH_ANNOTATION_RUNS_TASK, args=(variant_annotation_version_id,), immutable=True)
+
+
 @celery.shared_task
 def delete_annotation_run(annotation_run_id):
     try:
@@ -75,6 +83,12 @@ def assign_range_lock_to_annotation_run(annotation_run_id, annotation_range_lock
 
 @celery.shared_task
 def annotate_variants(annotation_run_id):
+    """ VEP lane (annotation_workers): dump unannotated variants + run the VEP subprocess, then stop at
+        ANNOTATION_COMPLETED and release the lease. The DB upload is deliberately NOT done here - the
+        dispatcher re-picks the completed run in its resume lane and runs import_annotation_run on
+        db_workers, so a throttled VEP slot is never held through the bulk insert. External runs
+        (#1568) never reach this - they're dumped off-VM and rejoin post-VEP as ANNOTATION_COMPLETED.
+        See #1649. """
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
     logging.info("annotate_variants: %s", annotation_run)
 
@@ -106,12 +120,8 @@ def annotate_variants(annotation_run_id):
 
         if annotation_run.vcf_annotated_filename is None:
             dump_and_annotate_variants(annotation_run)
-
-        if annotation_run.vcf_annotated_filename:
-            import_vcf_annotations(annotation_run)
-
-        annotation_run_complete_signal.send(sender=os.path.basename(__file__),
-                                            variant_annotation_version=annotation_run.annotation_range_lock.version)
+        # DB upload now runs as a separate db_workers task (import_annotation_run), launched by the
+        # dispatcher when this run reaches ANNOTATION_COMPLETED. #1649
     except Exception as e:
         tb = get_traceback()
         error_message = f"{e}: {annotation_run.pipeline_stderr}"
@@ -131,6 +141,52 @@ def annotate_variants(annotation_run_id):
         annotation_run.set_task_log("end", timezone.now())
         # #2667: release the dispatcher lease so the now-completed run no longer looks in-flight,
         # then kick the dispatcher to refill this freed worker slot (covers success and failure).
+        annotation_run.task_id = None
+        annotation_run.leased_by = None
+        annotation_run.lease_expires = None
+        annotation_run.save()
+        _trigger_dispatch(annotation_run.annotation_range_lock.version_id)
+
+
+@celery.shared_task
+def import_annotation_run(annotation_run_id):
+    """ Import lane (db_workers): bulk-load an already-annotated VCF into the DB. Reached for every run
+        once it is ANNOTATION_COMPLETED with an annotated VCF present - whether VEP just finished in-VM,
+        an external run (#1568) was imported, or an upload-only retry reset it. Kept off annotation_workers
+        so quick DB inserts never consume a throttled VEP slot. See #1649. """
+    annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+
+    # task_id used as Celery lock (as annotate_variants) so a double-dispatch can't double-import
+    num_modified = AnnotationRun.objects.filter(
+        pk=annotation_run.pk, task_id__isnull=True).update(task_id=import_annotation_run.request.id)
+    if num_modified != 1:
+        msg = f"Celery couldn't get task_id lock on AnnotationRun: {annotation_run.pk}"
+        annotation_run.celery_task_logs[import_annotation_run.request.id] = msg
+        annotation_run.save()
+        raise ValueError(msg)
+
+    try:
+        # Reload to get updated task_id
+        annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+        annotation_run.task_id = import_annotation_run.request.id
+        annotation_run.set_task_log("import_start", timezone.now())
+        annotation_run.save()
+
+        import_vcf_annotations(annotation_run)
+        # The run is only truly complete once imported (moved here from annotate_variants). #1649
+        annotation_run_complete_signal.send(sender=os.path.basename(__file__),
+                                            variant_annotation_version=annotation_run.annotation_range_lock.version)
+    except Exception:
+        tb = get_traceback()
+        create_event(None, "AnnotationRun import failed", tb, severity=LogLevel.ERROR)
+        annotation_run.error_exception = tb
+        annotation_run.set_task_log("error_exception", tb)
+        annotation_run.save()
+        raise
+    finally:
+        annotation_run.set_task_log("import_end", timezone.now())
+        # #2667: release the dispatcher lease so the now-completed run no longer looks in-flight, then
+        # kick the dispatcher to refill this freed import slot (covers success and failure).
         annotation_run.task_id = None
         annotation_run.leased_by = None
         annotation_run.lease_expires = None
@@ -244,11 +300,13 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
     annotation_run.save()
 
     if upload_only:
+        # Delete uploaded data, then hand back to the dispatcher: the run stays ANNOTATION_COMPLETED with
+        # its annotated VCF present -> import lane -> db_workers (import_annotation_run). #1649
         tasks = [
             delete_annotation_run_uploaded_data.si(annotation_run.pk),
         ]
     else:
-        # Delete old AnnotationRun then try again.
+        # Delete old AnnotationRun then try again: a fresh CREATED run -> VEP lane (annotate_variants). #1649
         old_annotation_run = annotation_run
         annotation_run = AnnotationRun.objects.create(pipeline_type=old_annotation_run.pipeline_type)
         tasks = [
@@ -256,7 +314,9 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
             assign_range_lock_to_annotation_run.si(annotation_run.pk, annotation_range_lock.pk),
         ]
 
-    tasks.append(annotate_variants.si(annotation_run.pk))
+    # #1649: retry no longer launches annotate_variants inline - it hands back to the single-authority
+    # dispatcher (preserving lease/reclaim/attempt-cap), which launches the right lane by status.
+    tasks.append(_dispatch_trigger_sig(annotation_range_lock.version_id))
     task = chain(tasks)
     task.apply_async()
 
