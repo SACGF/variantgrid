@@ -325,7 +325,8 @@ def build_snakemake_config(pipeline_type=VariantAnnotationPipelineType.STANDARD)
     """ config.yaml defaults - server paths the operator edits to point at the compute box (#1568). """
     config = {
         "dump_dir": ".",
-        "output_dir": "annotated",
+        # Have Snakemake write in same dir as sidecar so  --import finds them
+        "output_dir": ".",
         "vep_code_dir": settings.ANNOTATION_VEP_CODE_DIR,
         "vep_cache_dir": settings.ANNOTATION_VEP_CACHE_DIR,
         "vep_plugins_dir": settings.ANNOTATION_VEP_PLUGINS_DIR,
@@ -540,8 +541,8 @@ def explain_unmatched_annotation_run(meta: dict, variant_annotation_version: Var
 
 
 def find_annotated_vcf(meta_path: str) -> Optional[str]:
-    """ The annotated VCF sitting alongside a .meta.json sidecar (written by the Snakemake bundle) - None if
-        it has not been annotated/copied back yet (#1568). """
+    """ The annotated VCF sitting alongside a .meta.json sidecar (written by the Snakemake bundle, whose
+        config.yaml output_dir defaults to the dump dir) - None if it has not been annotated yet (#1568). """
     directory = os.path.dirname(meta_path)
     stem = os.path.basename(meta_path)[:-len(".meta.json")]
     for suffix in (ANNOTATED_VCF_SUFFIX, ".vep_annotated.vcf"):
