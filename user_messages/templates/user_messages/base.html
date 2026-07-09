@@ -1,0 +1,10 @@
+{% extends "uicore/page/base.html" %}
+{% load i18n %}
+{% block submenu %}
+    <a class="nav-link" href="{% url 'messages_inbox' %}">{% trans "Inbox" %}</a>
+    {% comment %}
+    <a class="nav-link" href="{% url 'messages_outbox' %}">{% trans "Sent Messages" %}</a>
+    <a class="nav-link" href="{% url 'messages_compose' %}">{% trans "New Message" %}</a>
+    {% endcomment %}
+    <a class="nav-link" href="{% url 'messages_trash' %}">{% trans "Trash" %}</a>
+{% endblock submenu %}

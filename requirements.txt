@@ -116,7 +116,6 @@ django==6.0.6
     #   django-guardian
     #   django-js-reverse
     #   django-leaflet
-    #   django-messages
     #   django-model-utils
     #   django-postgres-extra
     #   django-recaptcha
@@ -173,7 +172,6 @@ django-json-widget==2.1.1
     # via -r requirements.in
 django-leaflet==0.33.0
     # via -r requirements.in
-django-messages @ git+https://github.com/davmlaw/django-messages/@36920f188536d60b263320325577aa0ef87de4f4#egg=django-messages
     # via -r requirements.in
 django-model-utils==5.0.0
     # via -r requirements.in

@@ -5,7 +5,7 @@ from typing import Optional
 from auditlog.context import set_extra_data
 from django.dispatch import receiver
 from django.urls import reverse
-from django_messages.admin import User
+from django.contrib.auth.models import User
 
 from classification.enums import ShareLevel, SpecialEKeys, ClinicalSignificance
 from classification.models import classification_post_publish_signal, Classification, classification_flag_types, \

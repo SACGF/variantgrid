@@ -684,7 +684,7 @@ INSTALLED_APPS = [
     'auditlog',
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
-    'django_messages',
+    'user_messages',
     'django_dag',
     'django_js_reverse',
     'django_starfield',

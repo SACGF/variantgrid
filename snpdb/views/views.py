@@ -23,7 +23,7 @@ from django.urls.base import reverse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
-from django_messages.models import Message
+from user_messages.models import Message
 from global_login_required import login_not_required
 from guardian.shortcuts import get_objects_for_group, get_objects_for_user
 from termsandconditions.decorators import terms_required
