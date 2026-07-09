@@ -5,7 +5,7 @@ from datetime import timedelta
 import celery
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Case, F, IntegerField, Q, Value, When
+from django.db.models import F, Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
@@ -15,7 +15,7 @@ from annotation.celery_utils import annotation_worker_slots
 from annotation.models import AnnotationRun, AnnotationStatus, VariantAnnotationPipelineType, \
     VariantAnnotationVersion
 from annotation.models.models import AnnotationVersion, AnnotationRangeLock
-from annotation.tasks.annotate_variants import annotate_variants
+from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
 from library.log_utils import log_traceback
 from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF, Variant, JobsControl
 
@@ -240,19 +240,25 @@ def _dispatch_sweep():
         # #1646: fill `count` (and finish empties) off-thread before we consider dispatching.
         _trigger_counts_for_uncounted_runs(vav)
 
-    slots = annotation_worker_slots()
-    in_flight = sum(_in_flight_runs_qs(vav, now).count() for vav in vavs)
-    capacity = slots - in_flight
-    logging.info("dispatch sweep: slots=%d in_flight=%d capacity=%d", slots, in_flight, capacity)
-    if capacity <= 0:
-        return
+    # #1649: two independent budgets - VEP (annotation_workers) and DB import (db_workers). Quick imports
+    # drain at their own concurrency and never wait behind (or eat a slot of) VEP, and vice versa.
+    vep_slots = annotation_worker_slots()
+    vep_in_flight = sum(_lane_in_flight_qs(vav, now, _VEP_RUNNING_STATUSES).count() for vav in vavs)
+    vep_capacity = vep_slots - vep_in_flight
+
+    upload_slots = settings.ANNOTATION_UPLOAD_WORKER_SLOTS
+    upload_in_flight = sum(_lane_in_flight_qs(vav, now, _IMPORT_RUNNING_STATUSES).count() for vav in vavs)
+    upload_capacity = upload_slots - upload_in_flight
+
+    logging.info("dispatch sweep: vep slots=%d in_flight=%d cap=%d | import slots=%d in_flight=%d cap=%d",
+                 vep_slots, vep_in_flight, vep_capacity, upload_slots, upload_in_flight, upload_capacity)
 
     worker_id = f"dispatch:{dispatch_annotation_runs.request.id or 'sync'}"
-    # Phase 1: upload-only runs across all versions. Phase 2: heavy CREATED dump+VEP runs, with whatever
-    # capacity phase 1 left. Both share the same budget so we never lease more than the pool can run.
-    capacity = _lease_across_vavs(vavs, AnnotationStatus.ANNOTATION_COMPLETED, capacity, worker_id, now)
-    if capacity > 0:
-        _lease_across_vavs(vavs, AnnotationStatus.CREATED, capacity, worker_id, now)
+    # Import lane first so cheap DB imports (sometimes user-awaited) launch without waiting on the VEP scan.
+    if upload_capacity > 0:
+        _lease_across_vavs(vavs, AnnotationStatus.ANNOTATION_COMPLETED, upload_capacity, worker_id, now)
+    if vep_capacity > 0:
+        _lease_across_vavs(vavs, AnnotationStatus.CREATED, vep_capacity, worker_id, now)
 
 
 def _lease_across_vavs(vavs, status, capacity, worker_id, now) -> int:
@@ -287,37 +293,27 @@ def _dispatch_for_vav(vav: VariantAnnotationVersion):
     # system still closes empty runs (on db_workers, not competing with VEP).
     _trigger_counts_for_uncounted_runs(vav)
 
-    slots = annotation_worker_slots()
-    in_flight = _in_flight_runs_qs(vav, now).count()
-    capacity = slots - in_flight
-    logging.info("dispatch_annotation_runs(%s): slots=%d in_flight=%d capacity=%d",
-                 vav, slots, in_flight, capacity)
-    if capacity <= 0:
-        return
+    # #1649: two independent budgets - VEP (annotation_workers) and DB import (db_workers). Each lane's
+    # in-flight is counted only against its own pool, so a saturated VEP pool never blocks a quick import
+    # (and never eats an import slot), and vice versa.
+    vep_slots = annotation_worker_slots()
+    vep_capacity = vep_slots - _lane_in_flight_qs(vav, now, _VEP_RUNNING_STATUSES).count()
+    upload_slots = settings.ANNOTATION_UPLOAD_WORKER_SLOTS
+    upload_capacity = upload_slots - _lane_in_flight_qs(vav, now, _IMPORT_RUNNING_STATUSES).count()
+    logging.info("dispatch_annotation_runs(%s): vep slots=%d cap=%d | import slots=%d cap=%d",
+                 vav, vep_slots, vep_capacity, upload_slots, upload_capacity)
 
-    if _dispatchable_runs_qs(vav, now).count() > capacity:
-        # A real backlog exists (more pending work than free capacity) - merge it into bigger batches
-        # before leasing. With free capacity for everything, we skip this and launch as-is (low latency).
-        merge_pending_range_locks(vav, settings.ANNOTATION_VEP_BATCH_MAX)
-
-    # #1646: launch the cheap jobs first so slots free up faster. Two tiers:
-    #   0 - resume upload-only runs (past VEP, just the quick DB upload)
-    #   1 - the heavy CREATED dump+VEP+upload runs
-    # Empty runs never reach here - the count task (stage 2) finishes them without a dispatch. Within
-    # each tier, lowest-pk-first so the 'lowest unannotated id' watermark keeps moving and waiting VCF
-    # pipelines unblock in order.
+    # #1646/#1649: import lane first so the cheap DB upload of an already-annotated VCF (past VEP, sometimes
+    # user-awaited) launches ahead of the heavy CREATED dump+VEP runs. Each tier is bounded by its own
+    # budget; _lease_across_vavs merges the CREATED backlog into bigger VEP batches when it exceeds capacity.
+    # Empty runs never reach here - the count task (stage 2) finishes them without a dispatch. Within each
+    # tier, lowest-pk-first so the 'lowest unannotated id' watermark keeps moving and waiting VCF pipelines
+    # unblock in order.
     worker_id = f"dispatch:{dispatch_annotation_runs.request.id or 'sync'}"
-    dispatchable = _dispatchable_runs_qs(vav, now).annotate(
-        dispatch_priority=Case(When(status=AnnotationStatus.ANNOTATION_COMPLETED, then=Value(0)),
-                               default=Value(1), output_field=IntegerField())
-    ).order_by("dispatch_priority", "annotation_range_lock__min_variant_id")
-    launched = 0
-    for annotation_run in dispatchable:
-        if launched >= capacity:
-            break
-        _lease_and_launch_run(annotation_run, worker_id, now)
-        launched += 1
-    logging.info("dispatch_annotation_runs(%s): launched %d run(s)", vav, launched)
+    if upload_capacity > 0:
+        _lease_across_vavs([vav], AnnotationStatus.ANNOTATION_COMPLETED, upload_capacity, worker_id, now)
+    if vep_capacity > 0:
+        _lease_across_vavs([vav], AnnotationStatus.CREATED, vep_capacity, worker_id, now)
 
 
 def _dispatchable_runs_qs(vav: VariantAnnotationVersion, now):
@@ -354,6 +350,27 @@ def _in_flight_runs_qs(vav: VariantAnnotationVersion, now):
         .exclude(resume_ready)
 
 
+# #1649: two independent lanes, each with its own worker pool and dispatch budget. A run is leased
+# twice over its life - once for VEP (annotation_workers), once for the DB import (db_workers) - so
+# in-flight accounting is split by which lane's task is executing.
+# VEP lane: annotate_variants is running (leased/tasked, not yet past VEP). Occupies an annotation_workers
+# slot. ANNOTATION_COMPLETED is excluded - VEP is done and its lease released.
+_VEP_RUNNING_STATUSES = [AnnotationStatus.CREATED, AnnotationStatus.DUMP_STARTED,
+                         AnnotationStatus.DUMP_COMPLETED, AnnotationStatus.ANNOTATION_STARTED]
+# Import lane: import_annotation_run is running (leased/tasked). Occupies a db_workers import slot.
+_IMPORT_RUNNING_STATUSES = [AnnotationStatus.ANNOTATION_COMPLETED, AnnotationStatus.UPLOAD_STARTED]
+
+
+def _lane_in_flight_qs(vav: VariantAnnotationVersion, now, statuses):
+    """ Runs of the given lane currently occupying one of that lane's worker slots: a live lease or a
+        held task_id, in one of the lane's running statuses. A pending (un-leased, no task_id) run is
+        excluded - CREATED waiting for the VEP lane, or ANNOTATION_COMPLETED waiting for the import lane,
+        holds no slot yet. """
+    return AnnotationRun.objects.filter(
+        annotation_range_lock__version=vav, external=False, status__in=statuses,
+    ).filter(Q(lease_expires__gte=now) | Q(task_id__isnull=False))
+
+
 def _lease_and_launch_run(annotation_run: AnnotationRun, worker_id: str, now):
     lease_expires = now + timedelta(seconds=settings.ANNOTATION_RUN_LEASE_SECONDS)
     AnnotationRun.objects.filter(pk=annotation_run.pk).update(
@@ -361,7 +378,13 @@ def _lease_and_launch_run(annotation_run: AnnotationRun, worker_id: str, now):
         lease_expires=lease_expires,
         attempt_count=F("attempt_count") + 1,
     )
-    annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
+    # #1649: launch the right lane by status. VEP lane (annotate_variants) -> annotation_workers; post-VEP
+    # import lane (import_annotation_run) -> db_workers. Both routed statically in celery_settings.py; the
+    # dispatcher just picks the task. ANNOTATION_COMPLETED only ever means 'VEP done, DB upload pending'.
+    if annotation_run.status == AnnotationStatus.ANNOTATION_COMPLETED:
+        import_annotation_run.apply_async((annotation_run.pk,))  # @UndefinedVariable
+    else:
+        annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
 
 
 def reclaim_stalled_annotation_runs(vav: VariantAnnotationVersion, now=None):

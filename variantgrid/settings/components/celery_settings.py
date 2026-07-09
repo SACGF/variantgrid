@@ -73,7 +73,11 @@ CELERY_TASK_ROUTES = {
     "annotation.tasks.annotate_variants.delete_annotation_run": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.delete_annotation_run_uploaded_data": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.assign_range_lock_to_annotation_run": ANNOTATION_WORKERS,
+    # annotate_variants is the VEP lane (dump + VEP). Its DB upload phase is a separate task,
+    # import_annotation_run, pinned to db_workers so quick bulk inserts never consume a throttled VEP
+    # slot - the dispatcher runs it once a run reaches ANNOTATION_COMPLETED. See #1649.
     "annotation.tasks.annotate_variants.annotate_variants": ANNOTATION_WORKERS,
+    "annotation.tasks.annotate_variants.import_annotation_run": DB_WORKERS,
     'annotation.tasks.calculate_sample_stats.calculate_vcf_stats': ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CalculateCohortSampleGeneDamageCountsTask": ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CohortSampleGeneDamageCountTask": ANNOTATION_WORKERS,

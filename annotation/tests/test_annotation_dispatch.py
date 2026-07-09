@@ -25,13 +25,16 @@ from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPi
 from annotation.annotation_versions import _absorb_range_lock, merge_pending_range_locks
 from annotation.tasks import annotation_scheduler_task
 from annotation.tasks.annotation_scheduler_task import (
+    _IMPORT_RUNNING_STATUSES,
+    _VEP_RUNNING_STATUSES,
     _handle_range_lock,
+    _lane_in_flight_qs,
     _trigger_counts_for_uncounted_runs,
     count_annotation_run,
     dispatch_annotation_runs,
     reclaim_stalled_annotation_runs,
 )
-from annotation.tasks.annotate_variants import annotate_variants
+from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -71,13 +74,15 @@ class AnnotationDispatchTestCase(TestCase):
         annotation_run.save()
 
     def _dispatch(self, slots, merge_noop=False):
-        """ Run the dispatcher with a fixed pool size; optionally stub merge to isolate leasing.
-            Returns the annotate_variants.apply_async mock for assertions; the count_annotation_run
-            kick mock is stored on self.count_kick. """
+        """ Run the dispatcher with a fixed VEP pool size; optionally stub merge to isolate leasing.
+            Returns the annotate_variants.apply_async (VEP lane) mock for assertions; the
+            import_annotation_run.apply_async (import lane) mock is stored on self.import_launch and the
+            count_annotation_run kick mock on self.count_kick. """
         with ExitStack() as stack:
             stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
                                                   return_value=slots))
             launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
+            self.import_launch = stack.enter_context(mock.patch.object(import_annotation_run, "apply_async"))
             self.count_kick = stack.enter_context(mock.patch.object(count_annotation_run, "apply_async"))
             if merge_noop:
                 stack.enter_context(mock.patch.object(annotation_scheduler_task,
@@ -144,11 +149,12 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertEqual(new_run.attempt_count, 1)
         self.assertIsNotNone(new_run.lease_expires)
 
-    def test_sweep_launches_uploads_before_created_across_versions(self):
-        """ Global uploads-first: the no-arg sweep launches an upload-only (resume) run on ANY version
-            before a full-VEP CREATED run on ANOTHER version. A CREATED run on a version iterated FIRST
-            must not take the only slot ahead of an upload-only run on a version iterated later - a cheap
-            DB import should never wait behind a VEP dump on another build (shared worker pool). """
+    @override_settings(ANNOTATION_UPLOAD_WORKER_SLOTS=1)
+    def test_sweep_lanes_are_independent_across_versions(self):
+        """ #1649: the VEP and import lanes have separate budgets in the no-arg sweep. With one VEP slot
+            and one import slot, an upload-only (import lane) run on ANY version and a CREATED (VEP lane)
+            run on ANOTHER version both launch in the same sweep - the cheap DB import does not consume
+            the single VEP slot, and the VEP run does not consume the single import slot. """
         # NEW version (iterated before ACTIVE on the same build) carries only a CREATED VEP run.
         new_kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.REFSEQ, 2)
         new_kwargs["status"] = VariantAnnotationVersion.Status.NEW
@@ -171,16 +177,18 @@ class AnnotationDispatchTestCase(TestCase):
 
         with ExitStack() as stack:
             stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
-                                                  return_value=1))  # only one slot - forces the choice
+                                                  return_value=1))  # one VEP slot
             launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
+            import_launch = stack.enter_context(mock.patch.object(import_annotation_run, "apply_async"))
             stack.enter_context(mock.patch.object(count_annotation_run, "apply_async"))
             stack.enter_context(mock.patch.object(annotation_scheduler_task,
                                                   "merge_pending_range_locks", return_value=0))
             dispatch_annotation_runs()  # no arg -> global sweep
 
-        launched = {c.args[0][0] for c in launch.call_args_list}
-        self.assertIn(upload_run.pk, launched)       # upload-only won the slot
-        self.assertNotIn(created_run.pk, launched)   # CREATED VEP waited, despite its version coming first
+        vep_launched = {c.args[0][0] for c in launch.call_args_list}
+        import_launched = {c.args[0][0] for c in import_launch.call_args_list}
+        self.assertEqual(import_launched, {upload_run.pk})   # import lane launched the upload-only run
+        self.assertEqual(vep_launched, {created_run.pk})     # VEP lane launched the CREATED run, same sweep
 
     def test_dispatch_launches_lowest_pk_first(self):
         locks = [self._make_lock(i, i, count=100) for i in range(4)]
@@ -498,37 +506,58 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertTrue(run.is_upload_resumable())
         self.assertFalse(run.is_in_flight())
 
-    def test_resume_run_dispatched_before_created(self):
-        # A resume-upload run and a pending CREATED run, one free slot: the cheap resume run goes first.
+    def test_resume_run_dispatched_on_import_lane(self):
+        # #1649: a resume/upload-only run (ANNOTATION_COMPLETED, past VEP) launches via import_annotation_run
+        # (db_workers), while a pending CREATED run launches via annotate_variants (VEP). Independent lanes.
         resume_run = self._make_past_vep_run(lo_idx=1)
         self.assertTrue(resume_run.is_upload_resumable())
-        self._make_lock(0, 0, count=100)  # pending CREATED, lower pk
+        created_run = self._make_lock(0, 0, count=100).annotationrun_set.first()  # pending CREATED, lower pk
+        launch = self._dispatch(slots=1, merge_noop=True)
+        self.import_launch.assert_called_once()
+        self.assertEqual(self.import_launch.call_args_list[0].args[0][0], resume_run.pk)
+        launch.assert_called_once()
+        self.assertEqual(launch.call_args_list[0].args[0][0], created_run.pk)
+
+    def test_resume_run_does_not_shrink_vep_capacity(self):
+        # #1649: an ANNOTATION_COMPLETED resume run lives in the import lane, so it must not count against
+        # the VEP budget. With one VEP slot the pending CREATED run still launches on the VEP lane, and the
+        # resume run launches on the import lane in the same cycle.
+        resume_run = self._make_past_vep_run(lo_idx=0)
+        pending_run = self._make_lock(1, 1, count=100).annotationrun_set.first()
         launch = self._dispatch(slots=1, merge_noop=True)
         launch.assert_called_once()
-        self.assertEqual(launch.call_args_list[0].args[0][0], resume_run.pk)
+        self.assertEqual(launch.call_args_list[0].args[0][0], pending_run.pk)
+        self.import_launch.assert_called_once()
+        self.assertEqual(self.import_launch.call_args_list[0].args[0][0], resume_run.pk)
 
-    def test_resume_run_not_counted_as_in_flight(self):
-        # The resume run must not consume the only slot as 'in-flight' - the pending run still launches.
-        self._make_past_vep_run(lo_idx=0)
-        pending_run = self._make_lock(1, 1, count=100).annotationrun_set.first()
-        # in-flight excludes the resume run, so capacity remains for both; with 1 slot the resume run
-        # launches first. Give 2 slots so both launch, proving the resume run didn't shrink capacity.
-        launch = self._dispatch(slots=2, merge_noop=True)
-        self.assertEqual(launch.call_count, 2)
-        launched = {c.args[0][0] for c in launch.call_args_list}
-        self.assertIn(pending_run.pk, launched)
-
-    def test_annotate_variants_resumes_upload_only(self):
-        run = self._make_past_vep_run()
-        self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
+    def test_annotate_variants_is_vep_only(self):
+        # #1649: annotate_variants dumps + runs VEP and stops at ANNOTATION_COMPLETED. It does NOT import
+        # (the dispatcher runs import_annotation_run on db_workers) and does NOT send the complete signal.
+        run = self._make_lock(0, 0, count=100).annotationrun_set.first()
+        self.assertEqual(run.status, AnnotationStatus.CREATED)
         with mock.patch("annotation.tasks.annotate_variants.dump_and_annotate_variants") as dump_mock, \
              mock.patch("annotation.tasks.annotate_variants.import_vcf_annotations") as import_mock, \
              mock.patch.object(VariantAnnotationVersion, "get_annotation_run_blocker", return_value=None), \
-             mock.patch("annotation.tasks.annotate_variants.annotation_run_complete_signal"), \
+             mock.patch("annotation.tasks.annotate_variants.annotation_run_complete_signal") as signal, \
              mock.patch("annotation.tasks.annotate_variants._trigger_dispatch"):
             annotate_variants.apply((run.pk,)).get()
-        dump_mock.assert_not_called()  # VEP not re-run
-        import_mock.assert_called_once()  # straight to upload
+        dump_mock.assert_called_once()   # VEP ran
+        import_mock.assert_not_called()  # upload deferred to the import lane
+        signal.send.assert_not_called()  # not complete until imported
+
+    def test_import_annotation_run_imports_and_signals(self):
+        # #1649: import_annotation_run bulk-loads the annotated VCF and sends the complete signal once.
+        run = self._make_past_vep_run()
+        self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
+        with mock.patch("annotation.tasks.annotate_variants.import_vcf_annotations") as import_mock, \
+             mock.patch("annotation.tasks.annotate_variants.annotation_run_complete_signal") as signal, \
+             mock.patch("annotation.tasks.annotate_variants._trigger_dispatch"):
+            import_annotation_run.apply((run.pk,)).get()
+        import_mock.assert_called_once()   # straight to upload
+        signal.send.assert_called_once()   # complete signal fires from the import lane
+        run.refresh_from_db()
+        self.assertIsNone(run.task_id)     # lease/lock released in finally
+        self.assertIsNone(run.lease_expires)
 
     def test_reclaim_full_scrub_when_no_annotated_file(self):
         # Pre-VEP progress (no annotated VCF): existing behaviour - full scrub back to CREATED.
@@ -546,3 +575,102 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertIsNone(run.dump_start)
         self.assertIsNone(run.dump_count)
         self.assertTrue(run.is_dispatchable())
+
+    # ================================================================== #1649: VEP / import lane split
+    def test_dispatch_routes_by_status(self):
+        # CREATED -> annotate_variants (VEP lane); ANNOTATION_COMPLETED-with-file -> import_annotation_run.
+        created_run = self._make_lock(0, 0, count=100).annotationrun_set.first()
+        import_run = self._make_past_vep_run(lo_idx=1)
+        launch = self._dispatch(slots=4, merge_noop=True)
+        vep_launched = {c.args[0][0] for c in launch.call_args_list}
+        import_launched = {c.args[0][0] for c in self.import_launch.call_args_list}
+        self.assertEqual(vep_launched, {created_run.pk})
+        self.assertEqual(import_launched, {import_run.pk})
+
+    @override_settings(ANNOTATION_UPLOAD_WORKER_SLOTS=4)
+    def test_saturated_vep_lane_does_not_block_import(self):
+        # A full VEP lane (all VEP slots leased) must not stop the import lane launching an upload-only run.
+        for i in range(2):  # fill both VEP slots with in-flight CREATED runs
+            self._lease(self._make_lock(i, i, count=100).annotationrun_set.first())
+        import_run = self._make_past_vep_run(lo_idx=3)
+        # Another CREATED run that can't launch (VEP saturated)
+        blocked_created = self._make_lock(4, 4, count=100).annotationrun_set.first()
+        launch = self._dispatch(slots=2, merge_noop=True)
+        launch.assert_not_called()  # VEP lane saturated - nothing new on it
+        self.import_launch.assert_called_once()
+        self.assertEqual(self.import_launch.call_args_list[0].args[0][0], import_run.pk)
+        blocked_created.refresh_from_db()
+        self.assertIsNone(blocked_created.lease_expires)  # stayed pending
+
+    @override_settings(ANNOTATION_UPLOAD_WORKER_SLOTS=1)
+    def test_saturated_import_lane_does_not_block_vep(self):
+        # A full import lane (its one slot leased) must not stop the VEP lane launching a CREATED run.
+        busy_import = self._make_past_vep_run(lo_idx=0)
+        self._lease(busy_import)  # occupies the single import slot
+        created_run = self._make_lock(1, 1, count=100).annotationrun_set.first()
+        another_import = self._make_past_vep_run(lo_idx=2)  # can't launch - import lane full
+        launch = self._dispatch(slots=2, merge_noop=True)
+        self.import_launch.assert_not_called()  # import lane saturated
+        launch.assert_called_once()
+        self.assertEqual(launch.call_args_list[0].args[0][0], created_run.pk)
+        another_import.refresh_from_db()
+        self.assertIsNone(another_import.lease_expires)  # stayed pending
+
+    def test_lane_in_flight_accounting(self):
+        # A leased VEP-phase run counts only in the VEP lane; a leased import-phase run only in the import
+        # lane. Neither leaks into the other lane's in-flight budget.
+        vep_run = self._make_lock(0, 0, count=100).annotationrun_set.first()  # CREATED
+        self._lease(vep_run)
+        import_run = self._make_past_vep_run(lo_idx=1)  # ANNOTATION_COMPLETED
+        self._lease(import_run)
+        now = timezone.now()
+        vep_in_flight = set(_lane_in_flight_qs(self.vav, now, _VEP_RUNNING_STATUSES)
+                            .values_list("pk", flat=True))
+        import_in_flight = set(_lane_in_flight_qs(self.vav, now, _IMPORT_RUNNING_STATUSES)
+                               .values_list("pk", flat=True))
+        self.assertEqual(vep_in_flight, {vep_run.pk})
+        self.assertEqual(import_in_flight, {import_run.pk})
+
+    def test_pending_runs_not_counted_in_flight_in_either_lane(self):
+        # Un-leased CREATED (VEP lane) and un-leased ANNOTATION_COMPLETED (import lane) hold no slot yet.
+        self._make_lock(0, 0, count=100)                # pending CREATED
+        self._make_past_vep_run(lo_idx=1)               # un-leased ANNOTATION_COMPLETED
+        now = timezone.now()
+        self.assertEqual(_lane_in_flight_qs(self.vav, now, _VEP_RUNNING_STATUSES).count(), 0)
+        self.assertEqual(_lane_in_flight_qs(self.vav, now, _IMPORT_RUNNING_STATUSES).count(), 0)
+
+    def test_external_imported_run_launches_on_import_lane(self):
+        # #1568/#1649: an external run whose off-VM VEP was imported (external cleared, ANNOTATION_COMPLETED
+        # with an annotated VCF) rejoins post-VEP and launches on the import lane, never annotate_variants.
+        lock = self._make_lock(0, 0, count=100, external=True)
+        run = lock.annotationrun_set.first()
+        # Mirror _import_annotated_annotation_run: clear external, stamp annotation dates + annotated file.
+        run.external = False
+        run.dump_count = 100
+        run.annotation_start = run.annotation_end = timezone.now()
+        run.vcf_annotated_filename = "/tmp/fake_external.vep_annotated.vcf.gz"
+        run.save()
+        self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
+        launch = self._dispatch(slots=4, merge_noop=True)
+        launch.assert_not_called()  # never the VEP lane
+        self.import_launch.assert_called_once()
+        self.assertEqual(self.import_launch.call_args_list[0].args[0][0], run.pk)
+
+    def test_reclaimed_import_run_relaunches_on_import_lane(self):
+        # A stalled import-phase run is reclaimed to ANNOTATION_COMPLETED (annotated file kept) and
+        # re-launched on the import lane next cycle - not the VEP lane.
+        with tempfile.NamedTemporaryFile(suffix=".vcf.gz", delete=False) as tf:
+            annotated_filename = tf.name
+        self.addCleanup(lambda: os.path.exists(annotated_filename) and os.remove(annotated_filename))
+        run = self._make_past_vep_run(annotated_filename=annotated_filename)
+        run.upload_start = timezone.now()  # died mid-import -> UPLOAD_STARTED
+        run.save()
+        self._lease(run, attempt_count=1, expires_in=-1)  # expired lease
+        with mock.patch.object(AnnotationRun, "delete_related_objects"):
+            launch = self._dispatch(slots=4, merge_noop=True)
+        run.refresh_from_db()
+        self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
+        launch.assert_not_called()  # not the VEP lane
+        self.import_launch.assert_called_once()
+        self.assertEqual(self.import_launch.call_args_list[0].args[0][0], run.pk)
+        self.assertEqual(run.attempt_count, 2)  # reclaimed -> re-leased
