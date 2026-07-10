@@ -26,7 +26,8 @@ from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
-from annotation.tasks.annotation_scheduler_task import annotation_scheduler, subdivide_annotation_range_lock
+from annotation.tasks.annotation_scheduler_task import annotation_scheduler, subdivide_annotation_range_lock, \
+    dispatch_annotation_runs
 from annotation.vep_annotation import VEPConfig, get_vep_command, get_vep_variant_annotation_version_kwargs
 from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
@@ -514,6 +515,7 @@ def view_annotation_run(request, annotation_run_id):
         "can_retry_annotation_run": can_retry_annotation_run,
         "can_retry_annotation_run_upload": can_retry_annotation_run_upload,
         "can_subdivide_annotation_run": can_subdivide_annotation_run,
+        "can_make_annotation_run_local": annotation_run.external,
     }
     return render(request, "annotation/view_annotation_run.html", context)
 
@@ -537,6 +539,25 @@ def retry_annotation_run(request, annotation_run_id, upload_only=False):
 @require_POST
 def retry_annotation_run_upload(request, annotation_run_id):
     return retry_annotation_run(request, annotation_run_id, upload_only=True)
+
+
+@require_superuser
+@require_POST
+def make_annotation_run_local(request, annotation_run_id):
+    """ #1568: revert an external (off-VM) annotation run back to the in-VM pipeline so it is annotated
+        locally, regardless of size. Clears external + dump state (-> CREATED) and kicks the dispatcher. """
+    annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
+    if annotation_run.external:
+        annotation_run.revert_external_to_local()
+        dispatch_annotation_runs.si(annotation_run.variant_annotation_version.pk).apply_async()
+        messages.add_message(request, messages.INFO,
+                             "Reverted to in-VM pipeline - will be annotated locally",
+                             extra_tags='import-message')
+    else:
+        messages.add_message(request, messages.WARNING,
+                             "Annotation run is not external - nothing to do",
+                             extra_tags='import-message')
+    return redirect(annotation_run)
 
 
 @require_superuser

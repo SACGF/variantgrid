@@ -35,6 +35,29 @@ ANNOTATED_VCF_SUFFIX = ".vep_annotated.vcf.gz"
 # How often import_external_annotation_runs emits a running-progress line for large (e.g. 1k-run) imports.
 IMPORT_PROGRESS_INTERVAL_SECONDS = 10
 
+# An external dump smaller than this many variants is not worth the off-VM round-trip: such runs are kept on
+# (or reverted to) the in-VM pipeline and annotated locally instead (#1568). Aimed at the SV pipeline, where
+# most range locks hold only a handful of variants. Overridable via annotation_external --min-variants.
+DEFAULT_MIN_EXTERNAL_VARIANTS = 500
+
+# Step 1 of SV offload: the off-VM Snakemake bundle runs VEP only, so offloading structural variants on a
+# deployment with AnnotSV enabled would silently drop the AnnotSV stage. Refuse it until off-VM/staged
+# AnnotSV support lands.
+SV_ANNOTSV_ENABLED_MSG = (
+    "External annotation offload of structural variants runs VEP only; AnnotSV is enabled "
+    "(ANNOTATION_ANNOTSV_ENABLED=True) on this deployment and would be skipped. Keep SVs on the in-VM "
+    "pipeline until off-VM AnnotSV support lands."
+)
+
+
+def _require_sv_offload_supported(pipeline_type):
+    """ Guard shared by the dump/import entry points (#1568 SV step 1). Blocks SV offload when AnnotSV is
+        enabled - dumping while it is off then importing after it is on would reach FINISHED with no AnnotSV
+        data, so import is guarded as well as dump. """
+    if (pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+            and settings.ANNOTATION_ANNOTSV_ENABLED):
+        raise ValueError(SV_ANNOTSV_ENABLED_MSG)
+
 
 def _import_progress_line(processed: int, total: int, report: dict) -> str:
     tallies = " ".join(f"{key}={len(value)}" for key, value in report.items())
@@ -122,19 +145,25 @@ def parse_dump_metadata(path) -> dict:
 
 def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationVersion,
                                   output_dir: str,
-                                  pipeline_type=VariantAnnotationPipelineType.STANDARD) -> list[AnnotationRun]:
+                                  pipeline_type=VariantAnnotationPipelineType.STANDARD,
+                                  min_variants: int = 0) -> list[AnnotationRun]:
     """ Create all range locks + external AnnotationRuns for the (NEW) version up front, dumping each VCF +
         sidecar metadata into output_dir and parking it in EXTERNAL_DUMP_COMPLETED awaiting off-VM annotation
         (#1568 §4.2).
 
         Range locks are sized by the target's ANNOTATION_VEP_BATCH_MIN/MAX so boundaries line up with what a
         clone would produce (§3) - external parallelism comes from forks/concurrency across runs, never larger
-        locks. """
+        locks.
+
+        A run holding fewer than `min_variants` variants is reverted to the in-VM pipeline instead of parked
+        external (see DEFAULT_MIN_EXTERNAL_VARIANTS) - the off-VM round-trip is not worth it for a tiny run. """
+    _require_sv_offload_supported(pipeline_type)
     os.makedirs(output_dir, exist_ok=True)
     # Every run in this dump shares the same VAV, so compute the version identity (which runs VEP) once,
     # lazily on the first run so a no-op dump never invokes VEP.
     identity = None
     annotation_runs = []
+    reverted = []
     while True:
         range_lock, _unannotated_count = get_annotation_range_lock_and_unannotated_count(
             variant_annotation_version, settings.ANNOTATION_VEP_BATCH_MIN, settings.ANNOTATION_VEP_BATCH_MAX)
@@ -144,6 +173,18 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock,
                                                       pipeline_type=pipeline_type, external=True)
         dump_count = dump_variants(annotation_run, dump_dir=output_dir)
+        # Range locks are sized without pipeline_type, so an SV dump leaves most locks with zero SVs; such a
+        # run is already FINISHED (get_status: dump_count == 0) with nothing to annotate, so skip its sidecar
+        # rather than emit a no-op .meta.json (thousands of them, for a handful of SVs).
+        if dump_count == 0:
+            continue
+        if dump_count < min_variants:
+            # Too few variants to be worth the off-VM round-trip - keep it on the in-VM pipeline (#1568).
+            annotation_run.revert_external_to_local()
+            reverted.append(annotation_run)
+            logging.info("Reverted external AnnotationRun %s (%d variants < min %d) to the in-VM pipeline",
+                         annotation_run.pk, dump_count, min_variants)
+            continue
         if identity is None:
             identity = variant_annotation_version_identity(variant_annotation_version)
         meta_filename = write_dump_metadata(annotation_run, dump_dir=output_dir, identity=identity)
@@ -152,15 +193,18 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
         annotation_runs.append(annotation_run)
 
     write_snakemake_bundle(output_dir, variant_annotation_version, pipeline_type=pipeline_type)
-    logging.info("Dumped %d external annotation run(s) for %s into %s",
-                 len(annotation_runs), variant_annotation_version, output_dir)
+    if reverted:
+        dispatch_annotation_runs.si(variant_annotation_version.pk).apply_async()
+    logging.info("Dumped %d external annotation run(s) for %s into %s (reverted %d too-small run(s) to local)",
+                 len(annotation_runs), variant_annotation_version, output_dir, len(reverted))
     return annotation_runs
 
 
 def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationVersion,
                                   output_dir: str,
                                   pipeline_type=VariantAnnotationPipelineType.STANDARD,
-                                  leave: int = 0) -> list[AnnotationRun]:
+                                  leave: int = 0,
+                                  min_variants: int = 0) -> list[AnnotationRun]:
     """ Adopt AnnotationRuns that already exist for `variant_annotation_version` in CREATED state (created by
         the normal scheduler but not yet annotated), marking them external and dumping each VCF + sidecar
         metadata into output_dir (#1568). Unlike dump_external_annotation_runs (which creates every run up
@@ -172,6 +216,7 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
         watermark) while the dumped remainder is annotated off-VM. """
     if leave < 0:
         raise ValueError(f"leave must be >= 0, got {leave}")
+    _require_sv_offload_supported(pipeline_type)
 
     os.makedirs(output_dir, exist_ok=True)
     now = timezone.now()
@@ -195,6 +240,7 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
     # lazily on the first claimed run so a no-op dump never invokes VEP.
     identity = None
     annotation_runs = []
+    reverted = []
     for pk in candidate_ids:
         # Atomically claim as external only while still dispatchable (same filter as the dispatcher) so we
         # never adopt a run it just leased. If we lose the race (0 rows updated) skip it; if we win, the run
@@ -212,6 +258,17 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
 
         annotation_run = AnnotationRun.objects.get(pk=pk)
         dump_count = dump_variants(annotation_run, dump_dir=output_dir)
+        # A zero-count run is already FINISHED (get_status: dump_count == 0) with nothing to annotate, so
+        # skip its sidecar rather than emit a no-op .meta.json (see dump_external_annotation_runs).
+        if dump_count == 0:
+            continue
+        if dump_count < min_variants:
+            # Too few variants to be worth the off-VM round-trip - keep it on the in-VM pipeline (#1568).
+            annotation_run.revert_external_to_local()
+            reverted.append(annotation_run)
+            logging.info("Reverted external AnnotationRun %s (%d variants < min %d) to the in-VM pipeline",
+                         annotation_run.pk, dump_count, min_variants)
+            continue
         if identity is None:
             identity = variant_annotation_version_identity(variant_annotation_version)
         meta_filename = write_dump_metadata(annotation_run, dump_dir=output_dir, identity=identity)
@@ -220,8 +277,10 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
         annotation_runs.append(annotation_run)
 
     write_snakemake_bundle(output_dir, variant_annotation_version, pipeline_type=pipeline_type)
-    logging.info("Dumped %d existing annotation run(s) for %s into %s",
-                 len(annotation_runs), variant_annotation_version, output_dir)
+    if reverted:
+        dispatch_annotation_runs.si(variant_annotation_version.pk).apply_async()
+    logging.info("Dumped %d existing annotation run(s) for %s into %s (reverted %d too-small run(s) to local)",
+                 len(annotation_runs), variant_annotation_version, output_dir, len(reverted))
     return annotation_runs
 
 
@@ -593,6 +652,7 @@ def import_external_annotation_runs(genome_build: GenomeBuild, input_dir: str,
         `emit`, if given, is called emit(category, message) the moment each file's outcome is decided (the
         same category/message that lands in the report), so a caller can stream per-file progress + reasons
         live rather than waiting for the whole - potentially very long - run to finish. """
+    _require_sv_offload_supported(pipeline_type)
     report = {"imported": [], "matched": [], "unmatched": [], "missing_annotated": [], "id_mismatch": []}
     dispatched_vav_ids = set()
 

@@ -33,6 +33,12 @@
               <button type='submit' class="btn btn-primary">Subdivide AnnotationRun</button>
           </form>
         {% endif %}
+        {% if can_make_annotation_run_local %}
+          <form id="make-annotation-run-local-form" action={% url 'make_annotation_run_local' annotation_run.pk %} method="post">
+            {% csrf_token %}
+              <button type='submit' class="btn btn-primary">Make Local (in-VM annotation)</button>
+          </form>
+        {% endif %}
     </div>
 
     <div class="card">

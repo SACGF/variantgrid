@@ -1157,6 +1157,19 @@ class AnnotationRun(TimeStampedModel):
         self.count = None
         self.save()  # get_status() -> CREATED
 
+    def revert_external_to_local(self):
+        """ #1568: return an external run to the normal in-VM pipeline. Clears the external flag and dump
+            state (like reopen_to_created) so get_status() -> CREATED and the dispatcher - which sweeps the
+            latest NEW/ACTIVE versions filtering external=False - re-dumps + annotates it locally. Used when
+            a dump is too small to be worth the off-VM round-trip (see
+            external_annotation.DEFAULT_MIN_EXTERNAL_VARIANTS). """
+        self.external = False
+        self.dump_start = None
+        self.dump_end = None
+        self.dump_count = None
+        self.count = None
+        self.save()  # get_status() -> CREATED
+
     def is_upload_resumable(self, now=None) -> bool:
         """ #1646: a stalled run that already has an annotated VCF (past VEP) and only needs the quick
             DB upload. reclaim_stalled_annotation_runs keeps the annotated file and scrubs partial upload

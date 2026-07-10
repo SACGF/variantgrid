@@ -16,6 +16,7 @@ urlpatterns = [
     path('annotation_run/retry/<int:annotation_run_id>', views.retry_annotation_run, name='retry_annotation_run'),
     path('annotation_run/retry_upload/<int:annotation_run_id>', views.retry_annotation_run_upload, name='retry_annotation_run_upload'),
     path('annotation_run/subdivide/<int:annotation_run_id>', views.subdivide_annotation_run, name='subdivide_annotation_run'),
+    path('annotation_run/make_local/<int:annotation_run_id>', views.make_annotation_run_local, name='make_annotation_run_local'),
     path('create_manual_variant_entry_from_text/<genome_build_name>/<variants_text>', views.create_manual_variant_entry_from_text, name='create_manual_variant_entry_from_text'),
     path('view_annotation_descriptions', views.view_annotation_descriptions, name='view_annotation_descriptions'),
     path('view_annotation_descriptions/<genome_build_name>', views.view_annotation_descriptions, name='view_annotation_descriptions_genome_build'),

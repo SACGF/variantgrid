@@ -1,3 +1,4 @@
+import glob
 import gzip
 import json
 import os
@@ -19,6 +20,7 @@ from annotation.external_annotation import (
     build_dump_metadata,
     build_snakemake_config,
     build_vep_command_template,
+    dump_existing_annotation_runs,
     dump_external_annotation_runs,
     find_annotated_vcf,
     find_matching_annotation_run,
@@ -38,7 +40,8 @@ from annotation.models import AnnotationRangeLock, AnnotationRun
 from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.tasks.annotate_variants import annotate_variants
-from snpdb.models import GenomeBuild, Variant
+from library.utils import sha256sum_str
+from snpdb.models import GenomeBuild, Locus, Sequence, Variant
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
@@ -243,8 +246,9 @@ class ExternalAnnotationDumpTests(TestCase):
         self.variant_annotation_version.save()
 
         with tempfile.TemporaryDirectory() as output_dir:
+            # --min-variants 0 so the small fake dump is not reverted to the in-VM pipeline
             call_command("annotation_external", "--dump", "--genome-build", "GRCh37",
-                         "--output-dir", output_dir)
+                         "--output-dir", output_dir, "--min-variants", "0")
 
         annotation_runs = AnnotationRun.objects.filter(
             annotation_range_lock__version=self.variant_annotation_version, external=True)
@@ -252,6 +256,64 @@ class ExternalAnnotationDumpTests(TestCase):
         for annotation_run in annotation_runs:
             self.assertEqual(annotation_run.pipeline_type, VariantAnnotationPipelineType.STANDARD)
             self.assertEqual(annotation_run.status, AnnotationStatus.EXTERNAL_DUMP_COMPLETED)
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=2))
+class ExternalAnnotationMinVariantsTests(TestCase):
+    """ min-variants threshold (#1568): a dump too small to be worth the off-VM round-trip is kept on (or
+        reverted to) the in-VM pipeline instead of parked awaiting external annotation. """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.annotation_version = get_fake_annotation_version(cls.genome_build)
+        cls.variant_annotation_version = cls.annotation_version.variant_annotation_version
+        create_fake_variants(cls.genome_build)
+        cls.num_standard_variants = Variant.objects.all().count()
+
+    def test_dump_reverts_runs_below_min_variants(self):
+        # min_variants above the whole (small) fake dump -> every run is too small: none parked external,
+        # no sidecars, and each underlying run reverted to a local CREATED run for the in-VM pipeline.
+        with tempfile.TemporaryDirectory() as output_dir:
+            with patch("annotation.external_annotation.dispatch_annotation_runs"):
+                annotation_runs = dump_external_annotation_runs(
+                    self.variant_annotation_version, output_dir,
+                    min_variants=self.num_standard_variants + 1)
+            self.assertEqual(annotation_runs, [])
+            self.assertEqual(glob.glob(os.path.join(output_dir, "*.meta.json")), [])
+
+        runs = AnnotationRun.objects.filter(annotation_range_lock__version=self.variant_annotation_version)
+        self.assertTrue(runs.exists())
+        for annotation_run in runs:
+            self.assertFalse(annotation_run.external)
+            self.assertEqual(annotation_run.status, AnnotationStatus.CREATED)
+            self.assertIsNone(annotation_run.dump_count)
+
+    def test_dump_keeps_runs_at_or_above_min_variants(self):
+        # min_variants=0 keeps every non-empty run external (default helper behaviour)
+        with tempfile.TemporaryDirectory() as output_dir:
+            annotation_runs = dump_external_annotation_runs(self.variant_annotation_version, output_dir,
+                                                            min_variants=0)
+            self.assertTrue(annotation_runs)
+            for annotation_run in annotation_runs:
+                self.assertTrue(annotation_run.external)
+                self.assertEqual(annotation_run.status, AnnotationStatus.EXTERNAL_DUMP_COMPLETED)
+
+    def test_dump_command_default_reverts_small_dump(self):
+        # The command defaults --min-variants to 500; the small fake dump falls below it and stays local
+        self.variant_annotation_version.status = VariantAnnotationVersion.Status.NEW
+        self.variant_annotation_version.save()
+        with tempfile.TemporaryDirectory() as output_dir:
+            with patch("annotation.external_annotation.dispatch_annotation_runs"):
+                call_command("annotation_external", "--dump", "--genome-build", "GRCh37",
+                             "--output-dir", output_dir)
+
+        version_runs = AnnotationRun.objects.filter(
+            annotation_range_lock__version=self.variant_annotation_version)
+        self.assertFalse(version_runs.filter(external=True).exists())
+        self.assertTrue(version_runs.filter(external=False).exists())
+        for annotation_run in version_runs:
+            self.assertEqual(annotation_run.status, AnnotationStatus.CREATED)
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
@@ -480,3 +542,115 @@ class ExternalAnnotationImportTests(TestCase):
                 # Copied into ANNOTATION_VCF_DUMP_DIR
                 self.assertEqual(os.path.dirname(annotation_run.vcf_annotated_filename), dump_dir)
                 self.assertTrue(os.path.exists(annotation_run.vcf_annotated_filename))
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=2))
+class ExternalAnnotationStructuralVariantTests(TestCase):
+    """ SV step 1: VEP-only offload of the STRUCTURAL_VARIANT pipeline, guarded off when AnnotSV is enabled.
+
+        The dump/import round-trip is already pipeline-generic (see the STANDARD tests above); these cover the
+        SV-specific behaviour - the AnnotSV guard, the SV VEP command, and the mostly-empty-locks skip. """
+
+    SV = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.annotation_version = get_fake_annotation_version(cls.genome_build)
+        cls.variant_annotation_version = cls.annotation_version.variant_annotation_version
+        create_fake_variants(cls.genome_build)
+
+    def _create_symbolic_del(self, position=200_000, svlen=-5_000):
+        """ Persist a symbolic <DEL> Variant (alt seq contains '<', so it matches the SV filter) on the same
+            contig as the fake short variants. """
+        contig = Variant.objects.first().locus.contig
+        ref_seq, _ = Sequence.objects.get_or_create(seq="N", seq_sha256_hash=sha256sum_str("N"))
+        alt_seq, _ = Sequence.objects.get_or_create(seq="<DEL>", seq_sha256_hash=sha256sum_str("<DEL>"))
+        locus, _ = Locus.objects.get_or_create(contig=contig, position=position, ref=ref_seq)
+        end = position + abs(svlen)
+        variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt_seq, svlen=svlen,
+                                                   defaults={"end": end})
+        return variant
+
+    # --- AnnotSV guard (blocks SV offload while AnnotSV is enabled; import guarded too) ---
+
+    @override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
+    def test_guard_blocks_sv_dump(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            with self.assertRaises(ValueError):
+                dump_external_annotation_runs(self.variant_annotation_version, output_dir,
+                                              pipeline_type=self.SV)
+
+    @override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
+    def test_guard_blocks_sv_dump_existing(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            with self.assertRaises(ValueError):
+                dump_existing_annotation_runs(self.variant_annotation_version, output_dir,
+                                              pipeline_type=self.SV)
+
+    @override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
+    def test_guard_blocks_sv_import(self):
+        with tempfile.TemporaryDirectory() as input_dir:
+            with self.assertRaises(ValueError):
+                import_external_annotation_runs(self.genome_build, input_dir, pipeline_type=self.SV)
+
+    @override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
+    def test_guard_command_raises_command_error(self):
+        self.variant_annotation_version.status = VariantAnnotationVersion.Status.NEW
+        self.variant_annotation_version.save()
+        with tempfile.TemporaryDirectory() as output_dir:
+            with self.assertRaises(CommandError):
+                call_command("annotation_external", "--dump", "--genome-build", "GRCh37",
+                             "--pipeline-type", self.SV, "--output-dir", output_dir)
+
+    # --- SV VEP command differs from STANDARD (no plugins; SV buffer size) ---
+
+    def test_sv_command_has_no_plugins(self):
+        standard_cmd = " ".join(build_vep_command_template(self.variant_annotation_version))
+        sv_cmd = " ".join(build_vep_command_template(self.variant_annotation_version, pipeline_type=self.SV))
+        # STANDARD always emits Grantham/SpliceRegion (+ NMD at cv>=2); SVs get no plugins.
+        self.assertIn("--plugin", standard_cmd)
+        self.assertNotIn("--plugin", sv_cmd)
+
+    def test_sv_bundle_uses_sv_buffer_size(self):
+        config = build_snakemake_config(pipeline_type=self.SV)
+        self.assertEqual(config["vep_buffer_size"], settings.ANNOTATION_VEP_BUFFER_SIZE.get(self.SV))
+
+    # --- Dump behaviour: SV dumped, empty locks skipped ---
+
+    def test_sv_dump_includes_symbolic_variant(self):
+        self._create_symbolic_del()
+        with tempfile.TemporaryDirectory() as output_dir:
+            annotation_runs = dump_external_annotation_runs(self.variant_annotation_version, output_dir,
+                                                            pipeline_type=self.SV)
+            # Only non-empty SV runs come back (empty short-variant locks were skipped)
+            self.assertTrue(annotation_runs)
+            dumped_count = 0
+            for annotation_run in annotation_runs:
+                annotation_run.refresh_from_db()
+                self.assertEqual(annotation_run.pipeline_type, self.SV)
+                self.assertEqual(annotation_run.status, AnnotationStatus.EXTERNAL_DUMP_COMPLETED)
+                dumped_count += annotation_run.dump_count
+                with gzip.open(annotation_run.vcf_dump_filename, "rt") as f:
+                    content = f.read()
+                self.assertIn("<DEL>", content)  # symbolic alt written to the dump VCF
+                meta = parse_dump_metadata(annotation_run.get_dump_metadata_filename(dump_dir=output_dir))
+                self.assertEqual(meta["pipeline_type"], self.SV)
+            self.assertGreaterEqual(dumped_count, 1)
+
+    def test_sv_dump_over_short_variants_skips_empty_locks(self):
+        # No symbolic/long variants exist, so every lock is empty for the SV pipeline: no sidecars written,
+        # but the underlying runs are still created and auto-finished (dump_count == 0).
+        with tempfile.TemporaryDirectory() as output_dir:
+            annotation_runs = dump_external_annotation_runs(self.variant_annotation_version, output_dir,
+                                                            pipeline_type=self.SV)
+            self.assertEqual(annotation_runs, [])
+            self.assertEqual(glob.glob(os.path.join(output_dir, "*.meta.json")), [])
+            # Bundle is still emitted even with nothing to annotate
+            self.assertTrue(os.path.exists(os.path.join(output_dir, "Snakefile")))
+
+            created = AnnotationRun.objects.filter(
+                annotation_range_lock__version=self.variant_annotation_version, pipeline_type=self.SV)
+            self.assertTrue(created.exists())
+            for annotation_run in created:
+                self.assertEqual(annotation_run.status, AnnotationStatus.FINISHED)
