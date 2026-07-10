@@ -1,11 +1,14 @@
 import gzip
 import logging
 import os
+import threading
+from datetime import timedelta
 
 import celery
 from celery import chain
 from celery.canvas import Signature
 from django.conf import settings
+from django.db import connection
 from django.db.models.functions.math import Abs
 from django.db.models.query_utils import Q
 from django.utils import timezone
@@ -54,6 +57,64 @@ def _dispatch_trigger_sig(variant_annotation_version_id) -> Signature:
         run then routes by status - upload-only stays ANNOTATION_COMPLETED (import lane), a full retry is
         a fresh CREATED run (VEP lane). #1649 """
     return Signature(DISPATCH_ANNOTATION_RUNS_TASK, args=(variant_annotation_version_id,), immutable=True)
+
+
+class AnnotationRunLeaseHeartbeat:
+    """ Renews an AnnotationRun's dispatcher lease on a background thread while the task actively runs,
+        so a long-but-healthy run (e.g. a multi-hour structural-variant VEP dump, which has no SV-count
+        cap) is never mistaken for a dead worker and reclaimed into a duplicate. Because a live run keeps
+        its own lease fresh, ANNOTATION_RUN_LEASE_SECONDS can stay short - a genuinely dead worker stops
+        heartbeating and is reclaimed within one window.
+
+        The renew is guarded on our own task_id: if the run was reclaimed/reassigned out from under us the
+        update matches no rows, so we never stomp a lease another worker now holds - and we stop. Each
+        successful renew also syncs annotation_run.lease_expires in memory so the pipeline's own full
+        save() calls can't write back the stale load-time value over the fresh lease. """
+
+    def __init__(self, annotation_run: 'AnnotationRun', task_id: str):
+        self.annotation_run = annotation_run
+        self.task_id = task_id
+        self.lease_seconds = settings.ANNOTATION_RUN_LEASE_SECONDS
+        self.interval = settings.ANNOTATION_RUN_LEASE_HEARTBEAT_SECONDS
+        self._stop = threading.Event()
+        self._thread = None
+
+    def _renew(self):
+        now = timezone.now()
+        lease_expires = now + timedelta(seconds=self.lease_seconds)
+        updated = AnnotationRun.objects.filter(
+            pk=self.annotation_run.pk, task_id=self.task_id).update(lease_expires=lease_expires)
+        if updated:
+            # Keep the in-memory instance in step so a full save() in the pipeline doesn't clobber the
+            # renewed lease with the stale value loaded before the heartbeat started.
+            self.annotation_run.lease_expires = lease_expires
+        else:
+            logging.warning("Lease heartbeat: AnnotationRun %s no longer held by task %s - stopping",
+                            self.annotation_run.pk, self.task_id)
+            self._stop.set()
+
+    def _run(self):
+        try:
+            while not self._stop.wait(self.interval):
+                try:
+                    self._renew()
+                except Exception:
+                    # A transient DB blip must not kill the heartbeat (or the run) - log and retry next tick.
+                    log_traceback()
+        finally:
+            connection.close()  # release this thread's own DB connection
+
+    def __enter__(self):
+        self._thread = threading.Thread(target=self._run, daemon=True,
+                                        name=f"lease-heartbeat-{self.annotation_run.pk}")
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=self.interval)
+        return False
 
 
 @celery.shared_task
@@ -118,8 +179,11 @@ def annotate_variants(annotation_run_id):
         annotation_run.set_task_log("start", timezone.now())
         annotation_run.save()
 
-        if annotation_run.vcf_annotated_filename is None:
-            dump_and_annotate_variants(annotation_run)
+        # Renew the lease while the (potentially many-hour, e.g. structural-variant) VEP work runs, so a
+        # live worker is never reclaimed under us into a duplicate run.
+        with AnnotationRunLeaseHeartbeat(annotation_run, annotate_variants.request.id):
+            if annotation_run.vcf_annotated_filename is None:
+                dump_and_annotate_variants(annotation_run)
         # DB upload now runs as a separate db_workers task (import_annotation_run), launched by the
         # dispatcher when this run reaches ANNOTATION_COMPLETED. #1649
     except Exception as e:
@@ -172,7 +236,9 @@ def import_annotation_run(annotation_run_id):
         annotation_run.set_task_log("import_start", timezone.now())
         annotation_run.save()
 
-        import_vcf_annotations(annotation_run)
+        # Renew the lease while the bulk DB insert runs, so a live worker is never reclaimed under us.
+        with AnnotationRunLeaseHeartbeat(annotation_run, import_annotation_run.request.id):
+            import_vcf_annotations(annotation_run)
         # The run is only truly complete once imported (moved here from annotate_variants). #1649
         annotation_run_complete_signal.send(sender=os.path.basename(__file__),
                                             variant_annotation_version=annotation_run.annotation_range_lock.version)

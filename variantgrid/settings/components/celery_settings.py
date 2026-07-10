@@ -82,9 +82,14 @@ CELERY_TASK_ROUTES = {
     "annotation.tasks.cohort_sample_gene_damage_counts.CalculateCohortSampleGeneDamageCountsTask": ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CohortSampleGeneDamageCountTask": ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CohortSampleClassificationGeneDamageCountTask": ANNOTATION_WORKERS,
-    "annotation.tasks.import_clinvar_vcf_task.ImportCreateVersionForClinVarVCFTask": ANNOTATION_WORKERS,
-    "annotation.tasks.import_clinvar_vcf_task.ProcessClinVarVCFDataTask": ANNOTATION_WORKERS,
-    "annotation.tasks.import_clinvar_vcf_task.ImportClinVarSuccessTask": ANNOTATION_WORKERS,
+    # ClinVar import is a VCF import-processing pipeline that reuses AbstractVCFImportTaskFactory, so it
+    # is routed to match the normal (genotype) VCF import: the parallel per-split data-processing lane
+    # goes to WEB_WORKERS (mirrors ProcessGenotypeVCFDataTask), while the create-version and success
+    # steps fall through to the default db_workers (mirrors ImportCreateVCFModelForGenotypeVCFTask /
+    # ImportGenotypeVCFSuccessTask, which are likewise unrouted). It was previously all on
+    # ANNOTATION_WORKERS - the VEP lane - where it serialised behind long annotate_variants runs on the
+    # single-concurrency annotation worker, stalling imports for hours.
+    "annotation.tasks.import_clinvar_vcf_task.ProcessClinVarVCFDataTask": WEB_WORKERS,
 
     # Anything that runs on data uploaded from the web should be WEB_WORKERS
     # 1. As it may be a different machine than DB workers etc.

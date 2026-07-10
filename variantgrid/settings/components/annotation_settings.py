@@ -42,10 +42,15 @@ ANNOTATION_WORKER_SLOTS_FALLBACK = 2
 ANNOTATION_UPLOAD_WORKER_SLOTS = 4
 # Lease reclaims (dead-worker re-dispatch) allowed before a run is failed to ERROR.
 ANNOTATION_MAX_RUN_ATTEMPTS = 3
-# Lease window. Must exceed the worst-case single-run time so a live worker is never reclaimed
-# under us. A run is capped at BATCH_MAX (25k ~= 45 min); prod runs ~1.5 h / 50k. 16200 = 4.5 h
-# is a deliberately generous 3x margin - reclaim is the rare dead-worker path so erring long is cheap.
-ANNOTATION_RUN_LEASE_SECONDS = 16200
+# Lease window for dead-worker reclaim. A live run renews its own lease on a background heartbeat
+# (AnnotationRunLeaseHeartbeat in annotate_variants) every ANNOTATION_RUN_LEASE_HEARTBEAT_SECONDS,
+# so the window no longer has to exceed the worst-case run time - a long structural-variant VEP run
+# (no SV-count cap, can run many hours) stays leased by heartbeating, not by a generous static window.
+# So we keep it short: a genuinely dead/SIGKILLed worker stops heartbeating and its run is reclaimed
+# within one window (~15 min) instead of hours. The heartbeat interval is well under the window
+# (~7 beats/window) so a transient DB/process stall doesn't falsely reclaim a live run.
+ANNOTATION_RUN_LEASE_SECONDS = 900
+ANNOTATION_RUN_LEASE_HEARTBEAT_SECONDS = 120
 ANNOTATION_VEP_ARGS = []
 ANNOTATION_VEP_VERSION = "116"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
