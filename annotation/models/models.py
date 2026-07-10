@@ -776,7 +776,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         av = self.annotationversion_set.order_by("annotation_date").last()
         if av is None:
             return None
-        remediation = "Run 'python3 manage.py gene_annotation --latest-releases'."
+        remediation = "Run 'python3 manage.py gene_annotation --new-releases'."
         if av.gene_annotation_version_id is None:
             return (f"No gene annotation has been created for this GeneAnnotationRelease / current "
                     f"OntologyVersion. {remediation}")
