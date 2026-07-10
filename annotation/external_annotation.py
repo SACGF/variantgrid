@@ -59,6 +59,15 @@ def _require_sv_offload_supported(pipeline_type):
         raise ValueError(SV_ANNOTSV_ENABLED_MSG)
 
 
+def _revert_too_small_run(annotation_run: AnnotationRun, count: int, min_variants: int, reverted: list):
+    """ A run below `min_variants` isn't worth the off-VM round-trip, so return it to the in-VM pipeline and
+        record it (#1568). """
+    annotation_run.revert_external_to_local()
+    reverted.append(annotation_run)
+    logging.info("Reverted external AnnotationRun %s (%d variants < min %d) to the in-VM pipeline",
+                 annotation_run.pk, count, min_variants)
+
+
 def _import_progress_line(processed: int, total: int, report: dict) -> str:
     tallies = " ".join(f"{key}={len(value)}" for key, value in report.items())
     return f"External annotation import: {processed}/{total} meta files ({tallies})"
@@ -172,18 +181,19 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
         range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock,
                                                       pipeline_type=pipeline_type, external=True)
+        # If already counted off-thread (AnnotationRun.count, #1646), reject a too-small run before dumping.
+        # A counted run here is always non-empty (count_annotation_run finishes count==0 runs itself).
+        if annotation_run.count is not None and annotation_run.count < min_variants:
+            _revert_too_small_run(annotation_run, annotation_run.count, min_variants, reverted)
+            continue
         dump_count = dump_variants(annotation_run, dump_dir=output_dir)
         # Range locks are sized without pipeline_type, so an SV dump leaves most locks with zero SVs; such a
         # run is already FINISHED (get_status: dump_count == 0) with nothing to annotate, so skip its sidecar
         # rather than emit a no-op .meta.json (thousands of them, for a handful of SVs).
         if dump_count == 0:
             continue
-        if dump_count < min_variants:
-            # Too few variants to be worth the off-VM round-trip - keep it on the in-VM pipeline (#1568).
-            annotation_run.revert_external_to_local()
-            reverted.append(annotation_run)
-            logging.info("Reverted external AnnotationRun %s (%d variants < min %d) to the in-VM pipeline",
-                         annotation_run.pk, dump_count, min_variants)
+        if dump_count < min_variants:  # uncounted run whose dump turned out too small
+            _revert_too_small_run(annotation_run, dump_count, min_variants, reverted)
             continue
         if identity is None:
             identity = variant_annotation_version_identity(variant_annotation_version)
@@ -257,17 +267,18 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
             continue
 
         annotation_run = AnnotationRun.objects.get(pk=pk)
+        # If already counted off-thread (AnnotationRun.count, #1646), reject a too-small run before dumping.
+        # A counted run here is always non-empty (count_annotation_run finishes count==0 runs itself).
+        if annotation_run.count is not None and annotation_run.count < min_variants:
+            _revert_too_small_run(annotation_run, annotation_run.count, min_variants, reverted)
+            continue
         dump_count = dump_variants(annotation_run, dump_dir=output_dir)
         # A zero-count run is already FINISHED (get_status: dump_count == 0) with nothing to annotate, so
         # skip its sidecar rather than emit a no-op .meta.json (see dump_external_annotation_runs).
         if dump_count == 0:
             continue
-        if dump_count < min_variants:
-            # Too few variants to be worth the off-VM round-trip - keep it on the in-VM pipeline (#1568).
-            annotation_run.revert_external_to_local()
-            reverted.append(annotation_run)
-            logging.info("Reverted external AnnotationRun %s (%d variants < min %d) to the in-VM pipeline",
-                         annotation_run.pk, dump_count, min_variants)
+        if dump_count < min_variants:  # uncounted run whose dump turned out too small
+            _revert_too_small_run(annotation_run, dump_count, min_variants, reverted)
             continue
         if identity is None:
             identity = variant_annotation_version_identity(variant_annotation_version)
