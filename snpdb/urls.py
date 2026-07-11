@@ -8,7 +8,7 @@ from library.preview_request import preview_view
 from snpdb.grids import CohortListColumns, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListColumns, \
     CustomColumnsCollectionColumns, QuadsListColumns, TriosListColumns, VCFListGrid, TagColorsCollectionColumns, \
     LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, \
-    ManualVariantEntryCollectionColumns, SampleColumns
+    ManualVariantEntryCollectionColumns, SampleColumns, SampleSkippedAnnotationGrid, VCFSkippedAnnotationGrid
 from snpdb.views import views, views_json, views_rest, views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
@@ -115,6 +115,8 @@ urlpatterns = [
     path('cohort/datatable/', DatabaseTableView.as_view(column_class=CohortListColumns), name='cohort_datatable'),
     path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),
     path('sample/grid/<slug:op>/', JQGridView.as_view(grid=SamplesListGrid, delete_row=True), name='samples_grid'),
+    path('sample/skipped_annotation/grid/<int:sample_id>/<slug:op>/',
+         JQGridView.as_view(grid=SampleSkippedAnnotationGrid), name='sample_skipped_annotation_grid'),
     path('genomic_intervals/datatable/', DatabaseTableView.as_view(column_class=GenomicIntervalsListColumns), name='genomic_intervals_datatable'),
     path('liftover/liftover_runs/datatable', DatabaseTableView.as_view(column_class=LiftoverRunColumns),
          name='liftover_runs_datatable'),
@@ -135,6 +137,8 @@ urlpatterns = [
     path('trio/datatable/', DatabaseTableView.as_view(column_class=TriosListColumns), name='trio_datatable'),
     path('quad/datatable/', DatabaseTableView.as_view(column_class=QuadsListColumns), name='quad_datatable'),
     path('vcfs/grid/<slug:op>/', JQGridView.as_view(grid=VCFListGrid, delete_row=True), name='vcfs_grid'),
+    path('vcf/skipped_annotation/grid/<int:vcf_id>/<slug:op>/',
+         JQGridView.as_view(grid=VCFSkippedAnnotationGrid), name='vcf_skipped_annotation_grid'),
 
     # Autocompletes
     path('autocomplete/Cohort/', views_autocomplete.CohortAutocompleteView.as_view(), name='cohort_autocomplete'),

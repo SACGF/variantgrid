@@ -262,6 +262,12 @@ $(document).ready(function() {
     initSubCohort();
     $("#vcf-tabs").tabs({cache: true});  // need to avoid let/const redeclaration in Somalier html
 
+    // Skipped-annotation warning message (issue #1409) links to its tab
+    $(".activate-tab").click(function() {
+        $("#vcf-tabs > ul a[href='" + $(this).attr("href") + "']").trigger("click");
+        return false;
+    });
+
     addCreateProjectButtonAndForm();
 
     const dialog = setupCreatePatientDialog();
@@ -333,7 +339,10 @@ $(document).ready(function() {
     {% endfor %}
 });
 </script>
+<!-- jqGrid is used in skipped annotation tab -->
+<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
 {% endblock %}
 
 
@@ -354,6 +363,9 @@ $(document).ready(function() {
         {% endif %}
         {% if somalier_enabled and vcf.somaliervcfextract.somalierancestryrun %}
         <li><a href="#vcf-ancestry">Ancestry</a></li>
+        {% endif %}
+        {% if skipped_annotation_count %}
+        <li><a href="#vcf-skipped-annotation">Skipped Annotation ({{ skipped_annotation_count }})</a></li>
         {% endif %}
         {% if has_write_permission %}
         <li><a href="{% url 'group_permissions' 'snpdb.models.VCF' vcf.pk %}">Sharing / Permissions</a></li>
@@ -684,6 +696,13 @@ $(document).ready(function() {
 {% if somalier_enabled and vcf.somaliervcfextract.somalierancestryrun %}
     <div id="vcf-ancestry">
         <iframe width="100%" height="100%" src="{{ vcf.somaliervcfextract.somalierancestryrun.url }}"></iframe>
+    </div>
+{% endif %}
+{% if skipped_annotation_count %}
+    <div id="vcf-skipped-annotation">
+        <p>Variants that Variant Effect Predictor (VEP) was unable to annotate.</p>
+        {% load jqgrid_tags %}
+        {% jqgrid 'vcf_skipped_annotation_grid' name='VCF Skipped Annotation' search=False vcf_id=vcf.pk %}
     </div>
 {% endif %}
 </div>

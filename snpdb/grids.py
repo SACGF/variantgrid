@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
+from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
 from annotation.models import ManualVariantEntryCollection, PATIENT_ONTOLOGY_TERM_PATH
 from library.django_utils import get_url_from_view_path
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
@@ -231,6 +232,51 @@ class SamplesListGrid(JqGridUserRowConfig):
         Sample.objects.filter(pk=sample.pk).update(import_status=ImportStatus.MARKED_FOR_DELETION)
         task = remove_soft_deleted_vcfs_task.si()  # @UndefinedVariable
         task.apply_async()
+
+
+class AbstractSkippedAnnotationGrid(JqGridUserRowConfig):
+    """ Shows Variants that VEP was unable to annotate (variantannotation__vep_skipped_reason set).
+        Subclasses provide a variant source (VCF/Sample - anything with get_variant_qs) via
+        set_skipped_annotation_queryset(). """
+    model = Variant
+    caption = 'Skipped Annotation'
+    fields = ["id", "variantannotation__vep_skipped_reason", "variantannotation__annotation_run_id"]
+
+    colmodel_overrides = {"id": {"hidden": True},
+                          "variantannotation__annotation_run_id": {'formatter': 'formatAnnotationRunLink'}}
+
+    def set_skipped_annotation_queryset(self, variant_source, genome_build):
+        qs = get_queryset_for_latest_annotation_version(self.model, genome_build)
+        qs = variant_source.get_variant_qs(qs).filter(variantannotation__vep_skipped_reason__isnull=False)
+        qs = Variant.annotate_variant_string(qs)
+
+        field_names = list(self.get_field_names())
+        field_names.insert(1, "variant_string")
+
+        self.queryset = qs.values(*field_names)
+        self.extra_config.update({'sortname': 'variant_string',
+                                  'sortorder': 'asc'})
+
+    def get_colmodels(self, remove_server_side_only=False):
+        before_colmodels = [{'index': 'variant_string', 'name': 'variant_string', 'label': 'Variant',
+                             'formatter': 'linkFormatter',
+                             'formatter_kwargs': {"url_name": "view_variant", "url_object_column": "id"}}]
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
+        return before_colmodels + colmodels
+
+
+class SampleSkippedAnnotationGrid(AbstractSkippedAnnotationGrid):
+    def __init__(self, user, sample_id):
+        super().__init__(user)
+        sample = Sample.get_for_user(user, sample_id)
+        self.set_skipped_annotation_queryset(sample, sample.genome_build)
+
+
+class VCFSkippedAnnotationGrid(AbstractSkippedAnnotationGrid):
+    def __init__(self, user, vcf_id):
+        super().__init__(user)
+        vcf = VCF.get_for_user(user, vcf_id)
+        self.set_skipped_annotation_queryset(vcf, vcf.genome_build)
 
 
 class CohortSampleListGrid(JqGridUserRowConfig):

@@ -14,7 +14,8 @@ from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured, ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
-from django.utils.html import escape
+from django.template.defaultfilters import pluralize
+from django.utils.html import escape, format_html
 from django.forms.widgets import TextInput
 from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseRedirect, HttpResponseServerError, JsonResponse
@@ -35,7 +36,7 @@ from analysis.tasks.analysis_grid_export_tasks import get_annotated_download_fil
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import create_manual_variants, can_create_variants
 from annotation.models import AnnotationVersion, CohortGenotypeVariantAnnotationStats, \
-    CohortGenotypeGeneAnnotationStats, CohortGenotypeClinVarAnnotationStats
+    CohortGenotypeGeneAnnotationStats, CohortGenotypeClinVarAnnotationStats, VCFAnnotationStats
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
@@ -293,6 +294,23 @@ def _get_vcf_infos(vcf) -> list[str]:
     return infos
 
 
+def _get_vcf_skipped_annotation_count(vcf) -> int:
+    """ Number of variants VEP was unable to annotate for a VCF (latest annotation version) - see issue #1409 """
+    if annotation_version := AnnotationVersion.latest_or_none(vcf.genome_build, validate=False):
+        if vas := VCFAnnotationStats.objects.filter(
+                vcf=vcf, variant_annotation_version=annotation_version.variant_annotation_version).first():
+            return vas.vep_skipped_count
+    return 0
+
+
+def _skipped_annotation_message(count: int, tab_anchor: str) -> str:
+    """ HTML warning message linking to the skipped-annotation tab - see issue #1409 """
+    plural = pluralize(count)
+    return format_html('Variant Effect Predictor (VEP) was unable to annotate {} variant{}. '
+                       '<a class="activate-tab" href="#{}">View skipped variants</a>',
+                       count, plural, tab_anchor)
+
+
 def view_vcf(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
@@ -370,6 +388,13 @@ def view_vcf(request, vcf_id):
 
     vcf_length_stats = _get_vcf_length_stats(vcf)
 
+    # VEP-skipped variants for the latest annotation version (VG only - see issue #1409)
+    skipped_annotation_count = _get_vcf_skipped_annotation_count(vcf)
+    if skipped_annotation_count:
+        messages.add_message(request, messages.WARNING,
+                             _skipped_annotation_message(skipped_annotation_count, "vcf-skipped-annotation"),
+                             extra_tags='html import-message')
+
     from snpdb.archive import vcf_can_be_archived
     can_archive = has_write_permission and vcf_can_be_archived(vcf)
     restore_source_exists = bool(vcf.data_restorable_from) and os.path.exists(vcf.data_restorable_from)
@@ -394,6 +419,7 @@ def view_vcf(request, vcf_id):
         "can_archive": can_archive,
         "restore_source_exists": restore_source_exists,
         "restore_source_kind": restore_source_kind,
+        "skipped_annotation_count": skipped_annotation_count,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
 
@@ -566,6 +592,14 @@ def view_sample(request, sample_id):
 
     sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
     sample_genotype_stats = _get_sample_genotype_stats(sample)
+
+    # VEP-skipped variants for the latest annotation version (VG only - see issue #1409)
+    skipped_annotation_count = _get_vcf_skipped_annotation_count(sample.vcf)
+    if skipped_annotation_count:
+        messages.add_message(request, messages.WARNING,
+                             _skipped_annotation_message(skipped_annotation_count, "sample-skipped-annotation"),
+                             extra_tags='html import-message')
+
     annotated_download_files = {}
     if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
         if sample.import_status == ImportStatus.SUCCESS:
@@ -585,7 +619,8 @@ def view_sample(request, sample_id):
         "sample_stats_variant_class_df": sample_stats_variant_class_df,
         "sample_stats_zygosity_df": sample_stats_zygosity_df,
         "sample_genotype_stats": sample_genotype_stats,
-        "related_samples": related_samples
+        "related_samples": related_samples,
+        "skipped_annotation_count": skipped_annotation_count,
     }
     return render(request, 'snpdb/data/view_sample.html', context)
 

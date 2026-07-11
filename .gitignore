@@ -45,3 +45,4 @@ cover/
 /.idea/dataSources
 node_modules/
 eslint.txt
+/.idea/pyLspTools.xml
