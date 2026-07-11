@@ -529,9 +529,16 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         }
         return HttpResponseRedirect(reverse("node_load", kwargs=kwargs))
 
+    # Use the count for the view being shown - if an extra filter (eg clinvar) is selected, that filtered
+    # count (not the whole node's count) decides auto-load/sorting. Mirrors VariantGrid._grid_row_count().
+    try:
+        grid_row_count = NodeCount.load_for_node(node, extra_filters).count
+    except NodeCount.DoesNotExist:
+        grid_row_count = node.count
+
     max_variants = (UserSettings.get_for_user(request.user).node_grid_auto_load_max_variants
                     or settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS)
-    grid_auto_load = (max_variants is None) or (node.count is not None and node.count < max_variants)
+    grid_auto_load = (max_variants is None) or (grid_row_count is not None and grid_row_count < max_variants)
 
     max_variants_display = None
     if max_variants is not None:
@@ -540,7 +547,7 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
 
     # Sorting is disabled on large grids (see issue #1651) - warn the user so they filter first
     grid_sort_max_variants = settings.ANALYSIS_GRID_SORT_MAX_ROWS
-    grid_sorting_disabled = node.count is None or node.count >= grid_sort_max_variants
+    grid_sorting_disabled = grid_row_count is None or grid_row_count >= grid_sort_max_variants
 
     context = {
         "analysis_id": analysis_id,
@@ -550,6 +557,7 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         "extra_filters": extra_filters,
         "bams_dict": node.get_bams_dict(),
         "node": node,
+        "grid_row_count": grid_row_count,
         "grid_auto_load": grid_auto_load,
         "grid_auto_load_max_variants_display": max_variants_display,
         "grid_sorting_disabled": grid_sorting_disabled,
