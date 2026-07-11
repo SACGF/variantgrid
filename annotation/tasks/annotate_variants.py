@@ -363,6 +363,14 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
 
     annotation_run.error_exception = None  # Clear so status won't be error
     annotation_run.task_id = None  # Allow celery jobs to get lock on it
+    # A manual retry is a fresh start - reset the lease bookkeeping so the dispatcher's attempt-cap
+    # (reclaim_stalled_annotation_runs) counts from zero again. Otherwise an upload-only retry reuses
+    # the same run, whose attempt_count is already at ANNOTATION_MAX_RUN_ATTEMPTS, so the next stall
+    # fails it immediately with "exceeded max attempts". The full-retry path creates a new run below
+    # (attempt_count=0), but resetting here is harmless for it.
+    annotation_run.leased_by = None
+    annotation_run.lease_expires = None
+    annotation_run.attempt_count = 0
     annotation_run.save()
 
     if upload_only:
