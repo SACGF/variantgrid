@@ -1,5 +1,6 @@
 import abc
 
+from django.db.models.functions import Collate
 from django.db.models.functions.text import Length
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -49,7 +50,9 @@ class PanelAppPanelEngAutocompleteView(AbstractPanelAppPanelAutocompleteView):
 
 @method_decorator(cache_page(WEEK_SECS), name='dispatch')
 class GeneAutocompleteView(AutocompleteView):
-    fields = ['geneversion__gene_symbol__symbol']
+    # gene_symbol has a nondeterministic ('case_insensitive') collation which Postgres can't LIKE against,
+    # so match on a deterministically-collated annotation - see GeneSymbol.get_deterministic_queryset().
+    fields = ['symbol_deterministic']
 
     def sort_queryset(self, qs):
         f = "geneversion__gene_symbol__symbol"
@@ -57,7 +60,8 @@ class GeneAutocompleteView(AutocompleteView):
 
     def get_user_queryset(self, user):
         annotation_consortium = self.forwarded.get('annotation_consortium', None)
-        qs = Gene.objects.all().distinct()
+        qs = Gene.objects.annotate(
+            symbol_deterministic=Collate("geneversion__gene_symbol__symbol", "und-x-icu")).distinct()
 
         if annotation_consortium:
             qs = qs.filter(annotation_consortium=annotation_consortium)

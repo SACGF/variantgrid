@@ -398,8 +398,18 @@ def reclaim_stalled_annotation_runs(vav: VariantAnnotationVersion, now=None):
     # on `lease_expires < now` missed orphans left with a task_id / running status but a NULL lease
     # (e.g. a worker SIGKILLed mid-run before the annotate_variants `finally` could clear task_id):
     # a NULL lease is never < now, so those held slots forever and starved the dispatcher of capacity.
-    stalled_qs = _in_flight_runs_qs(vav, now).filter(
-        Q(lease_expires__isnull=True) | Q(lease_expires__lt=now))
+    no_live_lease = Q(lease_expires__isnull=True) | Q(lease_expires__lt=now)
+    orphaned_qs = _in_flight_runs_qs(vav, now).filter(no_live_lease)
+    # _in_flight_runs_qs deliberately treats CREATED as settled (holds no live slot), so it also skips
+    # a run a worker had *leased* but whose lease expired before the worker advanced the status off
+    # CREATED (died at launch, before annotate_variants set task_id/DUMP_STARTED). That run is stalled -
+    # its leased_by/lease are stale locks nothing will ever clear - so reclaim it too, or it would leak
+    # the lease forever and (attempt_count already bumped at lease time) never retry or fail out.
+    leased_stalled_qs = AnnotationRun.objects.filter(
+        annotation_range_lock__version=vav, external=False, leased_by__isnull=False,
+        lease_expires__lt=now,
+    ).exclude(status__in=AnnotationStatus.get_completed_states())
+    stalled_qs = (orphaned_qs | leased_stalled_qs).distinct()
 
     for annotation_run in stalled_qs:
         if annotation_run.attempt_count >= settings.ANNOTATION_MAX_RUN_ATTEMPTS:

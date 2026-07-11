@@ -28,8 +28,11 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
                                               "test", str(uuid4()))
 
     TEST_ANNOTATION = copy.deepcopy(settings.ANNOTATION)
-    # phastCons/phyloP custom tracks: v1-v3 fixtures were generated without the bigwig data,
-    # so disable to keep importer bindings clean. v4 fixtures include them.
+    # phastCons/phyloP custom tracks: v1-v3 fixtures were generated without the bigwig data, so disable
+    # to keep importer bindings clean. v4 fixtures include them, so pin the paths (has_data_files gates
+    # the columns on a non-None vep_config path) - a developer's local override nulling the bigwig tracks
+    # would otherwise drop the columns and leave the scores unset. The files aren't opened: the importer
+    # reads the scores straight from the pre-annotated CSQ.
     if columns_version < 4:
         TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
             "phastcons100way": None,
@@ -42,6 +45,19 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
             "phastcons30way": None,
             "phylop100way": None,
             "phylop30way": None,
+        })
+    else:
+        TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
+            "phastcons100way": "annotation_data/GRCh37/hg19.100way.phastCons.bw",
+            "phastcons46way": "annotation_data/GRCh37/hg19.phastCons46way.placental.bw",
+            "phylop100way": "annotation_data/GRCh37/hg19.100way.phyloP100way.bw",
+            "phylop46way": "annotation_data/GRCh37/hg19.phyloP46way.placental.bw",
+        })
+        TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
+            "phastcons100way": "annotation_data/GRCh38/hg38.phastCons100way.bw",
+            "phastcons30way": "annotation_data/GRCh38/hg38.phastCons30way.bw",
+            "phylop100way": "annotation_data/GRCh38/hg38.phyloP100way.bw",
+            "phylop30way": "annotation_data/GRCh38/hg38.phyloP30way.bw",
         })
 
     # columns_version 4 fixtures were generated against gnomAD 4.1 (the FILTER column shifts

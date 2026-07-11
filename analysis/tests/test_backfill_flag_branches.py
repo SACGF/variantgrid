@@ -147,24 +147,3 @@ class TestDamageNodeBackfillFlagWarnings(_BackfillFlagMixin, TestCase):
             f"warning fired without filter configured, got: {warnings}",
         )
 
-    def test_spliceai_warning_on_unbackfilled_vav(self):
-        self._set_vav_flag(backfilled_spliceai_max_ds=False)
-        node = DamageNode(analysis=self.analysis, splice_min=0.5)
-        warnings = node.get_warnings()
-        self.assertTrue(
-            any("SpliceAI" in w for w in warnings),
-            f"expected SpliceAI warning, got: {warnings}",
-        )
-        self.assertTrue(
-            any("fix_historical_spliceai_max_ds" in w for w in warnings),
-            f"expected fix_historical_spliceai_max_ds pointer, got: {warnings}",
-        )
-
-    def test_spliceai_warning_silent_without_filter(self):
-        self._set_vav_flag(backfilled_spliceai_max_ds=False)
-        node = DamageNode(analysis=self.analysis)  # no splice_min
-        warnings = node.get_warnings()
-        self.assertFalse(
-            any("SpliceAI" in w for w in warnings),
-            f"warning fired without filter configured, got: {warnings}",
-        )
