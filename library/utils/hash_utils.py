@@ -1,4 +1,5 @@
 import hashlib
+import json
 import secrets
 from hashlib import md5
 
@@ -35,6 +36,13 @@ def file_sha256sum(filename: str) -> str:
     with open(filename, "rb") as f:
         hasher.update(f.read())
     return hasher.hexdigest()
+
+
+def stable_dict_hash(d: dict) -> str:
+    """ Order-independent sha256 of a JSON-serialisable dict, returned as a hex str (so it
+        compares equal to a value round-tripped through a CharField). """
+    s = json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(s.encode()).hexdigest()
 
 
 def secure_random_string() -> str:
