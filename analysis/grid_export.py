@@ -12,7 +12,8 @@ from library.django_utils.jqgrid_view import grid_export_csv
 from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile
 from patients.models_enums import Zygosity
-from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes
+from snpdb.models import Sample, VariantGridColumn
+from snpdb.vcf_export_columns import COLUMN_VCF_INFO
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
 
@@ -99,11 +100,20 @@ def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by
 
 
 def _get_column_vcf_info():
+    columns = [c.column for c in COLUMN_VCF_INFO]
+    variant_column_by_name = dict(
+        VariantGridColumn.objects.filter(pk__in=columns).values_list("grid_column_name", "variant_column")
+    )
     column_vcf_info = {}
-    for cvi in ColumnVCFInfo.objects.all().values('column__variant_column', 'info_id', 'number', 'type', 'description'):
-        cvi['type'] = VCFInfoTypes(cvi['type']).label
-        index = cvi['column__variant_column']
-        column_vcf_info[index] = cvi
+    for c in COLUMN_VCF_INFO:
+        if variant_column := variant_column_by_name.get(c.column):
+            column_vcf_info[variant_column] = {
+                "column__variant_column": variant_column,
+                "info_id": c.info_id,
+                "number": c.number,
+                "type": c.type.label,
+                "description": c.description,
+            }
     return column_vcf_info
 
 
