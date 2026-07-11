@@ -148,12 +148,12 @@ def annotate_variants(annotation_run_id):
         ANNOTATION_COMPLETED and release the lease. The DB upload is deliberately NOT done here - the
         dispatcher re-picks the completed run in its resume lane and runs import_annotation_run on
         db_workers, so a throttled VEP slot is never held through the bulk insert. External runs
-        (#1568) never reach this - they're dumped off-VM and rejoin post-VEP as ANNOTATION_COMPLETED.
+        (#1568) never reach this - they're dumped externally and rejoin post-VEP as ANNOTATION_COMPLETED.
         See #1649. """
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
     logging.info("annotate_variants: %s", annotation_run)
 
-    # External annotation (#1568): VEP for these runs is managed off-VM via the annotation_external
+    # External annotation (#1568): VEP for these runs is managed externally via the annotation_external
     # command. Never auto-run VEP here while waiting for the operator to import an annotated VCF.
     if annotation_run.external and annotation_run.vcf_annotated_filename is None:
         logging.info("Skipping external AnnotationRun %s (awaiting external annotation)", annotation_run.pk)
@@ -215,7 +215,7 @@ def annotate_variants(annotation_run_id):
 @celery.shared_task
 def import_annotation_run(annotation_run_id):
     """ Import lane (db_workers): bulk-load an already-annotated VCF into the DB. Reached for every run
-        once it is ANNOTATION_COMPLETED with an annotated VCF present - whether VEP just finished in-VM,
+        once it is ANNOTATION_COMPLETED with an annotated VCF present - whether VEP just finished locally,
         an external run (#1568) was imported, or an upload-only retry reset it. Kept off annotation_workers
         so quick DB inserts never consume a throttled VEP slot. See #1649. """
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)

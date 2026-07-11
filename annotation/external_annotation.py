@@ -1,7 +1,7 @@
 """
 External annotation runs (#1568): dump/import helpers shared by the annotation_external command.
 
-The heavy VEP step can be run off-VM and the resulting annotated VCFs re-imported, and reused between a
+The heavy VEP step can be run externally and the resulting annotated VCFs re-imported, and reused between a
 database and its own clone for identical annotation runs. See claude/plans/1568_external_annotation_runs_plan.md.
 """
 import glob
@@ -35,18 +35,18 @@ ANNOTATED_VCF_SUFFIX = ".vep_annotated.vcf.gz"
 # How often import_external_annotation_runs emits a running-progress line for large (e.g. 1k-run) imports.
 IMPORT_PROGRESS_INTERVAL_SECONDS = 10
 
-# An external dump smaller than this many variants is not worth the off-VM round-trip: such runs are kept on
-# (or reverted to) the in-VM pipeline and annotated locally instead (#1568). Aimed at the SV pipeline, where
+# An external dump smaller than this many variants is not worth the external round-trip: such runs are kept on
+# (or reverted to) the local pipeline and annotated locally instead (#1568). Aimed at the SV pipeline, where
 # most range locks hold only a handful of variants. Overridable via annotation_external --min-variants.
 DEFAULT_MIN_EXTERNAL_VARIANTS = 500
 
-# Step 1 of SV offload: the off-VM Snakemake bundle runs VEP only, so offloading structural variants on a
-# deployment with AnnotSV enabled would silently drop the AnnotSV stage. Refuse it until off-VM/staged
+# Step 1 of SV offload: the external Snakemake bundle runs VEP only, so offloading structural variants on a
+# deployment with AnnotSV enabled would silently drop the AnnotSV stage. Refuse it until external/staged
 # AnnotSV support lands.
 SV_ANNOTSV_ENABLED_MSG = (
     "External annotation offload of structural variants runs VEP only; AnnotSV is enabled "
-    "(ANNOTATION_ANNOTSV_ENABLED=True) on this deployment and would be skipped. Keep SVs on the in-VM "
-    "pipeline until off-VM AnnotSV support lands."
+    "(ANNOTATION_ANNOTSV_ENABLED=True) on this deployment and would be skipped. Keep SVs on the local "
+    "pipeline until external AnnotSV support lands."
 )
 
 
@@ -60,11 +60,11 @@ def _require_sv_offload_supported(pipeline_type):
 
 
 def _revert_too_small_run(annotation_run: AnnotationRun, count: int, min_variants: int, reverted: list):
-    """ A run below `min_variants` isn't worth the off-VM round-trip, so return it to the in-VM pipeline and
+    """ A run below `min_variants` isn't worth the external round-trip, so return it to the local pipeline and
         record it (#1568). """
     annotation_run.revert_external_to_local()
     reverted.append(annotation_run)
-    logging.info("Reverted external AnnotationRun %s (%d variants < min %d) to the in-VM pipeline",
+    logging.info("Reverted external AnnotationRun %s (%d variants < min %d) to the local pipeline",
                  annotation_run.pk, count, min_variants)
 
 
@@ -157,15 +157,15 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
                                   pipeline_type=VariantAnnotationPipelineType.STANDARD,
                                   min_variants: int = 0) -> list[AnnotationRun]:
     """ Create all range locks + external AnnotationRuns for the (NEW) version up front, dumping each VCF +
-        sidecar metadata into output_dir and parking it in EXTERNAL_DUMP_COMPLETED awaiting off-VM annotation
+        sidecar metadata into output_dir and parking it in EXTERNAL_DUMP_COMPLETED awaiting external annotation
         (#1568 §4.2).
 
         Range locks are sized by the target's ANNOTATION_VEP_BATCH_MIN/MAX so boundaries line up with what a
         clone would produce (§3) - external parallelism comes from forks/concurrency across runs, never larger
         locks.
 
-        A run holding fewer than `min_variants` variants is reverted to the in-VM pipeline instead of parked
-        external (see DEFAULT_MIN_EXTERNAL_VARIANTS) - the off-VM round-trip is not worth it for a tiny run. """
+        A run holding fewer than `min_variants` variants is reverted to the local pipeline instead of parked
+        external (see DEFAULT_MIN_EXTERNAL_VARIANTS) - the external round-trip is not worth it for a tiny run. """
     _require_sv_offload_supported(pipeline_type)
     os.makedirs(output_dir, exist_ok=True)
     # Every run in this dump shares the same VAV, so compute the version identity (which runs VEP) once,
@@ -221,9 +221,9 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
         front for a NEW version), this leaves the existing range locks untouched and only claims runs the
         dispatcher has not already leased.
 
-        `leave` keeps that many of the lowest-min-variant CREATED runs on the normal in-VM pipeline so
-        annotation can be parallelised: the local VM keeps chewing through the low end (moving the unannotated
-        watermark) while the dumped remainder is annotated off-VM. """
+        `leave` keeps that many of the lowest-min-variant CREATED runs on the normal local pipeline so
+        annotation can be parallelised: the local pipeline keeps chewing through the low end (moving the unannotated
+        watermark) while the dumped remainder is annotated externally. """
     if leave < 0:
         raise ValueError(f"leave must be >= 0, got {leave}")
     _require_sv_offload_supported(pipeline_type)
@@ -243,7 +243,7 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
 
     candidate_ids = list(dispatchable.values_list("pk", flat=True))
     kept, candidate_ids = candidate_ids[:leave], candidate_ids[leave:]
-    logging.info("dump_existing: %d dispatchable run(s); leaving %d on the in-VM pipeline, dumping %d",
+    logging.info("dump_existing: %d dispatchable run(s); leaving %d on the local pipeline, dumping %d",
                  len(kept) + len(candidate_ids), len(kept), len(candidate_ids))
 
     # Every run in this dump shares the same VAV, so compute the version identity (which runs VEP) once,
@@ -332,7 +332,7 @@ def verify_annotated_vcf_variant_ids(annotation_run: AnnotationRun, meta: dict):
 # --------------------------------------------------------------------------------------------------------
 # Snakemake bundle generation (#1568 §4.3): emitted into the dump dir so the operator copies the whole
 # directory to a compute box, edits config.yaml, and runs `snakemake` to produce annotated VCFs. Reusing
-# get_vep_command() verbatim keeps the external run byte-identical to the in-VM run (so the ##VEP= header
+# get_vep_command() verbatim keeps the external run byte-identical to the local run (so the ##VEP= header
 # check passes on import). Every server path in the command is rewritten to a config.yaml placeholder so the
 # compute box can install VEP + annotation data at different paths.
 # --------------------------------------------------------------------------------------------------------
@@ -465,7 +465,7 @@ def render_snakefile(vep_command_template: list[str]) -> str:
 def write_snakemake_bundle(output_dir: str,
                            variant_annotation_version: VariantAnnotationVersion,
                            pipeline_type=VariantAnnotationPipelineType.STANDARD) -> tuple[str, str]:
-    """ Write Snakefile + config.yaml into output_dir so the dumped VCFs can be annotated off-VM (#1568). """
+    """ Write Snakefile + config.yaml into output_dir so the dumped VCFs can be annotated externally (#1568). """
     os.makedirs(output_dir, exist_ok=True)
     template = build_vep_command_template(variant_annotation_version, pipeline_type=pipeline_type)
     config = build_snakemake_config(pipeline_type=pipeline_type)
@@ -570,7 +570,7 @@ def find_matching_annotation_run(meta: dict, variant_annotation_version: Variant
 def explain_unmatched_annotation_run(meta: dict, variant_annotation_version: VariantAnnotationVersion,
                                      pipeline_type=VariantAnnotationPipelineType.STANDARD) -> str:
     """ Human-readable reason no external run awaiting annotation matched the file's range (#1568).
-        Distinguishes the benign cases (the in-VM pipeline already annotated the range, or is still
+        Distinguishes the benign cases (the local pipeline already annotated the range, or is still
         chewing on it, or it was already imported) from the real problem (no local range lock has this
         range at all - the file was produced against a different/diverged database), so an operator can
         tell a "nothing to do" skip apart from a genuine mismatch. """
@@ -601,11 +601,11 @@ def explain_unmatched_annotation_run(meta: dict, variant_annotation_version: Var
             return f"already imported - external {describe(annotation_run)}"
     for annotation_run in same_pipeline:
         if not annotation_run.external and annotation_run.vcf_annotated_filename:
-            return (f"range already annotated by the in-VM pipeline - {describe(annotation_run)}; "
+            return (f"range already annotated by the local pipeline - {describe(annotation_run)}; "
                     f"nothing to import")
     for annotation_run in same_pipeline:
         if not annotation_run.external:
-            return f"range is on the in-VM pipeline, not offloaded - {describe(annotation_run)}"
+            return f"range is on the local pipeline, not offloaded - {describe(annotation_run)}"
     return ("no matching-pipeline external run awaiting annotation for this range; found "
             + ", ".join(describe(annotation_run) for annotation_run in runs))
 
@@ -624,15 +624,15 @@ def find_annotated_vcf(meta_path: str) -> Optional[str]:
 
 def _import_annotated_annotation_run(annotation_run: AnnotationRun, annotated_vcf: str):
     """ Copy the annotated VCF into ANNOTATION_VCF_DUMP_DIR and hand the run to the normal single-authority
-        dispatcher as a resume upload-only run (#1568). The off-VM VEP step is done, so the run rejoins the
-        in-VM pipeline past VEP: we clear `external` (the dispatcher and its lease/reclaim system filter
+        dispatcher as a resume upload-only run (#1568). The external VEP step is done, so the run rejoins the
+        local pipeline past VEP: we clear `external` (the dispatcher and its lease/reclaim system filter
         external=False, so an external run is invisible to them) and stamp the annotation start/end dates so
         get_status() -> ANNOTATION_COMPLETED - the dispatcher's priority-0 upload-only lane
         (_dispatchable_runs_qs resume clause). annotate_variants then skips dump+VEP straight to
         import_vcf_annotations, which runs the ##VEP= header check + inserts rows, setting upload_* -> FINISHED.
 
         We deliberately do NOT apply_async the upload ourselves: a raw queued celery job bypasses the
-        dispatcher's capacity accounting + lease/reclaim (#2667/#1646), so it competes with the in-VM pipeline
+        dispatcher's capacity accounting + lease/reclaim (#2667/#1646), so it competes with the local pipeline
         for worker slots and is lost for good on a worker restart. Routing through the dispatcher means a
         stalled upload is reclaimed and re-launched like any other run. """
     dest = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, os.path.basename(annotated_vcf))
@@ -642,7 +642,7 @@ def _import_annotated_annotation_run(annotation_run: AnnotationRun, annotated_vc
 
     now = timezone.now()
     annotation_run.vcf_annotated_filename = dest
-    annotation_run.external = False  # VEP done off-VM - rejoin the in-VM pipeline for the DB upload
+    annotation_run.external = False  # VEP done externally - rejoin the local pipeline for the DB upload
     annotation_run.annotation_start = now
     annotation_run.annotation_end = now
     annotation_run.upload_start = None

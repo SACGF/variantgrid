@@ -78,7 +78,7 @@ def _handle_range_lock(range_lock, pipeline_type=None):
         annotation_run, _ = AnnotationRun.objects.get_or_create(annotation_range_lock=range_lock,
                                                                 pipeline_type=pipeline_type)
         if annotation_run.external:
-            # External annotation (#1568): VEP is managed off-VM via the annotation_external command.
+            # External annotation (#1568): VEP is managed externally via the annotation_external command.
             # Belt-and-braces guard - the scheduler only operates on ACTIVE versions and external runs
             # live on NEW versions, so this should not normally be reached.
             logging.info("Skipping external AnnotationRun %s (awaiting external annotation)", annotation_run.pk)
@@ -205,7 +205,7 @@ def _dispatchable_variant_annotation_versions() -> list[VariantAnnotationVersion
         onto it), so without a heartbeat here it only ever advances on discrete kicks (VCF import /
         manual / per-completion re-kick) and a stalled dispatch never self-recovers (stale leases go
         unreclaimed, freed capacity unused). Safe to include: the dispatcher already filters external=False
-        and annotate_variants no-ops external runs awaiting an off-VM VCF, and get_annotation_run_blocker()
+        and annotate_variants no-ops external runs awaiting an external VCF, and get_annotation_run_blocker()
         still guards a not-yet-ready version. """
     statuses = [VariantAnnotationVersion.Status.NEW, VariantAnnotationVersion.Status.ACTIVE]
     vavs = []

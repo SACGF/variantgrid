@@ -246,7 +246,7 @@ class ExternalAnnotationDumpTests(TestCase):
         self.variant_annotation_version.save()
 
         with tempfile.TemporaryDirectory() as output_dir:
-            # --min-variants 0 so the small fake dump is not reverted to the in-VM pipeline
+            # --min-variants 0 so the small fake dump is not reverted to the local pipeline
             call_command("annotation_external", "--dump", "--genome-build", "GRCh37",
                          "--output-dir", output_dir, "--min-variants", "0")
 
@@ -260,8 +260,8 @@ class ExternalAnnotationDumpTests(TestCase):
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
 class ExternalAnnotationMinVariantsTests(TestCase):
-    """ min-variants threshold (#1568): a dump too small to be worth the off-VM round-trip is kept on (or
-        reverted to) the in-VM pipeline instead of parked awaiting external annotation. """
+    """ min-variants threshold (#1568): a dump too small to be worth the external round-trip is kept on (or
+        reverted to) the local pipeline instead of parked awaiting external annotation. """
 
     @classmethod
     def setUpTestData(cls):
@@ -273,7 +273,7 @@ class ExternalAnnotationMinVariantsTests(TestCase):
 
     def test_dump_reverts_runs_below_min_variants(self):
         # min_variants above the whole (small) fake dump -> every run is too small: none parked external,
-        # no sidecars, and each underlying run reverted to a local CREATED run for the in-VM pipeline.
+        # no sidecars, and each underlying run reverted to a local CREATED run for the local pipeline.
         with tempfile.TemporaryDirectory() as output_dir:
             with patch("annotation.external_annotation.dispatch_annotation_runs"):
                 annotation_runs = dump_external_annotation_runs(

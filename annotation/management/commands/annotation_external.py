@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-External annotation runs (#1568): single entry point for off-VM annotation.
+External annotation runs (#1568): single entry point for external annotation.
 
 The same command both dumps (write VCFs + metadata, park runs awaiting external annotation) and imports
 (re-import annotated VCFs), selected by --dump / --import. Run against a NEW (not yet ACTIVE)
@@ -29,7 +29,7 @@ class Command(BaseCommand):
                           help="Create + dump all runs for the NEW version, parking them awaiting external annotation")
         mode.add_argument("--dump-existing", action="store_true", dest="dump_existing",
                           help="Adopt existing CREATED runs (already scheduled but not yet annotated), marking "
-                               "them external and dumping them; use --leave to keep some on the in-VM pipeline")
+                               "them external and dumping them; use --leave to keep some on the local pipeline")
         mode.add_argument("--import", action="store_true", dest="import_mode",
                           help="Re-import annotated VCFs, matching them back to local runs")
 
@@ -46,11 +46,11 @@ class Command(BaseCommand):
                                  "adopt (default NEW - runs created by 'Run scheduler against NEW', which the "
                                  "dispatcher won't touch; use ACTIVE to offload the version being annotated)")
         parser.add_argument("--leave", type=int, default=0,
-                            help="--dump-existing: leave this many lowest-id CREATED runs on the in-VM pipeline "
+                            help="--dump-existing: leave this many lowest-id CREATED runs on the local pipeline "
                                  "(so annotation can be parallelised across machines)")
         parser.add_argument("--min-variants", type=int, default=DEFAULT_MIN_EXTERNAL_VARIANTS,
                             help="--dump/--dump-existing: keep runs with fewer than this many variants on the "
-                                 "in-VM pipeline instead of parking them external (default %(default)s)")
+                                 "local pipeline instead of parking them external (default %(default)s)")
         parser.add_argument("--output-dir", help="--dump/--dump-existing: directory to write VCFs + metadata")
         parser.add_argument("--input-dir", help="--import: directory of annotated VCFs + sidecar metadata")
         parser.add_argument("--dry-run", action="store_true",
@@ -87,7 +87,7 @@ class Command(BaseCommand):
                                                         min_variants=options["min_variants"])
         self.stdout.write(
             f"Dumped {len(annotation_runs)} external annotation run(s) for {variant_annotation_version} "
-            f"into {output_dir} (runs with < {options['min_variants']} variants kept on the in-VM pipeline)")
+            f"into {output_dir} (runs with < {options['min_variants']} variants kept on the local pipeline)")
 
     def _run_dump_existing(self, genome_build, options):
         output_dir = options.get("output_dir")
@@ -109,8 +109,8 @@ class Command(BaseCommand):
                                                         min_variants=options["min_variants"])
         self.stdout.write(
             f"Dumped {len(annotation_runs)} existing CREATED run(s) as external for "
-            f"{variant_annotation_version} into {output_dir} (left {leave} on the in-VM pipeline; runs with "
-            f"< {options['min_variants']} variants kept on the in-VM pipeline)")
+            f"{variant_annotation_version} into {output_dir} (left {leave} on the local pipeline; runs with "
+            f"< {options['min_variants']} variants kept on the local pipeline)")
 
     def _run_import(self, genome_build, options):
         input_dir = options.get("input_dir")

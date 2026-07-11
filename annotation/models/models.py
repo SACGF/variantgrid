@@ -1023,7 +1023,7 @@ class AnnotationRun(TimeStampedModel):
     lease_expires = models.DateTimeField(null=True)  # for dead-worker reclaim
     attempt_count = models.IntegerField(default=0)  # bounded retries before giving up
     # External annotation (#1568): set by the annotation_external --dump command. The normal scheduler /
-    # annotate_variants skip these so VEP is never auto-run on a run the operator is managing off-VM.
+    # annotate_variants skip these so VEP is never auto-run on a run the operator is managing externally.
     external = models.BooleanField(default=False)
     dump_start = models.DateTimeField(null=True)
     dump_end = models.DateTimeField(null=True)
@@ -1158,10 +1158,10 @@ class AnnotationRun(TimeStampedModel):
         self.save()  # get_status() -> CREATED
 
     def revert_external_to_local(self):
-        """ #1568: return an external run to the normal in-VM pipeline. Clears the external flag and dump
+        """ #1568: return an external run to the normal local pipeline. Clears the external flag and dump
             state (like reopen_to_created) so get_status() -> CREATED and the dispatcher - which sweeps the
             latest NEW/ACTIVE versions filtering external=False - re-dumps + annotates it locally. Used when
-            a dump is too small to be worth the off-VM round-trip (see
+            a dump is too small to be worth the external round-trip (see
             external_annotation.DEFAULT_MIN_EXTERNAL_VARIANTS). """
         self.external = False
         self.dump_start = None

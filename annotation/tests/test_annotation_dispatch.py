@@ -640,7 +640,7 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertEqual(_lane_in_flight_qs(self.vav, now, _IMPORT_RUNNING_STATUSES).count(), 0)
 
     def test_external_imported_run_launches_on_import_lane(self):
-        # #1568/#1649: an external run whose off-VM VEP was imported (external cleared, ANNOTATION_COMPLETED
+        # #1568/#1649: an external run whose external VEP was imported (external cleared, ANNOTATION_COMPLETED
         # with an annotated VCF) rejoins post-VEP and launches on the import lane, never annotate_variants.
         lock = self._make_lock(0, 0, count=100, external=True)
         run = lock.annotationrun_set.first()

@@ -32,7 +32,7 @@ class AnnotationStatus(models.TextChoices):
     DELETING = 'x', "Deleting"
     DUMP_STARTED = 'd', "Dump Started"
     DUMP_COMPLETED = 'D', "Dump Completed"
-    # External annotation (#1568): dump written, parked waiting for the operator to run VEP off-VM
+    # External annotation (#1568): dump written, parked waiting for the operator to run VEP externally
     # and re-import the annotated VCF. NOT a completed state - genuinely waiting on the operator.
     EXTERNAL_DUMP_COMPLETED = 'e', "Awaiting external annotation"
     ANNOTATION_STARTED = 'a', "Annotation Started"
