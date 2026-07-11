@@ -1174,6 +1174,17 @@ def has_data_files(c: VEPColumnDef, vep_config: VEPConfig) -> bool:
     return True
 
 
+def plugin_applies_to_build(vep_plugin: VEPPlugin, genome_build_name: str) -> bool:
+    """ True iff this plugin has any VEPColumnDef configured for the given build. Plugins whose
+        columns declare `genome_builds` (e.g. GRCh38-only MaveDB/OpenTargets/EVE/PromoterAI) are
+        skipped on builds they don't list, so we never probe for their data. Plugins with no
+        column def at all default to True. """
+    plugin_defs = [c for c in VEP_COLUMNS if c.vep_plugin == vep_plugin]
+    if not plugin_defs:
+        return True
+    return any(c.applies_to(genome_build_name=genome_build_name) for c in plugin_defs)
+
+
 def filter_for(
     *,
     vep_config: Optional[VEPConfig] = None,

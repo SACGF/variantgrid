@@ -244,6 +244,10 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg))
 
     for vep_plugin, plugin_arg_func in plugin_data_func.items():
+        # Skip plugins that don't apply to this build per their VEPColumnDef genome_builds
+        # config (e.g. GRCh38-only plugins on GRCh37) so we never probe for their data.
+        if not vep_columns.plugin_applies_to_build(vep_plugin, genome_build.name):
+            continue
         try:
             cmd.extend(["--plugin", plugin_arg_func()])
         except Exception as e:
