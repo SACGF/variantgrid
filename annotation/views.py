@@ -544,14 +544,14 @@ def retry_annotation_run_upload(request, annotation_run_id):
 @require_superuser
 @require_POST
 def make_annotation_run_local(request, annotation_run_id):
-    """ #1568: revert an external (off-VM) annotation run back to the in-VM pipeline so it is annotated
+    """ #1568: revert an external annotation run back to the local pipeline so it is annotated
         locally, regardless of size. Clears external + dump state (-> CREATED) and kicks the dispatcher. """
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
     if annotation_run.external:
         annotation_run.revert_external_to_local()
         dispatch_annotation_runs.si(annotation_run.variant_annotation_version.pk).apply_async()
         messages.add_message(request, messages.INFO,
-                             "Reverted to in-VM pipeline - will be annotated locally",
+                             "Reverted to local pipeline - will be annotated locally",
                              extra_tags='import-message')
     else:
         messages.add_message(request, messages.WARNING,
