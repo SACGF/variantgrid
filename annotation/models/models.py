@@ -1104,9 +1104,13 @@ class AnnotationRun(TimeStampedModel):
                 status = AnnotationStatus.DUMP_COMPLETED
             if self.dump_count == 0:
                 status = AnnotationStatus.FINISHED
-            elif self.external and self.dump_end and self.vcf_annotated_filename is None:
-                # External annotation (#1568): once dumped, park awaiting the operator rather than getting
-                # stuck at DUMP_COMPLETED. Once --import sets vcf_annotated_filename the normal flow resumes.
+            elif self.external and self.vcf_annotated_filename is None:
+                # External annotation (#1568): an operator-managed run parks awaiting external annotation for
+                # its whole life (from being claimed external, through the local dump, until --import sets
+                # vcf_annotated_filename and the normal flow resumes) rather than surfacing the transient
+                # local dump states (DUMP_STARTED/DUMP_COMPLETED). This keeps `status` in sync with the
+                # `external` flag - the two never disagree - so a run whose dump is in progress or died
+                # mid-dump still reads "Awaiting external annotation" instead of getting stuck at DUMP_STARTED.
                 status = AnnotationStatus.EXTERNAL_DUMP_COMPLETED
             else:
                 if self.annotation_start:

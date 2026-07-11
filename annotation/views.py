@@ -515,7 +515,7 @@ def view_annotation_run(request, annotation_run_id):
         "can_retry_annotation_run": can_retry_annotation_run,
         "can_retry_annotation_run_upload": can_retry_annotation_run_upload,
         "can_subdivide_annotation_run": can_subdivide_annotation_run,
-        "can_make_annotation_run_local": annotation_run.external,
+        "can_make_annotation_run_local": annotation_run.get_status() == AnnotationStatus.EXTERNAL_DUMP_COMPLETED,
     }
     return render(request, "annotation/view_annotation_run.html", context)
 
@@ -547,7 +547,7 @@ def make_annotation_run_local(request, annotation_run_id):
     """ #1568: revert an external annotation run back to the local pipeline so it is annotated
         locally, regardless of size. Clears external + dump state (-> CREATED) and kicks the dispatcher. """
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
-    if annotation_run.external:
+    if annotation_run.get_status() == AnnotationStatus.EXTERNAL_DUMP_COMPLETED:
         annotation_run.revert_external_to_local()
         dispatch_annotation_runs.si(annotation_run.variant_annotation_version.pk).apply_async()
         messages.add_message(request, messages.INFO,
@@ -555,7 +555,7 @@ def make_annotation_run_local(request, annotation_run_id):
                              extra_tags='import-message')
     else:
         messages.add_message(request, messages.WARNING,
-                             "Annotation run is not external - nothing to do",
+                             "Annotation run is not awaiting external annotation - nothing to do",
                              extra_tags='import-message')
     return redirect(annotation_run)
 

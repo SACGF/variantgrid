@@ -60,7 +60,7 @@
     <div class="card mt-4">
         <div class="card-header">Annotation Run ({{ annotation_run.pk }})</div>
         <div class="card-body">
-            {% labelled hint="tiny" label="Status" %}{{ annotation_run.get_status_display }}{% endlabelled %}
+            {% labelled hint="tiny" label="Status" %}{{ annotation_run.get_status.label }}{% endlabelled %}
             {% labelled hint="tiny" label="Pipeline Type" %}{{ annotation_run.get_pipeline_type_display }}{% endlabelled %}
 
             <hr/>
