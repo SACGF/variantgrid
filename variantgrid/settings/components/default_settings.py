@@ -367,6 +367,11 @@ ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/v
 # Analysis nodes with at least this many variants don't auto-load their grid - the user clicks
 # "Load variants" to run the row query.
 ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000
+# Analysis node grids sort in-DB via ORDER BY. Sorting by joined/unindexed columns (e.g. OMIM) on a
+# large result set forces a full sort that blows the statement_timeout. At/above this row count we
+# disable sorting entirely and fall back to ORDER BY -pk (indexed). Users filter down to re-enable.
+ANALYSIS_GRID_SORT_MAX_ROWS = 10_000
+
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_SHOW_CANONICAL_HGVS = True

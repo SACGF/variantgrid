@@ -60,9 +60,6 @@ class VariantGrid(AbstractVariantGrid):
 
         self.url = SimpleLazyObject(lambda: reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id}))
         self.extra_config.update(node.get_extra_grid_config())
-        default_sort_by_column = node.analysis.default_sort_by_column
-        if default_sort_by_column:
-            self.extra_config['sortname'] = default_sort_by_column.variant_column
 
         update_dict_of_dict_values(self._overrides, override)
 
@@ -74,6 +71,14 @@ class VariantGrid(AbstractVariantGrid):
         except NodeCount.DoesNotExist:
             node_count = None
         self.node_count = node_count
+
+        # Only set an initial sort column when sorting is allowed (below the row limit) - otherwise the
+        # first grid load would request a sort on default_sort_by_column and blow the statement_timeout.
+        if not self.sorting_disabled():
+            default_sort_by_column = node.analysis.default_sort_by_column
+            if default_sort_by_column:
+                self.extra_config['sortname'] = default_sort_by_column.variant_column
+
         self._set_post_data(node, extra_filters)
 
     def _get_permission_user(self):
@@ -98,12 +103,27 @@ class VariantGrid(AbstractVariantGrid):
             post_data['zygosity_samples_hash'] = sha256sum_str(samples_str)
         self.extra_config['postData'] = post_data
 
+    def _grid_row_count(self) -> Optional[int]:
+        """ Current view's row count (mirrors get_count's source of truth), or None if unknown """
+        if self.node_count:
+            return self.node_count.count
+        return self.node.count
+
+    def sorting_disabled(self) -> bool:
+        """ Disable sorting on large nodes - sorting by joined/unindexed columns full-sorts the whole
+            result set before LIMIT, blowing the statement_timeout (see issue #1651) """
+        count = self._grid_row_count()
+        return count is None or count >= settings.ANALYSIS_GRID_SORT_MAX_ROWS
+
     def get_colmodels(self, remove_server_side_only=False):
         """ Put 'analysisNode' into every colmodel """
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         global_colmodel = {"analysisNode": {"visible": self.node.visible}}
+        sorting_disabled = self.sorting_disabled()
         for cm in colmodels:
             cm.update(global_colmodel)
+            if sorting_disabled:
+                cm["sortable"] = False
         return colmodels
 
     def _get_q(self) -> Optional[Q]:
@@ -280,6 +300,10 @@ class VariantGrid(AbstractVariantGrid):
 
     def _sort_items(self, items, sidx, sord):
         """ Special case to handle sort by CohortGenotype packed fields """
+        if self.sorting_disabled():
+            # Ignore any requested sort - order by -pk only (indexed scan + LIMIT). See issue #1651
+            return super()._sort_items(items, None, sord)
+
         if sidx is not None:
             # For special fields, we pack sorting info into the 'index' which doesn't map to a field
             # looks like 'cohortgenotype_134:1:samples_zygosity'

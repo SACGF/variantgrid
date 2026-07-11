@@ -131,6 +131,13 @@ $(document).ready(function() {
 	</div>
 	{% endif %}
 	<div id='node-data-grid' class='node-data'{% if not grid_auto_load %} style='display: none'{% endif %}>
+	{% if grid_sorting_disabled %}
+	<div class="alert alert-info" role="alert">
+		This grid has {{ node.count|default_if_none:"?"|intcomma }} variants. Sorting is disabled above {{ grid_sort_max_variants|intcomma }} rows because it is too slow.
+		<b>Add a filter to narrow your results, then sorting re-enables.</b>
+		To find variants with OMIM records, filter for them rather than sorting.
+	</div>
+	{% endif %}
 	<table id='grid-{{ node_id }}' class='grid'>
 	</table>
 	<div id='pager-{{ node_id }}'></div>

@@ -538,6 +538,10 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         # eg 50000 -> "50k", 50500 -> "50.5k"
         max_variants_display = f"{max_variants / 1000:g}k" if max_variants >= 1000 else str(max_variants)
 
+    # Sorting is disabled on large grids (see issue #1651) - warn the user so they filter first
+    grid_sort_max_variants = settings.ANALYSIS_GRID_SORT_MAX_ROWS
+    grid_sorting_disabled = node.count is None or node.count >= grid_sort_max_variants
+
     context = {
         "analysis_id": analysis_id,
         "analysis_version": analysis_version,
@@ -548,6 +552,8 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         "node": node,
         "grid_auto_load": grid_auto_load,
         "grid_auto_load_max_variants_display": max_variants_display,
+        "grid_sorting_disabled": grid_sorting_disabled,
+        "grid_sort_max_variants": grid_sort_max_variants,
     }
     return render(request, 'analysis/node_data/node_data_grid.html', context)
 
