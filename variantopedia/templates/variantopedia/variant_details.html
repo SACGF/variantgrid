@@ -322,7 +322,7 @@ function populateVariantAllele(data) {
         });
         $("#variant_coordinate").append(link);
     }
-    $("#variant-canonical-c-hgvs").text(data.link_data.canonical_c_hgvs);
+    $("#variant-canonical-c-hgvs").text(data.link_data.canonical_c_hgvs || "-");
 
     let clinGenId = $("#clingen-allele-id");
     clinGenId.empty(); // clear loading
