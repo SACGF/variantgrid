@@ -324,8 +324,13 @@ def create_backend_vcf_links(uploaded_vcf):
     """ returns backend_vcf if we can link to SeqAuto data (None if Web VCF) """
 
     backend_vcf = None
+    if not settings.SEQAUTO_ENABLED:
+        # Only SeqAuto deployments link uploads to backend sequencing VCFs by path.
+        # Elsewhere 'path' is just an optional client hint (e.g. API dedup), so skip linking.
+        return backend_vcf
+
     uploaded_file = uploaded_vcf.uploaded_file
-    # APIFileUploadView comes through as WEB_UPLOAD
+    # APIFileUploadView (including the SeqAuto API client) comes through as WEB_UPLOAD
     sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.WEB_UPLOAD}
     if uploaded_file.path and uploaded_file.import_source in sequencing_vcf_sources:
         path = uploaded_file.path

@@ -38,10 +38,17 @@ def _get_uploaded_file_for_user(user, *, uploaded_file_id=None, sha256_hash=None
 
 @method_decorator(csrf_exempt, name='dispatch')
 class APIFileUploadView(APIView):
-    """ Re-implemented uploads in DRF so we can use API tokens for all client work """
+    """ Re-implemented uploads in DRF so we can use API tokens for all client work.
+
+        The optional 'path' query param is a SeqAuto-only hint: on SeqAuto deployments it links the
+        upload to a pre-registered backend sequencing VCF at that server path. General upload / annotate
+        / download clients should omit it and identify uploads by the returned uploaded_file_id and/or
+        sha256_hash (content hash, which is stable across servers). """
 
     @extend_schema(
         summary="Upload a file (multipart form field 'file'), returning the uploaded file ID",
+        description="Optional query params: 'path' (SeqAuto backend-link hint only - omit for general "
+                    "uploads) and 'force' (skip sha256 de-duplication). Returns uploaded_file_id and sha256_hash.",
         request=OpenApiTypes.BINARY,
         responses=OpenApiTypes.OBJECT,
     )
