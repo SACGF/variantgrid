@@ -61,7 +61,9 @@ RECAPTCHA_PRIVATE_KEY = get_secret('RECAPTCHA.private_key')
 REGISTRATION_OPEN = True
 
 SOMALIER["enabled"] = True
-SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
+# Somalier reference/1k data + binary moved off slow EFS to local disk - the ancestry step
+# reads ~2500 small 1kg-somalier/*.somalier files per run, which stalls badly on EFS.
+SOMALIER["annotation_base_dir"] = "/opt/annotation/somalier"
 
 UPLOAD_ENABLED = True
 
