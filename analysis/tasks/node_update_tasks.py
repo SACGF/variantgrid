@@ -269,9 +269,10 @@ def delete_analysis_old_node_versions(analysis_id):
 def wait_for_node(self, node_id):
     """ Used to build a dependency on a node that's already loading.
 
-        No longer added to scheduling chains (issue #346 removed the worker-starvation pattern);
-        kept because analysis_grid_export_tasks._wait_for_output_node() still calls it
-        synchronously as a blocking export gate.
+        No longer added to scheduling chains (issue #346 removed the worker-starvation pattern).
+        Also no longer used by analysis_grid_export_tasks - calling this synchronously leaked its
+        self.retry() Retry up into the caller and wedged the export task in a stale RETRY state, so
+        the exports now do their own node-readiness retry. Kept as a standalone building block.
 
         Uses Celery retry (not sleep) to free the worker between checks, preventing deadlocks
         when all workers are occupied waiting for parent nodes.

@@ -5,18 +5,24 @@ import zipfile
 from typing import Optional
 
 import celery
+from celery.exceptions import Retry
 from django.conf import settings
 from django.utils import timezone
 
 from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
 from analysis.grid_export import node_grid_get_export_iterator
 from analysis.models import AnalysisTemplate, NodeStatus, CohortNode, SampleNode
-from analysis.tasks.node_update_tasks import wait_for_node
+from library.constants import MINUTE_SECS
 from library.django_utils import FakeRequest
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from library.utils import name_from_filename, sha256sum_str, mk_path_for_file
 from snpdb.models import Cohort, Sample, CachedGeneratedFile
+
+# How long (secs) to wait between checks that an export's output node has finished loading.
+# We re-queue the export task (Celery retry) between checks rather than sleeping, so the worker
+# is freed and we don't deadlock when workers are busy loading the parent nodes we're waiting on.
+NODE_WAIT_TIME_BETWEEN_CHECKS = [5, 5, 10, 10, 30, 30, 60, MINUTE_SECS * 2]
 
 
 def get_annotated_download_files_cgf(generator, pk) -> dict[str, Optional[CachedGeneratedFile]]:
@@ -94,17 +100,29 @@ def _write_node_to_cached_generated_file(cgf, analysis, node, name, export_type)
         cgf.task_status = "FAILURE"
     cgf.save()
 
-def _wait_for_output_node(node):
+def _wait_for_output_node(self, node):
+    """ Ensure the export's output node is ready.
+
+        `self` is the bound export task. If the node is still loading we re-queue the export task
+        (self.retry) rather than blocking the worker - each retry re-runs the export from the top,
+        re-fetching the node. Raises once the node is ready but has no count, or once we've waited
+        the full NODE_WAIT_TIME_BETWEEN_CHECKS schedule without it becoming ready. """
     if not NodeStatus.is_ready(node.status):
-        logging.info("Waiting for node...")
-        wait_for_node(node.pk)  # Needs to be ready
-        node = node.get_subclass()  # Easy way to reload
+        retry_index = self.request.retries
+        if retry_index < len(NODE_WAIT_TIME_BETWEEN_CHECKS):
+            countdown = NODE_WAIT_TIME_BETWEEN_CHECKS[retry_index]
+            logging.info("Output node %s not ready (status=%s) - retrying export in %d secs (attempt %d)",
+                         node.pk, node.get_status_display(), countdown, retry_index + 1)
+            raise self.retry(countdown=countdown, max_retries=len(NODE_WAIT_TIME_BETWEEN_CHECKS))
+        raise ValueError(f"Node {node}/{node.version} status={node.get_status_display()} "
+                         "still not ready after waiting - aborting export")
+    node = node.get_subclass()  # Easy way to reload
     if node.count is None:
         raise ValueError(f"Node {node}/{node.version} - {node.status} count is None")
     return node
 
-@celery.shared_task
-def export_cohort_to_downloadable_file(cohort_id, export_type):
+@celery.shared_task(bind=True)
+def export_cohort_to_downloadable_file(self, cohort_id, export_type):
     try:
         # This should have been created in analysis.views.views_grid.cohort_grid_export
         params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
@@ -115,14 +133,16 @@ def export_cohort_to_downloadable_file(cohort_id, export_type):
         analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
         analysis = get_cohort_analysis(cohort, analysis_template)
         node = CohortNode.objects.get_subclass(analysis=analysis, output_node=True)  # Should only be 1
-        node = _wait_for_output_node(node)
+        node = _wait_for_output_node(self, node)
         _write_node_to_cached_generated_file(cgf, analysis, node, cohort.name, export_type)
+    except Retry:
+        raise  # Output node not ready yet - export task re-queued, not an error
     except Exception:
         log_traceback()
         raise
 
-@celery.shared_task
-def export_sample_to_downloadable_file(sample_id, export_type):
+@celery.shared_task(bind=True)
+def export_sample_to_downloadable_file(self, sample_id, export_type):
     try:
         # This should have been created in analysis.views.views_grid.sample_grid_export
         params_hash = get_grid_downloadable_file_params_hash(sample_id, export_type)
@@ -133,8 +153,10 @@ def export_sample_to_downloadable_file(sample_id, export_type):
         analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
         analysis = get_sample_analysis(sample, analysis_template)
         node = SampleNode.objects.get_subclass(analysis=analysis, output_node=True)  # Should only be 1
-        node = _wait_for_output_node(node)
+        node = _wait_for_output_node(self, node)
         _write_node_to_cached_generated_file(cgf, analysis, node, sample.name, export_type)
+    except Retry:
+        raise  # Output node not ready yet - export task re-queued, not an error
     except Exception:
         log_traceback()
         raise
