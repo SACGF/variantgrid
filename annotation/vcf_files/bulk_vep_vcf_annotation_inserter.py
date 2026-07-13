@@ -108,6 +108,13 @@ class BulkVEPVCFAnnotationInserter:
     ALOFT_COLUMNS = ['aloft_prob_tolerant', 'aloft_prob_recessive', 'aloft_prob_dominant',
                      'aloft_pred', 'aloft_high_confidence', 'aloft_ensembl_transcript']
 
+    # PromoterAI (GRCh38, columns_version >= 5) runs with match_to=any, matching on genomic
+    # position + alt allele only. A variant overlapping multiple nearby TSS windows gets
+    # parallel '&'-joined arrays of score / tss_pos - collapse to the single strongest-effect
+    # entry (largest absolute score) in _pick_promoter_ai_values.
+    PROMOTER_AI_SCORE_COLUMN = 'promoter_ai_score'
+    PROMOTER_AI_COLUMNS = [PROMOTER_AI_SCORE_COLUMN, 'promoter_ai_tss_pos']
+
     # dbNSFP source fields that come as &-separated arrays parallel to Ensembl_transcriptid
     # (columns_version >= 4 only — earlier versions only consumed dbNSFP variant-level fields).
     # _pick_dbnsfp_per_transcript_values rewrites these to the single value matching the picked
@@ -330,6 +337,8 @@ class BulkVEPVCFAnnotationInserter:
         if self.aloft_columns and self._has_all_aloft_columns(raw_db_data):
             self._pick_aloft_values(raw_db_data)
 
+        self._pick_promoter_ai_values(raw_db_data)
+
         if self.sv_overlap_processor:
             self.sv_overlap_processor.process(raw_db_data)
 
@@ -422,6 +431,27 @@ class BulkVEPVCFAnnotationInserter:
         if best_aloft["aloft_pred"] == ".":
             best_aloft["aloft_ensembl_transcript"] = "."
         raw_db_data.update(best_aloft)
+
+    @classmethod
+    def _pick_promoter_ai_values(cls, raw_db_data: dict):
+        """ PromoterAI (match_to=any) emits parallel '&'-joined arrays of promoter_ai_score /
+            promoter_ai_tss_pos, one entry per nearby TSS the variant overlaps. Scores are signed
+            (predicted expression up/down) so we keep the strongest-effect entry (largest absolute
+            score) along with its matching TSS position. """
+        if raw_db_data.get(cls.PROMOTER_AI_SCORE_COLUMN) is None:
+            return
+
+        empty_scores = EMPTY_VALUES | {"NA"}
+        records = VariantAnnotation.vep_multi_fields_to_list_of_dicts(raw_db_data, cls.PROMOTER_AI_COLUMNS)
+        scored = [r for r in records if r.get(cls.PROMOTER_AI_SCORE_COLUMN) not in empty_scores]
+        if scored:
+            best = max(scored, key=lambda r: abs(float(r[cls.PROMOTER_AI_SCORE_COLUMN])))
+            if best.get("promoter_ai_tss_pos") in empty_scores:
+                best["promoter_ai_tss_pos"] = None
+            raw_db_data.update(best)
+        else:
+            for f in cls.PROMOTER_AI_COLUMNS:
+                raw_db_data.pop(f, None)
 
     def get_gene_id(self, vep_transcript_data: TranscriptData):
         gene_id = None
