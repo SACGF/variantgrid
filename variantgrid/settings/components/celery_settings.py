@@ -73,6 +73,9 @@ CELERY_TASK_ROUTES = {
     "annotation.tasks.annotate_variants.delete_annotation_run": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.delete_annotation_run_uploaded_data": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.assign_range_lock_to_annotation_run": ANNOTATION_WORKERS,
+    # #1654: retry clears a run's annotation rows (a big delete) then resets it to CREATED. On db_workers
+    # like import_annotation_run so the bulk delete never consumes a throttled VEP slot.
+    "annotation.tasks.annotate_variants.reset_annotation_run_for_retry": DB_WORKERS,
     # annotate_variants is the VEP lane (dump + VEP). Its DB upload phase is a separate task,
     # import_annotation_run, pinned to db_workers so quick bulk inserts never consume a throttled VEP
     # slot - the dispatcher runs it once a run reaches ANNOTATION_COMPLETED. See #1649.

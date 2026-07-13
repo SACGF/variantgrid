@@ -1161,6 +1161,27 @@ class AnnotationRun(TimeStampedModel):
         self.count = None
         self.save()  # get_status() -> CREATED
 
+    def reset_for_retry(self):
+        """ #1654: return this run to a clean, un-counted CREATED state so the dispatcher re-counts +
+            re-annotates it from scratch, keeping its existing annotation_range_lock. Reusing the run
+            in place (rather than delete + recreate) means no rangeless AnnotationRun is ever committed
+            and there's no unique_together (annotation_range_lock, pipeline_type) window to work around.
+
+            Clears any partially-imported annotation rows first - which can take a minute or two for a
+            large range - so callers run this on a worker rather than in a request. The flip to CREATED
+            happens only after that delete, so the dispatcher never re-annotates over stale rows; an
+            interrupted delete leaves the run in its current (visible, retryable) state, never orphaned. """
+        with transaction.atomic():
+            self.delete_related_objects()
+            # Overwrite the row in place with a fresh run carrying the same pk + range lock, so every other
+            # field returns to its default (no field-by-field reset to keep in sync as the model grows).
+            # pk is already set -> save() does an UPDATE of all columns; get_status() -> CREATED.
+            fresh = AnnotationRun(annotation_range_lock=self.annotation_range_lock, pipeline_type=self.pipeline_type)
+            fresh.pk = self.pk
+            fresh.created = self.created  # auto_now_add isn't re-applied on the UPDATE below
+            fresh.save()
+        self.refresh_from_db()  # keep this instance consistent with the reset row
+
     def revert_external_to_local(self):
         """ #1568: return an external run to the normal local pipeline. Clears the external flag and dump
             state (like reopen_to_created) so get_status() -> CREATED and the dispatcher - which sweeps the

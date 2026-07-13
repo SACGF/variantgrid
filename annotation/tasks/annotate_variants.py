@@ -143,6 +143,15 @@ def assign_range_lock_to_annotation_run(annotation_run_id, annotation_range_lock
 
 
 @celery.shared_task
+def reset_annotation_run_for_retry(annotation_run_id):
+    """ #1654: clear a run's partially-imported annotation rows and reset it in place to a clean CREATED
+        state (keeping its range lock). Runs on a worker because the row-clear can take a minute or two for
+        a large range; the retry request just queues this ahead of the dispatch trigger. """
+    annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+    annotation_run.reset_for_retry()
+
+
+@celery.shared_task
 def annotate_variants(annotation_run_id):
     """ VEP lane (annotation_workers): dump unannotated variants + run the VEP subprocess, then stop at
         ANNOTATION_COMPLETED and release the lease. The DB upload is deliberately NOT done here - the
@@ -361,31 +370,31 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
         msg = "Can't retry annotation run with no annotation lock!"
         raise ValueError(msg)
 
-    annotation_run.error_exception = None  # Clear so status won't be error
-    annotation_run.task_id = None  # Allow celery jobs to get lock on it
-    # A manual retry is a fresh start - reset the lease bookkeeping so the dispatcher's attempt-cap
-    # (reclaim_stalled_annotation_runs) counts from zero again. Otherwise an upload-only retry reuses
-    # the same run, whose attempt_count is already at ANNOTATION_MAX_RUN_ATTEMPTS, so the next stall
-    # fails it immediately with "exceeded max attempts". The full-retry path creates a new run below
-    # (attempt_count=0), but resetting here is harmless for it.
-    annotation_run.leased_by = None
-    annotation_run.lease_expires = None
-    annotation_run.attempt_count = 0
-    annotation_run.save()
-
     if upload_only:
+        # A manual retry is a fresh start - reset the lease bookkeeping so the dispatcher's attempt-cap
+        # (reclaim_stalled_annotation_runs) counts from zero again. Otherwise an upload-only retry reuses
+        # the same run, whose attempt_count is already at ANNOTATION_MAX_RUN_ATTEMPTS, so the next stall
+        # fails it immediately with "exceeded max attempts".
+        annotation_run.error_exception = None  # Clear so status won't be error
+        annotation_run.task_id = None  # Allow celery jobs to get lock on it
+        annotation_run.leased_by = None
+        annotation_run.lease_expires = None
+        annotation_run.attempt_count = 0
+        annotation_run.save()
         # Delete uploaded data, then hand back to the dispatcher: the run stays ANNOTATION_COMPLETED with
         # its annotated VCF present -> import lane -> db_workers (import_annotation_run). #1649
         tasks = [
             delete_annotation_run_uploaded_data.si(annotation_run.pk),
         ]
     else:
-        # Delete old AnnotationRun then try again: a fresh CREATED run -> VEP lane (annotate_variants). #1649
-        old_annotation_run = annotation_run
-        annotation_run = AnnotationRun.objects.create(pipeline_type=old_annotation_run.pipeline_type)
+        # #1654: full retry resets the run in place to a clean CREATED state (clearing any partially-
+        # imported annotation rows) rather than delete + recreate. Reusing the same run - keeping its
+        # range lock - means no rangeless AnnotationRun is ever committed, so a mid-retry crash can no
+        # longer strand it invisibly in Created. The row-clear can take a minute or two for a large
+        # range, so it runs on a worker (ahead of the dispatch trigger) instead of blocking this request;
+        # the run stays ERROR (visible, retryable) until the reset flips it to CREATED. #1649
         tasks = [
-            delete_annotation_run.si(old_annotation_run.pk),
-            assign_range_lock_to_annotation_run.si(annotation_run.pk, annotation_range_lock.pk),
+            reset_annotation_run_for_retry.si(annotation_run.pk),
         ]
 
     # #1649: retry no longer launches annotate_variants inline - it hands back to the single-authority

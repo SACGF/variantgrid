@@ -570,15 +570,21 @@ def subdivide_annotation_run(request, annotation_run_id):
     """ Sometimes runs fail w/out of memory etc (perhaps due to too many transcripts) - be able to subdivide """
 
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
-    new_range_lock = subdivide_annotation_range_lock(annotation_run.annotation_range_lock)
+    pipeline_type = annotation_run.pipeline_type
+    old_range_lock = annotation_run.annotation_range_lock
+    version_id = old_range_lock.version_id
 
-    new_annotation_run = AnnotationRun.objects.create(annotation_range_lock=new_range_lock,
-                                                      pipeline_type=annotation_run.pipeline_type)
+    # subdivide_annotation_range_lock deletes the run(s) on this lock, shrinks it to the bottom half and
+    # returns a new lock for the top half. Create a fresh CREATED run per half (each with its lock set,
+    # so no rangeless run is ever committed - #1654) and hand back to the dispatcher.
+    new_range_lock = subdivide_annotation_range_lock(old_range_lock)
+    bottom_half_run = AnnotationRun.objects.create(annotation_range_lock=old_range_lock,
+                                                   pipeline_type=pipeline_type)
+    AnnotationRun.objects.create(annotation_range_lock=new_range_lock, pipeline_type=pipeline_type)
+    dispatch_annotation_runs.si(version_id).apply_async()
 
-    # These runs will get deleted and new ones made during retry
-    annotation_run = annotation_run_retry(annotation_run)
-    _new_annotation_run = annotation_run_retry(new_annotation_run)
-    return redirect(annotation_run)
+    # The original run was deleted by the subdivision - land on the bottom-half replacement.
+    return redirect(bottom_half_run)
 
 
 @cache_page(WEEK_SECS)
