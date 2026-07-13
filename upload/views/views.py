@@ -196,14 +196,16 @@ def get_upload_status_dict(uploaded_file) -> dict:
 
     remaining_annotation_runs = None
     if uploaded_vcf:
+        # uploadedvcf can exist before its vcf is created (import still starting) - guard against
+        # the resulting race, as UploadPipeline.genome_build dereferences uploadedvcf.vcf
         if vcf := uploaded_vcf.vcf:
             data["vcf_id"] = vcf.pk
             data["import_status"] = ImportStatus(vcf.import_status).label
             data["samples"] = [{"sample_id": s.pk, "name": s.name}
                                for s in vcf.sample_set.all()]
-        if upload_pipeline.genome_build:
-            remaining_annotation_runs = get_remaining_annotation_runs(uploaded_vcf, upload_pipeline.genome_build)
-        data["remaining_annotation_runs"] = remaining_annotation_runs
+            if genome_build := upload_pipeline.genome_build:
+                remaining_annotation_runs = get_remaining_annotation_runs(uploaded_vcf, genome_build)
+            data["remaining_annotation_runs"] = remaining_annotation_runs
 
     annotation_complete = (upload_pipeline.status == ProcessingStatus.SUCCESS
                            and (remaining_annotation_runs or 0) == 0)

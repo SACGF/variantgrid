@@ -132,6 +132,26 @@ class UploadStatusAPITest(UploadAPITestBase):
         self.assertIsNotNone(data["vcf_id"])
         self.assertTrue(data["samples"])
 
+    def test_status_before_vcf_created(self):
+        """ Race: client polls immediately after upload, UploadedVCF exists but its vcf is still None """
+        django_file = SimpleUploadedFile("racey.vcf", _vcf_bytes("racey"))
+        uploaded_file = UploadedFile.objects.create(
+            user=self.owner, name="racey.vcf", file_type=UploadedFileTypes.VCF,
+            import_source=ImportSource.WEB_UPLOAD, uploaded_file=django_file)
+        uploaded_file.store_sha256_hash()
+        self._temp_upload_paths.append(uploaded_file.get_filename())
+        pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, uploaded_file=uploaded_file)
+        UploadedVCF.objects.create(uploaded_file=uploaded_file, vcf=None, upload_pipeline=pipeline)
+
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(reverse("api_upload_status",
+                                           kwargs={"uploaded_file_id": uploaded_file.pk}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertIsNone(data["vcf_id"])
+        self.assertEqual(data["samples"], [])
+        self.assertFalse(data["annotation_complete"])
+
     def test_status_by_sha256_success(self):
         uploaded_file = self._create_vcf_upload("status_ok", pipeline_status=ProcessingStatus.SUCCESS)
         self.client.force_authenticate(user=self.owner)
