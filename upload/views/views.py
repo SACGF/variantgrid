@@ -18,6 +18,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST, require_http_methods
 from django_downloadview import PathDownloadView
 
+from analysis.models import AnalysisTemplate
 from annotation.models import AnnotationRun
 from annotation.views import get_build_contigs
 from eventlog.models import create_event
@@ -26,6 +27,7 @@ from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
 from library.utils.django_utils import render_ajax_view
 from snpdb.models import VCF
+from snpdb.models.models_enums import ImportStatus
 from upload import forms, upload_processing, upload_stats
 from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
     UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, \
@@ -138,9 +140,76 @@ def handle_file_upload(user, django_uploaded_file, path=None) -> UploadedFile:
     uploaded_file.file_type = get_uploaded_file_type(uploaded_file, original_filename)
     uploaded_file.save()
 
+    # File is on disk now - store hash so uploads can be de-duped / polled by content (API + web)
+    uploaded_file.store_sha256_hash()
+
     if uploaded_file.file_type:
         upload_processing.process_uploaded_file(uploaded_file)
     return uploaded_file
+
+
+def _cohort_export_templates_configured() -> bool:
+    """ Whether this deployment can produce annotated cohort downloads (VCF/CSV export). """
+    try:
+        AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
+        return True
+    except ValueError:
+        return False
+
+
+def get_upload_status_dict(uploaded_file) -> dict:
+    """ Token-API status payload for an UploadedFile - import + annotation progress and, for VCFs,
+        the resulting vcf/samples plus whether annotated downloads are ready. """
+    file_type = None
+    if uploaded_file.file_type:
+        file_type = UploadedFileTypes(uploaded_file.file_type).label
+
+    data = {
+        "uploaded_file_id": uploaded_file.pk,
+        "sha256_hash": uploaded_file.sha256_hash,
+        "file_type": file_type,
+        "pipeline_status": None,
+        "progress_percent": None,
+        "import_status": None,
+        "remaining_annotation_runs": None,
+        "annotation_complete": False,
+        "vcf_id": None,
+        "samples": [],
+        "error": None,
+        "downloads_available": False,
+    }
+
+    upload_pipeline = UploadPipeline.objects.filter(uploaded_file=uploaded_file).first()
+    if upload_pipeline is None:
+        data["error"] = f'Could not determine how to read file: "{uploaded_file.name}"'
+        return data
+
+    data["pipeline_status"] = ProcessingStatus(upload_pipeline.status).label
+    data["progress_percent"] = upload_pipeline.progress_percent
+    if upload_pipeline.status == ProcessingStatus.ERROR:
+        data["error"] = upload_pipeline.progress_status
+
+    try:
+        uploaded_vcf = uploaded_file.uploadedvcf
+    except ObjectDoesNotExist:
+        uploaded_vcf = None
+
+    remaining_annotation_runs = None
+    if uploaded_vcf:
+        if vcf := uploaded_vcf.vcf:
+            data["vcf_id"] = vcf.pk
+            data["import_status"] = ImportStatus(vcf.import_status).label
+            data["samples"] = [{"sample_id": s.pk, "name": s.name}
+                               for s in vcf.sample_set.all()]
+        if upload_pipeline.genome_build:
+            remaining_annotation_runs = get_remaining_annotation_runs(uploaded_vcf, upload_pipeline.genome_build)
+        data["remaining_annotation_runs"] = remaining_annotation_runs
+
+    annotation_complete = (upload_pipeline.status == ProcessingStatus.SUCCESS
+                           and (remaining_annotation_runs or 0) == 0)
+    data["annotation_complete"] = annotation_complete
+    data["downloads_available"] = annotation_complete and _cohort_export_templates_configured()
+    return data
 
 @require_POST
 def upload_file(request):

@@ -4,7 +4,7 @@ from upload.grids import UploadPipelineModifiedVariantsGrid, UploadPipelineSkipp
     UploadStepColumns
 from upload.views import views
 from upload.views.views import view_upload_step_detail
-from upload.views.views_rest import APIFileUploadView
+from upload.views.views_rest import APIFileUploadView, APIUploadStatusView, APIAnnotatedDownloadView
 from variantgrid.perm_path import path
 
 urlpatterns = [
@@ -31,5 +31,9 @@ urlpatterns = [
 
     # APIs - Django REST framework
     path('api/v1/file_upload', APIFileUploadView.as_view(), name='api_file_upload'),
+    path('api/v1/upload_status/<int:uploaded_file_id>', APIUploadStatusView.as_view(), name='api_upload_status'),
+    path('api/v1/upload_status/sha256/<str:sha256_hash>', APIUploadStatusView.as_view(), name='api_upload_status_sha256'),
+    path('api/v1/download/<int:uploaded_file_id>/<str:export_type>', APIAnnotatedDownloadView.as_view(), name='api_annotated_download'),
+    path('api/v1/download/sha256/<str:sha256_hash>/<str:export_type>', APIAnnotatedDownloadView.as_view(), name='api_annotated_download_sha256'),
 
 ]
