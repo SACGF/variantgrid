@@ -190,7 +190,9 @@ ANNOTATION = {
             "open_targets": "annotation_data/GRCh38/open_targets_26.03_vep.tsv.bgz",
             "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",  # VEP >= 116
             "popeve": "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz",  # VEP >= 116
-            "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",  # VEP >= 116
+            # stripped_chr: source file was chr-prefixed (chr1); the plugin queries bare contigs (1),
+            # so the original silently returned no matches. This copy has the chr prefix removed + re-indexed.
+            "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.stripped_chr.tsv.bgz",  # VEP >= 116
         }
     },
     BUILD_T2TV2: {

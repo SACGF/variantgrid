@@ -219,7 +219,12 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             if vc.vep_version >= 116:
                 plugin_data_func.update({
                     VEPPlugin.EVE: lambda: f"EVE,file={vc['eve']},popeve_file={vc['popeve']}",
-                    VEPPlugin.PROMOTER_AI: lambda: f"PromoterAI,file={vc['promoter_ai']}",
+                    # match_to=any: our GRCh38 VEP runs use --refseq, but the PromoterAI data file keys
+                    # transcripts/genes by Ensembl ID (ENST/ENSG), so the default match_to=transcript never
+                    # matches RefSeq feature IDs and returns empty. match_to=any matches on genomic position
+                    # + alt allele only. The file is pre-filtered to TSS±500 promoter variants, so every hit
+                    # is a genuine promoter prediction.
+                    VEPPlugin.PROMOTER_AI: lambda: f"PromoterAI,file={vc['promoter_ai']},match_to=any",
                 })
 
     else:
