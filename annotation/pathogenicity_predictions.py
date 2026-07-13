@@ -17,6 +17,7 @@ class PathogenicityTool:
     source: str = ""                                   # short citation tag (table cell / colour-band tooltip)
     source_detail: str = ""                            # full citation, shown on the Pathogenicity Thresholds page
     source_url: str = ""                               # DOI / URL for the citation
+    note: str = ""                                     # caveat shown on the Pathogenicity Thresholds page (e.g. threshold not clinically recommended)
 
 
 # Pejaver V, Byrne AB, Feng B-J, et al. Calibration of computational tools for missense variant
@@ -109,6 +110,24 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_pathogenic_threshold=0.5,
         pred_pathogenic_values=("D",),
         source="dbNSFP readme 118", source_detail=_ALIREZAIE_2018[0], source_url=_ALIREZAIE_2018[1],
+    ),
+    # EVE - Frazer 2021, Nature (DOI 10.1038/s41586-021-04043-8). GRCh38, VEP >= 116; higher = more pathogenic.
+    # Bergquist 2024 measured EVE supporting thresholds (pathogenic >= 0.684, benign <= 0.137) but explicitly
+    # declined to recommend them clinically: EVE scored only ~half of their benign/likely-benign calibration
+    # variants, so potential sampling bias left them unable to endorse the cutoffs. We therefore list EVE with
+    # no active PP3/BP4 cutoff (no colour band, not counted in predictions_num_pathogenic) and say so via `note`.
+    PathogenicityTool(
+        name="EVE",
+        rankscore_field=None,
+        raw_field="eve_score",
+        pred_field=None,
+        raw_min=0.0, raw_max=1.0, raw_step=0.05,
+        raw_max_benign_threshold=None,
+        raw_pathogenic_threshold=None,
+        source="Bergquist 2024", source_detail=_BERGQUIST_2024[0], source_url=_BERGQUIST_2024[1],
+        note="Bergquist 2024 measured supporting thresholds (pathogenic ≥ 0.684, benign ≤ 0.137) but "
+             "declined to recommend them for clinical use due to potential sampling bias, so no "
+             "ClinGen-calibrated PP3/BP4 cutoff is applied.",
     ),
     # MetaRNN - Li 2022, Genome Med (DOI 10.1186/s13073-022-01120-z). dbNSFP 5.3a readme field 82.
     # No ClinGen calibration; use author cutoff 0.5. Single threshold.

@@ -688,10 +688,8 @@ function applyVariantValues() {
                         {% if variant_annotation.has_dbnsfp %}
                             {% labelled id='interpro_domain' label='InterPro' help=annotation_description.interpro_domain hint="tiny" %}{% endlabelled %}
                         {% endif %}
-                        {% if variant_annotation.has_protvar %}
-                            {% labelled id='protvar_pocket' visible_fields=visible_fields label='ProtVar pocket' help=annotation_description.protvar_pocket hint="tiny" %}{{ variant_annotation.protvar_pocket }}{% endlabelled %}
-                            {% labelled id='protvar_int' visible_fields=visible_fields label='ProtVar interface' help=annotation_description.protvar_int hint="tiny" %}{{ variant_annotation.protvar_int }}{% endlabelled %}
-                        {% endif %}
+                        {% labelled id='protvar_pocket' visible_fields=visible_fields label='ProtVar pocket' help=annotation_description.protvar_pocket hint="tiny" %}{% with pp=variant_annotation.protvar_pocket_parsed %}{% if pp %}<span class="text-monospace">{{ pp.id }}</span> <span class="text-secondary">score</span> <span class="text-monospace">{{ pp.score }}</span>{% if pp.confidence %} <span class="badge badge-{{ pp.confidence.css }}">{{ pp.confidence.label }}</span>{% endif %}<div class="text-muted small mt-1">MpLDDT {{ pp.mplddt }} &middot; energy {{ pp.energy }} &middot; buriedness {{ pp.buriedness }} &middot; RoG {{ pp.rog }}</div>{% if pp.residues %}<div class="text-muted small">residues: <span class="text-monospace">{{ pp.residues }}</span></div>{% endif %}{% endif %}{% endwith %}{% endlabelled %}
+                        {% labelled id='protvar_int' visible_fields=visible_fields label='ProtVar interface' help=annotation_description.protvar_int hint="tiny" %}{% with pi=variant_annotation.protvar_int_parsed %}{% if pi %}<a class='hover-link' href="{{ pi.uniprot_url }}" target="_blank">{{ pi.protein_id }}</a> <span class="text-secondary">pDockQ</span> <span class="text-monospace">{{ pi.pdockq }}</span>{% if pi.confidence %} <span class="badge badge-{{ pi.confidence.css }}">{{ pi.confidence.label }}</span>{% endif %}{% endif %}{% endwith %}{% endlabelled %}
                     </div>
                 </div>
             </div>
@@ -712,6 +710,9 @@ function applyVariantValues() {
                             {% labelled id='bayesdel_noaf_score' visible_fields=visible_fields label='BayesDel (No AF)' help=annotation_description.bayesdel_noaf_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_score }}{% endlabelled %}
                             {% labelled id='cadd_phred' visible_fields=visible_fields label='CADD (phred)' help=annotation_description.cadd_phred hint="tiny" value_css="text-monospace" %}{{ variant_annotation.cadd_phred }}{% endlabelled %}
                             {% labelled id='clinpred_score' visible_fields=visible_fields label='ClinPred' help=annotation_description.clinpred_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.clinpred_score }}{% endlabelled %}
+                            {% labelled id='eve_score' visible_fields=visible_fields label='EVE' help=annotation_description.eve_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.eve_score }}{% endlabelled %}
+                            {% labelled id='eve_class' visible_fields=visible_fields label='EVE class' help=annotation_description.eve_class hint="tiny" value_css="text-monospace" %}{{ variant_annotation.eve_class }}{% endlabelled %}
+                            {% labelled id='popeve_score' visible_fields=visible_fields label='popEVE' help=annotation_description.popeve_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.popeve_score }}{% endlabelled %}
                             {% labelled id='fathmm_pred_most_damaging' visible_fields=visible_fields label='FATHMM' help=annotation_description.fathmm_pred_most_damaging hint="tiny" value_css="text-monospace" %}{{ variant_annotation.get_fathmm_pred_most_damaging_display }}{% endlabelled %}
                             {% labelled id='grantham' visible_fields=visible_fields label='Grantham' help=annotation_description.grantham hint="tiny" value_css="text-monospace" %}{{ variant_annotation.grantham }}{% endlabelled %}
                             {% labelled id='metarnn_score' visible_fields=visible_fields label='MetaRNN' help=annotation_description.metarnn_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.metarnn_score }}{% endlabelled %}
@@ -752,18 +753,9 @@ function applyVariantValues() {
                                 </div>
                             {% endif %}
                         {% endif %}
-                        {% if variant_annotation.has_protvar %}
-                            {% labelled id='protvar_stability' visible_fields=visible_fields label='ProtVar ddG stability' help=annotation_description.protvar_stability hint="tiny" value_css="text-monospace" %}{{ variant_annotation.protvar_stability }}{% endlabelled %}
-                        {% endif %}
-                        {% if variant_annotation.has_eve %}
-                            {% labelled id='eve_score' visible_fields=visible_fields label='EVE' help=annotation_description.eve_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.eve_score }}{% endlabelled %}
-                            {% labelled id='eve_class' visible_fields=visible_fields label='EVE class' help=annotation_description.eve_class hint="tiny" value_css="text-monospace" %}{{ variant_annotation.eve_class }}{% endlabelled %}
-                            {% labelled id='popeve_score' visible_fields=visible_fields label='popEVE' help=annotation_description.popeve_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.popeve_score }}{% endlabelled %}
-                        {% endif %}
-                        {% if variant_annotation.has_promoter_ai %}
-                            {% labelled id='promoter_ai_score' visible_fields=visible_fields label='PromoterAI' help=annotation_description.promoter_ai_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.promoter_ai_score }}{% endlabelled %}
-                            {% labelled id='promoter_ai_tss_pos' visible_fields=visible_fields label='PromoterAI TSS pos' help=annotation_description.promoter_ai_tss_pos hint="tiny" value_css="text-monospace" %}{{ variant_annotation.promoter_ai_tss_pos }}{% endlabelled %}
-                        {% endif %}
+                        {% labelled id='protvar_stability' visible_fields=visible_fields label='ProtVar ddG stability' help=annotation_description.protvar_stability hint="tiny" value_css="text-monospace" %}{{ variant_annotation.protvar_stability }}{% endlabelled %}
+                        {% labelled id='promoter_ai_score' visible_fields=visible_fields label='PromoterAI' help=annotation_description.promoter_ai_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.promoter_ai_score }}{% endlabelled %}
+                        {% labelled id='promoter_ai_tss_pos' visible_fields=visible_fields label='PromoterAI TSS pos' help=annotation_description.promoter_ai_tss_pos hint="tiny" value_css="text-monospace" %}{{ variant_annotation.promoter_ai_tss_pos }}{% endlabelled %}
                         <div class="text-right mt-2"><a class="hover-link text-small" href="{% url 'pathogenicity_thresholds' %}" target="_blank">PP3/BP4 thresholds &amp; sources</a></div>
                     </div>
                 </div>
@@ -1136,7 +1128,7 @@ function applyVariantValues() {
                 </div>
             </div>
 
-            {% if variant_annotation.has_open_targets %}
+            {% if 'open_targets_gwas_l2g_score' in visible_fields %}
             <div class="col-md-6 mt-4">
                 <div class="card">
                     <div class="card-header">Open Targets</div>

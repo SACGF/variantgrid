@@ -35,7 +35,10 @@
                     <tbody>
                         {% for t in tools %}
                             <tr>
-                                <th>{{ t.name }}</th>
+                                <th>
+                                    {{ t.name }}
+                                    {% if t.note %}<div class="text-muted small font-weight-normal mt-1">{{ t.note }}</div>{% endif %}
+                                </th>
                                 <td class="text-monospace">{{ t.raw_min }} &ndash; {{ t.raw_max }}</td>
                                 <td class="text-monospace">
                                     {% if t.raw_max_benign_threshold is not None %}

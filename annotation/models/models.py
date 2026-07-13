@@ -1261,6 +1261,26 @@ class AnnotationRun(TimeStampedModel):
         return f"AnnotationRun: {self.pk}/{self.get_pipeline_type_display()}: ({self.get_status_display()})"
 
 
+_PROTVAR_CONFIDENCE_CSS = {"low": "secondary", "high": "info", "very high": "success"}
+
+
+def _protvar_confidence(value, *, low_below: float, high_max: float) -> Optional[dict]:
+    """ ProtVar confidence band for a numeric score (pDockQ or pocket score), matching the ProtVar.pm
+        bands: below `low_below` is 'low', up to and including `high_max` is 'high', above is
+        'very high'. Returns {label, css} for badge display, or None if not numeric. """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    if v < low_below:
+        label = "low"
+    elif v <= high_max:
+        label = "high"
+    else:
+        label = "very high"
+    return {"label": label, "css": _PROTVAR_CONFIDENCE_CSS[label]}
+
+
 class AbstractVariantAnnotation(models.Model):
     """ Common fields between VariantAnnotation and VariantTranscriptAnnotation
         These fields are PER-TRANSCRIPT """
@@ -1747,29 +1767,44 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.is_standard_annotation and self.version.columns_version >= 3
 
     @property
-    def has_protvar(self) -> bool:
-        """ ProtVar (columns_version >= 5) - any of stability / pocket / interface present. """
-        return any(v is not None for v in (self.protvar_stability, self.protvar_pocket, self.protvar_int))
+    def protvar_int_parsed(self) -> Optional[dict]:
+        """ ProtVar interface = 'protein_id&pDockQ' - a single interacting protein and its docking
+            confidence (e.g. 'Q6PJI9-2&0.420206'). Split into the interacting protein id + pDockQ,
+            with a UniProt entry link for the protein (isoform suffix dropped for the URL) and the
+            plugin's pDockQ confidence band. Returns None when there's no interface value. """
+        if not self.protvar_int:
+            return None
+        protein_id, _, pdockq = self.protvar_int.partition("&")
+        accession = protein_id.split("-")[0]  # strip isoform suffix (e.g. Q6PJI9-2 -> Q6PJI9) for the link
+        return {
+            "protein_id": protein_id,
+            "pdockq": pdockq,
+            "confidence": _protvar_confidence(pdockq, low_below=0.23, high_max=0.5),  # ProtVar.pm pDockQ bands
+            "uniprot_url": f"https://www.uniprot.org/uniprotkb/{accession}/entry" if accession else "",
+        }
 
     @property
-    def has_open_targets(self) -> bool:
-        """ Open Targets (columns_version >= 5, GRCh38) - any GWAS / QTL field present. """
-        return any(v is not None for v in (
-            self.open_targets_gwas_l2g_score, self.open_targets_gwas_gene_id,
-            self.open_targets_gwas_diseases, self.open_targets_study_type,
-            self.open_targets_study_id, self.open_targets_variant_id,
-            self.open_targets_qtl_gene_id, self.open_targets_qtl_biosample,
-        ))
-
-    @property
-    def has_eve(self) -> bool:
-        """ EVE / popEVE (columns_version >= 5, GRCh38, VEP >= 116) - missense only. """
-        return any(v is not None for v in (self.eve_score, self.eve_class, self.popeve_score))
-
-    @property
-    def has_promoter_ai(self) -> bool:
-        """ PromoterAI (columns_version >= 5, GRCh38, VEP >= 116). """
-        return self.promoter_ai_score is not None
+    def protvar_pocket_parsed(self) -> Optional[dict]:
+        """ ProtVar pocket = 'id&score&MpLDDT&energy&buriedness&RoG&residues' (e.g.
+            'P123&850&95.2&-1.3&0.7&12.4&p10p20p30'). Residues are 'p'-encoded by ProtVar.pm
+            (comma -> 'p') to survive the VCF field split; we decode them back to a position list.
+            Returns None when there's no pocket value. """
+        if not self.protvar_pocket:
+            return None
+        parts = self.protvar_pocket.split("&")
+        parts += [""] * (7 - len(parts))  # tolerate a short/truncated blob
+        pocket_id, score, mplddt, energy, buriedness, rog, residues = parts[:7]
+        residue_positions = [r for r in residues.lstrip("p").split("p") if r]
+        return {
+            "id": pocket_id,
+            "score": score,
+            "confidence": _protvar_confidence(score, low_below=800, high_max=900),  # ProtVar.pm pocket bands
+            "mplddt": mplddt,
+            "energy": energy,
+            "buriedness": buriedness,
+            "rog": rog,
+            "residues": ", ".join(residue_positions),
+        }
 
     @property
     def gnomad4_or_later(self) -> bool:
