@@ -97,7 +97,11 @@ def annotation_build_detail(request, genome_build_name):
     except Exception as e:
         annotation_details["reference_fasta_error"] = str(e)
 
-    if av := AnnotationVersion.latest(genome_build, status=VariantAnnotationVersion.Status.NEW, validate=False):
+    # Show the latest annotation version regardless of status (NEW while being built, or ACTIVE once
+    # promoted) - otherwise on a working deployment (ACTIVE) av would be None and every install-instructions
+    # block below would render as "not installed"
+    latest_av_qs = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("annotation_date")
+    if av := latest_av_qs.last():
         annotation_details["latest"] = av
 
         sync_with_current_vep = False

@@ -38,6 +38,11 @@ class Command(BaseCommand):
                                  'before annotation, unless it was already refreshed within '
                                  'PANEL_APP_CACHE_DAYS (so a multi-build run only crawls once). '
                                  'Default on; pass --no-update-panel-app to skip entirely.')
+        parser.add_argument('--status', choices=list(VariantAnnotationVersion.Status),
+                            default=VariantAnnotationVersion.Status.NEW,
+                            help="Which VariantAnnotationVersion status --missing operates on. Defaults to NEW "
+                                 "(the version being built); pass --status=ACTIVE to backfill gene annotation for "
+                                 "a build whose only version has already been promoted.")
 
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument('--gene-annotation-release', type=int, help=gar_ov_dbsnfp_help)
@@ -73,6 +78,7 @@ class Command(BaseCommand):
         self.update_panel_app = options["update_panel_app"]
 
         missing = options["missing"]
+        missing_status = options["status"]
         latest_releases = options["latest_releases"]
         new_releases = options["new_releases"]
         self._validate_has_required_data()
@@ -120,10 +126,9 @@ class Command(BaseCommand):
                 raise ValueError("Only specify ontology-version when gene-annotation-release also specified")
 
             for genome_build in GenomeBuild.builds_with_annotation():
-                av = AnnotationVersion.latest(genome_build, validate=False,
-                                              status=VariantAnnotationVersion.Status.NEW)
+                av = AnnotationVersion.latest(genome_build, validate=False, status=missing_status)
                 if not av:
-                    raise InvalidAnnotationVersionError(f"No AnnotationVersion for {genome_build}")
+                    raise InvalidAnnotationVersionError(f"No {missing_status} AnnotationVersion for {genome_build}")
 
                 if not av.variant_annotation_version:
                     raise InvalidAnnotationVersionError(f"AnnotationVersion {av} has no VariantAnnotationVersion set")
