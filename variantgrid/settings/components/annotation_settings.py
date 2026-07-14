@@ -69,13 +69,9 @@ ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE = True  # Only 'dup' for dups, false is all 
 ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD = "lowest_af"  # "greatest_overlap", "lowest_af", "exact_or_lowest_af"
 ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION = 0.8
 ANNOTATION_VEP_SV_MAX_SIZE = 10_000_000  # VEP default = 10M
-# Compute the 4 conservation _max columns (phastCons/phyloP) for structural variants with pyBigWig
-# instead of VEP --custom bigWig overlaps (#1657). VEP's summary_stats=max walks the bigWig across the
-# whole SV span (O(span)), which makes large SVs never finish; the pyBigWig aligned span-max is bit-exact
-# and ~ms/SV. The 4 conservation --custom args are dropped from the SV VEP command (their ColumnVEPField
-# rows are STANDARD-only), and this post-VEP stage populates the same _max columns on the import path.
-# Strictly opt-in: deployments enable this once pyBigWig + the conservation bigWig data files are installed.
-ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED = False
+
+# Use pyBigWig as optimisation rather than VEP --custom (see #1657)
+ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED = True
 
 ANNOTATION_MAX_BENIGN_RANKSCORE = 0.15
 ANNOTATION_MIN_PATHOGENIC_RANKSCORE = 0.85
