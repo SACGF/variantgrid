@@ -9,6 +9,8 @@ from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion
+from annotation.sv_conservation import ConservationTrack, conservation_sidecar_filename, \
+    write_conservation_sidecar
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_version_from_vcf, vep_dict_to_variant_annotation_version_kwargs, \
     VEPConfig
@@ -110,15 +112,52 @@ class TestAnnotationVCFCNV(TestCase):
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=4))
 class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
-    """ columns_version 4 = VEP 115 + gnomAD 4.1 + masked SpliceAI. SV CSQ adds
-        phastCons/phyloP conservation tracks (summary_stats=max bigwig overlap). """
+    """ columns_version 4 = VEP 115 + gnomAD 4.1 + masked SpliceAI. SV conservation _max columns
+        (phastCons/phyloP) are computed with pyBigWig instead of VEP --custom bigwig (#1657): the
+        annotate stage writes a sidecar TSV next to the annotated VCF and the import path merges it
+        into the same columns. Here we write that sidecar directly (scoring accuracy is covered by
+        annotation.tests.test_sv_conservation, which needs the real bigWig data) and assert the import
+        populates the columns from it. """
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
     TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version4_grch37_sv.vep_annotated.vcf")
     TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_columns_version4_grch38_sv.vep_annotated.vcf")
 
+    # {variant_id: {db_column: value}} - written to the conservation sidecar before import.
+    CONSERVATION_GRCH37 = {
+        202: {"phastcons_100_way_vertebrate": 1.0, "phastcons_46_way_mammalian": 1.0,
+              "phylop_100_way_vertebrate": 9.873, "phylop_46_way_mammalian": 2.894},
+        203: {"phastcons_100_way_vertebrate": 1.0, "phastcons_46_way_mammalian": 1.0,
+              "phylop_100_way_vertebrate": 6.180, "phylop_46_way_mammalian": 2.873},
+    }
+    CONSERVATION_GRCH38 = {
+        101: {"phastcons_100_way_vertebrate": 1.0, "phastcons_30_way_mammalian": 1.0,
+              "phylop_100_way_vertebrate": 9.556, "phylop_30_way_mammalian": 1.251},
+        102: {"phastcons_100_way_vertebrate": 1.0, "phastcons_30_way_mammalian": 1.0,
+              "phylop_100_way_vertebrate": 7.272, "phylop_30_way_mammalian": 1.312},
+    }
+
+    def setUp(self):
+        super().setUp()
+        self._sidecars = []
+
+    def tearDown(self):
+        for sidecar in self._sidecars:
+            if os.path.exists(sidecar):
+                os.remove(sidecar)
+        super().tearDown()
+
+    def _write_conservation_sidecar(self, vcf_filename, conservation):
+        columns = sorted({c for values in conservation.values() for c in values})
+        tracks = [ConservationTrack(name=c, path="", db_column=c) for c in columns]
+        sidecar = conservation_sidecar_filename(vcf_filename)
+        write_conservation_sidecar(sidecar, conservation, tracks)
+        self._sidecars.append(sidecar)
+
     def test_import_variant_annotations_grch37(self):
+        # Write the pyBigWig sidecar next to the annotated VCF so the import path picks it up.
+        self._write_conservation_sidecar(self.TEST_ANNOTATION_VCF_GRCH37, self.CONSERVATION_GRCH37)
         super().test_import_variant_annotations_grch37()
-        # Conservation tracks (bigwig --custom, summary_stats=max). v4 only.
+
         va = VariantAnnotation.objects.get(variant_id=202)
         self.assertAlmostEqual(va.phastcons_100_way_vertebrate, 1.0)
         self.assertAlmostEqual(va.phastcons_46_way_mammalian, 1.0)
@@ -130,8 +169,9 @@ class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
         self.assertAlmostEqual(va.phylop_46_way_mammalian, 2.873, places=3)
 
     def test_import_variant_annotations_grch38(self):
+        self._write_conservation_sidecar(self.TEST_ANNOTATION_VCF_GRCH38, self.CONSERVATION_GRCH38)
         super().test_import_variant_annotations_grch38()
-        # Conservation tracks (bigwig --custom, summary_stats=max). v4 only.
+
         va = VariantAnnotation.objects.get(variant_id=101)
         self.assertAlmostEqual(va.phastcons_100_way_vertebrate, 1.0)
         self.assertAlmostEqual(va.phastcons_30_way_mammalian, 1.0)

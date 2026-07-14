@@ -18,6 +18,8 @@ from annotation.annotsv_annotation import run_annotsv, annotsv_check_command_lin
 from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals.manual_signals import annotation_run_complete_signal
+from annotation.sv_conservation import score_sv_vcf, get_sv_conservation_tracks, \
+    write_conservation_sidecar, conservation_sidecar_filename
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_command, vep_check_command_line_version_match
 from eventlog.models import create_event
@@ -353,6 +355,24 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
                     annotation_run.pk, rc, tsv_missing,
                     (stderr or "")[-4000:], (stdout or "")[-4000:],
                 )
+
+        # Conservation (phastCons/phyloP) _max columns for SVs - computed with pyBigWig instead of the
+        # 4 conservation VEP --custom bigWig overlaps, whose O(SV-span) cost makes large SVs never finish
+        # (#1657). The values are written to a sidecar TSV next to the annotated VCF; the import lane
+        # (BulkVEPVCFAnnotationInserter) merges them into the same _max columns. Best-effort: a scoring
+        # failure logs and leaves the columns null rather than failing the run.
+        if (settings.ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED
+                and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
+            try:
+                tracks = get_sv_conservation_tracks(genome_build)
+                results = score_sv_vcf(vcf_dump_filename, genome_build)
+                sidecar = conservation_sidecar_filename(vcf_annotated_filename)
+                write_conservation_sidecar(sidecar, results, tracks)
+                logging.info("Wrote SV conservation for %d variants to %s", len(results), sidecar)
+            except Exception:
+                log_traceback()
+                logging.warning("SV conservation (pyBigWig) stage failed for AnnotationRun %s",
+                                annotation_run.pk)
     else:
         # Now we have standard/CNV type pipelines, it's possible some can be empty
         annotation_run.annotated_count = 0

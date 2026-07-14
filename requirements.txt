@@ -368,6 +368,8 @@ pygments==2.20.0
     #   ipython
     #   pytest
     #   rich
+pybigwig==0.3.25
+    # via -r requirements.in
 pyhgvs @ git+https://github.com/SACGF/hgvs@69ff4bdd09088be798708702779a5ba59f1c5b41#egg=pyhgvs
     # via -r requirements.in
 pyjwt==2.13.0

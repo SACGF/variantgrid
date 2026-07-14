@@ -1,5 +1,6 @@
 import logging
 import operator
+import os
 import shutil
 import time
 from collections import defaultdict, Counter
@@ -14,6 +15,7 @@ from annotation.models.models import VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
 from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
 from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
+from annotation.sv_conservation import read_conservation_sidecar, conservation_sidecar_filename
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
@@ -157,6 +159,7 @@ class BulkVEPVCFAnnotationInserter:
         )
 
         self._setup_vep_fields_and_db_columns(validate_columns, cvf_list)
+        self._load_sv_conservation()
         self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build,
                                         # We only want exact transcript version for annotation
                                         allow_alternative_transcript_version=False)
@@ -296,6 +299,29 @@ class BulkVEPVCFAnnotationInserter:
             "annotation_run_id": self.annotation_run.pk,
         }
         self.aloft_columns = self._has_all_aloft_columns(self.all_variant_columns)
+
+    def _load_sv_conservation(self):
+        """ Load the pyBigWig conservation sidecar (#1657) written by the SV annotate stage, if present.
+            For SVs the 4 conservation _max columns are computed with pyBigWig rather than VEP --custom
+            bigWig overlaps, so their ColumnVEPField rows are STANDARD-only and _setup_vep_fields_and_db_columns
+            drops the columns as out-of-scope/unpopulated. Re-add the columns the sidecar carries so they
+            get written, and hold the {variant_id: {column: value}} map for process_entry to merge in. """
+        self.sv_conservation: dict[int, dict[str, float]] = {}
+        self.sv_conservation_columns: set[str] = set()
+        vcf_annotated_filename = self.annotation_run.vcf_annotated_filename
+        if not vcf_annotated_filename:
+            return
+        sidecar = conservation_sidecar_filename(vcf_annotated_filename)
+        if not os.path.exists(sidecar):
+            return
+        self.sv_conservation = read_conservation_sidecar(sidecar)
+        for values in self.sv_conservation.values():
+            self.sv_conservation_columns.update(values)
+        if self.sv_conservation_columns:
+            # Conservation columns are variant-level (VariantAnnotation only, not the transcript model),
+            # so re-add them only to the variant column sets that _setup dropped as out-of-scope.
+            self.all_variant_columns |= self.sv_conservation_columns
+            self.variant_only_columns = self.all_variant_columns - self.transcript_columns
 
     @staticmethod
     def _has_all_aloft_columns(columns) -> bool:
@@ -681,6 +707,10 @@ class BulkVEPVCFAnnotationInserter:
                 if representative_transcript:
                     variant_data = self.vep_to_db_dict(vep_transcript_data, self.variant_only_columns)
                     variant_data.update(transcript_data)
+                    if conservation := self.sv_conservation.get(variant_id):
+                        # pyBigWig SV conservation _max columns (#1657) - the values VEP --custom bigwig
+                        # would have written, computed separately and merged onto the variant here.
+                        variant_data.update(conservation)
                     self._fix_multiple_values(variant_data)
                     self.add_calculated_variant_annotation_columns(variant_coordinate, variant_data)
                     # If we're using custom COSMIC vcf, merge with those from VEP existing variation
