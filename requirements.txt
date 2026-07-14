@@ -135,7 +135,7 @@ django-appconf==1.2.0
     #   django-compressor
 django-auditlog==3.4.1
     # via -r requirements.in
-django-autocomplete-light==4.0.1
+django-autocomplete-light==4.0.3
     # via -r requirements.in
 django-avatar==9.0.0
     # via -r requirements.in
@@ -170,7 +170,6 @@ django-js-reverse==1.0.0
 django-json-widget==2.1.1
     # via -r requirements.in
 django-leaflet==0.33.0
-    # via -r requirements.in
     # via -r requirements.in
 django-model-utils==5.0.0
     # via -r requirements.in
@@ -210,7 +209,7 @@ frozendict==2.4.7
     # via -r requirements.in
 gunicorn==26.0.0
     # via -r requirements.in
-hgvs @ git+https://github.com/biocommons/hgvs@fa02ca5ec0c9e28a1a6377b551e41ae77b450ce9#egg=hgvs
+hgvs @ git+https://github.com/biocommons/hgvs@dac6a2f75a2435804769fa836c527e4108c91297#egg=hgvs
     # via
     #   -r requirements.in
     #   cdot
@@ -355,6 +354,8 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.3
     # via stack-data
+pybigwig==0.3.25
+    # via -r requirements.in
 pycparser==3.0
     # via cffi
 pycryptodome==3.23.0
@@ -368,8 +369,6 @@ pygments==2.20.0
     #   ipython
     #   pytest
     #   rich
-pybigwig==0.3.25
-    # via -r requirements.in
 pyhgvs @ git+https://github.com/SACGF/hgvs@69ff4bdd09088be798708702779a5ba59f1c5b41#egg=pyhgvs
     # via -r requirements.in
 pyjwt==2.13.0
@@ -480,10 +479,8 @@ typing-extensions==4.15.0
     # via
     #   beautifulsoup4
     #   biocommons-seqrepo
-    #   django-guardian
     #   pydantic
     #   pydantic-core
-    #   referencing
     #   typing-inspection
 typing-inspection==0.4.2
     # via pydantic

@@ -12,7 +12,7 @@ deprecation
 Django
 django-amazon-ses
 django-auditlog>=3.0.0
-django_autocomplete_light
+django_autocomplete_light<5
 django-avatar>=8.0.0
 django_cache_memoize
 django-compressor
