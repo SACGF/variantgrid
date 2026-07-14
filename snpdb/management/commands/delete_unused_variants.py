@@ -8,7 +8,7 @@ from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, Va
 from classification.models import Classification, ImportedAlleleInfo, ResolvedVariantInfo
 from snpdb.models import Variant, VariantZygosityCount, VariantCollectionRecord, \
     CohortGenotype, CommonVariantClassified, VariantAllele, VariantWiki
-from upload.models import ModifiedImportedVariant, UploadedVCF
+from upload.models import ModifiedImportedVariant, UploadedVCFPipelineMaxVariant
 
 
 # Every model with a FK to Variant whose presence means the variant is still referenced and must be
@@ -40,7 +40,7 @@ PRELOAD_VARIANT_RELATIONS = [
     (AnnotationRangeLock, "max_variant_id"),
     (AllVariantsNode, "max_variant_id"),
     (IntersectionNode, "hgvs_variant_id"),
-    (UploadedVCF, "max_variant_id"),
+    (UploadedVCFPipelineMaxVariant, "max_variant_id"),
 ]
 
 

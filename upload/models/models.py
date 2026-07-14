@@ -22,6 +22,8 @@ from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
+from annotation.annotation_versions import get_lowest_unannotated_variant_id
+from annotation.models.models_enums import VariantAnnotationPipelineType
 from eventlog.models import create_event
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.django_file_utils import get_import_processing_dir
@@ -449,12 +451,32 @@ class UploadedVCF(models.Model):
     uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
     vcf = models.OneToOneField(VCF, null=True, on_delete=CASCADE)
     upload_pipeline = models.OneToOneField(UploadPipeline, null=True, on_delete=SET_NULL)
-    # Keep track of highest KNOWN variant, so we can quickly check whether it has been annotated.
-    max_variant = models.ForeignKey(Variant, null=True, on_delete=SET_NULL)
     vcf_importer = models.ForeignKey(VCFImporter, null=True, on_delete=SET_NULL)
 
     def get_data(self) -> VCF:
         return self.vcf
+
+    @property
+    def max_variant_id(self) -> Optional[int]:
+        """ Highest known variant across all pipeline types (None if not imported/no variants).
+            Prefer is_fully_annotated() for annotation-completeness - this is for display/progress. """
+        data = self.pipeline_max_variants.aggregate(m=Max("max_variant_id"))
+        return data["m"]
+
+    def is_fully_annotated(self, variant_annotation_version) -> bool:
+        """ True when every pipeline type present in this VCF is fully annotated. A VCF has one
+            UploadedVCFPipelineMaxVariant row per pipeline type its variants are subject to; the
+            absence of a row for a type means "no variants for that pipeline" -> it's ignored.
+            This stops a stuck run of one type (eg a slow SV/AnnotSV run) blocking a VCF whose
+            variants of another type are all annotated (issue #1656). """
+        for row in self.pipeline_max_variants.all():
+            if row.max_variant_id is None:
+                continue
+            lowest_unannotated = get_lowest_unannotated_variant_id(variant_annotation_version,
+                                                                   pipeline_type=row.pipeline_type)
+            if row.max_variant_id >= lowest_unannotated:
+                return False
+        return True
 
     def get_upload_context(self) -> dict:
         """ Dict for displaying upload widget """
@@ -484,14 +506,30 @@ def pre_delete_uploaded_vcf(sender, instance, *args, **kwargs):
             soft_delete_vcfs(vcf.user, vcf.pk)
 
 
+class UploadedVCFPipelineMaxVariant(models.Model):
+    """ Highest KNOWN variant per annotation pipeline type, so we can quickly check per-type whether a
+        VCF has been annotated. A row's absence for a type means the VCF has no variants subject to
+        that pipeline. Keyed by the same VariantAnnotationPipelineType enum AnnotationRun uses, so
+        adding a future pipeline type needs no schema change (see issue #1656). """
+    uploaded_vcf = models.ForeignKey(UploadedVCF, on_delete=CASCADE, related_name="pipeline_max_variants")
+    pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices)
+    max_variant = models.ForeignKey(Variant, null=True, on_delete=SET_NULL)
+
+    class Meta:
+        unique_together = ("uploaded_vcf", "pipeline_type")
+
+    def __str__(self):
+        return f"{self.uploaded_vcf}: {self.get_pipeline_type_display()} max_variant={self.max_variant_id}"
+
+
 class UploadedVCFPendingAnnotation(models.Model):
     uploaded_vcf = models.OneToOneField(UploadedVCF, on_delete=CASCADE)
     created = models.DateTimeField(auto_now_add=True)
     finished = models.DateTimeField(null=True)
     schedule_pipeline_stage_steps_celery_task = models.CharField(max_length=36, null=True)
 
-    def attempt_schedule_annotation_stage_steps(self, lowest_unannotated_variant_id):
-        if self.uploaded_vcf.max_variant is None or self.uploaded_vcf.max_variant_id < lowest_unannotated_variant_id:
+    def attempt_schedule_annotation_stage_steps(self, variant_annotation_version):
+        if self.uploaded_vcf.is_fully_annotated(variant_annotation_version):
             logging.info("UploadedVCF %s all variants are annotated", self.uploaded_vcf)
             self.finished = timezone.now()
             self.save()

@@ -201,10 +201,15 @@ def merge_pending_range_locks(variant_annotation_version: VariantAnnotationVersi
     return total_absorbed
 
 
-def get_lowest_unannotated_variant_id(variant_annotation_version):
-    # Get min_variant_id from annotation lock that hasn't completed
-    # There can be multiple AnnotationRuns (Statndard/SV) for a range lock
+def get_lowest_unannotated_variant_id(variant_annotation_version, pipeline_type=None):
+    """ Lowest variant pk not yet finished annotation (a variant is annotated iff pk < this).
+
+        There can be multiple AnnotationRuns (Standard/SV) for a range lock. Pass pipeline_type to
+        answer this per-pipeline - so a stuck run of one type doesn't drag the threshold down for
+        another (see issue #1656). pipeline_type=None keeps the type-blind (conflated) behaviour. """
     qs = AnnotationRun.objects.filter(annotation_range_lock__version=variant_annotation_version)
+    if pipeline_type is not None:
+        qs = qs.filter(pipeline_type=pipeline_type)
     unannotated_qs = qs.exclude(status=AnnotationStatus.FINISHED)
     data = unannotated_qs.aggregate(first_unannotated_variant_id=Min("annotation_range_lock__min_variant_id"))
     first_unannotated_variant_id = data["first_unannotated_variant_id"]
@@ -212,6 +217,8 @@ def get_lowest_unannotated_variant_id(variant_annotation_version):
         # All annotation locks completed - get 1 past the highest max
         annotated_qs = AnnotationRangeLock.objects.filter(version=variant_annotation_version,
                                                           annotationrun__status=AnnotationStatus.FINISHED)
+        if pipeline_type is not None:
+            annotated_qs = annotated_qs.filter(annotationrun__pipeline_type=pipeline_type)
         data = annotated_qs.aggregate(max_annotated_variant_id=Max("max_variant_id"))
         max_annotated_variant_id = data["max_annotated_variant_id"] or 0
         first_unannotated_variant_id = max_annotated_variant_id + 1

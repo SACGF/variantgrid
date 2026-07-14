@@ -1,13 +1,15 @@
-from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from upload.models import UploadedVCFPendingAnnotation
 
 
-def annotation_run_complete_signal_handler(variant_annotation_version, **kwargs):
+def annotation_run_complete_signal_handler(variant_annotation_version, pipeline_type=None, **kwargs):
     """ Re-start any pipelines that were waiting for annotation """
 
-    lowest_unannotated_variant = get_lowest_unannotated_variant_id(variant_annotation_version)
     genome_build = variant_annotation_version.genome_build
-    for pending_annotation in UploadedVCFPendingAnnotation.objects.filter(uploaded_vcf__max_variant_id__lt=lowest_unannotated_variant,
-                                                                          uploaded_vcf__vcf__genome_build=genome_build,
-                                                                          finished__isnull=True):
-        pending_annotation.attempt_schedule_annotation_stage_steps(lowest_unannotated_variant)
+    pending_qs = UploadedVCFPendingAnnotation.objects.filter(uploaded_vcf__vcf__genome_build=genome_build,
+                                                             finished__isnull=True)
+    if pipeline_type is not None:
+        # Only VCFs containing variants of the just-completed pipeline type could have been unblocked by it
+        pending_qs = pending_qs.filter(uploaded_vcf__pipeline_max_variants__pipeline_type=pipeline_type)
+    for pending_annotation in pending_qs.distinct():
+        # is_fully_annotated() makes the final per-type call
+        pending_annotation.attempt_schedule_annotation_stage_steps(variant_annotation_version)

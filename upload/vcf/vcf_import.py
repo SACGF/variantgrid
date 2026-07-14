@@ -24,7 +24,7 @@ from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
 from snpdb.models.models_enums import ImportSource, VariantsType, SampleFileType, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
-from upload.models import UploadedVCF, PipelineFailedJobTerminateEarlyException, \
+from upload.models import UploadedVCF, UploadedVCFPipelineMaxVariant, PipelineFailedJobTerminateEarlyException, \
     BackendVCF, UploadStep, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
@@ -291,17 +291,24 @@ def import_vcf_file(upload_step, bulk_inserter) -> int:
         raise ValueError(message)
 
     bulk_inserter.finish()
-    update_uploaded_vcf_max_variant(uploaded_vcf.pk, bulk_inserter.get_max_variant_id())
+    update_uploaded_vcf_max_variant(uploaded_vcf.pk, bulk_inserter.get_max_variant_id_by_pipeline_type())
     return bulk_inserter.rows_processed
 
 
-def update_uploaded_vcf_max_variant(pk, max_inserted_variant_id):
-    """ This can be run in parallel """
+def update_uploaded_vcf_max_variant(pk, max_inserted_variant_id_by_pipeline_type: dict):
+    """ Upsert one UploadedVCFPipelineMaxVariant row per pipeline type. This can be run in parallel
+        (multiple import steps) so each type's row is only raised, never lowered. """
 
-    if max_inserted_variant_id is not None:
-        uploaded_vcf_qs = UploadedVCF.objects.filter(pk=pk)
-        q_not_set_or_less_than = Q(max_variant__isnull=True) | Q(max_variant_id__lt=max_inserted_variant_id)
-        uploaded_vcf_qs.filter(q_not_set_or_less_than).update(max_variant_id=max_inserted_variant_id)
+    for pipeline_type, max_inserted_variant_id in max_inserted_variant_id_by_pipeline_type.items():
+        if max_inserted_variant_id is None:
+            continue
+        row, created = UploadedVCFPipelineMaxVariant.objects.get_or_create(
+            uploaded_vcf_id=pk, pipeline_type=pipeline_type,
+            defaults={"max_variant_id": max_inserted_variant_id})
+        if not created:
+            q_not_set_or_less_than = Q(max_variant__isnull=True) | Q(max_variant_id__lt=max_inserted_variant_id)
+            UploadedVCFPipelineMaxVariant.objects.filter(pk=row.pk).filter(q_not_set_or_less_than) \
+                .update(max_variant_id=max_inserted_variant_id)
 
 
 def create_vcf_from_uploaded_vcf(uploaded_vcf, num_genotype_samples):

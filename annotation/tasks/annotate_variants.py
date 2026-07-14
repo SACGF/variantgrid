@@ -250,7 +250,8 @@ def import_annotation_run(annotation_run_id):
             import_vcf_annotations(annotation_run)
         # The run is only truly complete once imported (moved here from annotate_variants). #1649
         annotation_run_complete_signal.send(sender=os.path.basename(__file__),
-                                            variant_annotation_version=annotation_run.annotation_range_lock.version)
+                                            variant_annotation_version=annotation_run.annotation_range_lock.version,
+                                            pipeline_type=annotation_run.pipeline_type)
     except Exception:
         tb = get_traceback()
         create_event(None, "AnnotationRun import failed", tb, severity=LogLevel.ERROR)

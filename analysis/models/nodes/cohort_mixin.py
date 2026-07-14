@@ -7,7 +7,6 @@ from django.db.models import Q
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
-from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from patients.models_enums import Zygosity
 from snpdb.archive import DataArchivedError
 from snpdb.models import VCFFilter, Cohort, Sample, CohortGenotypeCollection
@@ -299,11 +298,9 @@ class CohortMixin:
                 uv: UploadedVCF = vcf.uploadedvcf
                 if uv.max_variant_id:  # Very old VCFs may not have this set
                     variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
-                    if lowest_unannotated_variant := get_lowest_unannotated_variant_id(variant_annotation_version):
-                        if uv.max_variant_id > lowest_unannotated_variant:
-                            errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
-                                          f" (in variant annotation version={variant_annotation_version})"
-                                          f" {uv.max_variant_id=} > {lowest_unannotated_variant=}")
+                    if not uv.is_fully_annotated(variant_annotation_version):
+                        errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
+                                      f" (in variant annotation version={variant_annotation_version})")
             except UploadedVCF.DoesNotExist:
                 pass
         return errors
