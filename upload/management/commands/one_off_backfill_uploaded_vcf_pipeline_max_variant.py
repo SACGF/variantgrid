@@ -1,3 +1,5 @@
+import time
+
 from django.core.management.base import BaseCommand
 from django.db.models import Max
 
@@ -22,6 +24,8 @@ class Command(BaseCommand):
         self.stdout.write(f"Backfilling pipeline max-variant rows for {total} UploadedVCF(s)")
 
         processed = 0
+        tally_interval_secs = 30
+        last_tally = time.monotonic()
         for uploaded_vcf in uploaded_vcf_qs.iterator():
             processed += 1
             try:
@@ -58,7 +62,9 @@ class Command(BaseCommand):
                 for pipeline_type, max_id in max_by_pipeline_type.items()
             ])
 
-            if processed % 100 == 0:
+            now = time.monotonic()
+            if now - last_tally >= tally_interval_secs:
                 self.stdout.write(f"... {processed}/{total}")
+                last_tally = now
 
-        self.stdout.write("Done")
+        self.stdout.write(f"Done ({processed}/{total})")
