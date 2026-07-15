@@ -80,6 +80,32 @@ class AnnotationRunLeaseHeartbeat:
         self.interval = settings.ANNOTATION_RUN_LEASE_HEARTBEAT_SECONDS
         self._stop = threading.Event()
         self._thread = None
+        # #1658: handle to the currently-running subprocess (VEP), registered by execute_cmd on the task's
+        # main thread and read by this heartbeat thread to abort it if the run is reclaimed under us. Guarded
+        # by a lock because the two threads touch it concurrently.
+        self._process = None
+        self._process_lock = threading.Lock()
+
+    def set_process(self, process):
+        """ execute_cmd process_callback (#1658): register the live subprocess so the heartbeat can kill it
+            if the lease is lost. Pass None once the subprocess has returned to drop the stale handle. """
+        with self._process_lock:
+            self._process = process
+
+    def _abort_process(self):
+        """ #1658: kill the registered subprocess so its blocking communicate() on the main thread returns a
+            non-zero code, tripping the pipeline's `return_code != 0` guard and failing this losing attempt
+            cleanly - without writing results over the new owner's run. Best-effort; already-exited is a no-op. """
+        with self._process_lock:
+            process = self._process
+        if process is None or process.poll() is not None:
+            return
+        logging.warning("Lease heartbeat: killing subprocess for reclaimed AnnotationRun %s (task %s)",
+                        self.annotation_run.pk, self.task_id)
+        try:
+            process.kill()
+        except Exception:
+            log_traceback()
 
     def _renew(self):
         now = timezone.now()
@@ -94,6 +120,9 @@ class AnnotationRunLeaseHeartbeat:
             logging.warning("Lease heartbeat: AnnotationRun %s no longer held by task %s - stopping",
                             self.annotation_run.pk, self.task_id)
             self._stop.set()
+            # #1658: escalate loss into aborting the run - terminate VEP so it doesn't run to completion and
+            # double-write DB state for a run this worker no longer owns.
+            self._abort_process()
 
     def _run(self):
         try:
@@ -192,9 +221,9 @@ def annotate_variants(annotation_run_id):
 
         # Renew the lease while the (potentially many-hour, e.g. structural-variant) VEP work runs, so a
         # live worker is never reclaimed under us into a duplicate run.
-        with AnnotationRunLeaseHeartbeat(annotation_run, annotate_variants.request.id):
+        with AnnotationRunLeaseHeartbeat(annotation_run, annotate_variants.request.id) as lease_heartbeat:
             if annotation_run.vcf_annotated_filename is None:
-                dump_and_annotate_variants(annotation_run)
+                dump_and_annotate_variants(annotation_run, lease_heartbeat=lease_heartbeat)
         # DB upload now runs as a separate db_workers task (import_annotation_run), launched by the
         # dispatcher when this run reaches ANNOTATION_COMPLETED. #1649
     except Exception as e:
@@ -272,11 +301,12 @@ def import_annotation_run(annotation_run_id):
         _trigger_dispatch(annotation_run.annotation_range_lock.version_id)
 
 
-def dump_variants(annotation_run, dump_dir=None) -> int:
+def dump_variants(annotation_run, dump_dir=None, task_token=None) -> int:
     """ Write the unannotated variants in range to the dump VCF and set dump_* fields; returns dump count.
         Factored out of dump_and_annotate_variants so the annotation_external --dump command (#1568) can
-        dump (into --output-dir) and stop before VEP. """
-    vcf_dump_filename = annotation_run.get_dump_filename(dump_dir=dump_dir)
+        dump (into --output-dir) and stop before VEP. task_token (#1658) makes the local pipeline's dump
+        path per-task so a reclaimed run can't collide with its zombie predecessor. """
+    vcf_dump_filename = annotation_run.get_dump_filename(dump_dir=dump_dir, task_token=task_token)
     annotation_run.dump_start = timezone.now()
     annotation_run.vcf_dump_filename = vcf_dump_filename
     annotation_run.save()
@@ -292,7 +322,7 @@ def dump_variants(annotation_run, dump_dir=None) -> int:
     return vcf_dump_count
 
 
-def dump_and_annotate_variants(annotation_run, vep_version_check=True):
+def dump_and_annotate_variants(annotation_run, vep_version_check=True, lease_heartbeat=None):
     if vep_version_check:
         # Do a check before we annotate
         vep_check_command_line_version_match(annotation_run.variant_annotation_version)
@@ -301,7 +331,9 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
                 and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
             annotsv_check_command_line_version_match(annotation_run.variant_annotation_version)
 
-    vcf_dump_count = dump_variants(annotation_run)
+    # #1658: tag the local dump (and, via name_from_filename below, the annotated VCF) with the executing
+    # task_id so a reclaimed run's fresh attempt never shares a path with a stalled zombie worker.
+    vcf_dump_count = dump_variants(annotation_run, task_token=annotation_run.task_id)
     vcf_dump_filename = annotation_run.vcf_dump_filename
 
     genome_build = annotation_run.genome_build
@@ -319,7 +351,14 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
         annotation_run.annotation_start = timezone.now()
         annotation_run.pipeline_command = " ".join(cmd)
         annotation_run.save()
-        return_code, std_out, std_err = execute_cmd(cmd)
+        # #1658: register VEP with the lease heartbeat so a reclaim (lost lease) kills it mid-run instead
+        # of letting the losing worker annotate to completion and double-write the reassigned run's state.
+        process_callback = lease_heartbeat.set_process if lease_heartbeat else None
+        try:
+            return_code, std_out, std_err = execute_cmd(cmd, process_callback=process_callback)
+        finally:
+            if lease_heartbeat:
+                lease_heartbeat.set_process(None)  # drop the finished handle so a later tick can't kill anything
         # VEP can produce enormous output (>1GB) for large batches - PostgreSQL has a 1GB field limit
         max_output = 1_000_000
         annotation_run.pipeline_stdout = std_out[:max_output] if std_out else std_out

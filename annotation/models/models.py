@@ -1256,24 +1256,31 @@ class AnnotationRun(TimeStampedModel):
         VariantAnnotationPipelineType.STRUCTURAL_VARIANT: "structural_variant",
     }
 
-    def _get_dump_path_stem(self, dump_dir=None) -> str:
+    def _get_dump_path_stem(self, dump_dir=None, task_token=None) -> str:
         """ Self-describing dump path without extension (#1568): the stem carries site/build/version/run
             identity so dumps copied to other machines remain self-explanatory. Matching is driven by the
             sidecar metadata (get_dump_metadata), not by parsing this name. dump_dir defaults to
-            ANNOTATION_VCF_DUMP_DIR; the annotation_external --dump command passes its --output-dir instead. """
+            ANNOTATION_VCF_DUMP_DIR; the annotation_external --dump command passes its --output-dir instead.
+
+            #1658: the local VEP pipeline passes task_token (the executing Celery task_id) so a reclaimed
+            run's new attempt writes to a path distinct from the losing zombie worker's - two concurrent
+            executions always have distinct task_ids by construction, so each VEP owns its own file and
+            neither can corrupt the other. External dumps pass no token, keeping their stable name. """
         type_desc = self.PIPELINE_TYPE_DESC.get(self.pipeline_type, str(self.pipeline_type))
         vav = self.variant_annotation_version
         site = slugify(settings.SITE_NAME) or "site"
         stem = (f"{site}__{vav.genome_build.name}__{vav.get_annotation_consortium_display()}"
                 f"__vep{vav.vep}__cv{vav.columns_version}__gar{vav.gene_annotation_release_id}"
                 f"__run{self.pk}__{type_desc}")
+        if task_token:
+            stem += f"__task{slugify(task_token)}"
         return os.path.join(dump_dir or settings.ANNOTATION_VCF_DUMP_DIR, stem)
 
-    def get_dump_filename(self, dump_dir=None) -> str:
+    def get_dump_filename(self, dump_dir=None, task_token=None) -> str:
         # External dumps (#1568) are gzipped - smaller to ship to the compute box, and VEP reads gzipped
         # input natively. In-VM dumps stay plain (fed straight to VEP then deleted).
         suffix = ".vcf.gz" if self.external else ".vcf"
-        return self._get_dump_path_stem(dump_dir=dump_dir) + suffix
+        return self._get_dump_path_stem(dump_dir=dump_dir, task_token=task_token) + suffix
 
     def get_dump_metadata_filename(self, dump_dir=None) -> str:
         """ Sidecar metadata path written next to the dump VCF (#1568). """

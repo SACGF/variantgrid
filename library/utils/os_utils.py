@@ -22,6 +22,11 @@ def execute_cmd(cmd: list, **kwargs) -> CmdOutput:
     # (snpdb.bcftools_liftover) to build a trusted, server-side command pipeline -
     # no user-supplied input reaches `cmd`. Keep it that way: never pass
     # user-controlled values with shell=True.
+    #
+    # process_callback (#1658): optional callable invoked with the live Popen right after it starts,
+    # so a caller (e.g. the annotation lease heartbeat on a separate thread) can .kill() the subprocess
+    # while communicate() blocks here - the resulting non-zero return_code lets the caller abort cleanly.
+    process_callback = kwargs.pop("process_callback", None)
     if kwargs.pop("shell", False):
         command = ' '.join(cmd)
         logging.info('About to call %s', command)
@@ -30,6 +35,9 @@ def execute_cmd(cmd: list, **kwargs) -> CmdOutput:
     else:
         logging.info('About to call %s', cmd)
         pipes = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+
+    if process_callback is not None:
+        process_callback(pipes)
 
     std_out, std_err = pipes.communicate()
     return CmdOutput(
