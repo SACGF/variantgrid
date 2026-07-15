@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import shutil
 from collections import defaultdict
 from datetime import datetime
 from functools import cached_property
@@ -1181,6 +1182,15 @@ class AnnotationRun(TimeStampedModel):
             fresh.created = self.created  # auto_now_add isn't re-applied on the UPDATE below
             fresh.save()
         self.refresh_from_db()  # keep this instance consistent with the reset row
+        # #1596: the DB rows are gone, so drop the matching on-disk import-processing scratch dir too.
+        # Otherwise the previous attempt's TSVs survive the reset, and because upload_attempts is back to 0
+        # the upload_attempts>1 cleanup in import_vcf_annotations is skipped - so the leftover files trip
+        # write_sql_copy_csv's "don't want to overwrite" guard, which is meant only for genuinely out-of-sync
+        # dirs (moved dump / double launch). Done outside the transaction (filesystem op) and after the DB
+        # reset commits, so a rolled-back reset leaves the scratch dir intact. Prefix matches
+        # BulkVEPVCFAnnotationInserter.PREFIX.
+        import_processing_dir = os.path.join(settings.IMPORT_PROCESSING_DIR, f"annotation_run_{self.pk}")
+        shutil.rmtree(import_processing_dir, ignore_errors=True)
 
     def revert_external_to_local(self):
         """ #1568: return an external run to the normal local pipeline. Clears the external flag and dump

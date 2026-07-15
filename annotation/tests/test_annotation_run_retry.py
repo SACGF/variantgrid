@@ -7,6 +7,8 @@ annotation_range_lock=NULL, status=CREATED. It now resets the run in place (same
 reset_annotation_run_for_retry worker task, so no rangeless run is ever committed and the heavy row-clear
 never blocks the retry request.
 """
+import os
+import tempfile
 from unittest import mock
 
 from django.test import TestCase
@@ -98,3 +100,23 @@ class AnnotationRunRetryTestCase(TestCase):
         self.assertIsNone(fresh.count)  # re-counted by the dispatcher
         self.assertIsNone(fresh.dump_start)
         self.assertIsNone(fresh.dump_count)
+
+    def test_reset_task_removes_import_processing_scratch_dir(self):
+        """ #1596: the reset clears the DB rows, so it must also drop the run's on-disk import-processing
+            scratch dir. Otherwise the previous attempt's TSVs survive, and - since upload_attempts is back
+            to 0 - the upload_attempts>1 cleanup is skipped and the leftover files trip write_sql_copy_csv's
+            overwrite guard on retry. """
+        run = self._make_errored_run()
+
+        with tempfile.TemporaryDirectory() as import_processing_dir:
+            with override_settings(IMPORT_PROCESSING_DIR=import_processing_dir):
+                scratch_dir = os.path.join(import_processing_dir, f"annotation_run_{run.pk}")
+                os.makedirs(scratch_dir)
+                stale_tsv = os.path.join(scratch_dir, "annotation_run_annotation_variantannotation_0.tsv")
+                with open(stale_tsv, "w") as f:
+                    f.write("stale data from a previous attempt")
+                self.assertTrue(os.path.exists(stale_tsv))
+
+                reset_annotation_run_for_retry(run.pk)
+
+                self.assertFalse(os.path.exists(scratch_dir))
