@@ -1,0 +1,12 @@
+See in {{ site_name }} <a href='{{ allele_url }}?refer=franklin&since={{ date_str }}'>{{ allele_url }}</a>
+<br/>Data as of {{ date_str }}
+<br/><br/><b>Labs</b>:{% for lab in labs %}<br/>{{ lab }}{% endfor %}
+{% if conditions %}
+    <br/><br/><b>Conditions</b>: {% for condition in conditions %}<br/>{{ condition }}{% endfor %}
+{% endif %}
+{% if all_classification_values %}
+    <br/><br/><b>Classifications</b>: {% for cv in all_classification_values %}<br/>{{ cv }}{% endfor %}
+{% endif %}
+{% if all_clinsig_values %}
+    <br/><br/><b>Somatic Clinical Significances</b>: {% for cs in all_clinsig_values %}<br/>{{ cs }}{% endfor %}
+{% endif %}

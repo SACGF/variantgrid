@@ -108,6 +108,7 @@ class ClassificationGroupEntry:
     def __lt__(self, other):
         if self.grouping_key < other.grouping_key:
             return True
+        return False
 
 
 @deprecation.deprecated("Use ClassificationGrouping whenever possible")

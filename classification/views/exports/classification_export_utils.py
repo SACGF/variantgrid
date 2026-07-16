@@ -1,10 +1,10 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Iterable, Any
+from typing import Iterable, Any, Optional
 
 from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import ClassificationModification
 from classification.views.classification_export_utils import TranscriptGroup, VariantWithChgvs
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
@@ -57,6 +57,33 @@ class CHGVSData:
     chgvs: CHGVS
     different_chgvs: bool = False
     cms: list[ClassificationModification] = field(default_factory=list)
+    allele_origin: Optional[AlleleOriginBucket] = None
+
+    def split_by_allele_origin(self) -> list['CHGVSData']:
+        germline = []
+        somatic = []
+        for cm in self.cms:
+            if cm.allele_origin_bucket_obj == AlleleOriginBucket.SOMATIC:
+                somatic.append(cm)
+            else:
+                germline.append(cm)
+
+        records = []
+        if somatic:
+            records.append(CHGVSData(
+                allele=self.allele,
+                chgvs=self.chgvs,
+                different_chgvs=self.different_chgvs,
+                cms=somatic,
+                allele_origin=AlleleOriginBucket.SOMATIC))
+        if germline:
+            records.append(CHGVSData(
+                allele=self.allele,
+                chgvs=self.chgvs,
+                different_chgvs=self.different_chgvs,
+                cms=germline,
+                allele_origin=AlleleOriginBucket.GERMLINE))
+        return records
 
     @property
     def last_updated(self):
