@@ -101,6 +101,7 @@ def _export_view_context(request: HttpRequest) -> dict:
     format_condition_resolution = {'id': 'condition_resolution', 'name': 'Condition Resolution', 'admin_only': True}
     format_redcap = {'id': 'redcap', 'name': 'REDCap'}
     format_vcf = {'id': 'vcf', 'name': 'VCF'}
+    format_franklin = {'id': 'franklin', 'name': 'Franklin'}
     formats = [
         format_keys,
         format_csv,
@@ -110,7 +111,8 @@ def _export_view_context(request: HttpRequest) -> dict:
         format_lab_compare,
         format_condition_resolution,
         format_json,
-        format_mvl
+        format_mvl,
+        format_franklin
     ]
     if settings.CLASSIFICATION_REDCAP_EXPORT:
         formats += [format_redcap]

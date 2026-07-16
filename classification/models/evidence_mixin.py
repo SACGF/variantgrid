@@ -79,6 +79,15 @@ class SomaticClinicalSignificanceValue:
         else:
             return self.tier_level
 
+    @property
+    def pretty_str(self):
+        from classification.models import EvidenceKeyMap
+        pretty_tier = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.tier_level)
+        if amp_level := self.amp_level:
+            return f"{pretty_tier}{amp_level}"
+        else:
+            return pretty_tier
+
     def __str__(self):
         return self.as_str
 
