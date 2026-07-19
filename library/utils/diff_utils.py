@@ -11,7 +11,7 @@ from library.utils import first
 
 
 def format_diff_text(text: str) -> SafeString:
-    return SafeString(escape(text).replace("\n", "<span style='font-size:x-small;opacity:0.5'>&#8726;n</span><br/>"))
+    return SafeString(escape(str(text)).replace("\n", "<span style='font-size:x-small;opacity:0.5'>&#8726;n</span><br/>"))
 
 
 @dataclass
@@ -149,7 +149,7 @@ class DiffBuilder:
 def diff_text(a: str, b: str) -> DiffBuilder:
 
     def _tokenize(text: str) -> list[str]:
-        return re.split(r'(\s)', text)
+        return re.split(r'(\s)', str(text))
 
     diff_builder = DiffBuilder()
     for diff_chars in difflib.Differ().compare(_tokenize(a), _tokenize(b)):
