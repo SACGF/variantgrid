@@ -9,6 +9,7 @@ from django.urls import reverse
 from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKeyMap
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
+from classification.views.classification_export_view import InvalidExportParameter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
@@ -16,7 +17,7 @@ from classification.views.exports.classification_export_utils import CHGVSData
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
 from ontology.models import OntologyTerm
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, AlleleOriginFilterDefault
 
 
 class TestingContextMode(StrEnum):
@@ -112,6 +113,10 @@ class FranklinExportRow(ExportRow):
     def classification_system(self):
         return str(self.mode)
 
+    @export_column("Conditions")
+    def conditions_column(self):
+        return f"{settings.SITE_NAME} {self.mode[0]}{self.mode[1:].lower()}"
+
     def conditions(self) -> list[str]:
         # Don't make condition a column, as if it changes it'll go into a new section in Franklin
         condition_set: set[OntologyTerm] = set()
@@ -140,12 +145,21 @@ class FranklinExportRow(ExportRow):
         all_clinsig_values = [v for v in all_clinsig_values if v is not None]  # clear out unclassified
         all_clinsig_values = [cs.pretty_str for cs in sorted(set(all_clinsig_values))]
 
+        latest_date = None
+        latest_date_str = None
+
         all_labs = set()
         for cms in self.data.cms:
+            if not latest_date or latest_date < cms.curated_date_check:
+                latest_date = cms.curated_date_check
             all_labs.add(cms.classification.lab)
+
+        if latest_date:
+            latest_date_str = latest_date.relevant_date.date_str
 
         summary = render_to_string('classification/snippets/franklin_export_summary_cell.html', {
             "labs": list(sorted(all_labs)),
+            "latest_date_str": latest_date_str,
             "conditions": self.conditions(),
             "allele_url": allele_url,
             "site_name": settings.SITE_NAME,
@@ -187,6 +201,8 @@ class ClassificationExportFormatterFranklin(ClassificationExportFormatter):
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterFranklin':
         classification_filter = ClassificationFilter.from_request(request)
+        if classification_filter.allele_origin_filter != AlleleOriginFilterDefault.GERMLINE:
+            raise InvalidExportParameter("Fraknlin export requires Allele Origin to be set to Germline.")
         return ClassificationExportFormatterFranklin(
             classification_filter=classification_filter
         )
@@ -207,10 +223,10 @@ class ClassificationExportFormatterFranklin(ClassificationExportFormatter):
         def data_iterator():
             for by_allele_origin in c_data.split_by_allele_origin():
                 if by_allele_origin.allele_origin == AlleleOriginBucket.GERMLINE:
-                    yield FranklinExportRow(c_data, TestingContextMode.GERMLINE)
+                    yield FranklinExportRow(by_allele_origin, TestingContextMode.GERMLINE)
                 elif by_allele_origin.allele_origin == AlleleOriginBucket.SOMATIC:
                     for mode in (TestingContextMode.SOMATIC, TestingContextMode.ONCOGENIC):
-                        row = FranklinExportRow(c_data, mode)
+                        row = FranklinExportRow(by_allele_origin, mode)
                         if row.classification():
                             yield row
 

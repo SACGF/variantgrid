@@ -87,6 +87,10 @@
             if (!allele_origin || allele_origin !== "G") {
                 inputError = 'MVL download only supports Germline.<br/>Please set <a class="hover-link" onclick="scrollToAlleleOrigin()">Allele Origin</a> to <b>Germline</b> if you wish to export as MVL.';
             }
+        } else if (format == 'franklin') {
+            if (!allele_origin || allele_origin !== "G") {
+                inputError = 'Franklin download currently only supports Germline.<br/>Please set <a class="hover-link" onclick="scrollToAlleleOrigin()">Allele Origin</a> to <b>Germline</b> if you wish to export in Franklin format.';
+            }
         } else if (format === 'vcf') {
             params.target_system = $("input[name='vcf_target_system']:checked").val();
 
@@ -439,7 +443,14 @@
     </div>
     <div id="format-options">
         <div class="custom-option" data-format="franklin">
-            Data for upload into Franklin By QIAGEN
+            {% labelled label="Franklin By QIAGEN" %}
+            Data for upload into Franklin.<br/>
+            Only supports Germline export for now due to some apparently bugs in uploading oncogenic/somatic to Franklin.<br/>
+            If there is a conflict of classification values, the most pathogenic will be reported.<br/>
+            The curation date will be hardcoded to 2000-01-01 to give the data a lower priority to what's been curated in your system.<br/>
+            The condition will be hardcoded to "{{ site_name }} Germline" to group it separately from the other data.<br/>
+            Each record will have summary details as well as a link back to {{ site_name }} to see the up to-date data.
+            {% endlabelled %}
         </div>
         <div class="custom-option" data-format="mvl">
 

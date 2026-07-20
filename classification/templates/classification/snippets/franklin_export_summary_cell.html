@@ -1,5 +1,6 @@
 See in {{ site_name }} <a href='{{ allele_url }}?refer=franklin&since={{ date_str }}'>{{ allele_url }}</a>
-<br/>Data as of {{ date_str }}
+<br/>Data exported from {{ site_name }} on {{ date_str }}
+<br/>Most recent curation {{ latest_date_str }}
 <br/><br/><b>Labs</b>:{% for lab in labs %}<br/>{{ lab }}{% endfor %}
 {% if conditions %}
     <br/><br/><b>Conditions</b>: {% for condition in conditions %}<br/>{{ condition }}{% endfor %}
