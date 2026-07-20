@@ -52,8 +52,12 @@ class FranklinExportRow(ExportRow):
 
     @export_column("Classification Date")
     def classification_date(self):
-        max_date = max(cm.curated_date_check for cm in self.data.cms)
-        return max_date.relevant_date.date_str
+        # max_date = max(cm.curated_date_check for cm in self.data.cms)
+        # return max_date.relevant_date.date_str
+
+        # hardcoded to 2000-01-01 so as to not change and cause duplicate records
+        # as well as be old enough that it shouldn't be suggested to copy the details into a new record
+        return "2000-01-01"
 
     GERMLINE_CLASSIFICATION_MAPPER = {
         "B": "BENIGN",
