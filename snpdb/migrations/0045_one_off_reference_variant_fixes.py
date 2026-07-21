@@ -23,7 +23,148 @@ def _test_has_bad_alleles_or_seq(apps):
     return Sequence.objects.filter(seq='.').exists()
 
 
-def _one_off_reference_variant_fixes(apps, _schema_editor):
+# Deleting Sequence(seq='.') cascades to every Variant using it as alt (~324k on SA Path).
+# Django's collector resolves that cascade in Python, which means it issues
+# "WHERE variant_id IN (<every id>)" against each model FK-ing Variant - including
+# VariantCollectionRecord and CohortGenotype. Those two are Postgres inheritance parents with
+# 60k and 10k children, and children are not partitions, so there is no pruning: the planner
+# expands the query over every child and copies the id list into each one. That allocation is
+# large enough to take the machine down before any statement completes.
+#
+# So do the delete as ranged SQL instead. A "id BETWEEN lo AND hi" predicate stays a constant
+# two-element clause no matter how many variants it covers, and naming the tables explicitly
+# keeps the collector (and its fan-out) out of it entirely.
+#
+# Note this migration does need max_locks_per_transaction raised. The safety check below visits
+# every inheritance child, and the locks it takes on each (table plus indexes) are held to the
+# end of the migration's transaction: on SA Path's ~71k children that measured at 283,184 lock
+# slots. Budget ~4 slots per inheritance child and leave headroom, because running out aborts
+# with "out of shared memory". The memory itself is trivial (~150 bytes a slot, so ~40MB), and
+# the raised limit is safe here specifically because every statement is planned against one
+# table at a time. Raising it is only dangerous when it lets a query fan out.
+VARIANT_PK_CHUNK_SIZE = 1_000_000
+
+
+def _find_referencing_children(cursor, bad_seq_pk, min_pk, max_pk):
+    """ The FKs on the inheritance parents are NO ACTION, and Postgres checks those with ONLY -
+        so a DELETE will not notice rows sitting in the children, and will happily leave them
+        dangling. Every other referencing table does get checked by Postgres and will raise on
+        violation, so these two are the only ones we have to police ourselves.
+
+        Returns {parent: [(child, owning_collection_id), ...]} for children that hold at least
+        one row pointing at an alt='.' variant.
+
+        Two stages, because the exact check needs ~40ms per child and most children can be
+        ruled out in ~0.5ms: screen on the PK range using the variant_id index, then only
+        exact-check whatever survives. """
+    cursor.execute("""
+        SELECT p.relname, c.relname
+        FROM pg_inherits i
+        JOIN pg_class p ON p.oid = i.inhparent
+        JOIN pg_class c ON c.oid = i.inhrelid
+        WHERE p.relname IN ('snpdb_variantcollectionrecord', 'snpdb_cohortgenotype')
+    """)
+    children = cursor.fetchall()
+    print(f"Checking {len(children)} inheritance children for references to alt='.' variants")
+
+    referencing = {}
+    for parent, child in children:
+        # Table names come from pg_catalog, so they are safe to interpolate
+        cursor.execute(f'SELECT 1 FROM ONLY "{child}" WHERE variant_id BETWEEN %s AND %s LIMIT 1',
+                       [min_pk, max_pk])
+        if cursor.fetchone() is None:
+            continue
+
+        # There is one partition per collection, so grabbing the owning collection off any
+        # matching row identifies the whole child
+        owner = "variant_collection_id" if parent == "snpdb_variantcollectionrecord" else "collection_id"
+        cursor.execute(f'''
+            SELECT c.{owner} FROM ONLY "{child}" c
+            WHERE c.variant_id BETWEEN %s AND %s
+              AND EXISTS (SELECT 1 FROM snpdb_variant v WHERE v.id = c.variant_id AND v.alt_id = %s)
+            LIMIT 1
+        ''', [min_pk, max_pk, bad_seq_pk])
+        if row := cursor.fetchone():
+            referencing.setdefault(parent, []).append((child, row[0]))
+
+    return referencing
+
+
+def _clear_variant_collection_records(cursor, children, bad_seq_pk, min_pk, max_pk):
+    """ VariantCollections are cached analysis results, so the records pointing at alt='.'
+        variants can go and the collection can be recomputed. Drop the affected records, correct
+        the stored count, and delete the node caches so the owning analysis rebuilds them. """
+    collection_ids = []
+    for child, collection_id in children:
+        removed = 0
+        chunk_start = min_pk
+        while chunk_start <= max_pk:
+            chunk_end = min(chunk_start + VARIANT_PK_CHUNK_SIZE - 1, max_pk)
+            cursor.execute(f'''
+                DELETE FROM ONLY "{child}"
+                WHERE variant_id IN (SELECT id FROM snpdb_variant
+                                     WHERE alt_id = %s AND id BETWEEN %s AND %s)
+            ''', [bad_seq_pk, chunk_start, chunk_end])
+            removed += cursor.rowcount
+            chunk_start = chunk_end + 1
+
+        collection_ids.append(collection_id)
+        print(f"  VariantCollection {collection_id}: removed {removed} records "
+              f"referencing alt='.' variants")
+        cursor.execute("UPDATE snpdb_variantcollection SET count = count - %s WHERE id = %s",
+                       [removed, collection_id])
+
+    # Without a cache the analysis node recomputes the collection next time it is run
+    for table in ("analysis_vennnodecache", "analysis_nodecache"):
+        cursor.execute(f"DELETE FROM {table} WHERE variant_collection_id = ANY(%s)",
+                       [collection_ids])
+        if cursor.rowcount:
+            print(f"  invalidated {cursor.rowcount} {table} row(s)")
+
+
+def _delete_reference_alt_variants(cursor, bad_seq_pk):
+    """ Delete the Variants using bad_seq_pk as alt, plus their VariantZygosityCounts, in
+        PK-range chunks. Returns the number of variants deleted. """
+    cursor.execute("SELECT min(id), max(id), count(*) FROM snpdb_variant WHERE alt_id = %s",
+                   [bad_seq_pk])
+    min_pk, max_pk, total = cursor.fetchone()
+    if not total:
+        return 0
+
+    referencing = _find_referencing_children(cursor, bad_seq_pk, min_pk, max_pk)
+
+    # CohortGenotype holds real per-sample genotypes rather than a regenerable cache, so if
+    # alt='.' variants ever reach it that is a different problem needing a considered fix
+    if cohort_genotype := referencing.get("snpdb_cohortgenotype"):
+        raise ValueError(f"alt='.' variants are referenced by CohortGenotype partitions, which "
+                         f"hold real sample data: {[child for child, _ in cohort_genotype]}")
+
+    if collection_records := referencing.get("snpdb_variantcollectionrecord"):
+        print(f"Clearing alt='.' records from {len(collection_records)} VariantCollection(s)")
+        _clear_variant_collection_records(cursor, collection_records, bad_seq_pk, min_pk, max_pk)
+
+    print(f"Deleting {total} variants with alt='.' (PKs {min_pk}-{max_pk}) "
+          f"in chunks of {VARIANT_PK_CHUNK_SIZE}")
+    deleted = 0
+    chunk_start = min_pk
+    while chunk_start <= max_pk:
+        chunk_end = min(chunk_start + VARIANT_PK_CHUNK_SIZE - 1, max_pk)
+        # VariantZygosityCount rows live in an inheritance child, and DELETE without ONLY
+        # reaches children, so this clears both
+        cursor.execute("""
+            DELETE FROM snpdb_variantzygositycount
+            WHERE variant_id IN (SELECT id FROM snpdb_variant
+                                 WHERE alt_id = %s AND id BETWEEN %s AND %s)
+        """, [bad_seq_pk, chunk_start, chunk_end])
+        cursor.execute("DELETE FROM snpdb_variant WHERE alt_id = %s AND id BETWEEN %s AND %s",
+                       [bad_seq_pk, chunk_start, chunk_end])
+        deleted += cursor.rowcount
+        chunk_start = chunk_end + 1
+        print(f"  {deleted}/{total} variants deleted")
+    return deleted
+
+
+def _one_off_reference_variant_fixes(apps, schema_editor):
     Variant = apps.get_model("snpdb", "Variant")
     Allele = apps.get_model("snpdb", "Allele")
     Sequence = apps.get_model("snpdb", "Sequence")
@@ -94,11 +235,15 @@ def _one_off_reference_variant_fixes(apps, _schema_editor):
 
         # Liftover VCF inserted alt='.' instead of alt='=' (REFERENCE_ALT)
         # These wouldn't have been linked to alleles etc, and liftover pipeline just would have failed
-        _, deleted = bad_seq.delete()
-        expected = {'snpdb.Sequence', 'snpdb.Variant', 'snpdb.VariantZygosityCount'}
-        unexpected_deleted = set(deleted) - expected
-        if unexpected_deleted:
-            raise ValueError(f"Removing Sequence = '.' caused unexpected deletion of: {unexpected_deleted}")
+        #
+        # Only Sequence, Variant and VariantZygosityCount are expected to go. Naming those
+        # tables explicitly keeps that guarantee: the two inheritance parents are checked up
+        # front by _assert_no_inheritance_child_references, and every other table FK-ing Variant
+        # is NO ACTION, so Postgres itself raises a foreign key violation if anything else
+        # turns out to reference these variants.
+        with schema_editor.connection.cursor() as cursor:
+            _delete_reference_alt_variants(cursor, bad_seq.pk)
+            cursor.execute("DELETE FROM snpdb_sequence WHERE id = %s", [bad_seq.pk])
 
 
 class Migration(migrations.Migration):
