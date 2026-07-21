@@ -15,7 +15,8 @@ from annotation.celery_utils import annotation_worker_slots
 from annotation.models import AnnotationRun, AnnotationStatus, VariantAnnotationPipelineType, \
     VariantAnnotationVersion
 from annotation.models.models import AnnotationVersion, AnnotationRangeLock
-from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
+from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run, \
+    get_annotated_filename, get_run_output_paths, remove_run_output_files
 from library.log_utils import log_traceback
 from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF, Variant, JobsControl
 
@@ -441,20 +442,53 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
         throwing away minutes of VEP per stalled run.
 
         Otherwise (pre-VEP progress): scrub all partial output (on-disk dumps + partial rows) back to a
-        clean CREATED state so a re-dump won't collide. """
-    annotated_filename = annotation_run.vcf_annotated_filename
+        clean CREATED state so a re-dump won't collide.
+
+        #1660: which flavour applies is decided by *deriving* the annotated path from the dump stem, not
+        by reading vcf_annotated_filename off the row. That field is only persisted at the final save in
+        dump_and_annotate_variants - after VEP, AnnotSV and the conservation sidecar have all finished -
+        so a run reclaimed while AnnotSV is still running has a complete annotated VCF on disk but a NULL
+        field, and reading the field would scrub minutes of finished VEP work the resume path exists to
+        keep. The dump stem is persisted before VEP starts, so it always names the rest.
+
+        Deleting the dump can pull the input out from under a stalled-but-live worker's VEP. That is
+        intentional - it acts as a crude abort of an attempt whose result is going to be discarded anyway.
+        It is safe because the zombie fails loudly rather than silently (VEP returning non-zero raises,
+        and unlink does not truncate, so VEP either holds the fd and reads to completion or fails to open)
+        and because annotate_variants classifies any failure on a run it no longer owns as a reclaim at
+        warning level, not as a pipeline error. """
+    dump_filename = annotation_run.vcf_dump_filename
+    annotated_filename = None
+    if dump_filename:
+        annotated_filename = get_annotated_filename(annotation_run, dump_filename)
+    elif annotation_run.vcf_annotated_filename:
+        # No dump stem to derive from (eg an external run, #1568, imported without a local dump).
+        annotated_filename = annotation_run.vcf_annotated_filename
+
     if annotated_filename and os.path.exists(annotated_filename):
         # Past VEP - resume upload-only. Scrub partially-imported rows; keep dump/VEP/AnnotSV artifacts.
         annotation_run.delete_related_objects()
+        # The row may not name the annotated VCF yet (reclaimed mid-AnnotSV) - record the derived path so
+        # the upload-only relaunch, and any later reclaim, can find the VEP output we are keeping.
+        annotation_run.vcf_annotated_filename = annotated_filename
+        # annotation_end is persisted at that same final save, and get_status() keys ANNOTATION_COMPLETED
+        # off it - so without this the resumed run sits at ANNOTATION_STARTED, which is neither
+        # dispatchable nor upload-resumable, and it would never be picked up again. The annotated VCF on
+        # disk is the proof VEP finished; stamp the time we observed it.
+        if annotation_run.annotation_end is None:
+            annotation_run.annotation_end = timezone.now()
         annotation_run.upload_start = None
         annotation_run.upload_end = None
         annotation_run.annotsv_imported = False  # re-import re-updates the recreated rows (idempotent)
     elif annotation_run.status != AnnotationStatus.CREATED:
         # Worker got part-way before dying (pre-VEP) - scrub partial output (a CREATED run has none).
         annotation_run.delete_related_objects()
-        for filename in (annotation_run.vcf_dump_filename, annotation_run.vcf_annotated_filename):
-            if filename and os.path.exists(filename):
-                os.remove(filename)
+        paths = []
+        if dump_filename:
+            paths += get_run_output_paths(annotation_run, dump_filename)
+        if annotation_run.vcf_annotated_filename:
+            paths.append(annotation_run.vcf_annotated_filename)
+        remove_run_output_files(annotation_run, paths)
         annotation_run.dump_start = None
         annotation_run.dump_end = None
         annotation_run.dump_count = None

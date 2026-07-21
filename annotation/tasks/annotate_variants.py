@@ -14,7 +14,8 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.annotsv_annotation import run_annotsv, annotsv_check_command_line_version_match
+from annotation.annotsv_annotation import run_annotsv, annotsv_check_command_line_version_match, \
+    get_annotsv_tsv_filename
 from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals.manual_signals import annotation_run_complete_signal
@@ -387,7 +388,7 @@ def dump_variants(annotation_run, dump_dir=None, task_token=None) -> int:
     return vcf_dump_count
 
 
-def _get_annotated_filename(annotation_run, vcf_dump_filename) -> str:
+def get_annotated_filename(annotation_run, vcf_dump_filename) -> str:
     """ Path VEP writes its annotated VCF to for a given dump. Derived from the dump stem, which #1658
         makes per-task, so each attempt's annotated output is a file of its own. """
     name = name_from_filename(vcf_dump_filename)
@@ -395,36 +396,67 @@ def _get_annotated_filename(annotation_run, vcf_dump_filename) -> str:
     return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_annotated_basename)
 
 
-def _cleanup_reclaimed_run_files(annotation_run):
-    """ #1658: remove the on-disk output of an attempt that lost its run.
+def get_annotsv_dir(annotation_run) -> str:
+    """ AnnotSV output dir for a run. Deliberately keyed on the run, not the task - shared between
+        attempts, so any party holding the run can name it. See the #720 note: the TSV inside is named
+        from the per-task dump stem, so concurrent attempts write side by side and neither can truncate
+        the other, while a per-task *directory* would be nameable only by the attempt that created it. """
+    return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"annotsv_{annotation_run.pk}")
 
-        Reclaim (_reset_run_for_redispatch) deletes the dump the row names and NULLs both filename fields,
-        so by the time the losing attempt unwinds the DB no longer references its per-task annotated VCF -
-        complete, or the partial one the heartbeat's kill left behind. Nothing else would ever remove it:
-        the only file deletion in the pipeline is that same reclaim, deleting strictly what the DB row
-        names, and there is no sweep of ANNOTATION_VCF_DUMP_DIR. Before per-task paths (#1658) the
-        annotated name was a fixed function of the run, so a later attempt overwrote it or a later reclaim
-        deleted it by name; now the losing attempt is the last party that still knows the paths, and must
-        remove them on the way out. Best-effort, in the style of the reclaim's own cleanup. """
-    paths = []
-    if dump_filename := annotation_run.vcf_dump_filename:
-        annotated_filename = _get_annotated_filename(annotation_run, dump_filename)
-        paths += [dump_filename, annotated_filename, conservation_sidecar_filename(annotated_filename)]
-    if annotated_filename := annotation_run.vcf_annotated_filename:
-        paths += [annotated_filename, conservation_sidecar_filename(annotated_filename)]
-    if annotsv_tsv_filename := annotation_run.annotsv_tsv_filename:
-        # The AnnotSV output *dir* is shared between attempts, but the TSV inside it is named from the
-        # per-task dump basename, so removing the file can't touch the new owner's output.
-        paths.append(annotsv_tsv_filename)
 
+def get_run_output_paths(annotation_run, vcf_dump_filename) -> list[str]:
+    """ Every file the pipeline writes for one attempt, derived from that attempt's dump stem.
+
+        #1660: the single naming authority, shared by the losing attempt's cleanup and the dispatcher's
+        reclaim so the two can't drift. Derivation rather than the persisted filename fields is the whole
+        point - vcf_annotated_filename and annotsv_tsv_filename only reach the DB at the final save in
+        dump_and_annotate_variants, after VEP *and* AnnotSV *and* the conservation sidecar have finished,
+        so a run reclaimed before then has files on disk its row cannot name. The dump stem is persisted
+        before VEP starts (dump_variants), which makes it the one key that always names the rest. """
+    annotated_filename = get_annotated_filename(annotation_run, vcf_dump_filename)
+    return [
+        vcf_dump_filename,
+        annotated_filename,
+        conservation_sidecar_filename(annotated_filename),
+        get_annotsv_tsv_filename(vcf_dump_filename, get_annotsv_dir(annotation_run)),
+    ]
+
+
+def remove_run_output_files(annotation_run, paths):
+    """ Best-effort removal of an attempt's output. Shared by the losing attempt's cleanup and reclaim. """
     for path in dict.fromkeys(paths):  # de-dupe, keeping order
-        if os.path.exists(path):
+        if path and os.path.exists(path):
             try:
                 os.remove(path)
                 logging.info("Removed orphaned file from reclaimed AnnotationRun %s: %s",
                              annotation_run.pk, path)
             except OSError:
                 log_traceback()
+
+
+def _cleanup_reclaimed_run_files(annotation_run):
+    """ #1658: remove the on-disk output of an attempt that lost its run.
+
+        Reclaim (_reset_run_for_redispatch) deletes what it can derive from the dump stem and then NULLs
+        the filename fields, so by the time the losing attempt unwinds the DB no longer references its
+        per-task files. There is no sweep of ANNOTATION_VCF_DUMP_DIR, so anything reclaim could not name
+        has to be removed here. Before per-task paths (#1658) the annotated name was a fixed function of
+        the run, so a later attempt overwrote it or a later reclaim deleted it by name; now this attempt
+        is the last party still holding its own paths.
+
+        Works off the in-memory instance deliberately: it still carries the filenames reclaim has since
+        NULLed on the row. """
+    paths = []
+    if dump_filename := annotation_run.vcf_dump_filename:
+        paths += get_run_output_paths(annotation_run, dump_filename)
+    # The persisted fields are a superset only when this attempt got far enough to save them; include
+    # them so a path that somehow diverges from the derivation is still collected.
+    if annotated_filename := annotation_run.vcf_annotated_filename:
+        paths += [annotated_filename, conservation_sidecar_filename(annotated_filename)]
+    if annotsv_tsv_filename := annotation_run.annotsv_tsv_filename:
+        paths.append(annotsv_tsv_filename)
+
+    remove_run_output_files(annotation_run, paths)
 
 
 def dump_and_annotate_variants(annotation_run, vep_version_check=True, lease_heartbeat=None):
@@ -446,7 +478,7 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True, lease_hea
 
     logging.info("Annotating %d variants", vcf_dump_count)
     if vcf_dump_count:
-        vcf_annotated_filename = _get_annotated_filename(annotation_run, vcf_dump_filename)
+        vcf_annotated_filename = get_annotated_filename(annotation_run, vcf_dump_filename)
 
         cmd = get_vep_command(vcf_dump_filename, vcf_annotated_filename, genome_build, annotation_consortium,
                               annotation_run.pipeline_type,
@@ -483,8 +515,7 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True, lease_hea
 
         if (settings.ANNOTATION_ANNOTSV_ENABLED
                 and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
-            annotsv_dir = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR,
-                                       f"annotsv_{annotation_run.pk}")
+            annotsv_dir = get_annotsv_dir(annotation_run)
             tsv, rc, stdout, stderr = run_annotsv(vcf_dump_filename, annotsv_dir,
                                                   genome_build, annotation_consortium)
             if rc == 0 and os.path.exists(tsv):
