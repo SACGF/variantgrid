@@ -37,7 +37,7 @@ CONSERVATION_VEP_CUSTOMS = (
     VEPCustom.PHYLOP_46_WAY,
 )
 
-# Aligned-window decomposition constants (validated in claude/sv_pybigwig_plan.md / PoC).
+# Aligned-window decomposition constants (validated against per-base ground truth - see #1657).
 # Interior is read from zoom summaries on a fine grid of bin width G (so its zoom reduction is <= G),
 # with exact per-base scans on the two ragged ends of width E. The invariant E > G guarantees any
 # interior zoom bin that straddles the query boundary reaches at most ~G past the interior - which
