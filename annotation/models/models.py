@@ -3,7 +3,7 @@ import os
 import re
 import shutil
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, date, time
 from functools import cached_property
 from typing import Optional, Callable, Iterable
 
@@ -1291,9 +1291,34 @@ class AnnotationRun(TimeStampedModel):
         super().delete(using=using, keep_parents=keep_parents)
 
     def set_task_log(self, key, value):
+        """ #1658: append to this task's entry in celery_task_logs (keyed by task_id so a reclaimed run
+            keeps every attempt's log - the audit trail for diagnosing a reclaim).
+
+            Values are coerced to JSON-native types here rather than at the call sites: celery_task_logs is
+            a plain JSONField with no encoder=, and every real caller logs a timezone.now(). Coercing here
+            keeps the field's stored representation unchanged for every other value (adding
+            encoder=DjangoJSONEncoder would need a migration and would alter how they all round-trip). """
         assert self.task_id is not None
-        task_log = self.celery_task_logs.get(self.task_id, {})
-        task_log[key] = value
+        if isinstance(value, (datetime, date, time)):
+            value = value.isoformat()
+        self.celery_task_logs.setdefault(self.task_id, {})[key] = value
+
+    def save_if_owner(self, task_id) -> bool:
+        """ #1658: ownership-guarded counterpart to save(), for the writes that happen after a stage this
+            worker may have lost the run during (VEP / the bulk import). A stalled attempt whose lease
+            expired has its run reclaimed and handed to a fresh attempt, but it still holds the ORM
+            instance it loaded before the reclaim - saving that whole instance writes its status, dump
+            path and traceback onto a row the new attempt now owns, and blanks the new attempt's lease.
+
+            Issues a single conditional UPDATE of all concrete fields, matched on the task_id we believe we
+            hold; returns whether it matched a row. Being one statement it is atomic, so unlike a
+            read-then-write ownership check there is no TOCTOU window. status is recomputed here exactly as
+            save() does, so it can't desynchronise from the dump_*/annotation_* timestamps. """
+        self.status = self.get_status()
+        self.modified = timezone.now()  # auto_now isn't applied by .update()
+        update_kwargs = {f.attname: getattr(self, f.attname)
+                         for f in self._meta.concrete_fields if not f.primary_key}
+        return bool(AnnotationRun.objects.filter(pk=self.pk, task_id=task_id).update(**update_kwargs))
 
     def __str__(self):
         return f"AnnotationRun: {self.pk}/{self.get_pipeline_type_display()}: ({self.get_status_display()})"
