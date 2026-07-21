@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('genes', '0048_one_off_upgrade_pyhgvs'),
+        ('genes', '0001_initial'),
         ('analysis', '0050_auto_20210622_1459'),
     ]
 
