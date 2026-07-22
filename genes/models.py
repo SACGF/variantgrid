@@ -1486,8 +1486,10 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                     idtype="acc",
                 )
                 tvi_by_id.update(TranscriptVersionSequenceInfo._insert_from_genbank_handle(fetch_handle))
-            except RuntimeError as e:
-                logging.warning("Entrez failed w/params: %s", id_param)
+            except Exception as e:
+                # Entrez surfaces failures as RuntimeError, urllib HTTPError (e.g. 429 rate limit), etc.
+                # When the caller passed fail_on_error=False they want a best-effort batch, so swallow them all.
+                logging.warning("Entrez failed w/params: %s (%s)", id_param, e)
                 if fail_on_error:
                     raise e
 

@@ -112,53 +112,81 @@ def retrieve_entrez_gene_annotation(id_list):
     return annotations
 
 
-def store_refseq_sequence_info_from_web(cached_web_resource: CachedWebResource):
-    SEQUENCE_INFO_URL = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh38_latest/refseq_identifiers/GRCh38_latest_rna.fna.gz"
+REFSEQ_SEQUENCE_INFO_URL = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh38_latest/refseq_identifiers/GRCh38_latest_rna.fna.gz"
+# The RefSeq "latest" file above only has the current version of each transcript. Historical classifications
+# often cite older versions, which would otherwise fall back to slow per-transcript NCBI Entrez fetches during
+# variant re-matching. We host a supplementary FASTA of those older versions and load it straight after.
+REFSEQ_SUPPLEMENTARY_SEQUENCE_INFO_URL = "https://variantgrid.com/download/annotation/fasta/refseq_transcript_sequence_supplementary.fasta.gz"
 
-    known_transcripts = set(Transcript.objects.all().values_list("identifier", flat=True))
-    if not known_transcripts:
-        raise ValueError("No transcripts! Insert them first!")
 
-    r = requests.get(SEQUENCE_INFO_URL, stream=True, timeout=MINUTE_SECS)
-    f = gzip.GzipFile(fileobj=r.raw)
-    text_f = TextIOWrapper(f)
+def store_transcript_sequence_info_fasta(text_handle, filename: str, annotation_consortium) -> int:
+    """ Parse a FASTA of transcript sequences (>accession, then sequence) and bulk-load
+        TranscriptVersionSequenceInfo. Re-loading the same filename replaces its prior import. """
+    known_transcripts = set(Transcript.objects.values_list("identifier", flat=True))
 
-    annotation_consortium = AnnotationConsortium.REFSEQ
-
-    sha256_hash = sha256sum_str(SEQUENCE_INFO_URL)
+    sha256_hash = sha256sum_str(filename)
     if existing_import := TranscriptVersionSequenceInfoFastaFileImport.objects.filter(sha256_hash=sha256_hash).first():
-        logging.info("Deleting existing TranscriptVersionSequenceInfos for fasta import %s", sha256_hash)
+        logging.info("Deleting existing TranscriptVersionSequenceInfos for fasta import %s", filename)
         existing_import.delete()
 
     fasta_import = TranscriptVersionSequenceInfoFastaFileImport.objects.create(sha256_hash=sha256_hash,
                                                                                annotation_consortium=annotation_consortium,
-                                                                               filename=SEQUENCE_INFO_URL)
+                                                                               filename=filename)
     unknown_transcripts = []
     unknown_transcript_prefixes = Counter()
     records = []
-    for record in SeqIO.parse(text_f, "fasta"):
+    for record in SeqIO.parse(text_handle, "fasta"):
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(record.id)
+        if version is None:
+            logging.warning("Skipping versionless accession %s", record.id)
+            continue
         if transcript_id not in known_transcripts:
             if transcript_id.startswith("X"):
                 continue  # We don't want these
-            prefix = transcript_id.split("_")[0]
-            unknown_transcript_prefixes[prefix] += 1
+            known_transcripts.add(transcript_id)
+            unknown_transcript_prefixes[transcript_id.split("_")[0]] += 1
             unknown_transcripts.append(Transcript(identifier=transcript_id,
                                                   annotation_consortium=annotation_consortium))
 
-        tvi = TranscriptVersionSequenceInfo(transcript_id=transcript_id, version=version,
-                                            fasta_import=fasta_import,
-                                            sequence=str(record.seq), length=len(record.seq))
-        records.append(tvi)
+        records.append(TranscriptVersionSequenceInfo(transcript_id=transcript_id, version=version,
+                                                     fasta_import=fasta_import,
+                                                     sequence=str(record.seq), length=len(record.seq)))
 
     if unknown_transcripts:
         logging.info("Inserting %d unknown_transcripts (%s)", len(unknown_transcripts), unknown_transcript_prefixes)
-        Transcript.objects.bulk_create(unknown_transcripts, batch_size=2000)
+        Transcript.objects.bulk_create(unknown_transcripts, batch_size=2000, ignore_conflicts=True)
 
-    if num_records := len(records):
+    num_records = len(records)
+    if num_records:
         TranscriptVersionSequenceInfo.objects.bulk_create(records, ignore_conflicts=True, batch_size=2000)
+    return num_records
 
-    cached_web_resource.description = f"{num_records} TranscriptVersionSequenceInfo records"
+
+def _load_transcript_sequence_info_from_url(url: str, annotation_consortium) -> int:
+    r = requests.get(url, stream=True, timeout=MINUTE_SECS)
+    r.raise_for_status()
+    text_f = TextIOWrapper(gzip.GzipFile(fileobj=r.raw))
+    return store_transcript_sequence_info_fasta(text_f, url, annotation_consortium)
+
+
+def store_refseq_sequence_info_from_web(cached_web_resource: CachedWebResource):
+    known_transcripts = set(Transcript.objects.values_list("identifier", flat=True))
+    if not known_transcripts:
+        raise ValueError("No transcripts! Insert them first!")
+
+    annotation_consortium = AnnotationConsortium.REFSEQ
+    num_records = _load_transcript_sequence_info_from_url(REFSEQ_SEQUENCE_INFO_URL, annotation_consortium)
+
+    # Supplementary (older-version) sequences are an optimisation - don't fail the whole load if unavailable
+    supplementary = 0
+    try:
+        supplementary = _load_transcript_sequence_info_from_url(REFSEQ_SUPPLEMENTARY_SEQUENCE_INFO_URL,
+                                                                annotation_consortium)
+    except Exception as e:
+        logging.warning("Could not load supplementary transcript sequences from %s: %s",
+                        REFSEQ_SUPPLEMENTARY_SEQUENCE_INFO_URL, e)
+
+    cached_web_resource.description = f"{num_records} + {supplementary} supplementary TranscriptVersionSequenceInfo records"
     cached_web_resource.save()
 
 

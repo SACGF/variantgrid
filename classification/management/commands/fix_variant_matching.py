@@ -1,9 +1,12 @@
+import logging
 import re
 import time
 
+from django.conf import settings
 from django.core.management import BaseCommand, CommandError
 from django.db.models import Q
 
+from annotation.models import CachedWebResource
 from classification.management.commands.fix_migrate_flags_to_imported_allele_info import FlagDatabase
 from classification.models import Classification, ImportedAlleleInfo, ClassificationImportRun
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
@@ -11,6 +14,7 @@ from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from library.guardian_utils import admin_bot
 from library.utils import md5sum_str
 from snpdb.models import GenomeBuild
+from snpdb.models.models_enums import ImportStatus
 
 
 class Command(BaseCommand):
@@ -204,29 +208,51 @@ class Command(BaseCommand):
         total = len(pks)
         print(f"[shard {shard_index}/{shard_count}] {total} classifications to process", flush=True)
 
+        # The bulk "RefSeq Sequence Info" web resource loads current transcript sequences in one download;
+        # a supplementary FASTA (import_transcript_sequence_fasta) covers historical versions. Load those
+        # first so the per-transcript Entrez pre-warm below only handles genuine stragglers.
+        if not CachedWebResource.objects.filter(name=settings.CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO,
+                                                import_status=ImportStatus.SUCCESS).exists():
+            logging.warning("'%s' web resource not loaded - c.hgvs resolution will fall back to slow per-transcript "
+                            "NCBI fetches. Load it (annotation page) plus any supplementary transcript FASTA "
+                            "(manage.py import_transcript_sequence_fasta) before this command for best speed.",
+                            settings.CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO)
+
         # Pre-warm the transcript sequence cache in one batch. Otherwise c.hgvs resolution below falls back to
         # a per-transcript NCBI Entrez fetch (2-9s each) for every uncached transcript - the dominant cost on a
         # fresh deploy. This is a no-op for transcripts already cached, so it's cheap on repeat runs.
         if transcript_accessions:
             print(f"[shard {shard_index}/{shard_count}] pre-warming {len(transcript_accessions)} RefSeq "
                   f"transcript sequences...", flush=True)
-            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(
-                list(transcript_accessions), entrez_batch_size=100, fail_on_error=False)
+            try:
+                TranscriptVersionSequenceInfo.get_refseq_transcript_versions(
+                    list(transcript_accessions), entrez_batch_size=100, fail_on_error=False)
+            except Exception as e:
+                # Pre-warming is an optimisation - if the API is unavailable/rate-limited, fall back to the
+                # per-record fetch (which the loop below tolerates) rather than aborting the whole backfill.
+                logging.warning("fix_variant_matching --extra: transcript pre-warm failed, continuing: %s", e)
 
         ClassificationImportRun.record_classification_import("variant_rematching", 0)
         try:
+            skipped = 0
             for handled, pk in enumerate(pks, start=1):
                 c = Classification.objects.get(pk=pk)
                 if handled % 1000 == 0:
-                    print(f"[shard {shard_index}/{shard_count}] {handled}/{total}", flush=True)
-                # use force_update so we can be sure that the validation objects have been made
-                if not c.allele_info:
-                    c.ensure_allele_info()
-                    c.save(update_modified=False)
+                    print(f"[shard {shard_index}/{shard_count}] {handled}/{total} ({skipped} skipped)", flush=True)
+                # Skip (don't crash the whole backfill on) data-quality records - e.g. classifications with
+                # neither c.hgvs nor g.hgvs, or no genome build - matching how a bulk import tolerates bad rows.
+                try:
+                    # use force_update so we can be sure that the validation objects have been made
+                    if not c.allele_info:
+                        c.ensure_allele_info()
+                        c.save(update_modified=False)
 
-                if c.update_allele_info_from_classification(force_update=False):
-                    c.save(update_modified=False)
-            print(f"[shard {shard_index}/{shard_count}] finished {total} classifications", flush=True)
+                    if c.update_allele_info_from_classification(force_update=False):
+                        c.save(update_modified=False)
+                except Exception as e:
+                    skipped += 1
+                    logging.warning("fix_variant_matching --extra: skipping classification %s: %s", pk, e)
+            print(f"[shard {shard_index}/{shard_count}] finished {total} ({skipped} skipped)", flush=True)
         finally:
             if not sharded:
                 # Single batch grouping update via classification_imports_complete_signal.
