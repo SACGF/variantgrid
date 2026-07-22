@@ -6,6 +6,10 @@ from django.db import migrations
 def _new_ekey_testing_context(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
     # test section
+    # The restored DB may already carry this key (its snapshot predates this migration's record),
+    # so skip the create rather than collide on the EvidenceKey PK.
+    if EvidenceKey.objects.filter(key="somatic:testing_context").exists():
+        return
     EvidenceKey.objects.create(
         key="somatic:testing_context",
         label="Testing Context",

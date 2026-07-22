@@ -6,8 +6,14 @@ from django.db.models import Max
 
 def _one_off_rm_dupes_vcf_filter(apps, _schema_editor):
     VCFFilter = apps.get_model("snpdb", "VCFFilter")
-    newest_qs = VCFFilter.objects.values("vcf", "filter_id").annotate(latest_id=Max('id'))
-    VCFFilter.objects.exclude(pk__in=newest_qs.values_list("latest_id")).delete()
+    # The next migration (0061) adds unique_together on BOTH ("vcf", "filter_code") and
+    # ("vcf", "filter_id"), so both have to be deduped here. Only filter_id was, which left
+    # duplicate filter_codes behind and made 0061 fail building its unique index with
+    # "could not create unique index ... Key (vcf_id, filter_code) is duplicated".
+    # Dedupe each field in turn, keeping the newest row, matching the original intent.
+    for field in ["filter_id", "filter_code"]:
+        newest_qs = VCFFilter.objects.values("vcf", field).annotate(latest_id=Max('id'))
+        VCFFilter.objects.exclude(pk__in=newest_qs.values_list("latest_id")).delete()
 
 
 class Migration(migrations.Migration):

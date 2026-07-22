@@ -90,7 +90,9 @@ def _add_somatic_hrd_msi_tmb_ekeys(apps, _schema_editor):
             options=[],
         ),
     ]
-    EvidenceKey.objects.bulk_create(new_ekeys)
+    # ignore_conflicts: the restored DB may already carry some of these keys (its snapshot
+    # predates this migration's record), so skip any that already exist rather than collide.
+    EvidenceKey.objects.bulk_create(new_ekeys, ignore_conflicts=True)
 
 
 def _remove_somatic_hrd_msi_tmb_ekeys(apps, _schema_editor):

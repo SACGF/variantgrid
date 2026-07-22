@@ -77,14 +77,30 @@ BEGIN
             -- supported by the *_pattern_ops operator classes, so the column
             -- type change would fail. The case-insensitive PK can't have these
             -- LIKE indexes anyway, so dropping them matches the final schema.
+            --
+            -- This must cover inheritance CHILDREN as well as the parent.
+            -- genes_genecoverage and genes_genecoveragecanonicaltranscript are
+            -- inheritance parents with 44,234 children each, and children are
+            -- created with "LIKE parent INCLUDING INDEXES", so every one of them
+            -- carries its own copy of the _like index (88,468 on this database).
+            -- ALTER COLUMN TYPE always recurses into children -- Postgres rejects
+            -- ONLY on an inherited column -- so a child still holding a
+            -- pattern_ops index fails the whole migration. Matching on column
+            -- NAME rather than the parent's attnum, because an inherited column
+            -- is not guaranteed to have the same attnum on the child.
             FOR idx_name IN
                 SELECT DISTINCT i.indexrelid::regclass::text
-                FROM pg_index i
+                FROM (SELECT r.conrelid AS reloid
+                      UNION ALL
+                      SELECT inhrelid FROM pg_inherits WHERE inhparent = r.conrelid) t
+                JOIN pg_attribute ca ON ca.attrelid = t.reloid
+                                    AND ca.attname = col_name
+                                    AND NOT ca.attisdropped
+                JOIN pg_index i ON i.indrelid = t.reloid
                 CROSS JOIN LATERAL unnest(i.indkey, i.indclass)
                     WITH ORDINALITY AS k(att, opc, ord)
                 JOIN pg_opclass oc ON oc.oid = k.opc
-                WHERE i.indrelid = r.conrelid
-                  AND k.att = col_attnum
+                WHERE k.att = ca.attnum
                   AND oc.opcname IN ('text_pattern_ops',
                                      'varchar_pattern_ops',
                                      'bpchar_pattern_ops')

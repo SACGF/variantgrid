@@ -32,8 +32,34 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('data', models.JSONField(blank=True, default=dict)),
-                ('gene_symbol', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genes.genesymbol')),
                 ('panel_app_local_cache', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genes.panelapppanellocalcache')),
+            ],
+        ),
+        # gene_symbol pulled out of the CreateModel above: Django 6 emits CITextField as `text`,
+        # but genes_genesymbol.symbol is still `citext` here (genes.0078 converts the graph to
+        # text later), so a `text` FK cannot reference the citext PK. Create the column as citext;
+        # the table is otherwise Django-created and empty, so NOT NULL is safe.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql='''
+                        ALTER TABLE "genes_panelapppanellocalcachegenesymbol"
+                            ADD COLUMN "gene_symbol_id" citext NOT NULL;
+                        ALTER TABLE "genes_panelapppanellocalcachegenesymbol"
+                            ADD FOREIGN KEY ("gene_symbol_id")
+                            REFERENCES "genes_genesymbol" ("symbol") DEFERRABLE INITIALLY DEFERRED;
+                        CREATE INDEX ON "genes_panelapppanellocalcachegenesymbol" ("gene_symbol_id");
+                    ''',
+                    reverse_sql='ALTER TABLE "genes_panelapppanellocalcachegenesymbol" '
+                                'DROP COLUMN "gene_symbol_id";',
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='panelapppanellocalcachegenesymbol',
+                    name='gene_symbol',
+                    field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genes.genesymbol'),
+                ),
             ],
         ),
         migrations.DeleteModel(

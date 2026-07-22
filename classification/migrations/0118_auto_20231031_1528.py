@@ -158,16 +158,22 @@ def _install_horak_evidence_keys(apps, _schema_editor):
         value_type = "C"
         default_crit_evaluation = _points_to_criteria.get(int(entry_dict.get("score")))
         order = 10000
-        EvidenceKey.objects.create(
+        # get_or_create rather than create: the restored DB already carries these 17 horak keys
+        # (installed in prod before this migration's record travelled with the snapshot), so a
+        # plain create() collides on the EvidenceKey PK. Leave any existing key untouched and
+        # only create missing ones.
+        EvidenceKey.objects.get_or_create(
             key=key,
-            label=label,
-            sub_label=sub_label,
-            description=description,
-            evidence_category=evidence_category,
-            value_type=value_type,
-            default_crit_evaluation=default_crit_evaluation,
-            crit_uses_points=True,
-            order=order
+            defaults=dict(
+                label=label,
+                sub_label=sub_label,
+                description=description,
+                evidence_category=evidence_category,
+                value_type=value_type,
+                default_crit_evaluation=default_crit_evaluation,
+                crit_uses_points=True,
+                order=order,
+            )
         )
 
 

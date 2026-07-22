@@ -6,6 +6,10 @@ from django.db import migrations
 
 def _create_somatic_clinical_significance(apps, _schema):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
+    # The restored DB may already carry this key (its snapshot predates this migration's record),
+    # so skip the create rather than collide on the EvidenceKey PK.
+    if EvidenceKey.objects.filter(key="somatic:clinical_significance").exists():
+        return
     EvidenceKey.objects.create(
         key="somatic:clinical_significance",
         label="Somatic Clinical Significance",
