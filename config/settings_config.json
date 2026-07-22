@@ -12,6 +12,11 @@
     "login": "variantgrid",
     "password": "cl1ng3n_VG"
   },
+  "MME": {
+    "inbound_token": null,
+    "decipher_token": null,
+    "genematcher_token": null
+  },
   "RECAPTCHA": {
     "public_key": "",
     "private_key": ""

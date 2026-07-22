@@ -1,0 +1,42 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load js_tags %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% block title %}MME Submission {{ submission.pk }}{% endblock title %}
+{% block content %}
+    <div class="container">
+        <h3>MatchMaker Exchange submission</h3>
+        <p class="text-muted">
+            Classification {{ submission.classification_id }} &rarr; node
+            <strong>{{ submission.node_id }}</strong> — status {{ submission.get_status_display }}
+        </p>
+
+        {% if submission.error %}
+            <div class="alert alert-danger">{{ submission.error }}</div>
+        {% endif %}
+
+        <h4>Profile to submit</h4>
+        {% if profile_error %}
+            <div class="alert alert-warning">{{ profile_error }}</div>
+        {% else %}
+            <pre class="border p-2">{{ profile|jsonify_for_js:True }}</pre>
+        {% endif %}
+
+        {% if mme_enabled and not profile_error %}
+            <form method="post" action="{% url 'mme_submit' submission.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Submit to {{ submission.node_id }}</button>
+            </form>
+        {% elif not mme_enabled %}
+            <div class="alert alert-warning">MatchMaker Exchange is not enabled on this deployment.</div>
+        {% endif %}
+
+        <h4 class="mt-4">Match results</h4>
+        {% if results %}
+            <table id="mme-results-datatable" class="table" data-datatable-url="{% url 'mme_match_results_datatable' %}"
+                   data-datatable-data='{"submission_id": {{ submission.pk }}}'></table>
+        {% else %}
+            <p class="text-muted">No match results yet.</p>
+        {% endif %}
+    </div>
+{% endblock content %}

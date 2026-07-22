@@ -219,6 +219,57 @@ CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE = True
 CLINGEN_ALLELE_REGISTRY_REATTEMPT_WITH_ACTUAL_REF = True
 CLINGEN_ALLELE_REGISTRY_MAX_CACHE_DAYS = 180  # Set to None to last forever. 180 = ~6 months
 
+# --- MatchMaker Exchange -------------------------------------------------
+# Patient-centric, phenotype-aware rare-disease matching federation (GA4GH mme-apis v1.1).
+# See claude/matchmaker_exchange_plan.md. Disabled by default; enable per-deployment.
+MME_ENABLED = False
+
+# Once True we drop the `"test": true` flag from outbound patient profiles (only do this
+# after certifying against a target node's test instance). Keep False until then.
+MME_ENABLED_PRODUCTION_SUBMIT = False
+
+# Our own contact details, sent as the `contact` block on every outbound patient.
+# Public info, not secret. Blank by default - each deployment that enables MME fills these
+# in via its per-host env settings file (see vgaws.py). Required to submit.
+MME_CONTACT = {
+    "name": "",
+    "href": "",         # e.g. "mailto:mme@example.org"
+    "institution": "",
+}
+
+# Remote nodes we can submit to: public base_url + api_version as plain config; the
+# token THEY issued to us is the only secret, pulled via get_secret().
+MME_NODES = {
+    # "decipher": {"base_url": "https://...", "api_version": "1.1",
+    #              "token": get_secret("MME.decipher_token", mandatory=False)},
+    # "genematcher": {"base_url": "https://...", "api_version": "1.1",
+    #                 "token": get_secret("MME.genematcher_token", mandatory=False)},
+}
+
+# Token that remote nodes must present to call OUR inbound /match endpoint. Secret.
+# mandatory=False so deployments without the MME secret block still load (MME is off by default).
+MME_INBOUND_TOKEN = get_secret("MME.inbound_token", mandatory=False)
+
+# Follow EXACT OntologyTermRelations to alias each condition term into the ontology
+# form MME expects (e.g. a MONDO diagnosis -> its EXACT-equivalent OMIM for `disorders`).
+# These are lossless, same-concept aliases. On by default; labs that curate in MONDO
+# need this to produce any `disorders`. Off = send only terms already in MME's ontology.
+MME_ONTOLOGY_SNAKE_EXACT = True
+
+# Expand a curated disease term to its *typical* HPO phenotypes (disease -> phenotype is
+# NOT an equivalence, so this is approximate and not "observed" in the patient). Off by
+# default; turn on to widen the phenotype match surface, accepting looser matches.
+MME_ONTOLOGY_PHENOTYPE_EXPANSION = False
+
+# Standing disclaimer sent as the request-level `disclaimer`, so receiving curators
+# know some phenotype terms may be ontology-derived and matches may be approximate.
+MME_DISCLAIMER = (
+    "Some phenotype (HPO) terms may be derived from the curated diagnosis via ontology "
+    "cross-references and were not necessarily directly observed; terms carry a "
+    "`_derivedFrom` field where so derived. Please contact us to confirm before acting "
+    "on a match."
+)
+
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_
 
 VCF_DOWNLOAD_ADMIN_ONLY = False
@@ -727,7 +778,8 @@ INSTALLED_APPS = [
     'upload.apps.UploadConfig',
     'classification.apps.ClassificationConfig',
     'variantopedia',
-    'review'
+    'review',
+    'mme.apps.MMEConfig',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
 ]
@@ -836,6 +888,7 @@ PUBLIC_PATHS = [
     r'^/classification/api/.*',  # REST framework used by command line tools
     r'^/seqauto/api/.*',
     r'^/upload/api/.*',
+    r'^/mme/api/.*',  # Inbound MME /match endpoint - authenticated by shared X-Auth-Token (see mme/views_rest.py)
 ]
 
 # Both need to be set to enable - and use get_secret in server settings files to keep out of source control

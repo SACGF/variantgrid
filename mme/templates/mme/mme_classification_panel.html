@@ -1,0 +1,97 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% block title %}MatchMaker Exchange{% endblock title %}
+{% block content %}
+    <div class="container">
+        <h3>MatchMaker Exchange</h3>
+        <p class="text-muted">
+            Classification {{ classification.pk }} — {{ classification.friendly_label }}
+        </p>
+
+        {% if not mme_enabled %}
+            <div class="alert alert-warning">MatchMaker Exchange is not enabled on this deployment.</div>
+        {% endif %}
+
+        {% if not eligible %}
+            <div class="alert alert-info">
+                This classification is not shared at <strong>ShareLevel.PUBLIC</strong> ("3rd Party Databases"),
+                so it cannot be submitted to MatchMaker Exchange.
+            </div>
+        {% endif %}
+
+        <h4>Assembled profile</h4>
+
+        <h5>Genomic features</h5>
+        {% if genomic_features %}
+            <ul>
+                {% for gf in genomic_features %}
+                    <li>
+                        {% if gf.gene %}<strong>{{ gf.gene.id }}</strong>{% endif %}
+                        {% if gf.variant %}
+                            — {{ gf.variant.assembly }} {{ gf.variant.referenceName }}:{{ gf.variant.start }}
+                            {{ gf.variant.referenceBases }}&gt;{{ gf.variant.alternateBases }}
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-muted">None</p>
+        {% endif %}
+
+        <h5>Disorders</h5>
+        {% if disorders %}
+            <ul>{% for d in disorders %}<li>{{ d.id }}</li>{% endfor %}</ul>
+        {% else %}
+            <p class="text-muted">None</p>
+        {% endif %}
+
+        <h5>Phenotype features (HPO)</h5>
+        {% if features %}
+            <ul>
+                {% for f in features %}
+                    <li>
+                        {{ f.label }} <span class="text-monospace text-muted">({{ f.id }})</span>
+                        {% if f._derivedFrom %}
+                            <span class="badge badge-warning" title="Derived via ontology cross-reference, not directly observed">derived</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-muted">None</p>
+        {% endif %}
+
+        {% if eligible and mme_enabled %}
+            <h4>Submit</h4>
+            {% if nodes %}
+                {% for node_id in nodes %}
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="node_id" value="{{ node_id }}">
+                        <button type="submit" class="btn btn-primary mb-2">Submit to {{ node_id }}</button>
+                    </form>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">No MME nodes are configured (settings.MME_NODES).</p>
+            {% endif %}
+        {% endif %}
+
+        {% if submissions %}
+            <h4>Existing submissions</h4>
+            <table class="table">
+                <thead><tr><th>Node</th><th>Status</th><th>Created</th><th></th></tr></thead>
+                <tbody>
+                    {% for submission in submissions %}
+                        <tr>
+                            <td>{{ submission.node_id }}</td>
+                            <td>{{ submission.get_status_display }}</td>
+                            <td>{{ submission.created }}</td>
+                            <td><a href="{% url 'mme_view_submission' submission.pk %}">View</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+{% endblock content %}
