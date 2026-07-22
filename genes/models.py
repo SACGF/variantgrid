@@ -1045,6 +1045,17 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def _sum_intervals(intervals: list[tuple]):
         return sum(b - a for a, b in intervals)
 
+    @classmethod
+    def data_is_current_cdot_format(cls, genome_build: Optional['GenomeBuild'] = None) -> bool:
+        """ Current cdot nests per-build data under a 'genome_builds' key; pre-cdot imports stored a flat
+            structure with no 'genome_builds', which makes genome_build_data (and thus HGVS resolution)
+            raise KeyError on every record. Returns True once any TranscriptVersion is in the current
+            format - ie import_cdot_latest / import_gene_annotation has been run. """
+        qs = cls.objects.all()
+        if genome_build:
+            qs = qs.filter(genome_build=genome_build)
+        return qs.filter(data__has_key="genome_builds").exists()
+
     @cached_property
     def genome_build_data(self) -> dict:
         return self.data["genome_builds"][self.genome_build.name]

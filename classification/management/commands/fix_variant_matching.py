@@ -1,12 +1,15 @@
+import re
 import time
 
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
 from django.db.models import Q
 
 from classification.management.commands.fix_migrate_flags_to_imported_allele_info import FlagDatabase
-from classification.models import Classification, ImportedAlleleInfo
+from classification.models import Classification, ImportedAlleleInfo, ClassificationImportRun
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
+from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from library.guardian_utils import admin_bot
+from library.utils import md5sum_str
 from snpdb.models import GenomeBuild
 
 
@@ -26,6 +29,11 @@ class Command(BaseCommand):
         parser.add_argument('--non-coding', action='store_true', default=False, help='Fix issue #762 NR had c. instead of n.')
         parser.add_argument('--revalidate', action='store_true', default=False)
         parser.add_argument('--variant_coordinate', action='store_true', default=False, help='Validates Variant Coordinates')
+        # --extra can be sharded across processes for parallelism. Sharding is by md5(imported c/g.hgvs) so
+        # every classification sharing an ImportedAlleleInfo lands in the same shard (the allele_info_changed
+        # cascade re-processes all classifications on an allele_info, so they must not straddle shards).
+        parser.add_argument('--shard-count', type=int, default=1, help='Total number of parallel --extra shards')
+        parser.add_argument('--shard-index', type=int, default=0, help='This shard (0..shard-count-1)')
 
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
@@ -43,6 +51,18 @@ class Command(BaseCommand):
         mode_revalidate = options.get('revalidate')
         mode_variant_coordinate = options.get('variant_coordinate')
 
+        # These modes resolve c.hgvs, which needs current-format cdot transcript data. On a pre-cdot
+        # deploy every record would KeyError deep into the run - fail fast with a clear instruction instead.
+        hgvs_modes = {"extra": mode_extra, "revalidate_chgvs": mode_revalidation_chgvs,
+                      "non_coding": mode_non_coding, "revalidate": mode_revalidate,
+                      "variant_coordinate": mode_variant_coordinate}
+        if any(hgvs_modes.values()) and not TranscriptVersion.data_is_current_cdot_format():
+            active = ", ".join(name for name, on in hgvs_modes.items() if on)
+            raise CommandError(
+                f"Transcript data is in the old pre-cdot format (TranscriptVersion.data has no 'genome_builds' "
+                f"key), so c.hgvs resolution for mode(s) [{active}] would fail on every record. "
+                f"Run 'python3 manage.py import_cdot_latest' first.")
+
         # if mode_all and mode_missing:
         #     raise ValueError("all and missing are mutually exclusive parameters")
         #
@@ -53,7 +73,8 @@ class Command(BaseCommand):
         #     raise ValueError("Need one of all, file, missing, mode_extra, mode_validation")
 
         if mode_extra:
-            self.handle_extra()
+            self.handle_extra(shard_count=options.get("shard_count", 1),
+                              shard_index=options.get("shard_index", 0))
 
         if mode_validation:
             self.handle_validation()
@@ -143,19 +164,73 @@ class Command(BaseCommand):
             if rvc and rvc != ivc:
                 print(f"{iai.pk}\t{ivc}\t{rvc}")
 
-    def handle_extra(self):
-        i = 0
-        for i, c in enumerate(Classification.objects.all()):
-            if i % 100 == 0:
-                print(f"Processed {i} classifications")
-            # use force_update so we can be sure that the validation objects have been made
-            if not c.allele_info:
-                c.ensure_allele_info()
-                c.save(update_modified=False)
+    @staticmethod
+    def _shard_key(chgvs, ghgvs, pk) -> str:
+        # Same key ImportedAlleleInfo is de-duped on (imported_c_hgvs strips internal whitespace), so
+        # classifications sharing an allele_info shard together and the allele_info_changed cascade never
+        # straddles shards.
+        if chgvs:
+            return re.sub(r"\s+", "", chgvs)
+        return ghgvs or str(pk)
 
-            if c.update_allele_info_from_classification(force_update=False):
-                c.save(update_modified=False)
-        print(f"Finished {i} classifications")
+    @staticmethod
+    def _refseq_transcript_accession(chgvs):
+        """ The RefSeq transcript accession from a c.hgvs (e.g. 'NM_000123.4(BRCA1):c.1A>G' -> 'NM_000123.4'),
+            or None if it isn't a RefSeq c.hgvs. """
+        if not chgvs or ":" not in chgvs:
+            return None
+        accession = chgvs.split(":")[0].split("(")[0].strip()
+        return accession if re.match(r"^(NM_|NR_|XM_|XR_)\d", accession) else None
+
+    def handle_extra(self, shard_count: int = 1, shard_index: int = 0):
+        # Run inside a ClassificationImportRun so grouping updates are deferred while we backfill:
+        # otherwise every classification save triggers _instant_undirty_check -> update_all_dirty(), which
+        # re-updates every currently-dirty ClassificationGrouping on each record (O(dirty) per record, i.e.
+        # ~O(N^2) over the run). For a single-process run we complete the import at the end, which fires
+        # classification_imports_complete_signal -> one batch grouping update. Sharded runs leave the import
+        # ongoing (so grouping stays deferred across all shards) - run classification_groupings --all after.
+        sharded = shard_count > 1
+        # Select shard members from a lightweight (pk, c.hgvs, g.hgvs) stream so we never hold 60k full
+        # Classification objects (with evidence) in memory - each shard then loads its rows one at a time.
+        pks = []
+        transcript_accessions = set()
+        for pk, chgvs, ghgvs in Classification.objects.values_list(
+                "pk", "evidence__c_hgvs__value", "evidence__g_hgvs__value").iterator(chunk_size=5000):
+            if sharded and int(md5sum_str(self._shard_key(chgvs, ghgvs, pk)), 16) % shard_count != shard_index:
+                continue
+            pks.append(pk)
+            if accession := self._refseq_transcript_accession(chgvs):
+                transcript_accessions.add(accession)
+        total = len(pks)
+        print(f"[shard {shard_index}/{shard_count}] {total} classifications to process", flush=True)
+
+        # Pre-warm the transcript sequence cache in one batch. Otherwise c.hgvs resolution below falls back to
+        # a per-transcript NCBI Entrez fetch (2-9s each) for every uncached transcript - the dominant cost on a
+        # fresh deploy. This is a no-op for transcripts already cached, so it's cheap on repeat runs.
+        if transcript_accessions:
+            print(f"[shard {shard_index}/{shard_count}] pre-warming {len(transcript_accessions)} RefSeq "
+                  f"transcript sequences...", flush=True)
+            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(
+                list(transcript_accessions), entrez_batch_size=100, fail_on_error=False)
+
+        ClassificationImportRun.record_classification_import("variant_rematching", 0)
+        try:
+            for handled, pk in enumerate(pks, start=1):
+                c = Classification.objects.get(pk=pk)
+                if handled % 1000 == 0:
+                    print(f"[shard {shard_index}/{shard_count}] {handled}/{total}", flush=True)
+                # use force_update so we can be sure that the validation objects have been made
+                if not c.allele_info:
+                    c.ensure_allele_info()
+                    c.save(update_modified=False)
+
+                if c.update_allele_info_from_classification(force_update=False):
+                    c.save(update_modified=False)
+            print(f"[shard {shard_index}/{shard_count}] finished {total} classifications", flush=True)
+        finally:
+            if not sharded:
+                # Single batch grouping update via classification_imports_complete_signal.
+                ClassificationImportRun.record_classification_import("variant_rematching", 0, is_complete=True)
 
     def handle_revalidate(self):
         i = 0

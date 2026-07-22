@@ -797,6 +797,7 @@ class OntologyVersion(TimeStampedModel):
     ONTOLOGY_IMPORTS = {
         "gencc_import": (OntologyImportSource.GENCC,
                          ['https://search.thegencc.org/download/action/submissions-export-csv',
+                          'submissions-export-csv',  # bare basename some imports stored instead of the full URL
                           'gencc-submissions.csv']),
         "mondo_import": (OntologyImportSource.MONDO, ['mondo.json']),
         "hp_owl_import": (OntologyImportSource.HPO, ['hp.owl']),
