@@ -16,9 +16,11 @@ PatientMatcher, IRUD.
 
 - Spec: [`ga4gh/mme-apis`](https://github.com/ga4gh/mme-apis) (v1.1, Nov 2017). Live
   endpoint list on the repo wiki.
-- **Reciprocity requirement:** to join, a participant must *also serve* an inbound
-  `/match` endpoint, agree to the MME participant/user agreement, and complete
-  steering-committee onboarding + per-node auth-token exchange.
+- **Connection is bilateral, not centrally gated.** Per the API repo: *"to query most
+  MME services, you need to request an authentication token from that service"* — nodes
+  exchange tokens directly. Becoming a *recognised, discoverable MME Service* (and
+  serving inbound reciprocal matches) is the layer with central oversight — the Steering
+  Committee's Service Requirements + agreements (§10).
 
 ### Protocol summary
 
@@ -637,17 +639,37 @@ traversal for phenotype-driven scoring.
 
 ## 10. Privacy, consent & governance (non-code, blocking)
 
-These gate go-live and are larger than the code:
-- Sign the MME participant / user agreement; steering-committee onboarding.
-- Exchange auth tokens with each remote node we want to query (fills `MME_NODES`) and
-  issue our inbound token to peers.
+These gate go-live and are larger than the code. **The onboarding weight depends on
+scope** — there are two paths, and the technical connection is bilateral either way:
+
+**Path A — bilateral connection with a specific partner node** (lightest). The protocol
+is decentralized: request an auth token from each node we want to query, issue them one
+in return. Good for querying one or two friendly/collaborator nodes. No central
+Steering Committee process, though the partner sets their own terms.
+
+**Path B — become a recognised, discoverable MME Service** (needed to be listed and to
+serve inbound reciprocal matches to the established network). The official *"I have a
+database"* page: *"To become a Matchmaker Exchange Service, each new site must achieve
+the Service Requirements set forth by the Steering Committee."* In practice the big
+nodes (GeneMatcher, DECIPHER…) expect this before issuing a token. Involves:
+- Contact **api@matchmakerexchange.org** to start.
+- Meet/sign the three governance documents: **Informed Consent Policy**, **End User
+  Agreement**, **Service Requirements** (2026 revision).
+- Steering Committee review/approval.
+
+Common to both paths:
+- Exchange auth tokens with each remote node we query (fills `MME_NODES`) and issue our
+  inbound token to peers.
 - Consent is the classification's **`share_level = ShareLevel.PUBLIC`** — the same bar
   already used for ClinVar submission; no separate patient consent flag
   (`Patient.research_consent` is unrelated / internal-only). The MME `patient.id` and
   `label` we send must be non-PII (use the classification's opaque id).
 - Keep `"test": true` until certified against a target node's test instance.
 - Legal/ethics sign-off on serving inbound queries (we expose PUBLIC classifications'
-  gene/variant + condition, and linked-patient HPO where present).
+  gene/variant + condition, and linked-patient HPO where present) — heavier for Path B.
+
+A separate hand-off checklist for the lab head / research assistant lives in
+`claude/matchmaker_exchange_onboarding.md`.
 
 ## 11. Rollout order
 
