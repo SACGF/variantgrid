@@ -5,6 +5,7 @@ from typing import Optional
 import bleach
 from bs4 import BeautifulSoup
 from django.utils.html import format_html
+from django.utils.safestring import SafeString
 
 
 def html_id_safe(text: str) -> str:
