@@ -43,6 +43,7 @@ def beacon_meta(returned_granularity: str, received_request_summary: dict) -> di
     return {
         "beaconId": config["beacon_id"],
         "apiVersion": config["api_version"],
+        "returnedSchemas": [],  # required by beaconResponseMeta
         "returnedGranularity": returned_granularity,
         "receivedRequestSummary": received_request_summary,
     }

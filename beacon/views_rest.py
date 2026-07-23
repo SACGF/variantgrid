@@ -105,11 +105,20 @@ def _extract_params(request) -> tuple[dict, str, dict]:
     return params, requested, raw
 
 
-def _received_request_summary(params: dict, requested_granularity: str) -> dict:
-    return {
-        "requestedGranularity": requested_granularity,
+def _received_request_summary(params: dict, requested_granularity: str, extra: dict = None) -> dict:
+    """ Spec-complete beaconReceivedRequestSummary: apiVersion, requestedSchemas,
+        pagination and requestedGranularity are all required. """
+    config = settings.BEACON_CONFIG
+    summary = {
+        "apiVersion": config["api_version"],
+        "requestedSchemas": [],
+        "pagination": {"skip": 0, "limit": 0},
+        "requestedGranularity": requested_granularity or config.get("default_granularity", "boolean"),
         "requestParameters": {k: params.get(k) for k in _PARAM_KEYS},
     }
+    if extra:
+        summary.update(extra)
+    return summary
 
 
 class BeaconGVariantsView(APIView):
@@ -225,7 +234,7 @@ class BeaconGVariantByIdView(APIView):
 
         exists = obs.exists or cls.exists
         num_total_results = (obs.reportable_count or 0) + (cls.reportable_count or 0)
-        summary = {"requestedGranularity": RECORD, "variantInternalId": str(variant_id)}
+        summary = _received_request_summary({}, RECORD, extra={"variantInternalId": str(variant_id)})
         return Response(query_response(
             granularity, summary, exists=exists, num_total_results=num_total_results,
             result_sets=[obs.result_set(), cls.result_set()]))

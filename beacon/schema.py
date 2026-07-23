@@ -4,6 +4,13 @@ from django.conf import settings
 
 from beacon.response import GRANULARITIES
 
+# Canonical Beacon v2 schema URIs. The configuration/map `response` objects require a
+# `$schema` property (beaconMapSchema / beaconConfigurationSchema), used by clients for
+# schema discovery; omitting it fails spec validation (EGA beacon-verifier).
+_SCHEMA_BASE = "https://raw.githubusercontent.com/ga4gh-beacon/beacon-v2/main/framework/json/configuration"
+BEACON_MAP_SCHEMA = f"{_SCHEMA_BASE}/beaconMapSchema.json"
+BEACON_CONFIGURATION_SCHEMA = f"{_SCHEMA_BASE}/beaconConfigurationSchema.json"
+
 # The two datasets we serve (§5.5), advertised in service-info / entry types.
 OBSERVATIONS_DATASET_ID = "variantgrid_observations"
 CLASSIFICATIONS_DATASET_ID = "variantgrid_classifications"
@@ -71,6 +78,7 @@ def configuration() -> dict:
     """ GET /configuration - Beacon configuration object. """
     config = settings.BEACON_CONFIG
     return {
+        "$schema": BEACON_CONFIGURATION_SCHEMA,
         "maturityAttributes": {"productionStatus": "DEV"},
         "securityAttributes": {
             "defaultGranularity": config.get("default_granularity", "boolean"),
@@ -111,6 +119,7 @@ def endpoint_map(g_variants_url: str) -> dict:
         `format: uri`); relative paths crash strict clients (e.g. the EGA beacon-verifier
         whose URL parser rejects a base-less relative URL). """
     return {
+        "$schema": BEACON_MAP_SCHEMA,
         "endpointSets": {
             "genomicVariant": {
                 "entryType": "genomicVariant",
