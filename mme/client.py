@@ -4,14 +4,20 @@ Self-contained `requests` client that copies the *shape* of `library/oauth.py:Se
 (a small object wrapping `requests.post` + an auth header) without importing it or any
 `sync/` code. MME auth is a single static per-node header, so there is no OAuth machinery.
 """
+import logging
+
 import requests
 from django.conf import settings
+from django.urls import reverse
 from django.utils import timezone
 
 from library.constants import MINUTE_SECS
+from library.django_utils import get_url_from_view_path
+from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from mme.models import MMESubmissionStatus, MMEMatchResult
 from mme.serializers.patient_profile import build_patient_profile
+from user_messages.models import Message
 
 
 class MMEClient:
@@ -71,7 +77,8 @@ def submit(submission) -> None:
     submission.submitted = timezone.now()
     submission.save()
 
-    for result in data.get("results", []):
+    results = data.get("results", [])
+    for result in results:
         patient = result.get("patient", {})
         contact = patient.get("contact", {})
         MMEMatchResult.objects.create(
@@ -82,3 +89,29 @@ def submit(submission) -> None:
             contact_href=contact.get("href"),
             patient_json=patient,
         )
+
+    if results:
+        _notify_curator_of_matches(submission, len(results))
+
+
+def _notify_curator_of_matches(submission, num_results: int) -> None:
+    """ Tell the classification's curator, via the in-app user_messages inbox (which
+        also emails them), that their submission returned candidate matches. Best-effort:
+        a messaging failure must not undo an already-persisted successful submission. """
+    recipient = submission.classification.user
+    if recipient is None:
+        return
+    try:
+        url = get_url_from_view_path(
+            reverse("mme_view_submission", kwargs={"submission_id": submission.pk}))
+        plural = "es" if num_results != 1 else ""
+        Message.objects.create(
+            subject=f"MatchMaker Exchange: {num_results} possible match{plural}",
+            body=(f"Your MME submission of classification #{submission.classification_id} "
+                  f"to node `{submission.node_id}` returned {num_results} possible "
+                  f"match{plural}. [View matches]({url})."),
+            sender=admin_bot(),
+            recipient=recipient,
+        )
+    except Exception:
+        logging.exception("MME: failed to notify curator of matches for submission %s", submission.pk)

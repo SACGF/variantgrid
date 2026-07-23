@@ -12,6 +12,10 @@ class EligibilityTestCase(TestCase):
     def setUp(self):
         ClassificationTestUtils.setUp()
         self.lab, self.user = ClassificationTestUtils.lab_and_user()
+        # Eligibility requires the owning lab to have opted into MME with a contact.
+        self.lab.contact_email = "curator@lab.org"
+        self.lab.mme_enabled = True
+        self.lab.save()
 
     def _classification_with_mod(self, share_level: str, is_last_published: bool = True,
                                  withdrawn: bool = False) -> Classification:
@@ -49,3 +53,20 @@ class EligibilityTestCase(TestCase):
     def test_withdrawn_public_excluded(self):
         vc = self._classification_with_mod(ShareLevel.PUBLIC.value, withdrawn=True)
         self.assertNotIn(vc.pk, {cm.classification_id for cm in mme_eligible_classifications()})
+
+    def test_lab_not_mme_enabled_excluded(self):
+        # PUBLIC record, but the owning lab has not opted into MME -> excluded.
+        vc = self._classification_with_mod(ShareLevel.PUBLIC.value)
+        self.lab.mme_enabled = False
+        self.lab.save()
+        self.assertNotIn(vc.pk, {cm.classification_id for cm in mme_eligible_classifications()})
+
+    def test_lab_mme_enabled_toggle_includes(self):
+        # Flipping the same PUBLIC record's lab back on includes it again.
+        vc = self._classification_with_mod(ShareLevel.PUBLIC.value)
+        self.lab.mme_enabled = False
+        self.lab.save()
+        self.assertNotIn(vc.pk, {cm.classification_id for cm in mme_eligible_classifications()})
+        self.lab.mme_enabled = True
+        self.lab.save()
+        self.assertIn(vc.pk, {cm.classification_id for cm in mme_eligible_classifications()})

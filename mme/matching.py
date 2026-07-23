@@ -9,6 +9,7 @@ import logging
 
 from django.conf import settings
 
+from mme.contact import mme_contact_for_classification
 from mme.serializers.patient_profile import (
     mme_eligible_classifications,
     classification_ontology_slots,
@@ -51,10 +52,12 @@ def _extract_query(patient: dict) -> tuple[set[str], set[str], set[str]]:
 
 
 def _our_patient_object(classification, genomic_features, features, disorders) -> dict:
-    """ Non-PII patient object describing one of our classifications, in MME shape. """
+    """ Non-PII patient object describing one of our classifications, in MME shape.
+        Contact follows the classification's lab; if that can't be resolved we fall
+        back to the server contact as-is rather than drop the match. """
     patient = {
         "id": f"vg:{classification.pk}",   # opaque, stable, non-PII
-        "contact": settings.MME_CONTACT,
+        "contact": mme_contact_for_classification(classification) or (settings.MME_CONTACT or {}),
         "species": "NCBITaxon:9606",
     }
     if genomic_features:

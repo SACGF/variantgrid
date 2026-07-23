@@ -37,6 +37,7 @@ from model_utils.managers import InheritanceManager
 from more_itertools import first
 
 from classification.enums.classification_enums import ShareLevel
+from mme.contact import lab_mme_contact
 from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
@@ -494,6 +495,11 @@ class Lab(models.Model, PreviewModelMixin):
     contact_phone = models.TextField(blank=True)
     contact_email = models.TextField(blank=True)
 
+    # Opt-in to participate in MatchMaker Exchange (patient matchmaking). Distinct from
+    # a record's share_level=PUBLIC (which only means "publicly shareable"); enabling MME
+    # is a deliberate lab decision and requires a resolvable MME contact (see clean()).
+    mme_enabled = models.BooleanField(default=False, blank=True)
+
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=SET_NULL)
 
     group_name = models.TextField(blank=True, null=True, unique=True)
@@ -535,6 +541,15 @@ class Lab(models.Model, PreviewModelMixin):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-flask"
+
+    def clean(self):
+        super().clean()
+        # A lab cannot opt into MME without a resolvable contact, so every eligible
+        # classification is guaranteed a contact and eligibility stays a boolean check.
+        if self.mme_enabled and not lab_mme_contact(self):
+            raise ValidationError({
+                "mme_enabled": "Set an MME contact email before enabling MatchMaker Exchange."
+            })
 
     @property
     def contact_details(self) -> ContactDetails:

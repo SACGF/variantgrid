@@ -15,6 +15,7 @@ from django.conf import settings
 
 from classification.enums.classification_enums import SpecialEKeys, ShareLevel
 from classification.models.classification import ClassificationModification
+from mme.contact import mme_contact_for_classification
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation
 
 
@@ -105,13 +106,16 @@ def classification_genomic_feature(classification) -> list[dict] | None:
 
 
 def mme_eligible_classifications():
-    """ Latest PUBLIC ('3rd Party Databases') published, non-withdrawn modifications.
-        share_level=PUBLIC is the exact consent signal for an external DB like MME;
-        ALL_USERS is internal-only and must be excluded. """
+    """ Latest PUBLIC ('3rd Party Databases') published, non-withdrawn modifications
+        whose owning lab has opted into MME. Eligibility is a three-layer AND: node
+        (settings.MME_ENABLED) x lab (Lab.mme_enabled) x record (share_level=PUBLIC,
+        not withdrawn). share_level=PUBLIC is the exact consent signal for an external
+        DB like MME; ALL_USERS is internal-only and must be excluded. """
     return (ClassificationModification.objects
             .filter(is_last_published=True,
                     share_level=ShareLevel.PUBLIC.value,
-                    classification__withdrawn=False)
+                    classification__withdrawn=False,
+                    classification__lab__mme_enabled=True)
             .select_related("classification"))
 
 
@@ -119,17 +123,21 @@ def build_patient_profile(submission) -> dict:
     """ Assemble the MME `patient` object from the submission's classification.
         The request-level `disclaimer`/`terms` are siblings of `patient` in the
         envelope, so they are attached by the client (§7), not here. """
-    contact = settings.MME_CONTACT or {}
-    if not (contact.get("name") and contact.get("href")):
-        raise ValueError("Cannot submit to MME: settings.MME_CONTACT (name + href) is not configured")
-
     classification = submission.classification
+    contact = mme_contact_for_classification(classification)
+    if not (contact.get("name") and contact.get("href")):
+        lab = getattr(classification, "lab", None)
+        lab_name = getattr(lab, "name", None) or getattr(classification, "lab_id", None)
+        raise ValueError(
+            f"Cannot submit to MME: no resolvable contact for lab '{lab_name}' "
+            f"and settings.MME_CONTACT (name + href) is not configured")
+
     genomic_features = classification_genomic_feature(classification)      # §6b
     features, disorders = classification_ontology_slots(classification)    # §6a
 
     profile = {
         "id": submission.external_patient_id,   # opaque, stable, non-PII
-        "contact": settings.MME_CONTACT,
+        "contact": contact,
         "species": "NCBITaxon:9606",
     }
     if genomic_features:

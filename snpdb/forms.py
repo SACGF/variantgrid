@@ -180,8 +180,15 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "slack_webhook": "Slack Webhook",
             "contact_name": "Contact Name",
             "contact_email": "Contact Email",
-            "contact_phone": "Contact Phone"
+            "contact_phone": "Contact Phone",
+            "mme_enabled": "MatchMaker Exchange Enabled"
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Labs on non-MME deployments never see the opt-in toggle.
+        if not settings.MME_ENABLED:
+            self.fields.pop("mme_enabled", None)
         help_texts = {
             "email": "Lab wide email for discordance and general communications.",
             "contact_name": "Name of contact person available for other labs to contact (if applicable)",

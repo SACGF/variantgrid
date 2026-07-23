@@ -33,6 +33,20 @@ class FakeGenomeBuild:
 
 
 @dataclass
+class FakeOrganization:
+    name: str = ""
+
+
+@dataclass
+class FakeLab:
+    name: str = ""
+    contact_name: str = ""
+    contact_email: str = ""
+    url: str = ""
+    organization: Optional[FakeOrganization] = None
+
+
+@dataclass
 class FakeClassification:
     pk: int = 1
     terms: list = field(default_factory=list)
@@ -41,6 +55,8 @@ class FakeClassification:
     genome_build_name: str = "GRCh38"
     sample = None
     has_build: bool = True
+    lab: Optional[FakeLab] = None
+    lab_id: Optional[int] = None
 
     @property
     def condition_resolution_obj(self) -> Optional[ConditionResolved]:

@@ -8,6 +8,7 @@ from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.client import submit
 from mme.models import MMESubmission, MMESubmissionStatus, MMEMatchResult
+from user_messages.models import Message
 
 NODES = {"testnode": {"base_url": "https://node.test", "token": "secret-token", "api_version": "1.1"}}
 
@@ -54,6 +55,24 @@ class ClientTestCase(TestCase):
         self.assertEqual(result.score, 0.83)
         self.assertEqual(result.matched_patient_id, "remote-1")
         self.assertEqual(result.contact_name, "Lab X")
+
+    def test_success_notifies_curator_via_user_messages(self):
+        payload = {"results": [
+            {"score": {"patient": 0.83},
+             "patient": {"id": "remote-1", "contact": {"name": "Lab X", "href": "mailto:x@x.org"}}},
+        ]}
+        with patch("mme.client.requests.post", return_value=self._mock_response(payload)):
+            submit(self.submission)
+
+        msg = Message.objects.filter(recipient=self.classification.user).order_by("-sent_at").first()
+        self.assertIsNotNone(msg)
+        self.assertIn("MatchMaker Exchange", msg.subject)
+        self.assertIn(str(self.submission.classification_id), msg.body)
+
+    def test_no_results_creates_no_curator_message(self):
+        with patch("mme.client.requests.post", return_value=self._mock_response({"results": []})):
+            submit(self.submission)
+        self.assertFalse(Message.objects.filter(recipient=self.classification.user).exists())
 
     def test_failure_sets_error_and_notifies_admin(self):
         response = MagicMock()
