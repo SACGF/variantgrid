@@ -158,6 +158,13 @@ class BeaconGVariantsTestCase(TestCase):
         self.assertFalse(row.authenticated)
         self.assertTrue(row.classifications_exists)
 
-    def test_missing_params_returns_400(self):
+    def test_partial_params_returns_400(self):
+        # A partial coordinate (some params but not all) is malformed.
         response = APIClient().get(reverse("beacon_g_variants"), {"assemblyId": "GRCh37"})
         self.assertEqual(response.status_code, 400)
+
+    def test_bare_query_returns_valid_empty_200(self):
+        # No coordinate params at all -> valid empty envelope (200), not an error.
+        response = APIClient().get(reverse("beacon_g_variants"))
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["responseSummary"]["exists"])

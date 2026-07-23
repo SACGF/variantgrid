@@ -106,14 +106,16 @@ def filtering_terms() -> dict:
     return {"filteringTerms": [], "resources": []}
 
 
-def endpoint_map() -> dict:
-    """ GET /map - endpoint map. """
+def endpoint_map(g_variants_url: str) -> dict:
+    """ GET /map - endpoint map. rootUrl/singleEntryUrl must be absolute URIs (spec
+        `format: uri`); relative paths crash strict clients (e.g. the EGA beacon-verifier
+        whose URL parser rejects a base-less relative URL). """
     return {
         "endpointSets": {
             "genomicVariant": {
                 "entryType": "genomicVariant",
-                "rootUrl": "/beacon/g_variants",
-                "singleEntryUrl": "/beacon/g_variants/{id}",
+                "rootUrl": g_variants_url,
+                "singleEntryUrl": f"{g_variants_url}/{{id}}",
             }
         }
     }

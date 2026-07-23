@@ -40,7 +40,12 @@ class BeaconFrameworkTestCase(TestCase):
     def test_map(self):
         response = self.client.get(reverse("beacon_map"))
         self.assertEqual(response.status_code, 200)
+        endpoint_sets = response.json()["response"]["endpointSets"]
         self.assertIn("endpointSets", response.json()["response"])
+        # rootUrl / singleEntryUrl must be absolute URIs (spec format: uri).
+        root_url = endpoint_sets["genomicVariant"]["rootUrl"]
+        self.assertTrue(root_url.startswith("http://") or root_url.startswith("https://"))
+        self.assertTrue(endpoint_sets["genomicVariant"]["singleEntryUrl"].endswith("/{id}"))
 
     def test_disabled_returns_404(self):
         with override_settings(BEACON_ENABLED=False):

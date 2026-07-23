@@ -7,6 +7,7 @@ per-tier data scope is still enforced by filter_for_user (anonymous -> public gr
 import logging
 
 from django.conf import settings
+from django.urls import reverse
 from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.response import Response
@@ -33,38 +34,39 @@ class _BeaconFrameworkView(APIView):
     """ Base for the static framework endpoints - anonymous-readable, GET only. """
     permission_classes = []
 
-    def _payload(self) -> dict:
+    def _payload(self, request) -> dict:
         raise NotImplementedError()
 
     @extend_schema(exclude=True)
     def get(self, request, *args, **kwargs):
         _require_enabled()
-        return Response(info_response(self._payload()))
+        return Response(info_response(self._payload(request)))
 
 
 class BeaconInfoView(_BeaconFrameworkView):
-    def _payload(self):
+    def _payload(self, request):
         return schema.beacon_info()
 
 
 class BeaconConfigurationView(_BeaconFrameworkView):
-    def _payload(self):
+    def _payload(self, request):
         return schema.configuration()
 
 
 class BeaconEntryTypesView(_BeaconFrameworkView):
-    def _payload(self):
+    def _payload(self, request):
         return schema.entry_types()
 
 
 class BeaconFilteringTermsView(_BeaconFrameworkView):
-    def _payload(self):
+    def _payload(self, request):
         return schema.filtering_terms()
 
 
 class BeaconMapView(_BeaconFrameworkView):
-    def _payload(self):
-        return schema.endpoint_map()
+    def _payload(self, request):
+        g_variants_url = request.build_absolute_uri(reverse("beacon_g_variants"))
+        return schema.endpoint_map(g_variants_url)
 
 
 class BeaconServiceInfoView(APIView):
@@ -128,8 +130,15 @@ class BeaconGVariantsView(APIView):
         _require_enabled()
         params, requested_granularity, raw = _extract_params(request)
 
+        authenticated = bool(request.user and request.user.is_authenticated)
+
         missing = [k for k in _PARAM_KEYS if not params.get(k)]
         if missing:
+            # No coordinate params at all => a bare "list" query: return a valid, empty
+            # result envelope (200) so spec clients / the beacon-verifier get a conformant
+            # response. A partial coordinate is genuinely malformed => 400.
+            if len(missing) == len(_PARAM_KEYS):
+                return Response(self._empty_response(params, requested_granularity, authenticated))
             raise ParseError(f"Missing required Beacon g_variants parameters: {', '.join(missing)}")
 
         try:
@@ -145,7 +154,6 @@ class BeaconGVariantsView(APIView):
             params["alternateBases"], genome_build).first()
         allele = variant.allele if variant is not None else None
 
-        authenticated = bool(request.user and request.user.is_authenticated)
         granularity = clamp_granularity(requested_granularity, authenticated)
         is_record = granularity == RECORD
 
@@ -166,6 +174,15 @@ class BeaconGVariantsView(APIView):
 
         self._audit(raw, granularity, authenticated, obs, cls)
         return Response(response)
+
+    @staticmethod
+    def _empty_response(params, requested_granularity, authenticated):
+        """ Valid, empty g_variants envelope for a bare (no-coordinate) query. """
+        granularity = clamp_granularity(requested_granularity, authenticated)
+        return query_response(
+            granularity,
+            _received_request_summary(params, requested_granularity),
+            exists=False, num_total_results=0, result_sets=[])
 
     @staticmethod
     def _audit(request_json, granularity, authenticated, obs, cls):
