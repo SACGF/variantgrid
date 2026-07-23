@@ -2,6 +2,7 @@ from functools import reduce, cached_property
 from typing import Any, Optional
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
+from django.conf import settings
 from django.db.models import CASCADE, QuerySet, SET_NULL, JSONField
 from django.db import models
 from django.db.models.enums import IntegerChoices
@@ -15,9 +16,11 @@ from classification.models import ClassificationGrouping, EvidenceKeyMap, Condit
 from classification.enums.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
 from genes.hgvs import CHGVS
+from library.preview_request import PreviewModelMixin
 from library.utils import first, AuditUtils, AuditSingleChange
 from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
+from review.models import ReviewableModelMixin
 from snpdb.models import Allele, Lab, GenomeBuild, LabLike, CLINVAR_EXPERT_PANEL_LAB
 
 
@@ -182,7 +185,7 @@ class OverlapContribution(TimeStampedModel):
 auditlog.register(OverlapContribution)
 
 
-class Overlap(TimeStampedModel):
+class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     """
     Overlap is made by composition as making a separate model for each overlap type added a lot of overhead for just isolating a few fields
     """
@@ -201,6 +204,45 @@ class Overlap(TimeStampedModel):
 
     def get_absolute_url(self):
         return reverse('overlap_3', kwargs={"overlap_id": self.pk})
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "Overlap"
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-record-vinyl"
+
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        return settings.DISCORDANCE_ENABLED
+
+    @property
+    def preview(self) -> 'PreviewData':
+
+        from classification.views.discordance_report_views import DiscordanceReportTemplateData
+        drtd = DiscordanceReportTemplateData(self.pk, user=admin_bot())
+
+        c_hgvs_key_values = []
+        for c_hgvs in drtd.c_hgvses:
+            c_hgvs_key_values.append(
+                PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
+            )
+
+        status_text: str
+        if self.is_pending_concordance and self.is_latest:
+            status_text = "Pending Concordance"
+        else:
+            status_text = self.get_resolution_display() or 'Active Discordance'
+
+        # note there's also preview_extra_signal that provides the lab data
+        return self.preview_with(
+            identifier=f"DR_{self.pk}",
+            summary_extra=
+                [PreviewKeyValue(key="Status", value=status_text, dedicated_row=True)] +
+                [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}", dedicated_row=True)] +
+                c_hgvs_key_values
+        )
 
     @cached_property
     def c_hgvses(self):
@@ -237,6 +279,11 @@ class Overlap(TimeStampedModel):
             contribution_status=OverlapContributionStatus.CONTRIBUTING,
             pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)
         ).select_related("classification_grouping__lab__organization")
+
+    @property
+    def reviewing_labs(self) -> set[Lab]:
+        lab_ids = set(self.contributions.values_list('classification_grouping__lab', flat=True))
+        return set(Lab.objects.filter(pk__in=lab_ids).all())
 
     @property
     def has_clinvar_expert_panel(self) -> bool:
