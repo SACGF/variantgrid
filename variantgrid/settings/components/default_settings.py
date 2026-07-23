@@ -304,11 +304,13 @@ BEACON_MIN_REPORTABLE_COUNT = 5
 BEACON_OUTBOUND_ENABLED = False
 BEACON_QUERY_TIMEOUT = 5          # per-node seconds; keep small - remote Beacons vary wildly
 BEACON_QUERY_CACHE_DAYS = 7       # cache each (variant, node) result; live-refresh on expiry
-# Remote nodes we can query: public base_url + api_version as plain config; token (if a
-# node requires one for count/record) is the only secret, via get_secret(mandatory=False).
+# Remote nodes we can query. Each entry: public base_url + api_version, a `type` selecting the
+# query target/gate (see beacon/query_targets.py - "cnv" for copy-number Beacons, "snv" for
+# sequence Beacons), an optional `assemblies` allow-list, and an optional `token` (the only
+# secret, via get_secret(mandatory=False)) for nodes whose count/record tier requires one.
 BEACON_QUERY_NODES = {
-    # "some_beacon": {"base_url": "https://<confirmed-live-host>", "api_version": "v2.0.0",
-    #                 "token": get_secret("BEACON.some_beacon_token", mandatory=False)},
+    # "progenetix": {"base_url": "https://progenetix.org/beacon", "api_version": "v2.0.0",
+    #                "type": "cnv", "assemblies": ["GRCh38"]},
 }
 
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_

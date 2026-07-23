@@ -42,12 +42,18 @@ BEACON_CONFIG = {
         "contact_url": "mailto:admin@variantgrid.com",
     },
 }
-# Outbound: query external Beacons from the variant page. Point at any confirmed-live beacon
-# (including our own prod beacon) to exercise the variant-page section end to end.
+# Outbound: query external Beacons from the variant page, gated per node - a variant only fans
+# out to servers whose domain it matches (§9). Copy-number Beacons (bycon/progenetix) hold real
+# somatic CNV data, so symbolic <DEL>/<DUP> variants query them; germline SNVs have no
+# worthwhile public target yet, so no `snv` node is configured.
 BEACON_OUTBOUND_ENABLED = True
 BEACON_QUERY_NODES = {
-    "variantgrid": {"base_url": "https://variantgrid.com/beacon", "api_version": "v2.0.0",
-                    "token": get_secret("BEACON.variantgrid_token", mandatory=False)},
+    "progenetix": {"base_url": "https://progenetix.org/beacon", "api_version": "v2.0.0",
+                   "type": "cnv", "assemblies": ["GRCh38"]},
+    "cancercelllines": {"base_url": "https://cancercelllines.org/beacon", "api_version": "v2.0.0",
+                        "type": "cnv", "assemblies": ["GRCh38"]},
+    "refcnv": {"base_url": "https://refcnv.org/beacon", "api_version": "v2.0.0",
+               "type": "cnv", "assemblies": ["GRCh38"]},
 }
 
 

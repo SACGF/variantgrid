@@ -71,8 +71,8 @@ BEACON_CONFIG = {
 # whichever aggregator/beacons we confirm are live and reachable before turning this on.
 BEACON_OUTBOUND_ENABLED = False
 BEACON_QUERY_NODES = {
-    # "some_beacon": {"base_url": "https://<confirmed-live-host>", "api_version": "v2.0.0",
-    #                 "token": get_secret("BEACON.some_beacon_token", mandatory=False)},
+    # "progenetix": {"base_url": "https://progenetix.org/beacon", "api_version": "v2.0.0",
+    #                "type": "cnv", "assemblies": ["GRCh38"]},   # copy-number (somatic CNV)
 }
 
 

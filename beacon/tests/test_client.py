@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 import requests
@@ -7,13 +8,14 @@ from django.urls import reverse
 
 from beacon.client import query_node, query_external_beacons_for_variant
 from beacon.models import BeaconQueryCache
+from beacon.query_targets import eligible_queries
 from beacon.variant_mapping import variant_to_beacon_query_params, parse_beacon_response
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 NODES = {
-    "nodeA": {"base_url": "https://a.beacon", "api_version": "v2.0.0", "token": None},
-    "nodeB": {"base_url": "https://b.beacon", "api_version": "v2.0.0", "token": "secret"},
+    "nodeA": {"base_url": "https://a.beacon", "api_version": "v2.0.0", "token": None, "type": "snv"},
+    "nodeB": {"base_url": "https://b.beacon", "api_version": "v2.0.0", "token": "secret", "type": "snv"},
 }
 
 
@@ -57,8 +59,7 @@ class BeaconClientTestCase(TestCase):
     def test_query_node_error_is_isolated(self):
         response = MagicMock()
         response.raise_for_status.side_effect = requests.Timeout("timed out")
-        with patch("beacon.client.requests.get", return_value=response), \
-                patch("beacon.client.AdminNotificationBuilder"):
+        with patch("beacon.client.requests.get", return_value=response):
             result = query_node("nodeA", {"referenceName": "3"})
         self.assertFalse(result["exists"])
         self.assertIn("timed out", result["error"])
@@ -69,8 +70,7 @@ class BeaconClientTestCase(TestCase):
                 raise requests.ConnectionError("node A down")
             return _mock_response({"responseSummary": {"exists": True, "numTotalResults": 1}})
 
-        with patch("beacon.client.requests.get", side_effect=fake_get), \
-                patch("beacon.client.AdminNotificationBuilder"):
+        with patch("beacon.client.requests.get", side_effect=fake_get):
             results = {r["node_id"]: r for r in query_external_beacons_for_variant(self.variant, self.grch37)}
         self.assertIsNotNone(results["nodeA"]["error"])
         self.assertTrue(results["nodeB"]["exists"])
@@ -108,3 +108,57 @@ class ExternalBeaconsViewTestCase(TestCase):
         response = self.client.get(self._url())
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(b"External Beacons", response.content)
+
+
+class BeaconQueryGatingTestCase(TestCase):
+    """ eligible_queries() routes each variant only to servers whose domain it matches. """
+
+    def setUp(self):
+        self.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+        self.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        self.both_nodes = {"seq": {"type": "snv"}, "cnv": {"type": "cnv"}}
+
+    @staticmethod
+    def _variant(**coordinate):
+        return SimpleNamespace(coordinate=SimpleNamespace(**coordinate))
+
+    def test_snv_routes_to_snv_node_only(self):
+        variant = self._variant(is_symbolic=False, chrom="3", position=1000,
+                                ref="A", alt="T", svlen=None)
+        eligible = eligible_queries(variant, self.grch38, self.both_nodes)
+        self.assertEqual(list(eligible), ["seq"])
+        self.assertEqual(eligible["seq"]["start"], 999)  # 1-based -> 0-based
+        self.assertEqual(eligible["seq"]["alternateBases"], "T")
+
+    def test_cnv_deletion_routes_to_cnv_node_as_range_query(self):
+        variant = self._variant(is_symbolic=True, chrom="9", position=21967752,
+                                ref="N", alt="<DEL>", svlen=-27549, end=21995301)
+        eligible = eligible_queries(variant, self.grch38, self.both_nodes)
+        self.assertEqual(list(eligible), ["cnv"])
+        params = eligible["cnv"]
+        self.assertEqual(params["start"], 21967751)  # 0-based
+        self.assertEqual(params["end"], 21995301)    # position + abs(svlen)
+        self.assertEqual(params["variantType"], "EFO:0030067")  # <DEL> -> copy number loss
+        self.assertNotIn("referenceBases", params)   # a range query, not an exact-allele one
+
+    def test_cnv_duplication_maps_to_gain(self):
+        variant = self._variant(is_symbolic=True, chrom="2", position=15940550,
+                                ref="N", alt="<DUP>", svlen=5000, end=15945550)
+        eligible = eligible_queries(variant, self.grch38, {"cnv": {"type": "cnv"}})
+        self.assertEqual(eligible["cnv"]["variantType"], "EFO:0030070")  # <DUP> -> gain
+
+    def test_assembly_gate_skips_wrong_build(self):
+        variant = self._variant(is_symbolic=True, chrom="9", position=21967752,
+                                ref="N", alt="<DEL>", svlen=-27549, end=21995301)
+        nodes = {"cnv": {"type": "cnv", "assemblies": ["GRCh38"]}}
+        self.assertEqual(eligible_queries(variant, self.grch37, nodes), {})
+
+    def test_unsupported_symbolic_type_is_skipped(self):
+        variant = self._variant(is_symbolic=True, chrom="1", position=100,
+                                ref="N", alt="<INV>", svlen=500, end=600)
+        self.assertEqual(eligible_queries(variant, self.grch38, {"cnv": {"type": "cnv"}}), {})
+
+    def test_unknown_node_type_is_skipped(self):
+        variant = self._variant(is_symbolic=False, chrom="3", position=1000,
+                                ref="A", alt="T", svlen=None)
+        self.assertEqual(eligible_queries(variant, self.grch38, {"x": {"type": "mystery"}}), {})

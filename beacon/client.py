@@ -14,8 +14,12 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 from django.conf import settings
 
-from beacon.variant_mapping import variant_to_beacon_query_params, parse_beacon_response
-from library.log_utils import AdminNotificationBuilder
+from beacon.query_targets import eligible_queries
+from beacon.variant_mapping import parse_beacon_response
+
+# Identify ourselves to remote Beacons - some hosting WAFs block default client user-agents
+# (e.g. the progenetix family 403s Python clients). The Beacon spec itself requires no UA.
+USER_AGENT = "VariantGrid-Beacon/1.0 (+https://variantgrid.com)"
 
 
 class BeaconClient:
@@ -30,15 +34,17 @@ class BeaconClient:
 
     @property
     def _headers(self) -> dict:
-        headers = {"Accept": "application/json"}
+        headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
 
     def query_g_variants(self, params: dict, timeout: int) -> dict:
+        # We only ever render presence/count, so ask for count granularity - a beacon clamps
+        # it down to boolean if that's all its open tier allows, and it avoids pulling records.
         response = requests.get(
             url=f"{self.base_url}/g_variants",
-            params=params,
+            params={**params, "requestedGranularity": "count"},
             headers=self._headers,
             timeout=timeout,
         )
@@ -56,28 +62,26 @@ def query_node(node_id: str, params: dict) -> dict:
         result["exists"] = exists
         result["count"] = count
     except Exception as e:  # timeout / connection / HTTP error -> "unavailable" for this row
+        # A slow/dead external Beacon is an expected condition (§9.5): log it and surface an
+        # error row - it is not an admin-worthy incident, so no notification.
         logging.warning("Beacon outbound: node %s failed: %s", node_id, e)
         result["error"] = str(e)
-        nb = AdminNotificationBuilder("Beacon outbound query failed")
-        nb.add_markdown(f"Node `{node_id}`: {e}")
-        nb.send()
     return result
 
 
-def query_all_nodes(params: dict) -> list[dict]:
-    """ Fan out the same coordinate query across all configured nodes concurrently, each
-        bounded by BEACON_QUERY_TIMEOUT, so one slow node never blocks the others (§9.5). """
-    node_ids = list(settings.BEACON_QUERY_NODES.keys())
-    if not node_ids:
+def query_nodes(node_params: dict[str, dict]) -> list[dict]:
+    """ Fan out per-node queries concurrently - each node with its own params, each bounded by
+        BEACON_QUERY_TIMEOUT, so one slow node never blocks the others (§9.5). """
+    if not node_params:
         return []
-    with ThreadPoolExecutor(max_workers=len(node_ids)) as executor:
-        return list(executor.map(lambda nid: query_node(nid, params), node_ids))
+    items = list(node_params.items())
+    with ThreadPoolExecutor(max_workers=len(items)) as executor:
+        return list(executor.map(lambda item: query_node(item[0], item[1]), items))
 
 
 def query_external_beacons_for_variant(variant, genome_build) -> list[dict]:
-    """ Build the public coordinate params for a Variant and fan out to all nodes.
-        Returns [] for symbolic variants (no explicit coordinate to send). """
-    params = variant_to_beacon_query_params(variant, genome_build)
-    if params is None:
-        return []
-    return query_all_nodes(params)
+    """ Gate the variant against each configured node's target and fan out only to the servers
+        whose domain it matches (§9): symbolic CNVs -> copy-number Beacons, SNVs -> sequence
+        Beacons. A variant that matches no configured server queries nothing. """
+    node_params = eligible_queries(variant, genome_build, settings.BEACON_QUERY_NODES)
+    return query_nodes(node_params)
