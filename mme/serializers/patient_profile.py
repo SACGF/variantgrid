@@ -19,10 +19,14 @@ from mme.contact import mme_contact_for_classification
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation
 
 
-def classification_ontology_slots(classification) -> tuple[list[dict], list[dict]]:
+def classification_ontology_slots(classification, include_patient_phenotype: bool = True) -> tuple[list[dict], list[dict]]:
     """ Route condition + linked-patient terms into MME (features_hpo, disorders).
         Each condition term is routed by its ontology service, not assumed to be disease.
-        Derived terms carry a label suffix + `_derivedFrom` id for provenance. """
+        Derived terms carry a label suffix + `_derivedFrom` id for provenance.
+
+        include_patient_phenotype gates the linked-patient HPO block (part 2). MME always
+        includes it (the submission is curator-driven); Beacon passes False unless the
+        linked Patient is itself shared publicly (§5.5 patient extra gate). """
     features: dict[str, dict] = {}   # keyed by HPO id to de-dup
     disorders: list[dict] = []
     disorder_ids: set[str] = set()
@@ -59,7 +63,7 @@ def classification_ontology_slots(classification) -> tuple[list[dict], list[dict
                 add_feature(snake.leaf_term, observed="no", derived_from=term)
 
     # 2. Linked patient phenotype (auto-matched; HPO only, genuinely observed)
-    sample = classification.sample                              # nullable FK
+    sample = classification.sample if include_patient_phenotype else None  # nullable FK
     patient = getattr(sample, "patient", None) if sample else None
     ptp = getattr(patient, "patient_text_phenotype", None) if patient else None
     if ptp and ptp.phenotype_description:

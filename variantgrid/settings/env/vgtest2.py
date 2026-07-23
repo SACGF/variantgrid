@@ -26,6 +26,30 @@ ANNOTATION_VCF_DUMP_DIR = os.path.join(ANNOTATION_BASE_DIR, 'scratch')
 HEALTH_CHECK_ENABLED = False
 HGVS_DEFAULT_METHOD = "biocommons_hgvs"
 
+# Beacon v2 genomic data-sharing endpoint (#1661) - enabled on test.variantgrid.com for
+# manual testing. environment="test" is the spec's own signal that this is a non-production
+# instance. (HEALTH_CHECK_ENABLED=False above, so the nightly Slack line won't post here -
+# inspect BeaconInboundQuery rows via admin when testing.)
+BEACON_ENABLED = True
+BEACON_CONFIG = {
+    **BEACON_CONFIG,
+    "beacon_id": "com.variantgrid.test.beacon",
+    "environment": "test",
+    "organization": {
+        "id": "variantgrid",
+        "name": "VariantGrid (test)",
+        "welcome_url": "https://test.variantgrid.com/",
+        "contact_url": "mailto:admin@variantgrid.com",
+    },
+}
+# Outbound: query external Beacons from the variant page. Point at any confirmed-live beacon
+# (including our own prod beacon) to exercise the variant-page section end to end.
+BEACON_OUTBOUND_ENABLED = True
+BEACON_QUERY_NODES = {
+    "variantgrid": {"base_url": "https://variantgrid.com/beacon", "api_version": "v2.0.0",
+                    "token": get_secret("BEACON.variantgrid_token", mandatory=False)},
+}
+
 
 
 ANNOTATION[BUILD_GRCH37].update({
