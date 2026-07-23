@@ -442,7 +442,7 @@ s3transfer==0.19.0
     # via boto3
 scipy==1.17.1
     # via -r requirements.in
-setuptools==82.0.1
+setuptools==83.0.0
     # via pyvcf3
 simplejson==4.1.1
     # via -r requirements.in
