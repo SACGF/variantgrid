@@ -12,10 +12,10 @@
         {% endfor %}
     {% endif %}
 
-    {% if cohort.trio_set.exists %}
+    {% if trios %}
     <div id='related-trios'>
         <h3>Trios</h3>
-        {% for trio in cohort.trio_set.all %}
+        {% for trio in trios %}
             <div>
                 <a href="{% url 'view_trio' trio.pk %}">{{ trio }}</a> - {% trio_short_description trio %}
             </div>

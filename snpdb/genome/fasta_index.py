@@ -21,6 +21,9 @@ def load_genome_fasta_index(genome_fasta: 'GenomeFasta', genome_build: 'GenomeBu
 
     NAMES = ["NAME", "LENGTH", "OFFSET", "LINEBASES", "LINEWIDTH"]
     df = pd.read_csv(index_filename, sep='\t', header=None, names=NAMES)
+    # Can't import GenomeFastaContig at module level (models_genome imports this module)
+    GenomeFastaContig = genome_fasta.genomefastacontig_set.model
+    genome_fasta_contigs = []
     for _, row in df[["NAME", "LENGTH"]].iterrows():
         name = row["NAME"]
         length = row["LENGTH"]
@@ -31,10 +34,12 @@ def load_genome_fasta_index(genome_fasta: 'GenomeFasta', genome_build: 'GenomeBu
                 msg = f"Fasta contig {name} length = {length} but {genome_build} contig {contig} length={contig.length}"
                 raise ValueError(msg)
 
-            genome_fasta.genomefastacontig_set.create(name=name,
-                                                      length=length,
-                                                      contig=contig)
+            genome_fasta_contigs.append(GenomeFastaContig(genome_fasta=genome_fasta,
+                                                          name=name,
+                                                          length=length,
+                                                          contig=contig))
         else:
             logging.warning("Could not find contig in %s for fasta name '%s'", genome_build, name)
 
+    GenomeFastaContig.objects.bulk_create(genome_fasta_contigs, batch_size=2000)
     return genome_fasta
