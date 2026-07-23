@@ -10,6 +10,11 @@ from beacon.response import GRANULARITIES
 _SCHEMA_BASE = "https://raw.githubusercontent.com/ga4gh-beacon/beacon-v2/main/framework/json/configuration"
 BEACON_MAP_SCHEMA = f"{_SCHEMA_BASE}/beaconMapSchema.json"
 BEACON_CONFIGURATION_SCHEMA = f"{_SCHEMA_BASE}/beaconConfigurationSchema.json"
+# The genomicVariant entry type's default schema. `referenceToSchemaDefinition` is a
+# required, *fetchable* URL: clients (EGA beacon-verifier) load it to validate returned
+# variant records, and error out (HTTP 500) if the field is absent.
+GENOMIC_VARIANT_SCHEMA = ("https://raw.githubusercontent.com/ga4gh-beacon/beacon-v2/main/"
+                          "models/json/beacon-v2-default-model/genomicVariations/defaultSchema.json")
 
 # The two datasets we serve (§5.5), advertised in service-info / entry types.
 OBSERVATIONS_DATASET_ID = "variantgrid_observations"
@@ -99,6 +104,8 @@ def _entry_types() -> dict:
             "defaultSchema": {
                 "id": "ga4gh-beacon-variant-v2.0.0",
                 "name": "Default schema for a genomic variant",
+                "referenceToSchemaDefinition": GENOMIC_VARIANT_SCHEMA,
+                "schemaVersion": "v2.0.0",
             },
         }
     }
