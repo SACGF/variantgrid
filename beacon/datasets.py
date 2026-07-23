@@ -29,7 +29,8 @@ from snpdb.variant_sample_information import VariantZygosityCounts
 class DatasetResult:
     """ One dataset's contribution to a g_variants response.
         `reportable_count` is None when a k-anonymity floor suppresses the exact count -
-        the resultSet then drops to boolean presence (exists only). """
+        the resultSet then exposes count 0 with no records (presence without the small
+        count), rather than the true value. """
     dataset_id: str
     exists: bool = False
     count: int = 0                        # true count (used for audit + aggregation)
@@ -37,11 +38,16 @@ class DatasetResult:
     records: list = field(default_factory=list)  # record-tier detail
 
     def result_set(self) -> dict:
-        rs = {"id": self.dataset_id, "setType": "genomicVariant", "exists": self.exists}
-        if self.reportable_count is not None:
-            rs["resultsCount"] = self.reportable_count
-            rs["results"] = self.records
-        return rs
+        # `resultsCount` and `results` are always present: the Beacon resultSet schema
+        # requires both, and spec clients (e.g. the EGA beacon-verifier) index `results`
+        # unconditionally when exists is true. A floor-suppressed count is exposed as 0.
+        return {
+            "id": self.dataset_id,
+            "setType": "genomicVariant",
+            "exists": self.exists,
+            "resultsCount": self.reportable_count if self.reportable_count is not None else 0,
+            "results": self.records,
+        }
 
 
 def _global_germline_present(variant: Variant) -> Optional[bool]:

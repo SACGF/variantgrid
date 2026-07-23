@@ -118,11 +118,13 @@ class BeaconGVariantsTestCase(TestCase):
 
     @override_settings(BEACON_MIN_REPORTABLE_COUNT=5)
     def test_small_count_suppressed_by_floor(self):
-        # count of 1 is below the floor: observations resultSet drops to boolean presence.
+        # count of 1 is below the floor: presence kept, exact count hidden (exposed as 0,
+        # no records). resultsCount/results keys are always present (spec + verifier need them).
         data = self._query(self.obs_variant, user=self.user, granularity="record").json()
         obs = self._result_set(data, OBSERVATIONS_DATASET_ID)
         self.assertTrue(obs["exists"])
-        self.assertNotIn("resultsCount", obs)
+        self.assertEqual(obs["resultsCount"], 0)
+        self.assertEqual(obs["results"], [])
 
     # ---- granularity ------------------------------------------------------
     def test_boolean_granularity_hides_counts_and_records(self):
