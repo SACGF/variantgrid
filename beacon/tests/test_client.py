@@ -8,7 +8,7 @@ from django.urls import reverse
 
 from beacon.client import query_node, query_external_beacons_for_variant
 from beacon.models import BeaconQueryCache
-from beacon.query_targets import eligible_queries
+from beacon.query_targets import eligible_queries, evaluate_queries
 from beacon.variant_mapping import variant_to_beacon_query_params, parse_beacon_response
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -109,6 +109,18 @@ class ExternalBeaconsViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(b"External Beacons", response.content)
 
+    @override_settings(BEACON_QUERY_NODES={
+        "progenetix": {"base_url": "https://progenetix.org/beacon", "type": "cnv",
+                       "assemblies": ["GRCh38"]}})
+    def test_skipped_node_is_explained(self):
+        # setUp's variant is a GRCh37 SNV, so the GRCh38-only CNV node is skipped, not queried.
+        self.client.force_login(self.user)
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"External Beacons", response.content)
+        self.assertIn(b"progenetix", response.content)
+        self.assertIn(b"GRCh38", response.content)  # explains it's a GRCh38-only Beacon
+
 
 class BeaconQueryGatingTestCase(TestCase):
     """ eligible_queries() routes each variant only to servers whose domain it matches. """
@@ -162,3 +174,17 @@ class BeaconQueryGatingTestCase(TestCase):
         variant = self._variant(is_symbolic=False, chrom="3", position=1000,
                                 ref="A", alt="T", svlen=None)
         self.assertEqual(eligible_queries(variant, self.grch38, {"x": {"type": "mystery"}}), {})
+
+    def test_evaluate_queries_reports_skip_reasons(self):
+        # An SNV against a GRCh38-only CNV node: skipped, and evaluate_queries says why.
+        variant = self._variant(is_symbolic=False, chrom="3", position=1000,
+                                 ref="A", alt="T", svlen=None)
+        nodes = {"cnv": {"type": "cnv", "assemblies": ["GRCh38"]}}
+
+        [wrong_build] = evaluate_queries(variant, self.grch37, nodes)
+        self.assertFalse(wrong_build.eligible)
+        self.assertIn("GRCh38", wrong_build.reason)
+
+        [wrong_domain] = evaluate_queries(variant, self.grch38, nodes)
+        self.assertFalse(wrong_domain.eligible)
+        self.assertIn("copy-number", wrong_domain.reason)
