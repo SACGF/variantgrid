@@ -54,6 +54,27 @@ MME_CONTACT = {
     "institution": "Adelaide University",
 }
 
+# Beacon v2 genomic data-sharing endpoint (#1661) - enabled on variantgrid.com.
+BEACON_ENABLED = True
+BEACON_CONFIG = {
+    **BEACON_CONFIG,                              # inherit defaults, override identity
+    "beacon_id": "com.variantgrid.beacon",
+    "environment": "prod",
+    "organization": {
+        "id": "variantgrid",
+        "name": "VariantGrid",
+        "welcome_url": "https://variantgrid.com/",
+        "contact_url": "mailto:admin@variantgrid.com",
+    },
+}
+# Outbound: query external Beacons from the variant page. Populate BEACON_QUERY_NODES with
+# whichever aggregator/beacons we confirm are live and reachable before turning this on.
+BEACON_OUTBOUND_ENABLED = False
+BEACON_QUERY_NODES = {
+    # "some_beacon": {"base_url": "https://<confirmed-live-host>", "api_version": "v2.0.0",
+    #                 "token": get_secret("BEACON.some_beacon_token", mandatory=False)},
+}
+
 
 # Needed in production (when debug=False)
 ALLOWED_HOSTS = ['variantgrid.com', 'www.variantgrid.com', WEB_HOSTNAME, WEB_IP]

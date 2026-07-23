@@ -61,3 +61,9 @@ def mme_contact_for_classification(classification) -> dict:
         An Organization tier can be inserted here later without touching call sites. """
     lab = getattr(classification, "lab", None)
     return lab_mme_contact(lab) or settings_mme_contact()
+
+
+# Generic name for the shared resolver: the owning-lab {name, href, institution} of a
+# shared classification record. Beacon's record-tier attribution (§5.5) uses this same
+# chain so every record is attributed to the lab that produced it.
+lab_contact = mme_contact_for_classification

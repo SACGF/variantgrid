@@ -1,0 +1,44 @@
+{% load ui_utils %}
+<div class="external-beacons">
+    <h4>External Beacons</h4>
+    {% if rows %}
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Beacon</th>
+                    <th>Present</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>
+                            {% if row.base_url %}
+                                <a href="{{ row.base_url }}" target="_blank" rel="noopener">{{ row.node_id }}</a>
+                            {% else %}
+                                {{ row.node_id }}
+                            {% endif %}
+                        </td>
+                        {% if row.cache.error %}
+                            <td colspan="2" class="text-muted">unavailable</td>
+                        {% elif row.cache %}
+                            <td>
+                                {% if row.cache.exists %}
+                                    <span class="badge badge-success">Yes</span>
+                                {% else %}
+                                    <span class="badge badge-secondary">No</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ row.cache.count|default_if_none:"" }}</td>
+                        {% else %}
+                            <td colspan="2" class="text-muted">unavailable</td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="text-muted">No external Beacons configured.</p>
+    {% endif %}
+</div>

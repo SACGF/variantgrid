@@ -1189,6 +1189,16 @@ function applyVariantValues() {
 </div>
 {% endif %}
 
+{% settings_value 'BEACON_OUTBOUND_ENABLED' as beacon_outbound_enabled %}
+{% if beacon_outbound_enabled %}
+<div id="external_beacons" class="container-table"></div>
+<script>
+    $(function() {
+        $("#external_beacons").load("{% url 'external_beacons' variant.id genome_build.pk %}");
+    });
+</script>
+{% endif %}
+
 {% if variant.can_have_annotation and show_annotation %}
     <div class="container mt-4">
         <div class="row">

@@ -32,6 +32,7 @@ APPS_WITH_URLS = [
     "manual",
     "review",
     "mme",
+    "beacon",
 ]
 
 urlpatterns = [

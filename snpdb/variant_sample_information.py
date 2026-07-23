@@ -15,7 +15,13 @@ from patients.models_enums import Zygosity
 from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild, CohortGenotype
 
 
-class VariantSampleInformation:
+class VariantZygosityCounts:
+    """ Permission-scoped per-variant sample/zygosity lookup - the reusable core extracted
+        from VariantSampleInformation (no pandas/template concerns). Shared by the
+        Variantopedia sample-information view (presentation subclass below) and the Beacon
+        g_variants endpoint (§5.2 stage 2). Gates by Sample.filter_for_user (anonymous ->
+        public group), so presence/counts are only ever asserted from samples the requester
+        may read. """
 
     def __init__(self, user, variant, genome_build: GenomeBuild):
         locus_qs = Locus.objects.filter(pk=variant.locus.pk)
@@ -28,56 +34,55 @@ class VariantSampleInformation:
         visible_samples_qs = Sample.filter_for_user(user).filter(vcf__genome_build=self.genome_build)
         self.user_sample_ids = set(visible_samples_qs.values_list("pk", flat=True))
         self.num_user_samples = len(self.user_sample_ids)
-        visible_zygosity_counts = Counter()
 
-        locus_counter = defaultdict(Counter)
-        locus_patients = defaultdict(set)
-        num_observations = 0
+        self.visible_zygosity_counter = Counter()  # raw {zygosity: count} for visible samples
+        self.locus_counter = defaultdict(Counter)
+        self.locus_patients = defaultdict(set)
+        self.num_observations = 0
         self.visible_rows = []
         for row in values_qs:
             pk = row["variant"]
             zygosity = row.get("zygosity", Zygosity.UNKNOWN_ZYGOSITY)
-            locus_counter[pk][zygosity] += 1
+            self.locus_counter[pk][zygosity] += 1
             if patient := row.get("sample__patient"):
-                locus_patients[pk].add(patient)
+                self.locus_patients[pk].add(patient)
 
             if variant.pk == pk:
                 if sample_id := row.get("sample"):
-                    num_observations += 1
+                    self.num_observations += 1
 
                     if sample_id in self.user_sample_ids:
                         self.visible_rows.append(row)
-                        visible_zygosity_counts[zygosity] += 1
-
-        # Make this easy to build a filter from
-        default_visible = {Zygosity.HET, Zygosity.HOM_ALT}
-        has_defaults = any(visible_zygosity_counts[gt] for gt in default_visible)
-        self.visible_zygosity_counts = {}
-        for gt, label in Zygosity.CHOICES:
-            checked = gt in default_visible or not has_defaults
-            self.visible_zygosity_counts[gt] = (label, checked, visible_zygosity_counts[gt])
-
-        has_hidden_samples = self.num_samples > self.num_user_samples
-        self.hidden_samples_details = {}
-        if has_hidden_samples:
-            num_visible_observations = len(self.visible_rows)
-            num_invisible_observations = num_observations - num_visible_observations
-            self.hidden_samples_details = {"num_observations": num_observations,
-                                           "num_visible_observations": num_visible_observations,
-                                           "num_invisible_observations": num_invisible_observations}
-
-        self.has_observations = num_observations > 0
-        self.locus_counts_df = self._get_locus_counts(variant.pk, locus_counter)
-        self.patient_ids = locus_patients[variant.pk]
+                        self.visible_zygosity_counter[zygosity] += 1
 
     @property
-    def has_phenotype_match_graphs(self):
-        patients_qs = Patient.objects.filter(pk__in=self.patient_ids)
-        return patients_qs.filter(**{PATIENT_TPM_PATH + "__isnull": False}).exists()
+    def num_visible_observations(self) -> int:
+        return len(self.visible_rows)
 
-    @cached_property
-    def has_unknown_zygosity(self):
-        return 'Unknown' in self.locus_counts_df.columns
+    @property
+    def num_invisible_observations(self) -> int:
+        return self.num_observations - self.num_visible_observations
+
+    @property
+    def num_visible_het(self) -> int:
+        return self.visible_zygosity_counter[Zygosity.HET]
+
+    @property
+    def num_visible_hom_alt(self) -> int:
+        return self.visible_zygosity_counter[Zygosity.HOM_ALT]
+
+    @property
+    def num_visible_alt(self) -> int:
+        """ Visible het + hom_alt observations - the presence/count a Beacon reports. """
+        return self.num_visible_het + self.num_visible_hom_alt
+
+    @property
+    def has_visible_observations(self) -> bool:
+        return self.num_visible_alt > 0
+
+    @property
+    def has_observations(self) -> bool:
+        return self.num_observations > 0
 
     @staticmethod
     def _get_sample_values_for_variant_via_cohort_genotype(locus_qs):
@@ -181,6 +186,42 @@ class VariantSampleInformation:
                         k = "sample__" + k
                     sample_genotype_values[k] = v
                 yield sample_genotype_values
+
+
+class VariantSampleInformation(VariantZygosityCounts):
+    """ Presentation layer over VariantZygosityCounts: builds the pandas locus-counts
+        table, checkbox-formatted per-zygosity counts and hidden-sample summary the
+        Variantopedia variant_sample_information template renders. """
+
+    def __init__(self, user, variant, genome_build: GenomeBuild):
+        super().__init__(user, variant, genome_build)
+
+        # Make this easy to build a filter from
+        default_visible = {Zygosity.HET, Zygosity.HOM_ALT}
+        has_defaults = any(self.visible_zygosity_counter[gt] for gt in default_visible)
+        self.visible_zygosity_counts = {}
+        for gt, label in Zygosity.CHOICES:
+            checked = gt in default_visible or not has_defaults
+            self.visible_zygosity_counts[gt] = (label, checked, self.visible_zygosity_counter[gt])
+
+        has_hidden_samples = self.num_samples > self.num_user_samples
+        self.hidden_samples_details = {}
+        if has_hidden_samples:
+            self.hidden_samples_details = {"num_observations": self.num_observations,
+                                           "num_visible_observations": self.num_visible_observations,
+                                           "num_invisible_observations": self.num_invisible_observations}
+
+        self.locus_counts_df = self._get_locus_counts(variant.pk, self.locus_counter)
+        self.patient_ids = self.locus_patients[variant.pk]
+
+    @property
+    def has_phenotype_match_graphs(self):
+        patients_qs = Patient.objects.filter(pk__in=self.patient_ids)
+        return patients_qs.filter(**{PATIENT_TPM_PATH + "__isnull": False}).exists()
+
+    @cached_property
+    def has_unknown_zygosity(self):
+        return 'Unknown' in self.locus_counts_df.columns
 
     @staticmethod
     def _get_locus_counts(this_variant_id, locus_counter):

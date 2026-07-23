@@ -270,6 +270,47 @@ MME_DISCLAIMER = (
     "on a match."
 )
 
+# --- Beacon v2 ------------------------------------------------------------
+# GA4GH Beacon v2 genomic data-sharing endpoint (#1661). Variant-centric discovery:
+# "does this database contain an allele at chrom:pos ref>alt on assembly?", tiered
+# (boolean -> count -> record) by requester permission. See claude/beacon_v2_plan.md.
+# Off everywhere by default; only vgaws.py (prod) and vgtest2.py (test) turn it on.
+BEACON_ENABLED = False
+BEACON_CONFIG = {
+    # Static metadata served by the framework endpoints (/info, /service-info, /map).
+    # Placeholders - a deployment that enables Beacon overrides these in its env file.
+    "beacon_id": "org.variantgrid.beacon",       # reverse-DNS id; override per deployment
+    "name": "VariantGrid Beacon",
+    "api_version": "v2.0.0",
+    "environment": "prod",                        # prod | test | dev | staging
+    "organization": {
+        "id": "",
+        "name": "",
+        "welcome_url": "",
+        "contact_url": "",                        # e.g. "mailto:..."
+    },
+    "default_granularity": "boolean",             # tier for anonymous requests
+    "max_granularity": "record",                  # ceiling; per-request clamped by auth
+}
+
+# Small-count anonymity floor for the observations dataset: exact counts below this are
+# suppressed (the resultSet drops to boolean presence) to limit membership-inference
+# risk. Behind a setting so a later security pass can tune it. The classification
+# dataset is exempt (each record is already a deliberate public share).
+BEACON_MIN_REPORTABLE_COUNT = 5
+
+# Outbound: query external Beacons from the variant page. Off by default; vgaws.py turns
+# it on, and can turn it back off if remote Beacons are slow/unreliable.
+BEACON_OUTBOUND_ENABLED = False
+BEACON_QUERY_TIMEOUT = 5          # per-node seconds; keep small - remote Beacons vary wildly
+BEACON_QUERY_CACHE_DAYS = 7       # cache each (variant, node) result; live-refresh on expiry
+# Remote nodes we can query: public base_url + api_version as plain config; token (if a
+# node requires one for count/record) is the only secret, via get_secret(mandatory=False).
+BEACON_QUERY_NODES = {
+    # "some_beacon": {"base_url": "https://<confirmed-live-host>", "api_version": "v2.0.0",
+    #                 "token": get_secret("BEACON.some_beacon_token", mandatory=False)},
+}
+
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_
 
 VCF_DOWNLOAD_ADMIN_ONLY = False
@@ -780,6 +821,7 @@ INSTALLED_APPS = [
     'variantopedia',
     'review',
     'mme.apps.MMEConfig',
+    'beacon.apps.BeaconConfig',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
 ]
@@ -889,6 +931,7 @@ PUBLIC_PATHS = [
     r'^/seqauto/api/.*',
     r'^/upload/api/.*',
     r'^/mme/api/.*',  # Inbound MME /match endpoint - authenticated by shared X-Auth-Token (see mme/views_rest.py)
+    r'^/beacon/.*',  # Beacon v2 answers anonymous requests (public tier); views still enforce per-tier permission
 ]
 
 # Both need to be set to enable - and use get_secret in server settings files to keep out of source control
