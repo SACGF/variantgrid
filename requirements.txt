@@ -330,8 +330,9 @@ ped-parser==1.6.6
     # via -r requirements.in
 pexpect==4.9.0
     # via ipython
-pillow==12.2.0
+pillow==12.3.0
     # via
+    #   -r requirements.in
     #   django-avatar
     #   easy-thumbnails
     #   matplotlib
@@ -479,8 +480,10 @@ typing-extensions==4.15.0
     # via
     #   beautifulsoup4
     #   biocommons-seqrepo
+    #   django-guardian
     #   pydantic
     #   pydantic-core
+    #   referencing
     #   typing-inspection
 typing-inspection==0.4.2
     # via pydantic

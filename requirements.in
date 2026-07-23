@@ -63,6 +63,7 @@ numpy
 oauthlib
 pandas
 ped_parser
+pillow>=12.3.0
 pronto>=2.4.7
 psycopg2
 pyBigWig>=0.3.22
