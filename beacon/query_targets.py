@@ -7,11 +7,11 @@ settings.BEACON_QUERY_NODES selects its target via `type` (and may restrict `ass
 `eligible_queries()` loops the configured nodes and returns params only for the servers whose
 gate the variant passes, so a variant page shows only the Beacons that apply to that variant.
 """
-import re
 from abc import ABC, abstractmethod
 from typing import Optional
 
 from beacon.variant_mapping import variant_to_beacon_query_params
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import Variant, GenomeBuild
 
 
@@ -46,14 +46,12 @@ class CnvBeaconTarget(BeaconQueryTarget):
 
     # VG symbolic alt -> GA4GH/EFO copy-number class (validated live against progenetix).
     VARIANT_TYPE_EFO = {
-        "DEL": "EFO:0030067",  # copy number loss
-        "DUP": "EFO:0030070",  # copy number gain
+        VCFSymbolicAllele.DEL: "EFO:0030067",  # copy number loss
+        VCFSymbolicAllele.DUP: "EFO:0030070",  # copy number gain
     }
-    _SYMBOLIC_ALT = re.compile(r"<(DEL|DUP)>", re.IGNORECASE)
 
     def _efo(self, vc) -> Optional[str]:
-        match = self._SYMBOLIC_ALT.search(vc.alt or "")
-        return self.VARIANT_TYPE_EFO.get(match.group(1).upper()) if match else None
+        return self.VARIANT_TYPE_EFO.get(vc.alt)
 
     def accepts(self, variant, genome_build) -> bool:
         vc = variant.coordinate
