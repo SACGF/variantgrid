@@ -105,16 +105,20 @@ def _extract_params(request) -> tuple[dict, str, dict]:
     return params, requested, raw
 
 
-def _received_request_summary(params: dict, requested_granularity: str, extra: dict = None) -> dict:
+def _received_request_summary(requested_granularity: str, extra: dict = None) -> dict:
     """ Spec-complete beaconReceivedRequestSummary: apiVersion, requestedSchemas,
-        pagination and requestedGranularity are all required. """
+        pagination and requestedGranularity are all required.
+
+        `requestParameters` is deliberately omitted: the framework schema constrains its
+        values to objects (additionalProperties: {type: object}), so echoing flat g_variants
+        coordinates (referenceName/start/... as scalars) would fail validation. It is an
+        optional field; the exact request is still captured in the BeaconInboundQuery audit row. """
     config = settings.BEACON_CONFIG
     summary = {
         "apiVersion": config["api_version"],
         "requestedSchemas": [],
         "pagination": {"skip": 0, "limit": 0},
         "requestedGranularity": requested_granularity or config.get("default_granularity", "boolean"),
-        "requestParameters": {k: params.get(k) for k in _PARAM_KEYS},
     }
     if extra:
         summary.update(extra)
@@ -147,7 +151,7 @@ class BeaconGVariantsView(APIView):
             # result envelope (200) so spec clients / the beacon-verifier get a conformant
             # response. A partial coordinate is genuinely malformed => 400.
             if len(missing) == len(_PARAM_KEYS):
-                return Response(self._empty_response(params, requested_granularity, authenticated))
+                return Response(self._empty_response(requested_granularity, authenticated))
             raise ParseError(f"Missing required Beacon g_variants parameters: {', '.join(missing)}")
 
         try:
@@ -175,7 +179,7 @@ class BeaconGVariantsView(APIView):
 
         response = query_response(
             granularity,
-            _received_request_summary(params, requested_granularity),
+            _received_request_summary(requested_granularity),
             exists=exists,
             num_total_results=num_total_results,
             result_sets=result_sets,
@@ -185,12 +189,12 @@ class BeaconGVariantsView(APIView):
         return Response(response)
 
     @staticmethod
-    def _empty_response(params, requested_granularity, authenticated):
+    def _empty_response(requested_granularity, authenticated):
         """ Valid, empty g_variants envelope for a bare (no-coordinate) query. """
         granularity = clamp_granularity(requested_granularity, authenticated)
         return query_response(
             granularity,
-            _received_request_summary(params, requested_granularity),
+            _received_request_summary(requested_granularity),
             exists=False, num_total_results=0, result_sets=[])
 
     @staticmethod
@@ -234,7 +238,7 @@ class BeaconGVariantByIdView(APIView):
 
         exists = obs.exists or cls.exists
         num_total_results = (obs.reportable_count or 0) + (cls.reportable_count or 0)
-        summary = _received_request_summary({}, RECORD, extra={"variantInternalId": str(variant_id)})
+        summary = _received_request_summary(RECORD, extra={"variantInternalId": str(variant_id)})
         return Response(query_response(
             granularity, summary, exists=exists, num_total_results=num_total_results,
             result_sets=[obs.result_set(), cls.result_set()]))
