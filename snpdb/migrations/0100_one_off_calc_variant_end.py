@@ -2,13 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
-
-def _variants_missing_end(apps):
-    Variant = apps.get_model("snpdb", "Variant")
-    return Variant.objects.filter(end__isnull=True).exists()
-
 
 class Migration(migrations.Migration):
 
@@ -16,7 +9,6 @@ class Migration(migrations.Migration):
         ('snpdb', '0099_alter_variant_unique_together_cohortgenotype_format_and_more'),
     ]
 
-    operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["one_off_calc_variant_end"]),
-                        test=_variants_missing_end),
-    ]
+    # Variant.end is populated by 'one_off_fix_variant_end' (surfaced in 0118/0141, once svlen
+    # exists) and enforced NOT NULL in 0198_alter_variant_end_not_null after it has been calculated.
+    operations = []
