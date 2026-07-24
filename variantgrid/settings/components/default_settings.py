@@ -752,6 +752,20 @@ SPECTACULAR_SETTINGS = {
     'SWAGGER_UI_DIST': 'SIDECAR',
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
     'REDOC_DIST': 'SIDECAR',
+    # Tag groups. The Beacon v2 endpoints implement the GA4GH spec - link out to the
+    # authoritative spec rather than restating it in per-operation descriptions.
+    'TAGS': [
+        {
+            'name': 'Beacon v2',
+            'description': 'GA4GH Beacon v2 genomic data-sharing endpoints. These implement the '
+                           'external [GA4GH Beacon v2 specification](https://docs.genomebeacons.org/); '
+                           'request/response shapes and the meta envelope are defined there.',
+            'externalDocs': {
+                'description': 'GA4GH Beacon v2 documentation & specification',
+                'url': 'https://docs.genomebeacons.org/',
+            },
+        },
+    ],
     # Several predictors share the same Tolerated/Damaging choice set - use one canonical enum name
     'ENUM_NAME_OVERRIDES': {
         'ToleratedDamagingPredictionEnum': 'annotation.models.damage_enums.ToleratedDamagingPrediction.CHOICES',

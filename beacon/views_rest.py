@@ -8,7 +8,8 @@ import logging
 
 from django.conf import settings
 from django.urls import reverse
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -24,6 +25,9 @@ from beacon.variant_mapping import (
 )
 from snpdb.models import Variant
 
+# Groups every inbound Beacon v2 endpoint under one heading in the Swagger UI.
+BEACON_TAGS = ["Beacon v2"]
+
 
 def _require_enabled():
     if not settings.BEACON_ENABLED:
@@ -37,32 +41,58 @@ class _BeaconFrameworkView(APIView):
     def _payload(self, request) -> dict:
         raise NotImplementedError()
 
-    @extend_schema(exclude=True)
     def get(self, request, *args, **kwargs):
         _require_enabled()
         return Response(info_response(self._payload(request)))
 
 
+@extend_schema_view(get=extend_schema(
+    tags=BEACON_TAGS,
+    summary="Beacon information (identity & organisation)",
+    description="GA4GH Beacon v2 identity/metadata. Anonymous-readable.",
+    responses=OpenApiTypes.OBJECT,
+))
 class BeaconInfoView(_BeaconFrameworkView):
     def _payload(self, request):
         return schema.beacon_info()
 
 
+@extend_schema_view(get=extend_schema(
+    tags=BEACON_TAGS,
+    summary="Beacon configuration",
+    description="Beacon v2 configuration: entry types, security attributes and maturity.",
+    responses=OpenApiTypes.OBJECT,
+))
 class BeaconConfigurationView(_BeaconFrameworkView):
     def _payload(self, request):
         return schema.configuration()
 
 
+@extend_schema_view(get=extend_schema(
+    tags=BEACON_TAGS,
+    summary="Beacon entry types (data model schemas)",
+    responses=OpenApiTypes.OBJECT,
+))
 class BeaconEntryTypesView(_BeaconFrameworkView):
     def _payload(self, request):
         return schema.entry_types()
 
 
+@extend_schema_view(get=extend_schema(
+    tags=BEACON_TAGS,
+    summary="Beacon filtering terms",
+    responses=OpenApiTypes.OBJECT,
+))
 class BeaconFilteringTermsView(_BeaconFrameworkView):
     def _payload(self, request):
         return schema.filtering_terms()
 
 
+@extend_schema_view(get=extend_schema(
+    tags=BEACON_TAGS,
+    summary="Beacon endpoint map (endpoint discovery)",
+    responses=OpenApiTypes.OBJECT,
+))
 class BeaconMapView(_BeaconFrameworkView):
     def _payload(self, request):
         g_variants_url = request.build_absolute_uri(reverse("beacon_g_variants"))
@@ -73,7 +103,12 @@ class BeaconServiceInfoView(APIView):
     """ GA4GH service-info profile - returned raw (not wrapped in the Beacon meta). """
     permission_classes = []
 
-    @extend_schema(exclude=True)
+    @extend_schema(
+        tags=BEACON_TAGS,
+        summary="GA4GH service-info",
+        description="GA4GH service-info profile, returned raw (not wrapped in the Beacon meta envelope).",
+        responses=OpenApiTypes.OBJECT,
+    )
     def get(self, request, *args, **kwargs):
         _require_enabled()
         return Response(schema.service_info())
@@ -131,11 +166,40 @@ class BeaconGVariantsView(APIView):
         requester's permission. GET (flat params) and POST (Beacon request envelope). """
     permission_classes = []
 
-    @extend_schema(exclude=True)
+    @extend_schema(
+        tags=BEACON_TAGS,
+        summary="Query genomic variants (Beacon v2 g_variants)",
+        description="Exact-coordinate lookup over observations + public classifications. "
+                    "Anonymous requests are allowed; the response granularity (boolean/count/record) "
+                    "is clamped to the requester's permission tier.",
+        parameters=[
+            OpenApiParameter("referenceName", OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description="Chromosome / reference sequence, eg '17'"),
+            OpenApiParameter("start", OpenApiTypes.INT, OpenApiParameter.QUERY,
+                             description="0-based start position"),
+            OpenApiParameter("referenceBases", OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description="Reference allele bases"),
+            OpenApiParameter("alternateBases", OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description="Alternate allele bases"),
+            OpenApiParameter("assemblyId", OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description="Genome assembly, eg 'GRCh38'"),
+            OpenApiParameter("requestedGranularity", OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description="Requested response detail: 'boolean', 'count' or 'record'"),
+        ],
+        responses=OpenApiTypes.OBJECT,
+    )
     def get(self, request, *args, **kwargs):
         return self._handle(request)
 
-    @extend_schema(exclude=True)
+    @extend_schema(
+        tags=BEACON_TAGS,
+        summary="Query genomic variants (Beacon v2 request envelope)",
+        description="POST form of the g_variants query. The body is a Beacon request envelope "
+                    "carrying the coordinate fields under query.requestParameters (flat top-level "
+                    "params are also tolerated).",
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+    )
     def post(self, request, *args, **kwargs):
         return self._handle(request)
 
@@ -221,7 +285,17 @@ class BeaconGVariantByIdView(APIView):
         Runs the same two-dataset lookup as the query, clamped by the requester's tier. """
     permission_classes = []
 
-    @extend_schema(exclude=True)
+    @extend_schema(
+        tags=BEACON_TAGS,
+        summary="Retrieve a single genomic variant by internal id",
+        description="Single-variant detail by variantInternalId (the VariantGrid Variant pk). "
+                    "Runs the same two-dataset lookup as the query, clamped to the requester's tier.",
+        parameters=[
+            OpenApiParameter("variant_id", OpenApiTypes.INT, OpenApiParameter.PATH,
+                             description="variantInternalId (VariantGrid Variant pk)"),
+        ],
+        responses=OpenApiTypes.OBJECT,
+    )
     def get(self, request, variant_id, *args, **kwargs):
         _require_enabled()
         variant = Variant.objects.filter(pk=variant_id).first()
