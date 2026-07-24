@@ -22,6 +22,8 @@
                         </td>
                         {% if row.cache.error %}
                             <td colspan="2" class="text-muted">unavailable</td>
+                        {% elif row.cache.exists is None and row.cache %}
+                            <td colspan="2" class="text-muted" title="This Beacon responded but did not report presence for this variant">no answer</td>
                         {% elif row.cache %}
                             <td>
                                 {% if row.cache.exists %}
