@@ -146,6 +146,30 @@
 
     {% else %}
        <div class="card mt-4">
+            <div class="card-header">24 July 2026</div>
+            <div class="card-body">
+                <h4>Data Sharing</h4>
+                <ul>
+                    <li>#1661 - Beacon v2 - expose variants via a GA4GH Beacon v2 endpoint (inbound queries from other beacons, plus outbound federated queries to external beacons - gated per analysis node, with CNV / somatic support)</li>
+                    <li>#1662 - MatchMaker Exchange (MME) - integration for rare-disease patient matching; enable 'public' share level for outward sharing</li>
+                </ul>
+                <h4>Annotation</h4>
+                <ul>
+                    <li>#1652 - New VEP 116 plugins shown on variant details page (incl. Promoter AI, handle multiple values)</li>
+                    <li>#1656, #1657, #1658, #1660, #1654 - Annotation pipeline improvements</li>
+                </ul>
+                <h4>Variant Details</h4>
+                <ul>
+                    <li>#1663 - Variants page (all variants) - Loads faster. Requires at least one filter, sort by locus position</li>
+                </ul>
+                <h4>Data / Upload</h4>
+                <ul>
+                    <li>#1640 - Upload / Download API (with fixes for post-upload polling and file-download race conditions)</li>
+                </ul>
+            </div>
+       </div>
+
+       <div class="card mt-4">
             <div class="card-header">11 July 2026</div>
             <div class="card-body">
                 <h4>Analysis</h4>
