@@ -54,8 +54,9 @@ class BeaconClient:
 
 def query_node(node_id: str, params: dict) -> dict:
     """ Query one node, returning {"node_id", "exists", "count", "error"}.
-        A slow/dead node yields an error row, never raises to the caller. """
-    result = {"node_id": node_id, "exists": False, "count": None, "error": None}
+        A slow/dead node yields an error row, never raises to the caller. `exists` stays None
+        unless the node actually answered presence/absence. """
+    result = {"node_id": node_id, "exists": None, "count": None, "error": None}
     try:
         data = BeaconClient(node_id).query_g_variants(params, timeout=settings.BEACON_QUERY_TIMEOUT)
         exists, count = parse_beacon_response(data)

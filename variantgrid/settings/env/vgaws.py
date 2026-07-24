@@ -67,13 +67,6 @@ BEACON_CONFIG = {
         "contact_url": "mailto:admin@variantgrid.com",
     },
 }
-# Outbound: query external Beacons from the variant page. Populate BEACON_QUERY_NODES with
-# whichever aggregator/beacons we confirm are live and reachable before turning this on.
-BEACON_OUTBOUND_ENABLED = False
-BEACON_QUERY_NODES = {
-    # "progenetix": {"base_url": "https://progenetix.org/beacon", "api_version": "v2.0.0",
-    #                "type": "cnv", "assemblies": ["GRCh38"]},   # copy-number (somatic CNV)
-}
 
 
 # Needed in production (when debug=False)

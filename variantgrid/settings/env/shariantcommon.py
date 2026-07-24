@@ -252,6 +252,9 @@ VARIANT_MANUAL_CREATE_BY_NON_ADMIN = False
 # Don't show annotation or samples on variant page - don't want to be responsible for it
 VARIANT_DETAILS_SHOW_ANNOTATION = False
 VARIANT_DETAILS_SHOW_SAMPLES = False
+# Keep variant coordinates inside Shariant - viewing a variant page must not egress a query
+# to external Beacons (the panel is otherwise on by default).
+BEACON_OUTBOUND_ENABLED = False
 VARIANT_VCF_DB_PREFIX = "stv"
 VARIANT_SYMBOLIC_ALT_ENABLED = True
 

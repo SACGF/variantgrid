@@ -85,11 +85,17 @@ def variant_to_beacon_query_params(variant: Variant, genome_build: GenomeBuild) 
     }
 
 
-def parse_beacon_response(data: dict) -> tuple[bool, Optional[int]]:
+def parse_beacon_response(data: dict) -> tuple[Optional[bool], Optional[int]]:
     """ Parse a remote Beacon g_variants response into (exists, count).
+        `exists` is None when the node did not answer: Beacon v2 uses `exists: null` for
+        "cannot answer", and some live servers omit responseSummary entirely. That is not
+        the same as absence, so it must not collapse to False - a node that declines would
+        otherwise render as a confident "not found".
         `count` is None when the node reports presence but no numeric count. """
-    summary = (data or {}).get("responseSummary", {})
-    exists = bool(summary.get("exists", False))
+    summary = (data or {}).get("responseSummary") or {}
+    exists = summary.get("exists")
+    if exists is not None:
+        exists = bool(exists)
     count = summary.get("numTotalResults")
     if count is not None:
         try:

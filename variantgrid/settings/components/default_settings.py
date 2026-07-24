@@ -299,18 +299,31 @@ BEACON_CONFIG = {
 # dataset is exempt (each record is already a deliberate public share).
 BEACON_MIN_REPORTABLE_COUNT = 5
 
-# Outbound: query external Beacons from the variant page. Off by default; vgaws.py turns
-# it on, and can turn it back off if remote Beacons are slow/unreliable.
-BEACON_OUTBOUND_ENABLED = False
+# Outbound: query external Beacons from the variant page. On by default - each node is gated
+# (see beacon/query_targets.py) so a variant only fans out to the servers whose domain it
+# matches, and a slow or dead node degrades to an error row rather than blocking the page.
+# A deployment can set this False to drop the panel entirely.
+BEACON_OUTBOUND_ENABLED = True
 BEACON_QUERY_TIMEOUT = 5          # per-node seconds; keep small - remote Beacons vary wildly
 BEACON_QUERY_CACHE_DAYS = 7       # cache each (variant, node) result; live-refresh on expiry
 # Remote nodes we can query. Each entry: public base_url + api_version, a `type` selecting the
 # query target/gate (see beacon/query_targets.py - "cnv" for copy-number Beacons, "snv" for
 # sequence Beacons), an optional `assemblies` allow-list, and an optional `token` (the only
 # secret, via get_secret(mandatory=False)) for nodes whose count/record tier requires one.
+# Only openly-queryable v2 servers that answer an exact coordinate query belong here: most
+# public Beacons are unreachable or auth-gated, and a node that cannot answer is worse than
+# no node at all - it renders as a negative.
 BEACON_QUERY_NODES = {
-    # "progenetix": {"base_url": "https://progenetix.org/beacon", "api_version": "v2.0.0",
-    #                "type": "cnv", "assemblies": ["GRCh38"]},
+    # Germline sequence variants: gnomAD v4.1 (GRCh38), gnomAD v2.1.1 exomes + GCAT (GRCh37).
+    "ega_af": {"base_url": "https://af-ega-beacon-demo.ega-archive.org/api", "api_version": "v2.2.0",
+               "type": "snv", "assemblies": ["GRCh37", "GRCh38"]},
+    # Somatic copy-number (bycon/progenetix family) - symbolic <DEL>/<DUP>, GRCh38 only.
+    "progenetix": {"base_url": "https://progenetix.org/beacon", "api_version": "v2.0.0",
+                   "type": "cnv", "assemblies": ["GRCh38"]},
+    "cancercelllines": {"base_url": "https://cancercelllines.org/beacon", "api_version": "v2.0.0",
+                        "type": "cnv", "assemblies": ["GRCh38"]},
+    "refcnv": {"base_url": "https://refcnv.org/beacon", "api_version": "v2.0.0",
+               "type": "cnv", "assemblies": ["GRCh38"]},
 }
 
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_

@@ -45,6 +45,19 @@ class BeaconClientTestCase(TestCase):
         self.assertTrue(exists)
         self.assertEqual(count, 4)
 
+    def test_parse_response_distinguishes_absent_from_unanswered(self):
+        """ `exists: null` / a missing summary means "cannot answer", not "absent" - collapsing
+            either to False would render a definitive "not found" the node never claimed. """
+        exists, _ = parse_beacon_response({"responseSummary": {"exists": False, "numTotalResults": 0}})
+        self.assertIs(exists, False)
+
+        for unanswered in ({"responseSummary": {"exists": None, "numTotalResults": 0}},
+                           {"responseSummary": None},
+                           {"responseSummary": {}},
+                           {}):
+            exists, _ = parse_beacon_response(unanswered)
+            self.assertIsNone(exists, f"expected None for {unanswered}")
+
     def test_query_node_success(self):
         payload = {"responseSummary": {"exists": True, "numTotalResults": 2}}
         with patch("beacon.client.requests.get", return_value=_mock_response(payload)) as mock_get:
@@ -61,7 +74,7 @@ class BeaconClientTestCase(TestCase):
         response.raise_for_status.side_effect = requests.Timeout("timed out")
         with patch("beacon.client.requests.get", return_value=response):
             result = query_node("nodeA", {"referenceName": "3"})
-        self.assertFalse(result["exists"])
+        self.assertIsNone(result["exists"])  # errored -> unknown, never a negative
         self.assertIn("timed out", result["error"])
 
     def test_fanout_one_node_down_still_returns_others(self):
