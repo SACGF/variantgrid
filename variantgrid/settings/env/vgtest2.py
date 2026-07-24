@@ -39,7 +39,7 @@ BEACON_CONFIG = {
         "id": "variantgrid",
         "name": "VariantGrid (test)",
         "welcome_url": "https://test.variantgrid.com/",
-        "contact_url": "mailto:admin@variantgrid.com",
+        "contact_url": "mailto:david.lawrence@sa.gov.au",
     },
 }
 

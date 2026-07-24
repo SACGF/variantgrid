@@ -78,7 +78,7 @@ ANNOTATION_MIN_PATHOGENIC_RANKSCORE = 0.85
 
 # dbNSFP rankscores are legacy (replaced by raw scores at columns_version >= 4). New deployments hide
 # them so nobody filters/views by them going forward. Deployments that previously used rankscores set
-# this True (see env/vgaws.py, env/vgtest.py). A value that was already set is always shown/applied
+# this True (see env/vgaws.py, env/vgtest2.py). A value that was already set is always shown/applied
 # regardless of this flag.
 ANNOTATION_SHOW_LEGACY_RANKSCORES = False
 

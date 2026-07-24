@@ -39,7 +39,7 @@ ANNOTATION_VCF_DUMP_DIR = os.path.join(_BIG_DISK_BASE_DIR, 'annotation_scratch')
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 DEFAULT_FROM_EMAIL = 'noreply@variantgrid.com'
 SEND_EMAILS = True
-ADMIN_EMAIL_NOTIFICATION = "admin@variantgrid.com"
+ADMIN_EMAIL_NOTIFICATION = "david.lawrence@sa.gov.au"
 CONTACT_US_ENABLED = True
 
 # variantgrid.com static overrides (e.g. vc_settings.js enables the 'public' / "3rd Party
@@ -64,7 +64,7 @@ BEACON_CONFIG = {
         "id": "variantgrid",
         "name": "VariantGrid",
         "welcome_url": "https://variantgrid.com/",
-        "contact_url": "mailto:admin@variantgrid.com",
+        "contact_url": "mailto:david.lawrence@sa.gov.au",
     },
 }
 
