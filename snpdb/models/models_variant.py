@@ -1,5 +1,6 @@
 import logging
 import re
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Iterable, Union, Any
 
@@ -219,6 +220,29 @@ class AlleleMergeLog(TimeStampedModel):
     allele_linking_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     success = models.BooleanField(default=True)
     message = models.TextField(null=True)
+
+
+@dataclass(frozen=True)
+class GenomicCoordinates:
+    """ A location on the genome - a contig and a range on it, optionally stranded.
+        start/end are stored and displayed as-is, in whatever convention the caller uses (the codebase
+        keeps genomic coordinates 1-based). Like VariantCoordinate, the string is the raw coordinates
+        with no 'humanizing' offset, so it round-trips into search. """
+    contig: Contig
+    chrom: str
+    start: int
+    end: int
+    strand: Optional[str] = None
+
+    @property
+    def coordinates(self) -> str:
+        location = f"{self.chrom}:{self.start}-{self.end}"
+        if self.strand:
+            location += f" ({self.strand})"
+        return location
+
+    def __str__(self):
+        return self.coordinates
 
 
 class VariantCoordinate(FormerTuple, pydantic.BaseModel):

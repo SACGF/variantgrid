@@ -14,7 +14,7 @@ from django.db.models import Q
 from annotation.models import AnnotationVersion, VariantTranscriptAnnotation
 from genes.models import Gene, GeneSymbol
 from snpdb.models.models_enums import SequenceRole
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_genome import Contig, GenomeBuild
 from snpdb.models.models_user_settings import AllVariantsFilter
 from snpdb.models.models_variant import Variant
 
@@ -148,12 +148,32 @@ def get_gene_symbols_q(annotation_version: AnnotationVersion, gene_symbols: Opti
     return VariantTranscriptAnnotation.get_overlapping_genes_q(annotation_version.variant_annotation_version, genes)
 
 
+def get_contig_ids_for_gene_symbols(genome_build: GenomeBuild, gene_symbols: Optional[Iterable[Any]],
+                                    traverse_aliases: bool = True) -> list[int]:
+    """ The contigs a gene's transcripts live on - a gene filter is only visible once its contig is selected """
+    symbols = resolve_gene_symbols(gene_symbols)
+    if not symbols:
+        return []
+    genes = get_genes_for_gene_symbols(symbols, traverse_aliases=traverse_aliases)
+    # TranscriptVersion.contig exists as an optimisation to restrict Variant queries
+    contig_qs = Contig.objects.filter(transcriptversion__genome_build=genome_build,
+                                      transcriptversion__gene_version__gene__in=genes)
+    return sorted(set(contig_qs.values_list("pk", flat=True)))
+
+
 def get_variant_filter_q(genome_build: GenomeBuild, annotation_version: AnnotationVersion, *,
                          contig_ids: Optional[Iterable[int]] = None, non_standard_contigs: bool = False,
                          gene_symbols: Optional[Iterable[Any]] = None,
                          variant_types: Optional[Iterable[str]] = None) -> Q:
     """ The standard variant filters composed into a single Q """
-    filter_list = [get_contigs_q(genome_build, contig_ids=contig_ids, non_standard_contigs=non_standard_contigs)]
+    contig_id_list = list(contig_ids or [])
+    if gene_symbols and (contig_id_list or non_standard_contigs):
+        # Let the genes' contigs through, so a gene on a chromosome the user hasn't ticked still shows.
+        # The page ticks them too, but a stale saved filter set or a direct grid URL wouldn't have.
+        contig_id_list.extend(get_contig_ids_for_gene_symbols(genome_build, gene_symbols))
+
+    filter_list = [get_contigs_q(genome_build, contig_ids=contig_id_list,
+                                 non_standard_contigs=non_standard_contigs)]
     if (q_genes := get_gene_symbols_q(annotation_version, gene_symbols)) is not None:
         filter_list.append(q_genes)
     if (q_types := get_variant_types_q(variant_types)) is not None:

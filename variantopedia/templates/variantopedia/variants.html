@@ -14,6 +14,7 @@
     <script>
         let gridExtraFilters = {{ initial_filters_json | safe }};
         const setAllVariantsFilterUrl = "{% url 'set_all_variants_filter' genome_build.name %}";
+        const genomeBuildName = "{{ genome_build.name }}";
 
         function getBams() {
             return [];
@@ -131,6 +132,27 @@
             filterGrid();
         }
 
+        function tickGeneSymbolContigs(geneSymbol) {
+            // Tick the gene's chromosomes, otherwise a gene outside the current selection shows nothing
+            const url = Urls.api_gene_symbol_detail(geneSymbol) + "?genome_build=" + genomeBuildName;
+            return $.getJSON(url, function(data) {
+                for (const gene of data.genes || []) {
+                    for (const version of gene.versions || []) {
+                        for (const contig of version.contigs || []) {
+                            setChecked($(".contig-filter[value='" + contig.id + "']"), true);
+                        }
+                    }
+                }
+            });
+        }
+
+        function geneSymbolsChanged() {
+            const geneSymbols = $("#id_gene_symbols").val() || [];
+            $.when.apply($, geneSymbols.map(tickGeneSymbolContigs)).always(function() {
+                updateFilters(null);
+            });
+        }
+
         function resetFilters() {
             // An empty saved filter set means "use the defaults"
             $.ajax({
@@ -150,9 +172,7 @@
             $(".contig-filter, #non-standard-contigs, .variant-type-filter").change(function() {
                 updateFilters($(this));
             });
-            $("#id_gene_symbols").change(function() {
-                updateFilters(null);
-            });
+            $("#id_gene_symbols").change(geneSymbolsChanged);
             $("#filter-button").click(function() {
                 updateFilters(null);
             });

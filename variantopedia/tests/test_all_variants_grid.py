@@ -10,8 +10,9 @@ from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotat
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneSymbolAliasSource
 from library.genomics.vcf_enums import VCFSymbolicAllele
-from snpdb.models import AllVariantsFilter, GenomeBuild, Sequence, Variant, VariantZygosityCountCollection
-from snpdb.variant_filters import VariantType, get_all_variant_types, get_default_all_variants_filters
+from snpdb.models import AllVariantsFilter, GenomeBuild, Locus, Sequence, Variant, VariantZygosityCountCollection
+from snpdb.variant_filters import VariantType, get_all_variant_types, get_contig_ids_for_gene_symbols, \
+    get_default_all_variants_filters
 from variantopedia.grids import AllVariantsGrid
 
 
@@ -33,11 +34,17 @@ class AllVariantsGridFilterTest(TestCase):
         cls.other_variant = Variant.objects.get(locus__contig__name='15', locus__position=32928050,
                                                 locus__ref__seq='C', alt__seq='T')
 
-        # A gene overlapping cls.variant, reachable via an alias of its symbol
+        # The fake gene's transcripts live on their own contig, away from the variants above - so a gene
+        # filter only works if that contig is let through the chromosome filter
         transcript_version = create_fake_transcript_version(cls.genome_build)
         cls.gene = transcript_version.gene_version.gene
         cls.gene_symbol = transcript_version.gene_version.gene_symbol
-        cls._create_variant_gene_overlap(cls.variant, cls.gene)
+        cls.gene_contig = transcript_version.contig
+        gene_locus = Locus.objects.create(contig=cls.gene_contig, position=transcript_version.start,
+                                          ref=cls.variant.locus.ref)
+        cls.gene_variant = Variant.objects.create(locus=gene_locus, alt=cls.variant.alt,
+                                                  end=gene_locus.position)
+        cls._create_variant_gene_overlap(cls.gene_variant, cls.gene)
 
         cls.alias_symbol = GeneSymbol.objects.get_or_create(symbol="FAKEALIAS")[0]
         GeneSymbolAlias.objects.get_or_create(alias=cls.gene_symbol.symbol, gene_symbol=cls.alias_symbol,
@@ -117,19 +124,49 @@ class AllVariantsGridFilterTest(TestCase):
         self.assertEqual(no_types, all_types)
 
     def test_gene_symbol_filter(self):
-        variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+        variant_ids = self._grid_variant_ids({"contig_ids": [self.gene_contig.pk],
                                               "gene_symbols": [self.gene_symbol.symbol]})
-        self.assertEqual({self.variant.pk}, variant_ids)
+        self.assertEqual({self.gene_variant.pk}, variant_ids)
 
     def test_gene_symbol_filter_traverses_aliases(self):
         """ Searching the alias finds the variants of the symbol it aliases """
-        variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+        variant_ids = self._grid_variant_ids({"contig_ids": [self.gene_contig.pk],
                                               "gene_symbols": [self.alias_symbol.symbol]})
-        self.assertEqual({self.variant.pk}, variant_ids)
+        self.assertEqual({self.gene_variant.pk}, variant_ids)
+
+    def test_gene_on_unselected_contig_still_shows(self):
+        """ A chromosome selection plus a gene elsewhere used to return nothing - the gene's contig is let in """
+        self.assertNotEqual(self.contig, self.gene_contig, "Gene is on a contig that isn't selected")
+        variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+                                              "gene_symbols": [self.gene_symbol.symbol]})
+        self.assertEqual({self.gene_variant.pk}, variant_ids)
+
+    def test_gene_shows_alongside_non_standard_contigs(self):
+        """ 'Non-standard contigs' is a contig restriction too, so the gene's contig still has to be let in """
+        variant_ids = self._grid_variant_ids({"non_standard_contigs": True,
+                                              "gene_symbols": [self.gene_symbol.symbol]})
+        self.assertEqual({self.gene_variant.pk}, variant_ids)
+
+    def test_gene_contig_lookup(self):
+        contig_ids = get_contig_ids_for_gene_symbols(self.genome_build, [self.gene_symbol.symbol])
+        self.assertEqual([self.gene_contig.pk], contig_ids)
+
+    def test_gene_symbol_detail_api_reports_contigs(self):
+        """ The page ticks the gene's chromosomes from this API's genes[].versions[].contigs[] """
+        self.client.force_login(self.user)
+        url = reverse("api_gene_symbol_detail", kwargs={"gene_symbol": self.gene_symbol.symbol})
+        response = self.client.get(url, {"genome_build": self.genome_build.name})
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        contig_ids = {contig["id"]
+                      for gene in data["genes"]
+                      for version in gene["versions"]
+                      for contig in version["contigs"]}
+        self.assertIn(self.gene_contig.pk, contig_ids)
 
     def test_gene_symbol_alone_is_selective(self):
         variant_ids = self._grid_variant_ids({"gene_symbols": [self.gene_symbol.symbol]})
-        self.assertEqual({self.variant.pk}, variant_ids)
+        self.assertEqual({self.gene_variant.pk}, variant_ids)
 
     def test_min_count_filter(self):
         """ min_count >= 1 restricts to variants observed in samples - the test data has none """

@@ -3,7 +3,7 @@ from rest_framework import serializers
 from genes.models import GeneInfo, GeneListCategory, GeneList, Gene, Transcript, GeneListGeneSymbol, \
     GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList, GeneSymbol, TranscriptVersion, GeneVersion, HGNC, \
     GeneCoverageCollection, GeneCoverageCanonicalTranscript
-from snpdb.models import Company
+from snpdb.models import Company, Contig
 from snpdb.serializers import GenomeBuildSerializer
 
 
@@ -138,6 +138,100 @@ class GeneAnnotationReleaseSerializer(serializers.ModelSerializer):
 
     def get___str__(self, obj) -> str:
         return str(obj)
+
+
+class GeneContigSerializer(serializers.ModelSerializer):
+    """ Includes the pk, so callers can filter variant queries on locus__contig_id """
+
+    class Meta:
+        model = Contig
+        fields = ('id', 'name', 'refseq_accession')
+
+
+class GenomicCoordinatesSerializer(serializers.Serializer):
+    """ Serializes a GenomicCoordinates dataclass """
+    chrom = serializers.CharField()
+    start = serializers.IntegerField()
+    end = serializers.IntegerField()
+    strand = serializers.CharField(allow_null=True)
+    coordinates = serializers.CharField()
+
+
+class TranscriptVersionDetailSerializer(serializers.ModelSerializer):
+    """ A transcript's build specific location. Coordinates come out of the cdot data blob via
+        TranscriptVersion.get_coordinates(), which is null when an older import didn't store them """
+    accession = serializers.CharField(read_only=True)
+    genome_build = serializers.CharField(source="genome_build_id")
+    contig = GeneContigSerializer()
+    # DRF calls get_coordinates() once and yields null when it returns None (older imports lack coordinates)
+    coordinates = GenomicCoordinatesSerializer(source="get_coordinates", read_only=True)
+
+    class Meta:
+        model = TranscriptVersion
+        fields = ('accession', 'version', 'genome_build', 'biotype', 'contig', 'coordinates')
+
+
+class GeneVersionDetailSerializer(serializers.ModelSerializer):
+    """ A gene's details for one genome build, with the transcripts that place it on the genome """
+    accession = serializers.CharField(read_only=True)
+    gene_symbol = serializers.CharField(source="gene_symbol_id", allow_null=True)
+    genome_build = serializers.CharField(source="genome_build_id")
+    contigs = serializers.SerializerMethodField()
+    transcript_versions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GeneVersion
+        fields = ('accession', 'version', 'gene_symbol', 'genome_build', 'hgnc_identifier',
+                  'biotype', 'description', 'contigs', 'transcript_versions')
+
+    @staticmethod
+    def _transcript_versions(obj: GeneVersion):
+        return obj.transcriptversion_set.order_by("transcript_id", "version").select_related("contig")
+
+    def get_contigs(self, obj: GeneVersion):
+        """ Contigs this gene's transcripts are on - usually one, but a gene can also map to alt scaffolds """
+        contigs = {tv.contig for tv in self._transcript_versions(obj)}
+        return GeneContigSerializer(sorted(contigs, key=lambda c: c.pk), many=True).data
+
+    def get_transcript_versions(self, obj: GeneVersion):
+        return TranscriptVersionDetailSerializer(self._transcript_versions(obj), many=True).data
+
+
+class GeneDetailSerializer(serializers.ModelSerializer):
+    """ A Gene and its per genome build versions. Pass 'genome_build' in the serializer context to
+        restrict the versions to one build """
+    annotation_consortium = serializers.CharField(source="get_annotation_consortium_display")
+    versions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Gene
+        fields = ('identifier', 'prefixed_identifier', 'annotation_consortium', 'summary', 'versions')
+
+    def get_versions(self, obj: Gene):
+        qs = obj.geneversion_set.all()
+        if genome_build := self.context.get("genome_build"):
+            qs = qs.filter(genome_build=genome_build)
+        qs = qs.order_by("genome_build_id", "version").select_related("genome_build")
+        return GeneVersionDetailSerializer(qs, many=True).data
+
+
+class GeneSymbolDetailSerializer(serializers.ModelSerializer):
+    """ Everything we know about a gene symbol - its aliases and the genes each consortium assigned to it """
+    aliases = serializers.SerializerMethodField()
+    genes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GeneSymbol
+        fields = ('symbol', 'aliases', 'genes')
+
+    @staticmethod
+    def get_aliases(obj: GeneSymbol) -> list[str]:
+        """ Other symbols that resolve to the same genes """
+        return [s for s in obj.alias_meta.alias_symbol_strs if s != obj.symbol]
+
+    def get_genes(self, obj: GeneSymbol):
+        genes = sorted(obj.alias_meta.genes, key=lambda g: g.identifier)
+        return GeneDetailSerializer(genes, many=True, context=self.context).data
 
 
 class GeneInfoSerializer(serializers.ModelSerializer):

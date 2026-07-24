@@ -52,7 +52,7 @@ from library.log_utils import log_traceback
 from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import get_single_element, iter_fixed_chunks, FormerTuple
 from library.utils.file_utils import mk_path
-from snpdb.models import Wiki, Company, Sample, DataState
+from snpdb.models import Wiki, Company, Sample, DataState, GenomicCoordinates
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild, Contig
 from upload.vcf.sql_copy_files import write_sql_copy_csv, gene_coverage_canonical_transcript_sql_copy_csv, \
@@ -1099,6 +1099,17 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     @property
     def protein_length(self) -> int:
         return self.num_codons - 1  # stop codon doesn't count
+
+    def get_coordinates(self) -> Optional[GenomicCoordinates]:
+        """ Where this transcript sits on the genome for its build, or None if the cdot data lacks it
+            (older imports can be sparse - @see genome_build_data). Reuses the start/end/chrom/strand
+            properties so there's one source of truth for reading the cdot coordinates. """
+        build_data = self.data.get("genome_builds", {}).get(self.genome_build.name)
+        if not (build_data and build_data.get("contig") is not None
+                and build_data.get("exons") and build_data.get("strand") is not None):
+            return None
+        return GenomicCoordinates(contig=self.contig, chrom=self.chrom,
+                                  start=self.start, end=self.end, strand=self.strand)
 
     @property
     def chrom(self):

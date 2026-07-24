@@ -156,6 +156,8 @@ class Test(URLTestCase):
             ("view_transcript_accession", {"transcript_accession": self.transcript_version.transcript_id}, 200),
             # ("api_panel_app_gene_evidence", gene_symbol_kwargs, 200),
             ("api_gene_info", gene_symbol_kwargs, 200),
+            ("api_gene_detail", {"gene_id": self.gene.pk}, 200),
+            ("api_gene_symbol_detail", gene_symbol_kwargs, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 
