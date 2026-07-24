@@ -73,9 +73,14 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
 class AllVariantsGrid(AbstractVariantGrid):
     caption = 'All Variants'
     # Sorting on a joined or unindexed column full-sorts the whole result set before LIMIT, blowing the
-    # statement_timeout (@see issues #1279, #1651). Only columns backed by an index a page can be served
-    # from are sortable - everything else is served in the default order. @see issue #1663
-    SORTABLE_FIELDS = {"id"}
+    # statement_timeout (@see issues #1279, #1651). Nothing is user-sortable - every page is served in genomic
+    # order (see DEFAULT_ORDER_BY), which is the one ordering a contig-filtered page can stream. @see issue #1663
+    SORTABLE_FIELDS: set[str] = set()
+    # (contig, position) is the leading edge of the snpdb_locus(contig_id, position, ref_id) unique index, so a
+    # contig-filtered page streams straight off it via an incremental sort instead of full-sorting the result set
+    # (id-descending walks the whole variant table under a contig filter - measured 100-1000x slower). The pk
+    # tiebreaker makes pagination stable. @see issue #1663
+    DEFAULT_ORDER_BY = ("locus__contig_id", "locus__position", "pk")
 
     def __init__(self, user, genome_build_name, **kwargs):
         user_settings = UserSettings.get_for_user(user)
@@ -91,8 +96,8 @@ class AllVariantsGrid(AbstractVariantGrid):
         update_dict_of_dict_values(self._overrides, override)
         self.vzcc = VariantZygosityCountCollection.get_global_germline_counts()
         self.extra_filters = kwargs.pop("extra_filters", {})
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': "desc",
+        self.extra_config.update({'sortname': 'locus__position',
+                                  'sortorder': "asc",
                                   'shrinkToFit': False})
 
     def _get_base_queryset(self) -> QuerySet:
@@ -138,10 +143,10 @@ class AllVariantsGrid(AbstractVariantGrid):
         return colmodels
 
     def _sort_items(self, items, sidx, sord):
-        """ Drop a non-allowlisted sort so a hand-crafted grid URL can't bypass the colmodel flags """
-        if sidx not in self.SORTABLE_FIELDS:
-            sidx = None
-        return super()._sort_items(items, sidx, sord)
+        """ Serve every page in genomic order regardless of any sidx a hand-crafted grid URL supplies. Emitted as
+            a plain order_by so it matches the snpdb_locus(contig_id, position, ref_id) btree exactly - the base
+            class's F(sidx).asc(nulls_first=...) path defeats that index. @see issue #1663 """
+        return items.order_by(*self.DEFAULT_ORDER_BY)
 
     def _get_approx_count(self, qs) -> int:
         sql, params = qs.query.sql_with_params()
