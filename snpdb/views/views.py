@@ -81,7 +81,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, Quad, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, \
     Lab, LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, \
-    CohortGenotypeStats, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
+    CohortGenotypeStats, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection, \
+    AllVariantsFilter
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, AlleleConversionTool
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.liftover_tasks import liftover_alleles
@@ -847,6 +848,17 @@ def set_user_data_grid_config(request):
         user_grid_config.filter_name = request.POST["filter_name"]
 
     user_grid_config.save()
+    return HttpResponse()
+
+
+@require_POST
+def set_all_variants_filter(request, genome_build_name):
+    """ Remember the All Variants page filter selections - set from variants.html whenever a filter changes """
+
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    filters = json.loads(request.body)
+    AllVariantsFilter.objects.update_or_create(user=request.user, genome_build=genome_build,
+                                               defaults={"filters": filters})
     return HttpResponse()
 
 

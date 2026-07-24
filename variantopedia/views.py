@@ -58,6 +58,8 @@ from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.utils import get_genome_build_or_404
+from snpdb.variant_filters import get_all_variant_types, get_all_variants_filters, get_gene_symbol_alias_strs, \
+    get_variant_type_label, resolve_gene_symbols
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.models import ModifiedImportedVariant
 from upload.upload_stats import get_vcf_variant_upload_stats
@@ -72,7 +74,26 @@ from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
 def variants(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    context = {"genome_build": genome_build}
+    initial_filters = get_all_variants_filters(request.user, genome_build)
+
+    selected_gene_symbols = resolve_gene_symbols(initial_filters.get("gene_symbols"))
+    # Aliases are traversed when querying, so tell the user which extra symbols that brought in
+    gene_symbol_aliases = {}
+    for gene_symbol in selected_gene_symbols:
+        alias_symbol_strs = get_gene_symbol_alias_strs(gene_symbol)
+        if extra_symbols := [s for s in alias_symbol_strs if s != gene_symbol.symbol]:
+            gene_symbol_aliases[gene_symbol.symbol] = extra_symbols
+
+    gene_symbol_form = forms.AllVariantsGeneSymbolForm(initial={"gene_symbols": selected_gene_symbols})
+    context = {
+        "genome_build": genome_build,
+        "standard_contigs": genome_build.standard_contigs,
+        "variant_types": [(vt, get_variant_type_label(vt)) for vt in get_all_variant_types()],
+        "initial_filters": initial_filters,
+        "initial_filters_json": json.dumps(initial_filters),
+        "gene_symbol_form": gene_symbol_form,
+        "gene_symbol_aliases": gene_symbol_aliases,
+    }
     return render(request, "variantopedia/variants.html", context)
 
 

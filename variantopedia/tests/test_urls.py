@@ -8,7 +8,7 @@ from annotation.fake_annotation import get_fake_annotation_version, create_fake_
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant, ClinGenAllele, Allele, VariantAllele, AlleleOrigin, Tag, \
-    VariantZygosityCountCollection, VariantZygosityCount, VariantWiki
+    VariantZygosityCountCollection, VariantZygosityCount, VariantWiki, AllVariantsFilter
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 
@@ -52,6 +52,11 @@ class Test(URLTestCase):
         # Fake that we have a sample w/variant so it shows up on all variants grid
         vzcc = VariantZygosityCountCollection.objects.get_or_create(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)[0]
         VariantZygosityCount.objects.get_or_create(variant=cls.variant, collection=vzcc, het_count=1)
+
+        # The All Variants grid requires a selective filter - pin it to the test variant's contig
+        AllVariantsFilter.objects.update_or_create(
+            user=cls.user, genome_build=cls.grch37,
+            defaults={"filters": {"contig_ids": [cls.variant.locus.contig_id]}})
 
         # not sure how to test this properly
         cls.variant_wiki_obj = VariantWiki.objects.get_or_create(variant=cls.variant)

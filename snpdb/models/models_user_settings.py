@@ -146,6 +146,27 @@ class UserGridConfig(models.Model):
         return f"{self.user}/{self.grid_name}: {','.join(details)}"
 
 
+class AllVariantsFilter(models.Model):
+    """ Remembers the All Variants page filter selections per user + genome build.
+        A single JSON blob holds the grid's 'extra_filters' payload verbatim - the variant types offered are
+        settings driven, so a column per filter would need a migration every time those settings change.
+        Per genome build because contig ids are build specific.
+        @see snpdb.variant_filters for the payload's shape and defaults """
+    user = models.ForeignKey(User, on_delete=CASCADE)
+    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+    filters = models.JSONField(default=dict)
+
+    class Meta:
+        unique_together = ("user", "genome_build")
+
+    @staticmethod
+    def get(user: User, genome_build: GenomeBuild) -> 'AllVariantsFilter':
+        return thread_safe_unique_together_get_or_create(AllVariantsFilter, user=user, genome_build=genome_build)[0]
+
+    def __str__(self):
+        return f"{self.user}/{self.genome_build}: {self.filters}"
+
+
 class GridLoadingAnimation(models.TextChoices):
     """ DNA "reading" animations shown (randomly) while a node's variant grid loads.
         Values are the menu ids - the front end (analysis.js) maps these to VGLoaders ids. """

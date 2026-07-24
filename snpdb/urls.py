@@ -65,6 +65,8 @@ urlpatterns = [
     path('settings/custom_columns/clone/<int:custom_columns_collection_id>', views_json.clone_custom_columns, name='clone_custom_columns'),
     path('settings/set_user_row_config', views.set_user_row_config, name='set_user_row_config'),
     path('settings/set_user_data_grid_config', views.set_user_data_grid_config, name='set_user_data_grid_config'),
+    path('settings/set_all_variants_filter/<genome_build_name>', views.set_all_variants_filter,
+         name='set_all_variants_filter'),
     path('settings/tags', views.tag_settings, name='tag_settings'),
     path('settings/tags/collection/datatable', DatabaseTableView.as_view(column_class=TagColorsCollectionColumns),
          name='tag_color_collections_datatable'),

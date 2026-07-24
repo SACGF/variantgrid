@@ -1,6 +1,6 @@
 import operator
 import re
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Optional, Any
 
 from django.conf import settings
@@ -20,6 +20,7 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag, VariantWiki
 from snpdb.models.models_user_settings import UserSettings, UserGridConfig
+from snpdb.variant_filters import get_all_variants_filters, get_variant_filter_q, is_selective
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from variantopedia.interesting_nearby import get_nearby_qs
 
@@ -71,6 +72,10 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
 
 class AllVariantsGrid(AbstractVariantGrid):
     caption = 'All Variants'
+    # Sorting on a joined or unindexed column full-sorts the whole result set before LIMIT, blowing the
+    # statement_timeout (@see issues #1279, #1651). Only columns backed by an index a page can be served
+    # from are sortable - everything else is served in the default order. @see issue #1663
+    SORTABLE_FIELDS = {"id"}
 
     def __init__(self, user, genome_build_name, **kwargs):
         user_settings = UserSettings.get_for_user(user)
@@ -93,21 +98,50 @@ class AllVariantsGrid(AbstractVariantGrid):
     def _get_base_queryset(self) -> QuerySet:
         return get_variant_queryset_for_annotation_version(self.annotation_version)
 
-    def _get_q(self) -> Optional[Q]:
-        filter_list = [
-            Variant.get_contigs_q(self.annotation_version.genome_build),
-        ]
+    @cached_property
+    def filters(self) -> dict:
+        """ The page sends the current selection as extra_filters. A direct grid hit (CSV export, bookmarked
+            grid URL) has none, so fall back to what the user last chose on the page """
         if self.extra_filters:
-            if min_count := int(self.extra_filters.get("min_count", 0)):
-                filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gte": min_count}))
-        else:
+            return self.extra_filters
+        return get_all_variants_filters(self.user, self.genome_build)
+
+    def _get_q(self) -> Optional[Q]:
+        filters = self.filters
+        if not is_selective(filters):
+            # Match nothing rather than scanning the whole variant table - the page explains why
+            return Q(pk__isnull=True)
+
+        filter_list = [
+            get_variant_filter_q(self.genome_build, self.annotation_version,
+                                 contig_ids=filters.get("contig_ids"),
+                                 non_standard_contigs=filters.get("non_standard_contigs", False),
+                                 gene_symbols=filters.get("gene_symbols"),
+                                 variant_types=filters.get("variant_types")),
+            Variant.get_no_reference_q(),
+        ]
+        if min_count := int(filters.get("min_count") or 0):
             # benchmarking - I found it much faster to do both of these queries (seems redundant)
             hom_nonzero = Q(**{f"{self.vzcc.hom_alias}__gt": 0})
             het_nonzero = Q(**{f"{self.vzcc.het_alias}__gt": 0})
             filter_list.append(hom_nonzero | het_nonzero)
-            filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gt": 0}))
+            filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gte": min_count}))
 
         return reduce(operator.and_, filter_list)
+
+    def get_colmodels(self, remove_server_side_only=False):
+        """ Only the allowlisted columns keep their sort arrows """
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
+        for cm in colmodels:
+            if cm.get("name") not in self.SORTABLE_FIELDS:
+                cm["sortable"] = False
+        return colmodels
+
+    def _sort_items(self, items, sidx, sord):
+        """ Drop a non-allowlisted sort so a hand-crafted grid URL can't bypass the colmodel flags """
+        if sidx not in self.SORTABLE_FIELDS:
+            sidx = None
+        return super()._sort_items(items, sidx, sord)
 
     def _get_approx_count(self, qs) -> int:
         sql, params = qs.query.sql_with_params()

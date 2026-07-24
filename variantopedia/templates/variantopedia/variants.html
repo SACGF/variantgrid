@@ -1,6 +1,7 @@
 {% extends menu_variants_base %}
 {% load static %}
 {% load ui_utils %}
+{% load ui_help %}
 {% load ui_menu_bars %}
 {% load genome_build_tags %}
 {% load user_tag_color_tags %}
@@ -8,9 +9,11 @@
 {% block head %}
     {{ block.super }}
     {% render_tag_styles_and_formatter %}
+    {{ gene_symbol_form.media }}
     <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
     <script>
-        gridExtraFilters = {};
+        let gridExtraFilters = {{ initial_filters_json | safe }};
+        const setAllVariantsFilterUrl = "{% url 'set_all_variants_filter' genome_build.name %}";
 
         function getBams() {
             return [];
@@ -30,26 +33,113 @@
             return extraFilters;
         }
 
-        function showAll() {
-            $("#min_count").val(0);
-
-            gridExtraFilters = {};
-            $("#all-variants-filter-description").hide();
-            filterGrid();
+        function allVariantsGridInit(grid, pagerId, initKwargs) {
+            // Send the filter selection with every data fetch (and with the CSV download, which copies postData)
+            grid[0].p.postData["extra_filters"] = getExtraFilters;
         }
 
         function filterGrid() {
             $("#all-variants-grid").trigger("reloadGrid");
         }
 
-        function updateMinCount() {
-            let minCount = $("#min_count").val();
-            if (minCount.trim() != '') {
-                gridExtraFilters["min_count"] = minCount;
-                $("#all-variants-filter").text("Minimum count of " + minCount);
-                $("#all-variants-filter-description").show();
-                filterGrid();
+        function checkedValues(selector) {
+            return $(selector).filter(":checked").map(function() { return $(this).val(); }).get();
+        }
+
+        function setChecked(input, checked) {
+            // Bootstrap 4 button groups track state via the 'active' class on the wrapping label
+            input.prop("checked", checked);
+            input.closest("label").toggleClass("active", checked);
+        }
+
+        function readFilters() {
+            const contigIds = checkedValues(".contig-filter").map(Number);
+            return {
+                contig_ids: contigIds,
+                non_standard_contigs: $("#non-standard-contigs").is(":checked"),
+                gene_symbols: $("#id_gene_symbols").val() || [],
+                variant_types: checkedValues(".variant-type-filter"),
+                min_count: Number($("#min_count").val()) || 0,
+            };
+        }
+
+        function describeFilters(filters) {
+            let parts = [];
+            let contigNames = $(".contig-filter").filter(":checked").map(function() {
+                return $(this).data("contig-name");
+            }).get();
+            if (filters.non_standard_contigs) {
+                contigNames.push("non-standard contigs");
             }
+            if (contigNames.length) {
+                parts.push("chromosomes: " + contigNames.join(", "));
+            }
+            if (filters.gene_symbols.length) {
+                parts.push("genes: " + filters.gene_symbols.join(", "));
+            }
+            const allVariantTypes = {{ variant_types|length }};
+            if (filters.variant_types.length && filters.variant_types.length < allVariantTypes) {
+                parts.push("types: " + filters.variant_types.join(", "));
+            }
+            if (filters.min_count) {
+                parts.push("seen in at least " + filters.min_count + " sample(s)");
+            }
+            return parts.join("; ");
+        }
+
+        function saveFilters(filters) {
+            $.ajax({
+                type: "POST",
+                url: setAllVariantsFilterUrl,
+                contentType: "application/json",
+                data: JSON.stringify(filters),
+            });
+        }
+
+        function isSelective(filters) {
+            // Variant type and min count alone still walk the whole variant table
+            return Boolean(filters.contig_ids.length || filters.non_standard_contigs || filters.gene_symbols.length);
+        }
+
+        function showFilters(filters) {
+            const description = describeFilters(filters);
+            $("#all-variants-filter").text(description);
+            $("#all-variants-filter-description").toggle(Boolean(description));
+            $("#all-variants-unselective").toggle(!isSelective(filters));
+        }
+
+        function updateFilters(changedInput) {
+            let filters = readFilters();
+            const isContigInput = changedInput
+                && (changedInput.hasClass("contig-filter") || changedInput.attr("id") === "non-standard-contigs");
+            const isTypeInput = changedInput && changedInput.hasClass("variant-type-filter");
+
+            // Deselecting the last chromosome with no genes chosen would show nothing, so put it back
+            if (isContigInput && !isSelective(filters)) {
+                setChecked(changedInput, true);
+                filters = readFilters();
+            }
+            // Keep at least one variant type, so the buttons always describe what's on screen
+            if (isTypeInput && !filters.variant_types.length) {
+                setChecked(changedInput, true);
+                filters = readFilters();
+            }
+
+            gridExtraFilters = filters;
+            showFilters(filters);
+            saveFilters(filters);
+            filterGrid();
+        }
+
+        function resetFilters() {
+            // An empty saved filter set means "use the defaults"
+            $.ajax({
+                type: "POST",
+                url: setAllVariantsFilterUrl,
+                contentType: "application/json",
+                data: JSON.stringify({}),
+                success: function() { window.location.reload(); },
+            });
         }
 
         $(document).ready(() => {
@@ -57,13 +147,29 @@
                 'detailsLink' : detailsLink,
             });
 
+            $(".contig-filter, #non-standard-contigs, .variant-type-filter").change(function() {
+                updateFilters($(this));
+            });
+            $("#id_gene_symbols").change(function() {
+                updateFilters(null);
+            });
             $("#filter-button").click(function() {
-                updateMinCount();
-            })
+                updateFilters(null);
+            });
+            showFilters(readFilters());
         });
     </script>
     <style>
         {% render_node_count_colors_css %}
+
+        .filter-button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+        }
+        .filter-button-group > label.btn {
+            border-radius: 4px;
+        }
     </style>
 {% endblock head %}
 {% block submenu_page_content %}
@@ -71,19 +177,75 @@
 
         <h3>Variants</h3>
             <div class="container">
-                {% labelled label="Minimum Count" %}
+                {% labelled label="Chromosome" %}
+                    <div class="filter-button-group btn-group-toggle" data-toggle="buttons">
+                        {% for contig in standard_contigs %}
+                            <label class="btn btn-outline-primary btn-sm{% if contig.pk in initial_filters.contig_ids %} active{% endif %}">
+                                <input class="contig-filter" type="checkbox" name="contig" value="{{ contig.pk }}"
+                                       data-contig-name="{{ contig.name }}" autocomplete="off"
+                                       {% if contig.pk in initial_filters.contig_ids %}checked{% endif %}> {{ contig.name }}
+                            </label>
+                        {% endfor %}
+                        <label class="btn btn-outline-secondary btn-sm{% if initial_filters.non_standard_contigs %} active{% endif %}">
+                            <input id="non-standard-contigs" type="checkbox" name="non_standard_contigs" value="1"
+                                   autocomplete="off"
+                                   {% if initial_filters.non_standard_contigs %}checked{% endif %}> Non-standard contigs
+                        </label>
+                    </div>
+                {% endlabelled %}
+
+                {% labelled label="Variant Type" %}
+                    <div class="filter-button-group btn-group-toggle" data-toggle="buttons">
+                        {% for variant_type, label in variant_types %}
+                            <label class="btn btn-outline-primary btn-sm{% if variant_type in initial_filters.variant_types %} active{% endif %}">
+                                <input class="variant-type-filter" type="checkbox" name="variant_type"
+                                       value="{{ variant_type }}" autocomplete="off"
+                                       {% if variant_type in initial_filters.variant_types %}checked{% endif %}> {{ label }}
+                            </label>
+                        {% endfor %}
+                    </div>
+                {% endlabelled %}
+
+                {% labelled label="Gene Symbols" %}
+                    {{ gene_symbol_form.gene_symbols }}
+                    {% if gene_symbol_aliases %}
+                        {% page_help_embedded page_id='variantopedia/all_variants_gene_aliases' title='Gene Symbol Aliases' %}
+                            {% for symbol, aliases in gene_symbol_aliases.items %}
+                                <p>Also searching aliases of {{ symbol }}: {{ aliases|join:", " }}</p>
+                            {% endfor %}
+                        {% end_page_help_embedded %}
+                    {% endif %}
+                {% endlabelled %}
+
+                {% labelled label="Min sample count" %}
                     <div class="input-group">
-                        <input id='min_count' type='number' name='min_count' style='max-width: 200px' class="form-control" data-enter="#filter-button" />
+                        <input id='min_count' type='number' min='0' name='min_count' style='max-width: 200px'
+                               class="form-control" value="{{ initial_filters.min_count|default:0 }}"
+                               data-enter="#filter-button" />
                         <span class="input-group-append">
                             <button class="btn btn-primary" id='filter-button'>Filter</button>
                         </span>
                     </div>
-                    <p id='all-variants-filter-description' class='hidden mt-2'>
-                        Filtering to <span id='all-variants-filter'></span>. <a href='javascript:showAll()'>Show All</a>
+                    {% field_help %}
+                        0 = any, including variants not observed in any sample
+                    {% end_field_help %}
+                {% endlabelled %}
+
+                {% labelled label="Sorting" %}
+                    <p class="text-muted mb-0">
+                        Sorting is limited to Variant ID - sorting on other columns has to sort every matching
+                        variant before returning a page, which times out. Add filters to narrow the results.
                     </p>
                 {% endlabelled %}
 
+                <p id='all-variants-unselective' class='hidden alert alert-warning mt-2'>
+                    Select at least one chromosome or gene symbol - without one the whole variant table would be
+                    scanned, so no rows are shown.
+                </p>
+                <p id='all-variants-filter-description' class='mt-2'>
+                    Filtering to <span id='all-variants-filter'></span>. <a href='javascript:resetFilters()'>Reset</a>
+                </p>
             </div>
         {% load jqgrid_tags %}
-        {% jqgrid 'all_variants_grid' 'all-variants' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=True delete=False download_grid_json_as_csv=True %}
+        {% jqgrid 'all_variants_grid' 'all-variants' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=True delete=False download_grid_json_as_csv=True init_func='allVariantsGridInit' %}
 {% endblock submenu_page_content %}
