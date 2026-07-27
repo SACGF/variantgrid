@@ -221,7 +221,7 @@ CLINGEN_ALLELE_REGISTRY_MAX_CACHE_DAYS = 180  # Set to None to last forever. 180
 
 # --- MatchMaker Exchange -------------------------------------------------
 # Patient-centric, phenotype-aware rare-disease matching federation (GA4GH mme-apis v1.1).
-# See claude/matchmaker_exchange_plan.md. Disabled by default; enable per-deployment.
+# Disabled by default; enable per-deployment - needs incoming connections (ie on internet)
 MME_ENABLED = False
 
 # Once True we drop the `"test": true` flag from outbound patient profiles (only do this
@@ -315,6 +315,10 @@ BEACON_QUERY_CACHE_DAYS = 7       # cache each (variant, node) result; live-refr
 # no node at all - it renders as a negative.
 BEACON_QUERY_NODES = {
     # Germline sequence variants: gnomAD v4.1 (GRCh38), gnomAD v2.1.1 exomes + GCAT (GRCh37).
+    # The "-demo" host is the real service: its /info reports environment "prod" - don't "fix"
+    # this URL. The two cleaner-looking alternatives are both dead ends: af-beacon.ega-archive.org
+    # is only the browser UI (not an API), and beacon.ega-archive.org (advertised as this node's
+    # own /info "alternativeUrl") completes TLS but never answers - it hangs until timeout.
     "ega_af": {"base_url": "https://af-ega-beacon-demo.ega-archive.org/api", "api_version": "v2.2.0",
                "type": "snv", "assemblies": ["GRCh37", "GRCh38"]},
     # Somatic copy-number (bycon/progenetix family) - symbolic <DEL>/<DUP>, GRCh38 only.
