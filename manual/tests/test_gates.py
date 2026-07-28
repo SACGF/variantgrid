@@ -11,7 +11,7 @@ from manual import gates
 from manual.models import ManualGateSatisfied, ManualMigrationAttempt, ManualMigrationOutstanding, \
     ManualMigrationRequired, ManualMigrationTask
 from manual.operations.manual_operations import ManualOperation
-from scripts.migrator.migrator import run_scheduler
+from scripts.migrator.migrator import Migrator, run_scheduler
 
 # Migration module names start with a digit, so they can't be imported with normal import syntax.
 complete_obsolete_tasks = import_module(
@@ -90,6 +90,18 @@ class OutstandingRunnableTest(TestCase):
         self.assertFalse(by_id[missing.id]["command_exists"])
         self.assertFalse(by_id[missing.id]["runnable"])                                 # command missing
         self.assertFalse(by_id[human.id]["runnable"])                                   # 'other' never runs
+        self.assertIsNone(by_id[human.id]["command_exists"])                            # no command -> not obsolete
+
+    def test_menu_status_line_flags_only_missing_manage_commands(self):
+        # Regression: 'other' human steps have command_exists=None and must NOT read as "obsolete command".
+        missing = Migrator.subcommand_for_json(
+            {"id": "manage*deleted_cmd", "category": "manage", "line": "deleted_cmd",
+             "command_exists": False, "blocked_by": []})
+        human = Migrator.subcommand_for_json(
+            {"id": 'other*"do a thing"', "category": "other", "line": '"do a thing"',
+             "command_exists": None, "blocked_by": []})
+        self.assertIn("obsolete", missing.status_line())
+        self.assertIsNone(human.status_line())
 
 
 class ObsoleteCleanupTest(TestCase):
