@@ -129,6 +129,21 @@ class ManualGateTest(TestCase):
         self.assertIsNone(ManualMigrationOutstanding.outstanding_task(obsolete))  # cleared
         self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(keep))   # untouched
 
+    def test_cleanup_migration_completes_obsolete_task_id_but_not_kept_steps(self):
+        # command still exists -> matched by exact id, must NOT clear commands/variants we keep
+        omim = ManualMigrationTask.objects.create(id="manage*gene_annotation --add-missing-omim")
+        self._request(omim)
+        kept_variant = ManualMigrationTask.objects.create(id="manage*gene_annotation --new-releases")
+        self._request(kept_variant)
+        link_transcripts = ManualMigrationTask.objects.create(id="manage*fix_annotation_link_transcripts")
+        self._request(link_transcripts)
+
+        complete_obsolete_tasks(apps, None)
+
+        self.assertIsNone(ManualMigrationOutstanding.outstanding_task(omim))            # cleared
+        self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(kept_variant))     # untouched
+        self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(link_transcripts))  # kept
+
     def test_backfill_requires_migration(self):
         extra = ManualMigrationTask.objects.create(id="manage*fix_variant_matching --extra")
         reval = ManualMigrationTask.objects.create(id="manage*fix_variant_matching --revalidate_chgvs")
