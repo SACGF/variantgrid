@@ -1,17 +1,11 @@
+from django.core.management import get_commands
 from django.db import migrations
 
-# Manage-category commands that were deleted along with the feature they backfilled (audited: none
-# were wrongly deleted). A DB that ran the old (pre-neutralised) migrations still holds an outstanding
-# task row pointing at these now-missing commands; mark them complete so they drop out of the upgrade
-# flow instead of failing when run. See the neutralised source migrations (e.g. snpdb/0100, genes/0027).
-OBSOLETE_COMMANDS = {
-    "one_off_calc_variant_end",                      # superseded by one_off_fix_variant_end (#414)
-    "fix_panel_app_gene_list_permissions",           # feature removed (#690)
-    "fix_historical_max_af",                         # max-af feature removed
-    "remove_redundant_flags",                        # moved to a data migration (#1577)
-    "fix_retrieve_transcript_version_sequence_info",
-    "vep_download_fasta",
-}
+# Any manage task whose command no longer exists can't be run, so it's completed generically below
+# (a DB that ran the old, pre-neutralised migrations still holds such orphan rows). Audited examples,
+# none wrongly deleted: one_off_calc_variant_end (#414), fix_panel_app_gene_list_permissions (#690),
+# fix_historical_max_af, remove_redundant_flags, fix_retrieve_transcript_version_sequence_info,
+# vep_download_fasta.
 
 # Obsolete steps whose command still EXISTS (so command-name matching would wrongly clear sibling
 # variants) - matched by exact task id instead. These are historical in-place patches to EXISTING
@@ -64,20 +58,22 @@ OBSOLETE_OTHER_TASK_IDS = {
 }
 
 
-def _is_obsolete(task_id: str) -> bool:
+def _is_obsolete(task_id: str, known_commands: set) -> bool:
     category, _, line = task_id.partition("*")
     if not line:
         return False
     if category == "manage":
-        return line.split()[0] in OBSOLETE_COMMANDS or task_id in OBSOLETE_TASK_IDS
+        # Command deleted -> can't run, so obsolete; plus vetted skips whose command still exists.
+        return line.split()[0] not in known_commands or task_id in OBSOLETE_TASK_IDS
     return task_id in OBSOLETE_OTHER_TASK_IDS
 
 
 def complete_obsolete_tasks(apps, schema_editor):
     ManualMigrationTask = apps.get_model("manual", "ManualMigrationTask")
     ManualMigrationAttempt = apps.get_model("manual", "ManualMigrationAttempt")
+    known_commands = set(get_commands())
     for task in ManualMigrationTask.objects.all():
-        if _is_obsolete(task.id):
+        if _is_obsolete(task.id, known_commands):
             # A success attempt (requires_retry=False) dated now clears any earlier requirement, so the
             # task is no longer outstanding. Harmless if it was already complete.
             ManualMigrationAttempt.objects.create(

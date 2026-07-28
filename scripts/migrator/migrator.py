@@ -201,6 +201,27 @@ class CommandSubMigration(SubMigration):
         return PythonSubMigration(the_method)
 
 
+def run_scheduler(fetch_runnable, run_task, max_passes: int = 1000):
+    """ Pure scheduler loop, decoupled from Django/subprocess for testability.
+
+        Repeatedly asks fetch_runnable() for the currently-runnable tasks and runs each, re-fetching
+        after every pass so ordering gates (after:<task_id>) release as their prerequisites complete.
+        Stops on the first failure. max_passes is a runaway guard.
+
+        fetch_runnable() -> list[task];  run_task(task) -> bool (True on success).
+        Returns (ran, failed): tasks run in order, and the task that failed (or None). """
+    ran = []
+    for _ in range(max_passes):
+        runnable = fetch_runnable()
+        if not runnable:
+            return ran, None
+        for task in runnable:
+            ran.append(task)
+            if not run_task(task):
+                return ran, task
+    return ran, None
+
+
 class Migrator:
 
     def notify_deployed(self):
@@ -289,31 +310,28 @@ class Migrator:
             task-ordering gates (after:<task_id>) unblock as their prerequisites complete. Stops on
             the first failure; leaves blocked manage tasks and all 'other' tasks for a human. """
         print_purple("-- Auto-running unblocked manage.py steps --")
-        while True:
+
+        def fetch_runnable():
             try:
                 task_json = self._fetch_outstanding()
             except Exception:
                 print_red("Unable to retrieve outstanding commands")
                 traceback.print_exc()
-                return
+                return []
+            return [task for task in task_json.get("tasks", []) if task.get("runnable")]
 
-            runnable = [task for task in task_json.get("tasks", []) if task.get("runnable")]
-            if not runnable:
-                break
+        def run_task(task) -> bool:
+            migration = Migrator.subcommand_for_json(task)
+            success = migration.run().status == MigrationStatus.SUCCESS
+            if migration.task_id:
+                self.record_attempt(task_id=migration.task_id, success=success)
+            if success:
+                print_green("*** task succeeded ***")
+            else:
+                print_red("*** task failed - stopping auto-run ***")
+            return success
 
-            for task in runnable:
-                migration = Migrator.subcommand_for_json(task)
-                result = migration.run()
-                if migration.task_id:
-                    self.record_attempt(task_id=migration.task_id,
-                                        success=result.status == MigrationStatus.SUCCESS)
-                if result.status == MigrationStatus.SUCCESS:
-                    print_green("*** task succeeded ***")
-                else:
-                    print_red("*** task failed - stopping auto-run ***")
-                    self.report_outstanding()
-                    return
-
+        run_scheduler(fetch_runnable, run_task)
         self.report_outstanding()
 
     def report_outstanding(self):

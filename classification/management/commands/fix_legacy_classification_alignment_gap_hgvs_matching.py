@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
 
 from classification.classification_import import reattempt_variant_matching
 from classification.models import Classification
@@ -12,6 +12,14 @@ from library.guardian_utils import admin_bot
 class Command(BaseCommand):
 
     def handle(self, *args, **options):
+        # Resolving alignment_gap / c.hgvs needs current-format cdot transcript data; on a pre-cdot
+        # deploy every record KeyErrors deep in the run (data has no 'genome_builds' key) - fail fast
+        # with a clear instruction instead (mirrors fix_variant_matching).
+        if not TranscriptVersion.data_is_current_cdot_format():
+            raise CommandError(
+                "Transcript data is in the old pre-cdot format (TranscriptVersion.data has no "
+                "'genome_builds' key), so c.hgvs resolution would fail on every record. "
+                "Run 'python3 manage.py import_cdot_latest' first.")
 
         # Get a list of transcripts/genome build used by classifications
         build_transcript_classification_ids = defaultdict(lambda: defaultdict(list))
