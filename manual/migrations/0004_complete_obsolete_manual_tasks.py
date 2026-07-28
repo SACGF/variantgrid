@@ -37,14 +37,47 @@ OBSOLETE_TASK_IDS = {
 }
 
 
+# Obsolete 'other' (free-text) reminders. These were prerequisite/ordering notes now expressed as
+# gates (import_transcript_fasta -> transcript-sequences-loaded; import gene annotation -> cdot-current)
+# or superseded (deployment_check now verifies cdot + gnomAD files; one_off_fix_variant_end has a real
+# manage task; dbNSFP skipped for the fresh reload; VEP110 advisory is moot). Retired by exact task id
+# (single-arg operation_other, so the id is other*"<text>"). #1 has no current source - a DB orphan.
+def _other_id(text: str) -> str:
+    return f'other*"{text}"'
+
+
+OBSOLETE_OTHER_TASK_IDS = {
+    _other_id("VariantZygosityCount: Re-calculate and change config: "
+              "https://github.com/SACGF/variantgrid/issues/1571#issuecomment-688651886"),
+    _other_id("*** BEFORE rematching - import_transcript_fasta - see annotation page"),
+    _other_id("** Before fix_legacy_classification_alignment_gap_hgvs_matching ** - Import gene "
+              "annotation - see https://github.com/SACGF/variantgrid/issues/494#issuecomment-943977004"),
+    _other_id("Download cdot data and run import_gene_annotation. "
+              "See https://github.com/SACGF/variantgrid/issues/566#issuecomment-1097543081"),
+    _other_id("Get gnomad AF>5 vcf.gz for upload pre-processing "
+              "see https://github.com/SACGF/variantgrid/issues/521#issuecomment-1058830717"),
+    _other_id("Import dbNSFP gene annotation (see annotation page)"),
+    _other_id("Run 'python3 manage.py one_off_fix_variant_end' - this can be done outside of "
+              "migrations (use screen)"),
+    _other_id("You may want to update your annotation to VEP110 and latest annotation data "
+              "See https://github.com/SACGF/variantgrid/wiki/Annotation-Column-Versions"),
+}
+
+
+def _is_obsolete(task_id: str) -> bool:
+    category, _, line = task_id.partition("*")
+    if not line:
+        return False
+    if category == "manage":
+        return line.split()[0] in OBSOLETE_COMMANDS or task_id in OBSOLETE_TASK_IDS
+    return task_id in OBSOLETE_OTHER_TASK_IDS
+
+
 def complete_obsolete_tasks(apps, schema_editor):
     ManualMigrationTask = apps.get_model("manual", "ManualMigrationTask")
     ManualMigrationAttempt = apps.get_model("manual", "ManualMigrationAttempt")
     for task in ManualMigrationTask.objects.all():
-        category, _, line = task.id.partition("*")
-        if category != "manage" or not line:
-            continue
-        if line.split()[0] in OBSOLETE_COMMANDS or task.id in OBSOLETE_TASK_IDS:
+        if _is_obsolete(task.id):
             # A success attempt (requires_retry=False) dated now clears any earlier requirement, so the
             # task is no longer outstanding. Harmless if it was already complete.
             ManualMigrationAttempt.objects.create(
@@ -58,11 +91,13 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('manual', '0003_manualgatesatisfied_manualmigrationtask_requires'),
-        # The OBSOLETE_TASK_IDS skips are all created by annotation migrations (0022-0146). Depend on
-        # the latest so this cleanup runs after every creator - otherwise a still-pending creator could
-        # register the task after we clear it. (The OBSOLETE_COMMANDS orphans need no such dep: their
-        # creators are already applied or neutralised.)
+        # Run after every creator of a task we clear, otherwise a still-pending creator could register
+        # the task after we clear it. OBSOLETE_TASK_IDS (annotation) + the obsolete 'other' reminders
+        # span the annotation/genes/snpdb apps; depend on the latest creator in each. (The
+        # OBSOLETE_COMMANDS orphans need no such dep: their creators are already applied or neutralised.)
         ('annotation', '0146_one_off_cols_v4_pathogenic_counts'),
+        ('genes', '0054_one_off_import_gene_annotation_manual'),
+        ('snpdb', '0118_reminder_one_off_fix_variant_end'),
     ]
 
     operations = [

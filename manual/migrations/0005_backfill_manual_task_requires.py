@@ -12,13 +12,18 @@ TASK_REQUIRES = {
     # After variant annotation is upgraded (operator-confirmed manual gate):
     "manage*calculate_sample_stats": ["variant-annotation-current"],
     "manage*calculate_sample_stats --clear": ["variant-annotation-current"],
-    # fix_variant_matching needs current cdot transcripts (the command itself hard-errors otherwise).
-    # The four flags were inserted across successive migrations (classification 0083 --extra, 0089
-    # --revalidate_chgvs, 0091 --sort, 0101 --non-coding); chain them in that insertion order.
-    f"{_FVM} --extra": ["cdot-current"],
+    # fix_variant_matching needs current cdot transcripts (the command itself hard-errors otherwise);
+    # --extra also wants RefSeq transcript sequences loaded first, else c.hgvs resolution falls back
+    # to slow per-transcript NCBI fetches (was the "BEFORE rematching - import_transcript_fasta"
+    # reminder, now a gate). The four flags were inserted across successive migrations (classification
+    # 0083 --extra, 0089 --revalidate_chgvs, 0091 --sort, 0101 --non-coding); chain them in that order.
+    f"{_FVM} --extra": ["cdot-current", "transcript-sequences-loaded"],
     f"{_FVM} --revalidate_chgvs": ["cdot-current", f"after:{_FVM} --extra"],
     f"{_FVM} --sort": ["cdot-current", f"after:{_FVM} --revalidate_chgvs"],
     f"{_FVM} --non-coding": ["cdot-current", f"after:{_FVM} --sort"],
+    # Was the "Before fix_legacy_classification_alignment_gap_hgvs_matching - Import gene annotation"
+    # reminder; needs current cdot/gene annotation, so gate it on cdot-current.
+    "manage*fix_legacy_classification_alignment_gap_hgvs_matching": ["cdot-current"],
 }
 
 
@@ -42,6 +47,7 @@ class Migration(migrations.Migration):
         ('classification', '0101_one_off_fix_variant_matching_non_coding'),
         ('annotation', '0037_one_off_move_pheno_match_to_hgnc'),
         ('patients', '0004_one_off_fix_patient_imports_and_modifications'),
+        ('genes', '0043_one_off_hgvs_gap'),  # creates fix_legacy_classification_alignment_gap_hgvs_matching
     ]
 
     operations = [

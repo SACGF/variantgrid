@@ -144,6 +144,18 @@ class ManualGateTest(TestCase):
         self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(kept_variant))     # untouched
         self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(link_transcripts))  # kept
 
+    def test_cleanup_migration_retires_obsolete_other_reminders(self):
+        obsolete = ManualMigrationTask.objects.create(
+            id='other*"Import dbNSFP gene annotation (see annotation page)"')
+        self._request(obsolete)
+        kept = ManualMigrationTask.objects.create(id='other*"Some other human step we keep"')
+        self._request(kept)
+
+        complete_obsolete_tasks(apps, None)
+
+        self.assertIsNone(ManualMigrationOutstanding.outstanding_task(obsolete))   # retired
+        self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(kept))    # untouched
+
     def test_backfill_requires_migration(self):
         extra = ManualMigrationTask.objects.create(id="manage*fix_variant_matching --extra")
         reval = ManualMigrationTask.objects.create(id="manage*fix_variant_matching --revalidate_chgvs")
@@ -153,7 +165,7 @@ class ManualGateTest(TestCase):
 
         for t in (extra, reval, phenos):
             t.refresh_from_db()
-        self.assertEqual(extra.requires, ["cdot-current"])
+        self.assertEqual(extra.requires, ["cdot-current", "transcript-sequences-loaded"])
         # Chained in insertion order: revalidate_chgvs runs after --extra
         self.assertEqual(reval.requires,
                          ["cdot-current", "after:manage*fix_variant_matching --extra"])

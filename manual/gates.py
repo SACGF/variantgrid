@@ -16,9 +16,13 @@ A requires entry is resolved as:
 from dataclasses import dataclass
 from typing import Callable
 
+from django.conf import settings
+
+from annotation.models import CachedWebResource
 from genes.models import TranscriptVersion
 from manual.models import ManualGateSatisfied, ManualMigrationOutstanding, ManualMigrationTask
 from ontology.models import OntologyVersion
+from snpdb.models.models_enums import ImportStatus
 
 AFTER_PREFIX = "after:"
 
@@ -99,6 +103,12 @@ GATES: dict[str, Gate] = {
     "cdot-current": AutoGate(
         TranscriptVersion.data_is_current_cdot_format,
         "Transcripts are in current cdot format (run import_cdot_latest)",
+    ),
+    "transcript-sequences-loaded": AutoGate(
+        lambda: CachedWebResource.objects.filter(
+            name=settings.CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO,
+            import_status=ImportStatus.SUCCESS).exists(),
+        "RefSeq transcript sequences loaded (else c.hgvs resolution falls back to slow NCBI fetches)",
     ),
     "variant-annotation-current": ManualGate(
         "Variant annotation upgraded to the latest version",

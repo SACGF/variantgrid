@@ -68,6 +68,8 @@ class SubMigration:
         self.key = None
         self.task_id = None
         self.notes = None
+        self.blocked_by = None       # gate names not yet satisfied (see manual.gates)
+        self.command_exists = None   # False for an obsolete 'manage' task whose command was deleted
 
     def using(self, key: Optional[str] = None, task_id: Optional[str] = None, notes: Optional[list[str]] = None):
         if key:
@@ -77,6 +79,14 @@ class SubMigration:
         if notes:
             self.notes = notes
         return self
+
+    def status_line(self) -> Optional[str]:
+        """ Human-readable dependency/availability status for the interactive menu, or None. """
+        if self.command_exists is False:
+            return "obsolete - command no longer exists (review / mark complete)"
+        if self.blocked_by:
+            return f"blocked - waiting on: {', '.join(self.blocked_by)}"
+        return None
 
     def run(self) -> MigrationResult:
         return MigrationResult.skip()
@@ -356,8 +366,12 @@ class Migrator:
         notes = task.get("notes")
         if category == "manage":
             args = ["python", "manage.py", line]
-            return CommandSubMigration(args).using(task_id=task_id, notes=notes)
-        return ManualSubMigration(line).using(task_id=task_id, notes=notes)
+            sub_migration = CommandSubMigration(args).using(task_id=task_id, notes=notes)
+        else:
+            sub_migration = ManualSubMigration(line).using(task_id=task_id, notes=notes)
+        sub_migration.blocked_by = task.get("blocked_by")
+        sub_migration.command_exists = task.get("command_exists")
+        return sub_migration
 
     def prompt(self, refresh: bool = True):
         if refresh:
@@ -371,6 +385,8 @@ class Migrator:
                 print("****** SPECIAL STEPS ******")
             print(f"{migration.key}: {str(migration)}")
             keys.append(migration.key)
+            if status := migration.status_line():
+                print_yellow(f"    ⧗ {status}")
             if migration.notes:
                 for note in migration.notes:
                     print(f"    {note}")
@@ -440,8 +456,30 @@ class Migrator:
                 callback(False)
 
 
+USAGE = """variantgrid upgrader
+
+Usage: ./scripts/upgrade.sh [MODE]
+       python3 scripts/migrator/migrator.py [MODE]
+
+Modes:
+  (no argument)    Interactive menu (also offers 'a' and 'am' below).
+  --quick          Run the standard steps and quit if nothing else is outstanding:
+                   git pull, migrate, collectstatic_js_reverse, collectstatic,
+                   deployment_check, deployed.
+  --auto-manage    Plough through all outstanding manual steps automatically: run every
+                   unblocked 'manage' step (re-evaluating between passes so ordering gates
+                   release as prerequisites finish), stopping on the first failure. Gated,
+                   obsolete, and non-manage human steps are reported, not run.
+  --help, -h       Show this help.
+"""
+
+
 if __name__ == '__main__':
     arg = sys.argv[1] if len(sys.argv) > 1 else None
+
+    if arg in ('--help', '-h'):
+        print(USAGE)
+        sys.exit(0)
 
     migrator = Migrator()
     if arg == '--quick':
