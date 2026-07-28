@@ -8,11 +8,15 @@ class ManualOperation(Operation):
     reversable = False
     reduces_to_sql = False
 
-    def __init__(self, task_id: str, note: Optional[str] = None, test: Callable = None):
-        """ test - optional callable, only create manual operation if test returns True  """
+    def __init__(self, task_id: str, note: Optional[str] = None, test: Callable = None,
+                 requires: Optional[list[str]] = None):
+        """ test - optional callable, only create manual operation if test returns True
+            requires - gate names (see manual.gates) that must be satisfied before this task
+                       may be auto-run by the migrator """
         self.task_id = task_id
         self.note = note
         self.test = test
+        self.requires = requires
 
     def deconstruct(self):
         kwargs = {
@@ -20,6 +24,8 @@ class ManualOperation(Operation):
         }
         if self.note:
             kwargs['note'] = self.note
+        if self.requires:
+            kwargs['requires'] = self.requires
 
         return (
             self.__class__.__qualname__,
@@ -56,6 +62,11 @@ class ManualOperation(Operation):
             ManualMigrationTask.objects.filter(pk=self.task_id).delete()
         else:
             task, _ = ManualMigrationTask.objects.get_or_create(pk=self.task_id)
+            # 'requires' persists only once the field exists (historical migration states that
+            # predate it fall back to the one-off backfill migration).
+            if self.requires and hasattr(task, "requires"):
+                task.requires = list(self.requires)
+                task.save(update_fields=["requires"])
             if callable(self.note):
                 note = self.note(apps)
             else:
@@ -63,12 +74,16 @@ class ManualOperation(Operation):
             ManualMigrationRequsted.objects.create(task=task, note=note)
 
     @staticmethod
-    def operation_manage(args: list[str], note: Optional[str] = None, test: Callable = None):
-        return ManualOperation(task_id=ManualOperation._task_id_generate("manage", args), note=note, test=test)
+    def operation_manage(args: list[str], note: Optional[str] = None, test: Callable = None,
+                         requires: Optional[list[str]] = None):
+        return ManualOperation(task_id=ManualOperation._task_id_generate("manage", args), note=note, test=test,
+                               requires=requires)
 
     @staticmethod
-    def operation_other(args: list[str], note: Optional[str] = None, test: Callable = None):
-        return ManualOperation(task_id=ManualOperation._task_id_generate("other", args), note=note, test=test)
+    def operation_other(args: list[str], note: Optional[str] = None, test: Callable = None,
+                        requires: Optional[list[str]] = None):
+        return ManualOperation(task_id=ManualOperation._task_id_generate("other", args), note=note, test=test,
+                               requires=requires)
 
     @staticmethod
     def escape_arg(arg: str):

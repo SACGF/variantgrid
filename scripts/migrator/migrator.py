@@ -247,27 +247,94 @@ class Migrator:
         self.git_version = Migrator.get_git_ver()
         self.rollbar_token = None
 
+    def _fetch_outstanding(self) -> dict:
+        """ Call the manual_outstanding management command and return its parsed JSON envelope.
+            Each task carries 'category', 'line', 'requires', 'blocked_by' and 'runnable'. """
+        command = substitute_aliases(["python", "manage.py", "manual_outstanding"])
+        with Popen(command, stdout=subprocess.PIPE) as proc:
+            task_json = json.load(proc.stdout)
+        if token := task_json.get('ROLLBAR_ACCESS_TOKEN'):
+            self.rollbar_token = token
+        return task_json
+
     def refresh_migrations(self):
         try:
             migrations: list[SubMigration] = self.standard_migrations
 
-            command = substitute_aliases(["python", "manage.py", "manual_outstanding"])
+            task_json = self._fetch_outstanding()
             self.has_custom_migrations = False
-            with Popen(command, stdout=subprocess.PIPE) as proc:
-                # stdout_text = proc.stdout.read()
-                task_json = json.load(proc.stdout)
-                if token := task_json.get('ROLLBAR_ACCESS_TOKEN'):
-                    self.rollbar_token = token
-                command = 1
-                for task in task_json["tasks"]:
-                    self.has_custom_migrations = True
-                    migrations.append(Migrator.subcommand_for_json(task).using(key=f"{command}"))
-                    command += 1
+            command = 1
+            for task in task_json["tasks"]:
+                self.has_custom_migrations = True
+                migrations.append(Migrator.subcommand_for_json(task).using(key=f"{command}"))
+                command += 1
 
             self.migrations = migrations
         except Exception:
             print("Unable to retrieve outstanding commands")
             traceback.print_exc()
+
+    def run_auto_manage(self):
+        """ Auto-run every 'manage' task whose gates are satisfied, re-evaluating between passes so
+            task-ordering gates (after:<task_id>) unblock as their prerequisites complete. Stops on
+            the first failure; leaves blocked manage tasks and all 'other' tasks for a human. """
+        print_purple("-- Auto-running unblocked manage.py steps --")
+        while True:
+            try:
+                task_json = self._fetch_outstanding()
+            except Exception:
+                print_red("Unable to retrieve outstanding commands")
+                traceback.print_exc()
+                return
+
+            runnable = [task for task in task_json.get("tasks", []) if task.get("runnable")]
+            if not runnable:
+                break
+
+            for task in runnable:
+                migration = Migrator.subcommand_for_json(task)
+                result = migration.run()
+                if migration.task_id:
+                    self.record_attempt(task_id=migration.task_id,
+                                        success=result.status == MigrationStatus.SUCCESS)
+                if result.status == MigrationStatus.SUCCESS:
+                    print_green("*** task succeeded ***")
+                else:
+                    print_red("*** task failed - stopping auto-run ***")
+                    self.report_outstanding()
+                    return
+
+        self.report_outstanding()
+
+    def report_outstanding(self):
+        try:
+            task_json = self._fetch_outstanding()
+        except Exception:
+            return
+        tasks = task_json.get("tasks", [])
+        manage = [t for t in tasks if t["category"] == "manage"]
+        obsolete = [t for t in manage if not t.get("command_exists")]
+        manage_blocked = [t for t in manage if t.get("command_exists") and not t.get("runnable")]
+        others = [t for t in tasks if t["category"] != "manage"]
+
+        if manage_blocked:
+            print_yellow("Blocked manage.py steps (prerequisite gate not satisfied):")
+            for t in manage_blocked:
+                gates = ", ".join(t.get("blocked_by") or [])
+                print_yellow(f"    python3 manage.py {t['line']}    [waiting on: {gates}]")
+        if obsolete:
+            print_yellow("Obsolete manage steps (command no longer exists - review/mark complete):")
+            for t in obsolete:
+                print_yellow(f"    {t['line']}")
+        if others:
+            print_yellow("Manual steps still requiring you (not auto-run):")
+            for t in others:
+                print_yellow(f"    {t['line']}")
+        if not manage_blocked and not obsolete and not others:
+            print_green("No outstanding manual steps remain.")
+        if manage_blocked:
+            print_purple("Satisfy a manual gate with: python3 manage.py manual_gate --satisfy <gate>")
+            print_purple("List gate status with:      python3 manage.py manual_gate")
 
     def record_attempt(self, task_id: str, success: bool = True):
         args = ["python", "manage.py", "manual_complete", "--id", task_id, "--ver", self.git_version]
@@ -298,6 +365,7 @@ class Migrator:
         keys = []
         print_purple("-- Welcome to variantgrid upgrader --")
         print("a: automate standard steps (runs git, migrate, collectstatic_js_reverse, collectstatic, deployment_check, deployed)")
+        print("am: auto-run all unblocked manage.py steps (skips gated + non-manage manual steps)")
         for migration in self.migrations:
             if migration.key == "1":
                 print("****** SPECIAL STEPS ******")
@@ -309,6 +377,7 @@ class Migrator:
         print("q: exit")
         keys.append("q")
         keys.append("a")
+        keys.append("am")
 
         selected_migration: Optional[SubMigration] = None
         while selected_migration is None:
@@ -317,6 +386,11 @@ class Migrator:
 
             if selection == "a":
                 self.run_and_re_prompt(self.standard_migrations)
+                return
+
+            if selection == "am":
+                self.run_auto_manage()
+                self.prompt()
                 return
 
             if selection == "q":
@@ -367,13 +441,13 @@ class Migrator:
 
 
 if __name__ == '__main__':
-    quick_mode = False
-    if len(sys.argv) > 1:
-        quick_mode = sys.argv[1] == '--quick'
+    arg = sys.argv[1] if len(sys.argv) > 1 else None
 
     migrator = Migrator()
-    if quick_mode:
+    if arg == '--quick':
         print_purple("-- Attempting automatic update --")
         migrator.run_and_quit_if_success()
+    elif arg == '--auto-manage':
+        migrator.run_auto_manage()
     else:
         migrator.prompt()

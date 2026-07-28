@@ -10,6 +10,8 @@ from model_utils.models import TimeStampedModel
 
 class ManualMigrationTask(models.Model):
     id = models.TextField(primary_key=True)
+    # Gate names (see manual.gates) that must be satisfied before this task may auto-run.
+    requires = models.JSONField(null=False, blank=True, default=list)
 
     @staticmethod
     def describe_manual(text: str) -> str:
@@ -34,6 +36,18 @@ class ManualMigrationAttempt(TimeStampedModel):
     source_version = models.TextField(null=True, blank=True)
     requires_retry = models.BooleanField(default=False)
     note = models.TextField(null=True, blank=True)
+
+
+class ManualGateSatisfied(TimeStampedModel):
+    """ Records that an operator has confirmed a ManualGate (see manual.gates) as satisfied.
+        A gate is considered satisfied while at least one row for its name exists. """
+    name = models.TextField()
+    source_version = models.TextField(null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+
+    @staticmethod
+    def is_satisfied(name: str) -> bool:
+        return ManualGateSatisfied.objects.filter(name=name).exists()
 
 
 @dataclass
@@ -82,6 +96,7 @@ class ManualMigrationOutstanding:
         data["id"] = self.task.id
         data["category"] = id_split[0]
         data["line"] = id_split[1]
+        data["requires"] = list(self.task.requires or [])
         data["notes"] = [required.note for required in self.outstanding_required if required.note]
         if self.last_success:
             data["last_success"] = {
