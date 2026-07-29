@@ -2308,6 +2308,10 @@ a.clinical-context {
   background-image: url(/static/icons/sequencers/miseq_icon.png);
 }
 
+.iseq-100 {
+  background-image: url(/static/icons/sequencers/iseq_icon.png);
+}
+
 .patient-icon {
   background-image: url(/static/icons/patient-icon-png-3.png);
 }
