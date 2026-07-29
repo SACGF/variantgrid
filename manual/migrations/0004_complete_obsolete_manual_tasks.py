@@ -5,7 +5,8 @@ from django.db import migrations
 # (a DB that ran the old, pre-neutralised migrations still holds such orphan rows). Audited examples,
 # none wrongly deleted: one_off_calc_variant_end (#414), fix_panel_app_gene_list_permissions (#690),
 # fix_historical_max_af, remove_redundant_flags, fix_retrieve_transcript_version_sequence_info,
-# vep_download_fasta.
+# vep_download_fasta, classification_populate_sort_orders (column dropped again by classification/0155,
+# sorting moved to Classification.summary - the command could only ever fail, so it was deleted).
 
 # Obsolete steps whose command still EXISTS (so command-name matching would wrongly clear sibling
 # variants) - matched by exact task id instead. These are historical in-place patches to EXISTING

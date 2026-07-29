@@ -2,14 +2,6 @@
 
 from django.db import migrations, models
 
-from manual.operations.manual_operations import ManualOperation
-
-
-def _has_classification_modifications(apps):
-    # Only populates the sort column on existing modifications - none on a fresh install
-    ClassificationModification = apps.get_model("classification", "ClassificationModification")
-    return ClassificationModification.objects.exists()
-
 
 class Migration(migrations.Migration):
 
@@ -17,13 +9,15 @@ class Migration(migrations.Migration):
         ('classification', '0139_once_off_re_run_allele_origin_fix'),
     ]
 
+    # The ManualOperation registering 'classification_populate_sort_orders' is neutralised: the column
+    # it populated (somatic_clinical_significance_sort) was dropped again in
+    # 0155_allelegrouping_alleleorigingrouping_and_more (sorting moved to Classification.summary), so the
+    # command could only ever fail. The command has been deleted, so orphaned task rows in existing DBs
+    # are cleared by manual/0004_complete_obsolete_manual_tasks (deleted command -> obsolete).
     operations = [
         migrations.AddField(
             model_name='classificationmodification',
             name='somatic_clinical_significance_sort',
             field=models.IntegerField(blank=True, db_index=True, null=True),
         ),
-        ManualOperation(task_id=ManualOperation.task_id_manage(
-            ["classification_populate_sort_orders"]
-        ), test=_has_classification_modifications)
     ]
