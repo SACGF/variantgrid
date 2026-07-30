@@ -1,11 +1,11 @@
 import argparse
 import json
-import logging
 
 from django.core.management import BaseCommand, call_command
 from django.db.models import Max
 
-from annotation.models import VariantAnnotationVersion
+from annotation.models import VariantAnnotationVersion, AnnotationVersion, GeneAnnotationVersion, \
+    InvalidAnnotationVersionError
 from genes.cdot_data_release import find_latest_release_asset, download_cdot_json
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.management.commands.import_cdot_latest import cdot_data_needs_update, import_latest_combo_file
@@ -123,18 +123,23 @@ class Command(BaseCommand):
         parser.add_argument('--genome-build', choices=self.genome_builds, required=False,
                             help="Defaults to every build with annotation")
         parser.add_argument('--status', choices=list(VariantAnnotationVersion.Status), required=False,
-                            help="Which VariantAnnotationVersion to install a release for. Defaults to the "
-                                 "latest NEW version, falling back to ACTIVE")
+                            help="Only act on VariantAnnotationVersions with this status. Defaults to every "
+                                 "NEW and ACTIVE version, so a half configured build gets finished off")
         parser.add_argument('--json-file', required=False,
                             help="Create the release from a locally produced cdot JSON.gz instead of "
-                                 "downloading the published one. Requires --genome-build")
+                                 "downloading the published one. Acts on the latest version only, so it "
+                                 "requires --genome-build")
         parser.add_argument('--release-name', required=False,
                             help="Name for the GeneAnnotationRelease. Defaults to one derived from the "
                                  "VariantAnnotationVersion's VEP versions")
+        parser.add_argument('--relink', action='store_true',
+                            help="Re-point versions whose linked release disagrees with their VEP versions. "
+                                 "This changes which transcript versions existing analyses resolve to")
         parser.add_argument('--force', action='store_true',
-                            help="Install even if the VariantAnnotationVersion already has a release")
+                            help="Re-download and rebuild the release even if one is already linked")
         parser.add_argument('--gene-annotation', action=argparse.BooleanOptionalAction, default=True,
-                            help="Create the GeneAnnotationVersion for the release afterwards. Default on")
+                            help="Create any missing GeneAnnotationVersion and bring the AnnotationVersion "
+                                 "into line afterwards. Default on")
 
     @property
     def genome_builds(self):
@@ -148,25 +153,55 @@ class Command(BaseCommand):
         else:
             genome_builds = list(GenomeBuild.builds_with_annotation())
 
-        installed_releases = []
+        releases_by_build = {}
         for genome_build in genome_builds:
-            if release := self._install_for_build(genome_build, options):
-                installed_releases.append(release)
+            print(f"=== {genome_build} ===")
+            releases = {}  # keyed by pk so several versions sharing a release only annotate once
+            for vav in self._variant_annotation_versions(genome_build, options):
+                if release := self._ensure_release(vav, options):
+                    releases[release.pk] = release
+            if releases:
+                releases_by_build[genome_build] = list(releases.values())
 
-        if not installed_releases:
+        if not releases_by_build:
             return
 
         if options["gene_annotation"]:
-            for release in installed_releases:
-                print(f"Creating GeneAnnotationVersion for {release}")
-                call_command("gene_annotation", gene_annotation_release=release.pk)
+            for genome_build, releases in releases_by_build.items():
+                self._ensure_gene_annotation(genome_build, releases)
+            return
+
+        missing = [r for releases in releases_by_build.values() for r in releases
+                   if not GeneAnnotationVersion.objects.filter(gene_annotation_release=r).exists()]
+        if missing:
+            release_ids = ",".join(str(r.pk) for r in missing)
+            print(f"These releases have no GeneAnnotationVersion: {', '.join(str(r) for r in missing)}. "
+                  f"To create them, run:")
+            print(f"    python3 manage.py gene_annotation --gene-annotation-release={release_ids}")
+        for genome_build in releases_by_build:
+            self._report_annotation_versions(genome_build)
+
+    def _variant_annotation_versions(self, genome_build: GenomeBuild, options) -> list[VariantAnnotationVersion]:
+        if options.get("json_file"):
+            # A single local file makes a single release, so only the newest version can be meant
+            vav = self._latest_variant_annotation_version(genome_build, options.get("status"))
+            return [vav] if vav else []
+
+        if status := options.get("status"):
+            statuses = [status]
         else:
-            release_ids = ", ".join(str(r.pk) for r in installed_releases)
-            print(f"To create GeneAnnotationVersions for the releases installed above, run: "
-                  f"python3 manage.py gene_annotation --gene-annotation-release={release_ids}")
+            # NEW is the version being built, ACTIVE the one in use - both need a release
+            statuses = [VariantAnnotationVersion.Status.NEW, VariantAnnotationVersion.Status.ACTIVE]
+
+        vavs = list(VariantAnnotationVersion.objects.filter(genome_build=genome_build, status__in=statuses)
+                    .order_by("annotation_date"))
+        if not vavs:
+            print(f"No {'/'.join(statuses)} VariantAnnotationVersion - run "
+                  f"'python3 manage.py create_new_variant_annotation_version --genome-build={genome_build}'")
+        return vavs
 
     @staticmethod
-    def _get_variant_annotation_version(genome_build: GenomeBuild, status) -> VariantAnnotationVersion:
+    def _latest_variant_annotation_version(genome_build: GenomeBuild, status) -> VariantAnnotationVersion:
         if status:
             return VariantAnnotationVersion.latest(genome_build, status=status)
         # A release is normally installed for the version being built, but a build whose version has
@@ -176,26 +211,17 @@ class Command(BaseCommand):
                 return vav
         return None
 
-    def _install_for_build(self, genome_build: GenomeBuild, options) -> GeneAnnotationRelease:
-        print(f"=== {genome_build} ===")
-        vav = self._get_variant_annotation_version(genome_build, options.get("status"))
-        if vav is None:
-            print(f"{genome_build}: no VariantAnnotationVersion - run "
-                  f"'python3 manage.py create_new_variant_annotation_version --genome-build={genome_build}'")
-            return None
-
-        print(f"{vav}")
+    def _ensure_release(self, vav: VariantAnnotationVersion, options) -> GeneAnnotationRelease:
+        """ Returns the release this version should be using, whether we just installed it or it was
+            already linked - the caller still has to check it has a GeneAnnotationVersion """
+        print(f"{vav.status} {vav}")
         if vav.gene_annotation_release and not options["force"]:
-            print(f"Already has GeneAnnotationRelease '{vav.gene_annotation_release}' - use --force to reinstall")
-            return None
+            return self._check_existing_release(vav, options)
 
         annotation_consortium = AnnotationConsortium(vav.annotation_consortium)
-
         if json_file := options.get("json_file"):
-            release_name = options.get("release_name") or vav.suggested_gene_annotation_release_name
-            if release_name == VariantAnnotationVersion.UNKNOWN_GENE_ANNOTATION_RELEASE_NAME:
-                print(f"Could not derive a release name from this VEP "
-                      f"(refseq={vav.refseq!r} vep={vav.vep} genebuild={vav.genebuild!r}) - pass --release-name")
+            release_name = self._release_name(vav, options)
+            if release_name is None:
                 return None
             with open_handle_gzip(json_file, "rb") as f:
                 cdot_data, cdot_version = read_cdot_data(f)
@@ -204,37 +230,95 @@ class Command(BaseCommand):
             # between VEP versions
             if not options["force"]:
                 if release := vav.link_gene_annotation_release():
-                    print(f"Linked existing GeneAnnotationRelease '{release}' - no download needed")
-                    return None
+                    print(f"  linked existing GeneAnnotationRelease '{release}' - no download needed")
+                    return release
 
             release_token = vav.cdot_gene_release_token
             if release_token is None:
-                print(f"Could not work out the gene set release from this VEP. "
+                print(f"  could not work out the gene set release from this VEP. "
                       f"refseq={vav.refseq!r} vep={vav.vep} vep_cache={vav.vep_cache} genebuild={vav.genebuild!r}")
                 return None
 
-            release_name = options.get("release_name") or vav.suggested_gene_annotation_release_name
-            print(f"VEP used {annotation_consortium.label} release '{release_token}'")
-            asset, available = find_latest_release_asset(genome_build.name, annotation_consortium.label,
+            release_name = self._release_name(vav, options)
+            if release_name is None:
+                return None
+
+            print(f"  VEP used {annotation_consortium.label} release '{release_token}'")
+            asset, available = find_latest_release_asset(vav.genome_build.name, annotation_consortium.label,
                                                         release_token)
             if asset is None:
                 available_releases = ", ".join(a.release for a in available) or "none"
-                print(f"The latest cdot data release has no file for "
-                      f"{genome_build}/{annotation_consortium.label} release '{release_token}'. "
+                print(f"  the latest cdot data release has no file for "
+                      f"{vav.genome_build}/{annotation_consortium.label} release '{release_token}'. "
                       f"It publishes: {available_releases}")
                 return None
 
-            self._ensure_transcripts_installed(genome_build, annotation_consortium)
-            print(f"Creating GeneAnnotationRelease '{release_name}' from {asset.filename}")
+            self._ensure_transcripts_installed(vav.genome_build, annotation_consortium)
+            print(f"  creating GeneAnnotationRelease '{release_name}' from {asset.filename}")
             with download_cdot_json(asset.url) as f:
                 cdot_data, cdot_version = read_cdot_data(f)
 
-        release = create_gene_annotation_release(genome_build, annotation_consortium, release_name,
+        release = create_gene_annotation_release(vav.genome_build, annotation_consortium, release_name,
                                                  cdot_data, cdot_version)
         vav.gene_annotation_release = release
         vav.save()
-        print(f"Linked GeneAnnotationRelease '{release}' to {vav}")
+        print(f"  linked GeneAnnotationRelease '{release}'")
         return release
+
+    @staticmethod
+    def _check_existing_release(vav: VariantAnnotationVersion, options) -> GeneAnnotationRelease:
+        """ Already linked - keep it, unless it disagrees with the VEP versions and --relink was passed """
+        release = vav.gene_annotation_release
+        match = vav.match_gene_annotation_release()
+        if match.release_ids and release.pk not in match.release_ids:
+            matched = GeneAnnotationRelease.objects.filter(pk__in=match.release_ids)
+            matched_str = ", ".join(str(r) for r in matched)
+            if options["relink"] and (release_id := match.unique_release_id):
+                vav.gene_annotation_release = GeneAnnotationRelease.objects.get(pk=release_id)
+                vav.save()
+                print(f"  re-pointed from '{release}' to '{vav.gene_annotation_release}' "
+                      f"(matched on {match.description})")
+                return vav.gene_annotation_release
+            print(f"  linked to '{release}' but its VEP versions match {matched_str} "
+                  f"(on {match.description}) - pass --relink to re-point it")
+            return release
+
+        print(f"  has GeneAnnotationRelease '{release}'")
+        return release
+
+    @staticmethod
+    def _release_name(vav: VariantAnnotationVersion, options) -> str:
+        release_name = options.get("release_name") or vav.suggested_gene_annotation_release_name
+        if release_name == VariantAnnotationVersion.UNKNOWN_GENE_ANNOTATION_RELEASE_NAME:
+            print(f"  could not derive a release name from this VEP (refseq={vav.refseq!r} "
+                  f"vep={vav.vep} genebuild={vav.genebuild!r}) - pass --release-name")
+            return None
+        return release_name
+
+    def _ensure_gene_annotation(self, genome_build: GenomeBuild, releases: list[GeneAnnotationRelease]):
+        """ A release is only usable once it has a GeneAnnotationVersion and the AnnotationVersion points
+            at it - otherwise AnnotationVersion.validate() raises and variant pages break """
+        for release in releases:
+            if GeneAnnotationVersion.objects.filter(gene_annotation_release=release).exists():
+                continue
+            print(f"Creating GeneAnnotationVersion for {release}")
+            call_command("gene_annotation", gene_annotation_release=release.pk)
+
+        print(f"Bringing {genome_build} AnnotationVersion into line")
+        AnnotationVersion.new_sub_version(genome_build)
+        self._report_annotation_versions(genome_build)
+
+    @staticmethod
+    def _report_annotation_versions(genome_build: GenomeBuild):
+        for status in (VariantAnnotationVersion.Status.NEW, VariantAnnotationVersion.Status.ACTIVE):
+            av = AnnotationVersion.latest(genome_build, validate=False, status=status)
+            if av is None:
+                continue
+            try:
+                av.validate()
+                print(f"  {status} AnnotationVersion {av.pk}: ok")
+            except InvalidAnnotationVersionError as e:
+                print(f"  {status} AnnotationVersion {av.pk}: {e}")
 
     @staticmethod
     def _ensure_transcripts_installed(genome_build: GenomeBuild, annotation_consortium: AnnotationConsortium):

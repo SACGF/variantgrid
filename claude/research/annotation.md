@@ -50,7 +50,7 @@ VEP-specific version record.
   - `get_pathogenic_prediction_funcs()`: Returns callables for pathogenicity prediction scoring
   - `damage_predictions_description`: Human-readable description of active damage predictors
   - `cdot_gene_release_token`: The gene set release VEP used, as cdot names it (eg `RS_2025_08`)
-  - `cdot_release_asset`: The cdot per-GFF file matching this version's gene set (hits the GitHub API)
+  - `gene_annotation_release_gff_url`: The GFF/GTF cdot read to build that gene set
   - `match_gene_annotation_release()` / `link_gene_annotation_release()`: Find and link the
     `GeneAnnotationRelease` built from this version's gene set
 
