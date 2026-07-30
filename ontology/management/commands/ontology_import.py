@@ -12,6 +12,7 @@ import pronto
 from django.core.management import BaseCommand
 from django.utils import timezone
 
+from annotation.models import InvalidAnnotationVersionError
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC, HGNCImport
 from library.utils import file_md5sum
@@ -636,4 +637,14 @@ class Command(BaseCommand):
         print("*** To make sure no matched terms have become obsolete")
 
         # Create a new OntologyVersion with all the new imports
-        OntologyVersion.latest()
+        try:
+            OntologyVersion.latest()
+        except InvalidAnnotationVersionError as e:
+            # The imports above are all committed by now, so this is a warning not a failure - the new
+            # OntologyVersion exists, it's only the AnnotationVersion bump that needs gene annotation first
+            print("*** Ontology import finished, but the AnnotationVersion was left as-is:")
+            print(f"    {e}")
+            if ontology_version := OntologyVersion.objects.order_by("pk").last():
+                if OntologyVersion.objects.count() > 1:
+                    print(f"*** Add --ontology-version {ontology_version.pk} to build gene annotation "
+                          "against the ontology just imported")
