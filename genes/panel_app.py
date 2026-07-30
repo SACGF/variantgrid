@@ -1,6 +1,6 @@
 import logging
 import urllib.parse
-from typing import Optional, Union
+from typing import NamedTuple, Optional, Union
 
 import requests
 from rest_framework.exceptions import NotFound
@@ -8,7 +8,7 @@ from rest_framework.exceptions import NotFound
 from annotation.models import CachedWebResource
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelAppServer, PanelAppPanelLocalCache, \
-    PanelAppPanelLocalCacheGeneSymbol, GeneSymbol, create_fake_gene_list
+    PanelAppPanelLocalCacheGeneSymbol, GeneSymbol, HGNC, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import MINUTE_SECS
 
@@ -37,6 +37,48 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
         results = data.get("results")
     r.close()
     return results
+
+
+def get_hgnc_pk_from_api_record(api_record: dict) -> Optional[int]:
+    """ PanelApp gene records carry an HGNC ID e.g. "HGNC:10593" - return the numeric part, which is
+        our HGNC pk. This is the stable identifier PanelApp asks integrators to use, as their gene
+        symbols come from a dated Ensembl/HGNC snapshot. """
+    gene_data = api_record.get("gene_data") or {}
+    if hgnc_id := gene_data.get("hgnc_id"):
+        try:
+            return int(str(hgnc_id).replace("HGNC:", ""))
+        except ValueError:
+            logging.warning("PanelApp returned unparsable hgnc_id: %s", hgnc_id)
+    return None
+
+
+class ResolvedPanelAppGene(NamedTuple):
+    api_record: dict
+    hgnc_pk: Optional[int]  # HGNC pk we hold a record for, else None
+    gene_symbol: str  # our approved symbol where their HGNC ID resolves, else the one they reported
+
+
+def resolve_panel_app_genes(genes: list[dict], context: str = "") -> list[ResolvedPanelAppGene]:
+    """ Identify PanelApp gene records by their HGNC ID rather than their gene symbol, which comes from
+        a dated Ensembl/HGNC snapshot and so can lag - or mean a different gene than - our current
+        approved symbol. Falls back to the symbol they reported where we have no record of the HGNC ID.
+        Resolves the whole batch in one query. """
+    records_with_hgnc_pk = [(api_record, get_hgnc_pk_from_api_record(api_record)) for api_record in genes]
+    api_hgnc_pks = {hgnc_pk for _, hgnc_pk in records_with_hgnc_pk if hgnc_pk}
+    symbol_by_hgnc_pk = dict(HGNC.objects.filter(pk__in=api_hgnc_pks).values_list("pk", "gene_symbol_id"))
+
+    resolved = []
+    for api_record, hgnc_pk in records_with_hgnc_pk:
+        approved_symbol = symbol_by_hgnc_pk.get(hgnc_pk)
+        reported_symbol = (api_record.get("gene_data") or {}).get("gene_symbol") or ""
+        resolved.append(ResolvedPanelAppGene(api_record=api_record,
+                                             hgnc_pk=hgnc_pk if approved_symbol else None,
+                                             gene_symbol=approved_symbol or reported_symbol))
+
+    if unknown := api_hgnc_pks - set(symbol_by_hgnc_pk):
+        logging.warning("PanelApp %s referenced %d HGNC ID(s) we have no record of: %s",
+                        context, len(unknown), sorted(unknown)[:10])
+    return resolved
 
 
 def _mark_panel_deleted(panel_app_panel: PanelAppPanel):
@@ -91,10 +133,9 @@ def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
     # Need to build evidence from panel app but using our gene names
     panel_app_gene_evidence = {}
     gene_names_list = []
-    for gene_record in genes:
-        gene_symbol = gene_record["gene_data"]["gene_symbol"]
-        panel_app_gene_evidence[gene_symbol] = gene_record
-        gene_names_list.append(gene_symbol)
+    for resolved_gene in resolve_panel_app_genes(genes, context=f"panel {panel_app_panel.panel_id}"):
+        panel_app_gene_evidence[resolved_gene.gene_symbol] = resolved_gene.api_record
+        gene_names_list.append(resolved_gene.gene_symbol)
 
     gene_matcher = GeneSymbolMatcher()
     gene_list = create_fake_gene_list(name=name, user=None)
@@ -204,20 +245,15 @@ def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
 
     pap_lc = PanelAppPanelLocalCache.objects.create(panel_app_panel=panel_app_panel,
                                                     version=version)
-    existing_uc_symbols = GeneSymbol.get_upper_case_lookup()
-    new_symbols = []
     pap_lc_genes = []
-    for api_record in genes:
-        gene_symbol = api_record["gene_data"]["gene_symbol"]
-        if gene_symbol.upper() not in existing_uc_symbols:
-            new_symbols.append(GeneSymbol(symbol=gene_symbol))
+    for resolved_gene in resolve_panel_app_genes(genes, context=f"panel {panel_app_panel.panel_id}"):
+        gene_data = resolved_gene.api_record.get("gene_data") or {}
         record = PanelAppPanelLocalCacheGeneSymbol(panel_app_local_cache=pap_lc,
-                                                   gene_symbol_id=gene_symbol,
-                                                   data=api_record)
+                                                   hgnc_id=resolved_gene.hgnc_pk,
+                                                   gene_symbol_reported=gene_data.get("gene_symbol") or "",
+                                                   data=resolved_gene.api_record)
         pap_lc_genes.append(record)
 
-    if new_symbols:
-        GeneSymbol.objects.bulk_create(new_symbols, ignore_conflicts=True, batch_size=2000)
     if pap_lc_genes:
         PanelAppPanelLocalCacheGeneSymbol.objects.bulk_create(pap_lc_genes, batch_size=2000)
     return pap_lc

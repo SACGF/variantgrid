@@ -2,7 +2,7 @@ import logging
 import re
 from collections import defaultdict, namedtuple
 from functools import cached_property
-from typing import Iterable
+from typing import Iterable, Optional
 
 from django.db.models import Q
 from django.db.models.functions import Upper
@@ -85,21 +85,34 @@ class HGNCMatcher:
         return HGNCMatcher()
 
     @cached_property
-    def _aliases(self) -> dict:
+    def _aliases(self) -> dict[str, list[str]]:
+        """ Upper case alias -> upper case gene symbols it can redirect to. An alias can have
+            multiple targets, so keep them all (ordered by pk for stable results) rather than
+            collapsing to an arbitrary one. """
         alias_qs = GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.HGNC)
         alias_qs = alias_qs.annotate(uc_alias=Upper("alias"), uc_symbol=Upper("gene_symbol_id"))
-        return dict(alias_qs.values_list("uc_alias", "uc_symbol"))
+        aliases = defaultdict(list)
+        for uc_alias, uc_symbol in alias_qs.order_by("pk").values_list("uc_alias", "uc_symbol"):
+            aliases[uc_alias].append(uc_symbol)
+        return aliases
 
     @cached_property
     def _hgnc_by_uc_gene_symbol(self) -> dict:
         hgnc_qs = HGNC.objects.filter(status=HGNCStatus.APPROVED)
         return {str(hgnc.gene_symbol_id).upper(): hgnc for hgnc in hgnc_qs}
 
-    def match_hgnc(self, gene_symbol: str):
+    def match_hgnc(self, gene_symbol: str) -> Optional[HGNC]:
         gene_symbol = clean_string(gene_symbol).upper()
-        if gs := self._aliases.get(gene_symbol):
-            gene_symbol = gs
-        return self._hgnc_by_uc_gene_symbol.get(gene_symbol)
+        # An approved symbol outranks any alias redirect. HGNC's approved symbols are a current
+        # snapshot, while alias rows accumulate across every import and are never pruned - and they
+        # include HGNC's informal alias_symbol synonyms, which are frequently another gene's
+        # approved symbol (e.g. AURKAIP1 lists "AIP", TADA2A lists "ADA2").
+        if hgnc := self._hgnc_by_uc_gene_symbol.get(gene_symbol):
+            return hgnc
+        for alias_symbol in self._aliases.get(gene_symbol, []):
+            if hgnc := self._hgnc_by_uc_gene_symbol.get(alias_symbol):
+                return hgnc
+        return None
 
 
 class ReleaseGeneMatcher:

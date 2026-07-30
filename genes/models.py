@@ -2143,11 +2143,11 @@ class PanelAppPanelLocalCache(TimeStampedModel):
             gene_list = GeneList.objects.create(**gene_list_kwargs)
             logging.info("Created gene list: %s", gene_list.pk)
             gene_names_list = []
-            for pap_lc_gs in self.panelapppanellocalcachegenesymbol_set.all():
+            for pap_lc_gs in self.panelapppanellocalcachegenesymbol_set.select_related("hgnc"):
                 confidence_level = int(pap_lc_gs.data["confidence_level"])
                 if confidence_level >= min_level:
-                    gene_symbol = pap_lc_gs.data["gene_data"]["gene_symbol"]
-                    gene_names_list.append(gene_symbol)
+                    # Use our current approved symbol - PanelApp's own can be from an older HGNC snapshot
+                    gene_names_list.append(pap_lc_gs.gene_symbol_str)
 
             logging.info("Creating symbols: %s", gene_names_list)
             gene_matcher = GeneSymbolMatcher()
@@ -2166,9 +2166,30 @@ class PanelAppPanelLocalCache(TimeStampedModel):
 
 
 class PanelAppPanelLocalCacheGeneSymbol(models.Model):
+    """ A gene on a cached PanelApp panel.
+
+        PanelApp identifies genes by HGNC ID, and separately reports a gene symbol taken from a dated
+        Ensembl/HGNC snapshot - so their symbol can lag the current approved one (Genomics England is
+        pinned to Ensembl release 90). PanelApp Australia asks integrators to key off HGNC IDs rather
+        than symbols, so 'hgnc' is how we identify the gene and 'gene_symbol_reported' records what
+        they called it.
+
+        hgnc is nullable as PanelApp can reference an HGNC ID we have no record of. """
     panel_app_local_cache = models.ForeignKey(PanelAppPanelLocalCache, on_delete=CASCADE)
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+    # Django names the column 'hgnc_id' - that's HGNC's numeric pk, not the "HGNC:1234" string
+    hgnc = models.ForeignKey(HGNC, null=True, on_delete=SET_NULL)
+    gene_symbol_reported = models.TextField()
     data = models.JSONField(null=False, blank=True, default=dict)  # API response
+
+    @property
+    def gene_symbol_str(self) -> str:
+        """ Our current approved symbol where PanelApp's HGNC ID resolves, else the symbol they reported """
+        if self.hgnc_id is not None:
+            return str(self.hgnc.gene_symbol_id)
+        return self.gene_symbol_reported
+
+    def __str__(self):
+        return self.gene_symbol_str
 
 
 class CachedThirdPartyGeneList(models.Model):
