@@ -138,7 +138,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         return {
             "classification_id": row["latest_classification_modification__classification_id"],
             "curation_date": row.get_nested_json("latest_classification_modification__classification__summary__date",
-                                                 "value"),
+                                                 "date"),
             "date_type": row.get_nested_json("latest_classification_modification__classification__summary__date",
                                              "type")
         }
