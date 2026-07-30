@@ -3,6 +3,7 @@ import logging
 from django.core.management.base import BaseCommand
 
 from annotation.annotation_versions import get_or_create_variant_annotation_version_from_current_vep
+from annotation.models import VariantAnnotationVersion
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -24,3 +25,19 @@ class Command(BaseCommand):
                 logging.info("Created: %s", vav)
             else:
                 logging.info("Existing matches current VEP: %s", vav)
+
+            if vav.gene_annotation_release is None:
+                self._report_gene_annotation_release(vav)
+
+    @staticmethod
+    def _report_gene_annotation_release(vav: VariantAnnotationVersion):
+        """ A build's gene set often doesn't change between VEP versions (GRCh37 in particular), so an
+            existing release usually still matches - link it rather than making them install it again """
+        if release := vav.link_gene_annotation_release():
+            print(f"{vav.genome_build}: linked existing GeneAnnotationRelease '{release}'")
+            return
+
+        release_token = vav.cdot_gene_release_token or "could not be determined from this VEP"
+        print(f"{vav.genome_build}: no GeneAnnotationRelease for {vav.get_annotation_consortium_display()} "
+              f"release '{release_token}'. To download and install it, run:")
+        print(f"    python3 manage.py import_cdot_gene_annotation_release --genome-build={vav.genome_build}")

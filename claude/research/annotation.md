@@ -49,7 +49,10 @@ VEP-specific version record.
   - `latest(genome_build, active=True)`: Returns the most recent active version for a build
   - `get_pathogenic_prediction_funcs()`: Returns callables for pathogenicity prediction scoring
   - `damage_predictions_description`: Human-readable description of active damage predictors
-  - `cdot_gene_release_filename`: Filename for the cdot gene release associated with this version
+  - `cdot_gene_release_token`: The gene set release VEP used, as cdot names it (eg `RS_2025_08`)
+  - `cdot_release_asset`: The cdot per-GFF file matching this version's gene set (hits the GitHub API)
+  - `match_gene_annotation_release()` / `link_gene_annotation_release()`: Find and link the
+    `GeneAnnotationRelease` built from this version's gene set
 
 ---
 

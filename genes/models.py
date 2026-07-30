@@ -1576,8 +1576,8 @@ class LRGRefSeqGene(models.Model):
 
 class GeneAnnotationRelease(models.Model):
     """
-        import_gene_annotation management command now supports --release which is used to link all
-        GeneVersion/TranscriptVersion from a particular GTF file.
+        Links all the GeneVersion/TranscriptVersion from a particular GTF/GFF file, so they match what a
+        VEP build used. Created by the 'import_cdot_gene_annotation_release' management command.
 
         This release can be set on a VariantAnnotationVersion to be able to get genes/transcripts from a VEP build
     """

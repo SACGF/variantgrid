@@ -26,6 +26,8 @@ from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
+from annotation.gene_annotation_release_matching import VepGeneSetVersions, match_gene_annotation_release, \
+    GeneAnnotationReleaseMatch
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction, \
     AlphaMissensePrediction, ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction
@@ -623,6 +625,8 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     REPRESENTATIVE_TRANSCRIPT_ANNOTATION = "annotation_variantannotation"
     TRANSCRIPT_ANNOTATION = "annotation_varianttranscriptannotation"
     VARIANT_GENE_OVERLAP = "annotation_variantgeneoverlap"
+    # Returned by suggested_gene_annotation_release_name when the VEP versions don't tell us the gene set
+    UNKNOWN_GENE_ANNOTATION_RELEASE_NAME = "TODO_RELEASE_NAME"
     RECORDS_BASE_TABLE_NAMES = [REPRESENTATIVE_TRANSCRIPT_ANNOTATION, TRANSCRIPT_ANNOTATION, VARIANT_GENE_OVERLAP]
 
     class Status(models.TextChoices):
@@ -882,67 +886,52 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return self._vep_config.get("phylop46way")
 
     @cached_property
-    def _gene_annotation_release_and_gff_url(self) -> tuple[Optional[str], Optional[str]]:
-        release = None
-        gff_url = None
-        # See issue: https://github.com/Ensembl/ensembl-vep/issues/833 - perhaps this can be done more easily now
-        if self.annotation_consortium == AnnotationConsortium.ENSEMBL:
-            if self.genome_build.name == "GRCh37":
-                # This has remained unchanged (last checked v108)
-                release = "87"
-                gff_url = "ftp://ftp.ensembl.org/pub/grch37/release-87/gff3/homo_sapiens/Homo_sapiens.GRCh37.87.gff3.gz"
-            elif self.genome_build.name == "GRCh38":
-                release = str(self.vep)
-                gff_url = f"ftp://ftp.ensembl.org/pub/release-{self.vep}/gff3/homo_sapiens/Homo_sapiens.GRCh38.{self.vep}.gff3.gz"
-        else:
-            if self.genome_build.name == "GRCh37":
-                # This is the last GRCh37 release (checked VEP v108)
-                if self.refseq == '2020-10-26 17:03:42 - GCF_000001405.25_GRCh37.p13_genomic.gff':
-                    release = "105.20201022"
-                    gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz"
-            elif self.genome_build.name == "GRCh38":
-                if m := re.match(r"(109.20\d{6}) - GCF_000001405.39_GRCh38.p13_genomic.gff", self.refseq):
-                    release = m.group(1)
-                    gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz"
-                else:
-                    (release, gff_filename) = self.refseq.split(" - ", maxsplit=1)
-                    if not gff_filename.endswith(".gz"):
-                        gff_filename += ".gz"
-                    # This is good for VEP v108 (will need to keep on top of this)
-                    patch_version = 14
-                    gff_url = f"https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.40_GRCh38.p{patch_version}/{gff_filename}"
-        return release, gff_url
+    def vep_gene_set_versions(self) -> VepGeneSetVersions:
+        """ The VEP version strings describing which gene set was annotated against """
+        return VepGeneSetVersions.from_variant_annotation_version(self)
 
     @property
-    def gene_annotation_release_gff_url(self):
-        return self._gene_annotation_release_and_gff_url[1]
+    def cdot_gene_release_token(self) -> Optional[str]:
+        """ The release identifier cdot uses in its per-GFF asset names, eg 'RS_2025_08' """
+        return self.vep_gene_set_versions.release_token
 
-    @cached_property
-    def cdot_gene_release_filename(self) -> str:
-        """ returns blank if unknown """
-        name_components = []
-        _release, gff_url = self._gene_annotation_release_and_gff_url
-        if gff_url:
-            name_components = [name_from_filename(gff_url)]
-            # These ones got renamed as the filename wasn't unique
-            if self.annotation_consortium == AnnotationConsortium.REFSEQ:
-                if self.genome_build.name == "GRCh37":
-                    if m := re.match(r"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.20\d{6})/GCF_000001405.25_GRCh37.p13/(GCF_000001405.25_GRCh37.p13_genomic).gff.gz", gff_url):
-                        name_components = [m.group(2), m.group(1), "gff"]
-                elif self.genome_build.name == "GRCh38":
-                    # GCF_000001405.39_GRCh38.p13_genomic.109.20210514.gff.json.gz
-                    if m := re.match(r"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(109.20\d{6})/GCF_000001405.39_GRCh38.p13/(GCF_000001405.39_GRCh38.p13_genomic).gff.gz", gff_url):
-                        name_components = [m.group(2), m.group(1), "gff"]
-            name_components.append("json.gz")
-
-        return ".".join(name_components)
+    @property
+    def gene_annotation_release_gff_url(self) -> Optional[str]:
+        """ The GFF/GTF cdot read to build this gene set """
+        return self.vep_gene_set_versions.gff_url
 
     @property
     def suggested_gene_annotation_release_name(self) -> str:
-        release, _ = self._gene_annotation_release_and_gff_url
-        if release:
-            return f"{self.get_annotation_consortium_display()}_{release}"
-        return "TOOD_RELEASE_NAME"
+        if release_token := self.cdot_gene_release_token:
+            return f"{self.get_annotation_consortium_display()}_{release_token}"
+        return self.UNKNOWN_GENE_ANNOTATION_RELEASE_NAME
+
+    def match_gene_annotation_release(self) -> GeneAnnotationReleaseMatch:
+        """ Existing GeneAnnotationReleases for our build/consortium built from our VEP's gene set """
+        release_urls_by_id = dict(
+            GeneAnnotationRelease.objects.filter(genome_build=self.genome_build,
+                                                 annotation_consortium=self.annotation_consortium)
+            .values_list("pk", "gene_annotation_import__url"))
+        return match_gene_annotation_release(release_urls_by_id, self.vep_gene_set_versions)
+
+    def link_gene_annotation_release(self) -> Optional[GeneAnnotationRelease]:
+        """ Set gene_annotation_release from an existing matching release. Returns what it linked,
+            None if there was no single match (a build's annotation often doesn't change between VEP
+            versions, so the release the previous version used is usually still the right one) """
+        match = self.match_gene_annotation_release()
+        if release_id := match.unique_release_id:
+            self.gene_annotation_release = GeneAnnotationRelease.objects.get(pk=release_id)
+            self.save()
+            logging.info("%s: linked GeneAnnotationRelease '%s' - matched on %s",
+                         self, self.gene_annotation_release, match.description)
+            return self.gene_annotation_release
+
+        if match.release_ids:
+            releases = GeneAnnotationRelease.objects.filter(pk__in=match.release_ids)
+            logging.warning("%s: %d GeneAnnotationReleases match on %s (%s) - leaving unlinked",
+                            self, len(match.release_ids), match.description,
+                            ", ".join(str(r) for r in releases))
+        return None
 
     def short_string(self) -> str:
         """ Short VEP description """

@@ -86,7 +86,7 @@ def check_cdot_data() -> dict:
     for genome_build in GenomeBuild.builds_with_annotation():
         cdot_checks[f"cdot_{genome_build}"] = {
             "valid": TranscriptVersion.objects.filter(genome_build=genome_build).exists(),
-            "fix": f"python manage import_gene_annotation --genome-build={genome_build.name}",
+            "fix": f"python3 manage.py import_cdot_latest --genome-build={genome_build.name}",
         }
 
     try:
