@@ -131,7 +131,7 @@ class ReviewedObject(TimeStampedModel):
 
         # ._source_object could be set either via getting FlagInfo (via a hook)
         # or by us directly going through the
-        foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('reviews') and not m.startswith("_")]
+        foreign_sets = [m for m in dir(self) if m.endswith('_set') and m != "review_set" and not m.startswith("_")]
         for foreign_set in foreign_sets:
             try:
                 source_object = getattr(self, foreign_set).first()
@@ -143,6 +143,9 @@ class ReviewedObject(TimeStampedModel):
         logging.warning('Could not find source object for Review %s', self.id)
 
         raise ValueError(f"Review {self.pk} does not appear to be attached to an object")
+
+    def __str__(self) -> str:
+        return f"Reviewing {self.source_object}"
 
 
 @dataclass

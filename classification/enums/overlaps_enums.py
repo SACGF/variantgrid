@@ -4,6 +4,8 @@ from dataclasses_json import DataClassJsonMixin
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe
 
+from classification.enums import SpecialEKeys
+
 
 class OverlapType(TextChoices):
     SINGLE_CONTEXT = "context", "Single Context"
@@ -27,8 +29,10 @@ class OverlapType(TextChoices):
 
 class ClassificationResultValue(TextChoices):
     # FIXME should be called value type
+
     ONC_PATH = "O", "Onco-Path"
     CLINICAL_SIGNIFICANCE = "S", "Clinical significance"
+    # FIXME should be called Somatic Clinical Significance
 
     @staticmethod
     @property
@@ -44,6 +48,12 @@ class ClassificationResultValue(TextChoices):
         match self:
             case ClassificationResultValue.ONC_PATH: return 1
             case ClassificationResultValue.CLINICAL_SIGNIFICANCE: return 2
+
+    @property
+    def evidence_key_str(self) -> str:
+        match self:
+            case ClassificationResultValue.ONC_PATH: return SpecialEKeys.ONC_PATH
+            case ClassificationResultValue.CLINICAL_SIGNIFICANCE: return SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE
 
 
 class OverlapContributionStatus(TextChoices):

@@ -2,16 +2,20 @@ from typing import Optional
 from django.contrib import messages
 from django import forms
 from django.http import HttpRequest, HttpResponseBase
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.utils.safestring import mark_safe
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, OverlapStatus
 from classification.models import ClassificationResultValue, \
     EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep
 from classification.enums.overlaps_enums import TriageState, TriageStatus
+from classification.services.overlap_calculator import calculator_for_value_type
 from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
 from classification.views.overlaps_datatables_3 import OverlapColumns
+from library.log_utils import log_admin_change
 from library.utils import empty_to_none
 from library.utils.django_utils import render_ajax_view
+from review.models import Review
 from snpdb.lab_picker import LabPickerData
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
@@ -183,7 +187,6 @@ class TriageView3(AjaxFormView[OverlapContribution]):
 def view_overlap_3(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
     overlap = Overlap.objects.filter(pk=overlap_id).get()
     overlap_grouping = OverlapGrouping3(overlap=overlap, user=request.user)
-
     context = {
         "overlap_grouping": overlap_grouping
     }
@@ -198,3 +201,97 @@ def view_overlap_history(request: HttpRequest, overlap_id: int) -> HttpResponseB
         "overlap_grouping": overlap_grouping
     }
     return render_ajax_view(request, "classification/overlap_history.html", context, menubar="classification")
+
+
+def overlap_report_review(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
+    # data = DiscordanceReportTemplateData(discordance_report_id, user=request.user)
+    # if not data.is_user_editable:
+    #     raise PermissionDenied("User is not involved with lab that's involved with discordance")
+
+    overlap = Overlap.objects.get(pk=overlap_id)
+
+    if existing := overlap.reviews_all().first():
+        return redirect(reverse('edit_review', kwargs={"review_id": existing.pk}))
+    else:
+        reviewed_object = overlap.reviews_safe
+        return redirect(reverse('start_review',
+                                kwargs={"reviewed_object_id": reviewed_object.pk, "topic_id": "discordance_report"}))
+
+
+def discordance_calculator(request: HttpRequest) -> HttpResponseBase:
+    values = list(set(request.GET.get("values").split(",")))
+    overlap_status = OverlapStatus.EXACT_AGREEMENT
+    if len(values) > 1:
+        value_type = ClassificationResultValue(request.GET.get("value_type"))
+        calculator = calculator_for_value_type(value_type)
+        overlap_status = calculator.calculate_status_for_multiple_entries(values)
+    return render(request, "classification/snippets/overlap_status.html", {"overlap_status": overlap_status})
+
+
+def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseBase:
+    review = Review.objects.get(pk=review_id)
+    overlap: Overlap = review.reviewing.source_object
+
+    if request.method == 'POST':
+        # check to see if user is involved in this overlap?
+        action = request.POST.get('action')
+
+        review.user = request.user
+        if action == "postpone":
+            review.complete_with_data_and_save({
+                "outcome": "postpone"
+            })
+            # TODO make Review implement AuditInstead
+            log_admin_change(
+                obj=review,
+                message=review.as_json(),
+                user=request.user
+            )
+        elif action == "change":
+            changes_dict = {}
+            for contribution in overlap.contributions_list:
+                updated_value = request.POST.get(f"contribution-{contribution.pk}")
+                if updated_value != contribution.effective_value:
+                    old_effective_value = contribution.effective_value
+                    if updated_value == contribution.value:
+                        # actually doing a review to change a pending value back to the value that was originally there
+                        contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_SATISFACTORY)
+                    else:
+                        contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_WILL_FIX, updated_value)
+
+                    changes_dict[f"{contribution.lab}"] = f"{old_effective_value} -> {updated_value}"
+
+                    contribution.comment_obj = contribution.comment_obj.next_comment("Marked as update after review - see attached review for more details")
+                    contribution.save()
+
+            OverlapServices.update_skews(overlap)
+            OverlapServices.recalc_overlap(overlap)
+
+            resolution = overlap.overlap_status.label
+            review.complete_with_data_and_save({
+                "outcome": resolution,
+                "changes": changes_dict
+            })
+            log_admin_change(
+                obj=review,
+                message=review.as_json(),
+                user=review.user
+            )
+
+            if overlap.overlap_status.is_discordant:
+                # FIXME have to setup the overlap as some kind of ongoing
+                pass
+
+        else:
+            raise ValueError(f"Unsupported action \"{action}\"")
+
+        return redirect(reverse('overlap_3', kwargs={'overlap_id': overlap.pk}))
+
+    else:  # GET
+        evidence_key = EvidenceKeyMap.cached_key(overlap.value_type.evidence_key_str)
+        context = {
+            "review": review,
+            "overlap": overlap,
+            "evidence_key": evidence_key
+        }
+        return render(request, "classification/overlap_action.html", context)

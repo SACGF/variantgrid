@@ -43,7 +43,7 @@ from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
     ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleOriginGrouping, \
     ImportedAlleleInfo, ImportedAlleleInfoStatus, ClassificationImportRun, Overlap, OverlapContributionSkew, \
-    OverlapContribution
+    OverlapContribution, ClassificationGroupingEntry
 from classification.models.classification import ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
@@ -469,6 +469,14 @@ def view_classification(request: HttpRequest, classification_id: str):
         genome_build = user_settings.default_genome_build
 
     vc: Classification = ref.record
+
+    # see if there are pending values
+    classification_grouping = ClassificationGroupingEntry.grouping_for(vc)
+    triages_json = {}
+    for contribution in OverlapContribution.objects.filter(classification_grouping=classification_grouping):
+        triages_json[contribution.value_type] = contribution.triage_state_obj.to_dict()
+    # attach this directly to the record for now, might make it part of the default generation
+    record["triages"] = triages_json
 
     context = {
         'vc': vc,

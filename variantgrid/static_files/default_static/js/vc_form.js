@@ -993,6 +993,17 @@ const VCForm = (function() {
 
 
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Class.');
+            let oncoPathTriage = this.record.triages.O;
+            if (oncoPathTriage) {
+                if (oncoPathTriage.status === "F") {
+                    let label = "TBD";
+                    if (oncoPathTriage.amend_value) {
+                        let eKey = eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+                        label = eKey.prettyValue(oncoPathTriage.amend_value).val;
+                    }
+                    appendLabelHeading("Pending", label);
+                }
+            }
 
             if (this.value(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)) {
                 let extra = null;
@@ -1004,6 +1015,18 @@ const VCForm = (function() {
                     }
                 }
                 appendLabelHeadingForKey(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, true, 'Somatic Sig', extra);
+
+                let clinSigTriage = this.record.triages.S;
+                if (clinSigTriage) {
+                    if (clinSigTriage.status === "F") {
+                        let label = "TBD";
+                        if (clinSigTriage.amend_value) {
+                            let eKey = eKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+                            label = eKey.prettyValue(clinSigTriage.amend_value).val;
+                        }
+                        appendLabelHeading("Pending", label);
+                    }
+                }
             }
 
             if (this.record.sample_id) {

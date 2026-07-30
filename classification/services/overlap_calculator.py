@@ -69,7 +69,7 @@ class OverlapCalculatorBase(ABC):
             if len(all_values) == 1:
                 base_value = OverlapStatus.EXACT_AGREEMENT
             else:
-                base_value = cls._calculate_status_for_multiple_entries(all_values)
+                base_value = cls.calculate_status_for_multiple_entries(all_values)
 
             all_pending_values = set(con.effective_value for con in contributing)
 
@@ -80,12 +80,12 @@ class OverlapCalculatorBase(ABC):
                 if len(all_pending_values) == 1:
                     pending_value = OverlapStatus.EXACT_AGREEMENT
                 else:
-                    pending_value = cls._calculate_status_for_multiple_entries(all_pending_values)
+                    pending_value = cls.calculate_status_for_multiple_entries(all_pending_values)
                 return OverlapStatusCalculation(base_value, pending_value)
 
     @classmethod
     @abstractmethod
-    def _calculate_status_for_multiple_entries(cls, values: set[str]) -> OverlapStatus:
+    def calculate_status_for_multiple_entries(cls, values: set[str]) -> OverlapStatus:
         raise NotImplementedError()
 
 
@@ -100,7 +100,7 @@ class OverlapCalculatorClinSig(OverlapCalculatorBase):
         return True
 
     @classmethod
-    def _calculate_status_for_multiple_entries(cls, values: set[str]) -> OverlapStatus:
+    def calculate_status_for_multiple_entries(cls, values: set[str]) -> OverlapStatus:
         has_tier_1_and_2 = False
         tiers = set()
         for value in values:
@@ -159,7 +159,7 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
         return None
 
     @classmethod
-    def _calculate_status_for_multiple_entries(cls, values: set[str]) -> OverlapStatus:
+    def calculate_status_for_multiple_entries(cls, values: set[str]) -> OverlapStatus:
         """
         :param values: 2+ OverlapEntries all contributing, should have at least 1 difference
         :return: The calculated Overlap Status for Onc or Pathogenicity

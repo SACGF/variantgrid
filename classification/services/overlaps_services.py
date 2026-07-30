@@ -432,7 +432,7 @@ class OverlapGrouping3:
         return list(DiscordanceReport.objects.filter(clinical_context__allele=self.overlap.allele).order_by('-created'))
 
     @cached_property
-    def reviews(self) -> list[Review]:
+    def legacy_reviews(self) -> list[Review]:
         reviews = []
         for dr in self.discordance_reports:
             reviews.extend(list(dr.reviews_all()))

@@ -11,16 +11,17 @@ from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 from annotation.models import ClinVarRecord
 from annotation.models.data_enums import EffectiveDate
-from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull
+from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull, TriageStatus
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.enums.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
 from genes.hgvs import CHGVS
-from library.preview_request import PreviewModelMixin
+from library.guardian_utils import admin_bot
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import first, AuditUtils, AuditSingleChange
 from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
-from review.models import ReviewableModelMixin
+from review.models import ReviewableModelMixin, Review
 from snpdb.models import Allele, Lab, GenomeBuild, LabLike, CLINVAR_EXPERT_PANEL_LAB
 
 
@@ -41,7 +42,7 @@ class OverlapContribution(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)
 
     effective_date = JSONField(null=False, blank=False, default=EffectiveDate.default_json)
-    triage_state = JSONField(null=False, blank=False, default=TriageState.default_json)
+    triage_state = JSONField(null=False, blank=False, default=TriageState.default_json)  # pending values are captured here
     comment = JSONField(null=False, blank=False, default=TriageComment.default_json)
 
     @property
@@ -101,6 +102,10 @@ class OverlapContribution(TimeStampedModel):
     def effective_value(self):
         return self.triage_state_obj.amend_value or self.value
 
+    @property
+    def is_amending(self):
+        return self.triage_state_obj.status == TriageStatus.REVIEWED_WILL_FIX
+
     class Meta:
         unique_together = ('classification_grouping', 'value_type')
 
@@ -150,6 +155,10 @@ class OverlapContribution(TimeStampedModel):
         return OverlapContribution.pretty_value_for(self.value, self.value_type)
 
     @property
+    def pretty_effective_value(self):
+        return OverlapContribution.pretty_value_for(self.effective_value, self.value_type)
+
+    @property
     def value_sort_index(self):
         if self.value_type == ClassificationResultValue.ONC_PATH:
             return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).classification_sorter_value(self.value)
@@ -192,7 +201,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     history = AuditlogHistoryField()
 
     overlap_type = models.TextField(choices=OverlapType.choices)
-    value_type = models.TextField(max_length=1, choices=ClassificationResultValue.choices)
+    value_type = TextFieldChoices(max_length=1, choices_type=ClassificationResultValue)  # type:ClassificationResultValue
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE, null=True, blank=True)  # might be blank for gene symbol wide
     testing_context_bucket = models.TextField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
@@ -219,29 +228,27 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     @property
     def preview(self) -> 'PreviewData':
+        summary_extra = []
+        if not self.valid:
+            summary_extra.append(PreviewKeyValue(value="Invalid Overlap - ignore", dedicated_row=True))
+        else:
+            summary_extra.append(PreviewKeyValue("Status", ""))
+            if allele := self.allele:
+                summary_extra.append(PreviewKeyValue("Allele", f"{allele:CA}"))
+            if overlap_type := self.overlap_type:
+                if overlap_type != OverlapType.SINGLE_CONTEXT:
+                    summary_extra.append(PreviewKeyValue(value=OverlapType(overlap_type).label))
+            if value_type := self.value_type:
+                summary_extra.append(PreviewKeyValue(value=ClassificationResultValue(value_type).label))
 
-        from classification.views.discordance_report_views import DiscordanceReportTemplateData
-        drtd = DiscordanceReportTemplateData(self.pk, user=admin_bot())
-
-        c_hgvs_key_values = []
-        for c_hgvs in drtd.c_hgvses:
-            c_hgvs_key_values.append(
+        for c_hgvs in self.c_hgvses:
+            summary_extra.append(
                 PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
             )
 
-        status_text: str
-        if self.is_pending_concordance and self.is_latest:
-            status_text = "Pending Concordance"
-        else:
-            status_text = self.get_resolution_display() or 'Active Discordance'
-
-        # note there's also preview_extra_signal that provides the lab data
         return self.preview_with(
-            identifier=f"DR_{self.pk}",
-            summary_extra=
-                [PreviewKeyValue(key="Status", value=status_text, dedicated_row=True)] +
-                [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}", dedicated_row=True)] +
-                c_hgvs_key_values
+            identifier=f"O_{self.pk}",
+            summary_extra=summary_extra
         )
 
     @cached_property
@@ -285,6 +292,9 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         lab_ids = set(self.contributions.values_list('classification_grouping__lab', flat=True))
         return set(Lab.objects.filter(pk__in=lab_ids).all())
 
+    def post_review_url(self, review: Review) -> str:
+        return reverse('action_overlap_review', kwargs={"review_id": review.pk})
+
     @property
     def has_clinvar_expert_panel(self) -> bool:
         return self.contributions.filter(scv__isnull=False).exists()
@@ -316,7 +326,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     @property
     def value_type_label(self):
-        value_type = ClassificationResultValue(self.value_type)
+        value_type = self.value_type
         if value_type == ClassificationResultValue.ONC_PATH:
             if self.testing_contexts_objs == [TestingContextBucket.GERMLINE]:
                 return "Pathogenicity"

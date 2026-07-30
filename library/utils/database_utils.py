@@ -243,11 +243,11 @@ class ChoicesMixin(Generic[TX]):
     """
     While IntegerField, TextField and CharField all allow choices, they'll still return an integer or string.
     TextChoices or IntegerChoices allow you to add additional methods, so using one of the concrete implementations
-    below will gice you an instance of the actual Choices instead of the raw string or integer value.
+    below will give you an instance of the actual Choices instead of the raw string or integer value.
 
     Lastly you just need to provide the type and if you don't provide choices, they'll be taken from the type
 
-    PyCharm isn't smart enough to work out the execpted type, so just add the type hint after declaring using this in a model
+    PyCharm isn't smart enough to work out the expected type, so just add the type hint after declaring using this in a model
     """
 
     def __init__(self, choices_type: Type[TX], *args, **kwargs):
