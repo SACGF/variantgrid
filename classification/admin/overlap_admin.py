@@ -28,7 +28,7 @@ from snpdb.models import AlleleOrigin, Allele
 class OverlapContributionAdmin(AuditlogHistoryAdminMixin, ModelAdminBasics):
     show_auditlog_history_link = True
     search_fields = ("id", "scv", "value")
-    list_display = ['pk', 'source', 'allele', 'classification_grouping', 'value_type', 'value', 'testing_context_bucket', 'effective_date__date', 'classification_grouping__lab']
+    list_display = ['pk', 'source', 'allele', 'classification_grouping', 'possibly_outdated', 'value_type', 'value', 'testing_context_bucket', 'effective_date__date', 'classification_grouping__lab']
     list_filter = ('source', 'value_type', 'testing_context_bucket', 'classification_grouping__lab')
 
     @admin_list_column(short_description="Effective Date", order_field="effective_date__date")

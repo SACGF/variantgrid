@@ -35,6 +35,7 @@ class OverlapContribution(TimeStampedModel):
 
     value_type = models.TextField(choices=ClassificationResultValue.choices)
     value = models.TextField(null=True, blank=True)
+    possibly_outdated = models.BooleanField(null=True, blank=True, default=False)
     # annoying thing about contribution_status is it takes a little bit of context knowledge to work out
 
     contribution_status = TextFieldChoices(choices_type=OverlapContributionStatus)    # type: OverlapContributionStatus

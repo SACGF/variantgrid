@@ -55,6 +55,9 @@ class EffectiveDate(DataClassJsonMixin):
     def default_json():
         return EffectiveDate().to_dict()
 
+    def __lt__(self, other):
+        return self.date < other.date
+
     def __str__(self):
         if date_val := self.date:
             return f"{date_val} {self.date_type.label}"

@@ -228,7 +228,28 @@ class OverlapServices:
     @staticmethod
     def recalc_overlap(overlap: Overlap):
         calculator = calculator_for_value_type(overlap.value_type)
-        overlap_status_calculation = calculator.calculate_entries(list(overlap.contributions.all()))
+
+        if overlap.overlap_type == OverlapType.SINGLE_CONTEXT:
+            # check to see if we're marking ClinVar as old
+            latest_effective_date: Optional[EffectiveDate] = None
+            clinvar_records: list[OverlapContribution] = []
+            for contribution in overlap.contributions_list:
+                if contribution.classification_grouping is not None:
+                    if contribution_date := contribution.effective_date_obj:
+                        if not latest_effective_date or (contribution_date > latest_effective_date):
+                            latest_effective_date = contribution_date
+                else:
+                    clinvar_records.append(contribution)
+
+            if latest_effective_date and clinvar_records:
+                for clinvar_record in clinvar_records:
+                    possibly_outdated = clinvar_record.effective_date_obj < latest_effective_date
+                    if clinvar_record.possibly_outdated != possibly_outdated:
+                        clinvar_record.possibly_outdated = possibly_outdated
+                        clinvar_record.save()
+            # end marking ClinVar records old if there's
+
+        overlap_status_calculation = calculator.calculate_entries(overlap.contributions_list)
 
         old_overlap_status = overlap.overlap_status
         old_pending_status = overlap.overlap_pending_status

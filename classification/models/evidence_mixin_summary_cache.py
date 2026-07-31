@@ -63,6 +63,9 @@ class ClassificationSummaryCacheObjDate(DataClassJsonMixin):
     date: str  # in format of yyyy-mm-dd
     type: Optional[str]
 
+    def __lt__(self, other):
+        return self.date < other.date
+
 
 @dataclass(frozen=True)
 class ClassificationSummaryCacheObjSomatic(DataClassJsonMixin):

@@ -2,7 +2,8 @@ from auditlog.context import disable_auditlog, set_extra_data
 from django.core.management import BaseCommand
 from django.db.models import F
 
-from annotation.models import ClinVarRecordCollection, ClinVarRecord, EffectiveDate
+from annotation.models import ClinVarRecordCollection, ClinVarRecord
+from annotation.models.data_enums import EffectiveDate
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import TestingContextBucket, OverlapStatus, OverlapType
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
@@ -17,6 +18,7 @@ from snpdb.models import Allele
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
+        parser.add_argument('--recalc', required=False, action="store_true"),
         parser.add_argument('--migrate', required=False, action="store_true",
                             help="Migrates legacy data to new format - work in progress")
         parser.add_argument('--full_reset', required=False, action="store_true",
@@ -26,7 +28,9 @@ class Command(BaseCommand):
                             help="Populates max status (not entirely accurate) but should distinguish between records that have had a discordance reports to the ones that haven't")
 
     def handle(self, *args, **options):
-        if options["full_reset"]:
+        if options['recalc']:
+            self.recalc_overlaps()
+        elif options["full_reset"]:
             self.full_reset(args, options)
         elif options["migrate"]:
             self.populate_overlap_change_date()
@@ -37,6 +41,11 @@ class Command(BaseCommand):
             self.populate_max_status(args, options)
         else:
             print("Must choose full_reset or migrate")
+
+    def recalc_overlaps(self):
+        for overlap in Overlap.objects.all().iterator():
+            OverlapServices.recalc_overlap(overlap)
+            OverlapServices.update_skews(overlap)
 
     def recalc_skews(self):
         for overlap in Overlap.objects.all().iterator():

@@ -47,6 +47,9 @@ class OverlapCalculatorBase(ABC):
         non_comparable_values: int = 0
         contributing: list[OverlapContribution] = []
         for entry in entries:
+            if entry.possibly_outdated:
+                continue
+
             match entry.contribution_status:
                 case OverlapContributionStatus.CONTRIBUTING:
                     contributing.append(entry)
@@ -129,34 +132,34 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
     def value_from_summary(cls, summary: ClassificationSummaryCacheDict) -> str:
         return summary.get("pathogenicity", {}).get("classification")
 
-    @classmethod
-    def clinvar_to_contribution(cls, allele: Allele) -> Optional[OverlapContribution]:
-        # FIXME not used
-        if clinvar_details := ClinVarDetails.instance_from(allele=allele):
-            if clinvar_details.is_expert_panel_or_greater and clinvar_details.clinvar.highest_pathogenicity > 0:
-                clinvar_record_collection = ClinVarFetchRequest(
-                    clinvar_variation_id=clinvar_details.clinvar.clinvar_variation_id,
-                ).fetch()
-                expert_panel: ClinVarRecord
-                if expert_panel := clinvar_record_collection.expert_panel:
-                    value = expert_panel.clinical_significance
-                    relevant_value = ClassificationResultValue.ONC_PATH and EvidenceKeyMap.clinical_significance_to_bucket().get(value) is not None
-
-                    oc = OverlapContribution.objects.update_or_create(
-                        source=OverlapEntrySourceTextChoices.CLINVAR,
-                        scv=expert_panel.record_id,
-                        testing_context_bucket=TestingContextBucket.GERMLINE,
-                        allele=allele,
-                        classification_grouping_id=None,
-                        defaults={
-                            "value": value,
-                            "effective_date": expert_panel.effective_date.to_dict(),
-                        },
-                        contribution_status=OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE,
-                        triage_state=TriageState(TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
-                    )
-                    return oc
-        return None
+    # @classmethod
+    # def clinvar_to_contribution(cls, allele: Allele) -> Optional[OverlapContribution]:
+    #     # FIXME not used
+    #     if clinvar_details := ClinVarDetails.instance_from(allele=allele):
+    #         if clinvar_details.is_expert_panel_or_greater and clinvar_details.clinvar.highest_pathogenicity > 0:
+    #             clinvar_record_collection = ClinVarFetchRequest(
+    #                 clinvar_variation_id=clinvar_details.clinvar.clinvar_variation_id,
+    #             ).fetch()
+    #             expert_panel: ClinVarRecord
+    #             if expert_panel := clinvar_record_collection.expert_panel:
+    #                 value = expert_panel.clinical_significance
+    #                 relevant_value = ClassificationResultValue.ONC_PATH and EvidenceKeyMap.clinical_significance_to_bucket().get(value) is not None
+    #
+    #                 oc = OverlapContribution.objects.update_or_create(
+    #                     source=OverlapEntrySourceTextChoices.CLINVAR,
+    #                     scv=expert_panel.record_id,
+    #                     testing_context_bucket=TestingContextBucket.GERMLINE,
+    #                     allele=allele,
+    #                     classification_grouping_id=None,
+    #                     defaults={
+    #                         "value": value,
+    #                         "effective_date": expert_panel.effective_date.to_dict(),
+    #                     },
+    #                     contribution_status=OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE,
+    #                     triage_state=TriageState(TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
+    #                 )
+    #                 return oc
+    #     return None
 
     @classmethod
     def calculate_status_for_multiple_entries(cls, values: set[str]) -> OverlapStatus:
