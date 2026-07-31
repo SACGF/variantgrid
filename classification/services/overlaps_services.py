@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
 from json import JSONDecodeError
-from typing import Optional, Any, Self, Union
+from typing import Optional, Any, Self
 
 from auditlog.context import set_extra_data
 from auditlog.models import LogEntry
@@ -106,6 +106,9 @@ class OverlapServices:
     def update_clinvar_overlap_contribution(clinvar_record_collection: ClinVarRecordCollection, migrate: bool = False):
         # TODO - code assumes that ClinVarRecordCollection is just for Germline
         # need to fix that when we get other expert panels
+
+        if clinvar_record_collection.allele is None:
+            return
 
         expert_panel: ClinVarRecord
         if expert_panel := clinvar_record_collection.expert_panel:
@@ -291,9 +294,9 @@ class OverlapServices:
             clinvar_records: list[OverlapContribution] = []
             for contribution in overlap.contributions_list:
                 if contribution.classification_grouping is not None:
-                    if contribution_date := contribution.effective_date_obj:
-                        if not latest_effective_date or (contribution_date > latest_effective_date):
-                            latest_effective_date = contribution_date
+                    contribution_date = contribution.effective_date_obj
+                    if not latest_effective_date or (contribution_date > latest_effective_date):
+                        latest_effective_date = contribution_date
                 else:
                     clinvar_records.append(contribution)
 
@@ -468,21 +471,21 @@ class OverlapGrouping3:
     overlap: Overlap
     user: User
 
-    @cached_property
-    def involved_labs(self) -> list[LabContext]:
-        labs: set[LabLike] = []
-        for overlap_contribution in self.overlap.contributions:
-            subject = None
-            if lab := overlap_contribution.lab:
-                # TODO get lab's preferred genome build
-                subject = self.overlap.c_hgvs(lab=lab)
-            labs.append(
-                LabContext(
-                    overlap_contribution.lab_like,
-                    subject
-                )
-            )
-        return list(sorted(labs, key=lambda x: x.lab))
+    # @cached_property
+    # def involved_labs(self) -> list[LabContext]:
+    #     labs: set[LabLike] = []
+    #     for overlap_contribution in self.overlap.contributions:
+    #         subject = None
+    #         if lab := overlap_contribution.lab:
+    #             # TODO get lab's preferred genome build
+    #             subject = self.overlap.c_hgvs(lab=lab)
+    #         labs.add(
+    #             LabContext(
+    #                 overlap_contribution.lab_like,
+    #                 subject
+    #             )
+    #         )
+    #     return list(sorted(labs, key=lambda x: x.lab))
 
     @cached_property
     def rows(self) -> list[OverlapContributionPerspective]:

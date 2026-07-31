@@ -2,14 +2,13 @@ from auditlog.context import disable_auditlog, set_extra_data
 from django.core.management import BaseCommand
 from django.db.models import F
 
-from annotation.models import ClinVarRecordCollection, ClinVarRecord
-from annotation.models.data_enums import EffectiveDate
+from annotation.models import ClinVarRecordCollection
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import TestingContextBucket, OverlapStatus, OverlapType
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
-    EvidenceKeyMap, EffectiveDateType, DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \
+    DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \
     ClassificationFlagTypes
-from classification.enums.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices, TriageState, \
+from classification.enums.overlaps_enums import OverlapContributionStatus, TriageState, \
     TriageStatus
 from classification.services.overlaps_services import OverlapServices
 from snpdb.models import Allele
@@ -162,7 +161,6 @@ class Command(BaseCommand):
                     else:
                         print(f"Triage already up to date - possibly multiple discordances for same record")
 
-
     def populate_overlap_change_date(self):
         # timestamp on overlaps
         with disable_auditlog():
@@ -187,13 +185,6 @@ class Command(BaseCommand):
                     if latest_modification := grouping.latest_classification_modification:
                         date_check = latest_modification.curated_date_check
                         overlap_contribution.effective_date_obj = date_check.to_effective_date
-                        print(f"Setting effective date to {date_check.to_effective_date}")
-                        print(overlap_contribution.effective_date)
-                        overlap_contribution.save(update_fields=["effective_date"])
-                elif scv := overlap_contribution.scv:
-                    if clinvar_record := ClinVarRecord.objects.filter(record_id=scv).first():
-                        overlap_contribution.effective_date_obj = clinvar_record.effective_date
-                        print(f"Setting effective date to {date_check.to_effective_date}")
                         print(overlap_contribution.effective_date)
                         overlap_contribution.save(update_fields=["effective_date"])
 
@@ -201,32 +192,5 @@ class Command(BaseCommand):
         # only check already made ClinVarRecord collections in sync
         for clinvar_record_collection in ClinVarRecordCollection.objects.filter(
                 max_stars__gte=CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE, allele__isnull=False):
-            expert_panel: ClinVarRecord
-            if expert_panel := clinvar_record_collection.expert_panel:
-
-                value = expert_panel.clinical_significance
-                relevant_value = ClassificationResultValue.ONC_PATH and EvidenceKeyMap.clinical_significance_to_bucket().get(
-                    value) is not None
-                contribution_enum = OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE
-                effective_date = EffectiveDate.from_datetime(expert_panel.date_last_evaluated or expert_panel.date_clinvar_updated, EffectiveDateType.CURATED)
-
-                with set_extra_data({"timestamp": expert_panel.created, "migration": True}):
-                    contribution, created = OverlapContribution.objects.update_or_create(
-                        source=OverlapEntrySourceTextChoices.CLINVAR,
-                        scv=expert_panel.record_id,
-                        allele=clinvar_record_collection.allele,
-                        classification_grouping=None,
-                        value_type=ClassificationResultValue.ONC_PATH,
-                        contribution_status=contribution_enum,
-                        testing_context_bucket=TestingContextBucket.GERMLINE,
-                        tumor_type_category=None,
-                        defaults={
-                            "value": value,
-                            "effective_date": effective_date.to_dict(),
-                        },
-                        triage_state=TriageState(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
-                    )
-
-                    OverlapServices.link_overlap_contribution(contribution)
-                    for skew in contribution.overlapcontributionskew_set.select_related('overlap').all():
-                        OverlapServices.recalc_overlap(skew.overlap)
+            if clinvar_record_collection.expert_panel is not None:
+                OverlapServices.update_clinvar_overlap_contribution(clinvar_record_collection, migrate=True)
