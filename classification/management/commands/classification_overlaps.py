@@ -210,8 +210,6 @@ class Command(BaseCommand):
                 contribution_enum = OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE
                 effective_date = EffectiveDate.from_datetime(expert_panel.date_last_evaluated or expert_panel.date_clinvar_updated, EffectiveDateType.CURATED)
 
-                # WARNING: Do ClinVarRecords get wiped and replaced? but even if so, we will keep this created (in the migration) as the first
-                # date
                 with set_extra_data({"timestamp": expert_panel.created, "migration": True}):
                     contribution, created = OverlapContribution.objects.update_or_create(
                         source=OverlapEntrySourceTextChoices.CLINVAR,

@@ -163,7 +163,7 @@ class OverlapContribution(TimeStampedModel):
     def value_sort_index(self):
         if self.value_type == ClassificationResultValue.ONC_PATH:
             return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).classification_sorter_value(self.value)
-        elif self.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+        elif self.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
             return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).classification_sorter_value(self.value)
         else:
             return 0
@@ -186,7 +186,7 @@ class OverlapContribution(TimeStampedModel):
             return "no-value"
         if value_type == ClassificationResultValue.ONC_PATH:
             return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).pretty_value(value)
-        elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+        elif value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
             return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(value)
         else:
             raise ValueError(f"Unsupported ValueType {value_type}")
@@ -208,6 +208,11 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
     overlap_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     overlap_pending_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
+    """
+    overlap_pending_status will either be the same as overlap_status in most cases, but if there are records with WILL_FIX the status is based of the
+    pending values
+    """
+
     overlap_max_ever_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
@@ -248,7 +253,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             )
 
         return self.preview_with(
-            identifier=f"O_{self.pk}",
+            identifier=f"OV_{self.pk}",
             summary_extra=summary_extra
         )
 
@@ -417,7 +422,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
         if self.value_type == ClassificationResultValue.ONC_PATH:
             return list(EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(relevant_values))[::-1]
-        elif self.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+        elif self.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
             somatic_clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
             return [somatic_clin_sig_e_key.pretty_value(val) for val in somatic_clin_sig_e_key.sort_values(relevant_values)][::-1]
         else:

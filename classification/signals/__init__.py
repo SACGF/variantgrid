@@ -16,3 +16,4 @@ from classification.signals.classification_hooks_grouping import *  # so we load
 from classification.signals.classification_hooks_grouping_search_terms import *  # so we load the receivers
 from classification.signals.classification_hooks_pending_flags import *  # so we load the receivers
 from classification.signals.classification_hooks_overlaps import *
+from classification.signals.clinvar_record_to_contribution import *

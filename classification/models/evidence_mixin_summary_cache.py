@@ -98,7 +98,7 @@ class ClassificationSummaryCacheObj(DataClassJsonMixin):
     def value_for_value_type(self, value_type: ClassificationResultValue):
         match value_type:
             case ClassificationResultValue.ONC_PATH: return self.pathogenicity.classification
-            case ClassificationResultValue.CLINICAL_SIGNIFICANCE: return self.somatic.clinical_significance
+            case ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE: return self.somatic.clinical_significance
             case _: raise ValueError(f"Unexpected value type {value_type}")
 
     @staticmethod

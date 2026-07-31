@@ -123,7 +123,7 @@ class TriageView3(AjaxFormView[OverlapContribution]):
         value_e_key: EvidenceKey
         if value_type == ClassificationResultValue.ONC_PATH:
             value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH)
-        elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+        elif value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
             value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         else:
             raise ValueError(f"Unexpected ValueType {value_type}")

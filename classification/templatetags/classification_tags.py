@@ -809,7 +809,7 @@ def triage(context,
             new_value = "To Be Determined"
         elif value_type == ClassificationResultValue.ONC_PATH:
             new_value = EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).pretty_value(new_value)
-        elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+        elif value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
             new_value = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(new_value)
 
     last_comment = triage.last_comment

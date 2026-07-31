@@ -10,29 +10,26 @@ from classification.enums import SpecialEKeys
 class OverlapType(TextChoices):
     SINGLE_CONTEXT = "context", "Single Context"
     CROSS_CONTEXT = "cross", "Cross Context"
-    # CLINVAR_EXPERT_PANEL = "clinvar", "ClinVar Expert Panel"
-    # CROSS_GERMLINE_NON_CANCER = "cross_germ_non_cancer", "Cross Germline / Somatic Non-Cancer"
-    # CROSS_GERMLINE_HAEM = "cross_germ_haem", "Cross Germline / Somatic Haem"
-    # CROSS_GERMLINE_SOLID_TUMOR = "cross_germ_solid_tumor", "Cross Germline / Solid Tumour"
-    # CROSS_HAEM_SOLID_TUMOR = "cross_haem_solid_tumor", "Cross Haem / Solid Tumour"
 
     @property
     def priority_order(self) -> int:
         match self:
             case OverlapType.SINGLE_CONTEXT: return 1
-            # case OverlapType.CLINVAR_EXPERT_PANEL: return 2
-            case OverlapType.CROSS_CONTEXT: return 3
+            case OverlapType.CROSS_CONTEXT: return 2
 
     def __lt__(self, other):
         return self.priority_order < other.priority_order
 
 
 class ClassificationResultValue(TextChoices):
-    # FIXME should be called value type
+    """
+    Represents the different outcome values types of a Classification
+    e.g. a Germline or Somatic record will have a Pathogenicity or Oncogenicity score (comparable so treated as the same value type)
+    and a Somatic record can also have
+    """
 
     ONC_PATH = "O", "Onco-Path"
-    CLINICAL_SIGNIFICANCE = "S", "Clinical significance"
-    # FIXME should be called Somatic Clinical Significance
+    SOMATIC_CLINICAL_SIGNIFICANCE = "S", "Clinical significance"
 
     @staticmethod
     @property
@@ -41,22 +38,26 @@ class ClassificationResultValue(TextChoices):
         if not OVERLAP_CLIN_SIG_ENABLED:
             return [ClassificationResultValue.ONC_PATH]
         else:
-            return [ClassificationResultValue.ONC_PATH, ClassificationResultValue.CLINICAL_SIGNIFICANCE]
+            return [ClassificationResultValue.ONC_PATH, ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE]
 
     @property
     def priority_order(self) -> int:
         match self:
             case ClassificationResultValue.ONC_PATH: return 1
-            case ClassificationResultValue.CLINICAL_SIGNIFICANCE: return 2
+            case ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE: return 2
 
     @property
     def evidence_key_str(self) -> str:
         match self:
             case ClassificationResultValue.ONC_PATH: return SpecialEKeys.ONC_PATH
-            case ClassificationResultValue.CLINICAL_SIGNIFICANCE: return SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE
+            case ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE: return SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE
 
 
 class OverlapContributionStatus(TextChoices):
+    """
+    Represents if an OverlapContribution (typically a ClassificationGrouping) is contributing to the Overlap.
+    """
+
     PENDING_CALCULATION = "P", "Pending Calculation"
     CONTRIBUTING = "C", "Contributing"
     NOT_SHARED = "N", "Not-shared"
@@ -65,6 +66,10 @@ class OverlapContributionStatus(TextChoices):
 
 
 class TriageStatus(TextChoices):
+    """
+    An OverlapContribution has a triage status, generally saying how confident they are in the record
+    """
+
     PENDING = "P", "Pending Triage"
     REVIEWED_WILL_FIX = "F", "Will Amend"
     AMENDED = "A", "Amended"
@@ -75,6 +80,7 @@ class TriageStatus(TextChoices):
 
     @property
     def is_default(self):
+        # default as in the user likely hasn't changed anything
         return self in {TriageStatus.PENDING, TriageStatus.NON_INTERACTIVE_THIRD_PARTY}
 
     @property
@@ -105,6 +111,10 @@ class OverlapEntrySourceTextChoices(TextChoices):
 
 @dataclass(frozen=True)
 class TriageState(DataClassJsonMixin):
+    """
+    Combination of a TriageStatus, and an optional amend_value (only if TriageStatus is REVIEWED_WILL_FIX)
+    e.g. PENDING or REVIEWED WILL FIX - (P)athogenic
+    """
     status: TriageStatus = TriageStatus.PENDING
     amend_value: Optional[str] = None
 
@@ -121,6 +131,9 @@ class TriageState(DataClassJsonMixin):
 
 @dataclass(frozen=True)
 class TriageComment(DataClassJsonMixin):
+    """
+    A comment plus a counter of how many comments there's been
+    """
     text: Optional[str] = None
     count: int = 0
 

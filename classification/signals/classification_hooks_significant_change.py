@@ -36,7 +36,7 @@ def turn_off_unsubmitted_edits(sender, classification, previously_published, new
 @receiver(classification_grouping_summary_signal, sender=ClassificationGrouping)
 def summary_changed(sender, instance: ClassificationGrouping, old_summary: ClassificationSummaryCacheObj, new_summary: ClassificationSummaryCacheObj, **kwargs):
 
-    for value_type in (ClassificationResultValue.ONC_PATH, ClassificationResultValue.CLINICAL_SIGNIFICANCE):
+    for value_type in (ClassificationResultValue.ONC_PATH, ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE):
         if old_summary.value_for_value_type(value_type) != new_summary.value_for_value_type(value_type):
             if oc := OverlapContribution.objects.filter(classification_grouping=instance, value_type=ClassificationResultValue.ONC_PATH).first():
                 if oc.triage_state_obj.status == TriageStatus.REVIEWED_WILL_FIX:

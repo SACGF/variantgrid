@@ -201,7 +201,7 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
                 clinvar_variation_id=obj.clinvar_variation_id,
             ).fetch()
 
-    @admin_action("Refresh: Force (using VCV - default)")
+    @admin_action("Refresh: Force")
     def refresh_force_vcv(self, request, queryset: QuerySet[ClinVarRecordCollection]):
         start = datetime.now()
         for obj in queryset:
@@ -212,18 +212,6 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
             ).fetch()
         duration = datetime.now() - start
         messages.info(request, message=f"Fetching took {duration}")
-
-    # @admin_action("Refresh: Force (using RCVs)")
-    # def refresh_force_rcvs(self, request, queryset: QuerySet[ClinVarRecordCollection]):
-    #     start = datetime.now()
-    #     for obj in queryset:
-    #         ClinVarFetchRequest(
-    #             clinvar_variation_id=obj.clinvar_variation_id,
-    #             max_cache_age=timedelta(seconds=0),
-    #             parser=ClinVarXmlParserViaRCVs
-    #         ).fetch()
-    #     duration = datetime.now() - start
-    #     messages.info(request, message=f"Fetching took {duration}")
 
 
 class HasErrorFilter(admin.SimpleListFilter):

@@ -1,16 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Iterable
-from annotation.clinvar_fetch_request import ClinVarFetchRequest
-from annotation.models import ClinVarRecord
-from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.enums import TestingContextBucket, OverlapStatus
-from classification.models import ClassificationResultValue, ClassificationSummaryCacheDict, \
-    EvidenceKeyMap, OverlapContribution
-from classification.enums.overlaps_enums import OverlapContributionStatus, OverlapEntrySourceTextChoices, TriageState, \
-    TriageStatus
+from classification.models import ClassificationResultValue, \
+    EvidenceKeyMap, OverlapContribution, ClassificationSummaryCacheObj
+from classification.enums.overlaps_enums import OverlapContributionStatus
 from library.utils import first
-from snpdb.models import Allele
 
 
 OVERLAP_CLIN_SIG_ENABLED = False  # ensure reference this whenever doing some functionality when ClinSign should be supported
@@ -24,18 +19,19 @@ class OverlapStatusCalculation:
     override_pending_value: Optional[OverlapStatus] = None
 
     @property
-    def pending_value(self):
+    def effective_value(self):
         return self.override_pending_value if (self.override_pending_value is not None) else self.current_value
 
 
 class OverlapCalculatorBase(ABC):
 
     @classmethod
-    def value_from_summary(cls, summary: ClassificationSummaryCacheDict) -> str:
+    @abstractmethod
+    def value_type(cls) -> ClassificationResultValue:
         raise NotImplementedError()
 
     @classmethod
-    def clinvar_to_entry(cls, allele: Allele) -> Optional[OverlapContribution]:
+    def value_from_summary(cls, summary: ClassificationSummaryCacheObj) -> Optional[str]:
         raise NotImplementedError()
 
     @classmethod
@@ -95,8 +91,12 @@ class OverlapCalculatorBase(ABC):
 class OverlapCalculatorClinSig(OverlapCalculatorBase):
 
     @classmethod
-    def value_from_summary(cls, summary: ClassificationSummaryCacheDict) -> str:
-        return summary.get("somatic", {}).get("clinical_significance")
+    def value_type(cls) -> ClassificationResultValue:
+        return ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE
+
+    @classmethod
+    def value_from_summary(cls, summary: ClassificationSummaryCacheObj) -> Optional[str]:
+        return summary.somatic.clinical_significance
 
     @classmethod
     def is_comparable_value(cls, value):
@@ -123,43 +123,18 @@ class OverlapCalculatorClinSig(OverlapCalculatorBase):
 class OverlapCalculatorOncPath(OverlapCalculatorBase):
 
     @classmethod
+    def value_type(cls) -> ClassificationResultValue:
+        return ClassificationResultValue.ONC_PATH
+
+    @classmethod
     def is_comparable_value(cls, value):
         if EvidenceKeyMap.clinical_significance_to_bucket().get(value) is None:
             return False
         return True
 
     @classmethod
-    def value_from_summary(cls, summary: ClassificationSummaryCacheDict) -> str:
-        return summary.get("pathogenicity", {}).get("classification")
-
-    # @classmethod
-    # def clinvar_to_contribution(cls, allele: Allele) -> Optional[OverlapContribution]:
-    #     # FIXME not used
-    #     if clinvar_details := ClinVarDetails.instance_from(allele=allele):
-    #         if clinvar_details.is_expert_panel_or_greater and clinvar_details.clinvar.highest_pathogenicity > 0:
-    #             clinvar_record_collection = ClinVarFetchRequest(
-    #                 clinvar_variation_id=clinvar_details.clinvar.clinvar_variation_id,
-    #             ).fetch()
-    #             expert_panel: ClinVarRecord
-    #             if expert_panel := clinvar_record_collection.expert_panel:
-    #                 value = expert_panel.clinical_significance
-    #                 relevant_value = ClassificationResultValue.ONC_PATH and EvidenceKeyMap.clinical_significance_to_bucket().get(value) is not None
-    #
-    #                 oc = OverlapContribution.objects.update_or_create(
-    #                     source=OverlapEntrySourceTextChoices.CLINVAR,
-    #                     scv=expert_panel.record_id,
-    #                     testing_context_bucket=TestingContextBucket.GERMLINE,
-    #                     allele=allele,
-    #                     classification_grouping_id=None,
-    #                     defaults={
-    #                         "value": value,
-    #                         "effective_date": expert_panel.effective_date.to_dict(),
-    #                     },
-    #                     contribution_status=OverlapContributionStatus.CONTRIBUTING if relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE,
-    #                     triage_state=TriageState(TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
-    #                 )
-    #                 return oc
-    #     return None
+    def value_from_summary(cls, summary: ClassificationSummaryCacheObj) -> Optional[str]:
+        return summary.pathogenicity.classification
 
     @classmethod
     def calculate_status_for_multiple_entries(cls, values: set[str]) -> OverlapStatus:
@@ -197,7 +172,7 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
 def calculator_for_value_type(value_type: ClassificationResultValue) -> OverlapCalculatorBase:
     if value_type == ClassificationResultValue.ONC_PATH:
         return OverlapCalculatorOncPath()
-    elif value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
+    elif value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
         return OverlapCalculatorClinSig()
     else:
         raise ValueError(f"Unsupported value type {value_type}")
