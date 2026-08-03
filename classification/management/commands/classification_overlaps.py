@@ -5,6 +5,7 @@ from django.db.models import F
 from annotation.models import ClinVarRecordCollection
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import TestingContextBucket, OverlapStatus, OverlapType
+from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
     DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \
     ClassificationFlagTypes
@@ -99,6 +100,10 @@ class Command(BaseCommand):
                 #     triage_date = models.DateField(null=True, blank=True)
                 #     user = models.ForeignKey(User, null=True, blank=True, on_delete=PROTECT)
 
+                is_continued_discordance = discordance_report.is_latest and discordance_report.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE
+                if is_continued_discordance:
+                    print(f"*** CONTINUED DISCORDANCE for OV_{overlap.pk} ***")
+
                 for legacy_triage in discordance_report.discordancereporttriage_set.exclude(
                     triage_status=DiscordanceReportTriageStatus.PENDING,
                     note__isnull=True
@@ -116,12 +121,12 @@ class Command(BaseCommand):
                         print(f"Found illegal triage status \"{legacy_triage.triage_status}\" in triage {legacy_triage.pk}")
                         continue
 
-                    if triage_status == TriageStatus.PENDING and not legacy_triage.note:
-                        # user did not update triage
-                        continue
-
                     if not overlap_contribution:
                         print(f"Could not find OverlapContribution for DR_{discordance_report.pk} but there were modified triages against it")
+                        continue
+
+                    if triage_status == TriageStatus.PENDING and not legacy_triage.note and not is_continued_discordance:
+                        # user did not update triage, and this isn't a continued discordance so nothing to report
                         continue
 
                     triage_state = TriageState(triage_status)
@@ -138,6 +143,7 @@ class Command(BaseCommand):
                             print(f"Did not find pending change value for triage {legacy_triage.pk}, maybe it already changed")
 
                     has_change = False
+
                     if overlap_contribution.triage_state_obj != triage_state:
                         overlap_contribution.triage_state_obj = triage_state
                         has_change = True
@@ -147,6 +153,11 @@ class Command(BaseCommand):
                             overlap_contribution.comment_obj = overlap_contribution.comment_obj.next_comment(note)
                             print(f"SETTING NOTE to {overlap_contribution.comment_obj}")
                             has_change = True
+
+                    if discordance_report.is_latest and discordance_report.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
+                        print(f"Migrating continued discordance")
+                        overlap_contribution.review_agreed_value = overlap_contribution.effective_value
+                        has_change = True
 
                     if has_change:
                         print(f"Updating triage cousin to DR_{discordance_report.pk} - on allele {overlap.allele:CA}")
