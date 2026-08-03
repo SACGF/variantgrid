@@ -90,7 +90,6 @@
             <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-d" value="7" {% if tab == "D" %}checked="checked"{% endif %}>Ready to Discuss {{ counts.7 | badge }}</label>
             <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="5" {% if tab == "AA" %}checked="checked"{% endif %}>Awaiting Amendment {{ counts.5 | badge }}</label>
             <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="2" {% if tab == "O" %}checked="checked"{% endif %}>Waiting on Other Lab {{ counts.2 | badge }}</label>
-            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="6" {% if tab == "C" %}checked="checked"{% endif %}>Complex {{ counts.6 | badge }}</label>
             <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="S" {% if tab == "S" %}checked="checked"{% endif %}>Solved {{ counts.S | badge }}</label>
             <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="X" {% if tab == "A" %}checked="checked"{% endif %}>All Overlaps</label>
         </div>
