@@ -104,7 +104,7 @@ class Command(BaseCommand):
                 if is_continued_discordance:
                     print(f"*** CONTINUED DISCORDANCE for OV_{overlap.pk} ***")
 
-                legacy_triage_qs = discordance_report.discordancereporttriage_set
+                legacy_triage_qs = discordance_report.discordancereporttriage_set.all()
                 if not is_continued_discordance:
                     legacy_triage_qs = legacy_triage_qs.exclude(triage_status=DiscordanceReportTriageStatus.PENDING)
 
