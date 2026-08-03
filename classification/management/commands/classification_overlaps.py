@@ -104,10 +104,13 @@ class Command(BaseCommand):
                 if is_continued_discordance:
                     print(f"*** CONTINUED DISCORDANCE for OV_{overlap.pk} ***")
 
-                for legacy_triage in discordance_report.discordancereporttriage_set.exclude(
-                    triage_status=DiscordanceReportTriageStatus.PENDING,
-                    note__isnull=True
-                ):
+                legacy_triage_qs = discordance_report.discordancereporttriage_set
+                if not is_continued_discordance:
+                    legacy_triage_qs = legacy_triage_qs.exclude(triage_status=DiscordanceReportTriageStatus.PENDING)
+
+                for legacy_triage in legacy_triage_qs:
+                    has_stuff = legacy_triage.triage_status != DiscordanceReportTriageStatus.PENDING
+
                     overlap_contribution = OverlapContribution.objects.filter(
                         allele=allele,
                         testing_context_bucket=overlap.testing_context_bucket,
@@ -121,7 +124,7 @@ class Command(BaseCommand):
                         print(f"Found illegal triage status \"{legacy_triage.triage_status}\" in triage {legacy_triage.pk}")
                         continue
 
-                    if not overlap_contribution:
+                    if has_stuff and not overlap_contribution:
                         print(f"Could not find OverlapContribution for DR_{discordance_report.pk} but there were modified triages against it")
                         continue
 
@@ -154,7 +157,7 @@ class Command(BaseCommand):
                             print(f"SETTING NOTE to {overlap_contribution.comment_obj}")
                             has_change = True
 
-                    if discordance_report.is_latest and discordance_report.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
+                    if is_continued_discordance:
                         print(f"Migrating continued discordance")
                         overlap_contribution.review_agreed_value = overlap_contribution.effective_value
                         has_change = True
@@ -171,6 +174,8 @@ class Command(BaseCommand):
                             overlap_contribution.save()
                     else:
                         print(f"Triage already up to date - possibly multiple discordances for same record")
+                if is_continued_discordance:
+                    OverlapServices.recalc_overlap(overlap)
 
     def populate_overlap_change_date(self):
         # timestamp on overlaps
