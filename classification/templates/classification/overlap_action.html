@@ -15,7 +15,11 @@
             let selectedValues = $('.value-change option:selected').map(function() {
                 return this.value;
             }).get();
-            let uniqueValues = [...new Set(selectedValues)];
+            let nonInteractiveValues = $('.non-interactive').map(function() {
+                return this.value;
+            }).get();
+
+            let uniqueValues = [...new Set(selectedValues + nonInteractiveValues)];
             let valueStr = uniqueValues.join(',');
             let valueType = '{{ overlap.value_type.value }}';
             // <div data-toggle="ajax" href="{% url 'overlap_calc' %}?value_type=O&values=VUS,P"></div>
@@ -137,18 +141,24 @@
                                             {% else %}{{ o_cont.pretty_value }}
                                             {% endif %}
                                         </td>
-                                        <td style="vertical-align: middle"><i class="fas fa-arrow-right" /></td>
-                                        <td>
-                                            <select class="form-control value-change" name="contribution-{{ o_cont.pk }}">
-                                                {% for option in evidence_key.options %}
-                                                    {% if o_cont.effective_value == option.key %}
-                                                        <option value="{{ option.key }}" selected>{{ option.label }} : No Change</option>
-                                                    {% else %}
-                                                        <option value="{{ option.key }}">{{ option.label }}</option>
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </select>
-                                        </td>
+                                        {% if o_cont.triage_state_obj.status == "Z" %}
+                                            <td colspan="2">
+                                                <input class="non-interactive" type="hidden" value="{{ o_cont.effective_value }}" />
+                                            </td>
+                                        {% else %}
+                                            <td style="vertical-align: middle"><i class="fas fa-arrow-right" /></td>
+                                            <td>
+                                                <select class="form-control value-change" name="contribution-{{ o_cont.pk }}">
+                                                    {% for option in evidence_key.options %}
+                                                        {% if o_cont.effective_value == option.key %}
+                                                            <option value="{{ option.key }}" selected>{{ option.label }} : No Change</option>
+                                                        {% else %}
+                                                            <option value="{{ option.key }}">{{ option.label }}</option>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                        {% endif %}
                                     </tr>
                                 {% endfor %}
                                 {% comment %}

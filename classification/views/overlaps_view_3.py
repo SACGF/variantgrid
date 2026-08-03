@@ -250,6 +250,9 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
         elif action == "change":
             changes_dict = {}
             for contribution in overlap.contributions_list:
+                if contribution.triage_state_obj.status == TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
+                    continue
+
                 updated_value = request.POST.get(f"contribution-{contribution.pk}")
                 if updated_value != contribution.effective_value:
                     old_effective_value = contribution.effective_value
