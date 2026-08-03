@@ -254,18 +254,22 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
                     continue
 
                 updated_value = request.POST.get(f"contribution-{contribution.pk}")
-                if updated_value != contribution.effective_value:
-                    old_effective_value = contribution.effective_value
-                    if updated_value == contribution.value:
-                        # actually doing a review to change a pending value back to the value that was originally there
-                        contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_SATISFACTORY)
-                    else:
-                        contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_WILL_FIX, updated_value)
+                if updated_value:
+                    contribution.review_agreed_value = updated_value
+                    if updated_value != contribution.effective_value:
+                        old_effective_value = contribution.effective_value
+                        if updated_value == contribution.value:
+                            # actually doing a review to change a pending value back to the value that was originally there
+                            contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_SATISFACTORY)
+                        else:
+                            contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_WILL_FIX, updated_value)
 
-                    changes_dict[f"{contribution.lab}"] = f"{old_effective_value} -> {updated_value}"
+                        changes_dict[f"{contribution.lab}"] = f"{old_effective_value} -> {updated_value}"
 
-                    contribution.comment_obj = contribution.comment_obj.next_comment("Marked as update after review - see attached review for more details")
+                        contribution.comment_obj = contribution.comment_obj.next_comment("Marked as update after review - see attached review for more details")
+                    # save the reviewed value if nothing else
                     contribution.save()
+
 
             OverlapServices.update_skews(overlap)
             OverlapServices.recalc_overlap(overlap)

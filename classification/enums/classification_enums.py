@@ -31,6 +31,12 @@ class ConflictType(TextChoices):
             return "Clin-Sig"
 
 
+class OverlapOverrideStatus(IntegerChoices):
+    NO_OVERRIDE = 0, "No override"
+    COMPLEX = 10, "Complex"
+    CONTINUED_DISCORDANCE = 20, "Continued discordance"
+
+
 class OverlapStatus(IntegerChoices):
     NO_CONTRIBUTIONS = 0, "No contributions"
     NO_COUNTING_CONTRIBUTIONS = 10, "No counting contributions" # used if only Risk Factor or Drug Risk

@@ -11,7 +11,8 @@ from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 from annotation.models import ClinVarRecord
 from annotation.models.data_enums import EffectiveDate
-from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull, TriageStatus
+from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull, TriageStatus, \
+    OverlapOverrideStatus
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.enums.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
@@ -45,6 +46,22 @@ class OverlapContribution(TimeStampedModel):
     effective_date = JSONField(null=False, blank=False, default=EffectiveDate.default_json)
     triage_state = JSONField(null=False, blank=False, default=TriageState.default_json)  # pending values are captured here
     comment = JSONField(null=False, blank=False, default=TriageComment.default_json)
+
+    review_agreed_value = models.TextField(null=True, blank=True)
+    """
+    If this is not None, if it matches the effective_value, and every other OverlapContribution in the Overlap has their
+    final reviewed value matching their 
+    """
+
+    def is_review_agreed_value_met(self) -> bool:
+        """
+        Was there a review where there was going to be continued discordance
+        :return:
+        """
+        if review_agreed_value := self.review_agreed_value:
+            return review_agreed_value == self.effective_value
+        else:
+            return False
 
     @property
     def lab_like(self) -> LabLike:
@@ -209,9 +226,11 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     overlap_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     overlap_pending_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     """
-    overlap_pending_status will either be the same as overlap_status in most cases, but if there are records with WILL_FIX the status is based of the
-    pending values
+    FIXME, might be cleaner if rather than keep a different status of pending, we just have a flag to mark if there are pending values but the difference in status
+    isn't that important
     """
+
+    overlap_override_status = IntegerFieldChoices(choices_type=OverlapOverrideStatus, default=OverlapOverrideStatus.NO_OVERRIDE)  # type:OverlapOverrideStatus
 
     overlap_max_ever_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)

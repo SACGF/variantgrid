@@ -11,7 +11,7 @@ from django.template.loader import render_to_string
 from django.utils import html
 from django.utils.safestring import SafeString
 
-from classification.enums import OverlapStatus, SpecialEKeys
+from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus
 from classification.models import ClassificationGrouping, Overlap, OverlapType, OverlapContribution, \
     ClassificationResultValue, OverlapContributionStatus, OverlapContributionSkew, TriageNextStep, EvidenceKey, \
     EvidenceKeyMap
@@ -133,7 +133,9 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
 
         if self.get_query_param("skew_status") == "S":  # solved overlaps
-            qs = qs.filter(overlap_max_ever_status__gte=OverlapStatus.MAJOR_DIFFERENCES, overlap_status__lt=OverlapStatus.MAJOR_DIFFERENCES)
+            qs = qs.filter(
+                Q(overlap_max_ever_status__gte=OverlapStatus.MAJOR_DIFFERENCES, overlap_status__lt=OverlapStatus.MAJOR_DIFFERENCES) |
+                Q(overlap_override_status__ne=OverlapOverrideStatus.NO_OVERRIDE))
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionSkew.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk')
@@ -148,7 +150,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             ))
         else:
             # only look at discordant overlaps
-            qs = qs.filter(overlap_pending_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
+            qs = qs.filter(overlap_pending_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES).filter(overlap_override_status=OverlapOverrideStatus.NO_OVERRIDE)
             # filter based on overlap skew
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionSkew.objects.filter(lab_filter_q).filter(
@@ -254,7 +256,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         context = {
             "values": values,
             "overlap": cell.obj,
-            "max_triage_status": max_triage_status
+            "max_triage_status": max_triage_status,
+            "overlap_override_status": cell.obj.overlap_override_status
         }
 
         return render_to_string('classification/snippets/overlap_value_cell_3.html',
@@ -291,7 +294,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 name="summary",
                 label="Summary",
                 renderer=self.render_summary,
-                sort_keys=["overlap_pending_status", "skew_status", "overlap_status_change_timestamp"],
+                sort_keys=["overlap_pending_status", "skew_status", "overlap_status_change_timestamp", "overlap_override_status"],
                 default_sort=SortOrder.DESC
             ),
 

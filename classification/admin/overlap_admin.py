@@ -76,10 +76,10 @@ class OverlapContributionSkewsAdmin(admin.TabularInline):
 
 @admin.register(Overlap)
 class OverlapAdmin(ModelAdminBasics):
-    list_display = ('overlap_status', 'valid', 'overlap_type', 'value_type', 'allele', 'testing_context_bucket', 'tumor_type_category', 'contributions_list', 'modified_detailed')
+    list_display = ('overlap_status', 'valid', 'overlap_type', 'value_type', 'allele', 'testing_context_bucket', 'tumor_type_category', 'overlap_override_status', 'contributions_list', 'modified_detailed')
     # inlines = (OverlapContributionInline, )
     search_fields = ('pk', 'allele__id')
-    list_filter = (OverlapStatusFilter, 'valid', 'overlap_type', 'value_type', 'testing_context_bucket')
+    list_filter = (OverlapStatusFilter, 'valid', 'overlap_type', 'value_type', 'testing_context_bucket', 'overlap_override_status')
     inlines = (OverlapContributionSkewsAdmin,)
 
     @admin_list_column()

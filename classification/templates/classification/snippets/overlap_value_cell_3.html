@@ -1,5 +1,5 @@
 {% load js_tags %}
-{% if max_triage_status %}
+{% if max_triage_status and not overlap.overlap_override_status %}
     <div style="font-style:italic; color:#ccc">{{ max_triage_status.label }}</div>
 {% endif %}
 
@@ -15,4 +15,7 @@
     {% else %}<span title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>{% endif %}
     </span>
 {% endfor %}
+{% if overlap.overlap_override_status %}
+    <div>Reviewed as : <span style="font-weight:500">{{ overlap.overlap_override_status.label }}</span></div>
+{% endif %}
 <div id="overlap-{{ overlap.pk }}-updated"></div>

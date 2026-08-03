@@ -318,17 +318,19 @@ class OverlapServices:
 
         old_overlap_status = overlap.overlap_status
         old_pending_status = overlap.overlap_pending_status
+        old_override_status = overlap.overlap_override_status
 
         overlap_status_changed = False
         overlap_valid_changed = False
-        if (overlap_status_calculation.current_value, overlap_status_calculation.effective_value) != (old_overlap_status, old_pending_status):
+        if (overlap_status_calculation.current_value, overlap_status_calculation.effective_value, overlap_status_calculation.override_status) != (old_overlap_status, old_pending_status, old_override_status):
             # see if either overlap status or pending overlap status are changing
             overlap.overlap_status = overlap_status_calculation.current_value
             overlap.overlap_pending_status = overlap_status_calculation.effective_value
             overlap.overlap_max_ever_status = max(overlap.overlap_max_ever_status, overlap_status_calculation.current_value)
+            overlap.overlap_override_status = overlap_status_calculation.override_status
 
             overlap.overlap_status_change_timestamp = now()
-            overlap_changed = True
+            overlap_status_changed = True
 
         if overlap.overlap_type == OverlapType.SINGLE_CONTEXT:
             # a single context Overlap is always "valid" (though it can have an OverlapStatus of NO Contributions)
@@ -337,6 +339,7 @@ class OverlapServices:
                 overlap_valid_changed = True
         elif overlap.overlap_type == OverlapType.CROSS_CONTEXT:
             # cross contexts need at least 2 different contexts to be considered valid
+            # Rather than a whole valid bool, could this be better done as just the status of REQUIRES_MULTIPLE_CONTEXTS?
             valid = len(overlap.testing_contexts_objs) > 1
             if overlap.valid != valid:
                 overlap.valid = valid

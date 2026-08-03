@@ -25,6 +25,9 @@
                     {% if overlap.overlap_pending_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_pending_status.label }}{% endif %}
                 </span>
                 {% endif %}
+                {% if overlap.overlap_override_status %}
+                    <br/>Reviewed as : <b>{{ overlap.get_overlap_override_status_display }}</b>
+                {% endif %}
                 </span>
                 <div id="overlap-{{ overlap.pk }}-updated"></div>
             {% endlabelled %}

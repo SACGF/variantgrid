@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Iterable
-from classification.enums import TestingContextBucket, OverlapStatus
+from classification.enums import OverlapStatus, OverlapOverrideStatus, TriageStatus
 from classification.models import ClassificationResultValue, \
     EvidenceKeyMap, OverlapContribution, ClassificationSummaryCacheObj
 from classification.enums.overlaps_enums import OverlapContributionStatus
@@ -17,6 +17,7 @@ OVERLAP_CLIN_SIG_ENABLED = False  # ensure reference this whenever doing some fu
 class OverlapStatusCalculation:
     current_value: OverlapStatus
     override_pending_value: Optional[OverlapStatus] = None
+    override_status: Optional[OverlapOverrideStatus] = OverlapOverrideStatus.NO_OVERRIDE
 
     @property
     def effective_value(self):
@@ -42,7 +43,9 @@ class OverlapCalculatorBase(ABC):
     def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapStatusCalculation:
         non_comparable_values: int = 0
         contributing: list[OverlapContribution] = []
+
         for entry in entries:
+            # TODO do we want to do a cleaner solution than this for ExpertPanels?
             if entry.possibly_outdated:
                 continue
 
@@ -63,6 +66,8 @@ class OverlapCalculatorBase(ABC):
             return OverlapStatusCalculation(OverlapStatus.SINGLE_SUBMITTER)
         else:
             all_values = set(con.value for con in contributing)
+            pending_value: OverlapStatus = None
+            override_value: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
 
             base_value: OverlapStatus
             if len(all_values) == 1:
@@ -72,15 +77,22 @@ class OverlapCalculatorBase(ABC):
 
             all_pending_values = set(con.effective_value for con in contributing)
 
-            if all_pending_values == all_values:
-                return OverlapStatusCalculation(base_value)
-            else:
-                pending_value: OverlapStatus = None
+            if all_pending_values != all_values:
                 if len(all_pending_values) == 1:
                     pending_value = OverlapStatus.EXACT_AGREEMENT
                 else:
                     pending_value = cls.calculate_status_for_multiple_entries(all_pending_values)
-                return OverlapStatusCalculation(base_value, pending_value)
+
+            if interactive_contributors := [con for con in contributing if con.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY]:
+                all_reviewed = all(con.is_review_agreed_value_met() for con in interactive_contributors)
+                all_complex = all(con.triage_state_obj.status == TriageStatus.COMPLEX for con in interactive_contributors)
+
+                if all_reviewed:
+                    override_value = OverlapOverrideStatus.CONTINUED_DISCORDANCE
+                elif all_complex:
+                    override_value = OverlapOverrideStatus.COMPLEX
+
+            return OverlapStatusCalculation(base_value, pending_value, override_value)
 
     @classmethod
     @abstractmethod
