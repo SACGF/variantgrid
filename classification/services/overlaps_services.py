@@ -463,7 +463,7 @@ class OverlapContributionPerspective:
         return self._sort_index < other._sort_index
 
 
-@dataclass
+@dataclass(frozen=True)
 class LabContext:
     lab: LabLike
     contact_subject: Optional[str]
@@ -474,21 +474,21 @@ class OverlapGrouping3:
     overlap: Overlap
     user: User
 
-    # @cached_property
-    # def involved_labs(self) -> list[LabContext]:
-    #     labs: set[LabLike] = []
-    #     for overlap_contribution in self.overlap.contributions:
-    #         subject = None
-    #         if lab := overlap_contribution.lab:
-    #             # TODO get lab's preferred genome build
-    #             subject = self.overlap.c_hgvs(lab=lab)
-    #         labs.add(
-    #             LabContext(
-    #                 overlap_contribution.lab_like,
-    #                 subject
-    #             )
-    #         )
-    #     return list(sorted(labs, key=lambda x: x.lab))
+    @cached_property
+    def involved_labs(self) -> list[LabContext]:
+        labs: set[LabContext] = set()
+        for overlap_contribution in self.overlap.contributions:
+            subject = None
+            if lab := overlap_contribution.lab:
+                # TODO get lab's preferred genome build too
+                subject = self.overlap.c_hgvs(lab=lab)
+            labs.add(
+                LabContext(
+                    overlap_contribution.lab_like,
+                    subject
+                )
+            )
+        return list(sorted(labs, key=lambda x: x.lab))
 
     @cached_property
     def rows(self) -> list[OverlapContributionPerspective]:
