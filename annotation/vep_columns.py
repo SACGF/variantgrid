@@ -832,6 +832,8 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
         formatter=fmt.format_pick_highest_float,
     ),
+    # COSMIC renamed the sample count INFO field from CNT to SAMPLE_COUNT when we moved from
+    # CosmicCodingMuts (v97) to Cosmic_GenomeScreensMutant (v99) in columns version 3
     VEPColumnDef(
         source_field='CNT',
         variant_grid_columns=('cosmic_count',),
@@ -839,6 +841,17 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.COSMIC,
         source_field_has_custom_prefix=True,
         pipeline_types=STANDARD,
+        max_columns_version=2,
+        formatter=fmt.format_pick_highest_int,
+    ),
+    VEPColumnDef(
+        source_field='SAMPLE_COUNT',
+        variant_grid_columns=('cosmic_count',),
+        category=ColumnAnnotationCategory.FREQUENCY_DATA,
+        vep_custom=VEPCustom.COSMIC,
+        source_field_has_custom_prefix=True,
+        pipeline_types=STANDARD,
+        min_columns_version=3,
         formatter=fmt.format_pick_highest_int,
     ),
     VEPColumnDef(
