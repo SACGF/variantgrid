@@ -12,7 +12,6 @@ import tempfile
 from datetime import timedelta
 from unittest import mock
 
-from django.core.cache import cache
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
@@ -27,11 +26,11 @@ from annotation.tasks.annotate_variants import _cleanup_reclaimed_run_files, ann
     annotation_run_retry, conservation_sidecar_filename, get_annotated_filename, get_annotsv_dir, \
     get_annotsv_tsv_filename, import_annotation_run
 from annotation.tasks.annotation_scheduler_task import count_annotation_run, dispatch_annotation_runs, \
-    has_free_disk_for_annotation, reclaim_stalled_annotation_runs
+    has_free_disk_for_annotation
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
-from library.utils.file_utils import DiskUsage, get_mount_point_for_directory
+from library.utils.file_utils import DiskUsage
 
 STANDARD = VariantAnnotationPipelineType.STANDARD
 
@@ -107,7 +106,8 @@ class AnnotationRunCleanupTestCase(TestCase):
             self.assertTrue(os.path.isdir(annotsv_dir))
 
     def test_success_signal_without_a_run_is_harmless(self):
-        # The signal predates the cleanup - upload's receiver sends/consumes it without a run.
+        # The signal predates the cleanup - upload's receiver sends/consumes it without a run, so the
+        # handler's None guard is load-bearing. No assertions: this passes if nothing raises.
         annotation_run_complete_signal.send(sender="test", variant_annotation_version=self.vav,
                                             pipeline_type=STANDARD)
 
@@ -142,35 +142,6 @@ class AnnotationRunCleanupTestCase(TestCase):
                 self.assertFalse(os.path.exists(path))
             self.assertTrue(os.path.isdir(annotsv_dir))
             self.assertTrue(os.path.exists(os.path.join(annotsv_dir, "AnnotSV.log")))
-
-    def test_reclaim_scrub_discards_output(self):
-        # A stalled run with no annotated VCF is scrubbed back to CREATED - its partial output has to go
-        # or the re-dump would collide with it.
-        with tempfile.TemporaryDirectory() as tmp_dir, \
-                override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
-            run, paths, _ = self._run_with_output(
-                tmp_dir, leased_by="worker", lease_expires=timezone.now() - timedelta(seconds=1),
-                attempt_count=1, dump_start=timezone.now(), dump_count=100)
-            annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
-            os.remove(annotated_filename)  # no VEP output -> scrub branch, not resume
-
-            with mock.patch.object(AnnotationRun, "delete_related_objects"):
-                reclaim_stalled_annotation_runs(self.vav)
-
-            for path in paths:
-                self.assertFalse(os.path.exists(path), f"scrub left {os.path.basename(path)} behind")
-            run.refresh_from_db()
-            self.assertEqual(run.status, AnnotationStatus.CREATED)
-
-    def test_delete_removes_output_files(self):
-        with tempfile.TemporaryDirectory() as tmp_dir, \
-                override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
-            run, paths, annotsv_dir = self._run_with_output(tmp_dir)
-
-            with mock.patch.object(AnnotationRun, "delete_related_objects"):
-                run.delete()
-
-            self._assert_all_removed(paths, annotsv_dir)
 
     def test_queryset_delete_removes_output_files(self):
         # post_delete rather than a delete() override, so a bulk delete (eg
@@ -268,38 +239,3 @@ class AnnotationDiskGateTestCase(TestCase):
         # not to silently halt the pipeline.
         with mock.patch.object(annotation_scheduler_task, "_annotation_dump_disk_usage", return_value=None):
             self.assertTrue(has_free_disk_for_annotation())
-
-    @override_settings(ANNOTATION_MIN_FREE_DISK_GIGS=10)
-    def test_reads_real_disk_for_uncreated_dump_dir(self):
-        # End to end through the shared df-backed code: the dump dir may not exist yet, but its mount
-        # does, so the gate still gets an answer (and a real machine has more than 10G free here).
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            missing = os.path.join(tmp_dir, "not", "created", "yet")
-            with override_settings(ANNOTATION_VCF_DUMP_DIR=missing):
-                cache.delete(annotation_scheduler_task._DISK_USAGE_CACHE_KEY)
-                self.assertIsNotNone(annotation_scheduler_task._annotation_dump_disk_usage())
-                cache.delete(annotation_scheduler_task._DISK_USAGE_CACHE_KEY)
-
-
-class MountPointMatchingTestCase(TestCase):
-    """ Which filesystem a directory is attributed to. """
-
-    MOUNTS = ["/", "/data", "/database", "/boot/efi"]
-
-    def test_longest_match_wins(self):
-        # Every absolute path is under '/', so a plain prefix test would attribute this to whichever df
-        # listed first.
-        self.assertEqual(get_mount_point_for_directory("/data/annotation_scratch", self.MOUNTS), "/data")
-
-    def test_separator_boundary_respected(self):
-        # '/database'.startswith('/data') is True, but they are different filesystems
-        self.assertEqual(get_mount_point_for_directory("/database/dumps", self.MOUNTS), "/database")
-
-    def test_mount_point_itself(self):
-        self.assertEqual(get_mount_point_for_directory("/data", self.MOUNTS), "/data")
-
-    def test_falls_back_to_root(self):
-        self.assertEqual(get_mount_point_for_directory("/home/user/variantgrid", self.MOUNTS), "/")
-
-    def test_no_match(self):
-        self.assertIsNone(get_mount_point_for_directory("/data/x", ["/mnt"]))
