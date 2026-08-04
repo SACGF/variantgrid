@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import timedelta
+from typing import Optional
 
 import celery
 from django.conf import settings
@@ -15,14 +16,72 @@ from annotation.celery_utils import annotation_worker_slots
 from annotation.models import AnnotationRun, AnnotationStatus, VariantAnnotationPipelineType, \
     VariantAnnotationVersion
 from annotation.models.models import AnnotationVersion, AnnotationRangeLock
+from annotation.signals.manual_signals import annotation_run_discarded_signal
 from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run, \
-    get_annotated_filename, get_run_output_paths, remove_run_output_files
-from library.log_utils import log_traceback
+    get_annotated_filename
+from library.constants import HOUR_SECS, MINUTE_SECS
+from library.log_utils import log_traceback, report_message
+from library.utils.file_utils import DiskUsage, get_disk_usage_for_directory
 from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF, Variant, JobsControl
 
 # #1646: max count_annotation_run tasks the dispatcher kicks per cycle, so creating a new annotation
 # version (thousands of runs at once) doesn't burst the count queue - the rest drain over later cycles.
 COUNT_KICK_BATCH = 500
+
+# #1670: the dispatcher runs on every run completion, so an unthrottled low-disk report would bury
+# every other alert. Warn at most once an hour while the pause holds.
+_LOW_DISK_REPORT_CACHE_KEY = "annotation_dispatch_low_disk_reported"
+_LOW_DISK_REPORT_TTL = HOUR_SECS
+# get_disk_usage_for_directory shells out to df, and the dispatcher runs on every run completion - so
+# cache it briefly, as annotation_worker_slots does with its celery inspect() broadcast. Free space over
+# a minute moves by at most a fraction of one run's output, well inside the threshold's headroom.
+_DISK_USAGE_CACHE_KEY = "annotation_dump_dir_disk_usage"
+_DISK_USAGE_CACHE_TTL = MINUTE_SECS
+
+
+def _annotation_dump_disk_usage() -> Optional[DiskUsage]:
+    """ Usage of the ANNOTATION_VCF_DUMP_DIR filesystem, cached ~60s. """
+    disk_usage = cache.get(_DISK_USAGE_CACHE_KEY)
+    if disk_usage is None:
+        disk_usage = get_disk_usage_for_directory(settings.ANNOTATION_VCF_DUMP_DIR)
+        if disk_usage is None:
+            return None
+        cache.set(_DISK_USAGE_CACHE_KEY, disk_usage, _DISK_USAGE_CACHE_TTL)
+    return disk_usage
+
+
+def has_free_disk_for_annotation() -> bool:
+    """ #1670: whether there is room on the ANNOTATION_VCF_DUMP_DIR filesystem to start another VEP run.
+
+        Each run writes a variant dump plus a substantially larger annotated VCF, so dispatching into a
+        nearly-full disk fills it, taking down everything else sharing that mount. Warning after the fact
+        (warn_low_disk_space) does not prevent that, so the dispatcher declines to start new work.
+
+        Only the VEP lane is gated. Runs already past VEP still import - that consumes no new space and
+        releases their dump and annotated VCF on success, so the backlog drains the disk back to healthy
+        rather than deadlocking on it.
+
+        Unknown free space does not block: an unreadable path is a reason to keep annotating and let the
+        existing warning fire, not to silently halt the pipeline. """
+    min_gigs = settings.ANNOTATION_MIN_FREE_DISK_GIGS
+    if not min_gigs:
+        return True
+    dump_dir = settings.ANNOTATION_VCF_DUMP_DIR
+    disk_usage = _annotation_dump_disk_usage()
+    if disk_usage is None:
+        logging.warning("Couldn't determine free disk for '%s' - allowing annotation dispatch", dump_dir)
+        return True
+    if disk_usage.has_capacity(min_gigs):
+        return True
+
+    _, disk_message = disk_usage.as_status_message(min_gigs)
+    msg = (f"Annotation dispatch paused - {dump_dir} is on a mount below "
+           f"ANNOTATION_MIN_FREE_DISK_GIGS. {disk_message}. Runs already past VEP will still be "
+           f"imported (freeing their dumps); no new VEP runs start until there is space.")
+    logging.warning(msg)
+    if cache.add(_LOW_DISK_REPORT_CACHE_KEY, True, _LOW_DISK_REPORT_TTL):
+        report_message(message=msg, level='warning')
+    return False
 
 
 @celery.shared_task(queue='scheduling_single_worker')
@@ -258,7 +317,9 @@ def _dispatch_sweep():
     # Import lane first so cheap DB imports (sometimes user-awaited) launch without waiting on the VEP scan.
     if upload_capacity > 0:
         _lease_across_vavs(vavs, AnnotationStatus.ANNOTATION_COMPLETED, upload_capacity, worker_id, now)
-    if vep_capacity > 0:
+    # #1670: checked after the import lane has been dispatched, so a low-disk pause still lets the
+    # already-annotated backlog drain (and free its dumps).
+    if vep_capacity > 0 and has_free_disk_for_annotation():
         _lease_across_vavs(vavs, AnnotationStatus.CREATED, vep_capacity, worker_id, now)
 
 
@@ -313,7 +374,9 @@ def _dispatch_for_vav(vav: VariantAnnotationVersion):
     worker_id = f"dispatch:{dispatch_annotation_runs.request.id or 'sync'}"
     if upload_capacity > 0:
         _lease_across_vavs([vav], AnnotationStatus.ANNOTATION_COMPLETED, upload_capacity, worker_id, now)
-    if vep_capacity > 0:
+    # #1670: as _dispatch_sweep - the import lane is dispatched first so a low-disk pause drains the
+    # already-annotated backlog instead of deadlocking on the full disk.
+    if vep_capacity > 0 and has_free_disk_for_annotation():
         _lease_across_vavs([vav], AnnotationStatus.CREATED, vep_capacity, worker_id, now)
 
 
@@ -483,12 +546,10 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
     elif annotation_run.status != AnnotationStatus.CREATED:
         # Worker got part-way before dying (pre-VEP) - scrub partial output (a CREATED run has none).
         annotation_run.delete_related_objects()
-        paths = []
-        if dump_filename:
-            paths += get_run_output_paths(annotation_run, dump_filename)
-        if annotation_run.vcf_annotated_filename:
-            paths.append(annotation_run.vcf_annotated_filename)
-        remove_run_output_files(annotation_run, paths)
+        # #1670: announce the discard - annotation.signals.annotation_run_cleanup owns the removal, and
+        # collects the same derived-plus-persisted set of paths that the losing attempt's cleanup does.
+        # Sent before the filename fields below are NULLed, while they can still name the files.
+        annotation_run_discarded_signal.send(sender=__name__, annotation_run=annotation_run)
         annotation_run.dump_start = None
         annotation_run.dump_end = None
         annotation_run.dump_count = None

@@ -383,7 +383,7 @@ PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 # Set to None / empty to disable.
 PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
-IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
+IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = True
 
 # Where partition dump files are written when an archivable model (VAV, ClinVarVersion, CohortGenotypeCollection, ...)
 # is archived via the pre-drop archival pipeline (#1537).

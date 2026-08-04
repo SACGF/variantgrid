@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import os
+from typing import Optional
 
 from django.conf import settings
 from django.utils import timezone
@@ -19,9 +20,12 @@ def import_vcf_annotations(
         annotation_run: AnnotationRun,
         insert_variants: bool = True,
         vep_version_check: bool = True,
-        delete_temp_files: bool = settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS):
+        delete_temp_files: Optional[bool] = None):
     import cyvcf2
     from library.genomics.vcf_utils import cyvcf2_header_types
+
+    if delete_temp_files is None:
+        delete_temp_files = settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
 
     annotation_run.upload_start = timezone.now()
     annotation_run.upload_attempts += 1

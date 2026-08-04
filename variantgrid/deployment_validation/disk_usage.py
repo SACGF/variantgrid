@@ -1,69 +1,45 @@
-from dataclasses import dataclass
+""" Deployment view of disk space: which directories this site cares about, and the minimum it wants
+    free on them. The measurement itself is library.utils.file_utils.DiskUsage. """
 from typing import Optional
 
 from django.conf import settings
 
-from library.utils.file_utils import get_disk_usage
-
-
-@dataclass
-class DiskUsage:
-    mount_point: str
-    available_kb: int
-    # human readable below
-    available_nice: str
-    percent_nice: str
-
-    @property
-    def has_safe_capacity(self):
-        return self.available_kb >= settings.SERVER_MIN_DISK_WARNING_GIGS * 1000000
-
-    @property
-    def as_status_message(self) -> tuple[str, str]:
-        message = f"Mount point '{self.mount_point}' ({self.percent_nice} used, {self.available_nice} available)"
-        if self.has_safe_capacity:
-            status = "info"
-        else:
-            status = "warning"
-            message += f" is below minimum of {settings.SERVER_MIN_DISK_WARNING_GIGS}G"
-
-        return status, message
+from library.utils.file_utils import DiskUsage, get_disk_usage, get_mount_point_for_directory
 
 
 def get_disk_usage_objects(directories_list: Optional[list[str]] = None) -> list[DiskUsage]:
+    """ One DiskUsage per distinct mount point serving the given directories. """
     if directories_list is None:
         directories_list = [settings.BASE_DIR, settings.UPLOAD_DIR, settings.ANNOTATION_VCF_DUMP_DIR]
-
-    minimum_gigs = settings.SERVER_MIN_DISK_WARNING_GIGS
 
     disk_usage = get_disk_usage()
     nice_disk_usage = get_disk_usage(human_readable=True)
     handled_mount_points = set()
     disk_usages: list[DiskUsage] = []
-    for mount_point, data in disk_usage.items():
-        for d in directories_list:
-            if mount_point in handled_mount_points:
-                continue
-            if d.startswith(mount_point):
-                handled_mount_points.add(mount_point)
-                available = int(data["avail"])
-                percent = data["percent"]
-                nice_available = nice_disk_usage[mount_point]["avail"]
-
-                disk_usages.append(
-                    DiskUsage(
-                        mount_point=mount_point,
-                        available_kb=available,
-                        percent_nice=percent,
-                        available_nice=nice_available
-                    )
-                )
+    for d in directories_list:
+        mount_point = get_mount_point_for_directory(d, disk_usage)
+        if mount_point is None or mount_point in handled_mount_points:
+            continue
+        handled_mount_points.add(mount_point)
+        data = disk_usage[mount_point]
+        disk_usages.append(
+            DiskUsage(
+                mount_point=mount_point,
+                available_kb=int(data["avail"]),
+                percent_nice=data["percent"],
+                available_nice=nice_disk_usage[mount_point]["avail"]
+            )
+        )
     return disk_usages
 
 
-def get_disk_messages(directories_list: list[str] = None, info_messages=False) -> list[tuple[str, str]]:
+def get_disk_messages(directories_list: list[str] = None, info_messages=False,
+                      min_gigs: Optional[float] = None) -> list[tuple[str, str]]:
+    if min_gigs is None:
+        min_gigs = settings.SERVER_MIN_DISK_WARNING_GIGS
+
     disk_usages = get_disk_usage_objects(directories_list)
     if not info_messages:
-        disk_usages = [du for du in disk_usages if not du.has_safe_capacity]
+        disk_usages = [du for du in disk_usages if not du.has_capacity(min_gigs)]
 
-    return [du.as_status_message for du in disk_usages]
+    return [du.as_status_message(min_gigs) for du in disk_usages]

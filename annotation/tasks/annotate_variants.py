@@ -18,7 +18,8 @@ from annotation.annotsv_annotation import run_annotsv, annotsv_check_command_lin
     get_annotsv_tsv_filename
 from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
-from annotation.signals.manual_signals import annotation_run_complete_signal
+from annotation.signals.manual_signals import annotation_run_complete_signal, \
+    annotation_run_discarded_signal
 from annotation.sv_conservation import score_sv_vcf, get_sv_conservation_tracks, \
     write_conservation_sidecar, conservation_sidecar_filename
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
@@ -332,9 +333,12 @@ def import_annotation_run(annotation_run_id):
         with AnnotationRunLeaseHeartbeat(annotation_run, my_task_id):
             import_vcf_annotations(annotation_run)
         # The run is only truly complete once imported (moved here from annotate_variants). #1649
+        # #1670: annotation_run is carried so the cleanup receiver can reclaim this run's output now that
+        # its rows are committed. Existing receivers take **kwargs, so the extra key is transparent.
         annotation_run_complete_signal.send(sender=os.path.basename(__file__),
                                             variant_annotation_version=annotation_run.annotation_range_lock.version,
-                                            pipeline_type=annotation_run.pipeline_type)
+                                            pipeline_type=annotation_run.pipeline_type,
+                                            annotation_run=annotation_run)
     except Exception as e:
         tb = get_traceback()
         annotation_run.error_exception = tb
@@ -435,28 +439,18 @@ def remove_run_output_files(annotation_run, paths):
 
 
 def _cleanup_reclaimed_run_files(annotation_run):
-    """ #1658: remove the on-disk output of an attempt that lost its run.
+    """ #1658: discard the on-disk output of an attempt that lost its run.
 
         Reclaim (_reset_run_for_redispatch) deletes what it can derive from the dump stem and then NULLs
         the filename fields, so by the time the losing attempt unwinds the DB no longer references its
         per-task files. There is no sweep of ANNOTATION_VCF_DUMP_DIR, so anything reclaim could not name
-        has to be removed here. Before per-task paths (#1658) the annotated name was a fixed function of
+        has to be collected here. Before per-task paths (#1658) the annotated name was a fixed function of
         the run, so a later attempt overwrote it or a later reclaim deleted it by name; now this attempt
         is the last party still holding its own paths.
 
-        Works off the in-memory instance deliberately: it still carries the filenames reclaim has since
-        NULLed on the row. """
-    paths = []
-    if dump_filename := annotation_run.vcf_dump_filename:
-        paths += get_run_output_paths(annotation_run, dump_filename)
-    # The persisted fields are a superset only when this attempt got far enough to save them; include
-    # them so a path that somehow diverges from the derivation is still collected.
-    if annotated_filename := annotation_run.vcf_annotated_filename:
-        paths += [annotated_filename, conservation_sidecar_filename(annotated_filename)]
-    if annotsv_tsv_filename := annotation_run.annotsv_tsv_filename:
-        paths.append(annotsv_tsv_filename)
-
-    remove_run_output_files(annotation_run, paths)
+        Passes the in-memory instance deliberately: it still carries the filenames reclaim has since
+        NULLed on the row. #1670: the removal itself lives in annotation.signals.annotation_run_cleanup. """
+    annotation_run_discarded_signal.send(sender=os.path.basename(__file__), annotation_run=annotation_run)
 
 
 def dump_and_annotate_variants(annotation_run, vep_version_check=True, lease_heartbeat=None):
@@ -561,9 +555,16 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True, lease_hea
 
 
 def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> AnnotationRun:
-    if upload_only and annotation_run.vcf_annotated_filename is None:
-        msg = "Retry annotation run upload only requires annotation VCF to be written"
-        raise ValueError(msg)
+    if upload_only:
+        if annotation_run.vcf_annotated_filename is None:
+            msg = "Retry annotation run upload only requires annotation VCF to be written"
+            raise ValueError(msg)
+        if not os.path.exists(annotation_run.vcf_annotated_filename):
+            # #1670: a run that imported successfully has had its VEP output reclaimed, so the row still
+            # names a file that is gone. Say so here rather than failing deep inside cyvcf2.
+            msg = (f"Annotation VCF '{annotation_run.vcf_annotated_filename}' no longer exists "
+                   f"(removed after successful annotation) - retry the full run instead of upload only")
+            raise ValueError(msg)
 
     annotation_range_lock = annotation_run.annotation_range_lock
     if annotation_range_lock is None:
