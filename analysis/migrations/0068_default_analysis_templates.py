@@ -18,5 +18,5 @@ class Migration(migrations.Migration):
 
     operations = [
         ManualOperation(task_id=ManualOperation.task_id_manage(["analysis_create_default_templates"]),
-                        test=_test_no_templates)
+                        test=_test_no_templates, requires=["annotation-version"])
     ]

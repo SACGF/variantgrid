@@ -18,13 +18,27 @@ from typing import Callable
 
 from django.conf import settings
 
-from annotation.models import CachedWebResource
+from annotation.models import AnnotationVersion, CachedWebResource, InvalidAnnotationVersionError
 from genes.models import TranscriptVersion
 from manual.models import ManualGateSatisfied, ManualMigrationOutstanding, ManualMigrationTask
 from ontology.models import OntologyVersion
+from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import ImportStatus
 
 AFTER_PREFIX = "after:"
+
+
+def _has_valid_annotation_version() -> bool:
+    """ True once any annotated build has a valid AnnotationVersion - ie annotation has been imported.
+        Anything creating an Analysis needs one (Analysis.annotation_version is set from
+        AnnotationVersion.latest(), which raises if there is none or its sub-versions are incomplete) """
+    for genome_build in GenomeBuild.builds_with_annotation():
+        try:
+            if AnnotationVersion.latest(genome_build):
+                return True
+        except (AnnotationVersion.DoesNotExist, InvalidAnnotationVersionError):
+            pass
+    return False
 
 
 @dataclass
@@ -109,6 +123,10 @@ GATES: dict[str, Gate] = {
             name=settings.CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO,
             import_status=ImportStatus.SUCCESS).exists(),
         "RefSeq transcript sequences loaded (else c.hgvs resolution falls back to slow NCBI fetches)",
+    ),
+    "annotation-version": AutoGate(
+        _has_valid_annotation_version,
+        "Annotation has been imported (a valid AnnotationVersion exists)",
     ),
     "variant-annotation-current": ManualGate(
         "Variant annotation upgraded to the latest version",
