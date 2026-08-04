@@ -326,8 +326,6 @@ BEACON_QUERY_NODES = {
                    "type": "cnv", "assemblies": ["GRCh38"]},
     "cancercelllines": {"base_url": "https://cancercelllines.org/beacon", "api_version": "v2.0.0",
                         "type": "cnv", "assemblies": ["GRCh38"]},
-    "refcnv": {"base_url": "https://refcnv.org/beacon", "api_version": "v2.0.0",
-               "type": "cnv", "assemblies": ["GRCh38"]},
 }
 
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_
