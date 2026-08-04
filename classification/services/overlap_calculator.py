@@ -45,9 +45,10 @@ class OverlapCalculatorBase(ABC):
         contributing: list[OverlapContribution] = []
 
         for entry in entries:
+            # FIXME, looking for a different solution that possibly outdated
             # TODO do we want to do a cleaner solution than this for ExpertPanels?
-            if entry.possibly_outdated:
-                continue
+            # if entry.possibly_outdated:
+            #     continue
 
             match entry.contribution_status:
                 case OverlapContributionStatus.CONTRIBUTING:
@@ -66,7 +67,6 @@ class OverlapCalculatorBase(ABC):
         elif len(contributing) == 1:
             return OverlapStatusCalculation(OverlapStatus.SINGLE_SUBMITTER, has_pending_values=has_pending_values)
         else:
-            overlap_status: OverlapStatus = None
             override_value: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
 
             all_values = set(con.effective_value for con in contributing)
@@ -76,7 +76,10 @@ class OverlapCalculatorBase(ABC):
             else:
                 base_value = cls.calculate_status_for_multiple_entries(all_values)
 
-            if interactive_contributors := [con for con in contributing if con.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY]:
+            third_party = [con for con in contributing if con.triage_state_obj.status == TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
+            interactive_contributors = [con for con in contributing if con.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
+
+            if interactive_contributors:
                 all_reviewed = all(con.is_review_agreed_value_met() for con in interactive_contributors)
                 all_complex = all(con.triage_state_obj.status == TriageStatus.COMPLEX for con in interactive_contributors)
 
@@ -84,6 +87,18 @@ class OverlapCalculatorBase(ABC):
                     override_value = OverlapOverrideStatus.CONTINUED_DISCORDANCE
                 elif all_complex:
                     override_value = OverlapOverrideStatus.COMPLEX
+                elif base_value.is_discordant:
+                    # see if it's ClinVar that's making the over discordant
+                    non_clinvar_values = set(con.effective_value for con in interactive_contributors)
+                    clinvar_discordant = len(non_clinvar_values) > 1 and cls.calculate_status_for_multiple_entries(all_values).is_discordant
+
+                    if clinvar_discordant:
+                        max_clinvar_date = max(con.effecive_date for con in third_party)
+                        max_classification_date = max(con.effecive_date for con in interactive_contributors)
+                        if max_clinvar_date < max_classification_date:
+                            override_value = OverlapOverrideStatus.IGNORING_OLD_CLINVAR
+                        elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors): # all confident
+                            override_value = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
 
             return OverlapStatusCalculation(base_value, has_pending_values, override_value)
 

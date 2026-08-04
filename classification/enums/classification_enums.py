@@ -32,9 +32,12 @@ class ConflictType(TextChoices):
 
 
 class OverlapOverrideStatus(IntegerChoices):
+    # TODO resolution might be a better term, or ongoing
     NO_OVERRIDE = 0, "No override"
     COMPLEX = 10, "Complex"
     CONTINUED_DISCORDANCE = 20, "Continued discordance"
+    CONFIDENT_VS_CLINVAR = 30, "Confident vs ClinVar"
+    IGNORING_OLD_CLINVAR = 40, "Ignoring older ClinVar records"
 
 
 class OverlapStatus(IntegerChoices):
