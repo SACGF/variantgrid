@@ -1,10 +1,12 @@
 import logging
 
 import pandas as pd
+from django.db import transaction
 
 from library.utils import file_sha256sum
 
 
+@transaction.atomic
 def load_genome_fasta_index(genome_fasta: 'GenomeFasta', genome_build: 'GenomeBuild'):
     # Delete any older GenomeFasta entries for this build/annotation consortium (eg before we changed settings)
     gf_qs = genome_build.genomefasta_set.filter(annotation_consortium=genome_build.annotation_consortium)
