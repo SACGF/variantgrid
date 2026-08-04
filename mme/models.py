@@ -25,6 +25,9 @@ class MMESubmission(models.Model):
                               default=MMESubmissionStatus.DRAFT)
     request_json = models.JSONField(null=True)          # exact profile we POSTed
     response_json = models.JSONField(null=True)         # raw /match response
+    # Supersede the node's published baseline - what came back with THIS response.
+    response_disclaimer = models.TextField(blank=True, default="")
+    response_terms = models.TextField(blank=True, default="")
     error = models.TextField(null=True, blank=True)
     created = models.DateTimeField(default=timezone.now)
     submitted = models.DateTimeField(null=True, blank=True)
@@ -38,7 +41,8 @@ class MMESubmission(models.Model):
 
 
 class MMEMatchResult(models.Model):
-    """ One candidate patient returned in a /match response (inbound or outbound). """
+    """ One candidate patient a remote node returned to one of OUR submissions.
+        The mirror image - our records returned to a peer - is MMEInboundMatch. """
     submission = models.ForeignKey(MMESubmission, null=True, on_delete=models.CASCADE)
     score = models.FloatField()
     matched_patient_id = models.CharField(max_length=255)   # remote node's patient id
@@ -54,9 +58,33 @@ class MMEMatchResult(models.Model):
 class MMEInboundQuery(models.Model):
     """ Audit row for an inbound /match query served by us: who queried, when, what
         profile, and how many of our patients we returned. Keeps a compliance trail. """
+    # Peer whose issued token authenticated this request (mme/auth.py). Blank on rows
+    # written before per-peer tokens existed.
+    peer_node_id = models.CharField(max_length=64, blank=True, default="")
     request_json = models.JSONField()
     num_results = models.IntegerField(default=0)
     created = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"MMEInboundQuery({self.created}, num_results={self.num_results})"
+
+
+class MMEInboundMatch(models.Model):
+    """ One of OUR classifications returned to a peer in response to an inbound query -
+        we have to know which records went out to notify their depositors.
+        `query_patient_json` is the peer's full patient object, including its `contact`. """
+    inbound_query = models.ForeignKey(MMEInboundQuery, on_delete=models.CASCADE)
+    classification = models.ForeignKey("classification.Classification", on_delete=models.CASCADE)
+    score = models.FloatField()
+    # Stable across repeat queries, so it dedups "already told this curator about this case"
+    remote_patient_id = models.CharField(max_length=255, blank=True, default="")
+    query_patient_json = models.JSONField()
+    notified = models.DateTimeField(null=True, blank=True)
+    created = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [models.Index(fields=["classification", "remote_patient_id"])]
+
+    def __str__(self):
+        return (f"MMEInboundMatch(classification={self.classification_id}, "
+                f"remote={self.remote_patient_id}, score={self.score})")

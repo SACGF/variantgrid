@@ -162,6 +162,8 @@ Fake/fixture data helpers are in `annotation/tests/test_data_fake_genes.py`, `sn
 
 `UNIT_TEST = sys.argv[1:2] == ['test']` is set in default_settings and used to conditionally skip expensive setup.
 
+It's great to write tests while you are writing code to ensure correctness. At the end, you should audit the tests and decide whether they are worth their costs (code to run and maintain, and possibly hampering refactoring)
+
 ## Database
 
 PostgreSQL via `psqlextra` backend (`psqlextra.backend`), which adds PostgreSQL-specific features (partitioning, upserts). Redis is used for caching. `CACHE_VERSION` in settings must be incremented to flush caches after breaking changes.

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 
@@ -41,6 +43,12 @@ class LabMmeEnableValidationTestCase(TestCase):
 @override_settings(MME_ONTOLOGY_SNAKE_EXACT=True, MME_ONTOLOGY_PHENOTYPE_EXPANSION=False,
                    MME_ENABLED_PRODUCTION_SUBMIT=False)
 class BuildProfileContactTestCase(TestCase):
+
+    def setUp(self):
+        # Fakes have no DB row; eligibility is covered by test_eligibility.py
+        patcher = patch("mme.serializers.patient_profile.assert_mme_eligible")
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def _submission_with_hpo(self, lab):
         term = make_term("HP:0001250", OntologyService.HPO, 1250, "Seizure")

@@ -5,9 +5,16 @@ from variantgrid.perm_path import path
 
 urlpatterns = [
     path('api/match', views_rest.MMEMatchView.as_view(), name='mme_api_match'),
+    path('api/metrics', views_rest.MMEMetricsView.as_view(), name='mme_api_metrics'),
+
+    # Public (PUBLIC_PATHS) - MME requires these be published.
+    path('metrics', views.mme_public_metrics, name='mme_public_metrics'),
+    path('disclaimers', views.mme_public_disclaimers, name='mme_public_disclaimers'),
 
     path('classification/<int:classification_id>', views.mme_classification_panel,
          name='mme_classification_panel'),
+    path('inbound_match/<int:inbound_match_id>', views.view_mme_inbound_match,
+         name='mme_view_inbound_match'),
     path('submission/<int:submission_id>', views.view_mme_submission, name='mme_view_submission'),
     path('submission/<int:submission_id>/submit', views.submit_mme_submission, name='mme_submit'),
     path('match_results/datatable', DatabaseTableView.as_view(column_class=MMEMatchResultColumns),

@@ -18,6 +18,12 @@ from ontology.models import OntologyService
                    MME_ENABLED_PRODUCTION_SUBMIT=False)
 class PatientProfileTestCase(TestCase):
 
+    def setUp(self):
+        # Fakes have no DB row; eligibility is covered by test_eligibility.py
+        patcher = patch("mme.serializers.patient_profile.assert_mme_eligible")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_hpo_condition_term_routes_to_features(self):
         term = make_term("HP:0001250", OntologyService.HPO, 1250, "Seizure")
         classification = FakeClassification(terms=[term])

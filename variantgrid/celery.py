@@ -83,6 +83,13 @@ if settings.DISCORDANCE_EMAIL:
         'schedule': crontab(hour=10, minute=0, day_of_week='mon')
     }
 
+# MME metrics resolve every eligible classification's profile, so precompute and cache them
+if settings.MME_ENABLED:
+    app.conf.beat_schedule['mme-refresh-metrics'] = {
+        'task': 'mme.tasks.refresh_mme_metrics_task',
+        'schedule': crontab(hour=2, minute=30),
+    }
+
 # Server monitoring tasks - send RollBar warnings
 if settings.SERVER_MIN_DISK_WARNING_GIGS:
     app.conf.beat_schedule['warn-low-disk-space'] = {

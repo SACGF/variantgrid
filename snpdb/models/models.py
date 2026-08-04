@@ -37,7 +37,6 @@ from model_utils.managers import InheritanceManager
 from more_itertools import first
 
 from classification.enums.classification_enums import ShareLevel
-from mme.contact import lab_mme_contact
 from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
@@ -544,9 +543,9 @@ class Lab(models.Model, PreviewModelMixin):
 
     def clean(self):
         super().clean()
-        # A lab cannot opt into MME without a resolvable contact, so every eligible
-        # classification is guaranteed a contact and eligibility stays a boolean check.
-        if self.mme_enabled and not lab_mme_contact(self):
+        # An MME match is an invitation to a person-to-person clinical conversation, so a
+        # lab can't opt in without an address a matching lab can reply to.
+        if self.mme_enabled and not (self.contact_email or "").strip():
             raise ValidationError({
                 "mme_enabled": "Set an MME contact email before enabling MatchMaker Exchange."
             })

@@ -13,7 +13,8 @@
     "password": "cl1ng3n_VG"
   },
   "MME": {
-    "inbound_token": null,
+    "inbound_token_genematcher": null,
+    "inbound_token_decipher": null,
     "decipher_token": null,
     "genematcher_token": null
   },

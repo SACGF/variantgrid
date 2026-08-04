@@ -1,11 +1,37 @@
 """ Lightweight fakes for building MME patient profiles without the heavy
-    Classification/variant-matching machinery. """
+    Classification/variant-matching machinery, plus a real-DB builder for the tests that
+    need eligibility (a derived queryset filter) to actually resolve. """
 from dataclasses import dataclass, field
 from typing import Optional
 
-from classification.enums.classification_enums import SpecialEKeys
-from classification.models.classification import ConditionResolved
+from classification.enums import SubmissionSource
+from classification.enums.classification_enums import SpecialEKeys, ShareLevel, ClinicalSignificance
+from classification.models.classification import (
+    ConditionResolved, Classification, ClassificationModification,
+)
 from ontology.models import OntologyTerm, OntologyService
+
+
+def make_classification(lab, user, gene_symbol: str = "BRCA1",
+                        share_level: str = ShareLevel.PUBLIC.value,
+                        clinical_significance: str = ClinicalSignificance.VUS,
+                        withdrawn: bool = False,
+                        is_last_published: bool = True) -> Classification:
+    """ A real Classification with a deterministic "latest published" modification, so
+        mme_eligible_classifications() (a queryset filter on that modification) resolves.
+        Defaults produce an ELIGIBLE record; vary one argument per test to break one layer. """
+    vc = Classification.create(
+        user=user, lab=lab, data={SpecialEKeys.GENE_SYMBOL: {'value': gene_symbol}},
+        save=True, source=SubmissionSource.API)
+    if withdrawn:
+        vc.withdrawn = True
+        vc.save()
+    ClassificationModification.objects.filter(classification=vc).update(is_last_published=False)
+    ClassificationModification.objects.create(
+        classification=vc, user=user, source="TEST", delta={},
+        share_level=share_level, clinical_significance=clinical_significance,
+        is_last_published=is_last_published, published=True)
+    return vc
 
 
 def make_term(term_id: str, service: OntologyService, index: int, name: str) -> OntologyTerm:

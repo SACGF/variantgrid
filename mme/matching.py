@@ -1,11 +1,13 @@
 """ Inbound similarity scoring for MatchMaker Exchange /match.
 
 v1 is deliberately simple: overlap of candidate genes, disorders and HPO features
-between the querying patient and each of our ShareLevel.PUBLIC classifications — the
-same consented set we are willing to submit outward, so inbound and outbound expose a
-consistent dataset. Richer OntologySnake semantic similarity can be layered on later.
+between the querying patient and each of our eligible classifications
+(`mme_eligible_classifications`) — the same consented set we are willing to submit
+outward, so inbound and outbound expose a consistent dataset. Richer OntologySnake
+semantic similarity can be layered on later.
 """
 import logging
+from dataclasses import dataclass
 
 from django.conf import settings
 
@@ -27,6 +29,19 @@ MAX_RESULTS = 20
 _GENE_WEIGHT = 0.5
 _DISORDER_WEIGHT = 0.25
 _FEATURE_WEIGHT = 0.25
+
+
+@dataclass(frozen=True)
+class MMEMatch:
+    """ One of our classifications matched against an inbound query - both what we send
+        back (`patient`) and what we persist to notify the depositor. """
+    score: float
+    classification: object       # a Classification
+    patient: dict                # MME patient object describing our classification
+
+    def as_result(self) -> dict:
+        """ MME /match response entry. """
+        return {"score": {"patient": round(self.score, 4)}, "patient": self.patient}
 
 
 def _genes_from_profile(genomic_features) -> set[str]:
@@ -69,9 +84,9 @@ def _our_patient_object(classification, genomic_features, features, disorders) -
     return patient
 
 
-def find_matches(patient: dict) -> list[dict]:
-    """ Score the inbound `patient` against our PUBLIC classifications.
-        Returns MME result objects: {"score": {"patient": x}, "patient": {...}}. """
+def find_matches(patient: dict) -> list[MMEMatch]:
+    """ Score the inbound `patient` against our eligible classifications. The caller
+        renders each match for the wire (`as_result()`) and persists it. """
     query_genes, query_features, query_disorders = _extract_query(patient)
 
     qs = mme_eligible_classifications()
@@ -96,9 +111,11 @@ def find_matches(patient: dict) -> list[dict]:
                  + _DISORDER_WEIGHT * _jaccard(query_disorders, our_disorders)
                  + _FEATURE_WEIGHT * _jaccard(query_features, our_features))
         if score >= MIN_SCORE:
-            scored.append((score, _our_patient_object(
-                classification, genomic_features, features, disorders)))
+            scored.append(MMEMatch(
+                score=score,
+                classification=classification,
+                patient=_our_patient_object(classification, genomic_features, features, disorders),
+            ))
 
-    scored.sort(key=lambda t: t[0], reverse=True)
-    return [{"score": {"patient": round(score, 4)}, "patient": obj}
-            for score, obj in scored[:MAX_RESULTS]]
+    scored.sort(key=lambda m: m.score, reverse=True)
+    return scored[:MAX_RESULTS]

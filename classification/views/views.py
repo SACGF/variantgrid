@@ -476,7 +476,8 @@ def view_classification(request: HttpRequest, classification_id: str):
         'attachments_enabled': settings.CLASSIFICATION_FILE_ATTACHMENTS,
         'delete_enabled': settings.CLASSIFICATION_ALLOW_DELETE,
         'duplicate_records': duplicate_records,
-        'withdraw_reasons': withdraw_reasons
+        'withdraw_reasons': withdraw_reasons,
+        'mme_enabled': settings.MME_ENABLED,   # shows the MatchMaker Exchange card
     }
     return render(request, 'classification/classification.html', context)
 

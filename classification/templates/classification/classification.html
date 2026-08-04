@@ -50,6 +50,7 @@
                     attachmentsEnabled: {{ attachments_enabled | jsonify }},
                     withdrawReasons: {{ withdraw_reasons | jsonify }},
                     conditionMatchingIsViewEnabled: {{ "condition_matching" | is_view_enabled | jsonify }},
+                    mmeEnabled: {{ mme_enabled | jsonify }},
                 },
                 keys,
                 record,
@@ -58,6 +59,18 @@
             document.title = getPageTitle(record);
         });
     });
+    {% if mme_enabled %}
+    // Fetched separately so its ontology/variant resolution doesn't tax every page view.
+    $(document).ready(() => {
+        $('#vcform-mme .card-body').load(
+            "{% url 'mme_classification_panel' classification_id=record.id %}?fragment=1",
+            function(response, status) {
+                if (status === 'error') {
+                    $(this).html('<span class="text-muted">MatchMaker Exchange status unavailable.</span>');
+                }
+            });
+    });
+    {% endif %}
     {% if record and attachments_enabled %}
     $(document).ready(() => {
         const inputElement = document.querySelector('#classification-file-upload');
@@ -220,6 +233,17 @@
                 <div class="card-header">Links</div>
                 <div class="card-body card-body-list"></div>
             </div>
+
+            {% if mme_enabled %}
+                {# Every classification, not just eligible ones - the card explains why a #}
+                {# record doesn't qualify. Body loaded lazily, see above.                   #}
+                <div id="vcform-mme" class="card m-2">
+                    <div class="card-header">MatchMaker Exchange</div>
+                    <div class="card-body">
+                        <span class="text-muted">Loading…</span>
+                    </div>
+                </div>
+            {% endif %}
 
             <div class="card m-2">
                 <div class="card-header">Criteria Summary</div>

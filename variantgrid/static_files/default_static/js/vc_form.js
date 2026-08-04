@@ -336,7 +336,16 @@ const VCForm = (function() {
                 $('<i class="far fa-circle d-inline-block"></i>').appendTo(selectionDiv);
                 $('<img>', {class: 'ml-2 d-inline-block share-icon', width: '16px', height: '16px', src: label.icon }).appendTo(selectionDiv);
                 $('<div>', {class: 'ml-2 d-inline', text: label.title}).appendTo(selectionDiv);
-                
+
+                // '3rd Party Databases' is the MatchMaker Exchange consent moment, so name
+                // it here rather than only on the MME card.
+                if (share_level === 'public' && this.mmeEnabled) {
+                    $('<div>', {class: 'small text-muted ml-4 mt-1', text:
+                        'Includes MatchMaker Exchange: a VUS or above shared at this level becomes a ' +
+                        'candidate gene other labs can match against, and a match results in an email ' +
+                        'to your lab contact.'}).appendTo(selectionDiv);
+                }
+
                 if (label.included) {
                     selectionDiv.addClass('included list-group-item-primary');
                     selectionDiv.find('i').removeClass('fa-circle').addClass('fa-check-circle');
@@ -1278,6 +1287,7 @@ const VCForm = (function() {
             this.conditionResolution = params.conditionResolution;
             this.attachmentsEnabled = params.attachmentsEnabled || false;
             this.conditionMatchingIsViewEnabled = params.conditionMatchingIsViewEnabled || false;
+            this.mmeEnabled = params.mmeEnabled || false;
             
             jHelp = $(params.help);
             jCritTable = $(params.critTable);

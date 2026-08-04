@@ -19,7 +19,7 @@
         {% if profile_error %}
             <div class="alert alert-warning">{{ profile_error }}</div>
         {% else %}
-            <pre class="border p-2">{{ profile|jsonify_for_js:True }}</pre>
+            <pre class="border p-2">{{ profile|jsonify_pretty }}</pre>
         {% endif %}
 
         {% if mme_enabled and not profile_error %}
@@ -32,6 +32,16 @@
         {% endif %}
 
         <h4 class="mt-4">Match results</h4>
+        {% if disclaimer.disclaimer or disclaimer.terms %}
+            <div class="alert alert-secondary">
+                <strong>{{ submission.node_id }} disclaimer</strong>
+                {% if disclaimer.source == "baseline" %}
+                    <span class="text-muted">(published disclaimer — no disclaimer returned with this response)</span>
+                {% endif %}
+                {% if disclaimer.disclaimer %}<p class="mb-1">{{ disclaimer.disclaimer }}</p>{% endif %}
+                {% if disclaimer.terms %}<p class="mb-0"><strong>Terms:</strong> {{ disclaimer.terms }}</p>{% endif %}
+            </div>
+        {% endif %}
         {% if results %}
             <table id="mme-results-datatable" class="table" data-datatable-url="{% url 'mme_match_results_datatable' %}"
                    data-datatable-data='{"submission_id": {{ submission.pk }}}'></table>

@@ -4,8 +4,6 @@ Self-contained `requests` client that copies the *shape* of `library/oauth.py:Se
 (a small object wrapping `requests.post` + an auth header) without importing it or any
 `sync/` code. MME auth is a single static per-node header, so there is no OAuth machinery.
 """
-import logging
-
 import requests
 from django.conf import settings
 from django.urls import reverse
@@ -13,11 +11,10 @@ from django.utils import timezone
 
 from library.constants import MINUTE_SECS
 from library.django_utils import get_url_from_view_path
-from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from mme.models import MMESubmissionStatus, MMEMatchResult
+from mme.notifications import notify_match
 from mme.serializers.patient_profile import build_patient_profile
-from user_messages.models import Message
 
 
 class MMEClient:
@@ -45,6 +42,8 @@ class MMEClient:
         body = {"patient": patient_profile}
         if settings.MME_DISCLAIMER:
             body["disclaimer"] = settings.MME_DISCLAIMER
+        if settings.MME_TERMS:
+            body["terms"] = settings.MME_TERMS
         response = requests.post(
             url=f"{self.base_url}/match",
             json=body,
@@ -58,7 +57,15 @@ class MMEClient:
 def submit(submission) -> None:
     """ Build profile, POST, persist results. Notifies admins on failure
         (mirrors the Alissa upload failure-reporting pattern, no sync dep). """
-    profile = build_patient_profile(submission)
+    try:
+        # Re-asserts eligibility - the record may have been downgraded, withdrawn or
+        # unshared between the curator clicking submit and this worker running.
+        profile = build_patient_profile(submission)
+    except ValueError as ve:
+        submission.status = MMESubmissionStatus.ERROR
+        submission.error = str(ve)
+        submission.save()
+        raise
     submission.request_json = profile
     try:
         data = MMEClient(submission.node_id).match(profile)
@@ -73,6 +80,8 @@ def submit(submission) -> None:
         raise
 
     submission.response_json = data
+    submission.response_disclaimer = data.get("disclaimer") or ""
+    submission.response_terms = data.get("terms") or ""
     submission.status = MMESubmissionStatus.SUBMITTED
     submission.submitted = timezone.now()
     submission.save()
@@ -95,23 +104,15 @@ def submit(submission) -> None:
 
 
 def _notify_curator_of_matches(submission, num_results: int) -> None:
-    """ Tell the classification's curator, via the in-app user_messages inbox (which
-        also emails them), that their submission returned candidate matches. Best-effort:
-        a messaging failure must not undo an already-persisted successful submission. """
-    recipient = submission.classification.user
-    if recipient is None:
-        return
-    try:
-        url = get_url_from_view_path(
-            reverse("mme_view_submission", kwargs={"submission_id": submission.pk}))
-        plural = "es" if num_results != 1 else ""
-        Message.objects.create(
-            subject=f"MatchMaker Exchange: {num_results} possible match{plural}",
-            body=(f"Your MME submission of classification #{submission.classification_id} "
-                  f"to node `{submission.node_id}` returned {num_results} possible "
-                  f"match{plural}. [View matches]({url})."),
-            sender=admin_bot(),
-            recipient=recipient,
-        )
-    except Exception:
-        logging.exception("MME: failed to notify curator of matches for submission %s", submission.pk)
+    """ Tell the curator and lab their submission returned candidate matches, via the same
+        helper the inbound path uses. """
+    url = get_url_from_view_path(
+        reverse("mme_view_submission", kwargs={"submission_id": submission.pk}))
+    plural = "es" if num_results != 1 else ""
+    notify_match(
+        classification=submission.classification,
+        subject=f"MatchMaker Exchange: {num_results} possible match{plural}",
+        body=(f"Your MME submission of classification #{submission.classification_id} "
+              f"to node `{submission.node_id}` returned {num_results} possible "
+              f"match{plural}. [View matches]({url})."),
+    )

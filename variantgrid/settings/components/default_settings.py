@@ -238,17 +238,26 @@ MME_CONTACT = {
 }
 
 # Remote nodes we can submit to: public base_url + api_version as plain config; the
-# token THEY issued to us is the only secret, pulled via get_secret().
+# token THEY issued to us is the only secret, pulled via get_secret(). Peers issue these
+# after approval, so this stays empty here and is filled in per-deployment.
+# disclaimer/terms are the node's published baseline, transcribed from
+# https://github.com/ga4gh/mme-apis/tree/master/disclaimers - a live /match response wins.
 MME_NODES = {
     # "decipher": {"base_url": "https://...", "api_version": "1.1",
-    #              "token": get_secret("MME.decipher_token", mandatory=False)},
+    #              "token": get_secret("MME.decipher_token", mandatory=False),
+    #              "disclaimer": "", "terms": ""},
     # "genematcher": {"base_url": "https://...", "api_version": "1.1",
-    #                 "token": get_secret("MME.genematcher_token", mandatory=False)},
+    #                 "token": get_secret("MME.genematcher_token", mandatory=False),
+    #                 "disclaimer": "", "terms": ""},
 }
 
-# Token that remote nodes must present to call OUR inbound /match endpoint. Secret.
-# mandatory=False so deployments without the MME secret block still load (MME is off by default).
-MME_INBOUND_TOKEN = get_secret("MME.inbound_token", mandatory=False)
+# Tokens WE issue to peer nodes to call OUR inbound endpoints, keyed by the peer's node id
+# (same keys as MME_NODES). One per peer so inbound queries can be attributed and a single
+# peer revoked. mandatory=False so deployments without the MME secret block still load.
+MME_INBOUND_TOKENS = {
+    # "genematcher": get_secret("MME.inbound_token_genematcher", mandatory=False),
+    # "decipher": get_secret("MME.inbound_token_decipher", mandatory=False),
+}
 
 # Follow EXACT OntologyTermRelations to alias each condition term into the ontology
 # form MME expects (e.g. a MONDO diagnosis -> its EXACT-equivalent OMIM for `disorders`).
@@ -269,6 +278,14 @@ MME_DISCLAIMER = (
     "`_derivedFrom` field where so derived. Please contact us to confirm before acting "
     "on a match."
 )
+
+# Our own terms of use, sent alongside MME_DISCLAIMER on outbound requests and returned
+# on our inbound /match and /metrics responses.
+MME_TERMS = ""
+
+# From-address for match notifications. Required (with SEND_EMAILS) when MME_ENABLED -
+# email sending is silently a no-op without it, so mme/apps.py refuses to start.
+MME_FROM_EMAIL = None
 
 # --- Beacon v2 ------------------------------------------------------------
 # GA4GH Beacon v2 genomic data-sharing endpoint (#1661). Variant-centric discovery:
@@ -961,7 +978,8 @@ PUBLIC_PATHS = [
     r'^/classification/api/.*',  # REST framework used by command line tools
     r'^/seqauto/api/.*',
     r'^/upload/api/.*',
-    r'^/mme/api/.*',  # Inbound MME /match endpoint - authenticated by shared X-Auth-Token (see mme/views_rest.py)
+    r'^/mme/api/.*',  # Inbound MME /match + /metrics - authenticated by per-peer X-Auth-Token (see mme/auth.py)
+    r'^/mme/(metrics|disclaimers)$',  # MME requires these be published publicly
     r'^/beacon/.*',  # Beacon v2 answers anonymous requests (public tier); views still enforce per-tier permission
 ]
 

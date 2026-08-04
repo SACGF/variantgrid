@@ -13,7 +13,7 @@ genomicFeatures.
 """
 from django.conf import settings
 
-from classification.enums.classification_enums import SpecialEKeys, ShareLevel
+from classification.enums.classification_enums import SpecialEKeys, ShareLevel, ClinicalSignificance
 from classification.models.classification import ClassificationModification
 from mme.contact import mme_contact_for_classification
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation
@@ -109,18 +109,44 @@ def classification_genomic_feature(classification) -> list[dict] | None:
     return [feature]
 
 
+# MME has no field for clinical significance or "ruled out", so every submission reads as a
+# candidate causal gene. Negatives belong in ClinVar, which has a field for them; 'Other'
+# and no-significance-recorded are not candidate claims either.
+MME_CANDIDATE_CLINICAL_SIGNIFICANCE = {
+    ClinicalSignificance.VUS,
+    ClinicalSignificance.LIKELY_PATHOGENIC,
+    ClinicalSignificance.PATHOGENIC,
+}
+
+
 def mme_eligible_classifications():
-    """ Latest PUBLIC ('3rd Party Databases') published, non-withdrawn modifications
-        whose owning lab has opted into MME. Eligibility is a three-layer AND: node
-        (settings.MME_ENABLED) x lab (Lab.mme_enabled) x record (share_level=PUBLIC,
-        not withdrawn). share_level=PUBLIC is the exact consent signal for an external
-        DB like MME; ALL_USERS is internal-only and must be excluded. """
+    """ Latest PUBLIC ('3rd Party Databases') published, non-withdrawn, VUS-and-above
+        modifications whose owning lab has opted into MME. Eligibility is a three-layer AND:
+        node (settings.MME_ENABLED) x lab (Lab.mme_enabled) x record. share_level=PUBLIC is
+        the exact consent signal for an external DB like MME; ALL_USERS is internal-only.
+
+        Every filter is an indexed column on the latest modification (clinical_significance
+        is denormalised there at publish time), so eligibility is derived rather than
+        stateful - a downgrade to Benign drops the record out at the next publish, and a
+        re-classification back up restores it, with no flag to keep in sync. """
     return (ClassificationModification.objects
             .filter(is_last_published=True,
                     share_level=ShareLevel.PUBLIC.value,
+                    clinical_significance__in=MME_CANDIDATE_CLINICAL_SIGNIFICANCE,
                     classification__withdrawn=False,
                     classification__lab__mme_enabled=True)
             .select_related("classification"))
+
+
+def assert_mme_eligible(classification) -> None:
+    """ Eligibility is derived from the latest published modification, so it can change
+        between drafting, clicking submit, and the worker actually sending. Re-assert it
+        at each step; this is the last gate before a profile leaves the building. """
+    if not mme_eligible_classifications().filter(classification=classification).exists():
+        raise ValueError(
+            "Classification is no longer eligible for MatchMaker Exchange "
+            "(needs share level '3rd Party Databases', VUS or above, not withdrawn, "
+            "and a lab with MatchMaker Exchange enabled)")
 
 
 def build_patient_profile(submission) -> dict:
@@ -128,6 +154,7 @@ def build_patient_profile(submission) -> dict:
         The request-level `disclaimer`/`terms` are siblings of `patient` in the
         envelope, so they are attached by the client (§7), not here. """
     classification = submission.classification
+    assert_mme_eligible(classification)     # last gate before a profile leaves the building
     contact = mme_contact_for_classification(classification)
     if not (contact.get("name") and contact.get("href")):
         lab = getattr(classification, "lab", None)

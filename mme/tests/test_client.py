@@ -3,26 +3,27 @@ from unittest.mock import patch, MagicMock
 import requests
 from django.test import TestCase, override_settings
 
-from classification.enums import SpecialEKeys, SubmissionSource
-from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.client import submit
 from mme.models import MMESubmission, MMESubmissionStatus, MMEMatchResult
+from mme.tests.fakes import make_classification
 from user_messages.models import Message
 
 NODES = {"testnode": {"base_url": "https://node.test", "token": "secret-token", "api_version": "1.1"}}
 
 
 @override_settings(MME_NODES=NODES, MME_CONTACT={"name": "Test", "href": "mailto:t@t.org"},
-                   MME_DISCLAIMER="please confirm", MME_ENABLED_PRODUCTION_SUBMIT=False)
+                   MME_DISCLAIMER="please confirm", MME_TERMS="be nice",
+                   MME_ENABLED_PRODUCTION_SUBMIT=False)
 class ClientTestCase(TestCase):
 
     def setUp(self):
         ClassificationTestUtils.setUp()
         lab, user = ClassificationTestUtils.lab_and_user()
-        self.classification = Classification.create(
-            user=user, lab=lab, data={SpecialEKeys.GENE_SYMBOL: {'value': 'BRCA1'}},
-            save=True, source=SubmissionSource.API)
+        lab.contact_email = "curator@lab.org"
+        lab.mme_enabled = True
+        lab.save()
+        self.classification = make_classification(lab, user)
         self.submission = MMESubmission.objects.create(
             classification=self.classification, node_id="testnode", external_patient_id="vg:1")
 
@@ -47,6 +48,7 @@ class ClientTestCase(TestCase):
         self.assertEqual(headers["Accept"], "application/vnd.ga4gh.matchmaker.v1.1+json")
         self.assertEqual(kwargs["url"], "https://node.test/match")
         self.assertEqual(kwargs["json"]["disclaimer"], "please confirm")
+        self.assertEqual(kwargs["json"]["terms"], "be nice")
 
         self.submission.refresh_from_db()
         self.assertEqual(self.submission.status, MMESubmissionStatus.SUBMITTED)

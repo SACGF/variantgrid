@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from mme.models import MMESubmission, MMEMatchResult, MMEInboundQuery
+from mme.models import MMESubmission, MMEMatchResult, MMEInboundQuery, MMEInboundMatch
 from snpdb.admin_utils import ModelAdminBasics
 
 
@@ -20,4 +20,12 @@ class MMEMatchResultAdmin(ModelAdminBasics):
 
 @admin.register(MMEInboundQuery)
 class MMEInboundQueryAdmin(ModelAdminBasics):
-    list_display = ("pk", "num_results", "created")
+    list_display = ("pk", "peer_node_id", "num_results", "created")
+    list_filter = ("peer_node_id",)
+
+
+@admin.register(MMEInboundMatch)
+class MMEInboundMatchAdmin(ModelAdminBasics):
+    list_display = ("pk", "inbound_query", "classification", "score", "remote_patient_id",
+                    "notified", "created")
+    search_fields = ("remote_patient_id",)

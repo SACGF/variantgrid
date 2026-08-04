@@ -181,7 +181,8 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "contact_name": "Contact Name",
             "contact_email": "Contact Email",
             "contact_phone": "Contact Phone",
-            "mme_enabled": "MatchMaker Exchange Enabled"
+            "mme_enabled": "MatchMaker Exchange Enabled — shares VUS and above at "
+                           "3rd Party Databases level"
         }
 
     def __init__(self, *args, **kwargs):
@@ -197,8 +198,16 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
             "upload_auto_pattern": "If provided, then uploading files that match this pattern will be automatically processed, otherwise there will be a delay for manual review.",
             "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI",
-            "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit."
+            "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit.",
+            "mme_enabled": "Opt this lab into MatchMaker Exchange, a federated rare-disease "
+                           "patient-matching network. Classifications of VUS and above that are "
+                           "shared at '3rd Party Databases' level become candidate genes other "
+                           "labs can match against, and a match results in a person-to-person "
+                           "email to your Contact Email.",
         }
+        for field_name, help_text in help_texts.items():
+            if field := self.fields.get(field_name):
+                field.help_text = help_text
 
 
 class OrganizationForm(forms.ModelForm, ROFormMixin):
