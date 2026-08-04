@@ -142,6 +142,10 @@ When asked to draft a prompt for an agent to implement a plan in another convers
 - The plan reflects the final decision; the agent reading it won't see the alternatives. Mentioning rejected options only confuses or implies the plan is incomplete.
 - Keep prompts short: read-list, "follow plan §X-§Y", any positive overrides, report-back format. No "pre-resolved decisions" section.
 
+## Code comments
+
+Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't write comments about failed paths or reverted decisions, just let the existing code stand. If you are tempted to write a lot of comments, perhaps you could make the code clearer by extracting logic into better named variables
+
 ## GitHub Comments
 
 When writing any comment on a GitHub issue or pull request, always preface it with 🤖 Written by Claude.
