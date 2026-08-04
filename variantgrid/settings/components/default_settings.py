@@ -263,6 +263,14 @@ MME_INBOUND_TOKENS = {
     # "decipher": get_secret("MME.inbound_token_decipher", mandatory=False),
 }
 
+# Which identifier form goes in the outbound `genomicFeatures[].gene.id`. Ensembl id,
+# Entrez id and HGNC symbol have all been legal since v1.0, but v1.1 puts Ensembl first and
+# 2.0 makes it mandatory - so default there, carrying the symbol and Entrez id alongside as
+# `_geneName`/`_entrezGeneID` for peers that key on those. "symbol" publishes the bare
+# symbol as we did before v1.1, for a deployment with no Ensembl gene annotation loaded.
+# Inbound matching resolves every form either way, so this is an outbound choice only.
+MME_GENE_ID_PREFERENCE = "ensembl"
+
 # Follow EXACT OntologyTermRelations to alias each condition term into the ontology
 # form MME expects (e.g. a MONDO diagnosis -> its EXACT-equivalent OMIM for `disorders`).
 # These are lossless, same-concept aliases. On by default; labs that curate in MONDO

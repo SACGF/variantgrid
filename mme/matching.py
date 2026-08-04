@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from django.conf import settings
 
 from mme.contact import mme_contact_for_classification
+from mme.genes import gene_match_keys
 from mme.serializers.patient_profile import (
     mme_eligible_classifications,
     classification_ontology_slots,
@@ -45,11 +46,12 @@ class MMEMatch:
 
 
 def _genes_from_profile(genomic_features) -> set[str]:
+    """ Genes as a set of identifier keys rather than raw strings, so a peer naming a gene
+        by Ensembl id and us holding it by symbol still intersect (`mme.genes`). """
     genes = set()
     for gf in (genomic_features or []):
-        gene = (gf.get("gene") or {}).get("id")
-        if gene:
-            genes.add(gene.upper())
+        if gene := gf.get("gene"):
+            genes |= gene_match_keys(gene)
     return genes
 
 

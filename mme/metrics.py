@@ -10,6 +10,7 @@ from django.core.cache import cache
 from django.utils import timezone
 
 from library.constants import DAY_SECS, HOUR_SECS
+from mme.genes import canonical_gene_key
 from mme.models import MMEInboundQuery, MMEInboundMatch
 from mme.serializers.patient_profile import (
     mme_eligible_classifications, classification_genomic_feature, classification_ontology_slots,
@@ -40,9 +41,10 @@ def build_metrics() -> dict:
         submitters.add(classification.lab_id)   # lab, the unit that opts in and is contacted
 
         for gf in (classification_genomic_feature(classification) or []):
-            if gene_id := (gf.get("gene") or {}).get("id"):
+            if gene := gf.get("gene"):
                 gene_total += 1
-                unique_genes.add(gene_id.upper())
+                if gene_key := canonical_gene_key(gene):
+                    unique_genes.add(gene_key)
             if variant := gf.get("variant"):
                 variant_total += 1
                 unique_variants.add((variant.get("assembly"), variant.get("referenceName"),
@@ -81,8 +83,8 @@ def _unique_genes_matched() -> int:
     for classification in {m.classification for m in
                            MMEInboundMatch.objects.select_related("classification")}:
         for gf in (classification_genomic_feature(classification) or []):
-            if gene_id := (gf.get("gene") or {}).get("id"):
-                unique.add(gene_id.upper())
+            if (gene := gf.get("gene")) and (gene_key := canonical_gene_key(gene)):
+                unique.add(gene_key)
     return len(unique)
 
 

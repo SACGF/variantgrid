@@ -9,7 +9,9 @@ from classification.enums.classification_enums import SpecialEKeys, ShareLevel, 
 from classification.models.classification import (
     ConditionResolved, Classification, ClassificationModification,
 )
+from genes.models import Gene, GeneAnnotationImport, GeneSymbol, GeneVersion
 from ontology.models import OntologyTerm, OntologyService
+from snpdb.models import GenomeBuild
 
 
 def make_classification(lab, user, gene_symbol: str = "BRCA1",
@@ -32,6 +34,22 @@ def make_classification(lab, user, gene_symbol: str = "BRCA1",
         share_level=share_level, clinical_significance=clinical_significance,
         is_last_published=is_last_published, published=True)
     return vc
+
+
+def make_gene_version(gene_id: str, symbol: str, annotation_consortium: str,
+                      version: int = 1) -> GeneVersion:
+    """ One (gene, symbol) row of the gene annotation MME resolves identifiers through.
+        Call twice with the same gene_id and different symbols/versions to model a rename. """
+    genome_build = GenomeBuild.grch38()
+    gene, _ = Gene.objects.get_or_create(identifier=gene_id,
+                                         annotation_consortium=annotation_consortium)
+    import_source, _ = GeneAnnotationImport.objects.get_or_create(
+        url="fake", genome_build=genome_build, annotation_consortium=annotation_consortium)
+    gene_symbol, _ = GeneSymbol.objects.get_or_create(symbol=symbol)
+    gene_version, _ = GeneVersion.objects.get_or_create(
+        gene=gene, gene_symbol=gene_symbol, version=version,
+        genome_build=genome_build, import_source=import_source)
+    return gene_version
 
 
 def make_term(term_id: str, service: OntologyService, index: int, name: str) -> OntologyTerm:
@@ -73,6 +91,19 @@ class FakeLab:
 
 
 @dataclass
+class FakeResolvedVariantInfo:
+    gene_symbol: Optional[GeneSymbol] = None
+
+
+@dataclass
+class FakeAlleleInfo:
+    """ Stands in for ImportedAlleleInfo, whose only role here is carrying the resolved
+        (curated-transcript) gene symbol MME prefers over the evidence key. """
+    grch37: Optional[FakeResolvedVariantInfo] = None
+    grch38: Optional[FakeResolvedVariantInfo] = None
+
+
+@dataclass
 class FakeClassification:
     pk: int = 1
     terms: list = field(default_factory=list)
@@ -83,6 +114,7 @@ class FakeClassification:
     has_build: bool = True
     lab: Optional[FakeLab] = None
     lab_id: Optional[int] = None
+    allele_info: Optional[FakeAlleleInfo] = None
 
     @property
     def condition_resolution_obj(self) -> Optional[ConditionResolved]:

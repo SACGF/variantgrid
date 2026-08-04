@@ -16,6 +16,7 @@ from django.conf import settings
 from classification.enums.classification_enums import SpecialEKeys, ShareLevel, ClinicalSignificance
 from classification.models.classification import ClassificationModification
 from mme.contact import mme_contact_for_classification
+from mme.genes import resolve_gene
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation
 
 
@@ -80,6 +81,7 @@ def classification_genomic_feature(classification) -> list[dict] | None:
         MME variant coords are 0-based; ours are 1-based -> subtract 1.
         Returns None when there is neither a resolvable gene symbol nor variant. """
     gene_symbol = classification.get(SpecialEKeys.GENE_SYMBOL)
+    gene_identity = resolve_gene(classification)
 
     variant = None
     try:
@@ -88,11 +90,15 @@ def classification_genomic_feature(classification) -> list[dict] | None:
     except ValueError:
         genome_build = None
 
-    if not gene_symbol and variant is None:
+    if gene_identity is None and not gene_symbol and variant is None:
         return None
 
     feature: dict = {}
-    if gene_symbol:
+    if gene_identity:
+        feature["gene"] = gene_identity.as_mme_gene()
+    elif gene_symbol:
+        # Unresolvable gene: publish the symbol as we always have, rather than drop the
+        # submission over annotation we may simply not have loaded
         feature["gene"] = {"id": str(gene_symbol)}
     if variant is not None:
         vc = variant.coordinate                                # VariantCoordinate (1-based)
@@ -140,7 +146,10 @@ def mme_eligible_classifications():
                     clinical_significance__in=MME_CANDIDATE_CLINICAL_SIGNIFICANCE,
                     classification__withdrawn=False,
                     classification__lab__mme_enabled=True)
-            .select_related("classification"))
+            .select_related("classification",
+                            # the resolved gene symbol each profile is built from (mme.genes)
+                            "classification__allele_info__grch37__gene_symbol",
+                            "classification__allele_info__grch38__gene_symbol"))
 
 
 def assert_mme_eligible(classification) -> None:

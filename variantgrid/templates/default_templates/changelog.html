@@ -151,6 +151,7 @@
                 <h4>Data Sharing</h4>
                 <ul>
                     <li>#1672 - MatchMaker Exchange (MME) - 2026 service requirements: public metrics and disclaimers pages, bearer token authentication, email/notification to curator and querier when a match is made (once per match), and a MatchMaker Exchange card on the classification page showing whether a record is eligible to be shared (and why not, if it isn't)</li>
+                    <li>#1674 - MatchMaker Exchange - genes are now identified by Ensembl gene ID (strongly encouraged in API v1.1, mandatory in 2.0), published alongside the Entrez ID and HGNC symbol so peers can key on whichever form they use. Inbound queries naming a gene by any of the three forms - or by a superseded symbol or alias - now match records we hold under another form, where previously they scored zero. Published unique gene counts now count a gene once regardless of the form it was published in, so those figures may drop slightly</li>
                 </ul>
                 <h4>Annotation</h4>
                 <ul>
