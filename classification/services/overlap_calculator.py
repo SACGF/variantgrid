@@ -16,7 +16,7 @@ OVERLAP_CLIN_SIG_ENABLED = False  # ensure reference this whenever doing some fu
 @dataclass(frozen=True)
 class OverlapStatusCalculation:
     current_value: OverlapStatus
-    override_pending_value: Optional[OverlapStatus] = None
+    has_pending_values: bool = False
     override_status: Optional[OverlapOverrideStatus] = OverlapOverrideStatus.NO_OVERRIDE
 
     @property
@@ -57,31 +57,24 @@ class OverlapCalculatorBase(ABC):
                 case _:
                     pass  # don't care about unshared for calculation values
 
+        has_pending_values = any(con.is_amending for con in contributing)
         if len(contributing) == 0:
             if non_comparable_values > 0:
-                return OverlapStatusCalculation(OverlapStatus.NO_COUNTING_CONTRIBUTIONS)
+                return OverlapStatusCalculation(OverlapStatus.NO_COUNTING_CONTRIBUTIONS, has_pending_values=has_pending_values)
             else:
-                return OverlapStatusCalculation(OverlapStatus.NO_CONTRIBUTIONS)
+                return OverlapStatusCalculation(OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=has_pending_values)
         elif len(contributing) == 1:
-            return OverlapStatusCalculation(OverlapStatus.SINGLE_SUBMITTER)
+            return OverlapStatusCalculation(OverlapStatus.SINGLE_SUBMITTER, has_pending_values=has_pending_values)
         else:
-            all_values = set(con.value for con in contributing)
-            pending_value: OverlapStatus = None
+            overlap_status: OverlapStatus = None
             override_value: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
 
+            all_values = set(con.effective_value for con in contributing)
             base_value: OverlapStatus
             if len(all_values) == 1:
                 base_value = OverlapStatus.EXACT_AGREEMENT
             else:
                 base_value = cls.calculate_status_for_multiple_entries(all_values)
-
-            all_pending_values = set(con.effective_value for con in contributing)
-
-            if all_pending_values != all_values:
-                if len(all_pending_values) == 1:
-                    pending_value = OverlapStatus.EXACT_AGREEMENT
-                else:
-                    pending_value = cls.calculate_status_for_multiple_entries(all_pending_values)
 
             if interactive_contributors := [con for con in contributing if con.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY]:
                 all_reviewed = all(con.is_review_agreed_value_met() for con in interactive_contributors)
@@ -92,7 +85,7 @@ class OverlapCalculatorBase(ABC):
                 elif all_complex:
                     override_value = OverlapOverrideStatus.COMPLEX
 
-            return OverlapStatusCalculation(base_value, pending_value, override_value)
+            return OverlapStatusCalculation(base_value, has_pending_values, override_value)
 
     @classmethod
     @abstractmethod

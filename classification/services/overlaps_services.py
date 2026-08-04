@@ -317,15 +317,15 @@ class OverlapServices:
         overlap_status_calculation = calculator.calculate_entries(overlap.contributions_list)
 
         old_overlap_status = overlap.overlap_status
-        old_pending_status = overlap.overlap_pending_status
+        old_has_pending = overlap.has_pending_values
         old_override_status = overlap.overlap_override_status
 
         overlap_status_changed = False
         overlap_valid_changed = False
-        if (overlap_status_calculation.current_value, overlap_status_calculation.effective_value, overlap_status_calculation.override_status) != (old_overlap_status, old_pending_status, old_override_status):
+        if (overlap_status_calculation.current_value, overlap_status_calculation.has_pending_values, overlap_status_calculation.override_status) != (old_overlap_status, old_has_pending, old_override_status):
             # see if either overlap status or pending overlap status are changing
             overlap.overlap_status = overlap_status_calculation.current_value
-            overlap.overlap_pending_status = overlap_status_calculation.effective_value
+            overlap.has_pending_values = overlap_status_calculation.has_pending_values
             overlap.overlap_max_ever_status = max(overlap.overlap_max_ever_status, overlap_status_calculation.current_value)
             overlap.overlap_override_status = overlap_status_calculation.override_status
 
@@ -348,17 +348,18 @@ class OverlapServices:
         if overlap_valid_changed or overlap_status_changed:
             overlap.save()
             if overlap_status_changed:
-                OverlapServices.overlap_status_changed(overlap, old_pending_status)
+                OverlapServices.overlap_status_changed(overlap, old_overlap_status)
 
     @staticmethod
     def overlap_status_changed(overlap: Overlap, old_status: OverlapStatus):
+        # FIXME, override needs to be passed in
         if not settings.DISCORDANCE_ENABLED:
             return
 
         if overlap.overlap_type == OverlapType.CROSS_CONTEXT:
             return  # don't notify when cross context become discordant
 
-        new_status = overlap.overlap_pending_status
+        new_status = overlap.overlap_status
 
         # see if it's worth notifying anyone
         if not (new_status.is_discordant ^ old_status.is_discordant):

@@ -29,7 +29,7 @@ class Command(BaseCommand):
         for overlap in Overlap.objects.filter(
                 overlap_type=OverlapType.SINGLE_CONTEXT,
                 valid=True,
-                overlap_pending_status__gte=OverlapStatus.MAJOR_DIFFERENCES,
+                overlap_status__gte=OverlapStatus.MAJOR_DIFFERENCES,
                 value_type=ClassificationResultValue.ONC_PATH
         ).iterator():
             if override_status := overlap.overlap_override_status:

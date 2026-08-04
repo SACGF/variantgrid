@@ -3,9 +3,8 @@
     <div style="font-style:italic; color:#ccc">{{ max_triage_status.label }}</div>
 {% endif %}
 
-{% if overlap.has_pending_status %}Pending : {% endif %}
-<span {% if overlap.overlap_pending_status.is_attention %}class="text-danger"{% endif %}>
-    {% if overlap.overlap_pending_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_pending_status.label }}{% endif %}
+<span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>
+    {% if overlap.overlap_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status.label }}{% endif %}
 </span>
 {% if overlap.overlap_status_change_timestamp %} - {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}{% endif %}
 {% for c_value in values.sorted %}
@@ -18,4 +17,5 @@
 {% if overlap.overlap_override_status %}
     <div>Reviewed as : <span style="font-weight:500">{{ overlap.overlap_override_status.label }}</span></div>
 {% endif %}
+{% if overlap.has_pending_values %}<div style="color:#888">Includes Pending Updates</div>{% endif %}
 <div id="overlap-{{ overlap.pk }}-updated"></div>

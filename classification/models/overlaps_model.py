@@ -224,11 +224,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     testing_context_bucket = models.TextField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
     overlap_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
-    overlap_pending_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
-    """
-    FIXME, might be cleaner if rather than keep a different status of pending, we just have a flag to mark if there are pending values but the difference in status
-    isn't that important
-    """
+    has_pending_values = models.BooleanField(default=False, blank=True)  # if
 
     overlap_override_status = IntegerFieldChoices(choices_type=OverlapOverrideStatus, default=OverlapOverrideStatus.NO_OVERRIDE)  # type:OverlapOverrideStatus
 
@@ -283,10 +279,6 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             if cg := entry.classification_grouping:
                 c_hgvses.add(cg.latest_allele_info.preferred_c_hgvs_obj())
         return list(sorted(c_hgvses))
-
-    @property
-    def has_pending_status(self):
-        return self.overlap_status != self.overlap_pending_status
 
     def c_hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> CHGVS:
         # if no genome_build provided, use the imported value
