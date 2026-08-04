@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.db.models.functions import Length
@@ -5,6 +7,15 @@ from django.db.models.functions import Length
 from annotation.models import AnnotationRangeLock, ClinVar
 from genes.hgvs import HGVSMatcher
 from snpdb.models import Variant, Sequence, GenomeBuild, Locus
+
+
+@lru_cache(maxsize=None)
+def _get_sequence(seq: str) -> Sequence:
+    """ Sequence rows are created on first sight by the variant inserter (VariantPKLookup), so a symbolic
+        alt this deployment has never imported has no row yet - a legacy DB converting its first <DEL> has
+        to create it. Sequence.save() fills in seq_sha256_hash. """
+    sequence, _ = Sequence.objects.get_or_create(seq=seq)
+    return sequence
 
 
 class Command(BaseCommand):
@@ -21,7 +32,6 @@ class Command(BaseCommand):
         long_variants = Variant.objects.filter(Q(locus__ref__in=long_sequences) | Q(alt__in=long_sequences))
         print(f"Long variant count = {long_variants.count()}")
 
-        base_lookup = {s: Sequence.objects.get(seq=s) for s in ["G", "A", "T", "C", "<DEL>", "<DUP>"]}
         not_symbolic = []
         dry_run = options["dry_run"]
 
@@ -57,7 +67,7 @@ class Command(BaseCommand):
                             # It's already there as existing - but didn't have the ref trimmed down
                             print(f"Fixing {v.pk} ({v.alt}) had ref sequence length of {ref_length}")
                             if not dry_run:
-                                new_ref = base_lookup[v.locus.ref.seq[0]]
+                                new_ref = _get_sequence(v.locus.ref.seq[0])
                                 v.locus = Locus.objects.get_or_create(contig=v.locus.contig, position=vc.position,
                                                                       ref=new_ref)[0]
                                 v.save()
@@ -73,13 +83,13 @@ class Command(BaseCommand):
                         raise ValueError(f"{v.pk} had ref length of {len(vc.ref)}")
 
                     if not dry_run:
-                        new_ref = base_lookup[vc.ref]
+                        new_ref = _get_sequence(vc.ref)
                         v.locus = Locus.objects.get_or_create(contig=v.locus.contig, position=vc.position, ref=new_ref)[0]
-                        v.alt = base_lookup[vc.alt]
+                        v.alt = _get_sequence(vc.alt)
                         v.svlen = vc.svlen
                         v.save()
 
-            print(f"{GenomeBuild} Merged/Deleted {num_deleted} variants")
+            print(f"{genome_build} Merged/Deleted {num_deleted} variants")
 
         print(f"Non-symbolic not converted: {len(not_symbolic)}")
         # This will take ages on some systems...
@@ -88,7 +98,7 @@ class Command(BaseCommand):
     def _merge_variant_dupe(self, dupe_variant, original_variant) -> int:
         if dupe_variant.cohortgenotype_set.exists():
             print(f"Not deleting {dupe_variant.pk} as it has cohort genotype data")
-            return
+            return 0
 
         dupe_variant.clinvar_set.all().update(variant=original_variant)
         AnnotationRangeLock.release_variant(dupe_variant)
@@ -109,7 +119,7 @@ class Command(BaseCommand):
             ClinVar.objects.filter(version__genome_build=genome_build, variant__alt__seq=alt_seq).values_list(
                 "clinvar_variation_id", flat=True))
 
-        print(f"{genome_build} Found clinvar {alt_seq} count = {clinvar_variation_del.count()}")
+        print(f"{genome_build} Found clinvar {alt_seq} count = {len(clinvar_variation_del)}")
 
         clinvar_variation_original = {}
 
