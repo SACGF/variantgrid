@@ -224,9 +224,10 @@ CLINGEN_ALLELE_REGISTRY_MAX_CACHE_DAYS = 180  # Set to None to last forever. 180
 # Disabled by default; enable per-deployment - needs incoming connections (ie on internet)
 MME_ENABLED = False
 
-# Once True we drop the `"test": true` flag from outbound patient profiles (only do this
-# after certifying against a target node's test instance). Keep False until then.
-MME_ENABLED_PRODUCTION_SUBMIT = False
+# Are we a test instance? Sets `"test": true` on outbound patient profiles and reports
+# `production: false` on /heartbeat, so a peer sees the same answer either way. Set False
+# only after certifying against a target node's test instance.
+MME_TEST = True
 
 # Our own contact details, sent as the `contact` block on every outbound patient.
 # Public info, not secret. Blank by default - each deployment that enables MME fills these
@@ -235,6 +236,7 @@ MME_CONTACT = {
     "name": "",
     "href": "",         # e.g. "mailto:mme@example.org"
     "institution": "",
+    "email": "",        # preferred over a mailto: href since v1.1
 }
 
 # Remote nodes we can submit to: public base_url + api_version as plain config; the
@@ -243,10 +245,12 @@ MME_CONTACT = {
 # disclaimer/terms are the node's published baseline, transcribed from
 # https://github.com/ga4gh/mme-apis/tree/master/disclaimers - a live /match response wins.
 MME_NODES = {
-    # "decipher": {"base_url": "https://...", "api_version": "1.1",
+    # api_version is what THAT node speaks - see https://github.com/ga4gh/mme-apis/wiki/Endpoints
+    # (most of the federation is v1.0 only; GeneMatcher also offers v1.1). Defaults to 1.0.
+    # "decipher": {"base_url": "https://www.deciphergenomics.org/mmapi/v1", "api_version": "1.0",
     #              "token": get_secret("MME.decipher_token", mandatory=False),
     #              "disclaimer": "", "terms": ""},
-    # "genematcher": {"base_url": "https://...", "api_version": "1.1",
+    # "genematcher": {"base_url": "https://genematcher.org/mmapi", "api_version": "1.1",
     #                 "token": get_secret("MME.genematcher_token", mandatory=False),
     #                 "disclaimer": "", "terms": ""},
 }

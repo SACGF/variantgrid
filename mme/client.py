@@ -25,7 +25,9 @@ class MMEClient:
         self.node_id = node_id
         self.base_url = node["base_url"].rstrip("/")
         self.token = node["token"]
-        self.api_version = node.get("api_version", "1.1")
+        # v1.0 is the version every node in the federation speaks (only GeneMatcher also
+        # offers v1.1), so it is the safe default when a node's config doesn't say.
+        self.api_version = node.get("api_version", "1.0")
 
     @property
     def _headers(self) -> dict:

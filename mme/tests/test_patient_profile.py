@@ -15,7 +15,7 @@ from ontology.models import OntologyService
 
 @override_settings(MME_ONTOLOGY_SNAKE_EXACT=True, MME_ONTOLOGY_PHENOTYPE_EXPANSION=False,
                    MME_CONTACT={"name": "Test", "href": "mailto:t@t.org"},
-                   MME_ENABLED_PRODUCTION_SUBMIT=False)
+                   MME_TEST=True)
 class PatientProfileTestCase(TestCase):
 
     def setUp(self):
@@ -103,14 +103,14 @@ class PatientProfileTestCase(TestCase):
         with self.assertRaises(ValueError):
             build_patient_profile(submission)
 
-    def test_test_flag_present_until_production_submit_enabled(self):
+    def test_test_flag_present_while_mme_test(self):
         term = make_term("HP:0001250", OntologyService.HPO, 1250, "Seizure")
         submission = FakeSubmission(classification=FakeClassification(terms=[term]))
         profile = build_patient_profile(submission)
         self.assertTrue(profile.get("test"))
 
-    @override_settings(MME_ENABLED_PRODUCTION_SUBMIT=True)
-    def test_test_flag_absent_when_production_submit_enabled(self):
+    @override_settings(MME_TEST=False)
+    def test_test_flag_absent_once_mme_test_cleared(self):
         term = make_term("HP:0001250", OntologyService.HPO, 1250, "Seizure")
         submission = FakeSubmission(classification=FakeClassification(terms=[term]))
         profile = build_patient_profile(submission)

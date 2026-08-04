@@ -21,6 +21,7 @@ class LabMmeContactTestCase(TestCase):
             "name": "Dr Curator",
             "href": "mailto:curator@lab.org",
             "institution": "InstX",
+            "email": "curator@lab.org",
         })
 
     def test_falls_back_to_lab_name_and_url(self):
@@ -72,6 +73,7 @@ class MmeContactForClassificationTestCase(TestCase):
             "name": "Labby",
             "href": "mailto:curator@lab.org",
             "institution": "InstX",
+            "email": "curator@lab.org",
         })
 
     @override_settings(MME_CONTACT=SERVER_CONTACT)
@@ -83,3 +85,16 @@ class MmeContactForClassificationTestCase(TestCase):
     def test_empty_when_both_empty(self):
         classification = FakeClassification(lab=FakeLab(name="Labby"))
         self.assertEqual(mme_contact_for_classification(classification), {})
+
+
+class ContactEmailTestCase(TestCase):
+    """ v1.1 split `email` out of `href`; v1.0 peers ignore the extra key. """
+
+    def test_email_accompanies_mailto_href(self):
+        contact = lab_mme_contact(FakeLab(name="Labby", contact_email="curator@lab.org"))
+        self.assertEqual(contact["email"], "curator@lab.org")
+        self.assertEqual(contact["href"], "mailto:curator@lab.org")
+
+    def test_url_only_contact_has_no_email(self):
+        contact = lab_mme_contact(FakeLab(name="Labby", url="https://lab.org"))
+        self.assertNotIn("email", contact)

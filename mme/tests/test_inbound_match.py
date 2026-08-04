@@ -38,11 +38,11 @@ class InboundMatchViewTestCase(TestCase):
 
     def test_missing_token_rejected(self):
         response = self._post({"patient": QUERY_PATIENT}, token=None)
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(response.status_code, 401)
 
     def test_wrong_token_rejected(self):
         response = self._post({"patient": QUERY_PATIENT}, token="nope")
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(response.status_code, 401)
 
     def test_missing_features_and_genomic_rejected(self):
         response = self._post({"patient": {"id": "q1"}})
@@ -97,7 +97,7 @@ class InboundMatchViewTestCase(TestCase):
     @override_settings(MME_ENABLED=False)
     def test_disabled_rejected(self):
         response = self._post({"patient": QUERY_PATIENT})
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(response.status_code, 401)
 
 
 @override_settings(MME_CONTACT={"name": "Test", "href": "mailto:t@t.org"},

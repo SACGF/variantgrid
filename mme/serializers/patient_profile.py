@@ -129,6 +129,11 @@ def mme_eligible_classifications():
         is denormalised there at publish time), so eligibility is derived rather than
         stateful - a downgrade to Benign drops the record out at the next publish, and a
         re-classification back up restores it, with no flag to keep in sync. """
+    if not settings.MME_ENABLED:
+        # The node layer of the AND. Enforcing it here rather than per call site means a
+        # deployment with MME off exposes nothing anywhere: no outbound profile builds, no
+        # inbound match scores, and published metrics read zero rather than erroring.
+        return ClassificationModification.objects.none()
     return (ClassificationModification.objects
             .filter(is_last_published=True,
                     share_level=ShareLevel.PUBLIC.value,
@@ -177,7 +182,7 @@ def build_patient_profile(submission) -> dict:
         profile["disorders"] = disorders
     if features:
         profile["features"] = features
-    if not settings.MME_ENABLED_PRODUCTION_SUBMIT:   # keep test-mode until certified
+    if settings.MME_TEST:   # keep test-mode until certified
         profile["test"] = True
 
     # MME requires at least one of features / genomicFeatures

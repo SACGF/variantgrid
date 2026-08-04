@@ -12,9 +12,10 @@ from user_messages.models import Message
 NODES = {"testnode": {"base_url": "https://node.test", "token": "secret-token", "api_version": "1.1"}}
 
 
-@override_settings(MME_NODES=NODES, MME_CONTACT={"name": "Test", "href": "mailto:t@t.org"},
+@override_settings(MME_ENABLED=True,
+                   MME_NODES=NODES, MME_CONTACT={"name": "Test", "href": "mailto:t@t.org"},
                    MME_DISCLAIMER="please confirm", MME_TERMS="be nice",
-                   MME_ENABLED_PRODUCTION_SUBMIT=False)
+                   MME_TEST=True)
 class ClientTestCase(TestCase):
 
     def setUp(self):

@@ -7,7 +7,8 @@ inbound serve path share this single resolver so every record is attributed to t
 lab that produced it (not to the node operator).
 
 A lab contact is only "valid" when it yields both `name` and `href` (matching MME's
-existing name+href requirement); otherwise the resolver drops to the next tier.
+existing name+href requirement); otherwise the resolver drops to the next tier. `email`
+rides alongside where we have one - v1.1 split it out of `href` and prefers it there.
 """
 from django.conf import settings
 
@@ -45,7 +46,12 @@ def lab_mme_contact(lab) -> dict:
     org_name = (organization.name or "").strip() if organization else ""
     institution = org_name or (lab.name or "").strip()
 
-    return {"name": name, "href": href, "institution": institution}
+    contact = {"name": name, "href": href, "institution": institution}
+    if email:
+        # v1.1 splits the address out of href and prefers it there; v1.0 peers ignore the
+        # extra key, so href stays populated for them.
+        contact["email"] = email
+    return contact
 
 
 def settings_mme_contact() -> dict:

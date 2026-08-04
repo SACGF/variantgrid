@@ -50,6 +50,7 @@ class _EligibilityFixture:
         return {cm.classification_id for cm in mme_eligible_classifications()}
 
 
+@override_settings(MME_ENABLED=True)
 class EligibilityTestCase(_EligibilityFixture, TestCase):
 
     def test_public_included(self):
@@ -192,3 +193,18 @@ class AssertEligibleTestCase(_EligibilityFixture, TestCase):
         submission.refresh_from_db()
         self.assertEqual(submission.status, MMESubmissionStatus.ERROR)
         self.assertIn("no longer eligible", submission.error)
+
+
+class NodeGateTestCase(_EligibilityFixture, TestCase):
+    """ The node layer of the three-layer AND. With MME off a deployment exposes nothing,
+        whatever its labs and records say. """
+
+    @override_settings(MME_ENABLED=True)
+    def test_eligible_when_node_enabled(self):
+        vc = self._classification_with_mod(ShareLevel.PUBLIC.value)
+        self.assertIn(vc.pk, self._eligible_ids())
+
+    @override_settings(MME_ENABLED=False)
+    def test_nothing_eligible_when_node_disabled(self):
+        self._classification_with_mod(ShareLevel.PUBLIC.value)
+        self.assertEqual(self._eligible_ids(), set())

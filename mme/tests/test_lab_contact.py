@@ -41,7 +41,7 @@ class LabMmeEnableValidationTestCase(TestCase):
 
 
 @override_settings(MME_ONTOLOGY_SNAKE_EXACT=True, MME_ONTOLOGY_PHENOTYPE_EXPANSION=False,
-                   MME_ENABLED_PRODUCTION_SUBMIT=False)
+                   MME_TEST=True)
 class BuildProfileContactTestCase(TestCase):
 
     def setUp(self):
@@ -64,6 +64,7 @@ class BuildProfileContactTestCase(TestCase):
             "name": "Labby",
             "href": "mailto:curator@lab.org",
             "institution": "InstX",
+            "email": "curator@lab.org",
         })
 
     @override_settings(MME_CONTACT={"name": "", "href": ""})

@@ -6,6 +6,7 @@ from variantgrid.perm_path import path
 urlpatterns = [
     path('api/match', views_rest.MMEMatchView.as_view(), name='mme_api_match'),
     path('api/metrics', views_rest.MMEMetricsView.as_view(), name='mme_api_metrics'),
+    path('api/heartbeat', views_rest.MMEHeartbeatView.as_view(), name='mme_api_heartbeat'),
 
     # Public (PUBLIC_PATHS) - MME requires these be published.
     path('metrics', views.mme_public_metrics, name='mme_public_metrics'),

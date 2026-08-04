@@ -5,6 +5,7 @@ outbound submission all describe one dataset. Building them resolves every eligi
 classification's genomic + ontology profile, so they are cached and refreshed nightly
 rather than computed per request.
 """
+from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 
@@ -87,6 +88,10 @@ def _unique_genes_matched() -> int:
 
 def get_metrics(refresh: bool = False) -> dict:
     """ Cached metrics payload. `refresh=True` recomputes (nightly task). """
+    if not settings.MME_ENABLED:
+        # Eligibility is empty, so this is zeros over an empty queryset - cheap to build,
+        # and skipping the cache means enabling MME doesn't serve stale zeros for a day.
+        return build_metrics()
     if not refresh:
         if (cached := cache.get(MME_METRICS_CACHE_KEY)) is not None:
             return cached

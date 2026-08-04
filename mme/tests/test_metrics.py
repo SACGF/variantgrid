@@ -86,7 +86,7 @@ class MetricsEndpointTestCase(TestCase):
 
     def test_api_requires_a_peer_token(self):
         response = self.api_client.get(reverse("mme_api_metrics"))
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(response.status_code, 401)
 
     def test_api_returns_metrics_and_our_disclaimer(self):
         response = self.api_client.get(reverse("mme_api_metrics"), HTTP_X_AUTH_TOKEN=TOKEN)
@@ -96,3 +96,33 @@ class MetricsEndpointTestCase(TestCase):
         self.assertEqual(data["disclaimer"], "ours")
         self.assertEqual(data["terms"], "our terms")
 
+
+
+@override_settings(MME_ENABLED=False, MME_INBOUND_TOKENS={})
+class MetricsWhileDisabledTestCase(TestCase):
+    """ A deployment with MME off is still a reachable endpoint reporting an empty dataset,
+        rather than an error - eligibility is gated at the node layer, so this is zeros
+        computed over an empty queryset rather than a special case. """
+
+    def setUp(self):
+        cache.delete(MME_METRICS_CACHE_KEY)
+        self.api_client = APIClient()
+
+    def tearDown(self):
+        cache.delete(MME_METRICS_CACHE_KEY)
+
+    def test_api_answers_without_a_token(self):
+        response = self.api_client.get(reverse("mme_api_metrics"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_data_metrics_are_zero(self):
+        metrics = self.api_client.get(reverse("mme_api_metrics")).json()["metrics"]
+        for key in ("numberOfCases", "numberOfSubmitters", "numberOfGenes",
+                    "numberOfUniqueGenes", "numberOfVariants", "numberOfFeatures"):
+            self.assertEqual(metrics[key], 0, key)
+
+    def test_zeros_are_not_cached_over_an_enable(self):
+        """ The nightly cache lasts >24h; serving stale zeros after enabling would make the
+            published figures wrong for a day. """
+        self.api_client.get(reverse("mme_api_metrics"))
+        self.assertIsNone(cache.get(MME_METRICS_CACHE_KEY))

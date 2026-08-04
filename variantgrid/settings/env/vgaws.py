@@ -52,6 +52,7 @@ MME_CONTACT = {
     "name": "Centre for Cancer Biology",
     "href": "mailto:david.lawrence@adelaide.edu.au",
     "institution": "Adelaide University",
+    "email": "david.lawrence@adelaide.edu.au",
 }
 
 # Beacon v2 genomic data-sharing endpoint (#1661) - enabled on variantgrid.com.
