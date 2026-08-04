@@ -1459,7 +1459,7 @@ class AbstractVariantAnnotation(models.Model):
         hgvs_c = self.hgvs_c
         if self.has_hgvs_c and self.symbol:
             from genes.hgvs import HGVSMatcher
-            hgvs_matcher = HGVSMatcher(self.version.genome_build)
+            hgvs_matcher = HGVSMatcher.instance(self.version.genome_build)
             hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_c)
             hgvs_variant.gene = self.symbol
             hgvs_c = str(hgvs_variant)
@@ -2084,7 +2084,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
         if hgvs_g is None:
             # Reference variants have no annotation - so we'll have to fall back to generating it
             from genes.hgvs import HGVSMatcher
-            matcher = HGVSMatcher(variant.any_genome_build)
+            matcher = HGVSMatcher.instance(variant.any_genome_build)
             hgvs_g = matcher.variant_to_g_hgvs(variant)
 
         return hgvs_g

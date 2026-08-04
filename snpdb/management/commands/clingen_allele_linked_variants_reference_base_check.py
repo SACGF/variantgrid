@@ -3,7 +3,7 @@ import logging
 from django.core.management import BaseCommand
 
 from genes.hgvs import HGVSMatcher
-from snpdb.models import Variant, Allele, ClinGenAllele, Contig, AlleleLiftover, GenomeBuild
+from snpdb.models import Variant, Allele, ClinGenAllele, Contig, AlleleLiftover
 
 
 class Command(BaseCommand):
@@ -26,9 +26,6 @@ class Command(BaseCommand):
         else:
             logging.info("Going to unlink incorrect variants...")
 
-        # Re-using matchers as each one opens genome FASTA file handles (would run out of file descriptors)
-        hgvs_matchers = {gb: HGVSMatcher(gb) for gb in GenomeBuild.builds_with_annotation()}
-
         num_unlinked = 0
         for i, allele in enumerate(alleles_qs):
             if i % 500 == 0:
@@ -36,9 +33,7 @@ class Command(BaseCommand):
             for va in allele.variantallele_set.all():
                 existing_vc = va.variant.coordinate
                 try:
-                    hgvs_matcher = hgvs_matchers.get(va.genome_build)
-                    if hgvs_matcher is None:
-                        hgvs_matcher = hgvs_matchers.setdefault(va.genome_build, HGVSMatcher(va.genome_build))
+                    hgvs_matcher = HGVSMatcher.instance(va.genome_build)
                     clingen_vc = allele.clingen_allele.get_variant_coordinate(va.genome_build,
                                                                               hgvs_matcher=hgvs_matcher)
                     if existing_vc != clingen_vc:

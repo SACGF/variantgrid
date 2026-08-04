@@ -115,13 +115,11 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
 
     other_build_contigs_q_list = []
     other_builds = set()
-    hgvs_matchers = {}
     for genome_build in destination_genome_builds:
         if genome_build != inserted_genome_build:
             other_builds.add(genome_build)
             q = Q(variantallele__variant__locus__contig__in=genome_build.contigs)
             other_build_contigs_q_list.append(q)
-        hgvs_matchers[genome_build] = HGVSMatcher(genome_build)
 
     if not other_builds:
         return {}, {}  # Nothing to do
@@ -153,7 +151,7 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
                 build_liftover_existing_allele_and_variants[genome_build][same_contig_tool].append((allele, variant))
                 continue
 
-            hgvs_matcher = hgvs_matchers[genome_build]
+            hgvs_matcher = HGVSMatcher.instance(genome_build)
 
             for tool_coordinate_error in itertools.chain(
                     _liftover_using_dest_variant_coordinate(allele, genome_build,

@@ -2,7 +2,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Optional, Union
 
 from cdot.hgvs import clean_hgvs as cdot_clean_hgvs, rank_transcript_versions, \
@@ -163,6 +163,14 @@ class HGVSMatcher:
         self.hgvs_converter = HGVSConverterFactory.factory(genome_build, hgvs_converter_type,
                                                            local_resolution=local_resolution,
                                                            clingen_resolution=clingen_resolution)
+
+    @classmethod
+    def instance(cls, genome_build: GenomeBuild, hgvs_converter_type=None,
+                 local_resolution=True, clingen_resolution=True,
+                 allow_alternative_transcript_version=True) -> 'HGVSMatcher':
+        """ Shared matcher - constructing one opens the genome fasta, so don't do it per record """
+        return _cached_hgvs_matcher(genome_build, hgvs_converter_type, local_resolution, clingen_resolution,
+                                    allow_alternative_transcript_version)
 
     def _clingen_get_variant_coordinate_matches_reference_and_normalized(self, hgvs_string: str, match_ref_allele=None) -> tuple[VariantCoordinate, bool, Union[HgvsOriginallyNormalized, bool]]:
         hgvs_name = self.create_hgvs_variant(hgvs_string)
@@ -693,9 +701,17 @@ class HGVSMatcher:
         return hgvs_variant.get_gene_symbol_if_no_transcript()
 
 
+@lru_cache(maxsize=None)
+def _cached_hgvs_matcher(genome_build: GenomeBuild, hgvs_converter_type, local_resolution: bool,
+                         clingen_resolution: bool, allow_alternative_transcript_version: bool) -> HGVSMatcher:
+    return HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type,
+                       local_resolution=local_resolution, clingen_resolution=clingen_resolution,
+                       allow_alternative_transcript_version=allow_alternative_transcript_version)
+
+
 def get_hgvs_variant_coordinate(hgvs_string: str, genome_build: GenomeBuild) -> VariantCoordinate:
     """ Convenience method for 1 off HGVS - for batches use HGVSMatcher """
-    matcher = HGVSMatcher(genome_build)
+    matcher = HGVSMatcher.instance(genome_build)
     return matcher.get_variant_coordinate(hgvs_string)
 
 

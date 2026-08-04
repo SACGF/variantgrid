@@ -465,12 +465,11 @@ def view_transcript(request, transcript_id):
     genome_build_genes = [GenomeBuildGenes(genome_build, sorted(gene_by_build.get(genome_build))) for genome_build in genome_builds]
     transcript_version_details: list[TranscriptVersionDetails] = []
 
-    build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
     for version in sorted(versions):
         transcript_accession = f"{transcript}.{version}"
         for genome_build in genome_builds:
             tv = transcripts_versions_by_build.get(genome_build, {}).get(version)
-            matcher = build_matcher[genome_build]
+            matcher = HGVSMatcher.instance(genome_build)
             hgvs_method = matcher.filter_best_transcripts_and_converter_type_by_accession(transcript_accession)
 
             transcript_version_details.append(

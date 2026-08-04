@@ -7,28 +7,21 @@ from django.db.models.functions import Length
 
 from manual.operations.manual_operations import ManualOperation
 
-# one_off_fix_symbolic_variants pre-filters candidates on sequences >= 1000bp, then only converts the
-# ones as_internal_symbolic() makes symbolic - which applies settings.VARIANT_SYMBOLIC_ALT_SIZE. So the
-# size at which the command actually does something is the larger of the two.
+# The command pre-filters on 1000bp, then only converts what as_internal_symbolic() (which uses
+# VARIANT_SYMBOLIC_ALT_SIZE) makes symbolic - so it only does anything at the larger of the two
 _MIN_CONVERTED_SIZE = max(1000, settings.VARIANT_SYMBOLIC_ALT_SIZE)
 
 
 def _test_for_unconverted_long_explicit_variants(apps):
-    """ Long variants still stored explicitly (ref or alt sequence long enough that as_internal_symbolic
-        would make them <DEL>/<DUP>/<INV>). Mirrors the command's own long_variants query.
-
-        This is the case a legacy deployment upgrading straight to symbolic-alt support lands in: it has
-        never held a symbolic <DEL>/<DUP>, so neither corruption check below fires, yet every long variant
-        it holds needs converting. """
+    """ Long variants still stored explicitly - a legacy deployment upgrading to symbolic alts has these,
+        but has never had a symbolic <DEL>/<DUP> so the corruption checks below don't fire """
     if not settings.VARIANT_SYMBOLIC_ALT_ENABLED:
-        # Symbolic storage is off - converting would be wrong, and VariantCoordinate rejects a set svlen
         return False
 
     Sequence = apps.get_model("snpdb", "Sequence")
     Variant = apps.get_model("snpdb", "Variant")
 
     long_sequences = Sequence.objects.annotate(seq_length=Length("seq")).filter(seq_length__gte=_MIN_CONVERTED_SIZE)
-    # svlen__isnull=True -> already-symbolic variants are the other checks' business, not this one
     qs = Variant.objects.filter(Q(locus__ref__in=long_sequences) | Q(alt__in=long_sequences), svlen__isnull=True)
     return qs.exists()
 
@@ -51,8 +44,7 @@ def _test_needs_symbolic_variant_fix(apps):
     if diff_representation.exists():
         return True
 
-    # Last as it scans Sequence/Variant - the cheap corruption checks above short-circuit it
-    return _test_for_unconverted_long_explicit_variants(apps)
+    return _test_for_unconverted_long_explicit_variants(apps)  # Last as it scans Sequence/Variant
 
 
 class Migration(migrations.Migration):

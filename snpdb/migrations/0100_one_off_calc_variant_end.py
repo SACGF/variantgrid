@@ -9,6 +9,6 @@ class Migration(migrations.Migration):
         ('snpdb', '0099_alter_variant_unique_together_cohortgenotype_format_and_more'),
     ]
 
-    # Variant.end is populated by 'one_off_fix_variant_end' (surfaced in 0118/0141, once svlen
-    # exists) and enforced NOT NULL in 0198_alter_variant_end_not_null after it has been calculated.
+    # Variant.end is populated by 'one_off_fix_variant_end' (surfaced in 0141, once svlen exists)
+    # and enforced NOT NULL in 0198_alter_variant_end_not_null after it has been calculated.
     operations = []

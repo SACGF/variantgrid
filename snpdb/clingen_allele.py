@@ -374,7 +374,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
     variant_coordinate = variant.coordinate
     _clingen_check_variant_coordinate_length(str(variant), genome_build, variant_coordinate)
 
-    g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
+    g_hgvs = HGVSMatcher.instance(genome_build).variant_to_g_hgvs(variant)
     try:
         api_response = get_single_element(list(clingen_api.hgvs_put([g_hgvs])))
     except ClinGenAlleleServerException as cgse:

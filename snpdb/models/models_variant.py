@@ -441,7 +441,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                     # Possible dup
                     # TODO: Can probably remove HGVS dependency from here - just look directly at sequence
                     from genes.hgvs import HGVSMatcher
-                    matcher = HGVSMatcher(genome_build)
+                    matcher = HGVSMatcher.instance(genome_build)
                     hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(self)
                     if hgvs_variant.mutation_type == 'dup':
                         ref = self.ref[0]
