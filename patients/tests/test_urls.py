@@ -94,6 +94,24 @@ class Test(URLTestCase):
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
 
+    def testPatientImportWithoutUploadedFile(self):
+        """ #1684 - old imports may have lost their UploadedPatientRecords """
+        self._test_urls(self._no_uploaded_file_url_names_and_kwargs(),
+                        User.objects.create_superuser("admin_user"))
+
+    @prevent_request_warnings
+    def testPatientImportWithoutUploadedFileNoPermission(self):
+        self._test_urls(self._no_uploaded_file_url_names_and_kwargs(),
+                        self.user_non_owner, expected_code_override=403)
+
+    @staticmethod
+    def _no_uploaded_file_url_names_and_kwargs():
+        patient_import = PatientImport.objects.create(name="no uploaded file")
+        patient_records = PatientRecords.objects.create(patient_import=patient_import)
+        return [
+            ('view_patient_import', {"patient_records_id": patient_records.pk}, 200),
+        ]
+
     def testAutocompletePermission(self):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_owner, True)
 

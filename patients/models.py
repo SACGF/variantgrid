@@ -4,6 +4,7 @@ from typing import Optional
 import nameparser
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import CASCADE, SET_NULL
@@ -544,15 +545,26 @@ class PatientRecords(models.Model):
     patient_import = models.OneToOneField(PatientImport, on_delete=CASCADE)
 
     def can_view(self, user) -> bool:
-        return user.is_superuser or user == self.user
+        return user.is_superuser or (self.user is not None and user == self.user)
+
+    def check_can_view(self, user):
+        if not self.can_view(user):
+            msg = f"You do not have permission to access PatientRecords pk={self.pk}"
+            raise PermissionDenied(msg)
 
     @property
-    def user(self):
-        return self.uploaded_file.user
+    def user(self) -> Optional[User]:
+        if uploaded_file := self.uploaded_file:
+            return uploaded_file.user
+        return None
 
     @property
     def uploaded_file(self):
-        return self.uploadedpatientrecords.uploaded_file
+        """ Records from old imports may have had their UploadedFile removed """
+        try:
+            return self.uploadedpatientrecords.uploaded_file
+        except ObjectDoesNotExist:
+            return None
 
     def get_absolute_url(self):
         return reverse('view_patient_import', kwargs={"patient_records_id": self.pk})

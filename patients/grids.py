@@ -152,7 +152,7 @@ class PatientRecordColumns(DatatableConfig[PatientRecord]):
     def get_initial_queryset(self) -> QuerySet[PatientRecord]:
         patient_records_id = self.get_query_param("patient_records")
         patient_records = get_object_or_404(PatientRecords, pk=patient_records_id)
-        patient_records.uploaded_file.check_can_view(self.user)
+        patient_records.check_can_view(self.user)
         return PatientRecord.objects.filter(patient_records=patient_records)
 
 
