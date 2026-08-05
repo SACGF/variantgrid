@@ -23,6 +23,7 @@ from snpdb.models import Allele
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
+        parser.add_argument('--dates', required=False, action='store_true'),
         parser.add_argument('--recalc', required=False, action="store_true"),
         parser.add_argument('--full_reset', required=False, action="store_true",
                             help="Deletes all Overlaps and OverlapContributions and creates them from scratch")
@@ -31,27 +32,36 @@ class Command(BaseCommand):
                             help="Populates max status (not entirely accurate) but should distinguish between records that have had a discordance reports to the ones that haven't")
 
     def handle(self, *args, **options):
+        if options["full_reset"]:
+            self.full_reset(args, options)
+            return
+
         if options['recalc']:
             self.recalc_overlaps()
-        elif options["full_reset"]:
-            self.full_reset(args, options)
-        elif options["recalc_skews"]:
+
+        if options["recalc_skews"]:
             self.recalc_skews()
-        elif options["max_status"]:
+
+        if options["max_status"]:
             self.populate_max_status(args, options)
-        else:
-            print("Must choose full_reset or migrate")
+
+        if options["dates"]:
+            self.populate_overlap_change_date()
+
 
     def recalc_overlaps(self):
+        print("Recalcing Overlaps")
         for overlap in Overlap.objects.all().iterator():
             OverlapServices.recalc_overlap(overlap)
             OverlapServices.update_skews(overlap)
 
     def recalc_skews(self):
+        print("Recalcing just skews")
         for overlap in Overlap.objects.all().iterator():
             OverlapServices.update_skews(overlap)
 
     def full_reset(self, *args, **options):
+        print("Full Reset")
         Overlap.objects.all().delete()
         OverlapContribution.objects.all().delete()
 
@@ -63,6 +73,8 @@ class Command(BaseCommand):
         for overlap in Overlap.objects.all().iterator():
             OverlapServices.recalc_overlap(overlap)
             OverlapServices.update_skews(overlap)
+
+        self.populate_overlap_change_date()
 
     def populate_max_status(self, *args, **options):
         alleles_with_discordance_reports: dict[Allele, OverlapStatus] = {}
@@ -174,32 +186,32 @@ class Command(BaseCommand):
                 if is_continued_discordance:
                     OverlapServices.recalc_overlap(overlap)
 
-    # def populate_overlap_change_date(self):
-    #     # timestamp on overlaps
-    #     with disable_auditlog():
-    #         for overlap in Overlap.objects.all().iterator():
-    #             # note we're looking for the latest published date of a classification here
-    #             # as the upload date is when a discordance would occur
-    #             latest_date = None
-    #             for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
-    #                 if grouping := contribution.classification_grouping:
-    #                     for mod in grouping.classification_modifications:
-    #                         latest_mod_date = mod.created
-    #                         if latest_date is None or latest_mod_date > latest_date:
-    #                             latest_date = latest_mod_date
-    #
-    #             if latest_date:
-    #                 overlap.overlap_status_change_timestamp = latest_date
-    #                 overlap.save(update_fields=["overlap_status_change_timestamp"])
-    #
-    #         # dates on overlap contributions
-    #         for overlap_contribution in OverlapContribution.objects.filter(effective_date__date=None).iterator():
-    #             if grouping := overlap_contribution.classification_grouping:
-    #                 if latest_modification := grouping.latest_classification_modification:
-    #                     date_check = latest_modification.curated_date_check
-    #                     overlap_contribution.effective_date_obj = date_check.to_effective_date
-    #                     print(overlap_contribution.effective_date)
-    #                     overlap_contribution.save(update_fields=["effective_date"])
+    def populate_overlap_change_date(self):
+        print("Recalcing Dates")
+        # timestamp on overlaps
+        with disable_auditlog():
+            for overlap in Overlap.objects.all().iterator():
+                # note we're looking for the latest published date of a classification here
+                # as the upload date is when a discordance would occur
+                latest_date = None
+                for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
+                    if grouping := contribution.classification_grouping:
+                        for mod in grouping.classification_modifications:
+                            latest_mod_date = mod.created
+                            if latest_date is None or latest_mod_date > latest_date:
+                                latest_date = latest_mod_date
+
+                if overlap.testing_context_bucket == TestingContextBucket.GERMLINE:
+                    # if there are classification groupings
+                    for dr in DiscordanceReport.objects.filter(clinical_context__allele=overlap.allele):
+                        for review in dr.reviews_all():
+                            if review.modified > latest_date:
+                                latest_date = review.modified
+
+                if latest_date:
+                    overlap.overlap_status_change_timestamp = latest_date
+                    overlap.save(update_fields=["overlap_status_change_timestamp"])
+
 
     def populate_overlap_history(self):
         for grouping in ClassificationGrouping.objects.iterator():

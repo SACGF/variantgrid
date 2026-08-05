@@ -65,7 +65,7 @@
         {% endlabelled %}
     {% endif %}
     {% if overlap_grouping.legacy_reviews %}
-        {% labelled label="Legacy Discordance Reports" %}
+        {% labelled label="Legacy Reviews" %}
             {% for review in overlap_grouping.legacy_reviews %}
                 <div><a href="{{ review.get_absolute_url }}" class="hover-link">Review on {{ review.review_date }}</a></div>
             {% endfor %}
