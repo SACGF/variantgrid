@@ -253,11 +253,17 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                     elif cross_contribution.scv:
                         value.clinvar = True
 
+        overlap = cell.obj
+        max_overlap_status = None
+        if self.get_query_param("skew_status") == "S":  # solved overlaps
+            if not overlap.overlap_override_status and overlap.overlap_max_ever_status > overlap.overlap_status:
+                max_overlap_status = overlap.overlap_max_ever_status
+
         context = {
             "values": values,
             "overlap": cell.obj,
             "max_triage_status": max_triage_status,
-            "overlap_override_status": cell.obj.overlap_override_status
+            "max_overlap_status": max_overlap_status
         }
 
         return render_to_string('classification/snippets/overlap_value_cell_3.html',
