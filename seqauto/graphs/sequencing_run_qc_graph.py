@@ -112,7 +112,7 @@ class SequencingRunQCGraph(CacheableGraph):
             "percentage_of_clusters_pf": "% clusters P.F.",
         }
 
-        bplot = ax.boxplot([column_values], vert=False, widths=0.9, patch_artist=True)
+        bplot = ax.boxplot([column_values], orientation="horizontal", widths=0.9, patch_artist=True)
         for patch in bplot['boxes']:
             patch.set_facecolor(self.bp_color)
             patch.set_edgecolor(SequencingRunQCGraph.EDGE_COLOR)

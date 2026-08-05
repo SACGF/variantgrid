@@ -111,7 +111,7 @@ class QCExecSummaryGraph(CacheableGraph):
             "percent_duplication": "percent\nduplication",
         }
 
-        bplot = ax.boxplot([column_values], vert=False, patch_artist=True, flierprops={"markersize": 1})
+        bplot = ax.boxplot([column_values], orientation="horizontal", patch_artist=True, flierprops={"markersize": 1})
         for patch in bplot['boxes']:
             patch.set_facecolor(self.bp_color)
             patch.set_edgecolor(QCExecSummaryGraph.EDGE_COLOR)

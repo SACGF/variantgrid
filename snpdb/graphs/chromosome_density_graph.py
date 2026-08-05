@@ -3,7 +3,6 @@ from collections import defaultdict
 
 import numpy as np
 from django.db import connection
-from matplotlib import cm
 
 from library.genomics import get_genomic_size_description
 from library.graphs.chromosomes_graph import plot_chromosomes
@@ -107,9 +106,8 @@ class AbstractChromosomeDensityGraph(CacheableGraph, metaclass=abc.ABCMeta):
             c = np.array(bins)
             # TODO: log??
 
-            cmap = cm.get_cmap(self.cmap)
             masked_c = np.ma.masked_invalid(c)
-            quadmesh = ax.pcolormesh(x, y, masked_c, cmap=cmap, alpha=density_alpha)
+            quadmesh = ax.pcolormesh(x, y, masked_c, cmap=self.cmap, alpha=density_alpha)
             quadmesh.set_clim(vmin=0, vmax=vmax)
             self.im = quadmesh  # Just need one
 
