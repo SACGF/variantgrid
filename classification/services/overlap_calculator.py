@@ -21,7 +21,8 @@ class OverlapStatusCalculation:
 
     @property
     def effective_value(self):
-        return self.override_pending_value if (self.override_pending_value is not None) else self.current_value
+        # TODO remove this as redundant (it used to also check a pending date)
+        return self.current_value
 
 
 class OverlapCalculatorBase(ABC):
@@ -90,15 +91,16 @@ class OverlapCalculatorBase(ABC):
                 elif base_value.is_discordant:
                     # see if it's ClinVar that's making the over discordant
                     non_clinvar_values = set(con.effective_value for con in interactive_contributors)
-                    clinvar_discordant = len(non_clinvar_values) > 1 and cls.calculate_status_for_multiple_entries(all_values).is_discordant
+                    if third_party:
+                        clinvar_causing_discordant = len(non_clinvar_values) > 1 and not cls.calculate_status_for_multiple_entries(non_clinvar_values).is_discordant
 
-                    if clinvar_discordant:
-                        max_clinvar_date = max(con.effecive_date for con in third_party)
-                        max_classification_date = max(con.effecive_date for con in interactive_contributors)
-                        if max_clinvar_date < max_classification_date:
-                            override_value = OverlapOverrideStatus.IGNORING_OLD_CLINVAR
-                        elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors): # all confident
-                            override_value = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
+                        if clinvar_causing_discordant:
+                            max_clinvar_date = max(con.effective_date for con in third_party)
+                            max_classification_date = max(con.effective_date for con in interactive_contributors)
+                            if max_clinvar_date < max_classification_date:
+                                override_value = OverlapOverrideStatus.IGNORING_OLD_CLINVAR
+                            elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors): # all confident
+                                override_value = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
 
             return OverlapStatusCalculation(base_value, has_pending_values, override_value)
 
