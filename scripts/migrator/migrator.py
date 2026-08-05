@@ -19,13 +19,21 @@ COMMAND_ALIASES = {
 }
 
 
+YELLOW = "\033[93m"
+COLOR_END = "\033[00m"
+
+
 def print_color(color: str, skk: str):
-    print((color + "{}\033[00m").format(skk))
+    print((color + "{}" + COLOR_END).format(skk))
+
+
+def color(the_color: str, text: str) -> str:
+    return the_color + text + COLOR_END
 
 
 print_red = partial(print_color, "\033[91m")
 print_green = partial(print_color, "\033[92m")
-print_yellow = partial(print_color, "\033[93m")
+print_yellow = partial(print_color, YELLOW)
 print_light_purple = partial(print_color, "\033[94m")
 print_purple = partial(print_color, "\033[95m")
 print_cyan = partial(print_color, "\033[96m")
@@ -80,12 +88,21 @@ class SubMigration:
             self.notes = notes
         return self
 
-    def status_line(self) -> Optional[str]:
-        """ Human-readable dependency/availability status for the interactive menu, or None. """
+    def status_tag(self) -> Optional[str]:
+        """ Short prefix for the menu entry itself, so the status can't be mistaken for the
+            neighbouring task's. """
         if self.command_exists is False:
-            return "obsolete - command no longer exists (review / mark complete)"
+            return "[OBSOLETE]"
         if self.blocked_by:
-            return f"blocked - waiting on: {', '.join(self.blocked_by)}"
+            return "[BLOCKED]"
+        return None
+
+    def status_line(self) -> Optional[str]:
+        """ Detail for the status_tag, printed indented under the menu entry, or None. """
+        if self.command_exists is False:
+            return "command no longer exists (review / mark complete)"
+        if self.blocked_by:
+            return f"waiting on: {', '.join(self.blocked_by)} (selecting it here still runs it)"
         return None
 
     def run(self) -> MigrationResult:
@@ -401,7 +418,9 @@ class Migrator:
         for migration in self.migrations:
             if migration.key == "1":
                 print("****** SPECIAL STEPS ******")
-            print(f"{migration.key}: {str(migration)}")
+            tag = migration.status_tag()
+            prefix = f"{color(YELLOW, tag)} " if tag else ""
+            print(f"{migration.key}: {prefix}{str(migration)}")
             keys.append(migration.key)
             if status := migration.status_line():
                 print_yellow(f"    ⧗ {status}")

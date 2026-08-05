@@ -100,8 +100,18 @@ class OutstandingRunnableTest(TestCase):
         human = Migrator.subcommand_for_json(
             {"id": 'other*"do a thing"', "category": "other", "line": '"do a thing"',
              "command_exists": None, "blocked_by": []})
-        self.assertIn("obsolete", missing.status_line())
+        self.assertEqual(missing.status_tag(), "[OBSOLETE]")
+        self.assertIsNone(human.status_tag())
         self.assertIsNone(human.status_line())
+
+    def test_menu_tags_blocked_task_on_its_own_line(self):
+        # The tag has to sit on the task's own menu line - an indented detail line alone reads as
+        # belonging to whichever task is printed next.
+        blocked = Migrator.subcommand_for_json(
+            {"id": "manage*calculate_sample_stats", "category": "manage", "line": "calculate_sample_stats",
+             "command_exists": True, "blocked_by": ["variant-annotation-current"]})
+        self.assertEqual(blocked.status_tag(), "[BLOCKED]")
+        self.assertIn("variant-annotation-current", blocked.status_line())
 
 
 class ObsoleteCleanupTest(TestCase):
