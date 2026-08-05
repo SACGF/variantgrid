@@ -80,6 +80,7 @@ class Test(URLTestCase):
             ('gene_coverage', {"gene_symbol_id": self.gene_symbol.symbol}, 200),
             ("variant_sample_information", {"variant_id": self.variant.pk,
                                             "genome_build_name": self.grch37.name}, 200),
+            ("variant_sample_genotypes", {"variant_id": self.variant.pk}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
 

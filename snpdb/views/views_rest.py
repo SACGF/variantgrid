@@ -14,6 +14,7 @@ from snpdb.clingen_allele import get_variant_allele_for_variant
 from snpdb.models import Sample, Variant, Trio, Quad, GenomeBuild
 from snpdb.models.models_vcf import Project
 from snpdb.serializers import QuadSerializer, TrioSerializer, VariantAlleleSerializer, ProjectSerializer
+from snpdb.variant_sample_information import VariantSampleGenotypes
 
 
 class VariantZygosityForSampleView(APIView):
@@ -77,6 +78,23 @@ class VariantAlleleForVariantView(APIView):
         variant_allele = get_variant_allele_for_variant(genome_build, variant)
         data = VariantAlleleSerializer.data_with_link_data(variant_allele)
         return Response(data)
+
+
+class VariantSampleGenotypesView(APIView):
+    """ Samples/genotypes for a variant, scoped to the samples the user can read.
+
+        Keyed on variant (not variant + build) - a variant knows its builds via its contig, and
+        builds sharing a contig (MT, unplaced scaffolds) resolve to the same variant. Each row is
+        labelled with its own sample's VCF build. """
+
+    @extend_schema(
+        summary="Get samples/genotypes for a variant",
+        responses=OpenApiTypes.OBJECT,
+    )
+    def get(self, request, *args, **kwargs):
+        variant = get_object_or_404(Variant, pk=self.kwargs['variant_id'])
+        variant_sample_genotypes = VariantSampleGenotypes(request.user, variant)
+        return Response(variant_sample_genotypes.to_json())
 
 
 class ProjectViewSet(viewsets.ModelViewSet):

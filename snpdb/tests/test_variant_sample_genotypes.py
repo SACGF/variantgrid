@@ -1,0 +1,128 @@
+from django.contrib.auth.models import User
+from django.test import TestCase
+
+from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.models_enums import Zygosity
+from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild, Sample, VCFFilter
+from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.variant_sample_information import VariantSampleGenotypes
+
+
+class VariantSampleGenotypesTest(TestCase):
+    """ The JSON payload the client side samples grid is drawn from """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='vsg_test_user')[0]
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+
+        # create_fake_cohort packs samples as [proband, mother, father]
+        cls.cohort_37 = create_fake_cohort(cls.user, cls.grch37)
+        cls.cohort_38 = create_fake_cohort(cls.user, cls.grch38)
+
+        cls.other_user = User.objects.get_or_create(username='vsg_test_other_user')[0]
+        cls.other_cohort_37 = create_fake_cohort(cls.other_user, cls.grch37)
+
+    def _create_cohort_genotype(self, cohort, variant, samples_zygosity, filters=None, samples_filters=None):
+        cgc = CohortGenotypeCollection.objects.get(cohort=cohort)
+        n = len(samples_zygosity)
+        return CohortGenotype.objects.create(collection=cgc, variant=variant, filters=filters,
+                                             samples_zygosity=samples_zygosity, samples_filters=samples_filters,
+                                             samples_allele_depth=[20] * n, samples_allele_frequency=[100] * n,
+                                             samples_read_depth=[30] * n, samples_genotype_quality=[30] * n,
+                                             samples_phred_likelihood=[0] * n)
+
+    def _het_proband_and_mother(self, cohort, variant, **kwargs):
+        samples_zygosity = Zygosity.HET + Zygosity.HET + Zygosity.MISSING
+        return self._create_cohort_genotype(cohort, variant, samples_zygosity, **kwargs)
+
+    def _rows_by_sample_name(self, data) -> dict:
+        return {row["sample_name"]: row for row in data["rows"]}
+
+    def test_rows_restricted_to_visible_samples(self):
+        variant = slowly_create_test_variant("3", 3000, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, variant)
+        self._het_proband_and_mother(self.other_cohort_37, variant)
+
+        data = VariantSampleGenotypes(self.user, variant).to_json()
+        self.assertEqual({"total": 4, "visible": 2, "invisible": 2}, data["observations"])
+        self.assertEqual(2, len(data["rows"]), "Only the VCF this user can read")
+        vcf_ids = {Sample.objects.get(pk=row["sample"]).vcf_id for row in data["rows"]}
+        self.assertEqual({self.cohort_37.vcf_id}, vcf_ids)
+        self.assertEqual({Zygosity.HET: 2}, data["zygosity_counts"])
+
+    def test_locus_counts_cover_hidden_samples(self):
+        """ Counts are of everything at the locus - only rows are permission filtered """
+        variant = slowly_create_test_variant("3", 3100, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, variant)
+        self._het_proband_and_mother(self.other_cohort_37, variant)
+
+        data = VariantSampleGenotypes(self.user, variant).to_json()
+        locus_counts = data["locus_counts"]
+        self.assertEqual(1, len(locus_counts))
+        this_variant = locus_counts[0]
+        self.assertEqual("This variant", this_variant["description"])
+        self.assertEqual(4, this_variant["total"])
+        self.assertEqual(4, this_variant["HET"])
+
+    def test_filters_pass(self):
+        variant = slowly_create_test_variant("3", 3200, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, variant)
+
+        data = VariantSampleGenotypes(self.user, variant).to_json()
+        row = self._rows_by_sample_name(data)["proband"]
+        self.assertEqual("PASS", row["filters"])
+        self.assertIsNone(row["sample_filters"], "No FT in the VCF")
+
+    def test_filters_single_and_multiple(self):
+        vcf = self.cohort_37.vcf
+        VCFFilter.objects.create(vcf=vcf, filter_code="Y", filter_id="LOW_DEPTH")
+
+        single = slowly_create_test_variant("3", 3300, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, single, filters="X")
+        multiple = slowly_create_test_variant("3", 3400, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, multiple, filters="XY")
+
+        single_data = VariantSampleGenotypes(self.user, single).to_json()
+        self.assertEqual("YOUSHALLNOTPASS", self._rows_by_sample_name(single_data)["proband"]["filters"])
+
+        multiple_data = VariantSampleGenotypes(self.user, multiple).to_json()
+        self.assertEqual("YOUSHALLNOTPASS,LOW_DEPTH", self._rows_by_sample_name(multiple_data)["proband"]["filters"])
+
+    def test_sample_filters(self):
+        variant = slowly_create_test_variant("3", 3500, "A", "T", self.grch37)
+        # MISSING_FT_VALUE = no FT for that sample, "" = FT of PASS
+        samples_filters = ["X", "", CohortGenotype.MISSING_FT_VALUE]
+        self._het_proband_and_mother(self.cohort_37, variant, samples_filters=samples_filters)
+
+        data = VariantSampleGenotypes(self.user, variant).to_json()
+        row = self._rows_by_sample_name(data)["proband"]
+        self.assertEqual("YOUSHALLNOTPASS", row["sample_filters"])
+
+    def test_filter_codes_decoded_per_vcf(self):
+        """ Shared contig - one response, two VCFs, and the same code means different things in each """
+        variant = slowly_create_test_variant("MT", 3000, "A", "T", self.grch37)
+        self.assertEqual({self.grch37, self.grch38}, variant.genome_builds)
+
+        # Both VCFs use code "X", but for a different filter id
+        VCFFilter.objects.filter(vcf=self.cohort_38.vcf, filter_code="X").update(filter_id="OFF_TARGET")
+        # Make the second VCF's proband visible too, so we get a row from each build
+        assign_permission_to_user_and_groups(self.user, Sample.objects.get(vcf=self.cohort_38.vcf, name="proband"))
+
+        self._het_proband_and_mother(self.cohort_37, variant, filters="X")
+        self._het_proband_and_mother(self.cohort_38, variant, filters="X")
+
+        data = VariantSampleGenotypes(self.user, variant).to_json()
+        filters_by_build = {row["genome_build"]: row["filters"] for row in data["rows"]}
+        self.assertEqual({self.grch37.name: "YOUSHALLNOTPASS", self.grch38.name: "OFF_TARGET"}, filters_by_build)
+
+    def test_no_observations(self):
+        variant = slowly_create_test_variant("3", 3600, "A", "T", self.grch37)
+
+        data = VariantSampleGenotypes(self.user, variant).to_json()
+        self.assertEqual({"total": 0, "visible": 0, "invisible": 0}, data["observations"])
+        self.assertEqual([], data["rows"])
+        self.assertEqual([self.grch37.name], data["genome_builds"])

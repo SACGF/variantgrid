@@ -60,8 +60,6 @@ from snpdb.serializers import VariantAlleleSerializer
 from snpdb.utils import get_genome_build_or_404
 from snpdb.variant_filters import get_all_variant_types, get_all_variants_filters, get_gene_symbol_alias_strs, \
     get_variant_type_label, resolve_gene_symbols
-from snpdb.variant_sample_information import VariantSampleInformation
-from upload.models import ModifiedImportedVariant
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
@@ -762,18 +760,14 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
 
 def variant_sample_information(request, variant_id, genome_build_name):
+    """ Shell only - the samples grid, locus counts and multi-allelic list are drawn client side
+        from the variant_sample_genotypes API """
     variant = get_object_or_404(Variant, pk=variant_id)
     get_genome_build_or_404(genome_build_name)  # Validate, builds we search come from the variant's contig
-    vsi = VariantSampleInformation(request.user, variant)
-    other_loci_variants_by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(variant)
-    g_hgvs = VariantAnnotation.get_hgvs_g(variant)
 
     context = {
         "variant": variant,
-        "vsi": vsi,
-        "g_hgvs": g_hgvs,
-        "other_loci_variants_by_multiallelic": other_loci_variants_by_multiallelic,
-        "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build__in=vsi.genome_builds).exists(),
+        "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build__in=variant.genome_builds).exists(),
     }
     return render(request, "variantopedia/variant_sample_information.html", context)
 

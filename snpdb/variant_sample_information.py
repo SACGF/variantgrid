@@ -1,24 +1,32 @@
 import logging
 from collections import Counter, defaultdict
 from functools import cached_property
+from typing import Optional
 
-import pandas as pd
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import Q, TextField
+from django.urls import reverse
 
-from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_ONTOLOGY_TERM_PATH
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
+from library.log_utils import log_traceback
 from library.unit_percent import format_af
 from ontology.models import OntologyService
-from patients.models import Patient
 from patients.models_enums import Zygosity
-from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, CohortGenotype
+from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, CohortGenotype, VCFFilter
+from upload.models import ModifiedImportedVariant
+
+SAMPLE_ENRICHMENT_KIT_PATH = "samplefromsequencingsample__sequencing_sample__enrichment_kit__name"
+# Zygosity.CHOICES uses '?' for unknown, which doesn't make a great JSON key or column header
+LOCUS_COUNT_ZYGOSITY_LABELS = [(Zygosity.HOM_REF, "REF"), (Zygosity.HET, "HET"),
+                               (Zygosity.HOM_ALT, "HOM_ALT"), (Zygosity.UNKNOWN_ZYGOSITY, "Unknown")]
 
 
 class VariantZygosityCounts:
     """ Permission-scoped per-variant sample/zygosity lookup - the reusable core extracted
-        from VariantSampleInformation (no pandas/template concerns). Shared by the
-        Variantopedia sample-information view (presentation subclass below) and the Beacon
+        from VariantSampleGenotypes (no presentation concerns). Shared by the
+        Variantopedia sample-information API (subclass below) and the Beacon
         g_variants endpoint (§5.2 stage 2). Gates by Sample.filter_for_user (anonymous ->
         public group), so presence/counts are only ever asserted from samples the requester
         may read. """
@@ -40,15 +48,12 @@ class VariantZygosityCounts:
 
         self.visible_zygosity_counter = Counter()  # raw {zygosity: count} for visible samples
         self.locus_counter = defaultdict(Counter)
-        self.locus_patients = defaultdict(set)
         self.num_observations = 0
         self.visible_rows = []
         for row in values_qs:
             pk = row["variant"]
             zygosity = row.get("zygosity", Zygosity.UNKNOWN_ZYGOSITY)
             self.locus_counter[pk][zygosity] += 1
-            if patient := row.get("sample__patient"):
-                self.locus_patients[pk].add(patient)
 
             if variant.pk == pk:
                 if sample_id := row.get("sample"):
@@ -109,6 +114,9 @@ class VariantZygosityCounts:
                          "variant__alt",
                          "variant__cohortgenotype__collection",
                          "variant__cohortgenotype__collection__cohort__vcf__name",
+                         "variant__cohortgenotype__collection__cohort__vcf__genome_build",
+                         "variant__cohortgenotype__filters",
+                         "variant__cohortgenotype__samples_filters",
                          "variant__cohortgenotype__samples_zygosity",
                          "variant__cohortgenotype__samples_allele_frequency",
                          "variant__cohortgenotype__samples_allele_depth",
@@ -118,7 +126,8 @@ class VariantZygosityCounts:
     @staticmethod
     def _cohort_genotype_to_sample_genotypes(values_qs):
         """ We're now joining to CohortGenotype - break up into samples so old code works """
-        SAMPLE_ENRICHMENT_KIT_PATH = "samplefromsequencingsample__sequencing_sample__enrichment_kit__name"
+
+        filter_code_lookup_by_vcf = {}  # Filter codes are per-VCF, so can't share a lookup between them
 
         # turn a row of CohortGenotype into multiple rows of ObservedVariant values
         for cg_values in values_qs:
@@ -131,6 +140,7 @@ class VariantZygosityCounts:
                 continue
 
             vcf_name = cg_values["variant__cohortgenotype__collection__cohort__vcf__name"]
+            genome_build = cg_values["variant__cohortgenotype__collection__cohort__vcf__genome_build"]
             samples_zygosity = cg_values["variant__cohortgenotype__samples_zygosity"]
             num_samples = len(samples_zygosity)
             empty = [-1] * num_samples
@@ -138,6 +148,7 @@ class VariantZygosityCounts:
             samples_allele_depth = cg_values["variant__cohortgenotype__samples_allele_depth"] or empty
             samples_read_depth = cg_values["variant__cohortgenotype__samples_read_depth"] or empty
             samples_phred_likelihood = cg_values["variant__cohortgenotype__samples_phred_likelihood"] or empty
+            samples_filters = cg_values["variant__cohortgenotype__samples_filters"]
 
             cgc = CohortGenotypeCollection.objects.get(pk=cgc_id)
             if cgc.cohort_version != cgc.cohort.version:
@@ -147,6 +158,13 @@ class VariantZygosityCounts:
                 cohort_can_change = cgc.cohort.vcf is None
                 if cohort_can_change:
                     continue  # Otherwise not really out of date, just a bug - see issue #1053
+
+            vcf = cgc.cohort.vcf
+            if (filter_code_lookup := filter_code_lookup_by_vcf.get(vcf.pk)) is None:
+                filter_code_lookup = VCFFilter.get_code_lookup(vcf)
+                filter_code_lookup_by_vcf[vcf.pk] = filter_code_lookup
+            filters = VCFFilter.format_filter_codes(filter_code_lookup,
+                                                    cg_values["variant__cohortgenotype__filters"])
 
             samples_qs = cgc.cohort.get_samples()
 
@@ -183,13 +201,21 @@ class VariantZygosityCounts:
                 read_depth = samples_read_depth[i]
                 phred_likelihood = samples_phred_likelihood[i]
 
+                sample_filters = None  # VCF had no FT field
+                if samples_filters:
+                    if (ft := samples_filters[i]) != CohortGenotype.MISSING_FT_VALUE:
+                        sample_filters = VCFFilter.format_filter_codes(filter_code_lookup, ft)
+
                 sample_genotype_values = {
                     "variant": variant,
+                    "genome_build": genome_build,
                     "zygosity": zygosity,
                     "allele_frequency": allele_frequency,
                     "allele_depth": allele_depth,
                     "read_depth": read_depth,
                     "phred_likelihood": phred_likelihood,
+                    "filters": filters,
+                    "sample_filters": sample_filters,
                     "sample": sample_id,
                     "sample__vcf__name": vcf_name,
                 }
@@ -200,74 +226,100 @@ class VariantZygosityCounts:
                 yield sample_genotype_values
 
 
-class VariantSampleInformation(VariantZygosityCounts):
-    """ Presentation layer over VariantZygosityCounts: builds the pandas locus-counts
-        table, checkbox-formatted per-zygosity counts and hidden-sample summary the
-        Variantopedia variant_sample_information template renders. """
+class VariantSampleGenotypes(VariantZygosityCounts):
+    """ Builds the JSON payload for the variant details samples grid - one response per variant.
+        The grid is client side, so everything it draws (rows, locus counts, multi-allelic
+        variants, sample/observation summary) comes from here. """
 
-    def __init__(self, user, variant):
-        super().__init__(user, variant)
+    def to_json(self) -> dict:
+        return {
+            "genome_builds": [gb.name for gb in self.genome_builds],
+            "variant_id": self.variant.pk,
+            "variant": str(self.variant),
+            "variant_url": reverse("view_variant", kwargs={"variant_id": self.variant.pk}),
+            "g_hgvs": self._get_g_hgvs(),
+            "samples": {
+                "total": self.num_samples,
+                "visible": self.num_user_samples,
+            },
+            "observations": {
+                "total": self.num_observations,
+                "visible": self.num_visible_observations,
+                "invisible": self.num_invisible_observations,
+            },
+            "zygosity_counts": dict(self.visible_zygosity_counter),
+            "locus_counts": self._get_locus_counts(),
+            "multiallelic": self._get_multiallelic(),
+            "rows": [self._row_to_json(row) for row in self.visible_rows],
+        }
 
-        # Make this easy to build a filter from
-        default_visible = {Zygosity.HET, Zygosity.HOM_ALT}
-        has_defaults = any(self.visible_zygosity_counter[gt] for gt in default_visible)
-        self.visible_zygosity_counts = {}
-        for gt, label in Zygosity.CHOICES:
-            checked = gt in default_visible or not has_defaults
-            self.visible_zygosity_counts[gt] = (label, checked, self.visible_zygosity_counter[gt])
-
-        self.hidden_samples_details = {}
-        if self.has_hidden_samples:
-            self.hidden_samples_details = {"num_observations": self.num_observations,
-                                           "num_visible_observations": self.num_visible_observations,
-                                           "num_invisible_observations": self.num_invisible_observations}
-
-        self.locus_counts_df = self._get_locus_counts(variant.pk, self.locus_counter)
-        self.patient_ids = self.locus_patients[variant.pk]
-
-    @property
-    def has_phenotype_match_graphs(self):
-        patients_qs = Patient.objects.filter(pk__in=self.patient_ids)
-        return patients_qs.filter(**{PATIENT_TPM_PATH + "__isnull": False}).exists()
-
-    @cached_property
-    def has_unknown_zygosity(self):
-        return 'Unknown' in self.locus_counts_df.columns
+    def _get_g_hgvs(self) -> Optional[str]:
+        """ Only used to name the CSV export - reference variants have to generate it, which needs
+            annotation the deployment may not have, and that's not worth losing the samples over """
+        try:
+            return VariantAnnotation.get_hgvs_g(self.variant)
+        except Exception:  # pylint: disable=broad-except
+            log_traceback()
+            return None
 
     @staticmethod
-    def _get_locus_counts(this_variant_id, locus_counter):
-        variants_qs = Variant.objects.filter(pk__in=locus_counter.keys())
-        variant_by_id = {v.pk: v for v in variants_qs}
-        zygosity_display = dict(Zygosity.CHOICES)
+    def _row_to_json(row: dict) -> dict:
+        sample_id = row["sample"]
+        return {
+            "genome_build": row["genome_build"],
+            "sample": sample_id,
+            "sample_name": row["sample__name"],
+            "sample_url": reverse("view_sample", kwargs={"sample_id": sample_id}),
+            "patient": row["sample__patient"],  # Phenotype graphs count distinct patients, not samples
+            "vcf": row["sample__vcf__name"],
+            "zygosity": row["zygosity"],
+            "allele_frequency": row["allele_frequency"],
+            "allele_depth": row["allele_depth"],
+            "read_depth": row["read_depth"],
+            "phred_likelihood": row["phred_likelihood"],
+            "filters": row["filters"],
+            "sample_filters": row["sample_filters"],
+            "enrichment_kit": row["sample__" + SAMPLE_ENRICHMENT_KIT_PATH],
+            "patient_hpo": row["patient_hpo"],
+            "patient_omim": row["patient_omim"],
+            "patient_mondo": row["patient_mondo"],
+        }
 
-        rows = []
-        for variant_id, zygosity_counts in locus_counter.items():
-            row = {"variant_id": variant_id,
-                   "variant": variant_by_id[variant_id],
-                   "description": '',
-                   "Total": 0}
+    def _get_locus_counts(self) -> list[dict]:
+        """ Zygosity counts for every variant at this locus, this variant first """
+        variant_by_id = {v.pk: v for v in Variant.objects.filter(pk__in=self.locus_counter)}
 
-            for z in zygosity_display.values():
-                row[z] = 0
+        sorted_rows = []
+        for variant_id, zygosity_counts in self.locus_counter.items():
+            v = variant_by_id[variant_id]
+            row = {
+                "variant_id": variant_id,
+                "variant": str(v),
+                "url": reverse("view_variant", kwargs={"variant_id": variant_id}),
+                "description": "",
+                "total": sum(zygosity_counts.values()),
+            }
+            for zygosity, label in LOCUS_COUNT_ZYGOSITY_LABELS:
+                row[label] = zygosity_counts[zygosity]
 
-            if variant_id == this_variant_id:
-                row["sort_order"] = 1
-                row["description"] = 'This variant'
+            if variant_id == self.variant.pk:
+                row["description"] = "This variant"
+                sort_order = 1
+            elif v.is_reference:
+                sort_order = 0
             else:
-                v = variant_by_id[variant_id]
-                if v.is_reference:
-                    row["sort_order"] = 0
-                else:
-                    row["sort_order"] = sum(map(ord, v.alt.seq))
+                sort_order = sum(map(ord, v.alt.seq))
+            sorted_rows.append((sort_order, row))
 
-            for z, count in zygosity_counts.items():
-                zyg_display = zygosity_display[z]
-                row[zyg_display] = row.get(zyg_display, 0) + count
-                row["Total"] += count
+        sorted_rows.sort(key=lambda sort_order_row: sort_order_row[0])
+        return [row for _, row in sorted_rows]
 
-            rows.append(row)
-
-        df = pd.DataFrame.from_records(rows)
-        if rows:
-            df = df.sort_values("sort_order")
-        return df
+    def _get_multiallelic(self) -> list[dict]:
+        """ Variants that were split off this one's VCF record onto another locus """
+        by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(self.variant)
+        multiallelic = []
+        for old_multiallelic, variants in by_multiallelic.items():
+            variant_list = [{"id": v.pk, "label": str(v), "url": v.get_absolute_url()}
+                            for v in sorted(variants, key=lambda v: v.pk)]
+            multiallelic.append({"multiallelic": old_multiallelic, "variants": variant_list})
+        return multiallelic

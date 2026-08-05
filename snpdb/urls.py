@@ -169,6 +169,8 @@ urlpatterns = [
     path('api/quad/<pk>', views_rest.QuadView.as_view(), name='api_view_quad'),
     path('api/variant_allele_for_variant/<int:variant_id>/<genome_build_name>',
          views_rest.VariantAlleleForVariantView.as_view(), name='variant_allele_for_variant'),
+    path('api/variant_sample_genotypes/<int:variant_id>',
+         views_rest.VariantSampleGenotypesView.as_view(), name='variant_sample_genotypes'),
     path('api/project/create', views_rest.ProjectViewSet.as_view({"post": "create"}), name='api_project_create'),
     # Schema/docs moved to drf-spectacular at /api/schema and /api/docs (see variantgrid/urls.py)
     path_standard("docs/", RedirectView.as_view(pattern_name="api-docs", permanent=True)),

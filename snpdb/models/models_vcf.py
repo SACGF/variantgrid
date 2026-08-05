@@ -292,18 +292,23 @@ class VCFFilter(models.Model):
         unique_together = (('vcf', 'filter_code'), ('vcf', 'filter_id'))
 
     @staticmethod
+    def get_code_lookup(vcf: VCF) -> dict[str, str]:
+        """ Filter codes are assigned per-VCF, so this can only decode that VCF's records """
+        return {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
+
+    @staticmethod
+    def format_filter_codes(lookup: dict[str, str], filter_string: Optional[str]) -> str:
+        """ Empty/null means the record passed all of the VCF's filters """
+        if filter_string:
+            return ','.join(lookup.get(f, f) for f in filter_string)
+        return "PASS"
+
+    @staticmethod
     def get_formatter(vcf: VCF):
-        lookup = {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
+        lookup = VCFFilter.get_code_lookup(vcf)
 
         def filter_string_formatter(row, field):
-            if filter_string := row[field]:
-                formatted_filters = []
-                for f in filter_string:
-                    formatted_filters.append(lookup[f])
-                formatted_filters = ','.join(formatted_filters)
-            else:
-                formatted_filters = "PASS"
-            return formatted_filters
+            return VCFFilter.format_filter_codes(lookup, row[field])
 
         return filter_string_formatter
 
