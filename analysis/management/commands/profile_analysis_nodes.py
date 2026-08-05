@@ -261,7 +261,7 @@ class Command(BaseCommand):
         Parents in (threshold_current, threshold_bumped] are the experiment candidates.
 
         Backwards-compat: only touches stable APIs (parent.count, get_non_empty_parents).
-        Doesn't reference get_parent_pks / cache_memoize / the substitution helper, which
+        Doesn't reference get_cached_node_pks / cache_memoize / the substitution helper, which
         only exist on post-#546 code.
         """
         rows = []

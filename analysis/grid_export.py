@@ -10,11 +10,13 @@ from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
 from library.django_utils.jqgrid_view import grid_export_csv
 from library.genomics.vcf_writer import VCFWriter
-from library.utils import StashFile
+from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
 from snpdb.models import Sample, VariantGridColumn
 from snpdb.vcf_export_columns import COLUMN_VCF_INFO
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
+
+TRANSCRIPT_REPLACE_BATCH_SIZE = 1000
 
 
 def node_grid_get_export_iterator(request, node, export_type, canonical_transcript_collection=None,
@@ -40,7 +42,7 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
 
     if canonical_transcript_collection:
         basename += f"_{canonical_transcript_collection}"
-        items = _replace_transcripts_iterator(request, grid, canonical_transcript_collection, items)
+        items = _replace_transcripts_iterator(grid, canonical_transcript_collection, items)
 
     items = format_items_iterator(sample_ids, items, variant_tags_dict)
 
@@ -237,8 +239,12 @@ def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] =
         yield item
 
 
-def _replace_transcripts_iterator(request, grid, ctc: CanonicalTranscriptCollection, items):
-    """ This uses a large amount of RAM - reading a whole  """
+def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items):
+    """ Overwrite the representative ('pick') variantannotation__ values with the canonical transcript ones.
+
+        Transcript rows are looked up in batches of variant IDs taken off the streamed items, so we hit the
+        (version, variant, transcript_version) index directly rather than re-running the node queryset as an
+        'IN' subquery, and only hold one batch in RAM """
 
     variant_transcript_annotation_variant_id_field = "variant_id"
 
@@ -256,30 +262,27 @@ def _replace_transcripts_iterator(request, grid, ctc: CanonicalTranscriptCollect
                 transcript_replace_fields[suffix] = f
 
     # We only need things from VariantTranscriptAnnotation - so join there directly
-    variants_qs = grid.get_queryset(request).values_list("id")
     version = grid.node.analysis.annotation_version.variant_annotation_version
     ct_qs = ctc.canonicaltranscript_set
     transcript_versions = ct_qs.values_list("transcript_version", flat=True)
-    vta_qs = VariantTranscriptAnnotation.objects.filter(version=version, variant__in=variants_qs,
-                                                        transcript_version__in=transcript_versions)
-    transcript_values = vta_qs.values(*transcript_replace_fields.keys())
 
-    # Read into a massive dictionary
-    transcript_items_by_id = {}
+    def _transcript_items_by_id(variant_ids: list[int]) -> dict[int, dict]:
+        vta_qs = VariantTranscriptAnnotation.objects.filter(version=version, variant__in=variant_ids,
+                                                           transcript_version__in=transcript_versions)
 
-    def transcript_items():
-        for transcript_data in transcript_values:
-            transcript_item = {}
-            for before, after in transcript_replace_fields.items():
-                transcript_item[after] = transcript_data[before]
-            yield transcript_item
+        def transcript_items():
+            for transcript_data in vta_qs.values(*transcript_replace_fields.keys()):
+                transcript_item = {}
+                for before, after in transcript_replace_fields.items():
+                    transcript_item[after] = transcript_data[before]
+                yield transcript_item
 
-    for item in grid.iter_format_items(transcript_items()):
-        transcript_items_by_id[item["id"]] = item
+        return {item["id"]: item for item in grid.iter_format_items(transcript_items())}
 
     # Loop through items and changeroo
-    for item in items:
-        variant_id = item["id"]
-        if transcript_data := transcript_items_by_id.get(variant_id):
-            item.update(transcript_data)
-        yield item
+    for batch in iter_fixed_chunks(items, TRANSCRIPT_REPLACE_BATCH_SIZE):
+        transcript_items_by_id = _transcript_items_by_id([item["id"] for item in batch])
+        for item in batch:
+            if transcript_data := transcript_items_by_id.get(item["id"]):
+                item.update(transcript_data)
+            yield item

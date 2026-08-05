@@ -530,15 +530,17 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return arg_q_dict
 
     @staticmethod
-    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda p: (p.pk, p.version))
-    def get_parent_pks(parent) -> list:
+    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda n: (n.pk, n.version))
+    def get_cached_node_pks(node) -> list:
+        """ Materialised variant PKs for a node small enough to hold them - the source for explicit-PK
+            substitution (@see get_small_parent_arg_q_dict) and the grid export """
         max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        if parent.count is None or parent.count > max_size:
+        if node.count is None or node.count > max_size:
             raise ValueError(
-                f"get_parent_pks: refusing to cache {parent} PKs "
-                f"(count={parent.count}, max={max_size})"
+                f"get_cached_node_pks: refusing to cache {node} PKs "
+                f"(count={node.count}, max={max_size})"
             )
-        return list(parent.get_queryset().values_list("pk", flat=True))
+        return list(node.get_queryset().values_list("pk", flat=True))
 
     @staticmethod
     def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
@@ -551,7 +553,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             which case callers fall back to parent.get_arg_q_dict(). """
         max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
         if max_size and parent.count is not None and parent.count <= max_size:
-            variant_ids = AnalysisNode.get_parent_pks(parent)
+            variant_ids = AnalysisNode.get_cached_node_pks(parent)
             q = Q(pk__in=variant_ids)
             return {None: {q: q}}
         return None

@@ -10,7 +10,7 @@ from auditlog.models import LogEntry
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Max, F, Q, QuerySet
+from django.db.models import Max, F, Q, QuerySet, Case, When, Value, IntegerField
 from django.db.models.functions import Substr
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -353,11 +353,36 @@ class ExportVariantGrid(VariantGrid):
             contig_items = items.filter(locus__contig=contig).iterator()
             yield from contig_items
 
+    def _get_export_variant_ids(self) -> Optional[list[int]]:
+        """ Explicit-PK substitution for small nodes @see AnalysisNode.get_cached_node_pks.
+            None means the node is too big (or its count is unknown) to materialise """
+        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
+        if max_size and self.node.count is not None and self.node.count <= max_size:
+            return AnalysisNode.get_cached_node_pks(self.node)
+        return None
+
+    @staticmethod
+    def _iter_by_variant_ids(genome_build, items, variant_ids):
+        """ Known PKs bound the work, so the annotation joins only run for those rows - one query, no timeout
+            risk. Ordered by contig then position to match the genomic order _iter_by_contigs produces """
+        standard_contigs = list(genome_build.standard_contigs)
+        contig_order = Case(*[When(locus__contig=contig, then=Value(i)) for i, contig in enumerate(standard_contigs)],
+                            output_field=IntegerField())
+        items = items.filter(pk__in=variant_ids, locus__contig__in=standard_contigs)
+        items = items.annotate(contig_export_order=contig_order)
+        return items.order_by("contig_export_order", "locus__position").iterator()
+
     def paginate_items(self, request, items):
         # This is the step after queryset is sorted
-        # We want everything, but will retrieve contig at a time to reduce DB query
+        # We want everything, but retrieve a contig at a time so each query stays under the statement timeout -
+        # the node queryset joined to variant annotation is too slow to run across the whole genome in one go.
+        # Small nodes skip that by substituting their (cached) variant PKs, which bounds the query instead.
         genome_build = self.node.analysis.genome_build
-        items = self._iter_by_contigs(genome_build, items)
+        variant_ids = self._get_export_variant_ids()
+        if variant_ids is not None:
+            items = self._iter_by_variant_ids(genome_build, items, variant_ids)
+        else:
+            items = self._iter_by_contigs(genome_build, items)
         # items = self._iter_time(items)
         return None, None, items
 
