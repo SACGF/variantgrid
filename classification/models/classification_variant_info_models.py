@@ -198,7 +198,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         variant = self.variant
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
 
         result = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
         c_hgvs = result.hgvs_variant.format()
@@ -764,7 +764,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         message = None
         genome_build = self.imported_genome_build_patch_version.genome_build
         use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
-        hgvs_matcher = HGVSMatcher(genome_build)
+        hgvs_matcher = HGVSMatcher.instance(genome_build)
         hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         version = hgvs_matcher.hgvs_converter.get_version()
         used_converter_type = hgvs_converter_type

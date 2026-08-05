@@ -2172,7 +2172,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def _generate_c_hgvs(self, genome_build: GenomeBuild) -> str:
         variant = self.get_variant_for_build(genome_build)
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
 
         c_hgvs: str = None
         if variant:

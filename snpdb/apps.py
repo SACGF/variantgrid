@@ -34,6 +34,7 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals import clinvar_export_search
         from snpdb.signals import scv_search
         from snpdb.signals import genomics_search
+        from snpdb.signals import common_variants_classification_changed
         # pylint: enable=import-outside-toplevel,unused-import
 
         backend_vcf_import_success_signal.connect(backend_vcf_import_success_handler)

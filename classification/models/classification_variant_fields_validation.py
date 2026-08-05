@@ -191,7 +191,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
             genome_build = None
 
         if genome_build:
-            hgvs_matcher = HGVSMatcher(genome_build)
+            hgvs_matcher = HGVSMatcher.instance(genome_build)
             for evidence_key, variant_value in variant_values.items():
                 try:
                     if evidence_key in SpecialEKeys.VARIANT_LINKING_HGVS_KEYS:

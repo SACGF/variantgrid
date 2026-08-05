@@ -205,7 +205,7 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
     """ annotation_version is optional (defaults to latest for genome build) """
 
     data = AutopopulateData("basic variant")
-    hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+    hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
     clingen_allele = None
     if variant:
         clingen_allele, evidence_value, message = get_clingen_allele_and_evidence_value_for_variant(genome_build, variant)
