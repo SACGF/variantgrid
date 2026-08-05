@@ -19,7 +19,7 @@ from genes.models import CanonicalTranscript, GeneList, GeneSymbol, \
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import update_dict_of_dict_values, JsonDataType
+from library.utils import update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import UserSettings, Q, VariantGridColumn, Tag, ImportStatus
@@ -365,19 +365,13 @@ class GeneSymbolWikiColumns(DatatableConfig[GeneSymbolWiki]):
         self.download_csv_button_enabled = True
 
         self.rich_columns = [
-            RichColumn('gene_symbol', orderable=True,
-                       renderer=self.render_gene_symbol, client_renderer="renderGeneSymbol"),
+            RichColumn('gene_symbol', orderable=True, client_renderer="renderGeneSymbol"),
             RichColumn('markdown'),
             RichColumn('last_edited_by__username', name='user', orderable=True),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn('modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
         ]
-
-    @staticmethod
-    def render_gene_symbol(row: dict[str, Any]) -> JsonDataType:
-        gene_symbol = row["gene_symbol"]
-        return {"id": gene_symbol}
 
     def get_initial_queryset(self) -> QuerySet[GeneSymbolWiki]:
         return GeneSymbolWiki.objects.all()
