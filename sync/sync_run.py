@@ -1,7 +1,10 @@
+from typing import Optional
+
 from sync.alissa import *  # to get decorators to register
 from sync.models import SyncStatus
+from sync.models.models import SyncDestination, SyncRun
 from sync.shariant import *  # to get decorators to register
-from sync.sync_runner import sync_runner_for_destination
+from sync.sync_runner import sync_runner_for_destination, SyncRunInstance
 
 
 def run_sync(sync_destination: SyncDestination, full_sync: bool = False, max_rows: Optional[int] = None) -> SyncRun:

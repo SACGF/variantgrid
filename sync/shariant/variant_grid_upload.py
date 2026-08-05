@@ -1,5 +1,5 @@
 import socket
-from typing import Iterable, TypeVar, Union
+from typing import Iterable, Optional, TypeVar, Union
 
 from django.db.models import QuerySet
 
@@ -9,7 +9,6 @@ from classification.models.classification import ClassificationModification
 from classification.models.classification_utils import ClassificationJsonParams
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
-from library.oauth import ServerAuth
 from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
@@ -62,18 +61,24 @@ def batch_iterator_end(iterable: Iterable[T], batch_size: int = 10) -> Iterable[
 @register_sync_runner(config={"type": {"shariant", "variantgrid"}, "direction": "upload"})
 class VariantGridUploadSyncer(SyncRunner):
 
-    def __init__(self, sync_destination: SyncDestination):
+    def __init__(self):
+        self.sync_destination: Optional[SyncDestination] = None
+        self.filters = {}
+        self.lab_mappings = {}
+        self.share_level_mappings = {}
+        self.user_mappings = {}
+        self.historical_converter = HistoricalEKeyConverter()
+
+    def configure(self, sync_destination: SyncDestination):
         self.sync_destination = sync_destination
 
-        config = self.sync_destination.config
+        config = sync_destination.config
         self.filters = config.get('filters', {})
         mapping = config.get('mapping', {})
 
-        self.shariant = ServerAuth.for_sync_details(sync_destination.sync_details)
         self.lab_mappings = mapping.get('labs', {})
         self.share_level_mappings = mapping.get('share_levels', {})
         self.user_mappings = mapping.get('users', {})
-        self.historical_converter = HistoricalEKeyConverter()
 
     def records_to_sync(self, apply_filters: bool = True, full_sync: bool = False) -> QuerySet[ClassificationModification]:
         qs = ClassificationModification.objects.filter(
@@ -131,6 +136,7 @@ class VariantGridUploadSyncer(SyncRunner):
         return formatted_json
 
     def sync(self, sync_run_instance: SyncRunInstance):
+        self.configure(sync_run_instance.sync_destination)
         qs = self.records_to_sync(full_sync=sync_run_instance.full_sync)
 
         rows_uploaded = 0
