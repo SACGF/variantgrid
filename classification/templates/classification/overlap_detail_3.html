@@ -104,7 +104,7 @@
                         <tr><td colspan="6" style="text-align: center; font-weight: 600">Cross Context Records</td></tr>
                         {% endif %}
                     {% endifchanged %}
-                    <tr class="{% if overlap_entry.is_cross_context or overlap_entry.overlap_contribution.possibly_outdated %}cross-context-row{% elif overlap_entry.is_user_lab %}users-row{% endif %}">
+                    <tr class="{% if overlap_entry.is_cross_context %}cross-context-row{% elif overlap_entry.is_user_lab %}users-row{% endif %}">
                         <td>
                             {% lab overlap_entry.overlap_contribution.lab_like is_your_lab=overlap_entry.is_user_lab lab_css="font-weight:500" %}
                             <div>{% testing_context overlap_entry.overlap_contribution style="subtle" %}</div>
@@ -115,11 +115,6 @@
                                 {% with classification=overlap_entry.overlap_contribution.classification_grouping.latest_classification_modification.classification %}
                                     <a class="hover-link" href="{{ classification.get_absolute_url }}">{{ classification.cr_lab_id }}</a>
                                 {% endwith %}
-                            {% endif %}
-                            {% if overlap_entry.overlap_contribution.possibly_outdated %}
-                                <div>
-                                    <span class="hover-detail" title="A lab has submitted a classification more recently than this ClinVar Expert Panel. This record is ignored for calculations">{{ 'W' | severity_icon }} Possibly Outdated</span>
-                                </div>
                             {% endif %}
                         </td>
                         <td>

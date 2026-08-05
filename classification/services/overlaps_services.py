@@ -35,7 +35,7 @@ from snpdb.utils import LabNotificationBuilder
 class OverlapServices:
 
     @staticmethod
-    def update_classification_grouping_overlap_contribution(classification_grouping: ClassificationGrouping, migration: bool = False):
+    def update_classification_grouping_overlap_contribution(classification_grouping: ClassificationGrouping, migration: bool = False, recalc_overlaps: bool = True):
         if classification_grouping.testing_context in {TestingContextBucket.OTHER, TestingContextBucket.UNKNOWN}:
             # no overlaps for other
             return
@@ -96,14 +96,15 @@ class OverlapServices:
                 # make sure this is added to or creates the relevant overlaps
                 overlap_contribution.refresh_from_db()
 
-            # now update status of any created overlaps or existing linked overlaps
-            for overlap in overlap_contribution.overlaps:
-                # FIXME, should mark the overlap as dirty instead so overlap can be batch
-                OverlapServices.recalc_overlap(overlap)
-                OverlapServices.update_skews(overlap)
+            if recalc_overlaps:
+                # now update status of any created overlaps or existing linked overlaps
+                for overlap in overlap_contribution.overlaps:
+                    # FIXME, should mark the overlap as dirty instead so overlap can be batch
+                    OverlapServices.recalc_overlap(overlap)
+                    OverlapServices.update_skews(overlap)
 
     @staticmethod
-    def update_clinvar_overlap_contribution(clinvar_record_collection: ClinVarRecordCollection, migrate: bool = False):
+    def update_clinvar_overlap_contribution(clinvar_record_collection: ClinVarRecordCollection, migrate: bool = False, recalc_overlap=True):
         # TODO - code assumes that ClinVarRecordCollection is just for Germline
         # need to fix that when we get other expert panels
 
@@ -145,8 +146,12 @@ class OverlapServices:
                 )
 
                 OverlapServices.link_overlap_contribution(contribution)
-                for skew in contribution.overlapcontributionskew_set.select_related('overlap').all():
-                    OverlapServices.recalc_overlap(skew.overlap)
+                if recalc_overlap:
+                    overlaps = set()
+                    for skew in contribution.overlapcontributionskew_set.select_related('overlap').all():
+                        overlaps.add(skew.overlap)
+                    for overlap in overlaps:
+                        OverlapServices.recalc_overlap(overlap)
         else:
             # there's a chance an ExpertPanel has been removed, but extremely unlikely
             if once_expert := OverlapContribution.objects.filter(allele=clinvar_record_collection.allele,
@@ -282,37 +287,8 @@ class OverlapServices:
         )
 
     @staticmethod
-    def _check_clinvar_dates(overlap: Overlap):
-        """
-        Check to see if the Overlap has both ClassificationGroupings and ClinVar expert panels.
-        If the ClinVar expert panel is older than ClassificationGrouping, ignore it for the calculations
-        by marking it as possibly_outdated
-        """
-
-        if overlap.overlap_type == OverlapType.SINGLE_CONTEXT:
-            latest_effective_date: Optional[EffectiveDate] = None
-            clinvar_records: list[OverlapContribution] = []
-            for contribution in overlap.contributions_list:
-                if contribution.classification_grouping is not None:
-                    contribution_date = contribution.effective_date_obj
-                    if not latest_effective_date or (contribution_date > latest_effective_date):
-                        latest_effective_date = contribution_date
-                else:
-                    clinvar_records.append(contribution)
-
-            if latest_effective_date and clinvar_records:
-                for clinvar_record in clinvar_records:
-                    possibly_outdated = clinvar_record.effective_date_obj < latest_effective_date
-                    if clinvar_record.possibly_outdated != possibly_outdated:
-                        clinvar_record.possibly_outdated = possibly_outdated
-                        clinvar_record.save()
-            # end marking ClinVar records old if there's
-
-    @staticmethod
     def recalc_overlap(overlap: Overlap):
         calculator = calculator_for_value_type(overlap.value_type)
-
-        OverlapServices._check_clinvar_dates(overlap)
 
         overlap_status_calculation = calculator.calculate_entries(overlap.contributions_list)
 
@@ -579,12 +555,12 @@ class OverlapGrouping3:
 
         change_rows: list[ChangeRow] = []
 
-        for triage in self.overlap.contributions_all:
-            triage_log: list[LogEntry] = list(LogEntry.objects.get_for_object(triage).order_by('timestamp').all())
+        for contribution in self.overlap.contributions_all:
+            contribution_log: list[LogEntry] = list(LogEntry.objects.get_for_object(contribution).order_by('timestamp').all())
 
             buffer: list[LogEntry] = []
             time_buffer = False
-            for index, entry in enumerate(triage_log):
+            for index, entry in enumerate(contribution_log):
 
                 is_new_record = False
                 if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
@@ -606,8 +582,8 @@ class OverlapGrouping3:
                         continue
 
                 if time_buffer or not buffer:
-                    if index + 1 < len(triage_log):
-                        next_log = triage_log[index + 1]
+                    if index + 1 < len(contribution_log):
+                        next_log = contribution_log[index + 1]
                         use_timestamp = buffer[0] if buffer else entry
                         # buffer events that happen within 1 seconds - catches knock on effects
                         if next_log.timestamp - use_timestamp.timestamp < timedelta(seconds=1):
@@ -646,7 +622,7 @@ class OverlapGrouping3:
                 if contribution_status_change := latest_values.get("contribution_status"):
                     if not is_new_record and contribution_status_change[1] == OverlapContributionStatus.NO_VALUE:
                         change_rows.append(ChangeRow(
-                            overlap_contribution=triage,
+                            overlap_contribution=contribution,
                             user=entry.actor,
                             changes=[],
                             comment=None,
@@ -658,8 +634,8 @@ class OverlapGrouping3:
                         continue
 
                 for key, value_list in latest_values.items():
-                    old_value = OverlapGrouping3.tidy_change(triage, key, value_list[0])
-                    new_value = OverlapGrouping3.tidy_change(triage, key, value_list[1])
+                    old_value = OverlapGrouping3.tidy_change(contribution, key, value_list[0])
+                    new_value = OverlapGrouping3.tidy_change(contribution, key, value_list[1])
 
                     if key == "comment":
                         if new_value:
@@ -678,7 +654,7 @@ class OverlapGrouping3:
 
                     user: Optional[User] = entry.actor
                     change_row = ChangeRow(
-                        overlap_contribution=triage,
+                        overlap_contribution=contribution,
                         user=user,
                         changes=list(sorted(field_changes)),
                         comment=comment,

@@ -1,16 +1,21 @@
+from typing import Optional
+
 from auditlog.context import disable_auditlog, set_extra_data
 from django.core.management import BaseCommand
 from django.db.models import F
 
 from annotation.models import ClinVarRecordCollection
+from annotation.models.data_enums import EffectiveDate
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from classification.enums import TestingContextBucket, OverlapStatus, OverlapType
+from classification.enums import TestingContextBucket, OverlapStatus, OverlapType, SpecialEKeys, \
+    OverlapEntrySourceTextChoices, ShareLevel, AlleleOriginBucket
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
     DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \
-    ClassificationFlagTypes
+    ClassificationFlagTypes, ClassificationModification
 from classification.enums.overlaps_enums import OverlapContributionStatus, TriageState, \
     TriageStatus
+from classification.services.overlap_calculator import calculator_for_value_type
 from classification.services.overlaps_services import OverlapServices
 from snpdb.models import Allele
 
@@ -19,8 +24,6 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--recalc', required=False, action="store_true"),
-        parser.add_argument('--migrate', required=False, action="store_true",
-                            help="Migrates legacy data to new format - work in progress")
         parser.add_argument('--full_reset', required=False, action="store_true",
                             help="Deletes all Overlaps and OverlapContributions and creates them from scratch")
         parser.add_argument("--recalc_skews", required=False, action="store_true", help="Updates what each lab's perspective of the Overlap is")
@@ -32,9 +35,6 @@ class Command(BaseCommand):
             self.recalc_overlaps()
         elif options["full_reset"]:
             self.full_reset(args, options)
-        elif options["migrate"]:
-            self.populate_overlap_change_date()
-            self.migrate_discordance_reports(args, options)
         elif options["recalc_skews"]:
             self.recalc_skews()
         elif options["max_status"]:
@@ -55,17 +55,14 @@ class Command(BaseCommand):
         Overlap.objects.all().delete()
         OverlapContribution.objects.all().delete()
 
-        for cg in ClassificationGrouping.objects.iterator():
-            OverlapServices.update_classification_grouping_overlap_contribution(cg, migration=True)
-
-        self.make_clinvar_expert_panel_contributions()
-
-        print(f"Overlap Count = {Overlap.objects.count()}")
-        print(f"Overlap Contribution Count = {OverlapContribution.objects.count()}")
-
-        self.populate_overlap_change_date()
+        self.populate_overlap_history()
         self.migrate_discordance_reports(args, options)
         self.populate_max_status()
+        self.make_clinvar_expert_panel_contributions()
+
+        for overlap in Overlap.objects.all().iterator():
+            OverlapServices.recalc_overlap(overlap)
+            OverlapServices.update_skews(overlap)
 
     def populate_max_status(self, *args, **options):
         alleles_with_discordance_reports: dict[Allele, OverlapStatus] = {}
@@ -177,36 +174,96 @@ class Command(BaseCommand):
                 if is_continued_discordance:
                     OverlapServices.recalc_overlap(overlap)
 
-    def populate_overlap_change_date(self):
-        # timestamp on overlaps
-        with disable_auditlog():
-            for overlap in Overlap.objects.all().iterator():
-                # note we're looking for the latest published date of a classification here
-                # as the upload date is when a discordance would occur
-                latest_date = None
-                for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
-                    if grouping := contribution.classification_grouping:
-                        for mod in grouping.classification_modifications:
-                            latest_mod_date = mod.created
-                            if latest_date is None or latest_mod_date > latest_date:
-                                latest_date = latest_mod_date
+    # def populate_overlap_change_date(self):
+    #     # timestamp on overlaps
+    #     with disable_auditlog():
+    #         for overlap in Overlap.objects.all().iterator():
+    #             # note we're looking for the latest published date of a classification here
+    #             # as the upload date is when a discordance would occur
+    #             latest_date = None
+    #             for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
+    #                 if grouping := contribution.classification_grouping:
+    #                     for mod in grouping.classification_modifications:
+    #                         latest_mod_date = mod.created
+    #                         if latest_date is None or latest_mod_date > latest_date:
+    #                             latest_date = latest_mod_date
+    #
+    #             if latest_date:
+    #                 overlap.overlap_status_change_timestamp = latest_date
+    #                 overlap.save(update_fields=["overlap_status_change_timestamp"])
+    #
+    #         # dates on overlap contributions
+    #         for overlap_contribution in OverlapContribution.objects.filter(effective_date__date=None).iterator():
+    #             if grouping := overlap_contribution.classification_grouping:
+    #                 if latest_modification := grouping.latest_classification_modification:
+    #                     date_check = latest_modification.curated_date_check
+    #                     overlap_contribution.effective_date_obj = date_check.to_effective_date
+    #                     print(overlap_contribution.effective_date)
+    #                     overlap_contribution.save(update_fields=["effective_date"])
 
-                if latest_date:
-                    overlap.overlap_status_change_timestamp = latest_date
-                    overlap.save(update_fields=["overlap_status_change_timestamp"])
+    def populate_overlap_history(self):
+        for grouping in ClassificationGrouping.objects.iterator():
+            value_types = [ClassificationResultValue.ONC_PATH]
+            if grouping.allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+                value_types = [ClassificationResultValue.ONC_PATH, ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE]
+            for value_type in value_types:
+                calc = calculator_for_value_type(value_type)
+                all_classifications = grouping.classificationgroupingentry_set.values_list("classification", flat=True)
+                all_modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, published=True, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by('created')
 
-            # dates on overlap contributions
-            for overlap_contribution in OverlapContribution.objects.filter(effective_date__date=None).iterator():
-                if grouping := overlap_contribution.classification_grouping:
-                    if latest_modification := grouping.latest_classification_modification:
-                        date_check = latest_modification.curated_date_check
-                        overlap_contribution.effective_date_obj = date_check.to_effective_date
-                        print(overlap_contribution.effective_date)
-                        overlap_contribution.save(update_fields=["effective_date"])
+                overlap_contribution: Optional[OverlapContribution] = None
+                last_value: Optional[str] = None
+                last_curation_date: Optional[EffectiveDate] = None
+                for modification in all_modifications.iterator():
+                    this_value = None
+                    if value_type == ClassificationResultValue.ONC_PATH:
+                        this_value = modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+                    elif value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
+                        this_value = modification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+
+                    if this_value is None:
+                        continue # don't log uncurated variants
+
+                    this_curation_date = modification.curated_date_check.to_effective_date
+                    if last_curation_date and last_curation_date > this_curation_date:
+                        # don't go backwards with curation dates
+                        continue
+
+                    this_modification_date = modification.created
+
+                    if this_value != last_value or this_curation_date != last_curation_date:
+                        contribution_status = OverlapContributionStatus.CONTRIBUTING if calc.is_comparable_value(this_value) else OverlapContributionStatus.NON_COMPARABLE_VALUE
+                        audit_context = {"migration": True, "timestamp": this_modification_date}
+                        with set_extra_data(audit_context):
+                            if not overlap_contribution:
+                                overlap_contribution = OverlapContribution.objects.create(
+                                    source=OverlapEntrySourceTextChoices.CLASSIFICATION,
+                                    allele=grouping.allele,
+                                    classification_grouping=grouping,
+                                    testing_context_bucket=grouping.testing_context,
+                                    tumor_type_category=grouping.tumor_type_category,
+                                    value_type=value_type,
+                                    value=this_value,
+                                    contribution_status=contribution_status,
+                                    effective_date=this_curation_date.to_dict()
+                                )
+                                OverlapServices.link_overlap_contribution(overlap_contribution)
+                            else:
+                                overlap_contribution.value = this_value
+                                overlap_contribution.contribution_status = contribution_status
+                                overlap_contribution.effective_date_obj = this_curation_date
+                                overlap_contribution.save()
+
+                        last_value = this_value
+                        last_curation_date = this_curation_date
+
+            # This will make it so we still create OverlapContributions for unshared records
+            # as well as making sure the data we end up with matches the migration script
+            OverlapServices.update_classification_grouping_overlap_contribution(grouping, migration=True, recalc_overlaps=False)
 
     def make_clinvar_expert_panel_contributions(self):
         # only check already made ClinVarRecord collections in sync
         for clinvar_record_collection in ClinVarRecordCollection.objects.filter(
                 max_stars__gte=CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE, allele__isnull=False):
             if clinvar_record_collection.expert_panel is not None:
-                OverlapServices.update_clinvar_overlap_contribution(clinvar_record_collection, migrate=True)
+                OverlapServices.update_clinvar_overlap_contribution(clinvar_record_collection, migrate=True, recalc_overlap=False)
