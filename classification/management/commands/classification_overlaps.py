@@ -1,6 +1,7 @@
 from typing import Optional
 
 from auditlog.context import disable_auditlog, set_extra_data
+from auditlog.models import LogEntry
 from django.core.management import BaseCommand
 from django.db.models import F
 
@@ -16,7 +17,8 @@ from classification.models import ClassificationGrouping, Overlap, OverlapContri
 from classification.enums.overlaps_enums import OverlapContributionStatus, TriageState, \
     TriageStatus
 from classification.services.overlap_calculator import calculator_for_value_type
-from classification.services.overlaps_services import OverlapServices
+from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
+from library.guardian_utils import admin_bot
 from snpdb.models import Allele
 
 
@@ -193,23 +195,22 @@ class Command(BaseCommand):
             for overlap in Overlap.objects.all().iterator():
                 # note we're looking for the latest published date of a classification here
                 # as the upload date is when a discordance would occur
-                latest_date = None
-                for contribution in overlap.contributions.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
-                    if grouping := contribution.classification_grouping:
-                        for mod in grouping.classification_modifications:
-                            latest_mod_date = mod.created
-                            if latest_date is None or latest_mod_date > latest_date:
-                                latest_date = latest_mod_date
+                dates = []
+                for contribution in overlap.contributions_all:
+                    entry: LogEntry
+                    if entry := LogEntry.objects.get_for_object(contribution).order_by('-timestamp').first():
+                        dates.append(entry.timestamp)
 
                 if overlap.testing_context_bucket == TestingContextBucket.GERMLINE:
                     # if there are classification groupings
                     for dr in DiscordanceReport.objects.filter(clinical_context__allele=overlap.allele):
+                        dates.append(dr.modified)
                         for review in dr.reviews_all():
-                            if review.modified > latest_date:
-                                latest_date = review.modified
+                            dates.append(review.modified)
 
-                if latest_date:
-                    overlap.overlap_status_change_timestamp = latest_date
+                if dates:
+                    max_date = max(dates)
+                    overlap.overlap_status_change_timestamp = max_date
                     overlap.save(update_fields=["overlap_status_change_timestamp"])
 
 
