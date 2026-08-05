@@ -200,7 +200,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
     variant_ids_without_alleles = []
     variant_hgvs = []
 
-    hgvs_matcher = HGVSMatcher(genome_build)
+    hgvs_matcher = HGVSMatcher.instance(genome_build)
     num_existing_records = 0
     miv_qs = ModifiedImportedVariant.objects.filter(variant__in=variants)
     normalized_variants = set(miv_qs.values_list("variant_id", flat=True))

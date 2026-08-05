@@ -254,7 +254,7 @@ class VariantTranscriptSelections:
             if gene_symbol:
                 gene_symbols.add(gene_symbol)
 
-        hgvs_matcher = HGVSMatcher(self.genome_build)
+        hgvs_matcher = HGVSMatcher.instance(self.genome_build)
         kwargs = {
             "transcript__annotation_consortium": self.other_annotation_consortium,
             "genome_build": self.genome_build,

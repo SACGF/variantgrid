@@ -103,7 +103,7 @@ class VariantExtra:
 def variant_cosmic_search(search_input: SearchInputInstance):
     # Do via API as a full table scan takes way too long with big data
     for genome_build in search_input.genome_builds:
-        matcher = HGVSMatcher(genome_build)
+        matcher = HGVSMatcher.instance(genome_build)
         cosmic = CosmicAPI(search_input.search_string, genome_build)
         results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
         hgvs_by_variant_identifier: dict[str, list[str]] = defaultdict(list)
@@ -369,7 +369,7 @@ def search_variant_db_snp(search_input: SearchInputInstance):
     dbsnp = DbSNP.get(search_input.search_string)
 
     for genome_build in search_input.genome_builds:
-        matcher = HGVSMatcher(genome_build)
+        matcher = HGVSMatcher.instance(genome_build)
         for data in dbsnp.get_alleles_for_genome_build(genome_build):
             if hgvs_string := data.get("hgvs"):
                 search_message = SearchMessage(f'dbSNP "{search_input.search_string}" resolved to "{hgvs_string}"',
@@ -557,7 +557,7 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
 
 
 def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visible_variants: QuerySet, classify: bool = False) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
-    hgvs_matcher = HGVSMatcher(genome_build)
+    hgvs_matcher = HGVSMatcher.instance(genome_build)
     variant_qs = visible_variants
 
     # TODO, add genome build to more of the SearchMessages that are genome build specific

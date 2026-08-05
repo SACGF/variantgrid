@@ -22,7 +22,7 @@ def get_manual_variant_coordinates(mve: ManualVariantEntry) -> list[VariantCoord
                                                                      mve.entry_text):
             variant_coordinates.append(clingen_allele.get_variant_coordinate(mve.genome_build))
     elif mve.entry_type == ManualVariantEntryType.HGVS:
-        hgvs_matcher = HGVSMatcher(mve.genome_build)
+        hgvs_matcher = HGVSMatcher.instance(mve.genome_build)
         hgvs_string, search_messages = hgvs_matcher.clean_hgvs(mve.entry_text)
         if search_messages:
             mve.warning_message = "\n".join(search_messages)

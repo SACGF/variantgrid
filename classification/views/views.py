@@ -772,7 +772,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     refseq_transcript_accession = ""
     ensembl_transcript_accession = ""
-    matcher = HGVSMatcher(genome_build)
+    matcher = HGVSMatcher.instance(genome_build)
     hgvs_variant = matcher.create_hgvs_variant(hgvs_string)
     evidence = {}
     if hgvs_variant.transcript:
