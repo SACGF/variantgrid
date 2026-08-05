@@ -92,7 +92,7 @@ class OverlapCalculatorBase(ABC):
                     # see if it's ClinVar that's making the over discordant
                     non_clinvar_values = set(con.effective_value for con in interactive_contributors)
                     if third_party:
-                        clinvar_causing_discordant = len(non_clinvar_values) > 1 and not cls.calculate_status_for_multiple_entries(non_clinvar_values).is_discordant
+                        clinvar_causing_discordant = len(non_clinvar_values) == 1 or not cls.calculate_status_for_multiple_entries(non_clinvar_values).is_discordant
 
                         if clinvar_causing_discordant:
                             max_clinvar_date = max(con.effective_date_obj for con in third_party)
