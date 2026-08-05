@@ -6,11 +6,12 @@ RETIRED_TASK_ID = ManualOperation.task_id_manage(["fix_legacy_classification_ali
 _FVM = "manage*fix_variant_matching"
 
 
-def _test_has_legacy_allele_infos(apps):
-    """ Only deployments carrying HGVS resolution from before the cdot version was recorded can hold
-        matches made without alignment gap data """
+def _test_has_allele_infos(apps):
+    """ The command works out for itself which records (if any) still hold matching made without alignment
+        gap data - the converter version stamped on an ImportedAlleleInfo can't tell us, as it's re-stamped
+        by coordinate/c.hgvs recalculation without the matched variant being re-derived """
     ImportedAlleleInfo = apps.get_model("classification", "ImportedAlleleInfo")
-    return ImportedAlleleInfo.objects.filter(hgvs_converter_data_version="").exists()
+    return ImportedAlleleInfo.objects.exists()
 
 
 def complete_retired_task(apps, schema_editor):
@@ -40,6 +41,6 @@ class Migration(migrations.Migration):
         # classifications to them first, and the same data gates that step uses.
         ManualOperation.operation_manage(
             ["fix_legacy_imported_allele_info_alignment_gap"],
-            test=_test_has_legacy_allele_infos,
+            test=_test_has_allele_infos,
             requires=["cdot-current", "transcript-sequences-loaded", f"after:{_FVM} --extra"]),
     ]

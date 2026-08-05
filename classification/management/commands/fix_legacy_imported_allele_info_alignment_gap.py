@@ -2,10 +2,10 @@ from collections import defaultdict
 from typing import Optional
 
 from django.core.management import BaseCommand, CommandError
-from django.db.models import Q
 
 from classification.classification_import import reattempt_variant_matching
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
+from genes.hgvs import CHGVS
 from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from genes.models_enums import AnnotationConsortium
 from library.guardian_utils import admin_bot
@@ -18,21 +18,17 @@ class Command(BaseCommand):
         had no gap information, so anything resolved with it could be matched to the wrong variant
         coordinate - cdot data carries the gaps (@see TranscriptVersion.alignment_gap).
 
-        ImportedAlleleInfo caches HGVS resolution, so find the historical ones on gapped transcripts and
-        hard rematch them. Selection is deliberately a superset - an ImportedAlleleInfo only records the
-        cdot version it was resolved with from #1321 onwards, and re-resolving a record that was already
-        right lands on the same variant.
+        ImportedAlleleInfo caches HGVS resolution, so find the ones on gapped transcripts whose matched
+        variant disagrees with what current transcript data resolves to, and hard rematch those.
+
+        The converter version stamped on an ImportedAlleleInfo isn't evidence of how the variant was
+        matched - update_variant_coordinate/recalc_c_hgvs re-stamp it while leaving the matched variant
+        as it was, so the stored coordinate is compared against a fresh resolution instead.
     """
 
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true',
-                            help='Report the gapped transcripts and counts without rematching')
-
-    @staticmethod
-    def _imported_transcript_accession(allele_info: ImportedAlleleInfo) -> Optional[str]:
-        if c_hgvs := allele_info.imported_c_hgvs_obj:
-            return c_hgvs.transcript
-        return allele_info.imported_transcript
+                            help='Report the gapped transcripts and differences without rematching')
 
     def _gapped_transcript_version(self, genome_build: GenomeBuild, transcript_accession: str) \
             -> Optional[TranscriptVersion]:
@@ -58,6 +54,21 @@ class Command(BaseCommand):
                 print(f"Couldn't determine alignment gap for '{transcript_version.accession}': {e}")
         return None
 
+    @staticmethod
+    def _matching_out_of_date(allele_info: ImportedAlleleInfo) -> Optional[str]:
+        """ How the matched variant differs from what current transcript data resolves to, None if they agree """
+        genome_build = allele_info.imported_genome_build
+        new_coordinate = allele_info.calculate_variant_coordinate().variant_coordinate
+        if new_coordinate is None:
+            return None  # Can't resolve it now, so a rematch could only lose the match we have
+
+        if matched_variant := allele_info.matched_variant:
+            old_coordinate = matched_variant.coordinate
+            if old_coordinate.as_internal_symbolic(genome_build) != new_coordinate.as_internal_symbolic(genome_build):
+                return f"{old_coordinate} -> {new_coordinate}"
+            return None
+        return f"unmatched -> {new_coordinate}"
+
     def handle(self, *args, **options):
         if not TranscriptVersion.data_is_current_cdot_format():
             raise CommandError(
@@ -65,15 +76,16 @@ class Command(BaseCommand):
                 "'genome_builds' key), so there is no alignment gap data to compare against. "
                 "Run 'python3 manage.py import_cdot_latest' first.")
 
-        # No recorded cdot data version means we can't show it was resolved with gap aware transcript data
-        legacy_qs = ImportedAlleleInfo.objects.filter(Q(hgvs_converter_version__isnull=True) |
-                                                      Q(hgvs_converter_data_version=""))
+        genome_builds_by_name = {gb.name: gb for gb in GenomeBuild.builds_with_annotation()}
         allele_info_ids_by_transcript = defaultdict(list)
-        for allele_info in legacy_qs.iterator(chunk_size=1000):
-            if genome_build := allele_info.imported_genome_build:
-                if transcript_accession := self._imported_transcript_accession(allele_info):
-                    allele_info_ids_by_transcript[(genome_build, transcript_accession)].append(allele_info.pk)
-        print(f"{len(allele_info_ids_by_transcript)} transcripts to check from legacy ImportedAlleleInfo")
+        allele_info_values = ImportedAlleleInfo.objects.values_list(
+            "pk", "imported_c_hgvs", "imported_transcript", "imported_genome_build_patch_version__genome_build_id")
+        for pk, imported_c_hgvs, imported_transcript, genome_build_name in allele_info_values.iterator(chunk_size=10000):
+            if genome_build := genome_builds_by_name.get(genome_build_name):
+                transcript_accession = CHGVS(imported_c_hgvs).transcript if imported_c_hgvs else imported_transcript
+                if transcript_accession:
+                    allele_info_ids_by_transcript[(genome_build, transcript_accession)].append(pk)
+        print(f"{len(allele_info_ids_by_transcript)} transcripts used by ImportedAlleleInfo to check")
 
         # Batch retrieve sequence info, otherwise the gap check below falls back to a per-transcript
         # Entrez fetch (2-9s each) for every uncached RefSeq transcript
@@ -91,15 +103,23 @@ class Command(BaseCommand):
                                                                         entrez_batch_size=100,
                                                                         fail_on_error=False)
 
-        allele_info_ids_to_rematch = []
+        gapped_allele_info_ids = []
         for (genome_build, transcript_accession), allele_info_ids in allele_info_ids_by_transcript.items():
             if transcript_version := self._gapped_transcript_version(genome_build, transcript_accession):
                 print(f"{transcript_accession} ({genome_build}): {transcript_version.cdna_match_diff or 'gap'}"
-                      f" - {len(allele_info_ids)} to rematch")
-                allele_info_ids_to_rematch.extend(allele_info_ids)
+                      f" - {len(allele_info_ids)} ImportedAlleleInfo")
+                gapped_allele_info_ids.extend(allele_info_ids)
+        print(f"{len(gapped_allele_info_ids)} ImportedAlleleInfo on gapped transcripts - checking their matching")
+
+        allele_info_ids_to_rematch = []
+        for allele_info in ImportedAlleleInfo.objects.filter(pk__in=gapped_allele_info_ids).iterator(chunk_size=100):
+            if difference := self._matching_out_of_date(allele_info):
+                print(f"REMATCHING {allele_info.pk} ({allele_info.imported_c_hgvs or allele_info.imported_g_hgvs}): "
+                      f"{difference}")
+                allele_info_ids_to_rematch.append(allele_info.pk)
 
         rematch_qs = ImportedAlleleInfo.objects.filter(pk__in=allele_info_ids_to_rematch)
-        print(f"Have {len(allele_info_ids_to_rematch)} ImportedAlleleInfo on gapped transcripts")
+        print(f"Have {len(allele_info_ids_to_rematch)} ImportedAlleleInfo to rematch")
         if options["dry_run"]:
             print("Dry run - not rematching")
             return
