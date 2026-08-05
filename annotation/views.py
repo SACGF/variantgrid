@@ -636,13 +636,6 @@ def view_pathogenicity_thresholds(request):
     return render(request, "annotation/view_pathogenicity_thresholds.html", context)
 
 
-@cache_page(WEEK_SECS)
-@vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
-def about_new_vep_columns(request):
-    # Keep this around for another upgrade cycle
-    return render(request, "annotation/about_new_vep_columns.html")
-
-
 def view_annotation_version_details(request, annotation_version_id):
     annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
 
