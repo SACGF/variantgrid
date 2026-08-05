@@ -307,7 +307,7 @@ ANNOTATION_VCF_DUMP_DIR = os.path.join(PRIVATE_DATA_ROOT, 'annotation_dump')
 # #1670: delete a run's dump/VEP/AnnotSV output once imported (failed runs always keep theirs)
 ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = True
 # #1670: don't dispatch new VEP runs below this free space on ANNOTATION_VCF_DUMP_DIR (None = no limit)
-ANNOTATION_MIN_FREE_DISK_GIGS = 10
+ANNOTATION_MIN_FREE_DISK_GIGS = 1
 
 # AnnotSV (post-VEP stage on the STRUCTURAL_VARIANT pipeline). Strictly opt-in:
 # leaving ANNOTATION_ANNOTSV_ENABLED=False means no AnnotSV invocation, no version
