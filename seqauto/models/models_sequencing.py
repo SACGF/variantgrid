@@ -1,5 +1,7 @@
+from typing import Optional
+
 from django.db import models
-from django.db.models import CASCADE, PROTECT
+from django.db.models import CASCADE, PROTECT, Q
 from django.urls import reverse
 
 from genes.models import GeneList, CanonicalTranscriptCollection
@@ -158,6 +160,20 @@ class Experiment(PreviewModelMixin, models.Model):
         """
     name = models.TextField(primary_key=True)
     created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=~Q(name=""), name="experiment_name_not_blank"),
+        ]
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-flask-vial"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'data'
+
     def can_write(self, user) -> bool:
         """ can't delete once you've linked to SequencingRun """
         return user.is_superuser and not self.sequencingrun_set.exists()
