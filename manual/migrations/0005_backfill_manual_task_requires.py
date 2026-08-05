@@ -21,9 +21,6 @@ TASK_REQUIRES = {
     f"{_FVM} --revalidate_chgvs": ["cdot-current", f"after:{_FVM} --extra"],
     f"{_FVM} --sort": ["cdot-current", f"after:{_FVM} --revalidate_chgvs"],
     f"{_FVM} --non-coding": ["cdot-current", f"after:{_FVM} --sort"],
-    # Was the "Before fix_legacy_classification_alignment_gap_hgvs_matching - Import gene annotation"
-    # reminder; needs current cdot/gene annotation, so gate it on cdot-current.
-    "manage*fix_legacy_classification_alignment_gap_hgvs_matching": ["cdot-current"],
 }
 
 
@@ -47,7 +44,6 @@ class Migration(migrations.Migration):
         ('classification', '0101_one_off_fix_variant_matching_non_coding'),
         ('annotation', '0037_one_off_move_pheno_match_to_hgnc'),
         ('patients', '0004_one_off_fix_patient_imports_and_modifications'),
-        ('genes', '0043_one_off_hgvs_gap'),  # creates fix_legacy_classification_alignment_gap_hgvs_matching
     ]
 
     operations = [

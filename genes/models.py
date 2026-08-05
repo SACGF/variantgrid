@@ -1196,18 +1196,19 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return cdna_match_errors
 
     def hgvs_data_errors(self) -> dict[str, str]:
+        # Legacy pre-cdot rows have no 'genome_builds' at all - they report as missing every field
+        build_data = self.data.get("genome_builds", {}).get(self.genome_build.name, {})
         data_errors = {}
         for key in ["contig", "strand", "exons"]:
-            try:
-                _ = self.genome_build_data[key]
-            except KeyError:
+            if key not in build_data:
                 data_errors[key] = "Field missing"
 
-        if error := (self.data.get("error") or self.genome_build_data.get("error")):
+        if error := (self.data.get("error") or build_data.get("error")):
             data_errors["error"] = error
 
-        if cdna_errors := self._validate_cdna_match():
-            data_errors["cdna_match"] = ", ".join(cdna_errors)
+        if "exons" not in data_errors:
+            if cdna_errors := self._validate_cdna_match():
+                data_errors["cdna_match"] = ", ".join(cdna_errors)
 
         return data_errors
 
