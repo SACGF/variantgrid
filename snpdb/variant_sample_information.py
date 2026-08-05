@@ -12,7 +12,7 @@ from library.unit_percent import format_af
 from ontology.models import OntologyService
 from patients.models import Patient
 from patients.models_enums import Zygosity
-from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild, CohortGenotype
+from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, CohortGenotype
 
 
 class VariantZygosityCounts:
@@ -23,15 +23,18 @@ class VariantZygosityCounts:
         public group), so presence/counts are only ever asserted from samples the requester
         may read. """
 
-    def __init__(self, user, variant, genome_build: GenomeBuild):
+    def __init__(self, user, variant):
         locus_qs = Locus.objects.filter(pk=variant.locus.pk)
         values_qs = self._get_sample_values_for_variant_via_cohort_genotype(locus_qs)
         values_qs = self._cohort_genotype_to_sample_genotypes(values_qs)
 
         self.variant = variant
-        self.genome_build = genome_build
-        self.num_samples = Sample.objects.filter(vcf__genome_build=self.genome_build).count()
-        visible_samples_qs = Sample.filter_for_user(user).filter(vcf__genome_build=self.genome_build)
+        # Builds can share contigs (GRCh37/38 share MT and some unplaced scaffolds) in which case both builds
+        # have the same variant. Scope to every build the variant is in - scoping to one would count the other
+        # build's samples as observations without ever making them visible rows, reporting them as hidden.
+        self.genome_builds = sorted(variant.genome_builds, key=lambda gb: gb.name)
+        self.num_samples = Sample.objects.filter(vcf__genome_build__in=self.genome_builds).count()
+        visible_samples_qs = Sample.filter_for_user(user).filter(vcf__genome_build__in=self.genome_builds)
         self.user_sample_ids = set(visible_samples_qs.values_list("pk", flat=True))
         self.num_user_samples = len(self.user_sample_ids)
 
@@ -54,6 +57,15 @@ class VariantZygosityCounts:
                     if sample_id in self.user_sample_ids:
                         self.visible_rows.append(row)
                         self.visible_zygosity_counter[zygosity] += 1
+
+    @cached_property
+    def genome_builds_str(self) -> str:
+        return ", ".join(str(gb) for gb in self.genome_builds)
+
+    @property
+    def has_hidden_samples(self) -> bool:
+        """ Are there samples in these builds the user can't see (regardless of this variant) """
+        return self.num_samples > self.num_user_samples
 
     @property
     def num_visible_observations(self) -> int:
@@ -193,8 +205,8 @@ class VariantSampleInformation(VariantZygosityCounts):
         table, checkbox-formatted per-zygosity counts and hidden-sample summary the
         Variantopedia variant_sample_information template renders. """
 
-    def __init__(self, user, variant, genome_build: GenomeBuild):
-        super().__init__(user, variant, genome_build)
+    def __init__(self, user, variant):
+        super().__init__(user, variant)
 
         # Make this easy to build a filter from
         default_visible = {Zygosity.HET, Zygosity.HOM_ALT}
@@ -204,9 +216,8 @@ class VariantSampleInformation(VariantZygosityCounts):
             checked = gt in default_visible or not has_defaults
             self.visible_zygosity_counts[gt] = (label, checked, self.visible_zygosity_counter[gt])
 
-        has_hidden_samples = self.num_samples > self.num_user_samples
         self.hidden_samples_details = {}
-        if has_hidden_samples:
+        if self.has_hidden_samples:
             self.hidden_samples_details = {"num_observations": self.num_observations,
                                            "num_visible_observations": self.num_visible_observations,
                                            "num_invisible_observations": self.num_invisible_observations}

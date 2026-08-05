@@ -763,8 +763,8 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
 def variant_sample_information(request, variant_id, genome_build_name):
     variant = get_object_or_404(Variant, pk=variant_id)
-    genome_build = get_genome_build_or_404(genome_build_name)
-    vsi = VariantSampleInformation(request.user, variant, genome_build)
+    get_genome_build_or_404(genome_build_name)  # Validate, builds we search come from the variant's contig
+    vsi = VariantSampleInformation(request.user, variant)
     other_loci_variants_by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(variant)
     g_hgvs = VariantAnnotation.get_hgvs_g(variant)
 
@@ -773,7 +773,7 @@ def variant_sample_information(request, variant_id, genome_build_name):
         "vsi": vsi,
         "g_hgvs": g_hgvs,
         "other_loci_variants_by_multiallelic": other_loci_variants_by_multiallelic,
-        "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build=genome_build).exists(),
+        "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build__in=vsi.genome_builds).exists(),
     }
     return render(request, "variantopedia/variant_sample_information.html", context)
 
