@@ -22,7 +22,7 @@ from snpdb.models.models_variant import Allele, AlleleMergeLog, Sequence, Locus,
     VariantAlleleCollectionRecord, LiftoverRun, AlleleLiftover
 from snpdb.models.models_cohort_stats import CohortGenotypeStats
 from snpdb.models.models_vcf import Project, VCF, VCFFilter, VCFTag, Sample, SampleFilePath, SampleTag, VCFAlleleSource, \
-    SampleStatsCodeVersion, SampleStats, SampleStatsPassingFilter, SampleLocusCount, SampleLabProject, \
+    SampleStatsCodeVersion, SampleLocusCount, SampleLabProject, \
     VCFSourceSettings, VCFBedIntersection
 from snpdb.models.models_zygosity_counts import VariantZygosityCountCollection, VariantZygosityCount, \
     VariantZygosityCountForVCF, VariantZygosityCountForSample

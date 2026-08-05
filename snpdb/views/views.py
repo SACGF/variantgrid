@@ -41,6 +41,7 @@ from annotation.models.models import ManualVariantEntryCollection, VariantAnnota
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
 from annotation.serializers import ManualVariantEntryCollectionSerializer
+from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
 from classification.classification_stats import get_grouped_classification_counts
 from classification.enums import AlleleOriginBucket
 from classification.models.clinvar_export_sync import clinvar_export_sync
@@ -483,7 +484,8 @@ def get_patient_upload_csv_for_vcf(request, pk):
 def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
     annotation_version = AnnotationVersion.latest(sample.genome_build)
     try:
-        cgc = sample.vcf.cohort.cohort_genotype_collection
+        cohort = sample.vcf.cohort
+        cgc = cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
         return pd.DataFrame(), pd.DataFrame()
 
@@ -499,6 +501,7 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     variant_class_data = {}
     zygosity_data = {}
+    missing_stats = False
     for name, (stats_klass, shared_fields) in STATS.items():
         base_kwargs = {
             "cohort_genotype_collection": cgc,
@@ -512,7 +515,8 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
         try:
             objs[name] = stats_klass.objects.get(passing_filter=False, **base_kwargs)
         except ObjectDoesNotExist:
-            pass
+            # Stats absent for the latest annotation version (eg it was bumped since import)
+            missing_stats = True
 
         try:
             objs[f"{name} PASS filters"] = stats_klass.objects.get(passing_filter=True, **base_kwargs)
@@ -544,6 +548,10 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
         sample_stats_variant_class_df["Total %"] = 100 * total / total["variant"]
 
     sample_stats_zygosity_df = pd.DataFrame.from_dict(zygosity_data).reindex(ZYGOSITY)
+
+    if missing_stats:
+        enqueue_cohort_stats_recompute(cohort, annotation_version)
+
     return sample_stats_variant_class_df, sample_stats_zygosity_df
 
 

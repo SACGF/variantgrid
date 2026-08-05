@@ -485,7 +485,7 @@ Raises `InvalidAnnotationVersionError` with details if any check fails.
 | `annotate_variants` | Drives VEP execution and result insertion |
 | `annotation_scheduler_task` | Schedules pending annotation jobs |
 | `cached_web_resource_tasks` | Updates HGNC, MANE, Pfam, Panel App cached data |
-| `calculate_sample_stats` | Computes per-sample annotation statistics |
+| `calculate_sample_stats` | Computes cohort/per-sample annotation statistics (eager at VCF import, lazy on cache miss) |
 | `cohort_sample_gene_damage_counts` | Aggregates gene damage counts across cohort samples |
 | `import_clinvar_vcf_task` | Imports a ClinVar VCF file |
 | `process_manual_variants_task` | Processes manually entered variants |

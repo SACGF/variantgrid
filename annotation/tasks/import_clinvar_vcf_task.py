@@ -46,10 +46,7 @@ class ProcessClinVarVCFDataTask(ImportVCFStepTask):
 class ImportClinVarSuccessTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
-        logging.info("ClinVar imported - you may want to calculate sample stats (not happening automatically)")
-        # Disabling - as we don't want to do huge amount of recalc...
-        # logging.info("ClinVar import succeeded - calculate sample stats!")
-        # calculate_needed_stats(run_async=True)
+        # Cohort stats referencing the old ClinVar version are recomputed lazily when next read
         return 0
 
 

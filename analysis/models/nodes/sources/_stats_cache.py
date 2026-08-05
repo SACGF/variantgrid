@@ -152,8 +152,5 @@ def get_cached_label_count_for_cohort(cohort, sample, filter_key: FilterKey,
 
 def _enqueue_lazy_recompute(cohort, annotation_version) -> None:
     """ Fire-and-forget. Idempotent — task no-ops if the row now exists. """
-    from annotation.tasks.calculate_sample_stats import calculate_cohort_stats_task
-    calculate_cohort_stats_task.apply_async(
-        args=[cohort.pk, annotation_version.pk],
-        queue="annotation_workers",
-    )
+    from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
+    enqueue_cohort_stats_recompute(cohort, annotation_version)
