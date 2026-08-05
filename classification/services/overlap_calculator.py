@@ -95,8 +95,8 @@ class OverlapCalculatorBase(ABC):
                         clinvar_causing_discordant = len(non_clinvar_values) > 1 and not cls.calculate_status_for_multiple_entries(non_clinvar_values).is_discordant
 
                         if clinvar_causing_discordant:
-                            max_clinvar_date = max(con.effective_date for con in third_party)
-                            max_classification_date = max(con.effective_date for con in interactive_contributors)
+                            max_clinvar_date = max(con.effective_date_obj for con in third_party)
+                            max_classification_date = max(con.effective_date_obj for con in interactive_contributors)
                             if max_clinvar_date < max_classification_date:
                                 override_value = OverlapOverrideStatus.IGNORING_OLD_CLINVAR
                             elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors): # all confident
