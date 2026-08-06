@@ -13,7 +13,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
-from django.http import StreamingHttpResponse
+from django.http import StreamingHttpResponse, Http404
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
@@ -483,6 +483,18 @@ def view_classification(request: HttpRequest, classification_id: str):
         'mme_enabled': settings.MME_ENABLED,   # shows the MatchMaker Exchange card
     }
     return render(request, 'classification/classification.html', context)
+
+
+def view_classification_lab_record(request: HttpRequest, classification_ref: str):
+    """ Resolve a classification from "lab_group_name/lab_record_id" and redirect to its canonical URL """
+    lab_group_name, _, lab_record_id = classification_ref.rpartition('/')
+    if not lab_group_name or not lab_record_id:
+        raise Http404(f"Expected a classification reference of lab_group_name/lab_record_id, got ({classification_ref})")
+
+    classification = get_object_or_404(Classification, lab__group_name=lab_group_name, lab_record_id=lab_record_id)
+    # same view permission as landing on the record directly - writable, or has a version we can see
+    ClassificationRef.init_from_obj(request.user, classification).check_security()
+    return redirect(classification.get_absolute_url())
 
 
 def view_classification_diff(request):
