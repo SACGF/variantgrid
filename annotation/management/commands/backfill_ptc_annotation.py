@@ -5,12 +5,16 @@ stored, so the values are recoverable without reannotation.
 
 Restricted to columns_version=5 VariantAnnotationVersions - that matches the
 min_columns_version=5 gate on the column defs and where the inserter computes the values.
+
+Only frameshift rows are touched. The inserter also writes NOT_APPLICABLE on everything else
+(free, it's just another character in the COPY row), but writing it here would rewrite ~98% of
+the partition for a value nothing reads - once backfilled_ptc is set, null carries the same
+meaning to DamageNode.
 """
 from django.core.management.base import BaseCommand
 
 from annotation.models import VariantAnnotationVersion, VariantAnnotation
 from annotation.models.models import VariantTranscriptAnnotation
-from annotation.models.models_enums import NMDEscapeStatus
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import (
     FRAMESHIFT_CONSEQUENCE, TranscriptGeometryCache, add_calculated_ptc,
 )
@@ -26,12 +30,9 @@ class Command(BaseCommand):
             # One cache per VAV - the geometry is per (transcript version, build)
             transcript_geometry_cache = TranscriptGeometryCache()
             for klass in (VariantTranscriptAnnotation, VariantAnnotation):
-                qs = klass.objects.filter(version=vav)
-                num_not_applicable = qs.exclude(consequence__contains=FRAMESHIFT_CONSEQUENCE) \
-                    .update(nmd_escape_status=NMDEscapeStatus.NOT_APPLICABLE)
-                num_frameshift = self._backfill_frameshifts(
-                    klass, qs.filter(consequence__contains=FRAMESHIFT_CONSEQUENCE), transcript_geometry_cache)
-                print(f"  {klass.__name__}: {num_frameshift} frameshift, {num_not_applicable} not applicable")
+                qs = klass.objects.filter(version=vav, consequence__contains=FRAMESHIFT_CONSEQUENCE)
+                num_frameshift = self._backfill_frameshifts(klass, qs, transcript_geometry_cache)
+                print(f"  {klass.__name__}: {num_frameshift} frameshift rows")
 
             vav.backfilled_ptc = True
             vav.save(update_fields=["backfilled_ptc"])
