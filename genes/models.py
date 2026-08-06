@@ -1766,7 +1766,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         # Sample gene lists for samples we have permission to see
         samples_qs = Sample.filter_for_user(user)
         sample_gene_list_qs = GeneList.objects.filter(category__name=GeneListCategory.SAMPLE_GENE_LIST,
-                                                      customtextgenelist__qcgenelist__qc__bam_file__unaligned_reads__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
+                                                      customtextgenelist__qcgenelist__qc__bam_file__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
 
         qs = user_qs | sample_gene_list_qs
         if success_only:
@@ -2310,7 +2310,7 @@ class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):
 
     @staticmethod
     def filter_for_kit_and_gene_symbol(enrichment_kit, genome_build, gene_symbol):
-        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample"
+        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
         kwargs = {sequencing_sample + "__enrichment_kit": enrichment_kit,
                   # Ensure we only get current SampleSheet
                   sequencing_sample + "__sample_sheet__sequencingruncurrentsamplesheet__isnull": False}

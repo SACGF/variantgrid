@@ -24,7 +24,10 @@
 		<h3>Input</h3>
 		<ul>
 		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' single_sample_vcf.sequencing_run.pk %}">{{ single_sample_vcf.sequencing_run }}</a></li>
+		<li>Sequencing Sample: {{ single_sample_vcf.bam_file.sequencing_sample }}</li>
+		{% if single_sample_vcf.bam_file.unaligned_reads %}
 		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' single_sample_vcf.bam_file.unaligned_reads.pk %}">{{ single_sample_vcf.bam_file.unaligned_reads }}</a></li>
+		{% endif %}
 		<li>Bam: <a href="{% url 'view_bam_file' single_sample_vcf.bam_file.pk %}">{{ single_sample_vcf.bam_file }}</a></li>
 		</ul>
 

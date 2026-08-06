@@ -659,7 +659,7 @@ def view_canonical_transcript_collection(request, pk):
     summary = None
     qs = canonical_transcript_collection.genecoveragecanonicaltranscript_set.all()
     if qs.exists():
-        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit__name")
+        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit__name")
 
     is_system_default = pk == str(settings.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID)
     context = {"canonical_transcript_collection": canonical_transcript_collection,
@@ -711,7 +711,7 @@ def gene_coverage_graphs(request, genome_build, gene_symbols: Iterable[str]):
         has_coverage = has_coverage or base_gene_coverage_qs.exists()
 
         for enrichment_kit in enrichment_kits:
-            filter_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit=enrichment_kit)
+            filter_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit=enrichment_kit)
             enrichment_kit_data = get_coverage_stats(base_gene_coverage_qs, filter_q, fields)
             enrichment_kit_name = str(enrichment_kit)
             for field_name in fields:

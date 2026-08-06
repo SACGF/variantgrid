@@ -88,7 +88,7 @@ class QCExecSummaryGraph(CacheableGraph):
         patches = [Line2D([0], [0], color='none', marker='o', markerfacecolor=color),
                    Rectangle((0, 0), 1, 1, fc=self.bp_color)]
 
-        sample_name = self.qc_exec_summary.qc.bam_file.unaligned_reads.sequencing_sample.sample_name
+        sample_name = self.qc_exec_summary.qc.sequencing_sample.sample_name
         run_label = f"{sample_name} from {self.sequencing_run}"
         labels = [run_label, comparison_description]
         figure.legend(patches, labels, loc='upper center', bbox_to_anchor=(0.5, 1), numpoints=1)

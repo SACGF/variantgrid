@@ -56,7 +56,7 @@ def create_canonical_gene_coverage_for_enrichment_kit(enrichment_kit_id):
     if enrichment_kit_id:
         enrichment_kit = EnrichmentKit.objects.get(pk=enrichment_kit_id)
         canonical_collection = canonical_transcript_manager.get_canonical_collection_for_enrichment_kit(enrichment_kit)
-        coverage_collection_qs = GeneCoverageCollection.objects.filter(qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit=enrichment_kit)
+        coverage_collection_qs = GeneCoverageCollection.objects.filter(qc__bam_file__sequencing_sample__enrichment_kit=enrichment_kit)
     else:
         canonical_collection = canonical_transcript_manager.get_default_canonical_collection()
         coverage_collection_qs = GeneCoverageCollection.objects.filter(qc__isnull=True)

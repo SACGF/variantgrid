@@ -86,7 +86,7 @@ class GoldCoverageSummaryGrid(JqGridUserRowConfig):
 
 
 class EnrichmentKitGeneCoverageGrid(JqGridUserRowConfig):
-    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample"
+    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
     SEQUENCING_RUN_PATH = SEQUENCING_SAMPLE_PATH + "__sample_sheet__sequencing_run"
     GOLD_PATH = SEQUENCING_RUN_PATH + "__gold_standard"
     SAMPLE_NAME_PATH = SEQUENCING_SAMPLE_PATH + "__sample_name"

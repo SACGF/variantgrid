@@ -149,9 +149,11 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
         old_sample_links = SampleFromSequencingSample.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
         old_unaligned_reads = UnalignedReads.get_for_old_sample_sheets(self)
+        old_bam_files = BamFile.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
         return any([not illuminate_qc.exists() and old_illuminate_qc.exists(),
                     old_joint_called_vcfs.exists(),
                     old_unaligned_reads.exists(),
+                    old_bam_files.exists(),
                     old_sample_links.exists()])
 
     @staticmethod
@@ -277,6 +279,10 @@ class SequencingSample(models.Model):
     failed = models.BooleanField(default=False)
     automatically_process = models.BooleanField(default=True)
 
+    @property
+    def sequencing_run(self):
+        return self.sample_sheet.sequencing_run
+
     @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
         params = self.sample_sheet.get_params()
@@ -306,26 +312,24 @@ class SequencingSample(models.Model):
         sequencer_model = self.sample_sheet.sequencing_run.sequencer.sequencer_model
         if sequencer_model.data_naming_convention == DataGeneration.HISEQ:
             full_sample_name = f"{self.sample_id}_{self.barcode}"
+            aligned_pattern = settings.SEQAUTO_HISEQ_ALIGNED_PATTERN
         elif sequencer_model.data_naming_convention == DataGeneration.MISEQ:
             full_sample_name = f"{self.sample_name}_S{self.sample_number}"
+            aligned_pattern = settings.SEQAUTO_MISEQ_ALIGNED_PATTERN
         else:
             msg = f"Unknown sequencer_model.data_naming_convention '{sequencer_model.data_naming_convention}'"
             raise ValueError(msg)
         params['full_sample_name'] = full_sample_name
         params['full_sample_name_underscores'] = full_sample_name.replace("-", "_")
+        params['aligned_pattern'] = aligned_pattern % params
         return params
 
     def get_single_bam(self):
         """ relies on there being only one """
         try:
-            unaligned_reads = self.unalignedreads_set.get()
-            try:
-                bam_file = unaligned_reads.bamfile_set.get()
-                return bam_file
-            except Exception:
-                logging.error("Wasn't exactly 1 bam_file for unaligned_reads %s", unaligned_reads)
+            return self.bamfile_set.get()
         except Exception:
-            logging.error("Wasn't exactly 1 unaligned reads for sequencing sample %s", self)
+            logging.error("Wasn't exactly 1 bam_file for sequencing sample %s", self)
         return None
 
     def get_single_qc(self):
@@ -459,25 +463,14 @@ class UnalignedReads(models.Model):
 
     @property
     def sequencing_run(self):
-        return self.sequencing_sample.sample_sheet.sequencing_run
+        return self.sequencing_sample.sequencing_run
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
-        fastq_params = self.sequencing_sample.get_params()
-        data_naming_convention = self.sequencing_run.sequencer.sequencer_model.data_naming_convention
-        if data_naming_convention == DataGeneration.HISEQ:
-            aligned_pattern = settings.SEQAUTO_HISEQ_ALIGNED_PATTERN
-        elif data_naming_convention == DataGeneration.MISEQ:
-            aligned_pattern = settings.SEQAUTO_MISEQ_ALIGNED_PATTERN
-        else:
-            msg = f"Unknown data_naming_convertion: {data_naming_convention}"
-            raise ValueError(msg)
-        params = {"aligned_pattern": aligned_pattern % fastq_params,
-                  "read_1": self.fastq_r1.path}
+        params = self.sequencing_sample.get_params()
+        params["read_1"] = self.fastq_r1.path
         if self.fastq_r2:
             params["read_2"] = self.fastq_r2.path
-
-        params.update(fastq_params)
         return params
 
     @staticmethod
@@ -490,22 +483,22 @@ class UnalignedReads(models.Model):
 
 
 class BamFile(SeqAutoRecord):
+    sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
+    # UnalignedReads is optional metadata - some sequencers produce BAMs with no FastQ stage at all
     unaligned_reads = models.ForeignKey(UnalignedReads, null=True, on_delete=CASCADE)
     name = models.TextField()
     aligner = models.ForeignKey(Aligner, on_delete=CASCADE)
 
     def get_params(self):
-        params = self.unaligned_reads.get_params()
-        params['bam'] = self.get_path_from_unaligned_reads(self.unaligned_reads)
+        params = self.sequencing_sample.get_params()
+        if self.unaligned_reads:
+            params.update(self.unaligned_reads.get_params())
+        params['bam'] = self.get_path_from_sequencing_sample(self.sequencing_sample)
         return params
 
-    @property
-    def sequencing_sample(self):
-        return self.unaligned_reads.sequencing_sample
-
     @staticmethod
-    def get_path_from_unaligned_reads(unaligned_reads):
-        params = unaligned_reads.get_params()
+    def get_path_from_sequencing_sample(sequencing_sample):
+        params = sequencing_sample.get_params()
         pattern = os.path.join(settings.SEQAUTO_BAM_DIR_PATTERN, settings.SEQAUTO_BAM_PATTERN)
         try:
             filename = pattern % params
@@ -513,7 +506,7 @@ class BamFile(SeqAutoRecord):
             if "enrichment_kit" in ke.args:
                 logging.error("'enrichment_kit' not set, this is usually done via signal handlers in a custom app")
             missing = ', '.join(ke.args)
-            logging.error("%s missing: %s. params=%s", unaligned_reads, missing, params)
+            logging.error("%s missing: %s. params=%s", sequencing_sample, missing, params)
             raise
         return os.path.abspath(filename)
 
@@ -524,7 +517,7 @@ class BamFile(SeqAutoRecord):
         return aligner
 
     def __str__(self):
-        return f"BAM: {self.unaligned_reads.sequencing_sample}"
+        return f"BAM: {self.sequencing_sample}"
 
 
 class Flagstats(SeqAutoRecord):
@@ -583,7 +576,7 @@ class SingleSampleVCF(SeqAutoRecord):
 
     @property
     def sample_sheet(self) -> SampleSheet:
-        return self.bam_file.unaligned_reads.sequencing_sample.sample_sheet
+        return self.bam_file.sequencing_sample.sample_sheet
 
     def __str__(self):
         return f"VCF {self.name}"
@@ -811,7 +804,7 @@ class QCExecSummary(SeqAutoRecord):
 
     @staticmethod
     def get_sequencing_run_path():
-        return "qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run"
+        return "qc__bam_file__sequencing_sample__sample_sheet__sequencing_run"
 
     def __str__(self):
         return f"QCExecSummary for {self.qc}"
@@ -881,7 +874,7 @@ class GoldGeneCoverageCollection(models.Model):
         If you wish to delete / replace a GeneCoverageCollection here, you must delete the
         old gold first (PROTECT) to stop Stored gold reference and current gold runs
         getting out of sync """
-    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample"
+    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
 
     gold_reference = models.ForeignKey(GoldReference, on_delete=CASCADE)
     gene_coverage_collection = models.ForeignKey(GeneCoverageCollection, on_delete=PROTECT)
@@ -889,7 +882,7 @@ class GoldGeneCoverageCollection(models.Model):
     @property
     def sequencing_sample(self):
         try:
-            ss = self.gene_coverage_collection.qcgenecoverage.qc.bam_file.unaligned_reads.sequencing_sample
+            ss = self.gene_coverage_collection.qcgenecoverage.qc.sequencing_sample
         except Exception:
             ss = None
         return ss
@@ -968,7 +961,7 @@ def get_samples_by_sequencing_sample(sample_sheet, vcf):
 
 def get_20x_gene_coverage(gene_symbol, min_coverage=100):
     gcg_qs = GeneCoverageCollection.objects.filter(
-        qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
+        qcgenecoverage__qc__bam_file__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
 
     existing_count = 0
     existing_max_pk = 0

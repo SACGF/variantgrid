@@ -452,7 +452,7 @@ def qc_column_graph(request, qc_column_id, use_percent):
     logging.info("Using %s", qc_column)
     use_percent = json.loads(use_percent)  # Boolean
 
-    SEQUENCING_SAMPLE_PATH = 'bam_file__unaligned_reads__sequencing_sample'
+    SEQUENCING_SAMPLE_PATH = 'bam_file__sequencing_sample'
     ENRICHMENT_KIT_PATH = SEQUENCING_SAMPLE_PATH + '__enrichment_kit'
 
     def get_field(f):
@@ -530,7 +530,7 @@ def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):
     # Create a new label based on sequencing_run + sample
     current_label = get_label(qc_exec_summary.sequencing_run.name, qc_exec_summary.sample_name)
     sequencing_run_names = qc_exec_summary_data[sequencing_run_column]
-    sample_names = qc_exec_summary_data["qc__bam_file__unaligned_reads__sequencing_sample__sample_name"]
+    sample_names = qc_exec_summary_data["qc__bam_file__sequencing_sample__sample_name"]
     labels = [get_label(sr, ss) for sr, ss in zip(sequencing_run_names, sample_names)]
     qc_exec_summary_data["label"] = labels
 

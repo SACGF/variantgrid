@@ -181,6 +181,7 @@ class LinkSamplesJointCallPreservedTests(TestCase):
         bam_file = BamFile.objects.create(path=f"/d/{sample_name}.bam",
                                           name=f"{sample_name}.bam",
                                           sequencing_run=self.sequencing_run,
+                                          sequencing_sample=seq_sample,
                                           unaligned_reads=unaligned,
                                           aligner=aligner)
         single_sample_vcf = SingleSampleVCF.objects.create(path=path,

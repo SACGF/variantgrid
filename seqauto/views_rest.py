@@ -194,7 +194,7 @@ class EnrichmentKitGeneCoverageView(APIView):
     """ Coverage stats (mean, percent_20x) for a gene symbol across samples sequenced with an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
-        return Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit=enrichment_kit)
+        return Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit=enrichment_kit)
 
     @extend_schema(
         summary="Coverage stats (mean, percent_20x) for a gene symbol across samples for an enrichment kit",
@@ -247,7 +247,7 @@ class EnrichmentKitGeneGoldCoverageView(EnrichmentKitGeneCoverageView):
     """ Coverage stats for a gene symbol restricted to gold standard sequencing runs for an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
-        gold_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__gold_standard=True)
+        gold_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__sample_sheet__sequencing_run__gold_standard=True)
         return reduce(operator.and_, [super().get_coverage_q(enrichment_kit), gold_q])
 
 

@@ -193,6 +193,26 @@ class SequencingSampleLookupSerializer(serializers.Serializer):
     sample_sheet = SampleSheetLookupSerializer()
     sample_name = serializers.CharField()
 
+    @staticmethod
+    def get_object(validated_data):
+        sample_sheet_data = validated_data['sample_sheet']
+        try:
+            return SequencingSample.objects.get(
+                sample_sheet__sequencing_run__name=sample_sheet_data['sequencing_run'],
+                sample_sheet__hash=sample_sheet_data['hash'],
+                sample_name=validated_data['sample_name'],
+            )
+        except SequencingSample.DoesNotExist as exc:
+            raise serializers.ValidationError(f"SequencingSample not found for {validated_data}") from exc
+
+
+def resolve_sequencing_sample(data):
+    """ Nested serializers are passed either a lookup dict from the API, or a SequencingSample a
+        parent serializer has already resolved """
+    if data is None or isinstance(data, SequencingSample):
+        return data
+    return SequencingSampleLookupSerializer.get_object(data)
+
 
 class SequencingSampleSerializer(serializers.ModelSerializer):
     """ This is when we want the whole object as a dict """
@@ -284,7 +304,7 @@ class UnalignedReadsSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def create(self, validated_data):
-        sequencing_sample = validated_data['sequencing_sample']
+        sequencing_sample = resolve_sequencing_sample(validated_data['sequencing_sample'])
         unaligned_reads_kwargs = {}
 
         fastq_serializer = FastqSerializer()
@@ -320,6 +340,7 @@ class BamFilePathSerializer(serializers.ModelSerializer):
 
 
 class BamFileSerializer(serializers.ModelSerializer):
+    sequencing_sample = SequencingSampleLookupSerializer(required=False)
     unaligned_reads = UnalignedReadsSerializer(required=False)
     aligner = AlignerSerializer(required=False)
     flagstats = FlagstatsSerializer(read_only=True, required=False)  # 1-to-1 field
@@ -327,19 +348,34 @@ class BamFileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BamFile
-        fields = ("path", "unaligned_reads", "name", "aligner", "flagstats")
+        fields = ("path", "sequencing_sample", "unaligned_reads", "name", "aligner", "flagstats")
 
     def create(self, validated_data):
-        unaligned_reads_data = validated_data["unaligned_reads"]
         aligner_data = validated_data["aligner"]
         flagstats_data = validated_data.get('flagstats')
-
-        unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
-        aligner = AlignerSerializer().create(aligner_data)
         path = validated_data["path"]
+
+        sequencing_sample = resolve_sequencing_sample(validated_data.get("sequencing_sample"))
+        unaligned_reads = None
+        if unaligned_reads_data := validated_data.get("unaligned_reads"):
+            unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
+            if sequencing_sample:
+                if unaligned_reads.sequencing_sample_id != sequencing_sample.pk:
+                    msg = f"BAM '{path}' sequencing_sample '{sequencing_sample}' doesn't match " \
+                          f"the one its unaligned_reads came from: '{unaligned_reads.sequencing_sample}'"
+                    raise serializers.ValidationError(msg)
+            else:
+                sequencing_sample = unaligned_reads.sequencing_sample
+
+        if sequencing_sample is None:
+            msg = f"BAM '{path}' needs either 'sequencing_sample' or 'unaligned_reads' to say which sample it's from"
+            raise serializers.ValidationError(msg)
+
+        aligner = AlignerSerializer().create(aligner_data)
         name = os.path.basename(path)
         bam_file, _ = BamFile.objects.update_or_create(path=path,
-                                                       sequencing_run=unaligned_reads.sequencing_run,
+                                                       sequencing_run=sequencing_sample.sequencing_run,
+                                                       sequencing_sample=sequencing_sample,
                                                        unaligned_reads=unaligned_reads,
                                                        aligner=aligner,
                                                        name=name)
@@ -423,7 +459,7 @@ class SingleSampleVCFSerializer(serializers.ModelSerializer):
 
 class SequencingFilesSerializer(serializers.Serializer):
     sample_name = serializers.CharField()
-    unaligned_reads = UnalignedReadsSerializer()
+    unaligned_reads = UnalignedReadsSerializer(required=False)
     bam_file = BamFileSerializer()
     vcf_file = SingleSampleVCFSerializer()
 
@@ -432,16 +468,21 @@ class SequencingFilesSerializer(serializers.Serializer):
         super().__init__(*args, **kwargs)
 
     def create(self, validated_data):
-        unaligned_reads_data = validated_data.pop('unaligned_reads')
+        unaligned_reads_data = validated_data.pop('unaligned_reads', None)
         bam_file_data = validated_data.pop('bam_file')
         vcf_file_data = validated_data.pop('vcf_file')
 
         if self.sequencing_sample is None:
             raise ValueError("SequencingSample is required for create()")
-        unaligned_reads_data["sequencing_sample"] = self.sequencing_sample
-        unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
 
-        bam_file_data['unaligned_reads'] = unaligned_reads_data
+        # An explicit sequencing_sample on the BAM is kept, so it can be checked against the FastQs below
+        bam_file_data.setdefault('sequencing_sample', self.sequencing_sample)
+        unaligned_reads = None
+        if unaligned_reads_data:
+            unaligned_reads_data["sequencing_sample"] = self.sequencing_sample
+            unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
+            bam_file_data['unaligned_reads'] = unaligned_reads_data
+
         bam_file = BamFileSerializer().create(bam_file_data)
 
         vcf_file_data['bam_file'] = bam_file_data
