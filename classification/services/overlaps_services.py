@@ -15,7 +15,7 @@ from django.db.models.aggregates import Max
 from django.utils.timezone import now
 
 from annotation.models import ClinVarRecordCollection, ClinVarRecord
-from classification.enums import TestingContextBucket, OverlapStatus
+from classification.enums import TestingContextBucket, OverlapStatus, OverlapState
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, \
     TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
@@ -291,18 +291,15 @@ class OverlapServices:
         calculator = calculator_for_value_type(overlap.value_type)
 
         overlap_status_calculation = calculator.calculate_entries(overlap.contributions_list)
-
-        old_overlap_status = overlap.overlap_status
-        old_has_pending = overlap.has_pending_values
-        old_override_status = overlap.overlap_override_status
+        current_state = overlap.overlap_state
 
         overlap_status_changed = False
         overlap_valid_changed = False
-        if (overlap_status_calculation.current_value, overlap_status_calculation.has_pending_values, overlap_status_calculation.override_status) != (old_overlap_status, old_has_pending, old_override_status):
+        if overlap_status_calculation != current_state:
             # see if either overlap status or pending overlap status are changing
-            overlap.overlap_status = overlap_status_calculation.current_value
+            overlap.overlap_status = overlap_status_calculation.status
             overlap.has_pending_values = overlap_status_calculation.has_pending_values
-            overlap.overlap_max_ever_status = max(overlap.overlap_max_ever_status, overlap_status_calculation.current_value)
+            overlap.overlap_max_ever_status = max(overlap.overlap_max_ever_status, overlap_status_calculation.status)
             overlap.overlap_override_status = overlap_status_calculation.override_status
 
             overlap.overlap_status_change_timestamp = now()
@@ -324,21 +321,18 @@ class OverlapServices:
         if overlap_valid_changed or overlap_status_changed:
             overlap.save()
             if overlap_status_changed:
-                OverlapServices.overlap_status_changed(overlap, old_overlap_status)
+                OverlapServices.overlap_status_changed(overlap, current_state, overlap_status_calculation)
 
     @staticmethod
-    def overlap_status_changed(overlap: Overlap, old_status: OverlapStatus):
-        # FIXME, override needs to be passed in
+    def overlap_status_changed(overlap: Overlap, old_state: OverlapState, new_state: OverlapState):
         if not settings.DISCORDANCE_ENABLED:
             return
 
         if overlap.overlap_type == OverlapType.CROSS_CONTEXT:
             return  # don't notify when cross context become discordant
 
-        new_status = overlap.overlap_status
-
         # see if it's worth notifying anyone
-        if not (new_status.is_discordant ^ old_status.is_discordant):
+        if not (old_state.is_active_discordance ^ new_state.is_active_discordance):
             # only care if we're going from discordant to not discordant or vice versa
             # an overlap could change from concordant to discordant back to concordant
             # , but we just check if the notification is worth sending
@@ -347,10 +341,13 @@ class OverlapServices:
         odn, created = OverlapDiscordanceNotification.objects.get_or_create(
             overlap=overlap,
             notification_sent_date=None,
-            defaults={"old_status": old_status, "new_status": new_status}
+            defaults={
+                "old_state": old_state.to_dict(),
+                "new_state": new_state.to_dict()
+            }
         )
         if not created:
-            odn.new_status = new_status
+            odn.new_state_obj = new_state
             odn.save()
 
         # this will send emails right away if we're no in an import, otherwise at the end of an import
@@ -779,9 +776,9 @@ def send_prepared_discordance_notifications(
                 sorted_lab_str = "\n".join(str(lab) for lab in sorted(labs))
 
                 overlap = notification.overlap
-                discordance_status_icon = ":no_good:" if notification.new_status.is_discordant else ":handshake:"
+                discordance_status_icon = ":no_good:" if notification.new_state_obj.is_active_discordance else ":handshake:"
                 overlap_description = f"{overlap.scope_description} {overlap.value_type_label}"
-                overlap_change = f"{notification.old_status.label} -> {notification.new_status.label} {discordance_status_icon}"
+                overlap_change = f"{notification.old_state_obj.label} -> {notification.new_state_obj.label} {discordance_status_icon}"
 
                 overall_admin_notification.add_field("Overlap",
                                                      f"<{_report_url_for_id(notification.overlap)}|Overlap_{notification.overlap_id}> {overlap_description}")
@@ -808,7 +805,7 @@ def send_prepared_discordance_notifications(
 
                 report_url = _report_url_for_id(notification.overlap)
                 # report_summary = DiscordanceReportRowData(discordance_report=dr, perspective=user_perspective)
-                lab_notification.add_markdown(f"The below overlap is now marked as *{notification.new_status.label}*")
+                lab_notification.add_markdown(f"The below overlap is now marked as *{notification.new_state_obj.label}*")
                 # notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
 
                 lab_notification.add_field(label="Overlap", value=f"<{report_url}|OV_{notification.overlap_id}>")

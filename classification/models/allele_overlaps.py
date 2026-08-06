@@ -96,7 +96,7 @@ class OverlapsCalculatorState:
         return self._collection_to_flag.get(cms.classification.flag_collection_id)
 
 
-class OverlapState(ABC):
+class LegacyOverlapState(ABC):
 
     @property
     @abstractmethod
@@ -132,7 +132,7 @@ class ClinicalGroupingOverlap:
     Overlaps detail for a clinical grouping within an allele
     """
 
-    def __init__(self, state: OverlapState, clinical_context: Optional[ClinicalContext]):
+    def __init__(self, state: LegacyOverlapState, clinical_context: Optional[ClinicalContext]):
         self.state = state
         self.clinical_context = clinical_context
         self.groups: dict[ClassificationLabSummaryEntry, list[ClassificationModification]] = defaultdict(list)
@@ -240,7 +240,7 @@ class ClinicalGroupingOverlap:
         ) for group, cms in self.groups.items()])
 
 
-class AlleleOverlap(OverlapState):
+class AlleleLegacyOverlap(LegacyOverlapState):
     """
     Details of all overlaps for clinical groupings within an allele.
     Most of the important details are kept in ClinicalGroupingOverlap, but we like to order things in Allele
@@ -313,13 +313,13 @@ class AlleleOverlap(OverlapState):
         return self._sort_value
 
     def __lt__(self, other):
-        if isinstance(other, AlleleOverlap):
+        if isinstance(other, AlleleLegacyOverlap):
             return self._sort_value < other._sort_value
 
 
 @dataclass(frozen=True)
 class OverlapSet:
-    overlaps: list[AlleleOverlap]
+    overlaps: list[AlleleLegacyOverlap]
     label: str
 
 
@@ -335,7 +335,7 @@ class OverlapsCalculator:
         self.shared_only = shared_only
 
     @cached_property
-    def overlaps(self) -> list[AlleleOverlap]:
+    def overlaps(self) -> list[AlleleLegacyOverlap]:
         perspective = self.calculator_state.perspective
         lab_ids = perspective.lab_ids
         # find all overlaps, then see if user is allowed to see them and if user wants to see them (lab restriction)
@@ -367,7 +367,7 @@ class OverlapsCalculator:
         cms_list: list[ClassificationModification]
         for allele, cms_list in group_by_key(cm_qs, lambda x: x.classification.allele_object):
             if len(cms_list) >= 2 and any((cms.classification.lab_id in lab_ids for cms in cms_list)):
-                overlap = AlleleOverlap(calculator_state=self.calculator_state, allele=allele)
+                overlap = AlleleLegacyOverlap(calculator_state=self.calculator_state, allele=allele)
                 all_overlaps.append(overlap)
                 cm: Classification
                 for cm in cms_list:

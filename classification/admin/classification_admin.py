@@ -1052,7 +1052,7 @@ class DiscordanceNotificationAdmin(ModelAdminBasics):
 
 @admin.register(OverlapDiscordanceNotification)
 class OverlapDiscordanceNotificationAdmin(ModelAdminBasics):
-    list_display = ("overlap", "old_status", "new_status", "notification_sent_date")
+    list_display = ("overlap", "old_state", "new_state", "notification_sent_date")
     #list_filter = (('notification_sent_date', DateFieldListFilter))
 
     @admin_action("Resend Notifications")

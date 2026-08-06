@@ -51,7 +51,6 @@ def summary_changed(sender, instance: ClassificationGrouping, old_summary: Class
 
                     for overlap in oc.overlaps:
                         OverlapServices.recalc_overlap(overlap)
-                        # now need to recalc the overlap
 
 
 # THE BELOW ARE FOR SINGLE CLASSIFICATION FLAGS

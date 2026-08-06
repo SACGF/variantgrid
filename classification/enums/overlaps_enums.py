@@ -4,7 +4,7 @@ from dataclasses_json import DataClassJsonMixin
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe
 
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, OverlapStatus, OverlapOverrideStatus
 
 
 class OverlapType(TextChoices):
@@ -149,3 +149,25 @@ class TriageComment(DataClassJsonMixin):
 
     def __bool__(self):
         return bool(self.text)
+
+
+@dataclass(frozen=True)
+class OverlapState(DataClassJsonMixin):
+    status: OverlapStatus
+    has_pending_values: bool = False
+    override_status: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
+
+    @property
+    def label(self):
+        if override_status := self.override_status:
+            return f"Reviewed as {override_status.label}"
+        else:
+            return self.status.label
+
+    @property
+    def is_active_discordance(self):
+        return self.status.is_discordant and not self.override_status
+
+    @staticmethod
+    def default_json():
+        return OverlapState(status=OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=False, override_status=OverlapOverrideStatus.NO_OVERRIDE).to_dict()

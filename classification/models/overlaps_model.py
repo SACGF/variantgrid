@@ -12,7 +12,7 @@ from django_extensions.db.models import TimeStampedModel
 from annotation.models import ClinVarRecord
 from annotation.models.data_enums import EffectiveDate
 from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull, TriageStatus, \
-    OverlapOverrideStatus
+    OverlapOverrideStatus, OverlapState
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.enums.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
@@ -232,6 +232,14 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     def get_absolute_url(self):
         return reverse('overlap_3', kwargs={"overlap_id": self.pk})
+
+    @property
+    def overlap_state(self):
+        return OverlapState(
+            status=self.overlap_status,
+            has_pending_values=self.has_pending_values,
+            override_status=self.overlap_override_status
+        )
 
     @classmethod
     def preview_category(cls) -> str:
@@ -485,13 +493,33 @@ class OverlapContributionSkew(TimeStampedModel):
 
 class OverlapDiscordanceNotification(TimeStampedModel):
     overlap = models.ForeignKey('Overlap', on_delete=CASCADE)
-    old_status = IntegerFieldChoices(OverlapStatus)  # type:OverlapStatus
-    new_status = IntegerFieldChoices(OverlapStatus)  # type:OverlapStatus
+    old_state = models.JSONField(default=OverlapState.default_json)
+    new_state = models.JSONField(default=OverlapState.default_json)
+
+    # old_status = IntegerFieldChoices(OverlapStatus)  # type:OverlapStatus
+    # new_status = IntegerFieldChoices(OverlapStatus)  # type:OverlapStatus
+
     notification_sent_date = models.DateTimeField(null=True, blank=True)
 
     @property
+    def old_state_obj(self):
+        return OverlapState.from_dict(self.old_state)
+
+    @old_state_obj.setter
+    def old_state_obj(self, value: OverlapState):
+        self.old_state = value.to_dict()
+
+    @property
+    def new_state_obj(self):
+        return OverlapState.from_dict(self.new_state)
+
+    @new_state_obj.setter
+    def new_state_obj(self, value: OverlapState):
+        self.new_state = value.to_dict()
+
+    @property
     def is_still_relevant(self):
-        if self.old_status.is_discordant ^ self.new_status.is_discordant:
+        if self.old_state_obj.is_active_discordance ^ self.new_state_obj.is_active_discordance:
             return True
         # TODO is going from somewhat discordant to more discordant notification worthy?
         return False

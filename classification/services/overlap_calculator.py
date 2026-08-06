@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Optional, Iterable
-from classification.enums import OverlapStatus, OverlapOverrideStatus, TriageStatus
+from classification.enums import OverlapStatus, OverlapOverrideStatus, TriageStatus, OverlapState
 from classification.models import ClassificationResultValue, \
     EvidenceKeyMap, OverlapContribution, ClassificationSummaryCacheObj
 from classification.enums.overlaps_enums import OverlapContributionStatus
@@ -11,18 +10,6 @@ from library.utils import first
 OVERLAP_CLIN_SIG_ENABLED = False  # ensure reference this whenever doing some functionality when ClinSign should be supported
 # So it's easy to work out where to write functionality when we start supporting it
 # The idea is NOT to have some environments support it and some not
-
-
-@dataclass(frozen=True)
-class OverlapStatusCalculation:
-    current_value: OverlapStatus
-    has_pending_values: bool = False
-    override_status: Optional[OverlapOverrideStatus] = OverlapOverrideStatus.NO_OVERRIDE
-
-    @property
-    def effective_value(self):
-        # TODO remove this as redundant (it used to also check a pending date)
-        return self.current_value
 
 
 class OverlapCalculatorBase(ABC):
@@ -41,15 +28,11 @@ class OverlapCalculatorBase(ABC):
         return True
 
     @classmethod
-    def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapStatusCalculation:
+    def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapState:
         non_comparable_values: int = 0
         contributing: list[OverlapContribution] = []
 
         for entry in entries:
-            # FIXME, looking for a different solution that possibly outdated
-            # TODO do we want to do a cleaner solution than this for ExpertPanels?
-            # if entry.possibly_outdated:
-            #     continue
 
             match entry.contribution_status:
                 case OverlapContributionStatus.CONTRIBUTING:
@@ -62,11 +45,11 @@ class OverlapCalculatorBase(ABC):
         has_pending_values = any(con.is_amending for con in contributing)
         if len(contributing) == 0:
             if non_comparable_values > 0:
-                return OverlapStatusCalculation(OverlapStatus.NO_COUNTING_CONTRIBUTIONS, has_pending_values=has_pending_values)
+                return OverlapState(OverlapStatus.NO_COUNTING_CONTRIBUTIONS, has_pending_values=has_pending_values)
             else:
-                return OverlapStatusCalculation(OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=has_pending_values)
+                return OverlapState(OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=has_pending_values)
         elif len(contributing) == 1:
-            return OverlapStatusCalculation(OverlapStatus.SINGLE_SUBMITTER, has_pending_values=has_pending_values)
+            return OverlapState(OverlapStatus.SINGLE_SUBMITTER, has_pending_values=has_pending_values)
         else:
             override_value: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
 
@@ -102,7 +85,7 @@ class OverlapCalculatorBase(ABC):
                             elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors): # all confident
                                 override_value = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
 
-            return OverlapStatusCalculation(base_value, has_pending_values, override_value)
+            return OverlapState(base_value, has_pending_values, override_value)
 
     @classmethod
     @abstractmethod
