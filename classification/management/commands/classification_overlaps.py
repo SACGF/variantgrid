@@ -13,11 +13,12 @@ from classification.enums import TestingContextBucket, OverlapStatus, OverlapTyp
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
     DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \
-    ClassificationFlagTypes, ClassificationModification
+    ClassificationFlagTypes, ClassificationModification, Classification, ClassificationGroupingEntry
 from classification.enums.overlaps_enums import OverlapContributionStatus, TriageState, \
     TriageStatus
 from classification.services.overlap_calculator import calculator_for_value_type
 from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
+from flags.models import Flag, FlagStatus
 from library.guardian_utils import admin_bot
 from snpdb.models import Allele
 
@@ -25,6 +26,7 @@ from snpdb.models import Allele
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
+        parser.add_argument('--flags', required=False, action='store_true'),
         parser.add_argument('--dates', required=False, action='store_true'),
         parser.add_argument('--recalc', required=False, action="store_true"),
         parser.add_argument('--full_reset', required=False, action="store_true",
@@ -37,6 +39,10 @@ class Command(BaseCommand):
         if options["full_reset"]:
             self.full_reset(args, options)
             return
+
+        if options['flags']:
+            self.check_pending_change_flags()
+            self.recalc_overlaps()
 
         if options['recalc']:
             self.recalc_overlaps()
@@ -70,6 +76,7 @@ class Command(BaseCommand):
         self.populate_overlap_history()
         self.migrate_discordance_reports(args, options)
         self.populate_max_status()
+        self.check_pending_change_flags()
         self.make_clinvar_expert_panel_contributions()
 
         for overlap in Overlap.objects.all().iterator():
@@ -94,6 +101,22 @@ class Command(BaseCommand):
             Overlap.objects.filter(overlap_type=OverlapType.SINGLE_CONTEXT, value_type=ClassificationResultValue.ONC_PATH, allele=allele).update(overlap_max_ever_status=value)
 
         Overlap.objects.filter(overlap_max_ever_status__lt=F('overlap_status')).update(overlap_max_ever_status=F('overlap_status'))
+
+    def check_pending_change_flags(self):
+        for flag in Flag.objects.filter(flag_type=classification_flag_types.classification_pending_changes):
+            if flag.resolution.status == FlagStatus.OPEN:
+                if pending_value := (flag.data or {}).get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY):
+                    if classification := Classification.objects.filter(flag_collection=flag.collection).first():
+                        if grouping := ClassificationGroupingEntry.grouping_for(classification):
+                            # TODO see if we can use audit log to time this as part of the original
+                            triage: OverlapContribution = grouping.contribution_for(ClassificationResultValue.ONC_PATH)
+                            new_triage_state = TriageState(TriageStatus.REVIEWED_WILL_FIX, pending_value)
+                            if triage.triage_state_obj != new_triage_state:
+                                print("Updating triage with pending value")
+                                with disable_auditlog():
+                                    triage.triage_state_obj = new_triage_state
+                                    triage.save()
+
 
     def migrate_discordance_reports(self, *args, **options):
         for discordance_report in DiscordanceReport.objects.all().order_by('created').iterator():
@@ -144,18 +167,6 @@ class Command(BaseCommand):
                         continue
 
                     triage_state = TriageState(triage_status)
-                    if triage_status == TriageStatus.REVIEWED_WILL_FIX:
-                        found_pending_value = False
-                        # see if we can get the flag from somewhere if it's outstanding
-                        if target_grouping := overlap_contribution.classification_grouping:
-                            if target_classification := target_grouping.latest_classification_modification:
-                                if flag := target_classification.classification.flag_collection_safe.get_flag_of_type(classification_flag_types.classification_pending_changes):
-                                    pending_value = (flag.data or {}).get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
-                                    triage_state = TriageState(triage_status, pending_value)
-                                    found_pending_value = True
-                        if not found_pending_value:
-                            print(f"Did not find pending change value for triage {legacy_triage.pk}, maybe it already changed")
-
                     has_change = False
 
                     if overlap_contribution.triage_state_obj != triage_state:
