@@ -112,10 +112,8 @@ django==6.0.6
     #   django-debug-toolbar
     #   django-downloadview
     #   django-extensions
-    #   django-geojson
     #   django-guardian
     #   django-js-reverse
-    #   django-leaflet
     #   django-model-utils
     #   django-postgres-extra
     #   django-recaptcha
@@ -157,8 +155,6 @@ django-downloadview==2.5.0
     # via -r requirements.in
 django-extensions==4.1
     # via -r requirements.in
-django-geojson==4.2.0
-    # via -r requirements.in
 django-glrm==1.1.3
     # via -r requirements.in
 django-guardian==3.3.2
@@ -168,8 +164,6 @@ django-htmlmin==0.11.0
 django-js-reverse==1.0.0
     # via -r requirements.in
 django-json-widget==2.1.1
-    # via -r requirements.in
-django-leaflet==0.33.0
     # via -r requirements.in
 django-model-utils==5.0.0
     # via -r requirements.in

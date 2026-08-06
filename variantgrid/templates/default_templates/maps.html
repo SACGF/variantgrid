@@ -8,8 +8,10 @@
 	function tabActivateFunc(event, ui) {
 		var active = $("#tabs").tabs('option', 'active');
 		var mapName = mapIds[active];
-		var map = window.leafletMaps[mapName];
-		map.invalidateSize();
+		var map = (window.leafletMaps || {})[mapName];
+		if (map) {
+			map.invalidateSize();
+		}
 	}
 
 	$(document).ready(function() {

@@ -840,6 +840,10 @@ LOGOUT_REDIRECT_URL = '/'
 
 ACCOUNT_ACTIVATION_DAYS = 7  # One-week activation window
 
+# Optional apps have to be switched on before INSTALLED_APPS is built, which is before the env settings files get a
+# chance to run - so they're configured in settings_config.json rather than Python. See #1410
+USE_MAPS = get_secret("INSTALLED_APPS.maps", mandatory=False) or False
+
 INSTALLED_APPS = [
     'compressor',
     'avatar',
@@ -866,11 +870,9 @@ INSTALLED_APPS = [
     'django_dag',
     'django_js_reverse',
     'django_extensions',
-    'djgeojson',
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
-    'leaflet',
     'martor',
     "psqlextra",
     'rest_framework',
@@ -906,6 +908,9 @@ INSTALLED_APPS = [
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
 ]
+
+if USE_MAPS:
+    INSTALLED_APPS.append('leaflet')
 
 # https://django-crispy-forms.readthedocs.io/en/latest/install.html
 # CRISPY_ALLOWED_TEMPLATE_PACKS = ('bootstrap4_neat', 'bootstrap4') # need to do this if you make an alternative template pack
@@ -1081,7 +1086,8 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "condition_matchings": False,
     "condition_match_test": False,
     "discordance_reports": False,
-    "vus": False
+    "vus": False,
+    "maps": USE_MAPS,
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 

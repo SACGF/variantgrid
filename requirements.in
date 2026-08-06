@@ -22,13 +22,12 @@ django_datetime_utc
 django_debug_toolbar
 django_downloadview
 django-extensions
-django-geojson
 django_glrm
 django-guardian
 django_htmlmin
 django-js-reverse
 django_json_widget
-django-leaflet
+# maps are optional - install django-leaflet and set INSTALLED_APPS.maps in settings_config.json, see #1410
 django_model_utils
 django-postgres-extra
 django_recaptcha>=4.0.0

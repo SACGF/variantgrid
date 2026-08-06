@@ -8,6 +8,9 @@
   "CELERY": {
     "broker_url": "amqp://guest:guest@localhost"
   },
+  "INSTALLED_APPS": {
+    "maps": false
+  },
   "CLINGEN_ALLELE_REGISTRY": {
     "login": "variantgrid",
     "password": "cl1ng3n_VG"
