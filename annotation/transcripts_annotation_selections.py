@@ -7,6 +7,7 @@ from django.forms.models import model_to_dict
 from django.utils.timesince import timesince
 
 from annotation.models import VEPSkippedReason, AnnotationStatus
+from annotation.models.models_enums import NMDEscapeStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
     InvalidAnnotationVersionError, VariantTranscriptAnnotation, AnnotationRun
 from genes.hgvs import HGVSMatcher, HGVSException
@@ -133,6 +134,11 @@ class VariantTranscriptSelections:
                 data[f] = getattr(obj, f"get_{f}_display")()
             except AttributeError:
                 pass
+
+        # The PTC columns (#579) only say something for frameshifts - every other transcript
+        # is deliberately NOT_APPLICABLE, which would just be noise down the table.
+        if data.get("nmd_escape_status") == NMDEscapeStatus.NOT_APPLICABLE.label:
+            data["nmd_escape_status"] = None
 
         # Split/clean aggregate fields
         VEP_JOINED_FIELDS = ["domains"]

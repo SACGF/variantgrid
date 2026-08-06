@@ -1,9 +1,9 @@
 """
 Coverage for the per-VAV backfill-completion flags that gate optimised query
 branches in DamageNode. The flags live on VariantAnnotationVersion
-(backfilled_spliceai_max_ds, backfilled_damage_counts) and are flipped True by
-the matching `fix_*` management commands once a partition's derived columns are
-populated.
+(backfilled_spliceai_max_ds, backfilled_damage_counts, backfilled_ptc) and are
+flipped True by the matching `fix_*` / `backfill_*` management commands once a
+partition's derived columns are populated.
 """
 from django.test import TestCase, override_settings
 
@@ -147,3 +147,55 @@ class TestDamageNodeBackfillFlagWarnings(_BackfillFlagMixin, TestCase):
             f"warning fired without filter configured, got: {warnings}",
         )
 
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestDamageNodePTCBackfillFlag(_BackfillFlagMixin, TestCase):
+    """ ptc_nmd_escaping (#579) is columns_version 5 only, so force the VAV up. """
+
+    def _cv5_node(self, **kwargs) -> DamageNode:
+        vav = self.analysis.annotation_version.variant_annotation_version
+        original_columns_version = vav.columns_version
+        vav.columns_version = 5
+        vav.save(update_fields=["columns_version"])
+
+        def restore():
+            vav.columns_version = original_columns_version
+            vav.save(update_fields=["columns_version"])
+        self.addCleanup(restore)
+        return DamageNode(analysis=self.analysis, **kwargs)
+
+    def test_backfilled_emits_nmd_escape_status_clause(self):
+        self._set_vav_flag(backfilled_ptc=True)
+        node = self._cv5_node(ptc_nmd_escaping=True)
+        self.assertIn("variantannotation__nmd_escape_status", str(node._get_node_q()))
+
+    def test_unbackfilled_omits_nmd_escape_status_clause(self):
+        """On pre-backfill VAVs nmd_escape_status is null on every row, so we skip the filter
+        entirely rather than excluding the whole partition."""
+        self._set_vav_flag(backfilled_ptc=False)
+        node = self._cv5_node(ptc_nmd_escaping=True)
+        q = node._get_node_q()
+        self.assertNotIn("nmd_escape_status", str(q) if q is not None else "")
+
+    def test_ptc_warning_on_unbackfilled_vav(self):
+        self._set_vav_flag(backfilled_ptc=False)
+        node = self._cv5_node(ptc_nmd_escaping=True)
+        warnings = node.get_warnings()
+        self.assertTrue(
+            any("ptc_nmd_escaping" in w for w in warnings),
+            f"expected ptc_nmd_escaping warning, got: {warnings}",
+        )
+        self.assertTrue(
+            any("backfill_ptc_annotation" in w for w in warnings),
+            f"expected backfill_ptc_annotation pointer, got: {warnings}",
+        )
+
+    def test_no_ptc_warning_when_backfilled(self):
+        self._set_vav_flag(backfilled_ptc=True)
+        node = self._cv5_node(ptc_nmd_escaping=True)
+        self.assertEqual([], [w for w in node.get_warnings() if "ptc_nmd_escaping" in w])
+
+    def test_ptc_warning_silent_without_filter(self):
+        self._set_vav_flag(backfilled_ptc=False)
+        node = self._cv5_node()  # no ptc_nmd_escaping
+        self.assertEqual([], [w for w in node.get_warnings() if "ptc_nmd_escaping" in w])

@@ -14,6 +14,7 @@ from annotation.models.damage_enums import (
     ClinPredPrediction, MetaRNNPrediction, PrimateAIPrediction,
 )
 from annotation.models.models import VariantAnnotation
+from annotation.models.models_enums import NMDEscapeStatus
 from annotation.pathogenicity_predictions import TOOLS, TOOLS_BY_PRED_FIELD
 
 
@@ -149,6 +150,10 @@ class DamageNode(AnalysisNode):
     nmd_escaping_variant = models.BooleanField(default=False)
     nmd_escaping_variant_required = models.BooleanField(default=False)
 
+    # Matches nmd_escape_status = ESCAPING - the PVS1-relevant state (columns v5, #579)
+    ptc_nmd_escaping = models.BooleanField(default=False)
+    ptc_nmd_escaping_required = models.BooleanField(default=False)
+
     aloft = models.CharField(max_length=1, choices=ALoFTPredictionOptions.choices, null=True, blank=True)
     aloft_required = models.BooleanField(default=False)
     aloft_allow_null = models.BooleanField(default=True)
@@ -175,14 +180,20 @@ class DamageNode(AnalysisNode):
                 self.nmd_escaping_variant, self.aloft]
         v3_fields = v2_fields + [self.alphamissense_rankscore_min]
         v4_fields = v3_fields + self._v4_score_min_fields() + self._v4_pred_fields()
+        # v5 offers the raw scores and preds; rankscores are legacy from here, so they only
+        # count when this node already carries one.
+        v5_fields = [self.nmd_escaping_variant, self.aloft, self.ptc_nmd_escaping,
+                     self.has_rankscore_predictions()] \
+            + self._v4_score_min_fields() + self._v4_pred_fields()
 
         _COLUMNS_VERSION = {
             1: [self.cadd_score_min, self.revel_score_min],
             2: v2_fields,
             3: v3_fields,
             4: v4_fields,
+            5: v5_fields,
         }
-        modifiers = all_versions + _COLUMNS_VERSION.get(self.columns_version, [])
+        modifiers = all_versions + _COLUMNS_VERSION.get(self.columns_version, v5_fields)
         return any(modifiers)
 
     def has_required(self) -> bool:
@@ -193,13 +204,20 @@ class DamageNode(AnalysisNode):
                 self.vest4_rankscore_required, self.nmd_escaping_variant_required, self.aloft_required]
         v3_fields = v2_fields + [self.alphamissense_rankscore_required]
         v4_fields = v3_fields + self._v4_score_required_fields() + self._v4_pred_required_fields()
+        # Legacy rankscore filters still apply at v5, so their required flags still count -
+        # but only on nodes that actually carry a rankscore.
+        v5_fields = [self.nmd_escaping_variant_required, self.aloft_required, self.ptc_nmd_escaping_required] \
+            + self._v4_score_required_fields() + self._v4_pred_required_fields()
+        if self.has_rankscore_predictions():
+            v5_fields += self._rankscore_required_fields()
         _COLUMNS_VERSION = {
             1: [self.cadd_score_required, self.revel_score_required],
             2: v2_fields,
             3: v3_fields,
             4: v4_fields,
+            5: v5_fields,
         }
-        required = all_versions + _COLUMNS_VERSION.get(self.columns_version, [])
+        required = all_versions + _COLUMNS_VERSION.get(self.columns_version, v5_fields)
         return any(required)
 
     def has_individual_pathogenic_predictions(self) -> bool:
@@ -207,28 +225,42 @@ class DamageNode(AnalysisNode):
                 self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min]
         v3_fields = v2_fields + [self.alphamissense_rankscore_min]
         v4_fields = v3_fields + self._v4_score_min_fields() + self._v4_pred_fields()
+        # Matching v2-v4, the v5 list excludes nmd_escaping_variant / aloft / ptc_nmd_escaping -
+        # those are categorical LoF flags rather than per-tool pathogenicity predictions.
+        v5_fields = self._v4_score_min_fields() + self._v4_pred_fields() + self._rankscore_min_fields()
         _COLUMNS_VERSION = {
             1: [self.cadd_score_min, self.revel_score_min],
             2: v2_fields,
             3: v3_fields,
             4: v4_fields,
+            5: v5_fields,
         }
-        pathogenic_predictions = _COLUMNS_VERSION.get(self.columns_version, [])
+        pathogenic_predictions = _COLUMNS_VERSION.get(self.columns_version, v5_fields)
         return any(pathogenic_predictions)
+
+    def _rankscore_min_fields(self) -> list:
+        return [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min,
+                self.clinpred_rankscore_min, self.metalr_rankscore_min, self.revel_rankscore_min,
+                self.vest4_rankscore_min, self.alphamissense_rankscore_min]
+
+    def _rankscore_required_fields(self) -> list:
+        return [self.bayesdel_noaf_rankscore_required, self.cadd_raw_rankscore_required,
+                self.clinpred_rankscore_required, self.metalr_rankscore_required, self.revel_rankscore_required,
+                self.vest4_rankscore_required, self.alphamissense_rankscore_required]
 
     def has_rankscore_predictions(self) -> bool:
         """ v4 hides rankscore sliders by default - used to auto-reveal them when one is still set. """
-        rankscore_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min,
-                            self.clinpred_rankscore_min, self.metalr_rankscore_min, self.revel_rankscore_min,
-                            self.vest4_rankscore_min, self.alphamissense_rankscore_min]
-        return any(rankscore_fields)
+        return any(self._rankscore_min_fields())
 
     def show_rankscore_sliders(self) -> bool:
-        """ v2/v3 only have rankscores so always show them. v4 onward they're legacy: only offered when
-        the deployment allows legacy rankscores, or this node already has one set (so saved filters stay
-        visible/editable - the filter is applied regardless). """
+        """ v2/v3 only have rankscores so always show them. At v4 they're legacy: offered when the
+        deployment allows legacy rankscores, or this node already has one set. From v5 they're
+        legacy-only - just the nodes that already carry one (saved filters stay visible/editable,
+        and the filter is applied regardless). """
         if self.columns_version < 4:
             return True
+        if self.columns_version >= 5:
+            return self.has_rankscore_predictions()
         return settings.ANNOTATION_SHOW_LEGACY_RANKSCORES or self.has_rankscore_predictions()
 
     def damage_predictions_description(self) -> str:
@@ -242,6 +274,12 @@ class DamageNode(AnalysisNode):
                 f"damage_predictions_min filter is NOT being applied on this VariantAnnotationVersion: "
                 f"predictions_num_pathogenic / predictions_num_benign aggregates have not been backfilled. "
                 f"Run `manage.py fix_columns_version{vav.columns_version}_damage_counts` to enable the filter."
+            )
+        if self.ptc_nmd_escaping and self.columns_version >= 5 and not vav.backfilled_ptc:
+            warnings.append(
+                "ptc_nmd_escaping filter is NOT being applied on this VariantAnnotationVersion: "
+                "nmd_escape_status has not been backfilled. "
+                "Run `manage.py backfill_ptc_annotation` to enable the filter."
             )
         if self.splice_min is not None and vav.uses_raw_spliceai:
             warnings.append(
@@ -369,6 +407,19 @@ class DamageNode(AnalysisNode):
                     and_filters.append(q_nmd)
                 else:
                     or_filters.append(q_nmd)
+
+            if self.ptc_nmd_escaping and self.columns_version >= 5:
+                # Skip on pre-backfill VAVs: nmd_escape_status is null on every row annotated
+                # before the PTC calculation existed, so the filter would exclude the whole
+                # partition. See VariantAnnotationVersion.backfilled_ptc; get_warnings()
+                # surfaces the skip to the user.
+                vav = self.analysis.annotation_version.variant_annotation_version
+                if vav.backfilled_ptc:
+                    q_ptc = Q(variantannotation__nmd_escape_status=NMDEscapeStatus.ESCAPING)
+                    if self.ptc_nmd_escaping_required:
+                        and_filters.append(q_ptc)
+                    else:
+                        or_filters.append(q_ptc)
 
             if self.aloft:
                 q_aloft = Q(variantannotation__aloft_high_confidence=True)

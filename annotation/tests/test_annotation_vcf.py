@@ -10,6 +10,7 @@ from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation
 from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
+from annotation.models.models_enums import NMDEscapeStatus
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vep_field_formatters import get_clean_and_pick_single_value_func, EMPTY_VALUES
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
@@ -409,6 +410,13 @@ class TestAnnotationVCF5(TestAnnotationVCF4):
         va = VariantAnnotation.objects.get(variant_id=131165)
         self.assertAlmostEqual(va.popeve_score, -3.958)
         self.assertIsNone(va.protvar_stability)
+
+        # ---- PTC / PTC-aware NMD (#579). No frameshifts in the fixture, so every row should
+        # record that the calculation ran and doesn't apply, rather than staying null. ----
+        vta_qs = VariantTranscriptAnnotation.objects.filter(version=self.variant_annotation_versions_by_build["GRCh38"])
+        self.assertFalse(vta_qs.filter(nmd_escape_status__isnull=True).exists())
+        self.assertFalse(vta_qs.exclude(nmd_escape_status=NMDEscapeStatus.NOT_APPLICABLE).exists())
+        self.assertFalse(vta_qs.filter(ptc_distance_codons__isnull=False).exists())
 
         # ---- OpenTargets / PromoterAI columns are in CSQ but no overlapping data for these
         # test variants. Verify they parse to NULL rather than crashing. ----

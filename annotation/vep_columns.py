@@ -107,6 +107,7 @@ STRUCTURAL = frozenset({VariantAnnotationPipelineType.STRUCTURAL_VARIANT})
 _ALOFT_DESC = 'Most damaging transcript prediction chosen, and Ensembl transcript stored.'
 _GNOMAD2_AF_DESC = '(exome_AC+genome_AC)/(exome_AN+genome_AN)'
 _INDEL_MAX_DESC = 'max() for indels'
+_PTC_DESC = 'Calculated from HGVSp / Protein_position and transcript exon geometry, not a VEP field.'
 
 # Choice / most-damaging formatters that need a damage enum as argument. The simpler
 # shared factory instances (format_pick_highest_float etc.) live in vep_field_formatters.
@@ -985,6 +986,36 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_columns_version=2,
         formatter=fmt.format_nmd_escaping_variant,
     ),
+
+    # ---------- PTC / PTC-aware NMD (columns_version >= 5, #579) ------------
+    # No VEP source - calculated at insert time from hgvs_p + protein_position + transcript
+    # geometry. @see BulkVEPVCFAnnotationInserter._add_calculated_ptc. Registered here so
+    # visible_columns_for() shows the variant details rows on the versions that populate them.
+    VEPColumnDef(
+        source_field=None,
+        variant_grid_columns=('ptc_distance_codons',),
+        category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS,
+        pipeline_types=STANDARD,
+        min_columns_version=5,
+        source_field_processing_description=_PTC_DESC,
+    ),
+    VEPColumnDef(
+        source_field=None,
+        variant_grid_columns=('ptc_last_junction_distance',),
+        category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS,
+        pipeline_types=STANDARD,
+        min_columns_version=5,
+        source_field_processing_description=_PTC_DESC,
+    ),
+    VEPColumnDef(
+        source_field=None,
+        variant_grid_columns=('nmd_escape_status',),
+        category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS,
+        pipeline_types=STANDARD,
+        min_columns_version=5,
+        source_field_processing_description=_PTC_DESC,
+    ),
+
     VEPColumnDef(
         source_field='SpliceRegion',
         variant_grid_columns=('splice_region',),

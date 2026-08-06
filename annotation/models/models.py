@@ -39,7 +39,7 @@ from annotation.vep_config import VEPConfig
 from annotation.models.models_enums import AnnotationStatus, \
     ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
-    EssentialGeneGeneTrap, VariantAnnotationPipelineType
+    EssentialGeneGeneTrap, VariantAnnotationPipelineType, NMDEscapeStatus
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import AlleleOriginBucket
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
@@ -761,6 +761,12 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_pathogenicity_prediction_counts
     backfilled_damage_counts = models.BooleanField(default=True)
 
+    # #579 - DamageNode.ptc_nmd_escaping filters on nmd_escape_status, which is null on
+    # rows annotated before the PTC calculation existed. Flipped by
+    # `manage.py backfill_ptc_annotation`. Backfill source:
+    # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_calculated_ptc
+    backfilled_ptc = models.BooleanField(default=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -1402,6 +1408,18 @@ class AbstractVariantAnnotation(models.Model):
     clinpred_pred = models.CharField(max_length=1, choices=ClinPredPrediction.CHOICES, null=True, blank=True)
     clinpred_score = models.FloatField(null=True, blank=True)
     nmd_escaping_variant = models.BooleanField(null=True, blank=True)
+
+    # #579 - where the frameshift's new premature termination codon lands, and what that
+    # implies for NMD. @see annotation/ptc.py
+    # Codons from the first changed residue to the new stop, read from hgvs_p "fsTer<n>".
+    # 1 = the changed codon is itself the stop (e.g. p.Tyr535Ter)
+    ptc_distance_codons = models.IntegerField(null=True, blank=True)
+    # Nucleotides from the PTC to the last exon-exon junction.
+    # Negative = PTC lies in the final exon. Drives the 50nt rule.
+    ptc_last_junction_distance = models.IntegerField(null=True, blank=True)
+    # PTC-aware NMD prediction - see NMDEscapeStatus
+    nmd_escape_status = models.CharField(max_length=1, choices=NMDEscapeStatus.choices, null=True, blank=True)
+
     codons = models.TextField(null=True, blank=True)
     consequence = models.TextField(null=True, blank=True)
     distance = models.IntegerField(null=True, blank=True)

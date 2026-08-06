@@ -4,6 +4,7 @@ import os
 import shutil
 import time
 from collections import defaultdict, Counter
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Iterable, TypeAlias
 
@@ -13,7 +14,8 @@ from django.conf import settings
 from annotation import vep_columns as vep_columns_registry
 from annotation.models.models import VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
-from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
+from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom, NMDEscapeStatus
+from annotation.ptc import parse_ptc_distance_codons, calculate_ptc_position, predict_nmd_escape
 from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
 from annotation.sv_conservation import read_conservation_sidecar, conservation_sidecar_filename
 from annotation.vcf_files.vcf_types import VCFVariant
@@ -50,6 +52,93 @@ class VEPColumns:
 
 TranscriptData: TypeAlias = dict
 
+FRAMESHIFT_CONSEQUENCE = "frameshift_variant"
+
+
+@dataclass(frozen=True)
+class TranscriptGeometry:
+    """ The three numbers the PTC calculation needs, cached per transcript so the
+        cdot blob is read once per annotation run rather than once per row. """
+    fivep_utr_length: int
+    coding_length: int
+    last_junction_cdna: int
+    single_exon: bool
+
+    @classmethod
+    def for_transcript_version(cls, transcript_version: TranscriptVersion) -> Optional['TranscriptGeometry']:
+        """ None when the cdot data is too sparse to place exons - @see TranscriptVersion.get_coordinates """
+        build_data = transcript_version.data.get("genome_builds", {}).get(transcript_version.genome_build.name)
+        if not (build_data and build_data.get("exons") and build_data.get("strand")):
+            return None
+
+        exons = build_data["exons"]
+        # cdot exons are in genomic order, so the transcript's final exon is at whichever end
+        # the strand puts it. Everything before it sums to the last exon-exon junction in cDNA.
+        final_exon = exons[-1] if build_data["strand"] == '+' else exons[0]
+        transcript_length = sum(end - start for start, end, *_ in exons)
+        final_exon_length = final_exon[1] - final_exon[0]
+        return cls(fivep_utr_length=transcript_version.fivep_utr_length,
+                   coding_length=transcript_version.coding_length,
+                   last_junction_cdna=transcript_length - final_exon_length,
+                   single_exon=len(exons) == 1)
+
+
+class TranscriptGeometryCache:
+    """ Lazily loads TranscriptGeometry per transcript_version_id, storing a None sentinel for
+        transcripts whose cdot data is sparse so each is read at most once. Only frameshift rows
+        (~1 in 47) consult it, so the working set stays a few % of the transcriptome. """
+
+    def __init__(self):
+        self._geometry_by_transcript_version_id: dict[int, Optional[TranscriptGeometry]] = {}
+
+    def get(self, transcript_version_id: int) -> Optional[TranscriptGeometry]:
+        if transcript_version_id not in self._geometry_by_transcript_version_id:
+            geometry = None
+            if transcript_version := TranscriptVersion.objects.filter(pk=transcript_version_id).first():
+                geometry = TranscriptGeometry.for_transcript_version(transcript_version)
+            self._geometry_by_transcript_version_id[transcript_version_id] = geometry
+        return self._geometry_by_transcript_version_id[transcript_version_id]
+
+
+def add_calculated_ptc(transcript_data: TranscriptData, indel_offset: int,
+                       transcript_geometry_cache: TranscriptGeometryCache):
+    """ Writes ptc_distance_codons / ptc_last_junction_distance / nmd_escape_status into
+        transcript_data. Shared by the inserter and `manage.py backfill_ptc_annotation`.
+
+        @param indel_offset len(ref) - len(alt) @see annotation.ptc.calculate_ptc_position """
+    transcript_data["nmd_escape_status"] = NMDEscapeStatus.NOT_APPLICABLE
+
+    consequence = transcript_data.get("consequence") or ""
+    if FRAMESHIFT_CONSEQUENCE not in consequence:
+        return
+
+    protein_position = transcript_data.get("protein_position")
+    transcript_version_id = transcript_data.get("transcript_version_id")
+    if not (protein_position and transcript_version_id):
+        return
+
+    ptc_distance_codons = parse_ptc_distance_codons(transcript_data.get("hgvs_p"))
+    if ptc_distance_codons is None:
+        return
+
+    geometry = transcript_geometry_cache.get(transcript_version_id)
+    if geometry is None or not geometry.coding_length:
+        return
+
+    try:
+        protein_position_int = VariantAnnotation.protein_position_to_int(protein_position)
+    except ValueError:
+        return
+
+    ptc_cds = calculate_ptc_position(protein_position_int, ptc_distance_codons, indel_offset)
+    ptc_cdna = ptc_cds + geometry.fivep_utr_length
+    ptc_last_junction_distance = geometry.last_junction_cdna - ptc_cdna
+
+    transcript_data["ptc_distance_codons"] = ptc_distance_codons
+    transcript_data["ptc_last_junction_distance"] = ptc_last_junction_distance
+    transcript_data["nmd_escape_status"] = predict_nmd_escape(ptc_cds, ptc_last_junction_distance,
+                                                              geometry.single_exon)
+
 
 class BulkVEPVCFAnnotationInserter:
     """ Reads VEP VCF, pulling data from CSQ INFO field.
@@ -73,6 +162,9 @@ class BulkVEPVCFAnnotationInserter:
         "transcript_id",
         "transcript_version_id",
         "maxentscan_percent_diff_ref",
+        "ptc_distance_codons",
+        "ptc_last_junction_distance",
+        "nmd_escape_status",
     ]
     DB_MANUALLY_POPULATED_VARIANT_ONLY_COLUMNS = [
         "predictions_num_pathogenic",
@@ -172,6 +264,7 @@ class BulkVEPVCFAnnotationInserter:
         self.sv_overlap_processor = sv_overlap_processor
         self.sv_gene_overlap_resolver = sv_gene_overlap_resolver
         self._generated_hgvs_c = Counter()
+        self.transcript_geometry_cache = TranscriptGeometryCache()
 
         # Resolver for picking per-transcript dbNSFP values (RefSeq <-> Ensembl translation).
         # Only relevant for columns_version >= 4 (which introduced per-transcript dbNSFP
@@ -227,7 +320,11 @@ class BulkVEPVCFAnnotationInserter:
 
         # cvf_list is already filtered through vep_config so unconfigured customs are dropped.
         # Sort to have consistent VCF headers (case-insensitive to match postgres `ORDER BY source_field`)
+        # Defs without a source_field are calculated at insert time (see DB_MANUALLY_POPULATED_COLUMNS)
+        # so there's no CSQ column to copy from.
         for cvf in sorted(cvf_list, key=lambda c: (c.source_field or "").lower()):
+            if cvf.vep_info_field is None:
+                continue
             for vgc_id in cvf.variant_grid_columns:
                 self.source_field_to_columns[cvf.vep_info_field].add(vgc_id)
 
@@ -535,6 +632,8 @@ class BulkVEPVCFAnnotationInserter:
 
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD:
             self._add_calculated_maxentscan(transcript_data)
+            if self.vep_config.columns_version >= 5:
+                self._add_calculated_ptc(variant_coordinate, transcript_data)
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             self._add_hgvs_c(variant_coordinate, transcript_accession, transcript_data)
 
@@ -599,6 +698,13 @@ class BulkVEPVCFAnnotationInserter:
             maxentscan_ref = float(maxentscan_ref)
             if maxentscan_ref:
                 transcript_data["maxentscan_percent_diff_ref"] = 100 * maxentscan_diff / maxentscan_ref
+
+    def _add_calculated_ptc(self, variant_coordinate: Optional[VariantCoordinate],
+                            transcript_data: TranscriptData):
+        """ #579 - where the frameshift's premature termination codon lands, and the
+            PTC-anchored NMD prediction that falls out of it. """
+        indel_offset = len(variant_coordinate.ref) - len(variant_coordinate.alt)
+        add_calculated_ptc(transcript_data, indel_offset, self.transcript_geometry_cache)
 
     @staticmethod
     def _merge_cosmic_ids(transcript_data: TranscriptData, custom_vcf_cosmic_id: str):
