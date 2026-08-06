@@ -73,6 +73,19 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
     # Pin gnomAD so a developer's local override doesn't shift VEP CSQ fields and break fixture parsing.
     TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"]["gnomad4"] = gnomad4_path
 
+    # Same for the columns_version 5 plugin data (#1638) - a deployment pinned below cv5 calls
+    # _disable_columns_version_5_plugins(), which nulls these and would drop the columns entirely.
+    if columns_version >= 5:
+        TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"]["protvar"] = \
+            "annotation_data/all_builds/ProtVar_data.db"
+        TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
+            "protvar": "annotation_data/all_builds/ProtVar_data.db",
+            "open_targets": "annotation_data/GRCh38/open_targets_26.03_vep.tsv.bgz",
+            "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",
+            "popeve": "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz",
+            "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",
+        })
+
     ANNOTATION_COLUMNS = copy.deepcopy(TEST_ANNOTATION)
     ANNOTATION_COLUMNS[settings.BUILD_GRCH37]["columns_version"] = columns_version
     ANNOTATION_COLUMNS[settings.BUILD_GRCH38]["columns_version"] = columns_version
@@ -81,6 +94,9 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
         "IMPORT_PROCESSING_DIR": TEST_IMPORT_PROCESSING_DIR,
         "VARIANT_ZYGOSITY_GLOBAL_COLLECTION": "global",
         "ANNOTATION_VEP_FAKE_VERSION": True,
+        # AnnotSV is off in the shipped defaults - pin it so a developer who enables it locally doesn't
+        # trip the SV guards. Tests that want it on override at the method level.
+        "ANNOTATION_ANNOTSV_ENABLED": False,
         "ANNOTATION": ANNOTATION_COLUMNS,
     }
 
