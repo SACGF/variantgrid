@@ -472,11 +472,6 @@ def view_classification(request: HttpRequest, classification_id: str):
 
     # see if there are pending values
     classification_grouping = ClassificationGroupingEntry.grouping_for(vc)
-    triages_json = {}
-    for contribution in OverlapContribution.objects.filter(classification_grouping=classification_grouping):
-        triages_json[contribution.value_type] = contribution.triage_state_obj.to_dict()
-    # attach this directly to the record for now, might make it part of the default generation
-    record["triages"] = triages_json
 
     context = {
         'vc': vc,

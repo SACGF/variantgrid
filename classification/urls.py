@@ -10,7 +10,7 @@ from classification.views.classification_email_view import summary_email_preview
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
-from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
+from classification.views.classification_overlaps_view import view_overlaps, \
     view_clinical_context, view_overlaps_detail
 from classification.views.classification_overlaps_vus_view import view_overlaps_vus, view_overlaps_vus_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
@@ -178,7 +178,7 @@ urlpatterns = [
 
     path('hgvs_resolution_tool', hgvs_resolution_tool, name='hgvs_resolution_tool'),
 
-    path('clinical_context', post_clinical_context, name='clinical_context'),
+    # path('clinical_context', post_clinical_context, name='clinical_context'),
     path('overlaps', view_overlaps, name='overlaps'),
     path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
     path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
