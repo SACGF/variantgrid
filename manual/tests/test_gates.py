@@ -2,6 +2,7 @@ import json
 from contextlib import redirect_stdout
 from importlib import import_module
 from io import StringIO
+from unittest.mock import patch
 
 from django.apps import apps
 from django.core.management import CommandError, call_command
@@ -11,7 +12,7 @@ from manual import gates
 from manual.models import ManualGateSatisfied, ManualMigrationAttempt, ManualMigrationOutstanding, \
     ManualMigrationRequired, ManualMigrationTask
 from manual.operations.manual_operations import ManualOperation
-from scripts.migrator.migrator import Migrator, run_scheduler
+from scripts.migrator.migrator import Migrator, MigrationStatus, ObsoleteSubMigration, run_scheduler
 
 # Migration module names start with a digit, so they can't be imported with normal import syntax.
 complete_obsolete_tasks = import_module(
@@ -112,6 +113,37 @@ class OutstandingRunnableTest(TestCase):
              "command_exists": True, "blocked_by": ["variant-annotation-current"]})
         self.assertEqual(blocked.status_tag(), "[BLOCKED]")
         self.assertIn("variant-annotation-current", blocked.status_line())
+
+    def test_selecting_obsolete_task_offers_to_mark_it_complete(self):
+        # Selecting an obsolete step used to shell out to a command that no longer exists and fail,
+        # with no way to retire it from the upgrader.
+        task = ManualMigrationTask.objects.create(id="manage*deleted_cmd")
+        self._request(task)
+        obsolete = Migrator.subcommand_for_json(
+            {"id": task.id, "category": "manage", "line": "deleted_cmd",
+             "command_exists": False, "blocked_by": []})
+        self.assertIsInstance(obsolete, ObsoleteSubMigration)
+
+        out = StringIO()
+        with redirect_stdout(out), patch("builtins.input", return_value="y"):
+            result = obsolete.run()
+        self.assertEqual(result.status, MigrationStatus.SUCCESS)
+        self.assertTrue(result.note)
+
+        # what the migrator does with that success - records it, which retires the task
+        call_command("manual_complete", "--id", task.id, "--note", result.note)
+        self.assertIsNone(ManualMigrationOutstanding.outstanding_task(task))
+
+    def test_backing_out_of_an_obsolete_task_leaves_it_outstanding(self):
+        task = ManualMigrationTask.objects.create(id="manage*deleted_cmd")
+        self._request(task)
+        obsolete = ObsoleteSubMigration("deleted_cmd").using(task_id=task.id)
+
+        out = StringIO()
+        with redirect_stdout(out), patch("builtins.input", return_value="x"):
+            result = obsolete.run()
+        self.assertEqual(result.status, MigrationStatus.SKIP)  # SKIP -> migrator records no attempt
+        self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(task))
 
 
 class ObsoleteCleanupTest(TestCase):

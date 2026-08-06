@@ -100,7 +100,7 @@ class SubMigration:
     def status_line(self) -> Optional[str]:
         """ Detail for the status_tag, printed indented under the menu entry, or None. """
         if self.command_exists is False:
-            return "command no longer exists (review / mark complete)"
+            return "command no longer exists (selecting it here marks it complete)"
         if self.blocked_by:
             return f"waiting on: {', '.join(self.blocked_by)} (selecting it here still runs it)"
         return None
@@ -143,6 +143,32 @@ class ManualSubMigration(SubMigration):
                 return MigrationResult.success()
             if selection == "n":
                 return MigrationResult.failure()
+            if selection == "x":
+                return MigrationResult.skip()
+            print(f"Unexpected input - \"{selection}\"")
+
+
+class ObsoleteSubMigration(SubMigration):
+    """ A 'manage' task whose command no longer exists - running it can only fail, so selecting it
+        offers to record it as complete (which takes it off the outstanding list) instead. """
+
+    def __init__(self, line: str):
+        super().__init__()
+        self.line = line
+        self.command_exists = False
+
+    def __str__(self):
+        return "python3 manage.py " + self.line
+
+    def run(self) -> MigrationResult:
+        while True:
+            print_yellow(f"'{self.line}' no longer exists in this codebase, so it can't be run.")
+            print("y: mark as complete (no longer required)")
+            print("x: back")
+            selection = input("\033[95mPlease enter a selection: \033[00m")
+            selection = selection.strip().lower()
+            if selection == "y":
+                return MigrationResult.success(note="Obsolete - command no longer exists, marked complete in upgrader")
             if selection == "x":
                 return MigrationResult.skip()
             print(f"Unexpected input - \"{selection}\"")
@@ -339,9 +365,10 @@ class Migrator:
 
         def run_task(task) -> bool:
             migration = Migrator.subcommand_for_json(task)
-            success = migration.run().status == MigrationStatus.SUCCESS
+            result = migration.run()
+            success = result.status == MigrationStatus.SUCCESS
             if migration.task_id:
-                self.record_attempt(task_id=migration.task_id, success=success)
+                self.record_attempt(task_id=migration.task_id, success=success, note=result.note)
             if success:
                 print_green("*** task succeeded ***")
             else:
@@ -368,7 +395,7 @@ class Migrator:
                 gates = ", ".join(t.get("blocked_by") or [])
                 print_yellow(f"    python3 manage.py {t['line']}    [waiting on: {gates}]")
         if obsolete:
-            print_yellow("Obsolete manage steps (command no longer exists - review/mark complete):")
+            print_yellow("Obsolete manage steps (command no longer exists):")
             for t in obsolete:
                 print_yellow(f"    {t['line']}")
         if others:
@@ -380,11 +407,15 @@ class Migrator:
         if manage_blocked:
             print_purple("Satisfy a manual gate with: python3 manage.py manual_gate --satisfy <gate>")
             print_purple("List gate status with:      python3 manage.py manual_gate")
+        if obsolete:
+            print_purple("Mark an obsolete step complete by selecting it in the ./scripts/upgrade.sh menu")
 
-    def record_attempt(self, task_id: str, success: bool = True):
+    def record_attempt(self, task_id: str, success: bool = True, note: Optional[str] = None):
         args = ["python", "manage.py", "manual_complete", "--id", task_id, "--ver", self.git_version]
         if not success:
             args.extend(["--failed"])
+        if note:
+            args.extend(["--note", note])
         command = substitute_aliases(args)
         with Popen(command, stdout=subprocess.PIPE) as proc:
             proc.stdout.read()  # do we care about this output
@@ -400,8 +431,11 @@ class Migrator:
         line = task["line"]
         notes = task.get("notes")
         if category == "manage":
-            args = ["python", "manage.py", line]
-            sub_migration = CommandSubMigration(args).using(task_id=task_id, notes=notes)
+            if task.get("command_exists") is False:
+                sub_migration = ObsoleteSubMigration(line).using(task_id=task_id, notes=notes)
+            else:
+                args = ["python", "manage.py", line]
+                sub_migration = CommandSubMigration(args).using(task_id=task_id, notes=notes)
         else:
             sub_migration = ManualSubMigration(line).using(task_id=task_id, notes=notes)
         sub_migration.blocked_by = task.get("blocked_by")
@@ -483,7 +517,9 @@ class Migrator:
             result = migration.run()
             if result.status != MigrationStatus.SKIP:
                 if migration.task_id:
-                    self.record_attempt(task_id=migration.task_id, success=result.status == MigrationStatus.SUCCESS)
+                    self.record_attempt(task_id=migration.task_id,
+                                        success=result.status == MigrationStatus.SUCCESS,
+                                        note=result.note)
             if result.status == MigrationStatus.SUCCESS:
                 print_green("*** task succeeded ***")
                 self.run_and_callback(migrations, callback)
@@ -506,7 +542,8 @@ Modes:
   --auto-manage    Plough through all outstanding manual steps automatically: run every
                    unblocked 'manage' step (re-evaluating between passes so ordering gates
                    release as prerequisites finish), stopping on the first failure. Gated,
-                   obsolete, and non-manage human steps are reported, not run.
+                   obsolete, and non-manage human steps are reported, not run. Select an
+                   obsolete step in the interactive menu to mark it complete.
   --help, -h       Show this help.
 """
 
