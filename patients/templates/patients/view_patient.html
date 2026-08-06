@@ -177,7 +177,7 @@
         {% endif %}
 
         {% related_data_for_patient patient %}
-        {% related_analyses_for_samples patient.get_samples show_sample_info=True %}
+        {% related_analyses_for_samples patient.get_samples show_sample_info=True show_create_analyses=False %}
 
     </div>
 {% endblock content %}
