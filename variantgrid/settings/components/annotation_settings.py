@@ -92,7 +92,8 @@ BUILD_T2TV2 = "T2T-CHM13v2.0"
 ANNOTATION = {
     # 'reference_fasta' is an NCBI fasta, with contig accessions as the sequence names - required by cdot,
     # and used for VEP. The 'liftover' fasta has sequences named by chromosome, to match the contig names in
-    # the chain files - it's only needed when LIFTOVER_BCFTOOLS_ENABLED.
+    # the chain files - it's only needed when LIFTOVER_BCFTOOLS_ENABLED. bcftools +liftover has no
+    # --rename-chrs equivalent, so using 'reference_fasta' here would mean rewriting the chain contigs (see #1373)
 
     BUILD_GRCH37: {
         "enabled": True,
