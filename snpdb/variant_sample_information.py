@@ -52,8 +52,12 @@ class VariantZygosityCounts:
         self.visible_rows = []
         for row in values_qs:
             pk = row["variant"]
-            zygosity = row.get("zygosity", Zygosity.UNKNOWN_ZYGOSITY)
-            self.locus_counter[pk][zygosity] += 1
+            # Alleles at the locus with no CohortGenotype yield a row with no sample - touch the counter so they
+            # still appear in the locus counts, but with zeros rather than being counted as unknown zygosity
+            zygosity_counter = self.locus_counter[pk]
+            zygosity = row.get("zygosity")
+            if zygosity:
+                zygosity_counter[zygosity] += 1
 
             if variant.pk == pk:
                 if sample_id := row.get("sample"):

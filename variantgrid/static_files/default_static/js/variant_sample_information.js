@@ -39,6 +39,7 @@ const VariantSampleInformation = (function () {
     let pendingRequests = 0;
     let allRows = [];
     let checkedZygosities = null;  // null until we've seen a response and know what to default to
+    let genomeBuildChecked = {};  // build -> bool, a build starts checked when its first rows arrive
     let graphedFilter = null;  // Redrawing 10k plotly points on every page change is a waste
 
     function genotypesUrl(variantId) {
@@ -112,11 +113,11 @@ const VariantSampleInformation = (function () {
             {data: 'sample_name', title: 'Sample Name', render: renderSampleLink},
             {data: 'genome_build', name: 'genome_build', title: 'Genome Build', visible: false},
             {data: 'zygosity', title: 'Zygosity', render: renderZygosity},
-            {data: 'filters', title: 'FILTER', render: renderFilters},
             {data: 'allele_frequency', title: 'Allele Frequency', render: renderFormatField},
             {data: 'allele_depth', title: 'Allele Depth', render: renderFormatField},
             {data: 'read_depth', title: 'Read Depth', render: renderFormatField},
             {data: 'phred_likelihood', title: 'Phred Likelihood', render: renderFormatField},
+            {data: 'filters', title: 'FILTER', render: renderFilters},
             {data: 'enrichment_kit', title: 'EnrichmentKit', defaultContent: ''},
             {data: 'patient_hpo', title: 'Patient HPO', className: 'no-word-wrap', render: ontologyRenderer('HP')},
             {data: 'patient_omim', title: 'Patient OMIM', className: 'no-word-wrap', render: ontologyRenderer('OMIM')},
@@ -148,17 +149,20 @@ const VariantSampleInformation = (function () {
         });
 
         $.fn.dataTable.ext.search.push(function (settings, searchData, dataIndex, rowData) {
-            if (settings.nTable.id !== 'genotype-grid' || checkedZygosities === null) {
+            if (settings.nTable.id !== 'genotype-grid') {
                 return true;
             }
-            return checkedZygosities.has(rowData.zygosity);
+            if (genomeBuildChecked[rowData.genome_build] === false) {
+                return false;
+            }
+            return checkedZygosities === null || checkedZygosities.has(rowData.zygosity);
         });
 
-        // Graphs summarise what the grid is showing, so follow the zygosity/search filters
+        // Graphs summarise what the grid is showing, so follow the zygosity/build/search filters
         dataTable.on('draw', drawGraphs);
     }
 
-    /** The rows the grid is currently showing - across all pages, but after zygosity/search filtering */
+    /** The rows the grid is currently showing - across all pages, but after zygosity/build/search filtering */
     function visibleRows() {
         return dataTable.rows({search: 'applied'}).data().toArray();
     }
@@ -173,6 +177,34 @@ const VariantSampleInformation = (function () {
         return counts;
     }
 
+    function genomeBuildCounts() {
+        const counts = {};
+        for (const row of allRows) {
+            counts[row.genome_build] = (counts[row.genome_build] || 0) + 1;
+        }
+        return counts;
+    }
+
+    /** Draws "label (count): [x] |" checkboxes, handing the checked values to onChange */
+    function drawFilterCheckboxes(container, entries, isChecked, onChange) {
+        container.empty();
+        for (const entry of entries) {
+            const checkbox = $('<input>', {
+                type: 'checkbox',
+                class: 'genotype-filter',
+                value: entry.value,
+            }).prop('checked', isChecked(entry.value));
+            container.append($('<label>', {text: `${entry.label} (${entry.count}):`}), checkbox,
+                $('<span>', {class: 'separator', text: '|'}));
+        }
+
+        container.find(".genotype-filter").change(function () {
+            onChange(container.find(".genotype-filter:checked")
+                .map(function () { return $(this).val(); }).get());
+            dataTable.draw();
+        });
+    }
+
     function drawZygosityFilters() {
         const counts = zygosityCounts();
         if (checkedZygosities === null) {
@@ -182,26 +214,30 @@ const VariantSampleInformation = (function () {
             checkedZygosities = new Set(visible);
         }
 
-        const container = $("#zygosity-filters").empty();
-        for (const zygosity of ZYGOSITIES) {
-            const count = counts[zygosity.code];
-            if (!count) {
-                continue;
+        const entries = ZYGOSITIES.filter(z => counts[z.code])
+            .map(z => ({value: z.code, label: z.label, count: counts[z.code]}));
+        drawFilterCheckboxes($("#zygosity-filters"), entries,
+            code => checkedZygosities.has(code),
+            values => checkedZygosities = new Set(values));
+    }
+
+    function drawGenomeBuildFilters() {
+        const counts = genomeBuildCounts();
+        const builds = Object.keys(counts).sort();
+        for (const build of builds) {
+            if (!(build in genomeBuildChecked)) {
+                genomeBuildChecked[build] = true;  // Builds load one at a time, so this can be after a filter change
             }
-            const checkbox = $('<input>', {
-                type: 'checkbox',
-                class: 'genotype-filter',
-                value: zygosity.code,
-            }).prop('checked', checkedZygosities.has(zygosity.code));
-            container.append($('<label>', {text: `${zygosity.label} (${count}):`}), checkbox,
-                $('<span>', {class: 'separator', text: '|'}));
         }
 
-        container.find(".genotype-filter").change(function () {
-            checkedZygosities = new Set(container.find(".genotype-filter:checked")
-                .map(function () { return $(this).val(); }).get());
-            dataTable.draw();
-        });
+        // A single build is the whole grid, so there'd be nothing to filter
+        $("#genome-build-filter").toggle(builds.length > 1);
+        const entries = builds.map(build => ({value: build, label: build, count: counts[build]}));
+        drawFilterCheckboxes($("#genome-build-filters"), entries,
+            build => genomeBuildChecked[build],
+            function (values) {
+                builds.forEach(build => genomeBuildChecked[build] = values.includes(build));
+            });
     }
 
     function locusCountsTable(locusCounts) {
@@ -399,7 +435,8 @@ const VariantSampleInformation = (function () {
 
     function drawGraphs() {
         const zygosities = checkedZygosities === null ? '' : [...checkedZygosities].sort().join(',');
-        const filter = [allRows.length, dataTable.search(), zygosities].join('|');
+        const builds = Object.keys(genomeBuildChecked).filter(b => genomeBuildChecked[b]).sort().join(',');
+        const filter = [allRows.length, dataTable.search(), zygosities, builds].join('|');
         if (filter === graphedFilter) {
             return;  // Paging/sorting doesn't change what the graphs summarise
         }
@@ -421,7 +458,8 @@ const VariantSampleInformation = (function () {
             allRows = allRows.concat(data.rows);
             $("#genotype-grid-container").show();
             drawZygosityFilters();
-            dataTable.column('genome_build:name').visible(new Set(allRows.map(r => r.genome_build)).size > 1, false);
+            drawGenomeBuildFilters();
+            dataTable.column('genome_build:name').visible(Object.keys(genomeBuildCounts()).length > 1, false);
             dataTable.rows.add(data.rows).draw();  // 'draw' redraws the graphs
             dataTable.columns.adjust();  // Grid was hidden when created, so scrollX header/body need re-sizing
         }

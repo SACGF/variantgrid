@@ -5,7 +5,7 @@ from patients.models_enums import Zygosity
 from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
-from snpdb.variant_sample_information import VariantZygosityCounts
+from snpdb.variant_sample_information import VariantSampleGenotypes, VariantZygosityCounts
 
 
 class VariantZygosityCountsTest(TestCase):
@@ -24,10 +24,14 @@ class VariantZygosityCountsTest(TestCase):
 
     def _het_proband(self, cohort, variant):
         """ samples_zygosity is indexed [proband, mother, father] - only proband is called """
+        self._proband_zygosity(cohort, variant, Zygosity.HET)
+
+    def _proband_zygosity(self, cohort, variant, zygosity):
         cgc = CohortGenotypeCollection.objects.get(cohort=cohort)
-        samples_zygosity = Zygosity.HET + Zygosity.MISSING + Zygosity.MISSING
+        samples_zygosity = zygosity + Zygosity.MISSING + Zygosity.MISSING
         n = len(samples_zygosity)
-        CohortGenotype.objects.create(collection=cgc, variant=variant, het_count=1,
+        CohortGenotype.objects.create(collection=cgc, variant=variant,
+                                      het_count=int(zygosity == Zygosity.HET),
                                       samples_zygosity=samples_zygosity,
                                       samples_allele_depth=[20] * n, samples_allele_frequency=[100] * n,
                                       samples_read_depth=[30] * n, samples_genotype_quality=[30] * n,
@@ -77,3 +81,53 @@ class VariantZygosityCountsTest(TestCase):
         no_perms = VariantZygosityCounts(other_user, variant)
         self.assertEqual(0, no_perms.num_user_samples)
         self.assertTrue(no_perms.has_hidden_samples)
+
+
+class LocusCountsTest(TestCase):
+    """ The locus counts table is per-allele zygosity counts for every variant at the locus """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='locus_counts_test_user')[0]
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.cohort = create_fake_cohort(cls.user, cls.grch37)
+
+    def _proband_zygosity(self, variant, zygosity):
+        cgc = CohortGenotypeCollection.objects.get(cohort=self.cohort)
+        samples_zygosity = zygosity + Zygosity.MISSING + Zygosity.MISSING
+        n = len(samples_zygosity)
+        CohortGenotype.objects.create(collection=cgc, variant=variant,
+                                      het_count=int(zygosity == Zygosity.HET),
+                                      samples_zygosity=samples_zygosity,
+                                      samples_allele_depth=[20] * n, samples_allele_frequency=[100] * n,
+                                      samples_read_depth=[30] * n, samples_genotype_quality=[30] * n,
+                                      samples_phred_likelihood=[0] * n)
+
+    def _locus_counts_by_variant(self, variant) -> dict:
+        locus_counts = VariantSampleGenotypes(self.user, variant).to_json()["locus_counts"]
+        return {row["variant"]: row for row in locus_counts}
+
+    def test_allele_without_samples_counts_zero(self):
+        """ An allele at the locus with no CohortGenotype still gets a row, but it has no observations """
+        variant = slowly_create_test_variant("3", 3000, "A", "T", self.grch37)
+        no_samples = slowly_create_test_variant("3", 3000, "A", "G", self.grch37)
+        self._proband_zygosity(variant, Zygosity.HET)
+
+        by_variant = self._locus_counts_by_variant(variant)
+        self.assertEqual({str(variant), str(no_samples)}, set(by_variant))
+
+        row = by_variant[str(no_samples)]
+        self.assertEqual(0, row["total"])
+        self.assertEqual(0, row["Unknown"], "No CohortGenotype isn't an unknown zygosity call")
+
+    def test_unknown_zygosity_is_counted(self):
+        """ './.' calls are real observations, and the grid has a zygosity filter for them """
+        variant = slowly_create_test_variant("3", 4000, "A", "T", self.grch37)
+        self._proband_zygosity(variant, Zygosity.UNKNOWN_ZYGOSITY)
+
+        data = VariantSampleGenotypes(self.user, variant).to_json()
+        row = {r["variant"]: r for r in data["locus_counts"]}[str(variant)]
+        self.assertEqual(1, row["total"])
+        self.assertEqual(1, row["Unknown"])
+        self.assertEqual({Zygosity.UNKNOWN_ZYGOSITY: 1}, data["zygosity_counts"])
