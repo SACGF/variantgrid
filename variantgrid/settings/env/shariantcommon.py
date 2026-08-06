@@ -129,6 +129,7 @@ ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", A
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
 ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
 pin_annotation_to_columns_version_3(ANNOTATION)
+use_pre_vep112_fasta(ANNOTATION)
 
 ANNOTATION[BUILD_GRCH37].update({
     "annotation_consortium": "RefSeq",

@@ -90,8 +90,9 @@ BUILD_T2TV2 = "T2T-CHM13v2.0"
 
 
 ANNOTATION = {
-    # We need separate 'reference_fasta' as cdot requires a NCBI fasta with contig_ids as the names
-    # While VEP has issues with this, so has 'vep_config.fasta' see https://github.com/Ensembl/ensembl-vep/issues/1635
+    # 'reference_fasta' is an NCBI fasta, with contig accessions as the sequence names - required by cdot,
+    # and used for VEP. The 'liftover' fasta has sequences named by chromosome, to match the contig names in
+    # the chain files - it's only needed when LIFTOVER_BCFTOOLS_ENABLED.
 
     BUILD_GRCH37: {
         "enabled": True,
@@ -101,8 +102,11 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "liftover": {
-            BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR,"liftover/GRCh37_to_GRCh38.chain.gz"),
-            BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg19ToHs1.over.chain.gz"),
+            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"),
+            "chain": {
+                BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR, "liftover/GRCh37_to_GRCh38.chain.gz"),
+                BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg19ToHs1.over.chain.gz"),
+            },
         },
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
@@ -118,8 +122,6 @@ ANNOTATION = {
             # We use gnomAD SV VCF with --custom twice
             "gnomad_sv": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
-            # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
-            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"),
             "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2023.10.02-grch37.vcf.gz",
             "mave": None,  # n/a for GRCh37
             "maxentscan": "annotation_data/all_builds/maxentscan",
@@ -152,8 +154,11 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "liftover": {
-            BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/GRCh38_to_GRCh37.chain.gz"),
-            BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg38ToHs1.over.chain.gz"),
+            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.toplevel.fa.gz"),
+            "chain": {
+                BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/GRCh38_to_GRCh37.chain.gz"),
+                BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg38ToHs1.over.chain.gz"),
+            },
         },
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
@@ -165,8 +170,6 @@ ANNOTATION = {
             "dbnsfp": "annotation_data/GRCh38/dbNSFP5.3.1a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
             "denovo_db": "annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz",
-            # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
-            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.toplevel.fa.gz"),
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
             "gnomad4": "annotation_data/GRCh38/gnomad4.1_GRCh38_contigs.vcf.gz",
@@ -204,8 +207,11 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_009914755.1_T2T-CHM13v2.0_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "liftover": {
-            BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg19.over.chain.gz"),
-            BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg38.over.chain.gz"),
+            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens-GCA_009914755.4-softmasked.fa.gz"),
+            "chain": {
+                BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg19.over.chain.gz"),
+                BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg38.over.chain.gz"),
+            },
         },
 
         "vep_config": {
@@ -218,8 +224,6 @@ ANNOTATION = {
             "gnomad4": "annotation_data/T2T-CHM13v2.0/gnomad4.1.t2t_liftover_T2T-CHM13v2.0_combined_af.vcf.bgz",
             "gnomad_sv": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
-            # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
-            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens-GCA_009914755.4-softmasked.fa.gz"),
             "mastermind": None,  # N/A
             "mave": None,  # N/A
             "maxentscan": "annotation_data/all_builds/maxentscan",
@@ -272,6 +276,18 @@ def pin_annotation_to_columns_version_4(annotation):
     annotation[BUILD_GRCH37]["columns_version"] = 4
     annotation[BUILD_GRCH38]["columns_version"] = 4
     _disable_columns_version_5_plugins(annotation)
+
+
+def use_pre_vep112_fasta(annotation):
+    """Annotate against the chromosome-named (liftover) fasta rather than the NCBI 'reference_fasta'.
+
+    Before v112, VEP renamed contigs to match an NCBI fasta, which silently dropped plugin/custom
+    annotations - see https://github.com/Ensembl/ensembl-vep/issues/1635. Deployments that keep
+    ANNOTATION_VEP_VERSION below 112 call this from their env settings file.
+    """
+    for build_settings in annotation.values():
+        if fasta := build_settings["liftover"].get("fasta"):
+            build_settings["vep_config"]["fasta"] = fasta
 
 
 def pin_annotation_to_columns_version_3(annotation):

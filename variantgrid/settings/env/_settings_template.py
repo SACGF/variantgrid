@@ -36,6 +36,7 @@ if _historical_annotation:
     ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
     ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
     pin_annotation_to_columns_version_3(ANNOTATION)
+    use_pre_vep112_fasta(ANNOTATION)  # VEP below 112 needs a chromosome-named fasta
 
 _use_grch38 = False
 if _use_grch38:

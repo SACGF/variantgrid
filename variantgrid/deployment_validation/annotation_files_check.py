@@ -39,8 +39,10 @@ def annotation_data_exists(flat=False, include_tbi_for_gz=False) -> dict:
                 check_files[key] = filename
 
         if settings.LIFTOVER_BCFTOOLS_ENABLED:
-            annotation_build_config = settings.ANNOTATION[genome_build.name]
-            for dest_genome_build, chain_filename in annotation_build_config["liftover"].items():
+            liftover_config = settings.ANNOTATION[genome_build.name]["liftover"]
+            if liftover_fasta := liftover_config.get("fasta"):
+                check_files["liftover_fasta"] = liftover_fasta
+            for dest_genome_build, chain_filename in liftover_config["chain"].items():
                 if dest_genome_build in active_build_names:
                     key = f"bcftools_chain_{genome_build.name}_to_{dest_genome_build}"
                     check_files[key] = chain_filename

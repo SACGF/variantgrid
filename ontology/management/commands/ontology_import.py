@@ -1,6 +1,7 @@
 import csv
 import itertools
 import json
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -293,9 +294,9 @@ def load_hpo(filename: str, force: bool):
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
-    print("About to pronto the file")
+    logging.info("About to pronto the file")
     ot = pronto.Ontology(filename)
-    print("Pronto complete")
+    logging.info("Pronto complete")
     scope_lookup = {v.upper(): k for k, v in HPOSynonymScope.choices}
 
     for term in ot.terms():
@@ -345,7 +346,7 @@ def load_hpo(filename: str, force: bool):
                 relation=OntologyRelation.IS_A
             )
     ontology_builder.complete(verbose=True)
-    print("Committing...")
+    logging.info("Committing...")
 
 
 def load_phenotype_to_genes(filename: str, force: bool):

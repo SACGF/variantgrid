@@ -98,6 +98,16 @@ def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path) -> 
     return ["--custom", command]
 
 
+def _get_vep_fasta(vep_config: VEPConfig, genome_build: GenomeBuild) -> str:
+    """ VEP renamed contigs when given an NCBI fasta before v112, silently dropping plugin annotations
+        (https://github.com/Ensembl/ensembl-vep/issues/1635) - deployments pinned to those versions set
+        vep_config "fasta" to a chromosome-named one """
+    try:
+        return vep_config["fasta"]
+    except KeyError:
+        return genome_build.reference_fasta
+
+
 def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
                     pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True,
                     variant_annotation_version=None):
@@ -114,7 +124,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--dir_cache", settings.ANNOTATION_VEP_CACHE_DIR,
         "--dir_plugins", settings.ANNOTATION_VEP_PLUGINS_DIR,
         # Need to provide VEP a fasta rather than use the default - https://github.com/Ensembl/VEP_plugins/issues/708
-        "--fasta", vc["fasta"],
+        "--fasta", _get_vep_fasta(vc, genome_build),
         "--assembly", genome_build.name,
         "--offline", "--use_given_ref", "--vcf",
         "--force_overwrite", "--flag_pick", "--exclude_predicted", "--no_stats",

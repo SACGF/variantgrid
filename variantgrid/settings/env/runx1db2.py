@@ -31,6 +31,7 @@ _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 # The GRCh37 overrides below then pin this deployment further back to columns_version 1.
 ANNOTATION_VEP_VERSION = "110"
 pin_annotation_to_columns_version_3(ANNOTATION)
+use_pre_vep112_fasta(ANNOTATION)
 
 ANNOTATION[BUILD_GRCH37].update({
     "columns_version": 1,

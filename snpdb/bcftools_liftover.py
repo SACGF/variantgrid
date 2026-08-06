@@ -5,7 +5,6 @@ from typing import Optional
 
 from django.conf import settings
 
-from annotation.vep_annotation import VEPConfig
 from library.utils import execute_cmd
 from snpdb.models import GenomeBuild, VariantCoordinate
 
@@ -32,18 +31,12 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,
                       out_vcf: str, out_genome_build: GenomeBuild) -> tuple[str, int]:
     """ returns reject file and items to process if any failed """
 
-    vep_config_per_build = {}
-    for genome_build in GenomeBuild.builds_with_annotation():
-        vep_config_per_build[genome_build.name] = VEPConfig(genome_build)
+    source_liftover_config = settings.ANNOTATION[source_genome_build.name]["liftover"]
+    dest_liftover_config = settings.ANNOTATION[out_genome_build.name]["liftover"]
 
-    source_vep_config = vep_config_per_build[source_genome_build.name]
-    dest_vep_config = vep_config_per_build[out_genome_build.name]
-
-    source_fasta_filename = source_vep_config["fasta"]
-    dest_fasta_filename = dest_vep_config["fasta"]
-
-    annotation_build_config = settings.ANNOTATION[source_genome_build.name]
-    chain_filename = annotation_build_config["liftover"].get(out_genome_build.name)
+    source_fasta_filename = source_liftover_config.get("fasta")
+    dest_fasta_filename = dest_liftover_config.get("fasta")
+    chain_filename = source_liftover_config["chain"].get(out_genome_build.name)
     required_files = {
         "source_fasta_filename": source_fasta_filename,
         "dest_fasta_filename": dest_fasta_filename,
