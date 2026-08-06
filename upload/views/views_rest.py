@@ -18,22 +18,22 @@ from analysis.tasks.analysis_grid_export_tasks import export_cohort_to_downloada
 from library.log_utils import report_exc_info
 from snpdb.models import Cohort, CachedGeneratedFile
 from snpdb.models.models_enums import ImportStatus
-from upload.models import UploadedFile
+from upload.models import FileUpload
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
 from upload.views.views import handle_file_upload, get_upload_status_dict
 
 
-def _get_uploaded_file_for_user(user, *, uploaded_file_id=None, sha256_hash=None) -> UploadedFile:
-    """ Resolve an UploadedFile by pk or by content hash, then run the ownership check. """
-    if uploaded_file_id is not None:
-        uploaded_file = get_object_or_404(UploadedFile, pk=uploaded_file_id)
+def _get_file_upload_for_user(user, *, file_upload_id=None, sha256_hash=None) -> FileUpload:
+    """ Resolve a FileUpload by pk or by content hash, then run the ownership check. """
+    if file_upload_id is not None:
+        file_upload = get_object_or_404(FileUpload, pk=file_upload_id)
     elif sha256_hash:
         # Most-recent matching upload the user can see
-        uploaded_file = get_object_or_404(UploadedFile.objects.order_by("-pk"), sha256_hash=sha256_hash)
+        file_upload = get_object_or_404(FileUpload.objects.order_by("-pk"), sha256_hash=sha256_hash)
     else:
-        raise Http404("Provide uploaded_file_id or sha256_hash")
-    uploaded_file.check_can_view(user)
-    return uploaded_file
+        raise Http404("Provide file_upload_id or sha256_hash")
+    file_upload.check_can_view(user)
+    return file_upload
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -42,13 +42,15 @@ class APIFileUploadView(APIView):
 
         The optional 'path' query param is a SeqAuto-only hint: on SeqAuto deployments it links the
         upload to a pre-registered backend sequencing VCF at that server path. General upload / annotate
-        / download clients should omit it and identify uploads by the returned uploaded_file_id and/or
-        sha256_hash (content hash, which is stable across servers). """
+        / download clients should omit it and identify uploads by the returned file_upload_id and/or
+        sha256_hash (content hash, which is stable across servers). 'uploaded_file_id' is a retained
+        alias for 'file_upload_id'. """
 
     @extend_schema(
         summary="Upload a file (multipart form field 'file'), returning the uploaded file ID",
         description="Optional query params: 'path' (SeqAuto backend-link hint only - omit for general "
-                    "uploads) and 'force' (skip sha256 de-duplication). Returns uploaded_file_id and sha256_hash.",
+                    "uploads) and 'force' (skip sha256 de-duplication). Returns file_upload_id and "
+                    "sha256_hash. 'uploaded_file_id' is a retained alias for 'file_upload_id'.",
         request=OpenApiTypes.BINARY,
         responses=OpenApiTypes.OBJECT,
     )
@@ -59,37 +61,38 @@ class APIFileUploadView(APIView):
             force = request.query_params.get("force", False)
 
             response_data = {}
-            existing_uploaded_file: Optional[UploadedFile] = None
+            existing_file_upload: Optional[FileUpload] = None
             if not force:
                 sha256_hash = self._django_file_sha256(django_uploaded_file)
-                existing_uploaded_file = self._get_existing_uploaded_file(request.user, sha256_hash, path)
+                existing_file_upload = self._get_existing_file_upload(request.user, sha256_hash, path)
 
-            if existing_uploaded_file:
+            if existing_file_upload:
                 response_data["message"] = "Existing uploaded file with matching hash found"
-                uploaded_file = existing_uploaded_file
+                file_upload = existing_file_upload
             else:
                 # This is still a Django UploadedFile - even though it's API we save as import_source.WEB_UPLOAD
-                # So we know to handle it as UploadedFile rather than 'path' (which is the path on the API client)
-                uploaded_file = handle_file_upload(request.user, django_uploaded_file, path=path)
+                # So we know to handle it as a web upload rather than 'path' (which is the path on the API client)
+                file_upload = handle_file_upload(request.user, django_uploaded_file, path=path)
 
-            response_data["uploaded_file_id"] = uploaded_file.pk
-            response_data["sha256_hash"] = uploaded_file.sha256_hash
+            response_data["file_upload_id"] = file_upload.pk
+            response_data["uploaded_file_id"] = file_upload.pk  # deprecated alias
+            response_data["sha256_hash"] = file_upload.sha256_hash
             return JsonResponse(response_data)
         except Exception:
             report_exc_info(request=request)
             return JsonResponse({"error": "Upload failed"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     @classmethod
-    def _get_existing_uploaded_file(cls, user, sha256_hash, path=None) -> Optional[UploadedFile]:
+    def _get_existing_file_upload(cls, user, sha256_hash, path=None) -> Optional[FileUpload]:
         """ Most-recent successfully-processed upload with the same content the user can view.
             Prefers a matching 'path' when supplied. """
         matches = []
-        for existing_uf in UploadedFile.objects.filter(sha256_hash=sha256_hash).order_by("-pk"):
+        for existing_uf in FileUpload.objects.filter(sha256_hash=sha256_hash).order_by("-pk"):
             if not existing_uf.can_view(user):
                 continue
             # Only re-use uploaded files that have been successfully processed
             upload_data = get_upload_data_for_uploaded_file(existing_uf)
-            if upload_data is not None and existing_uf.uploaded_file:
+            if upload_data is not None and existing_uf.file_field:
                 matches.append(existing_uf)
 
         if not matches:
@@ -114,14 +117,16 @@ class APIUploadStatusView(APIView):
 
     @extend_schema(
         summary="Get import/annotation status for an uploaded file (by id or sha256 hash)",
+        description="Returns file_upload_id and sha256_hash along with import/annotation progress. "
+                    "'uploaded_file_id' is a retained alias for 'file_upload_id'.",
         responses=OpenApiTypes.OBJECT,
     )
     def get(self, request, *args, **kwargs):
-        uploaded_file = _get_uploaded_file_for_user(
+        file_upload = _get_file_upload_for_user(
             request.user,
-            uploaded_file_id=kwargs.get("uploaded_file_id"),
+            file_upload_id=kwargs.get("file_upload_id"),
             sha256_hash=kwargs.get("sha256_hash"))
-        return JsonResponse(get_upload_status_dict(uploaded_file))
+        return JsonResponse(get_upload_status_dict(file_upload))
 
 
 class APIAnnotatedDownloadView(APIView):
@@ -140,13 +145,13 @@ class APIAnnotatedDownloadView(APIView):
             return JsonResponse({"error": f"export_type must be one of {sorted(self.EXPORT_TYPES)}"},
                                 status=HTTPStatus.BAD_REQUEST)
 
-        uploaded_file = _get_uploaded_file_for_user(
+        file_upload = _get_file_upload_for_user(
             request.user,
-            uploaded_file_id=kwargs.get("uploaded_file_id"),
+            file_upload_id=kwargs.get("file_upload_id"),
             sha256_hash=kwargs.get("sha256_hash"))
 
         try:
-            uploaded_vcf = uploaded_file.uploadedvcf
+            uploaded_vcf = file_upload.uploadedvcf
         except ObjectDoesNotExist:
             uploaded_vcf = None
         vcf = uploaded_vcf.vcf if uploaded_vcf else None

@@ -22,7 +22,7 @@ from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
-from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
+from upload.models import FileUpload, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 
 # VariantCoordinate can be None, with an error string at the end
@@ -93,15 +93,15 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                                                         contig_allow_list=used_chroms)
                 write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates=variant_coordinates,
                                                    vcf_ids=vcf_ids, header_lines=header_lines)
-                uploaded_file = UploadedFile.objects.create(path=liftover_vcf_filename,
-                                                            import_source=import_source,
-                                                            name='Liftover',
-                                                            user=user,
-                                                            file_type=UploadedFileTypes.LIFTOVER)
+                file_upload = FileUpload.objects.create(path=liftover_vcf_filename,
+                                                        import_source=import_source,
+                                                        name='Liftover',
+                                                        user=user,
+                                                        file_type=UploadedFileTypes.LIFTOVER)
 
-                UploadedLiftover.objects.create(uploaded_file=uploaded_file,
+                UploadedLiftover.objects.create(file_upload=file_upload,
                                                 liftover=liftover)
-                upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+                upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
                 process_upload_pipeline(upload_pipeline)
             else:
                 logging.info("LiftoverRun %s doesn't need to be run", liftover)

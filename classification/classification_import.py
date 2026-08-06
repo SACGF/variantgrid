@@ -15,7 +15,7 @@ from library.utils import full_class_name
 from snpdb.models import Variant, ImportSource
 from snpdb.models.models_variant import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup, VariantHash
-from upload.models import UploadedFile, UploadPipeline, UploadStep, \
+from upload.models import FileUpload, UploadPipeline, UploadStep, \
     UploadedClassificationImport
 from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, \
     UploadStepTaskType, VCFPipelineStage
@@ -100,15 +100,15 @@ def _classification_upload_pipeline(
     else:
         vcf_filename = None
 
-    uploaded_file = UploadedFile.objects.create(path=vcf_filename,
-                                                import_source=import_source,
-                                                name='Variants from API',
-                                                user=classification_import.user,
-                                                file_type=UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY)
+    file_upload = FileUpload.objects.create(path=vcf_filename,
+                                            import_source=import_source,
+                                            name='Variants from API',
+                                            user=classification_import.user,
+                                            file_type=UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY)
 
-    UploadedClassificationImport.objects.create(uploaded_file=uploaded_file,
+    UploadedClassificationImport.objects.create(file_upload=file_upload,
                                                 classification_import=classification_import)
-    upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+    upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
     _add_post_data_insertion_upload_steps(upload_pipeline)
     process_upload_pipeline(upload_pipeline)
 

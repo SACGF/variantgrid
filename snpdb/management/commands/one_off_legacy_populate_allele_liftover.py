@@ -98,7 +98,7 @@ class Command(BaseCommand):
             if i % 10 == 0:
                 logging.info("Assigning alleles to Liftover runs - %d/%d", i, num_liftover_runs)
             try:
-                status = lr.uploadedliftover.uploaded_file.uploadpipeline.status
+                status = lr.uploadedliftover.file_upload.uploadpipeline.status
             except Exception as e:
                 if lr not in known_missing_upload_pipelines:
                     logging.error("Couldn't get upload pipeline status for run: %s", lr)
@@ -199,7 +199,7 @@ class Command(BaseCommand):
         unused_liftover_runs_qs = LiftoverRun.objects.all().annotate(num_alleles=Count("alleleliftover")).filter(num_alleles=0)
         for lr in unused_liftover_runs_qs:
             try:
-                lr.uploadedliftover.uploaded_file.delete()
+                lr.uploadedliftover.file_upload.delete()
             except:
                 pass
         unused_liftover_runs_qs.delete()

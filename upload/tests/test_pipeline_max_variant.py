@@ -22,7 +22,7 @@ from snpdb.models import GenomeBuild, Locus, Sequence, Variant, VCF, Cohort, Coh
     CohortGenotype, CohortGenotypeCollection, ImportStatus
 from snpdb.models.models_enums import ImportSource
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
-from upload.models import UploadedFile, UploadedVCF, UploadedVCFPipelineMaxVariant, UploadPipeline, \
+from upload.models import FileUpload, UploadedVCF, UploadedVCFPipelineMaxVariant, UploadPipeline, \
     UploadedFileTypes, ProcessingStatus
 from upload.vcf.vcf_import import update_uploaded_vcf_max_variant
 
@@ -69,11 +69,11 @@ class PipelineMaxVariantTestCase(TestCase):
         return lock
 
     def _make_uploaded_vcf(self, vcf=None) -> UploadedVCF:
-        uploaded_file = UploadedFile.objects.create(user=self.user, name="test.vcf",
-                                                    file_type=UploadedFileTypes.VCF,
-                                                    import_source=ImportSource.WEB_UPLOAD)
-        pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, uploaded_file=uploaded_file)
-        return UploadedVCF.objects.create(uploaded_file=uploaded_file, upload_pipeline=pipeline, vcf=vcf)
+        file_upload = FileUpload.objects.create(user=self.user, name="test.vcf",
+                                                file_type=UploadedFileTypes.VCF,
+                                                import_source=ImportSource.WEB_UPLOAD)
+        pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, file_upload=file_upload)
+        return UploadedVCF.objects.create(file_upload=file_upload, upload_pipeline=pipeline, vcf=vcf)
 
     # ------------------------------------------------------------------ predicate
     def test_pipeline_type_variant_q_classifies_short_and_sv(self):

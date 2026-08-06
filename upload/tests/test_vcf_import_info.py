@@ -7,18 +7,18 @@ from snpdb.models import Sequence, GenomeBuild
 from snpdb.models.models_enums import ImportSource
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from upload.models import (
-    UploadedFile, UploadPipeline, UploadStep, UploadedFileTypes,
+    FileUpload, UploadPipeline, UploadStep, UploadedFileTypes,
     SimpleVCFImportInfo, ModifiedImportedVariants, ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
 )
 
 
 def _make_upload_step(user, step_name="test step"):
-    uploaded_file = UploadedFile.objects.create(
+    file_upload = FileUpload.objects.create(
         user=user, name="test.vcf", path="/tmp/test.vcf",
         file_type=UploadedFileTypes.VCF, import_source=ImportSource.COMMAND_LINE,
     )
-    pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+    pipeline = UploadPipeline.objects.create(file_upload=file_upload)
     return UploadStep.objects.create(upload_pipeline=pipeline, name=step_name, sort_order=0)
 
 

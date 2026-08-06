@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from snpdb.models.models_enums import ImportSource
-from upload.models import UploadedFile, UploadedVCF, UploadPipeline, UploadedFileTypes, ProcessingStatus
+from upload.models import FileUpload, UploadedVCF, UploadPipeline, UploadedFileTypes, ProcessingStatus
 from upload.vcf.vcf_import import create_backend_vcf_links
 
 
@@ -16,15 +16,15 @@ class BackendVCFLinksTest(TestCase):
         cls.user = User.objects.create_user(username="backend_links_user", password="x")
 
     def _make_uploaded_vcf(self, path):
-        uploaded_file = UploadedFile.objects.create(
+        file_upload = FileUpload.objects.create(
             user=self.user,
             name="api_upload.vcf",
             path=path,
             file_type=UploadedFileTypes.VCF,
             import_source=ImportSource.WEB_UPLOAD,
         )
-        pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, uploaded_file=uploaded_file)
-        return UploadedVCF.objects.create(uploaded_file=uploaded_file, upload_pipeline=pipeline)
+        pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, file_upload=file_upload)
+        return UploadedVCF.objects.create(file_upload=file_upload, upload_pipeline=pipeline)
 
     @override_settings(SEQAUTO_ENABLED=False)
     def test_unmatched_path_skips_linking_when_seqauto_disabled(self):

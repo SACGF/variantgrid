@@ -15,7 +15,7 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.allele_ids = []
-        self.liftover = self.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        self.liftover = self.upload_pipeline.file_upload.uploadedliftover.liftover
         self.allele_liftovers_by_allele_id = {}
         for al in AlleleLiftover.objects.filter(liftover=self.liftover):
             self.allele_liftovers_by_allele_id[al.allele_id] = al
@@ -118,7 +118,7 @@ class FailedLiftoverVCFProcessor(BulkMinimalVCFProcessor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.allele_id_reject_reason = {}
-        self.liftover = self.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        self.liftover = self.upload_pipeline.file_upload.uploadedliftover.liftover
         self.set_max_variant_called = True  # Just need warning to go away
 
     @property

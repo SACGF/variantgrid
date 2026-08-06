@@ -60,7 +60,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def get_header_types(vcf):
-        filename = vcf.uploadedvcf.uploaded_file.get_filename()
+        filename = vcf.uploadedvcf.file_upload.get_filename()
         if os.path.isfile(filename):
             reader = Reader(filename)
         else:

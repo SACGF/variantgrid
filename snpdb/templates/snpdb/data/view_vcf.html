@@ -377,12 +377,12 @@ $(document).ready(function() {
         {% csrf_token %}
         {% crispy vcf_form form_helper.horizontal %}
 
-        {% if vcf.uploadedvcf.uploaded_file.exists or annotated_download_files and not vcf.data_archived %}
+        {% if vcf.uploadedvcf.file_upload.exists or annotated_download_files and not vcf.data_archived %}
             <div class="form-group-row row">
                 <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
                 <div class="d-flex flex-row">
-                    {% if vcf.uploadedvcf.uploaded_file.exists %}
-                        <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
+                    {% if vcf.uploadedvcf.file_upload.exists %}
+                        <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.file_upload.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.file_upload.size|filesizeformat }})</div>
                     {% endif %}
                     {% if not vcf.data_archived %}
                         {% for file_type in annotated_download_files %}
@@ -500,11 +500,11 @@ $(document).ready(function() {
     </div>
     <div id="vcf-info">
         <fieldset class="form-fields">
-            {% if vcf.uploadedvcf.uploaded_file.uploadpipeline %}
+            {% if vcf.uploadedvcf.file_upload.uploadpipeline %}
                 {% if url_name_visible.view_upload_pipeline and can_view_upload_pipeline %}
                 <p>
                     <label>Processing</label>
-                    <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.uploaded_file.uploadpipeline.pk %}">View upload processing</a></span>
+                    <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.file_upload.uploadpipeline.pk %}">View upload processing</a></span>
                 </p>
                 {% endif %}
                 {% include "snpdb/data/_archive_action.html" with obj=vcf archive_url_name='archive_vcf' %}

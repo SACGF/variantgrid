@@ -654,10 +654,10 @@ def classification_file_upload(request, classification_id):
         classification = get_object_or_404(Classification, pk=classification_id)
         if not classification.can_write(request.user):
             raise PermissionDenied('User can not edit this variant classification')
-        uploaded_file = filepond_upload_receive(request)
+        django_uploaded_file = filepond_upload_receive(request)
 
         vc_attachment = ClassificationAttachment(classification=classification,
-                                                 file=uploaded_file)
+                                                 file=django_uploaded_file)
         vc_attachment.save()
     except Exception:
         log_traceback()

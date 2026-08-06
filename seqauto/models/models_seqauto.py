@@ -612,7 +612,7 @@ class JointCalledVCF(SeqAutoRecord):
     @cached_property
     def vcf(self) -> Optional[VCF]:
         try:
-            return VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)
+            return VCF.objects.get(uploadedvcf__file_upload__path=self.path)
         except VCF.DoesNotExist:
             return None
 

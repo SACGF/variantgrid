@@ -270,7 +270,7 @@ def import_clinvar_vcf(upload_step: UploadStep):
     """ This can run in parallel """
     logging.debug("import_clinvar_file start")
 
-    clinvar_version = ClinVarVersion.objects.get(sha256_hash=upload_step.uploaded_file.sha256_hash)
+    clinvar_version = ClinVarVersion.objects.get(sha256_hash=upload_step.file_upload.sha256_hash)
 
     vcf_reader = cyvcf2.VCF(upload_step.input_filename)
     bulk_inserter = BulkClinVarInserter(clinvar_version, upload_step)

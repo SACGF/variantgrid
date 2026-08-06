@@ -43,7 +43,7 @@ class ManualVariantsPostInsertTask(ImportVCFStepTask):
     """
 
     def process_items(self, upload_step):
-        mvec = upload_step.uploaded_file.uploadedmanualvariantentrycollection.collection
+        mvec = upload_step.file_upload.uploadedmanualvariantentrycollection.collection
         logging.info("ManualVariantsPostInsertTask: mvec_id = %s", mvec)
 
         failed_entries = mvec.manualvariantentry_set.filter(createdmanualvariant__isnull=True)

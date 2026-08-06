@@ -24,7 +24,7 @@ from seqauto.models import (
 from seqauto.models.models_enums import DataGeneration, PairedEnd
 from seqauto.serializers.sequencing_serializers import JointCalledVCFSerializer
 from snpdb.models import VCF, Sample
-from upload.models import BackendVCF, UploadedFile, UploadedVCF
+from upload.models import BackendVCF, FileUpload, UploadedVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
 
 
@@ -62,16 +62,16 @@ def _make_user():
 
 
 def _make_vcf(user, name, sample_names, source_path):
-    """Create VCF + Samples + UploadedFile + UploadedVCF wired together (no real file IO)."""
+    """Create VCF + Samples + FileUpload + UploadedVCF wired together (no real file IO)."""
     vcf = VCF.objects.create(name=name, date=timezone.now(), user=user,
                              genotype_samples=len(sample_names))
     samples = []
     for sname in sample_names:
         sample = Sample.objects.create(vcf=vcf, name=sname, vcf_sample_name=sname)
         samples.append(sample)
-    uploaded_file = UploadedFile.objects.create(
+    file_upload = FileUpload.objects.create(
         path=source_path, name=name, user=user, import_source="S")  # ImportSource.SEQAUTO
-    uploaded_vcf = UploadedVCF.objects.create(uploaded_file=uploaded_file, vcf=vcf)
+    uploaded_vcf = UploadedVCF.objects.create(file_upload=file_upload, vcf=vcf)
     return vcf, samples, uploaded_vcf
 
 

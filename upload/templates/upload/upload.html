@@ -177,26 +177,26 @@ img.thumbnail {
 	}
 
 	function ensure_upload_row(ufd) {
-        const uploaded_file_id = ufd['uploaded_file_id'];
-        if ($("td.upload-name[uploaded_file_id=" + uploaded_file_id + "]").length) {
+        const file_upload_id = ufd['file_upload_id'];
+        if ($("td.upload-name[uploaded_file_id=" + file_upload_id + "]").length) {
             return;
         }
         const tbody = $("#upload-files-table tbody");
         const fileTypeCode = ufd['file_type_code'] || '';
         const row = $('<tr/>');
         row.append('<td><span class="status-icon"></span></td>');
-        const nameTd = $('<td/>').addClass('upload-name').attr('uploaded_file_id', uploaded_file_id);
+        const nameTd = $('<td/>').addClass('upload-name').attr('uploaded_file_id', file_upload_id);
         nameTd.append($('<div/>').addClass('file_type_icon file-type-' + fileTypeCode));
         const details = $('<div/>').addClass('uploaded-file-details');
         details.append($('<div/>').addClass('name').text(ufd['name'] || ''));
         details.append($('<div/>').addClass('file-type'));
         nameTd.append(details);
         row.append(nameTd);
-        row.append($('<td/>').addClass('upload-user').attr('uploaded_file_id', uploaded_file_id));
-        row.append($('<td/>').addClass('upload-date').attr('uploaded_file_id', uploaded_file_id));
+        row.append($('<td/>').addClass('upload-user').attr('uploaded_file_id', file_upload_id));
+        row.append($('<td/>').addClass('upload-date').attr('uploaded_file_id', file_upload_id));
         const deleteTd = $('<td/>').addClass('upload-delete');
         deleteTd.append(
-            $('<a/>', {href: '#', class: 'upload-delete-link', title: 'Delete', 'data-uploaded-file-id': uploaded_file_id})
+            $('<a/>', {href: '#', class: 'upload-delete-link', title: 'Delete', 'data-uploaded-file-id': file_upload_id})
                 .append($('<i/>').addClass('fas fa-trash text-danger'))
         );
         row.append(deleteTd);
@@ -229,10 +229,10 @@ img.thumbnail {
         });
     });
 
-	function process_upload_status(uploaded_file_dicts) {
+	function process_upload_status(file_upload_dicts) {
         let needsUpdate = false;
-        for (let i=0 ; i<uploaded_file_dicts.length ; ++i) {
-            const ufd = uploaded_file_dicts[i];
+        for (let i=0 ; i<file_upload_dicts.length ; ++i) {
+            const ufd = file_upload_dicts[i];
             ensure_upload_row(ufd);
             update_upload_status(ufd);
             const status = ufd['processing_status'];
@@ -293,8 +293,8 @@ img.thumbnail {
     }
 
 	function update_upload_status(upload_status) {
-        const uploaded_file_id = upload_status['uploaded_file_id'];
-        const nameTd = $("td.upload-name[uploaded_file_id=" + uploaded_file_id + "]");
+        const file_upload_id = upload_status['file_upload_id'];
+        const nameTd = $("td.upload-name[uploaded_file_id=" + file_upload_id + "]");
 
         // Status icon
         const statusIconSpan = $("span.status-icon", nameTd.parents("tr"));
@@ -332,10 +332,10 @@ img.thumbnail {
         const file_type_code = upload_status["file_type_code"];
         //draw_upload_data(nameTd, file_type_code, upload_data);
 
-        const userTd = $("td.upload-user[uploaded_file_id=" + uploaded_file_id + "]");
+        const userTd = $("td.upload-user[uploaded_file_id=" + file_upload_id + "]");
         userTd.html(upload_status.user);
 
-        const dateTd = $("td.upload-date[uploaded_file_id=" + uploaded_file_id + "]");
+        const dateTd = $("td.upload-date[uploaded_file_id=" + file_upload_id + "]");
         dateTd.html(upload_status.time_since);
 	}
 
@@ -417,7 +417,7 @@ img.thumbnail {
 							{% endif %}
 						</span>
 					</td>
-					<td class="upload-name" uploaded_file_id="{{ ufd.uploaded_file_id }}">
+					<td class="upload-name" uploaded_file_id="{{ ufd.file_upload_id }}">
 						<div title="{{ ufd.file_type }}" class="file_type_icon file-type-{{ ufd.file_type_code }}"></div>
 						<div class="uploaded-file-details">
 							<div class="name" file_type="{{ ufd.file_type }}">
@@ -442,10 +442,10 @@ img.thumbnail {
 							{% endif %}
 						</div>
 					</td>
-					<td class="upload-user" uploaded_file_id="{{ ufd.uploaded_file_id }}">{{ ufd.user }}</td>
-					<td class="upload-date" uploaded_file_id="{{ ufd.uploaded_file_id }}">{{ ufd.time_since }}</td>
+					<td class="upload-user" uploaded_file_id="{{ ufd.file_upload_id }}">{{ ufd.user }}</td>
+					<td class="upload-date" uploaded_file_id="{{ ufd.file_upload_id }}">{{ ufd.time_since }}</td>
 					<td class="upload-delete">
-						<a href="#" class="upload-delete-link" data-uploaded-file-id="{{ ufd.uploaded_file_id }}" title="Delete"><i class="fas fa-trash text-danger"></i></a>
+						<a href="#" class="upload-delete-link" data-uploaded-file-id="{{ ufd.file_upload_id }}" title="Delete"><i class="fas fa-trash text-danger"></i></a>
 					</td>
 				</tr>
 			{% endfor %}

@@ -17,7 +17,7 @@ class Command(BaseCommand):
             if not vcf.has_genotype:
                 continue  # Will only have 1 sample
             try:
-                filename = vcf.uploadedvcf.uploaded_file.get_filename()
+                filename = vcf.uploadedvcf.file_upload.get_filename()
             except UploadedVCF.DoesNotExist:
                 logging.info("VCF %d missing uploadedvcf", vcf.pk)
                 continue

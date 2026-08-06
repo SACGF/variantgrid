@@ -13,12 +13,12 @@ class ImportCreateVersionForClinVarVCFTask(ImportVCFStepTask):
     """ Create Data from header """
 
     def process_items(self, upload_step):
-        check_can_import_clinvar(upload_step.uploaded_file.user)
+        check_can_import_clinvar(upload_step.file_upload.user)
         filename = upload_step.input_filename
         genome_build = vcf_detect_genome_build(filename)
 
-        upload_step.uploaded_file.store_sha256_hash()
-        kwargs = {"sha256_hash": upload_step.uploaded_file.sha256_hash,
+        upload_step.file_upload.store_sha256_hash()
+        kwargs = {"sha256_hash": upload_step.file_upload.sha256_hash,
                   "genome_build": genome_build}
         clinvar_version, created = ClinVarVersion.objects.get_or_create(**kwargs)
         if created:
@@ -31,7 +31,7 @@ class ImportCreateVersionForClinVarVCFTask(ImportVCFStepTask):
             clinvar_version.delete_related_objects()
             clinvar_version.create_partition()  # Put it back...
 
-        UploadedClinVarVersion.objects.get_or_create(uploaded_file=upload_step.uploaded_file,
+        UploadedClinVarVersion.objects.get_or_create(file_upload=upload_step.file_upload,
                                                      clinvar_version=clinvar_version)
         return 0
 

@@ -11,7 +11,7 @@ from patients.models import Clinician, ExternalPK, ExternalModelManager, Patient
     Specimen
 from snpdb.models import Sex, ImportSource
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import UploadedFile, UploadedPatientRecords, UploadedFileTypes
+from upload.models import FileUpload, UploadedPatientRecords, UploadedFileTypes
 
 
 class Test(URLTestCase):
@@ -35,14 +35,14 @@ class Test(URLTestCase):
 
         dirname = os.path.dirname(__file__)
         filename = os.path.join(dirname, "test_data", "fake_patient_records.csv")
-        uploaded_file = UploadedFile.objects.create(user=cls.user_owner,
-                                                    name="fake uploaded file",
-                                                    path=filename,
-                                                    file_type=UploadedFileTypes.PATIENT_RECORDS,
-                                                    import_source=ImportSource.COMMAND_LINE)
+        file_upload = FileUpload.objects.create(user=cls.user_owner,
+                                                name="fake uploaded file",
+                                                path=filename,
+                                                file_type=UploadedFileTypes.PATIENT_RECORDS,
+                                                import_source=ImportSource.COMMAND_LINE)
         patient_import = PatientImport.objects.get_or_create(name="shazbot")[0]
         patient_records = PatientRecords.objects.get_or_create(patient_import=patient_import)[0]
-        UploadedPatientRecords.objects.get_or_create(uploaded_file=uploaded_file, patient_records=patient_records)
+        UploadedPatientRecords.objects.get_or_create(file_upload=file_upload, patient_records=patient_records)
 
         patient_kwargs = {"patient_id": cls.patient.pk}
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [

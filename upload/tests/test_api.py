@@ -15,7 +15,7 @@ from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import CachedGeneratedFile, GenomeBuild
 from snpdb.models.models_enums import ImportSource, ProcessingStatus
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
-from upload.models import UploadedFile, UploadedVCF, UploadPipeline, UploadedFileTypes
+from upload.models import FileUpload, UploadedVCF, UploadPipeline, UploadedFileTypes
 
 COHORT_EXPORT_TEMPLATE_NAME = "Cohort VCF Export auto analysis"  # settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT
 
@@ -50,24 +50,24 @@ class UploadAPITestBase(APITestCase):
 
     @classmethod
     def _create_vcf_upload(cls, marker: str, *, pipeline_status=ProcessingStatus.SUCCESS, path=None):
-        """ Build a fully-processed VCF upload (UploadedFile + UploadPipeline + UploadedVCF)
+        """ Build a fully-processed VCF upload (FileUpload + UploadPipeline + UploadedVCF)
             attached to a permissioned cohort's VCF. """
         cohort = create_fake_cohort(cls.owner, cls.grch37)
         vcf = cohort.vcf
         django_file = SimpleUploadedFile(f"{marker}.vcf", _vcf_bytes(marker))
-        uploaded_file = UploadedFile.objects.create(
+        file_upload = FileUpload.objects.create(
             user=cls.owner,
             name=f"{marker}.vcf",
             path=path,
             file_type=UploadedFileTypes.VCF,
             import_source=ImportSource.WEB_UPLOAD,
-            uploaded_file=django_file,
+            file_field=django_file,
         )
-        uploaded_file.store_sha256_hash()
-        cls._temp_upload_paths.append(uploaded_file.get_filename())
-        pipeline = UploadPipeline.objects.create(status=pipeline_status, uploaded_file=uploaded_file)
-        UploadedVCF.objects.create(uploaded_file=uploaded_file, vcf=vcf, upload_pipeline=pipeline)
-        return uploaded_file
+        file_upload.store_sha256_hash()
+        cls._temp_upload_paths.append(file_upload.get_filename())
+        pipeline = UploadPipeline.objects.create(status=pipeline_status, file_upload=file_upload)
+        UploadedVCF.objects.create(file_upload=file_upload, vcf=vcf, upload_pipeline=pipeline)
+        return file_upload
 
 
 class UploadFileAPITest(UploadAPITestBase):
@@ -85,10 +85,37 @@ class UploadFileAPITest(UploadAPITestBase):
             )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
-        uploaded_file = UploadedFile.objects.get(pk=data["uploaded_file_id"])
-        self._temp_upload_paths.append(uploaded_file.get_filename())
-        self.assertEqual(uploaded_file.sha256_hash, expected_hash)
+        file_upload = FileUpload.objects.get(pk=data["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.sha256_hash, expected_hash)
         self.assertEqual(data["sha256_hash"], expected_hash)
+
+    def test_deprecated_uploaded_file_id_alias(self):
+        """ file_upload_id is the identifier - uploaded_file_id is a retained alias for older clients.
+            Delete this test along with the alias. """
+        file_upload = self._create_vcf_upload("alias")
+        self.client.force_authenticate(user=self.owner)
+
+        with patch("upload.views.views.upload_processing.process_uploaded_file"):
+            upload_response = self.client.post(
+                reverse("api_file_upload"),
+                {"file": SimpleUploadedFile("alias_new.vcf", _vcf_bytes("alias_new"))},
+                format="multipart",
+            )
+        self._temp_upload_paths.append(
+            FileUpload.objects.get(pk=upload_response.json()["file_upload_id"]).get_filename())
+
+        status_response = self.client.get(reverse("api_upload_status",
+                                                  kwargs={"file_upload_id": file_upload.pk}))
+        self.client.force_login(self.owner)  # upload_poll is a session-auth view
+        poll_response = self.client.get(reverse("upload_poll"))
+
+        payloads = [upload_response.json(), status_response.json()]
+        payloads.extend(ufd for ufd in poll_response.json() if ufd["file_upload_id"] == file_upload.pk)
+        self.assertEqual(len(payloads), 3)
+        for payload in payloads:
+            self.assertIn("uploaded_file_id", payload)
+            self.assertEqual(payload["uploaded_file_id"], payload["file_upload_id"])
 
     def test_upload_dedups_by_hash_without_path(self):
         existing = self._create_vcf_upload("dedup_nopath")
@@ -101,7 +128,7 @@ class UploadFileAPITest(UploadAPITestBase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
-        self.assertEqual(data["uploaded_file_id"], existing.pk)
+        self.assertEqual(data["file_upload_id"], existing.pk)
         self.assertIn("message", data)
 
     def test_upload_dedups_by_hash_with_path(self):
@@ -114,19 +141,19 @@ class UploadFileAPITest(UploadAPITestBase):
             format="multipart",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()["uploaded_file_id"], existing.pk)
+        self.assertEqual(response.json()["file_upload_id"], existing.pk)
 
 
 class UploadStatusAPITest(UploadAPITestBase):
     def test_status_by_id_processing(self):
-        uploaded_file = self._create_vcf_upload("status_proc", pipeline_status=ProcessingStatus.PROCESSING)
+        file_upload = self._create_vcf_upload("status_proc", pipeline_status=ProcessingStatus.PROCESSING)
         self.client.force_authenticate(user=self.owner)
 
         response = self.client.get(reverse("api_upload_status",
-                                           kwargs={"uploaded_file_id": uploaded_file.pk}))
+                                           kwargs={"file_upload_id": file_upload.pk}))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
-        self.assertEqual(data["uploaded_file_id"], uploaded_file.pk)
+        self.assertEqual(data["file_upload_id"], file_upload.pk)
         self.assertEqual(data["pipeline_status"], ProcessingStatus.PROCESSING.label)
         self.assertFalse(data["annotation_complete"])
         self.assertIsNotNone(data["vcf_id"])
@@ -135,17 +162,17 @@ class UploadStatusAPITest(UploadAPITestBase):
     def test_status_before_vcf_created(self):
         """ Race: client polls immediately after upload, UploadedVCF exists but its vcf is still None """
         django_file = SimpleUploadedFile("racey.vcf", _vcf_bytes("racey"))
-        uploaded_file = UploadedFile.objects.create(
+        file_upload = FileUpload.objects.create(
             user=self.owner, name="racey.vcf", file_type=UploadedFileTypes.VCF,
-            import_source=ImportSource.WEB_UPLOAD, uploaded_file=django_file)
-        uploaded_file.store_sha256_hash()
-        self._temp_upload_paths.append(uploaded_file.get_filename())
-        pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, uploaded_file=uploaded_file)
-        UploadedVCF.objects.create(uploaded_file=uploaded_file, vcf=None, upload_pipeline=pipeline)
+            import_source=ImportSource.WEB_UPLOAD, file_field=django_file)
+        file_upload.store_sha256_hash()
+        self._temp_upload_paths.append(file_upload.get_filename())
+        pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, file_upload=file_upload)
+        UploadedVCF.objects.create(file_upload=file_upload, vcf=None, upload_pipeline=pipeline)
 
         self.client.force_authenticate(user=self.owner)
         response = self.client.get(reverse("api_upload_status",
-                                           kwargs={"uploaded_file_id": uploaded_file.pk}))
+                                           kwargs={"file_upload_id": file_upload.pk}))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertIsNone(data["vcf_id"])
@@ -153,25 +180,25 @@ class UploadStatusAPITest(UploadAPITestBase):
         self.assertFalse(data["annotation_complete"])
 
     def test_status_by_sha256_success(self):
-        uploaded_file = self._create_vcf_upload("status_ok", pipeline_status=ProcessingStatus.SUCCESS)
+        file_upload = self._create_vcf_upload("status_ok", pipeline_status=ProcessingStatus.SUCCESS)
         self.client.force_authenticate(user=self.owner)
 
         response = self.client.get(reverse("api_upload_status_sha256",
-                                           kwargs={"sha256_hash": uploaded_file.sha256_hash}))
+                                           kwargs={"sha256_hash": file_upload.sha256_hash}))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
-        self.assertEqual(data["uploaded_file_id"], uploaded_file.pk)
+        self.assertEqual(data["file_upload_id"], file_upload.pk)
         self.assertEqual(data["remaining_annotation_runs"], 0)
         self.assertTrue(data["annotation_complete"])
         # Default settings name a template that doesn't exist in tests -> downloads not available
         self.assertFalse(data["downloads_available"])
 
     def test_status_permission_denied_for_other_user(self):
-        uploaded_file = self._create_vcf_upload("status_perm")
+        file_upload = self._create_vcf_upload("status_perm")
         self.client.force_authenticate(user=self.other_user)
 
         response = self.client.get(reverse("api_upload_status",
-                                           kwargs={"uploaded_file_id": uploaded_file.pk}))
+                                           kwargs={"file_upload_id": file_upload.pk}))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
@@ -180,24 +207,24 @@ class AnnotatedDownloadAPITest(UploadAPITestBase):
         return AnalysisTemplate.objects.create(name=COHORT_EXPORT_TEMPLATE_NAME, user=self.owner)
 
     def test_invalid_export_type(self):
-        uploaded_file = self._create_vcf_upload("dl_badtype")
+        file_upload = self._create_vcf_upload("dl_badtype")
         self.client.force_authenticate(user=self.owner)
         response = self.client.get(reverse("api_annotated_download",
-                                           kwargs={"uploaded_file_id": uploaded_file.pk,
+                                           kwargs={"file_upload_id": file_upload.pk,
                                                    "export_type": "bam"}))
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_download_template_not_configured(self):
-        uploaded_file = self._create_vcf_upload("dl_notemplate")
+        file_upload = self._create_vcf_upload("dl_notemplate")
         self.client.force_authenticate(user=self.owner)
         response = self.client.get(reverse("api_annotated_download",
-                                           kwargs={"uploaded_file_id": uploaded_file.pk,
+                                           kwargs={"file_upload_id": file_upload.pk,
                                                    "export_type": "vcf"}))
         self.assertEqual(response.status_code, status.HTTP_501_NOT_IMPLEMENTED)
         self.assertIn("error", response.json())
 
     def test_download_generating_returns_202(self):
-        uploaded_file = self._create_vcf_upload("dl_generating")
+        file_upload = self._create_vcf_upload("dl_generating")
         self._make_export_template()
         self.client.force_authenticate(user=self.owner)
 
@@ -205,7 +232,7 @@ class AnnotatedDownloadAPITest(UploadAPITestBase):
                                   params_hash="fake", progress=0.3, filename=None)
         with patch.object(CachedGeneratedFile, "get_or_create_and_launch", return_value=cgf):
             response = self.client.get(reverse("api_annotated_download",
-                                               kwargs={"uploaded_file_id": uploaded_file.pk,
+                                               kwargs={"file_upload_id": file_upload.pk,
                                                        "export_type": "vcf"}))
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
         data = response.json()
@@ -213,7 +240,7 @@ class AnnotatedDownloadAPITest(UploadAPITestBase):
         self.assertEqual(data["progress"], 0.3)
 
     def test_download_ready_streams_file(self):
-        uploaded_file = self._create_vcf_upload("dl_ready")
+        file_upload = self._create_vcf_upload("dl_ready")
         self._make_export_template()
         self.client.force_authenticate(user=self.owner)
 
@@ -228,7 +255,7 @@ class AnnotatedDownloadAPITest(UploadAPITestBase):
                                   params_hash="fake", progress=1.0, filename=gz_path)
         with patch.object(CachedGeneratedFile, "get_or_create_and_launch", return_value=cgf):
             response = self.client.get(reverse("api_annotated_download",
-                                               kwargs={"uploaded_file_id": uploaded_file.pk,
+                                               kwargs={"file_upload_id": file_upload.pk,
                                                        "export_type": "vcf"}))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response["Content-Type"], "application/gzip")

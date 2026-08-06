@@ -153,7 +153,7 @@ class SequencingRunSerializer(serializers.ModelSerializer):
             }
             try:
                 # This is set on ones sent up via API
-                data["path"] = vcf.uploadedvcf.uploaded_file.path
+                data["path"] = vcf.uploadedvcf.file_upload.path
             except Exception:
                 pass
             vcfs.append(data)

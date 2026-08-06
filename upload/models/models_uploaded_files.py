@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Optional
 
 from django.conf import settings
 from django.db import models
@@ -14,26 +15,26 @@ from genes.models import GeneList, GeneCoverageCollection
 from library.utils.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
-from snpdb.models import GenomicIntervalsCollection, ImportStatus, Sample, ImportedWikiCollection
+from snpdb.models import GenomicIntervalsCollection, ImportStatus, Sample, ImportedWikiCollection, GenomeBuild
 from snpdb.models.models_variant import LiftoverRun
 from upload.bed_file_processing import process_bed_file
-from upload.models import UploadedFile
+from upload.models import FileUpload, UploadData
 
 
-class UploadedGeneList(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+class UploadedGeneList(UploadData):
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     gene_list = models.OneToOneField(GeneList, null=True, on_delete=CASCADE)
 
     def get_data(self):
         return self.gene_list
 
 
-class UploadedBed(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
+class UploadedBed(UploadData):
+    file_upload = models.ForeignKey(FileUpload, on_delete=CASCADE)
     genomic_intervals_collection = models.OneToOneField(GenomicIntervalsCollection, null=True, on_delete=CASCADE)
 
     def process_bed_file(self):
-        bed_file = self.uploaded_file.get_filename()
+        bed_file = self.file_upload.get_filename()
         has_chr = self.genomic_intervals_collection.genome_build.reference_fasta_has_chr
         if has_chr:
             chrom_description = "has_chr"
@@ -54,16 +55,16 @@ class UploadedBed(models.Model):
         return self.genomic_intervals_collection
 
 
-class UploadedPedFile(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
+class UploadedPedFile(UploadData):
+    file_upload = models.ForeignKey(FileUpload, on_delete=CASCADE)
     ped_file = models.OneToOneField(PedFile, null=True, on_delete=CASCADE)
 
     def get_data(self):
         return self.ped_file
 
 
-class UploadedPatientRecords(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
+class UploadedPatientRecords(UploadData):
+    file_upload = models.ForeignKey(FileUpload, on_delete=CASCADE)
     patient_records = models.OneToOneField(PatientRecords, on_delete=CASCADE)
 
     def get_data(self):
@@ -78,8 +79,8 @@ def uploaded_patient_records_post_delete_handler(sender, instance, **kwargs):  #
         instance.patient_records.delete()
 
 
-class UploadedGeneCoverage(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+class UploadedGeneCoverage(UploadData):
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     gene_coverage_collection = models.OneToOneField(GeneCoverageCollection, null=True, on_delete=CASCADE)
     sample = models.OneToOneField(Sample, null=True, on_delete=CASCADE)
 
@@ -96,47 +97,85 @@ class UploadedGeneCoverage(models.Model):
         return self.gene_coverage_collection
 
 
-class UploadedManualVariantEntryCollection(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+class UploadedManualVariantEntryCollection(UploadData):
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     collection = models.OneToOneField(ManualVariantEntryCollection, null=True, on_delete=CASCADE)
 
     def get_data(self):
         return self.collection
 
+    @property
+    def genome_build(self) -> Optional[GenomeBuild]:
+        if collection := self.collection:
+            return collection.genome_build
+        return None
 
-class UploadedClassificationImport(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+
+class UploadedClassificationImport(UploadData):
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     classification_import = models.OneToOneField(ClassificationImport, null=True, on_delete=CASCADE)
 
     def get_data(self):
         return self.classification_import
 
+    @property
+    def genome_build(self) -> Optional[GenomeBuild]:
+        if classification_import := self.classification_import:
+            return classification_import.genome_build
+        return None
 
-class UploadedLiftover(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+
+class UploadedLiftover(UploadData):
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     liftover = models.OneToOneField(LiftoverRun, null=True, on_delete=CASCADE)
 
     def get_data(self):
         return self.liftover
 
+    @property
+    def genome_build(self) -> Optional[GenomeBuild]:
+        if liftover := self.liftover:
+            return liftover.genome_build
+        return None
 
-class UploadedWikiCollection(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+
+class UploadedWikiCollection(UploadData):
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     wiki_collection = models.OneToOneField(ImportedWikiCollection, null=True, on_delete=CASCADE)
 
     def get_data(self):
         return self.wiki_collection
 
+    @property
+    def genome_build(self) -> Optional[GenomeBuild]:
+        # Gene wiki collections have no build - only variant ones do
+        if wiki_collection := self.wiki_collection:
+            return wiki_collection.genome_build
+        return None
 
-class UploadedClinVarVersion(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+
+class UploadedClinVarVersion(UploadData):
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     # It's possible someone could upload the same clinvar VCF again
     clinvar_version = models.ForeignKey(ClinVarVersion, null=True, on_delete=CASCADE)
 
+    def get_data(self):
+        return self.clinvar_version
 
-class UploadedVariantTags(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+    @property
+    def genome_build(self) -> Optional[GenomeBuild]:
+        if clinvar_version := self.clinvar_version:
+            return clinvar_version.genome_build
+        return None
+
+
+class UploadedVariantTags(UploadData):
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     variant_tags_import = models.OneToOneField(VariantTagsImport, on_delete=CASCADE)
 
     def get_data(self):
         return self.variant_tags_import
+
+    @property
+    def genome_build(self) -> Optional[GenomeBuild]:
+        return self.variant_tags_import.genome_build

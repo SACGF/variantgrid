@@ -46,7 +46,7 @@ class ArchivePreconditionError(Exception):
 def _resolve_vcf_upload_path(vcf: VCF) -> Optional[str]:
     """ Returns the filesystem path of the uploaded source VCF, or None if missing. """
     try:
-        uf = vcf.uploadedvcf.uploaded_file
+        uf = vcf.uploadedvcf.file_upload
         return uf.get_filename()
     except (ObjectDoesNotExist, AttributeError):
         return None
@@ -158,7 +158,7 @@ def restore_vcf(vcf: VCF, user: User):
     if not os.path.exists(vcf.data_restorable_from):
         raise ValueError(f"Restore source missing: {vcf.data_restorable_from}")
 
-    upload_pipeline = vcf.uploadedvcf.uploaded_file.uploadpipeline
+    upload_pipeline = vcf.uploadedvcf.file_upload.uploadpipeline
     vcf.import_status = ImportStatus.IMPORTING
     vcf.save()
     for sample in vcf.sample_set.all():

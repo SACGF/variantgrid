@@ -17,7 +17,7 @@ class Command(BaseCommand):
         missing_file = 0
         for vcf in VCF.objects.filter(q_no_header | q_no_chrom_line):
             try:
-                filename = vcf.uploadedvcf.uploaded_file.get_filename()
+                filename = vcf.uploadedvcf.file_upload.get_filename()
                 if os.path.exists(filename):
                     reader = Reader(filename)
                     vcf.header = reader.raw_header

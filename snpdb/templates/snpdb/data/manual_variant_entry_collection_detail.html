@@ -1,7 +1,7 @@
 {% load ui_utils %}
 
 {% if url_name_visible.view_upload_pipeline and mvec.uploadedmanualvariantentrycollection %}
-    <a class="hover-link" href="{% url 'view_upload_pipeline' mvec.uploadedmanualvariantentrycollection.uploaded_file.uploadpipeline.pk %}">
+    <a class="hover-link" href="{% url 'view_upload_pipeline' mvec.uploadedmanualvariantentrycollection.file_upload.uploadpipeline.pk %}">
         view upload pipeline
     </a>
 {% endif %}

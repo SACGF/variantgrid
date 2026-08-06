@@ -554,15 +554,15 @@ class PatientRecords(models.Model):
 
     @property
     def user(self) -> Optional[User]:
-        if uploaded_file := self.uploaded_file:
-            return uploaded_file.user
+        if file_upload := self.file_upload:
+            return file_upload.user
         return None
 
     @property
-    def uploaded_file(self):
-        """ Records from old imports may have had their UploadedFile removed """
+    def file_upload(self):
+        """ Records from old imports may have had their FileUpload removed """
         try:
-            return self.uploadedpatientrecords.uploaded_file
+            return self.uploadedpatientrecords.file_upload
         except ObjectDoesNotExist:
             return None
 

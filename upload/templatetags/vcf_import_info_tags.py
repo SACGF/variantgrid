@@ -11,7 +11,7 @@ def vcf_import_info(vcf: VCF, examine_error_instructions):
     errors = []
     warnings = []
     try:
-        upload_pipeline = vcf.uploadedvcf.uploaded_file.uploadpipeline
+        upload_pipeline = vcf.uploadedvcf.file_upload.uploadpipeline
         for vii in upload_pipeline.get_errors():
             errors.append(vii)
 

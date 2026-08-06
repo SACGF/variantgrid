@@ -1023,7 +1023,7 @@ class LiftoverRun(TimeStampedModel):
 
         Alleles must have already been created - allele_source used to retrieve them
 
-        The VCF (in genome_build build) is set in UploadedFile for the UploadPipeline """
+        The VCF (in genome_build build) is set in FileUpload for the UploadPipeline """
     user = models.ForeignKey(User, on_delete=CASCADE)
     allele_source = models.ForeignKey(AlleleSource, null=True, on_delete=CASCADE)
     conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)

@@ -355,7 +355,7 @@ def view_vcf(request, vcf_id):
 
     if reload_vcf:
         set_vcf_and_samples_import_status(vcf, ImportStatus.IMPORTING)
-        retry_upload_pipeline(vcf.uploadedvcf.uploaded_file.uploadpipeline)
+        retry_upload_pipeline(vcf.uploadedvcf.file_upload.uploadpipeline)
         vcf_form = forms.VCFForm(post, instance=vcf)  # Reload as import status has changed
         messages.add_message(request, messages.INFO, "Reloading VCF")
 
@@ -379,7 +379,7 @@ def view_vcf(request, vcf_id):
         variant_zygosity_count_collections[vzcc] = vzc_vcf
 
     try:
-        can_view_upload_pipeline = vcf.uploadedvcf.uploaded_file.can_view(request.user)
+        can_view_upload_pipeline = vcf.uploadedvcf.file_upload.can_view(request.user)
     except UploadedVCF.DoesNotExist:
         can_view_upload_pipeline = False
 

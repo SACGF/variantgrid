@@ -156,17 +156,17 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     """ Reads header only - returns VCF object """
 
     upload_pipeline = upload_step.upload_pipeline
-    uploaded_file = upload_pipeline.uploaded_file
+    file_upload = upload_pipeline.file_upload
     # There is no VCF file if this method is called, but it could be possible for UploadedVCF
     # to exist if there was an error before previous VCF was created, so re-use if there
     try:
         # Reload as VCF may have been deleted before calling this and still attached
         uploaded_vcf = UploadedVCF.objects.get(upload_pipeline=upload_pipeline)
-        uploaded_vcf.uploaded_file = uploaded_file
+        uploaded_vcf.file_upload = file_upload
         uploaded_vcf.vcf_importer = None
         uploaded_vcf.save()
     except UploadedVCF.DoesNotExist:
-        uploaded_vcf = UploadedVCF.objects.create(uploaded_file=uploaded_file,
+        uploaded_vcf = UploadedVCF.objects.create(file_upload=file_upload,
                                                   upload_pipeline=upload_pipeline)
         logging.info("import_vcf_file: CREATED uploaded_vcf: %d", uploaded_vcf.pk)
 
@@ -197,7 +197,7 @@ def _get_vcf_sample_names(vcf, vcf_reader) -> list[str]:
     if vcf.genotype_samples > 0:
         sample_names = vcf_reader.samples
     else:  # Need at least 1 sample per VCF
-        default_name = vcf.uploadedvcf.uploaded_file.name
+        default_name = vcf.uploadedvcf.file_upload.name
         sample_names = [default_name]
     return sample_names
 
@@ -312,16 +312,16 @@ def update_uploaded_vcf_max_variant(pk, max_inserted_variant_id_by_pipeline_type
 
 
 def create_vcf_from_uploaded_vcf(uploaded_vcf, num_genotype_samples):
-    vcf = VCF.objects.create(name=uploaded_vcf.uploaded_file.name,
+    vcf = VCF.objects.create(name=uploaded_vcf.file_upload.name,
                              date=timezone.now(),
-                             user=uploaded_vcf.uploaded_file.user,
+                             user=uploaded_vcf.file_upload.user,
                              genotype_samples=num_genotype_samples,
                              import_status=ImportStatus.IMPORTING)
     logging.debug("Saved vcf %d from uploaded_vcf %d", vcf.pk, uploaded_vcf.pk)
 
     # Assign view permission to all of users groups
     # TODO: Make this a user option (auto share to groups?)
-    user = uploaded_vcf.uploaded_file.user
+    user = uploaded_vcf.file_upload.user
     assign_permission_to_user_and_groups(user, vcf)
 
     return vcf
@@ -336,11 +336,11 @@ def create_backend_vcf_links(uploaded_vcf):
         # Elsewhere 'path' is just an optional client hint (e.g. API dedup), so skip linking.
         return backend_vcf
 
-    uploaded_file = uploaded_vcf.uploaded_file
+    file_upload = uploaded_vcf.file_upload
     # APIFileUploadView (including the SeqAuto API client) comes through as WEB_UPLOAD
     sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.WEB_UPLOAD}
-    if uploaded_file.path and uploaded_file.import_source in sequencing_vcf_sources:
-        path = uploaded_file.path
+    if file_upload.path and file_upload.import_source in sequencing_vcf_sources:
+        path = file_upload.path
         if path:
             joint_called_vcf = None
             single_sample_vcf = None

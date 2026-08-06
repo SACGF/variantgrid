@@ -37,7 +37,7 @@ class VCFListGrid(JqGridUserRowConfig):
     caption = 'VCFs'
     fields = ["id", "name", "vcf_url", "date", "import_status", "data_archived_date", "genome_build__name",
               "user__username", "source",
-              "uploadedvcf__uploaded_file__import_source", "genotype_samples", "project__name", "cohort__import_status",
+              "uploadedvcf__file_upload__import_source", "genotype_samples", "project__name", "cohort__import_status",
               "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
     colmodel_overrides = {
         'id': {"hidden": True},
@@ -100,7 +100,7 @@ class SamplesListGrid(JqGridUserRowConfig):
     caption = 'Samples'
     fields = ["id", "name", "sample_url", "het_hom_count", "vcf__date", "import_status",
               "vcf__genome_build__name", "variants_type", "vcf__user__username", "vcf__source", "vcf__name", "vcf_url",
-              "vcf__project__name", "vcf__uploadedvcf__uploaded_file__import_source",
+              "vcf__project__name", "vcf__uploadedvcf__file_upload__import_source",
               "sample_gene_list_count", "activesamplegenelist__id",
               "mutationalsignature__id", "mutationalsignature__summary",
               "somaliersampleextract__somalierancestry__predicted_ancestry",
@@ -630,9 +630,9 @@ class LiftoverRunColumns(DatatableConfig[LiftoverRun]):
             RichColumn(key='source_vcf', orderable=True, css_class="formatted-text"),
             RichColumn(key='source_genome_build', label='Source Build', orderable=True),
             RichColumn(key='genome_build', label='Dest Build', orderable=True),
-            RichColumn(key="uploadedliftover__uploaded_file__uploadpipeline__status",
+            RichColumn(key="uploadedliftover__file_upload__uploadpipeline__status",
                        label='Status', renderer=self.render_import_status, orderable=True),
-            RichColumn(key="uploadedliftover__uploaded_file__uploadpipeline__items_processed",
+            RichColumn(key="uploadedliftover__file_upload__uploadpipeline__items_processed",
                        label='Processed', orderable=True, css_class="num"),
         ]
 
@@ -645,7 +645,7 @@ class LiftoverRunColumns(DatatableConfig[LiftoverRun]):
 
     def render_import_status(self, row: dict[str, Any]) -> JsonDataType:
         label = ""
-        if status := row['uploadedliftover__uploaded_file__uploadpipeline__status']:
+        if status := row['uploadedliftover__file_upload__uploadpipeline__status']:
             processing_status = ProcessingStatus(status)
             label = processing_status.label
         return label

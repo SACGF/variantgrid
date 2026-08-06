@@ -18,7 +18,7 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
     def get_initial_queryset(self) -> QuerySet[UploadStep]:
         upload_pipeline_id = self.get_query_param("upload_pipeline")
         upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
-        upload_pipeline.uploaded_file.check_can_view(self.user)
+        upload_pipeline.file_upload.check_can_view(self.user)
         return UploadStep.objects.filter(upload_pipeline_id=upload_pipeline_id)
 
     @staticmethod

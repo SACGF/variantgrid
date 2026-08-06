@@ -105,8 +105,8 @@ def patient_file_upload(request, patient_id):
     try:
         patient = Patient.get_for_user(request.user, patient_id)
         patient.check_can_write(request.user)
-        uploaded_file = filepond_upload_receive(request)
-        patient_attachment = PatientAttachment.objects.create(patient=patient, file=uploaded_file)
+        django_uploaded_file = filepond_upload_receive(request)
+        patient_attachment = PatientAttachment.objects.create(patient=patient, file=django_uploaded_file)
     except Exception:
         log_traceback()
         return HttpResponse("Upload failed", status=500)

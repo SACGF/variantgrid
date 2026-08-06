@@ -20,12 +20,12 @@ def filepond_upload_receive(request, field_name="filepond"):
             "Upload POST had empty FILES - this is often due to running out of "
             "disk space for Nginx temp file storage."
         )
-    uploaded_file = request.FILES.get(field_name)
-    if uploaded_file is None:
+    django_uploaded_file = request.FILES.get(field_name)
+    if django_uploaded_file is None:
         # FilePond's default field name is ``filepond`` but a caller may
         # supply a different name; fall back to the first file present.
-        uploaded_file = next(iter(request.FILES.values()))
-    return uploaded_file
+        django_uploaded_file = next(iter(request.FILES.values()))
+    return django_uploaded_file
 
 
 def filepond_process_response(file_id) -> HttpResponse:
@@ -48,7 +48,7 @@ def filepond_load_initial(file_dicts):
     initial = []
     for file_dict in file_dicts:
         source = (
-            file_dict.get('uploaded_file_id')
+            file_dict.get('file_upload_id')
             or file_dict.get('pk')
             or file_dict.get('id')
             or file_dict.get('name')

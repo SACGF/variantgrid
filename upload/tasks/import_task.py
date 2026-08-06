@@ -12,7 +12,7 @@ class ImportTask(Task):
     """ Subclass this to be able to perform imports """
     abstract = True
 
-    def process_items(self, uploaded_file):
+    def process_items(self, file_upload):
         raise NotImplementedError("Need to override ImportTask.process_items()")
 
     def run(self, upload_pipeline_id):
@@ -24,7 +24,7 @@ class ImportTask(Task):
         try:
             start = time.time()
 
-            items_processed = self.process_items(upload_pipeline.uploaded_file)
+            items_processed = self.process_items(upload_pipeline.file_upload)
             if items_processed is None:
                 msg = "%s.process_items() returned None!" % str(self.__class__)
                 raise ValueError(msg)
