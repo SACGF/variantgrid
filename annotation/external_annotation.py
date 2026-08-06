@@ -502,10 +502,12 @@ def _expected_matchable_identity(meta: dict) -> dict:
 
 
 def _identity_diff(expected: dict, actual: dict) -> dict:
-    """ field -> (dump_value, local_value) for every key that differs or is absent on one side. """
+    """ field -> (dump_value, local_value) for every key the dump carries whose local value differs.
+        Fields the dump doesn't carry are ones added to the identity since it was written (eg the #462
+        component pins) - a dump made before an upgrade still describes the version that produced it, so
+        those fields go uncompared rather than stranding in-flight external runs. """
     diff = {}
-    for key in set(expected) | set(actual):
-        dump_value = expected.get(key, "<absent>")
+    for key, dump_value in expected.items():
         local_value = actual.get(key, "<absent>")
         if dump_value != local_value:
             diff[key] = (dump_value, local_value)
@@ -519,7 +521,8 @@ def find_matching_variant_annotation_version(meta: dict) -> Optional[VariantAnno
     expected = _expected_matchable_identity(meta)
     for variant_annotation_version in VariantAnnotationVersion.objects.filter(
             genome_build=genome_build, annotation_consortium=annotation_consortium):
-        if _matchable_identity(variant_annotation_version_identity(variant_annotation_version)) == expected:
+        actual = _matchable_identity(variant_annotation_version_identity(variant_annotation_version))
+        if not _identity_diff(expected, actual):
             return variant_annotation_version
     return None
 

@@ -12,7 +12,7 @@ from annotation import vep_columns
 from annotation.fake_annotation import get_fake_vep_version
 from annotation.models.models_enums import VEPPlugin, VEPCustom, VariantAnnotationPipelineType
 from annotation.vep_columns import VEPColumnDef
-from annotation.vep_config import VEPConfig, parse_gnomad_version_from_filename
+from annotation.vep_config import VEPConfig, parse_gnomad_version_from_filename, vep_component_version_kwargs
 from genes.models_enums import AnnotationConsortium
 from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
@@ -385,6 +385,8 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
             kwargs[python_field] = value
 
     genome_build = vep_config.genome_build
+    # The data files / settings the ##VEP= header doesn't cover - see #462
+    kwargs.update(vep_component_version_kwargs(genome_build.settings))
     kwargs["genome_build"] = genome_build
     kwargs["vep_cache"] = vep_config.cache_version
     kwargs["annotation_consortium"] = vep_config.annotation_consortium

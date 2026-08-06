@@ -677,6 +677,32 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     spliceai = models.TextField(blank=True, null=True)
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
+    # --- remaining VEP command line component pins (#462) ------------------
+    # Data files and settings that go into the VEP command line but aren't reported in the ##VEP=
+    # header. Files whose name carries a version store the parsed version, the rest store the
+    # basename, so installing different data registers as a change - as does removing it, which
+    # drops that data's columns. All derived by vep_config.vep_component_version_kwargs().
+    # NULL on versions created before #462 other than the ones migration 0161 backfilled.
+    conservation = models.TextField(null=True, blank=True)  # phastCons/phyloP bigwig basenames
+    dbscsnv = models.TextField(null=True, blank=True)
+    eve = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
+    fasta = models.TextField(null=True, blank=True)  # whatever _get_vep_fasta passes to --fasta
+    gnomad_sv = models.TextField(null=True, blank=True)
+    mastermind = models.TextField(null=True, blank=True)
+    maxentscan = models.TextField(null=True, blank=True)
+    promoter_ai = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
+    protvar = models.TextField(null=True, blank=True)
+    repeat_masker = models.TextField(null=True, blank=True)
+    topmed = models.TextField(null=True, blank=True)
+    transcript_blocklist = models.TextField(null=True, blank=True)  # --transcript_filter
+    uk10k = models.TextField(null=True, blank=True)
+
+    pick_order = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_PICK_ORDER
+    sift_enabled = models.BooleanField(null=True)  # vep_config "sift" - whether we pass --sift b
+    sv_max_size = models.IntegerField(null=True, blank=True)  # ANNOTATION_VEP_SV_MAX_SIZE
+    sv_overlap_min_fraction = models.FloatField(null=True, blank=True)  # gnomAD SV overlap_cutoff
+    vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
+
     # AnnotSV version pins. Both default to NULL. Populated only on deployments
     # that opt-in to AnnotSV via settings + management command. Either value
     # changing triggers reannotation via the standard VariantAnnotationVersion
