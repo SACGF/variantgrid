@@ -183,17 +183,19 @@ class QuadCompHet(AbstractQuadInheritance):
 
         annotation_kwargs = self.node.get_annotation_kwargs()
 
+        # Gene overlaps (not transcript annotation) - a long SV is skipped by VEP so its only
+        # record of the genes it crosses is VariantGeneOverlap @see issue #940
         def get_parent_genes(q):
             qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
-            return qs.values_list("varianttranscriptannotation__gene", flat=True).distinct()
+            return qs.values_list("variantgeneoverlap__gene", flat=True).distinct()
 
         common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
         vav = self.node.analysis.annotation_version.variant_annotation_version
         q_in_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(vav, common_genes)
         parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
-        parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
+        parent_genes_qs = parent_genes_qs.values_list("variantgeneoverlap__gene")
         two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
-        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True).distinct())
+        two_hit_genes = set(two_hits.values_list("variantgeneoverlap__gene", flat=True).distinct())
         return comp_het_q, two_hit_genes
 
     def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
