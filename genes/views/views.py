@@ -31,7 +31,7 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm,
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
 from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
 from genes.hgvs import HGVSMatcher
-from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
+from genes.models import CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
     PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, NoTranscript, GnomADGeneConstraint
@@ -308,10 +308,6 @@ class GeneSymbolViewInfo:
         return gene_in_gene_lists
 
     @cached_property
-    def gene_infos(self):
-        return GeneInfo.get_for_gene_symbol(self.gene_symbol)
-
-    @cached_property
     def classifications(self) -> QuerySet[ClassificationModification]:
         # Note this is loaded in Ajax
         classifications_qs = ClassificationModification.objects.none()
@@ -393,7 +389,6 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "gene_external_urls",
             "gene_constraint",
             "gene_in_gene_lists",
-            "gene_infos",
             "gene_summary",
             "genome_build",
             "has_classified_variants",

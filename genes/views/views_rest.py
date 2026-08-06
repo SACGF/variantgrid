@@ -10,18 +10,17 @@ from django.views.decorators.cache import cache_page
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import permissions
-from rest_framework.generics import ListAPIView
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import Gene, GeneInfo, GeneList, GeneAnnotationRelease, GeneSymbol, \
+from genes.models import Gene, GeneList, GeneAnnotationRelease, GeneSymbol, \
     ReleaseGeneSymbolGene, PanelAppServer, SampleGeneList, ActiveSampleGeneList, create_fake_gene_list
 from genes.panel_app import get_panel_app_panel_as_gene_list_json
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json
-from genes.serializers import GeneDetailSerializer, GeneInfoSerializer, GeneListGeneSymbolSerializer, \
+from genes.serializers import GeneDetailSerializer, GeneListGeneSymbolSerializer, \
     GeneListSerializer, GeneAnnotationReleaseSerializer, GeneSymbolDetailSerializer, SampleGeneListSerializer
 from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils.django_rest_utils import MultipleFieldLookupMixin
@@ -208,42 +207,6 @@ class GeneAnnotationReleaseView(RetrieveAPIView):
 
     def get_queryset(self):
         return GeneAnnotationRelease.objects.all()
-
-
-@extend_schema(
-    parameters=[OpenApiParameter("gene_symbol", OpenApiTypes.STR, OpenApiParameter.PATH,
-                                 description="Gene symbol to retrieve GeneInfo for")],
-)
-class GeneInfoView(ListAPIView):
-    """ List GeneInfo records (e.g. tags/icons) for a gene symbol """
-    serializer_class = GeneInfoSerializer
-
-    def get_queryset(self):
-        gene_symbol = self.kwargs['gene_symbol']
-        return GeneInfo.get_for_gene_symbol(gene_symbol)
-
-
-class BatchGeneInfoView(APIView):
-    """ Needs to be a post as we can send a large number of genes
-        returns {gene_symbol : [gene_info_dict1, gene_info_dict2]} """
-
-    @extend_schema(
-        summary="Retrieve GeneInfo records for a batch of gene symbols",
-        request=OpenApiTypes.OBJECT,
-        responses=OpenApiTypes.OBJECT,
-    )
-    def post(self, request):
-        gene_symbols_json = request.data["gene_symbols_json"]
-        gene_symbols = json.loads(gene_symbols_json)
-        gene_symbol_path = "gene_list__genelistgenesymbol__gene_symbol"
-
-        qs = GeneInfo.objects.filter(**{gene_symbol_path + "__in": gene_symbols}).distinct()
-        gene_info = defaultdict(list)
-        for gi in qs.values('name', 'description', 'icon_css_class', gene_symbol_path).distinct():
-            gene_symbol = gi[gene_symbol_path]
-            gene_info[gene_symbol].append(gi)
-
-        return Response(dict(gene_info))
 
 
 class BatchGeneIdentifierForReleaseView(APIView):

@@ -51,11 +51,6 @@ class GeneAnnotationReleaseAdmin(ModelAdminBasics):
     pass
 
 
-@admin.register(models.GeneInfo)
-class GeneInfoAdmin(ModelAdminBasics):
-    pass
-
-
 @admin.register(models.GeneListGeneSymbol)
 class GeneListGeneSymbolAdmin(ModelAdminBasics):
     pass

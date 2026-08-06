@@ -2675,14 +2675,6 @@ a.clinical-context {
 }
 
 
-.gene-icon {
-	width: 24px;
-	height: 24px;
-	background-size: 24px 24px;
-	margin: auto;
-	float: left;
-}
-
 .gene-grid-icon {
 	background-image: url("/static/images/gene_grid.png");
 	cursor: pointer;
@@ -2697,18 +2689,6 @@ a.clinical-context {
 
 .expression-icon {
 	background-image: url("/static/images/node_icons/expression.png");
-}
-
-.alt-haplotype-icon {
-	background-image: url(/static/icons/alt_haplotype.png);
-}
-
-.pseudogene-icon {
-	background-image: url(/static/icons/pseudogene.png);
-}
-
-.triplet-repeat-icon {
-	background-image: url(/static/icons/triplet_repeat.png);
 }
 
 .show-grid-icon {

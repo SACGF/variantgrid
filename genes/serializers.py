@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from genes.models import GeneInfo, GeneListCategory, GeneList, Gene, Transcript, GeneListGeneSymbol, \
+from genes.models import GeneListCategory, GeneList, Gene, Transcript, GeneListGeneSymbol, \
     GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList, GeneSymbol, TranscriptVersion, GeneVersion, HGNC, \
     GeneCoverageCollection, GeneCoverageCanonicalTranscript
 from snpdb.models import Company, Contig
@@ -232,13 +232,6 @@ class GeneSymbolDetailSerializer(serializers.ModelSerializer):
     def get_genes(self, obj: GeneSymbol):
         genes = sorted(obj.alias_meta.genes, key=lambda g: g.identifier)
         return GeneDetailSerializer(genes, many=True, context=self.context).data
-
-
-class GeneInfoSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = GeneInfo
-        fields = ('name', 'description', 'icon_css_class')
 
 
 class SampleGeneListSerializer(serializers.ModelSerializer):

@@ -20,7 +20,7 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
 from django.db import models, IntegrityError, transaction
 from django.db.models import QuerySet, TextField
-from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Upper, Collate
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_save, pre_delete
@@ -1561,7 +1561,6 @@ class GeneListCategory(models.Model):
     PATHOLOGY_TEST = 'PathologyTest'
     PATHOLOGY_TEST_ORDER = 'PathologyTestOrder'
     PANEL_APP_CACHE = 'PanelAppCache'
-    GENE_INFO = "GeneInfo"
 
     name = models.TextField()
     company = models.OneToOneField(Company, null=True, blank=True, on_delete=CASCADE)
@@ -2054,18 +2053,6 @@ class PanelAppPanelLocalCacheGeneSymbol(models.Model):
 class CachedThirdPartyGeneList(models.Model):
     cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
     company = models.ForeignKey(Company, on_delete=CASCADE)
-
-
-class GeneInfo(models.Model):
-    """ These represent some kind of special tagging on genes """
-    name = models.TextField(primary_key=True)
-    description = models.TextField(blank=True)
-    icon_css_class = models.TextField()
-    gene_list = models.OneToOneField(GeneList, null=True, on_delete=PROTECT)
-
-    @staticmethod
-    def get_for_gene_symbol(gene_symbol):
-        return GeneInfo.objects.filter(gene_list__genelistgenesymbol__gene_symbol=gene_symbol).distinct()
 
 
 class CanonicalTranscriptCollection(TimeStampedModel):

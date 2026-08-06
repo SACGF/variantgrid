@@ -221,7 +221,6 @@ Organizes gene lists by purpose. Known categories:
 - `QCCoverageCustomText`
 - `PathologyTest`
 - `PanelAppCache`
-- `GeneInfo`
 
 ---
 
@@ -371,17 +370,6 @@ Maps LRG (Locus Reference Genomic) identifiers to RefSeq transcript accessions. 
 ---
 
 ## Documentation and Metadata
-
-### GeneInfo
-
-Special tags attached to specific genes with:
-- `icon_css_class`: CSS class for display icon
-- `description`: Free-text description
-- Linked `GeneList`: Genes associated with this info tag
-
-Used for highlighting genes of special clinical interest.
-
----
 
 ### GeneSymbolWiki / GeneListWiki
 
