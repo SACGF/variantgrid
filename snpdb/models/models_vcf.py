@@ -25,7 +25,7 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
-from library.log_utils import log_traceback, report_event
+from library.log_utils import log_traceback
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from patients.models import FakeData, Patient, Specimen
 from snpdb.models.models import Tag, LabProject
@@ -630,10 +630,6 @@ class VCFAlleleSource(AlleleSource):
         else:
             qs = Variant.objects.none()
         return qs
-
-    def liftover_complete(self, genome_build: GenomeBuild):
-        report_event('Completed VCF liftover',
-                     extra_data={'vcf_id': self.vcf.pk, 'allele_count': self.get_allele_qs().count()})
 
 
 class SampleStatsCodeVersion(TimeStampedModel):

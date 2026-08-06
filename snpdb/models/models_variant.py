@@ -979,9 +979,6 @@ class AlleleSource(models.Model):
     def get_allele_qs(self):
         return Allele.objects.filter(variantallele__variant__in=self.get_variants_qs())
 
-    def liftover_complete(self, genome_build: GenomeBuild):
-        """ This is called at the end of a liftover pipeline (once per build) """
-
 
 class VariantAlleleSource(AlleleSource):
     variant_allele = models.ForeignKey(VariantAllele, on_delete=CASCADE)

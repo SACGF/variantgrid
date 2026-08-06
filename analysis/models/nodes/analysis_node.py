@@ -37,7 +37,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
-from library.log_utils import report_event, log_traceback
+from library.log_utils import log_traceback
 from library.utils import format_percent, add_exception_note
 from library.utils.database_utils import queryset_to_sql
 from library.utils.django_utils import get_model_content_type_dict
@@ -1197,10 +1197,6 @@ class AnalysisNodeAlleleSource(AlleleSource):
         else:
             qs = Variant.objects.none()
         return qs
-
-    def liftover_complete(self, genome_build: GenomeBuild):
-        report_event('Completed AnalysisNode liftover',
-                     extra_data={'node_id': self.node_id, 'allele_count': self.get_allele_qs().count()})
 
 
 class NodeVersion(TimeStampedModel):

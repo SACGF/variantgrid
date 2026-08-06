@@ -877,11 +877,18 @@ class ImportedAlleleInfo(TimeStampedModel):
             logging.info("Found %s", new_dirty_message)
             self.save()
 
-    def update_status(self):
+    def update_status(self, force_complete: bool = False):
+        """
+        :param force_complete: We've stopped attempting liftover, so a missing genome build is an inability to
+        liftover rather than work still in progress
+        """
         if self.grch37 and self.grch38:
             self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
         elif self.variant_info_for_imported_genome_build:
-            self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
+            if force_complete:
+                self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
+            else:
+                self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
         else:
             self.status = ImportedAlleleInfoStatus.FAILED
 
@@ -943,15 +950,15 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.save()
         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
-    def refresh_and_save(self, force_update=False, liftover_complete=False):
+    def refresh_and_save(self, force_update=False, force_complete=False):
         """
         Updates linked variants (c.hgvs, etc)
         """
         if va := self.matched_variant:
             # chances are that variant is linked to an allele now
-            self.set_variant_and_save(matched_variant=va, force_update=force_update, liftover_complete=liftover_complete)
+            self.set_variant_and_save(matched_variant=va, force_update=force_update, force_complete=force_complete)
 
-    def set_variant_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False, liftover_complete: bool = False):
+    def set_variant_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False, force_complete: bool = False):
         """
         Call to update this object, and attached ResolvedVariantInfos (will check if matched_variant has an attached allele).
         If the variant is not yet attached to an allele (or the attached allele doesn't have a variant for each build yet
@@ -959,8 +966,8 @@ class ImportedAlleleInfo(TimeStampedModel):
         :param matched_variant: The variant (for the imported genome build) that we matched on.
         :param message: Details about the matching (if blank previous message will remain)
         :param force_update: Forces recalc of c.hgvs etc. on variants, we will still test to see if variants for certain
-        :param liftover_complete: Indicates if liftover is complete (and if any missing genome build should be considered an inability to liftover)
         builds are newly provided, change etc.
+        :param force_complete: We've stopped attempting liftover, so mark as complete even if a build is missing
         """
 
         if not matched_variant:
@@ -986,30 +993,17 @@ class ImportedAlleleInfo(TimeStampedModel):
         if not self.pk:
             self.save()
 
-        applied_all = False
-        applied_any = False
         if matched_allele:
             # we have an allele, attempt to update config of relevant genome builds
-            missing_variant = False
             for genome_build in ImportedAlleleInfo._genome_builds():
                 variant = self.allele.variant_for_build_optional(genome_build)
                 self._update_variant(genome_build, variant, force_update)
-                if variant:
-                    applied_any = True
-                else:
-                    missing_variant = True
-            applied_all = not missing_variant
         elif matched_variant:
             # no allele, but we do have the variant for the current genome build
             self._update_variant(self.imported_genome_build_patch_version.genome_build, matched_variant, force_update)
 
-        if applied_all or (liftover_complete and applied_any):
-            self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
-        else:
-            self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
-
         self.apply_validation()
-        self.update_status()
+        self.update_status(force_complete=force_complete)
         self.save()
         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
@@ -1038,12 +1032,16 @@ class ImportedAlleleInfo(TimeStampedModel):
     @staticmethod
     def relink_variants(vc_import: Optional['ClassificationImport'] = None,
                         liftover_run: Optional['LiftoverRun'] = None,
-                        force_update=False):
+                        force_update=False,
+                        force_complete=False):
         """
             Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
             Updates all records that have a variant but not cached c.hgvs values or no clinical context.
 
             :param vc_import: if provided only classifications associated to this import will have their values set
+            :param liftover_run: if provided only records for alleles in this liftover run will be updated
+            :param force_update: recalc c.hgvs etc. even if the variant hasn't changed
+            :param force_complete: we've stopped attempting liftover, so mark as complete even if a build is missing
             :return: A tuple of records now correctly set and those still outstanding
         """
 
@@ -1055,5 +1053,5 @@ class ImportedAlleleInfo(TimeStampedModel):
             relink_qs = relink_qs.filter(allele__alleleliftover__liftover=liftover_run).distinct()
 
         for allele_info in relink_qs:
-            allele_info.refresh_and_save(force_update=force_update)
+            allele_info.refresh_and_save(force_update=force_update, force_complete=force_complete)
             # note that refresh_and_save will update linked classifications

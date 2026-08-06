@@ -19,6 +19,7 @@ def liftover_run_complete_handler(sender, instance: LiftoverRun, **kwargs):
                                                 variantallele__allele__in=allele_qs)
         populate_clingen_alleles_for_variants(instance.genome_build, build_variants)
 
-    ImportedAlleleInfo.relink_variants(liftover_run=instance, force_update=True)
+    # force_complete as this run was our last attempt at liftover - a build we don't have now is one we couldn't get
+    ImportedAlleleInfo.relink_variants(liftover_run=instance, force_update=True, force_complete=True)
     report_event('Completed import liftover',
                  extra_data={'liftover_id': instance.pk, 'allele_count': allele_qs.count()})
