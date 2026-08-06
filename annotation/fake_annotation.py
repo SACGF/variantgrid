@@ -12,7 +12,8 @@ from django.utils import timezone
 from annotation.models import ClinVarReviewStatus, GeneAnnotationRelease
 from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, \
     HumanProteinAtlasAnnotationVersion, AnnotationVersion, ClinVar, ClinVarCitation, \
-    ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion
+    ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion, \
+    SubVersionPartition
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport
@@ -142,7 +143,7 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     gene_annotation_import = GeneAnnotationImport.objects.get_or_create(genome_build=genome_build,
                                                                         annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                         url="fake")[0]
-    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version=42,
+    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version="42",  # TextField
                                                                           genome_build=genome_build,
                                                                           annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                           defaults={
@@ -152,28 +153,28 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     create_ontology_test_data()
     ontology_version = create_test_ontology_version()
 
-    # GeneAnnotationVersion must exist before VariantAnnotationVersion: VAV.save() triggers
-    # AnnotationVersion.new_sub_version which raises InvalidAnnotationVersionError if VAV's
-    # gene_annotation_release has no matching GeneAnnotationVersion yet.
-    gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
-                                                                          ontology_version=ontology_version,
-                                                                          gnomad_import_date=timezone.now())[0]
+    # Each sub-version save() would otherwise bump AnnotationVersion, so we'd build and discard 4 of
+    # them on the way to the one we create below.
+    with SubVersionPartition.defer_new_sub_version():
+        gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
+                                                                              ontology_version=ontology_version,
+                                                                              gnomad_import_date=timezone.now())[0]
 
-    vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
-    vav_kwargs["gene_annotation_release"] = gene_annotation_release
-    vav_defaults = {k: vav_kwargs.pop(k) for k in list(vav_kwargs) if k != "genome_build"}
-    vav_defaults["status"] = VariantAnnotationVersion.Status.ACTIVE
-    variant_annotation_version, _ = VariantAnnotationVersion.objects.get_or_create(
-        genome_build=genome_build,
-        status=VariantAnnotationVersion.Status.ACTIVE,
-        defaults=vav_defaults,
-    )
-    clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
-                                                           sha256_hash="not_a_real_hash",
-                                                           genome_build=genome_build)[0]
-    human_protein_atlas_version = HumanProteinAtlasAnnotationVersion.objects.get_or_create(filename="fake_hpa",
-                                                                                           sha256_hash="not_a_real_hash",
-                                                                                           hpa_version=0.42)[0]
+        vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
+        vav_kwargs["gene_annotation_release"] = gene_annotation_release
+        vav_defaults = {k: vav_kwargs.pop(k) for k in list(vav_kwargs) if k != "genome_build"}
+        vav_defaults["status"] = VariantAnnotationVersion.Status.ACTIVE
+        variant_annotation_version, _ = VariantAnnotationVersion.objects.get_or_create(
+            genome_build=genome_build,
+            status=VariantAnnotationVersion.Status.ACTIVE,
+            defaults=vav_defaults,
+        )
+        clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
+                                                               sha256_hash="not_a_real_hash",
+                                                               genome_build=genome_build)[0]
+        human_protein_atlas_version = HumanProteinAtlasAnnotationVersion.objects.get_or_create(filename="fake_hpa",
+                                                                                               sha256_hash="not_a_real_hash",
+                                                                                               hpa_version=0.42)[0]
 
     av, _ = AnnotationVersion.objects.get_or_create(genome_build=genome_build,
                                                     variant_annotation_version=variant_annotation_version,

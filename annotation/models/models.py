@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import datetime, date, time
 from functools import cached_property
 from typing import Optional, Callable, Iterable
@@ -61,16 +62,28 @@ from snpdb.models.models_enums import ImportStatus
 class SubVersionPartition(RelatedModelsPartitionModel):
     RECORDS_FK_FIELD_TO_THIS_MODEL = "version_id"
     PARTITION_LABEL_TEXT = "version"
+    _defer_new_sub_version = False
     created = models.DateTimeField(auto_now_add=True)  # Inserted into DB
     annotation_date = models.DateTimeField(auto_now_add=True)  # Date of annotation (what we sort by)
 
     class Meta:
         abstract = True
 
+    @staticmethod
+    @contextmanager
+    def defer_new_sub_version():
+        """ Create a batch of sub-versions without bumping AnnotationVersion on each save.
+            The caller is responsible for creating the AnnotationVersion afterwards. """
+        SubVersionPartition._defer_new_sub_version = True
+        try:
+            yield
+        finally:
+            SubVersionPartition._defer_new_sub_version = False
+
     def save(self, *args, **kwargs):
         created = not self.pk
         super().save(*args, **kwargs)
-        if created:
+        if created and not SubVersionPartition._defer_new_sub_version:
             genome_build = getattr(self, "genome_build", None)
             AnnotationVersion.new_sub_version(genome_build)
 

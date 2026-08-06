@@ -98,6 +98,13 @@ DATABASES = {
     }
 }
 
+TEST_RUNNER = "variantgrid.test_runner.VariantGridTestRunner"
+
+if UNIT_TEST:
+    # InheritanceManager.select_subclasses() (analysis nodes) emits ~30 way joins, whose estimated cost
+    # trips jit_above_cost. Against empty test tables that's ~2.6s of LLVM codegen to return no rows.
+    DATABASES['default']['OPTIONS'] = {'options': '-c jit=off'}
+
 # DB load / DOS protection - see variantgrid_private #1502
 # Global statement_timeout applied to every connection (see variantgrid/wsgi.py)
 DATABASE_STATEMENT_TIMEOUT_SECONDS = 10 * 60
@@ -112,22 +119,35 @@ CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
 CACHE_VERSION = 44  # increment to flush caches (eg if invalid due to upgrade)
-CACHES = {
-    'default': {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
-        'TIMEOUT': TIMEOUT,
-        'VERSION': CACHE_VERSION,
-    },
-    'debug-panel': {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
-        'TIMEOUT': TIMEOUT,
-        'OPTIONS': {
-            'MAX_ENTRIES': 200
-        }
-    },
-}
+if UNIT_TEST:
+    # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
+    CACHES = {
+        'default': {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "default",
+        },
+        'debug-panel': {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "debug-panel",
+        },
+    }
+else:
+    CACHES = {
+        'default': {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
+            'TIMEOUT': TIMEOUT,
+            'VERSION': CACHE_VERSION,
+        },
+        'debug-panel': {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
+            'TIMEOUT': TIMEOUT,
+            'OPTIONS': {
+                'MAX_ENTRIES': 200
+            }
+        },
+    }
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -913,11 +933,13 @@ LEAFLET_CONFIG = {
 # See http://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.
 
+LOG_LEVEL = 'WARNING' if UNIT_TEST else 'INFO'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
     'root': {
-        'level': 'INFO',
+        'level': LOG_LEVEL,
         'handlers': ['console'],
     },
     'formatters': {
@@ -958,7 +980,7 @@ LOGGING = {
         'django': {
             'handlers': ['console', 'db'],
             'propagate': False,
-            'level': 'INFO',
+            'level': LOG_LEVEL,
         },
         'hgvs': {
             'level': 'WARNING',
