@@ -192,9 +192,14 @@ class VariantZygosityCounts:
                 if zygosity == Zygosity.MISSING or s_values["no_dna_control"]:
                     continue
 
-                allele_frequency = samples_allele_frequency[i]
-                allele_frequency = format_af(allele_frequency,
-                                             source_in_percent=s_values["vcf__allele_frequency_percent"],
+                # The displayed AF may be percent formatted text, so keep the unit value for graphing
+                source_in_percent = s_values["vcf__allele_frequency_percent"]
+                allele_frequency_unit = format_af(samples_allele_frequency[i],
+                                                  source_in_percent=source_in_percent,
+                                                  dest_in_percent=False,
+                                                  missing_value=CohortGenotype.MISSING_NUMBER_VALUE)
+                allele_frequency = format_af(samples_allele_frequency[i],
+                                             source_in_percent=source_in_percent,
                                              dest_in_percent=settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT,
                                              missing_value=CohortGenotype.MISSING_NUMBER_VALUE)
                 allele_depth = samples_allele_depth[i]
@@ -211,6 +216,7 @@ class VariantZygosityCounts:
                     "genome_build": genome_build,
                     "zygosity": zygosity,
                     "allele_frequency": allele_frequency,
+                    "allele_frequency_unit": allele_frequency_unit,
                     "allele_depth": allele_depth,
                     "read_depth": read_depth,
                     "phred_likelihood": phred_likelihood,
@@ -265,6 +271,9 @@ class VariantSampleGenotypes(VariantZygosityCounts):
     @staticmethod
     def _row_to_json(row: dict) -> dict:
         sample_id = row["sample"]
+        allele_frequency_unit = row["allele_frequency_unit"]
+        if allele_frequency_unit == CohortGenotype.MISSING_NUMBER_VALUE:
+            allele_frequency_unit = None
         return {
             "genome_build": row["genome_build"],
             "sample": sample_id,
@@ -274,6 +283,7 @@ class VariantSampleGenotypes(VariantZygosityCounts):
             "vcf": row["sample__vcf__name"],
             "zygosity": row["zygosity"],
             "allele_frequency": row["allele_frequency"],
+            "allele_frequency_unit": allele_frequency_unit,  # Graphs need a number, not the display value
             "allele_depth": row["allele_depth"],
             "read_depth": row["read_depth"],
             "phred_likelihood": row["phred_likelihood"],

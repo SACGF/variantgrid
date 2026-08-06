@@ -312,6 +312,11 @@ function populateVariantAllele(data) {
         allele.text("-");
     }
 
+    // Retrieving the allele links it to the other builds' variants - tell the samples section, which
+    // loads in parallel and may have started before any of them existed
+    window.alleleVariantIds = (data.allele && data.allele.variant_ids) || [];
+    $(document).trigger("allele-variants-loaded", [window.alleleVariantIds]);
+
     $("#variant_coordinate").text(data.link_data.variant_string);
     data.link_data.igv_links_enabled = {{ igv_links_enabled | jsonify }};
     if (data.link_data.variant_string !== data.link_data.variant_coordinate) {

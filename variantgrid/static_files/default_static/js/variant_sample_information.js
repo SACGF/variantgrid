@@ -1,9 +1,12 @@
 /**
  * Variant details "Samples" section.
  *
- * The server renders a shell, this fills it in from the variant_sample_genotypes API. Requests are
- * per variant (not per build) - builds sharing a contig resolve to the same variant, and each row
- * carries its own sample's build.
+ * The server renders a shell, this fills it in from the variant_sample_genotypes API. The same mutation
+ * is a separate variant in each genome build, so the server hands us one variant per build (via the
+ * allele) and we request each - responses accumulate into the one grid, keyed by the row's own build.
+ *
+ * The allele may be created (and linked to the other builds' variants) by the variant details page while
+ * this is loading, so we also listen for ALLELE_VARIANTS_EVENT and pick up any variants that turned up.
  */
 const VariantSampleInformation = (function () {
     // Ordered as the zygosity filter checkboxes are drawn
@@ -22,15 +25,20 @@ const VariantSampleInformation = (function () {
     const HPO_COLOR = "#FF8C00";
     const OMIM_COLOR = "#22529e";
     const MONDO_COLOR = "#99CD83";
+    const AF_COLOR = "#1f77b4";
     const MAX_GRAPH_TERMS = 20;
     const GRAPH_WIDTH = 512;
     const GRAPH_HEIGHT = 384;
+    const ALLELE_VARIANTS_EVENT = "allele-variants-loaded";
 
     let config = null;
     let dataTable = null;
+    let responses = [];
+    let requestedVariantIds = new Set();
+    let pendingRequests = 0;
     let allRows = [];
-    let zygosityCounts = {};
     let checkedZygosities = null;  // null until we've seen a response and know what to default to
+    let graphedFilter = null;  // Redrawing 10k plotly points on every page change is a waste
 
     function genotypesUrl(variantId) {
         return config.genotypesUrlForVariant.replace(/0$/, variantId);
@@ -66,7 +74,8 @@ const VariantSampleInformation = (function () {
     }
 
     function filterSpan(value, text) {
-        const cssClass = value === 'PASS' ? 'text-muted' : 'text-danger font-weight-bold';
+        // PASS is the boring case so let it recede, anything else reads as normal body text
+        const cssClass = value === 'PASS' ? 'text-muted' : '';
         return $('<span>', {class: cssClass, text: text}).prop('outerHTML');
     }
 
@@ -100,17 +109,18 @@ const VariantSampleInformation = (function () {
     function columns() {
         return [
             {data: 'sample_name', title: 'Sample Name', render: renderSampleLink},
+            {data: 'genome_build', name: 'genome_build', title: 'Genome Build', visible: false},
             {data: 'zygosity', title: 'Zygosity', render: renderZygosity},
             {data: 'filters', title: 'FILTER', render: renderFilters},
+            {data: 'allele_frequency', title: 'Allele Frequency', render: renderFormatField},
+            {data: 'allele_depth', title: 'Allele Depth', render: renderFormatField},
+            {data: 'read_depth', title: 'Read Depth', render: renderFormatField},
+            {data: 'phred_likelihood', title: 'Phred Likelihood', render: renderFormatField},
             {data: 'enrichment_kit', title: 'EnrichmentKit', defaultContent: ''},
             {data: 'patient_hpo', title: 'Patient HPO', className: 'no-word-wrap', render: ontologyRenderer('HP')},
             {data: 'patient_omim', title: 'Patient OMIM', className: 'no-word-wrap', render: ontologyRenderer('OMIM')},
             {data: 'patient_mondo', title: 'Patient MONDO', className: 'no-word-wrap', render: ontologyRenderer('MONDO')},
             {data: 'vcf', title: 'VCF', defaultContent: ''},
-            {data: 'allele_frequency', title: 'Allele Frequency', render: renderFormatField},
-            {data: 'allele_depth', title: 'Allele Depth', render: renderFormatField},
-            {data: 'read_depth', title: 'Read Depth', render: renderFormatField},
-            {data: 'phred_likelihood', title: 'Phred Likelihood', render: renderFormatField},
         ];
     }
 
@@ -141,19 +151,38 @@ const VariantSampleInformation = (function () {
             }
             return checkedZygosities.has(rowData.zygosity);
         });
+
+        // Graphs summarise what the grid is showing, so follow the zygosity/search filters
+        dataTable.on('draw', drawGraphs);
+    }
+
+    /** The rows the grid is currently showing - across all pages, but after zygosity/search filtering */
+    function visibleRows() {
+        return dataTable.rows({search: 'applied'}).data().toArray();
+    }
+
+    function zygosityCounts() {
+        const counts = {};
+        for (const data of responses) {
+            for (const [zygosity, count] of Object.entries(data.zygosity_counts)) {
+                counts[zygosity] = (counts[zygosity] || 0) + count;
+            }
+        }
+        return counts;
     }
 
     function drawZygosityFilters() {
+        const counts = zygosityCounts();
         if (checkedZygosities === null) {
             // Show variants by default, but don't hide everything if that's all there is
-            const hasDefaults = DEFAULT_VISIBLE_ZYGOSITIES.some(code => zygosityCounts[code]);
+            const hasDefaults = DEFAULT_VISIBLE_ZYGOSITIES.some(code => counts[code]);
             const visible = hasDefaults ? DEFAULT_VISIBLE_ZYGOSITIES : ZYGOSITIES.map(z => z.code);
             checkedZygosities = new Set(visible);
         }
 
         const container = $("#zygosity-filters").empty();
         for (const zygosity of ZYGOSITIES) {
-            const count = zygosityCounts[zygosity.code];
+            const count = counts[zygosity.code];
             if (!count) {
                 continue;
             }
@@ -173,7 +202,7 @@ const VariantSampleInformation = (function () {
         });
     }
 
-    function drawLocusCounts(locusCounts) {
+    function locusCountsTable(locusCounts) {
         const showUnknown = locusCounts.some(row => row["Unknown"]);
         const headers = ['Allele', 'Total', 'Hom Ref', 'Het', 'Hom'];
         const fields = ['total', 'REF', 'HET', 'HOM_ALT'];
@@ -195,13 +224,24 @@ const VariantSampleInformation = (function () {
             fields.forEach(f => tr.append($('<td>', {text: row[f]})));
             tbody.append(tr);
         }
-        table.append(tbody);
-        $("#locus-counts").empty().append(table);
+        return table.append(tbody);
     }
 
-    function drawMultiallelic(multiallelic) {
+    function drawLocusCounts() {
+        // Each build has its own locus, so they get their own table rather than being merged
+        const container = $("#locus-counts").empty();
+        for (const data of responses) {
+            if (responses.length > 1) {
+                container.append($('<h5>', {text: data.genome_builds.join(', ')}));
+            }
+            container.append(locusCountsTable(data.locus_counts));
+        }
+    }
+
+    function drawMultiallelic() {
         const container = $("#other-loci-variants-by-multiallelic").empty();
-        if (!multiallelic.length) {
+        const entries = responses.flatMap(data => data.multiallelic);
+        if (!entries.length) {
             return;
         }
         container.append($('<h4>', {text: 'Variants from multi-allelic VCF records'}));
@@ -209,7 +249,7 @@ const VariantSampleInformation = (function () {
             text: 'Multi-allelic VCF records are split then separately normalised. This may cause records ' +
                 'that were on a line together in a VCF to now have different loci.'
         }));
-        for (const entry of multiallelic) {
+        for (const entry of entries) {
             container.append($('<b>', {text: entry.multiallelic}));
             const list = $('<ul>');
             for (const variant of entry.variants) {
@@ -219,38 +259,63 @@ const VariantSampleInformation = (function () {
         }
     }
 
-    function drawSummary(data) {
-        const builds = data.genome_builds.join(', ');
-        const samples = data.samples;
+    function mergedSummary() {
+        const genomeBuilds = [];
+        const countedBuilds = new Set();  // Builds sharing a contig come back in one response - count them once
+        const samples = {total: 0, visible: 0};
+        const observations = {total: 0, visible: 0, invisible: 0};
+
+        for (const data of responses) {
+            const buildKey = data.genome_builds.join(',');
+            if (!countedBuilds.has(buildKey)) {
+                countedBuilds.add(buildKey);
+                data.genome_builds.forEach(b => genomeBuilds.push(b));
+                samples.total += data.samples.total;
+                samples.visible += data.samples.visible;
+            }
+            observations.total += data.observations.total;
+            observations.visible += data.observations.visible;
+            observations.invisible += data.observations.invisible;
+        }
+        genomeBuilds.sort();
+        return {genomeBuilds: genomeBuilds, samples: samples, observations: observations};
+    }
+
+    function drawSummary() {
+        const {genomeBuilds, samples, observations} = mergedSummary();
+        const builds = genomeBuilds.join(', ');
         let summary = `Searching ${samples.total} samples for ${builds}`;
         summary += samples.visible < samples.total ? ` (you can see ${samples.visible}).` : '.';
 
         const container = $("#samples-summary").empty();
-        if (!data.observations.total) {
+        if (!observations.total) {
             container.append($('<p>', {text: `No results found (searched ${samples.total} samples for ${builds}).`}));
             return;
         }
         container.append($('<p>', {text: summary}));
 
-        if (data.observations.invisible) {
+        if (observations.invisible) {
             const hidden = $('<div>').append(
                 $('<img>', {src: config.unknownSampleIconUrl}),
-                $('<b>', {text: `You cannot see ${data.observations.invisible} samples`}),
+                $('<b>', {text: `You cannot see ${observations.invisible} samples`}),
                 $('<p>', {
-                    text: `You only have permission to view ${data.observations.visible} out of ` +
-                        `${data.observations.total} total observations in the database.`
+                    text: `You only have permission to view ${observations.visible} out of ` +
+                        `${observations.total} total observations in the database.`
                 }));
             container.append(hidden);
         }
     }
 
-    function plotAlleleFrequencies() {
+    function plotAlleleFrequencies(rows) {
         const x = [];
         const alleleFrequencies = [];
         const labels = [];
-        for (const row of allRows) {
+        for (const row of rows) {
+            if (row.allele_frequency_unit === null || row.allele_frequency_unit === undefined) {
+                continue;
+            }
             x.push((Math.random() - 0.5) * 0.1);  // jitter
-            alleleFrequencies.push(row.allele_frequency);
+            alleleFrequencies.push(row.allele_frequency_unit);
             let sampleDescription = `Sample: (${row.sample})`;
             if (row.sample_name) {
                 sampleDescription += " " + row.sample_name;
@@ -259,16 +324,22 @@ const VariantSampleInformation = (function () {
             labels.push(sampleDescription);
         }
 
+        $("#allele-frequency-graphs-container").toggle(alleleFrequencies.length > 0);
+        if (!alleleFrequencies.length) {
+            return;
+        }
+
         const scatterData = {
             name: "Allele Frequency",
             type: 'scatter',
             mode: 'markers',
+            marker: {color: AF_COLOR},
             x: x,
             y: alleleFrequencies,
             text: labels,
         };
         const layout = defaultLayout(config.variantLabel + " Allele Frequency");
-        layout.xaxis = Object.assign(layout.xaxis || {}, {zeroline: false, showgrid: false});
+        layout.xaxis = Object.assign(layout.xaxis || {}, {zeroline: false, showgrid: false, showticklabels: false});
         layout.yaxis = Object.assign(layout.yaxis || {}, {range: [0, 1.05], showgrid: false, zeroline: false});
         Plotly.newPlot('sample-allele-frequency-scatter', [scatterData], layout);
 
@@ -277,6 +348,7 @@ const VariantSampleInformation = (function () {
         const histogramData = {
             name: "Allele Frequency",
             type: 'histogram',
+            marker: {color: AF_COLOR},
             x: clampedAf,
             autobinx: false,
             histnorm: "count",
@@ -288,10 +360,10 @@ const VariantSampleInformation = (function () {
         Plotly.newPlot('sample-allele-frequency-histogram', [histogramData], histogramLayout);
     }
 
-    function plotPatientTermCounts(selector, title, color, rowField) {
+    function plotPatientTermCounts(rows, selector, title, color, rowField) {
         // The graph counts patients, while the grid is per sample - a patient can have several
         const patientsByTerm = {};
-        for (const row of allRows) {
+        for (const row of rows) {
             if (!row.patient || !row[rowField]) {
                 continue;
             }
@@ -302,6 +374,7 @@ const VariantSampleInformation = (function () {
 
         const counts = Object.entries(patientsByTerm).map(([term, patients]) => [term, patients.size]);
         if (!counts.length) {
+            Plotly.purge(selector);
             return false;
         }
         counts.sort((a, b) => b[1] - a[1]);
@@ -311,31 +384,60 @@ const VariantSampleInformation = (function () {
         return true;
     }
 
-    function drawPhenotypeGraphs() {
-        const hpo = plotPatientTermCounts('sample-hpo-graph', "Human Phenotype Ontology", HPO_COLOR, 'patient_hpo');
-        const omim = plotPatientTermCounts('sample-omim-graph', "OMIM", OMIM_COLOR, 'patient_omim');
-        const mondo = plotPatientTermCounts('sample-mondo-graph', "MONDO", MONDO_COLOR, 'patient_mondo');
+    function drawPhenotypeGraphs(rows) {
+        const hpo = plotPatientTermCounts(rows, 'sample-hpo-graph', "Human Phenotype Ontology", HPO_COLOR, 'patient_hpo');
+        const omim = plotPatientTermCounts(rows, 'sample-omim-graph', "OMIM", OMIM_COLOR, 'patient_omim');
+        const mondo = plotPatientTermCounts(rows, 'sample-mondo-graph', "MONDO", MONDO_COLOR, 'patient_mondo');
         $("#variant-sample-phenotype-graphs").toggle(hpo || omim || mondo);
     }
 
-    function addResponse(data) {
-        config.gHgvs = config.gHgvs || data.g_hgvs;
-        drawSummary(data);
-        drawLocusCounts(data.locus_counts);
-        drawMultiallelic(data.multiallelic);
-
-        for (const [zygosity, count] of Object.entries(data.zygosity_counts)) {
-            zygosityCounts[zygosity] = (zygosityCounts[zygosity] || 0) + count;
+    function drawGraphs() {
+        const zygosities = checkedZygosities === null ? '' : [...checkedZygosities].sort().join(',');
+        const filter = [allRows.length, dataTable.search(), zygosities].join('|');
+        if (filter === graphedFilter) {
+            return;  // Paging/sorting doesn't change what the graphs summarise
         }
+        graphedFilter = filter;
+
+        const rows = visibleRows();
+        plotAlleleFrequencies(rows);
+        drawPhenotypeGraphs(rows);
+    }
+
+    function addResponse(data) {
+        responses.push(data);
+        config.gHgvs = config.gHgvs || data.g_hgvs;
+        drawSummary();
+        drawLocusCounts();
+        drawMultiallelic();
 
         if (data.rows.length) {
             allRows = allRows.concat(data.rows);
             $("#genotype-grid-container").show();
             drawZygosityFilters();
-            dataTable.rows.add(data.rows).draw();
-            $("#allele-frequency-graphs-container").show();
-            plotAlleleFrequencies();
-            drawPhenotypeGraphs();
+            dataTable.column('genome_build:name').visible(new Set(allRows.map(r => r.genome_build)).size > 1, false);
+            dataTable.rows.add(data.rows).draw();  // 'draw' redraws the graphs
+        }
+    }
+
+    function requestComplete() {
+        if (--pendingRequests === 0) {
+            $("#samples-loading").hide();
+            if (!responses.length) {
+                $("#samples-summary").html($('<p>', {class: 'text-danger', text: 'Error retrieving samples'}));
+            }
+        }
+    }
+
+    function requestVariants(variantIds) {
+        for (const variantId of variantIds || []) {
+            if (requestedVariantIds.has(variantId)) {
+                continue;
+            }
+            requestedVariantIds.add(variantId);
+            pendingRequests++;
+            $("#samples-loading").show();
+            $.getJSON(genotypesUrl(variantId), addResponse).always(requestComplete);
         }
     }
 
@@ -346,11 +448,11 @@ const VariantSampleInformation = (function () {
         // getOntologyTermLinks makes these as the grid renders, so delegate from the document
         $(document).on('click', '.ontology-terms-container .collapsed-term', expandCollapsedOntologyTerm);
 
-        $.getJSON(genotypesUrl(config.variantId), addResponse).fail(function () {
-            $("#samples-summary").html($('<p>', {class: 'text-danger', text: 'Error retrieving samples'}));
-        }).always(function () {
-            $("#samples-loading").hide();
-        });
+        // The allele can be created (linking the other builds' variants) while this section is loading
+        $(document).on(ALLELE_VARIANTS_EVENT, (event, variantIds) => requestVariants(variantIds));
+
+        requestVariants(config.variantIds);
+        requestVariants(window.alleleVariantIds);  // Allele resolved before we got here, so we missed the event
     }
 
     return {

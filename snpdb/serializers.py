@@ -72,7 +72,7 @@ class AlleleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Allele
-        fields = ('id', 'clingen_allele', "build_names", "__str__")
+        fields = ('id', 'clingen_allele', "build_names", "variant_ids", "__str__")
 
     def get___str__(self, obj) -> str:
         return str(obj)

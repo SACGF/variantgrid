@@ -119,6 +119,20 @@ class VariantSampleGenotypesTest(TestCase):
         filters_by_build = {row["genome_build"]: row["filters"] for row in data["rows"]}
         self.assertEqual({self.grch37.name: "YOUSHALLNOTPASS", self.grch38.name: "OFF_TARGET"}, filters_by_build)
 
+    def test_allele_frequency_unit_for_graphs(self):
+        """ The displayed AF may be percent formatted text - graphs need the unit number """
+        variant = slowly_create_test_variant("3", 3700, "A", "T", self.grch37)
+        cgc = CohortGenotypeCollection.objects.get(cohort=self.cohort_37)
+        CohortGenotype.objects.create(collection=cgc, variant=variant,
+                                      samples_zygosity=Zygosity.HET + Zygosity.HET + Zygosity.MISSING,
+                                      samples_allele_frequency=[0.25, CohortGenotype.MISSING_NUMBER_VALUE, -1],
+                                      samples_allele_depth=[20] * 3, samples_read_depth=[30] * 3,
+                                      samples_genotype_quality=[30] * 3, samples_phred_likelihood=[0] * 3)
+
+        rows = self._rows_by_sample_name(VariantSampleGenotypes(self.user, variant).to_json())
+        self.assertEqual(0.25, rows["proband"]["allele_frequency_unit"])
+        self.assertIsNone(rows["mother"]["allele_frequency_unit"], "Missing AF is left off the graph")
+
     def test_no_observations(self):
         variant = slowly_create_test_variant("3", 3600, "A", "T", self.grch37)
 

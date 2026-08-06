@@ -696,7 +696,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
             allele: Allele
             if allele := Allele.objects.filter(id=allele_id).first():
                 has_37 = bool(allele.variant_for_build_optional(GenomeBuild.grch37()))
-                has_38 = bool(allele.variant_for_build_optional(GenomeBuild.grch37()))
+                has_38 = bool(allele.variant_for_build_optional(GenomeBuild.grch38()))
                 label += f" (Current: {has_build_to_icon[has_37]} GRCh37, {has_build_to_icon[has_38]} GRCh38)"
 
         return label

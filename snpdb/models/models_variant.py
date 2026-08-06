@@ -185,6 +185,19 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     def build_names(self) -> str:
         return ", ".join(sorted(self.variantallele_set.values_list("genome_build__name", flat=True)))
 
+    @property
+    def variant_ids(self) -> list[int]:
+        """ The same mutation as a variant in each build it's been linked to """
+        return list(self.variantallele_set.order_by("genome_build__name").values_list("variant_id", flat=True))
+
+    @cached_property
+    def all_genome_builds(self) -> set['GenomeBuild']:
+        """ Every build this allele's variants are in. Wider than the builds it's been lifted over to -
+            builds that share a contig (MT, unplaced scaffolds) share the one variant """
+        gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),
+                                                  contig__locus__variant__variantallele__allele=self)
+        return {gbc.genome_build for gbc in gbc_qs}
+
     @staticmethod
     def missing_variants_for_build(genome_build) -> QuerySet['Allele']:
         alleles_with_variants_qs = Allele.objects.filter(variantallele__isnull=False)
@@ -676,6 +689,24 @@ class Variant(PreviewModelMixin, models.Model):
         gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),
                                                   contig__locus__variant=self)
         return {gbc.genome_build for gbc in gbc_qs}
+
+    @cached_property
+    def all_build_variants(self) -> list['Variant']:
+        """ The same mutation in every build it's been linked to, this variant first.
+
+            A Variant is per-build, so the others come via the allele. Builds that share a contig
+            (MT, unplaced scaffolds) share the one variant, so this can be shorter than all_genome_builds """
+        variants = [self]
+        if allele := self.allele:
+            variants += [va.variant for va in allele.variant_alleles() if va.variant_id != self.pk]
+        return variants
+
+    @cached_property
+    def all_genome_builds(self) -> set['GenomeBuild']:
+        """ Every build this mutation is in - genome_builds is only the builds sharing this variant's contig """
+        if allele := self.allele:
+            return allele.all_genome_builds
+        return self.genome_builds
 
     @property
     def any_genome_build(self) -> GenomeBuild:

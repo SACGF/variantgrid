@@ -1,11 +1,12 @@
 {% load static %}
+{% load js_tags %}
 {% load ui_help %}
 
 {% if has_samples_in_other_builds %}
 <div id="sv-annotation-help-info" class="container">
     {% page_help_embedded page_id='genes/variant_sample_information_help' title='Variant Sample Information' %}
-        <p>The locus counts and sample genotypes are from VCFs in the current genome build only -
-            you will not see the same mutation in a sample from a different build.</p>
+        <p>The locus counts and sample genotypes come from every genome build this allele has been lifted over to.
+            There are samples in builds not shown below - to see those, the allele needs to be lifted over to them.</p>
 
         <p>You may want to visit the Allele link (box at the top of the page) then view variants in a different build</p>
     {% end_page_help_embedded %}
@@ -84,7 +85,7 @@
 <script>
     $(document).ready(function() {
         VariantSampleInformation.init({
-            variantId: {{ variant.pk }},
+            variantIds: {{ variant_ids | jsonify }},
             variantLabel: "{{ variant|escapejs }}",
             genotypesUrlForVariant: "{% url 'variant_sample_genotypes' 0 %}",
             unknownSampleIconUrl: "{% static 'icons/unknown_sample.png' %}",

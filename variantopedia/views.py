@@ -761,13 +761,15 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
 def variant_sample_information(request, variant_id, genome_build_name):
     """ Shell only - the samples grid, locus counts and multi-allelic list are drawn client side
-        from the variant_sample_genotypes API """
+        from the variant_sample_genotypes API, one request per variant """
     variant = get_object_or_404(Variant, pk=variant_id)
-    get_genome_build_or_404(genome_build_name)  # Validate, builds we search come from the variant's contig
+    get_genome_build_or_404(genome_build_name)  # Validate, builds we search come from the variants' contigs
 
     context = {
         "variant": variant,
-        "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build__in=variant.genome_builds).exists(),
+        "variant_ids": [v.pk for v in variant.all_build_variants],
+        "has_samples_in_other_builds":
+            Sample.objects.exclude(vcf__genome_build__in=variant.all_genome_builds).exists(),
     }
     return render(request, "variantopedia/variant_sample_information.html", context)
 
