@@ -801,7 +801,8 @@ def cohort_zygosity_filters(request, analysis_id, node_id, cohort_id):
                                         extra=0)
 
     formset = CNZFFormSet(request.POST or None, instance=cnzfc)
-    context = {'formset': formset}
+    context = {'formset': formset,
+               'cohort': cohort}
 
     template = 'analysis/node_editors/cohort_zygosity_filters.html'
     return render(request, template, context)
