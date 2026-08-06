@@ -700,25 +700,28 @@ function setupNodeModifications(nodes_selector) {
 		bringNodeToFront(node);
 	}
 
-	function dragStop(event) {
+	function saveNodePosition() {
 		const nodeId = $(this).attr("node_id");
 		const position = $(this).position();
 		const params = {'x' : position.left, 'y' : position.top};
 		updateNode(nodeId, 'move', params);
+	}
+
+	function dragStop(event) {
+		saveNodePosition.call(this);
 
 		// Avoid click event at end of drag
 		// http://stackoverflow.com/questions/3486760/how-to-avoid-jquery-ui-draggable-from-also-triggering-click-event/13973319#13973319
 		$( event.toElement ).one('click', function(e){ e.stopImmediatePropagation(); } );
 	}
 
-	// It's not clear to me how to always get a drag so we listen on both
-	// This can causes 2 POST's for an update, but is better than losing it
+	// Native = the node you grabbed, All = the other selected nodes dragged along with it
 	const params = {
 		activeClass: ACTIVE_CLASS,
 		startNative: dragStart,
 		startAll: dragStart,
 		stopNative: dragStop,
-		stopAll: dragStop,
+		stopAll: saveNodePosition,
 	};
 	nodes_selector.multiDraggable(params);
 
