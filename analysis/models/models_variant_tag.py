@@ -90,9 +90,16 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
             va_kwargs["variant__in"] = variant_qs
 
         va_qs = VariantAllele.objects.filter(**va_kwargs)
+        q_allele = Q(allele__in=va_qs.values_list("allele", flat=True))
+
+        # Tags in our own build are matched on variant, so they show up straight away - allele is assigned
+        # asynchronously (@see analysis.tasks.variant_tag_tasks._liftover_variant_tag)
+        q_native_build = Q(genome_build=genome_build)
+        if variant_qs is not None:
+            q_native_build &= Q(variant__in=variant_qs)
+
         # Do distinct as we used to get 2x results with MT (which share contigs across builds)
-        tags_qs = VariantTag.objects.filter(allele__in=va_qs.values_list("allele", flat=True))
-        return tags_qs.distinct()
+        return tags_qs.filter(q_allele | q_native_build).distinct()
 
     @staticmethod
     def variants_for_build_q(genome_build, tags_qs, tag_ids: list[str]) -> Q:
