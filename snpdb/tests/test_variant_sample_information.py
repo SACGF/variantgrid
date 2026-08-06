@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
 from patients.models_enums import Zygosity
 from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild
@@ -67,6 +69,24 @@ class VariantZygosityCountsTest(TestCase):
         self.assertEqual(1, counts.num_observations)
         self.assertEqual(1, counts.num_visible_observations)
         self.assertEqual(0, counts.num_invisible_observations)
+
+    def test_query_count_does_not_scale_with_vcfs(self):
+        """ A common variant is in a lot of VCFs. Everything the walk needs is loaded in bulk, so the
+            cost of the page is fixed - it must not creep back to a query per VCF or per sample. """
+        user = User.objects.get_or_create(username='vsi_test_scaling_user')[0]
+
+        def queries_for(position, num_cohorts, max_rows=1):
+            variant = slowly_create_test_variant("3", position, "A", "T", self.grch37)
+            for _ in range(num_cohorts):
+                self._het_proband(create_fake_cohort(user, self.grch37), variant)
+            VariantSampleGenotypes(user, variant, max_rows=max_rows).to_json()  # Warm up cached lookups
+            with CaptureQueriesContext(connection) as context:
+                VariantSampleGenotypes(user, variant, max_rows=max_rows).to_json()
+            return len(context.captured_queries)
+
+        few = queries_for(10_000, 2)
+        many = queries_for(11_000, 6)
+        self.assertEqual(few, many, "Same queries for 2 VCFs at the locus as for 6")
 
     def test_hidden_samples(self):
         """ has_hidden_samples is what the template branches on to explain the visible/total split """

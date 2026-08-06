@@ -81,6 +81,8 @@ class Test(URLTestCase):
             ("variant_sample_information", {"variant_id": self.variant.pk,
                                             "genome_build_name": self.grch37.name}, 200),
             ("variant_sample_genotypes", {"variant_id": self.variant.pk}, 200),
+            ("variant_sample_genotypes", {"variant_id": self.variant.pk, "GET_PARAMS": {"limit": 0}}, 200),
+            ("variant_sample_genotypes", {"variant_id": self.variant.pk, "GET_PARAMS": {"limit": "all"}}, 400),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
 

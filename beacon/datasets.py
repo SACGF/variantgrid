@@ -81,7 +81,7 @@ def observations_dataset(user, variant: Optional[Variant], genome_build: GenomeB
     # Stage 2 - permission-scoped exact count (anonymous -> public group). Counts are for this
     # variant only - builds sharing its contig have the same variant/coordinates, so their samples
     # are native observations, not lifted over.
-    counts = VariantZygosityCounts(user, variant)
+    counts = VariantZygosityCounts(user, variant, max_rows=0)  # Counts only, we never look at rows
     visible = counts.num_visible_alt
     result.count = visible
     result.exists = visible > 0

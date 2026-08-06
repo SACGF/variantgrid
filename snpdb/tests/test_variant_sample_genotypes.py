@@ -1,11 +1,16 @@
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from library.guardian_utils import assign_permission_to_user_and_groups
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
+from classification.models import Classification
+from classification.tests.models.test_utils import ClassificationTestUtils
+from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from patients.models_enums import Zygosity
-from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild, Sample, VCFFilter
+from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild, Sample, VariantZygosityCount, \
+    VariantZygosityCountCollection, VCFFilter
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 from snpdb.variant_sample_information import VariantSampleGenotypes
 
 
@@ -133,6 +138,70 @@ class VariantSampleGenotypesTest(TestCase):
         self.assertEqual(0.25, rows["proband"]["allele_frequency_unit"])
         self.assertIsNone(rows["mother"]["allele_frequency_unit"], "Missing AF is left off the graph")
 
+    def test_row_limit(self):
+        """ max_rows bounds what we materialise, and leaves every count exact """
+        variant = slowly_create_test_variant("3", 3750, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, variant)
+        self._het_proband_and_mother(self.other_cohort_37, variant)
+
+        data = VariantSampleGenotypes(self.user, variant, max_rows=1).to_json()
+        self.assertTrue(data["truncated"])
+        self.assertEqual(1, len(data["rows"]))
+
+        for max_rows in [None, 2, 100]:
+            all_data = VariantSampleGenotypes(self.user, variant, max_rows=max_rows).to_json()
+            self.assertFalse(all_data["truncated"], f"max_rows={max_rows} isn't truncated")
+            self.assertEqual(2, len(all_data["rows"]), f"max_rows={max_rows} materialises all visible rows")
+
+    def test_counts_never_depend_on_row_limit(self):
+        """ Counting reads the packed arrays, so capping rows must not move a single count.
+            Beacon reports these numbers, and it asks for no rows at all. """
+        variant = slowly_create_test_variant("3", 3800, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, variant)
+        self._het_proband_and_mother(self.other_cohort_37, variant)
+
+        def counts(max_rows):
+            data = VariantSampleGenotypes(self.user, variant, max_rows=max_rows).to_json()
+            return {k: data[k] for k in ["observations", "zygosity_counts", "locus_counts", "samples"]}
+
+        uncapped = counts(None)
+        self.assertEqual({"total": 4, "visible": 2, "invisible": 2}, uncapped["observations"])
+        self.assertEqual({Zygosity.HET: 2}, uncapped["zygosity_counts"])
+        self.assertEqual(4, uncapped["locus_counts"][0]["HET"])
+        for max_rows in [0, 1, 2]:
+            self.assertEqual(uncapped, counts(max_rows), f"counts with max_rows={max_rows}")
+
+    def test_stop_when_full_uses_global_counts(self):
+        """ Stopping the scan early means we no longer know the permission-scoped counts, so the
+            payload reports the precomputed global ones and says nothing about what's visible """
+        variant = slowly_create_test_variant("3", 3900, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, variant)
+        self._het_proband_and_mother(self.other_cohort_37, variant)
+        vzcc, _ = VariantZygosityCountCollection.objects.get_or_create(
+            name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION, defaults={"description": "test"})
+        VariantZygosityCount.objects.create(collection=vzcc, variant=variant, het_count=4)
+
+        vsg = VariantSampleGenotypes(self.user, variant, max_rows=1, stop_when_full=True)
+        self.assertTrue(vsg.partial)
+        data = vsg.to_json()
+        self.assertTrue(data["truncated"])
+        self.assertEqual(1, len(data["rows"]))
+        self.assertEqual(4, data["observations"]["total"], "Global count, not what we scanned")
+        self.assertIsNone(data["observations"]["visible"], "We stopped before counting these")
+        self.assertIsNone(data["observations"]["invisible"])
+        self.assertEqual(4, data["locus_counts"][0]["HET"], "Locus counts come from the global collection")
+
+    def test_stop_when_full_completes_when_it_fits(self):
+        """ Under the cap there's nothing to stop for, so the counts are the exact scanned ones """
+        variant = slowly_create_test_variant("3", 3950, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, variant)
+        self._het_proband_and_mother(self.other_cohort_37, variant)
+
+        vsg = VariantSampleGenotypes(self.user, variant, max_rows=100, stop_when_full=True)
+        self.assertFalse(vsg.partial)
+        data = vsg.to_json()
+        self.assertEqual({"total": 4, "visible": 2, "invisible": 2}, data["observations"])
+
     def test_no_observations(self):
         variant = slowly_create_test_variant("3", 3600, "A", "T", self.grch37)
 
@@ -140,3 +209,70 @@ class VariantSampleGenotypesTest(TestCase):
         self.assertEqual({"total": 0, "visible": 0, "invisible": 0}, data["observations"])
         self.assertEqual([], data["rows"])
         self.assertEqual([self.grch37.name], data["genome_builds"])
+
+
+class VariantSampleGenotypesClassificationsTest(TestCase):
+    """ Classification pills, attached to the row for the sample that was classified """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        ClassificationTestUtils.setUp()
+        cls.lab, cls.lab_user = ClassificationTestUtils.lab_and_user()
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+
+        cls.user = User.objects.get_or_create(username='vsg_classification_user')[0]
+        cls.user.groups.add(all_users_group())  # Every logged in user is in this
+        cls.cohort = create_fake_cohort(cls.user, cls.grch37)
+        cls.samples = {s.name: s for s in cls.cohort.get_samples()}
+        for sample in cls.samples.values():
+            assign_permission_to_user_and_groups(cls.user, sample)
+            assign_permission_to_user_and_groups(cls.lab_user, sample)
+
+        cls.variant = slowly_create_test_variant("3", 6000, "A", "T", cls.grch37)
+        create_mock_allele(cls.variant, cls.grch37)
+        cgc = CohortGenotypeCollection.objects.get(cohort=cls.cohort)
+        CohortGenotype.objects.create(collection=cgc, variant=cls.variant,
+                                      samples_zygosity=Zygosity.HET * 3,
+                                      samples_allele_depth=[20] * 3, samples_allele_frequency=[100] * 3,
+                                      samples_read_depth=[30] * 3, samples_genotype_quality=[30] * 3,
+                                      samples_phred_likelihood=[0] * 3)
+
+    def _create_classification(self, sample, clinical_significance, share_level):
+        classification = Classification.create(
+            user=self.lab_user,
+            lab=self.lab,
+            data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": clinical_significance},
+                  SpecialEKeys.ALLELE_ORIGIN: {"value": "germline"}},  # Otherwise it gets a somatic pill too
+            save=True,
+            source=SubmissionSource.API,
+            make_fields_immutable=False,
+            variant=self.variant,
+            sample=sample)
+        classification.publish_latest(user=self.lab_user, share_level=share_level)
+        return classification
+
+    def _classifications_by_sample_name(self, user) -> dict:
+        data = VariantSampleGenotypes(user, self.variant).to_json()
+        return {row["sample_name"]: row["classifications"] for row in data["rows"]}
+
+    def test_classification_attached_to_its_sample(self):
+        classification = self._create_classification(self.samples["proband"], "VUS", ShareLevel.ALL_USERS)
+
+        by_sample_name = self._classifications_by_sample_name(self.user)
+        self.assertEqual([], by_sample_name["mother"], "Only the classified sample gets pills")
+        proband_pills = by_sample_name["proband"]
+        self.assertEqual(1, len(proband_pills))
+        pill = proband_pills[0]
+        self.assertEqual(classification.pk, pill["id"])
+        self.assertEqual("VUS (3)", pill["label"], "Pretty value from the evidence key")
+        self.assertEqual("cs cs-vus", pill["css_class"])
+        self.assertEqual(str(self.lab), pill["lab"])
+
+    def test_classification_user_cannot_read_is_absent(self):
+        self._create_classification(self.samples["proband"], "VUS", ShareLevel.LAB)
+
+        by_sample_name = self._classifications_by_sample_name(self.user)
+        self.assertEqual([], by_sample_name["proband"], "Not shared outside the lab's organisation")
+        lab_by_sample_name = self._classifications_by_sample_name(self.lab_user)
+        self.assertEqual(1, len(lab_by_sample_name["proband"]), "Visible to the lab that curated it")

@@ -34,7 +34,7 @@ const VariantSampleInformation = (function () {
 
     let config = null;
     let dataTable = null;
-    let responses = [];
+    const responses = new Map();  // variant_id -> payload, replaced when that variant is re-loaded uncapped
     let requestedVariantIds = new Set();
     let pendingRequests = 0;
     let allRows = [];
@@ -42,8 +42,17 @@ const VariantSampleInformation = (function () {
     let genomeBuildChecked = {};  // build -> bool, a build starts checked when its first rows arrive
     let graphedFilter = null;  // Redrawing 10k plotly points on every page change is a waste
 
-    function genotypesUrl(variantId) {
-        return config.genotypesUrlForVariant.replace(/0$/, variantId);
+    function genotypesUrl(variantId, limit) {
+        const url = config.genotypesUrlForVariant.replace(/0$/, variantId);
+        return limit === undefined ? url : url + "?limit=" + limit;
+    }
+
+    function loadVariant(variantId, limit) {
+        return $.getJSON(genotypesUrl(variantId, limit)).done(addResponse);
+    }
+
+    function showError(message) {
+        $("#samples-messages").empty().append(createMessage("error", message));
     }
 
     function ontologyTermUrl(termType, term) {
@@ -104,6 +113,33 @@ const VariantSampleInformation = (function () {
         };
     }
 
+    function classificationPill(classification) {
+        // Same shape as the server rendered clinical_significance_values tag - CSS is in global.scss
+        const pill = $('<span>', {
+            class: 'd-inline-block c-pill ' + classification.css_class,
+            title: classification.title,
+            text: classification.label,
+        });
+        if (classification.pending_from) {
+            pill.append($('<i>', {
+                class: 'fa-solid fa-clock ml-1',
+                title: `This is a pending change, the classification is currently ${classification.pending_from}`,
+            }));
+        }
+        return $('<a>', {href: classification.url, class: 'mr-1', title: classification.lab})
+            .append(pill).prop('outerHTML');
+    }
+
+    function renderClassifications(data, type) {
+        if (!data || !data.length) {
+            return '';
+        }
+        if (type !== 'display') {
+            return data.map(classification => classification.label).join(', ');
+        }
+        return data.map(classificationPill).join('');
+    }
+
     function renderFormatField(data) {
         return MISSING_FORMAT_VALUES.has(data) ? '.' : data;
     }
@@ -113,6 +149,9 @@ const VariantSampleInformation = (function () {
             {data: 'sample_name', title: 'Sample Name', render: renderSampleLink},
             {data: 'genome_build', name: 'genome_build', title: 'Genome Build', visible: false},
             {data: 'zygosity', title: 'Zygosity', render: renderZygosity},
+            // Hidden until a row actually has one - see addResponse
+            {data: 'classifications', name: 'classifications', title: 'Classifications',
+                visible: false, render: renderClassifications},
             {data: 'allele_frequency', title: 'Allele Frequency', render: renderFormatField},
             {data: 'allele_depth', title: 'Allele Depth', render: renderFormatField},
             {data: 'read_depth', title: 'Read Depth', render: renderFormatField},
@@ -132,6 +171,29 @@ const VariantSampleInformation = (function () {
         return 'variant_genotypes_' + slug + '_' + dateStr;
     }
 
+    function truncatedVariantIds() {
+        return [...responses.values()].filter(data => data.truncated).map(data => data.variant_id);
+    }
+
+    function exportCsv(e, dt, node, csvConfig) {
+        const csvAction = $.fn.dataTable.ext.buttons.csvHtml5.action;
+        const variantIds = truncatedVariantIds();
+        if (!variantIds.length) {
+            csvAction.call(this, e, dt, node, csvConfig);
+            return;
+        }
+
+        // A download must not silently be a truncated view of the data
+        const button = $(node);
+        const buttonHtml = button.html();
+        button.addClass('disabled').empty()
+            .append($('<i>', {class: 'fas fa-spinner fa-spin mr-1'}), document.createTextNode('Loading all rows...'));
+        $.when(...variantIds.map(variantId => loadVariant(variantId, 0)))
+            .done(() => csvAction.call(this, e, dt, node, csvConfig))
+            .fail(() => showError("Error loading all rows - CSV export cancelled"))
+            .always(() => button.removeClass('disabled').html(buttonHtml));
+    }
+
     function createDataTable() {
         dataTable = $("#genotype-grid").DataTable({
             data: [],
@@ -145,6 +207,7 @@ const VariantSampleInformation = (function () {
                 text: 'CSV',
                 exportOptions: {orthogonal: 'export'},
                 filename: csvFilename,
+                action: exportCsv,
             }],
         });
 
@@ -169,7 +232,7 @@ const VariantSampleInformation = (function () {
 
     function zygosityCounts() {
         const counts = {};
-        for (const data of responses) {
+        for (const data of responses.values()) {
             for (const [zygosity, count] of Object.entries(data.zygosity_counts)) {
                 counts[zygosity] = (counts[zygosity] || 0) + count;
             }
@@ -268,8 +331,8 @@ const VariantSampleInformation = (function () {
     function drawLocusCounts() {
         // Each build has its own locus, so they get their own table rather than being merged
         const container = $("#locus-counts").empty();
-        for (const data of responses) {
-            if (responses.length > 1) {
+        for (const data of responses.values()) {
+            if (responses.size > 1) {
                 container.append($('<h5>', {text: data.genome_builds.join(', ')}));
             }
             container.append(locusCountsTable(data.locus_counts));
@@ -278,7 +341,7 @@ const VariantSampleInformation = (function () {
 
     function drawMultiallelic() {
         const container = $("#other-loci-variants-by-multiallelic").empty();
-        const entries = responses.flatMap(data => data.multiallelic);
+        const entries = [...responses.values()].flatMap(data => data.multiallelic);
         if (!entries.length) {
             return;
         }
@@ -302,8 +365,9 @@ const VariantSampleInformation = (function () {
         const countedBuilds = new Set();  // Builds sharing a contig come back in one response - count them once
         const samples = {total: 0, visible: 0};
         const observations = {total: 0, visible: 0, invisible: 0};
+        let partial = false;
 
-        for (const data of responses) {
+        for (const data of responses.values()) {
             const buildKey = data.genome_builds.join(',');
             if (!countedBuilds.has(buildKey)) {
                 countedBuilds.add(buildKey);
@@ -311,22 +375,60 @@ const VariantSampleInformation = (function () {
                 samples.total += data.samples.total;
                 samples.visible += data.samples.visible;
             }
-            observations.total += data.observations.total;
-            observations.visible += data.observations.visible;
-            observations.invisible += data.observations.invisible;
+            if (data.partial) {
+                // Stopped scanning, so its total is the precomputed database-wide one and it never
+                // worked out how many of those this user can see
+                partial = true;
+                observations.total += data.observations.total || 0;
+            } else {
+                observations.total += data.observations.total;
+                observations.visible += data.observations.visible;
+                observations.invisible += data.observations.invisible;
+            }
         }
         genomeBuilds.sort();
-        return {genomeBuilds: genomeBuilds, samples: samples, observations: observations};
+        return {genomeBuilds: genomeBuilds, samples: samples, observations: observations, partial: partial};
+    }
+
+    function loadAllRows(button) {
+        button.prop('disabled', true).text('Loading...');
+        $.when(...truncatedVariantIds().map(variantId => loadVariant(variantId, 0)))
+            .fail(() => showError("Error loading all rows"));
+    }
+
+    function truncatedRows(observations, partial) {
+        const button = $('<button>', {
+            type: 'button',
+            class: 'btn btn-outline-secondary btn-sm',
+            text: 'Load all rows',
+        }).click(function () {
+            loadAllRows($(this));
+        });
+
+        const shown = allRows.length.toLocaleString();
+        // A partial scan has nothing but the precomputed counts to give a total, and they may not be there
+        const text = observations.total
+            ? `Showing ${shown} of ${(partial ? '~' : '') + observations.total.toLocaleString()} rows. `
+            : `Showing ${shown} rows, there are more. `;
+        const block = $('<p>').append($('<span>', {text: text}), button);
+        if (partial) {
+            block.append($('<span>', {
+                class: 'text-muted',
+                text: ' Counts are the precomputed totals for the whole database - loading all rows counts' +
+                    ' the ones you have permission to see.',
+            }));
+        }
+        return block;
     }
 
     function drawSummary() {
-        const {genomeBuilds, samples, observations} = mergedSummary();
+        const {genomeBuilds, samples, observations, partial} = mergedSummary();
         const builds = genomeBuilds.join(', ');
         let summary = `Searching ${samples.total} samples for ${builds}`;
         summary += samples.visible < samples.total ? ` (you can see ${samples.visible}).` : '.';
 
         const container = $("#samples-summary").empty();
-        if (!observations.total) {
+        if (!observations.total && !allRows.length) {
             container.append($('<p>', {text: `No results found (searched ${samples.total} samples for ${builds}).`}));
             return;
         }
@@ -341,6 +443,10 @@ const VariantSampleInformation = (function () {
                         `${observations.total} total observations in the database.`
                 }));
             container.append(hidden);
+        }
+
+        if (truncatedVariantIds().length) {
+            container.append(truncatedRows(observations, partial));
         }
     }
 
@@ -448,19 +554,27 @@ const VariantSampleInformation = (function () {
     }
 
     function addResponse(data) {
-        responses.push(data);
+        // A truncated response is replaced when its rows are loaded in full, so the grid and everything
+        // drawn from more than one response is rebuilt rather than appended to
+        responses.set(data.variant_id, data);
         config.gHgvs = config.gHgvs || data.g_hgvs;
+        allRows = [...responses.values()].flatMap(response => response.rows);
+
         drawSummary();
         drawLocusCounts();
         drawMultiallelic();
 
-        if (data.rows.length) {
-            allRows = allRows.concat(data.rows);
+        dataTable.clear();
+        if (allRows.length) {
             $("#genotype-grid-container").show();
             drawZygosityFilters();
             drawGenomeBuildFilters();
             dataTable.column('genome_build:name').visible(Object.keys(genomeBuildCounts()).length > 1, false);
-            dataTable.rows.add(data.rows).draw();  // 'draw' redraws the graphs
+            const hasClassifications = allRows.some(row => row.classifications && row.classifications.length);
+            dataTable.column('classifications:name').visible(hasClassifications, false);
+            dataTable.rows.add(allRows);
+            graphedFilter = null;  // The rows changed, so the graphs have to follow
+            dataTable.draw();  // 'draw' redraws the graphs
             dataTable.columns.adjust();  // Grid was hidden when created, so scrollX header/body need re-sizing
         }
     }
@@ -468,7 +582,7 @@ const VariantSampleInformation = (function () {
     function requestComplete() {
         if (--pendingRequests === 0) {
             $("#samples-loading").hide();
-            if (!responses.length) {
+            if (!responses.size) {
                 $("#samples-summary").html($('<p>', {class: 'text-danger', text: 'Error retrieving samples'}));
             }
         }
@@ -482,7 +596,7 @@ const VariantSampleInformation = (function () {
             requestedVariantIds.add(variantId);
             pendingRequests++;
             $("#samples-loading").show();
-            $.getJSON(genotypesUrl(variantId), addResponse).always(requestComplete);
+            loadVariant(variantId).always(requestComplete);
         }
     }
 

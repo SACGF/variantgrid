@@ -1104,6 +1104,8 @@ URLS_NAME_REGISTER.update({"classification_dashboard": False,
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
 VARIANT_DETAILS_SHOW_GENE_COVERAGE = False
 VARIANT_DETAILS_SHOW_SAMPLES = True
+# Rows the samples grid loads before it stops and offers "load all rows" - 0 for no cap
+VARIANT_DETAILS_SAMPLES_MAX_ROWS = 1000
 VARIANT_DETAILS_NEARBY_RANGE = 50
 VARIANT_DETAILS_NEARBY_SHOW_GENE = False
 
