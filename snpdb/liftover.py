@@ -21,7 +21,7 @@ from snpdb.bcftools_liftover import bcftools_pre_liftover_error_check
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
+from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover, VariantCoordinate
 from upload.models import FileUpload, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 
@@ -69,6 +69,11 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
             variant_coordinates = []
             for allele, variant_coordinate, error_message in allele_variant_coordinate_error:
                 if variant_coordinate is not None:
+                    if contig_error := _non_standard_contig_error(vcf_genome_build, variant_coordinate):
+                        variant_coordinate = None
+                        error_message = contig_error
+
+                if variant_coordinate is not None:
                     al = AlleleLiftover(allele=allele,
                                         liftover=liftover,
                                         status=ProcessingStatus.CREATED)
@@ -105,6 +110,19 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                 process_upload_pipeline(upload_pipeline)
             else:
                 logging.info("LiftoverRun %s doesn't need to be run", liftover)
+
+
+def _non_standard_contig_error(vcf_genome_build: GenomeBuild, variant_coordinate: VariantCoordinate) -> Optional[str]:
+    """ Liftover VCFs are written with standard contigs only (and tools like BCFTools look the chrom up in the
+        reference fasta) so an alt/unlocalized contig would fail the entire run - see issue #1197 """
+    if variant_coordinate.chrom in vcf_genome_build.chrom_standard_contig_mappings:
+        return None
+
+    if contig := vcf_genome_build.chrom_contig_mappings.get(variant_coordinate.chrom):
+        description = f"'{contig}' has role '{contig.get_role_display()}'"
+    else:
+        description = f"'{variant_coordinate.chrom}' is not in {vcf_genome_build}"
+    return f"Liftover VCFs only contain standard contigs - {description}"
 
 
 def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: GenomeBuild,
