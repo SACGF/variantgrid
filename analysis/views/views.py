@@ -399,6 +399,8 @@ def analysis_template_settings(request, pk):
             valid = formset.is_valid()
             if valid:
                 formset.save()
+                # Rebuild unbound, so saved rows are re-displayed along with a new blank one to add another
+                formset = AutoLaunchFormSet(prefix='auto-launch', instance=analysis_template)
             add_save_message(request, valid, "Auto Launch Config")
 
         if atv_form and atv_form.is_bound:
