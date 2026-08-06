@@ -184,6 +184,32 @@
             <div id="vcform-summary" class="card m-2">
                 <div class="card-header">{{ record.org_name }} / {{ record.lab_name }} / {{ record.cr_lab_id }}{% if classification_distinguish_research and vc.lab.research %} <span class="badge badge-info" title="Research lab">{{ research_icon }} Research</span>{% endif %}</div>
                 <div class="card-body"></div>
+                {% if sync_statuses %}
+                    {# Footer rather than a second card-body, which updateTitle() would empty. Sits directly #}
+                    {# under the share level message, and only moves when the hourly sync task runs.        #}
+                    <div id="vcform-sync" class="card-footer">
+                        {% for status in sync_statuses %}
+                            <div class="{% if not forloop.first %}mt-3 {% endif %}sync-status">
+                                <div><i class="{{ status.icon }}"></i> {{ status.label }} - {{ status.destination_name }}</div>
+                                {% if status.last_synced %}
+                                    <div class="text-muted">Last uploaded {{ status.last_synced|timesince }} ago</div>
+                                {% endif %}
+                                {% if status.reasons %}
+                                    <ul class="mb-0 pl-4">
+                                        {% for reason in status.reasons %}<li>{{ reason }}</li>{% endfor %}
+                                    </ul>
+                                {% endif %}
+                                {% if status.note %}
+                                    <div class="text-muted">{{ status.note }}</div>
+                                {% endif %}
+                                {% if status.remote_url %}
+                                    <div><a href="{{ status.remote_url }}" target="_blank" rel="noopener">View remote record <i class="fas fa-external-link-alt"></i></a></div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        <div class="text-muted mt-2" style="font-size:11px">As at {% now "j M Y H:i" %}</div>
+                    </div>
+                {% endif %}
             </div>
         {% if duplicate_records %}
             <div class="card m-2">

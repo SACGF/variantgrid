@@ -68,6 +68,7 @@ from snpdb.lab_picker import LabPickerData
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
+from sync.classification_sync_status import classification_sync_status
 from uicore.utils.form_helpers import form_helper_horizontal
 from variantopedia.forms import SearchAndClassifyForm
 
@@ -481,6 +482,7 @@ def view_classification(request: HttpRequest, classification_id: str):
         'duplicate_records': duplicate_records,
         'withdraw_reasons': withdraw_reasons,
         'mme_enabled': settings.MME_ENABLED,   # shows the MatchMaker Exchange card
+        'sync_statuses': classification_sync_status(vc),
     }
     return render(request, 'classification/classification.html', context)
 
