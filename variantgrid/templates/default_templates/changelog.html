@@ -228,6 +228,28 @@
 
     {% else %}
        <div class="card mt-4">
+            <div class="card-header">Unreleased</div>
+            <div class="card-body">
+                <h4>Annotation</h4>
+                <ul>
+                    <li>#579 - New columns for frameshifts - "Stop codon distance", "PTC to last junction", and "NMD escape"
+                        (predicted from the new stop codon, not the variant). Existing annotation is backfilled</li>
+                </ul>
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#940 - Trio / Quad node - compound het uses gene overlaps, so long structural variants can be a hit</li>
+                    <li>Tag node - "all tags" mode warns that it's a snapshot, and when it was taken</li>
+                </ul>
+                <h4>Classification</h4>
+                <ul>
+                    <li>#1347 - Classification page shows sync status - whether the last published version reached each
+                        remote (with a link to it), or why it was excluded</li>
+                    <li>#1030 - gnomAD structural variant frequencies autopopulate classifications</li>
+                </ul>
+            </div>
+       </div>
+
+       <div class="card mt-4">
             <div class="card-header">6 August 2026</div>
             <div class="card-body">
                 <h4>Variant Details</h4>
