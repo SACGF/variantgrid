@@ -95,6 +95,7 @@ class Test(URLTestCase):
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [
             ("classifications", {}, 200),
+            ("classification_groupings", {}, 200),
             ("export_classifications_grid", {}, 200),
             ("export_classifications_grid_redcap", {}, 200),
             ("redcap_data_dictionary", {}, 200),

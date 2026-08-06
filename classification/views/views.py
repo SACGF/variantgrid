@@ -35,7 +35,8 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
 from classification.classification_changes import ClassificationChanges
 from classification.classification_stats import get_grouped_classification_counts, \
     get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason, AlleleOriginBucket
+from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason, AlleleOriginBucket, \
+    LabExternalFilter
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
@@ -258,6 +259,8 @@ def classification_groupings(request):
         "labs": Lab.valid_labs_qs(request.user),
         "genome_build": user_settings.default_genome_build,
         "user_settings": user_settings,
+        "lab_external_choices": LabExternalFilter.choices,
+        "lab_external_default": LabExternalFilter.ALL,
     }
     return render(request, 'classification/classification_groupings.html', context)
 

@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import TextChoices
+from django.db.models import Q, TextChoices
 
 from library.guardian_utils import public_group, all_users_group
 from library.utils import ChoicesEnum
@@ -38,6 +38,25 @@ class AlleleOriginBucket(TextChoices):
             return AlleleOriginBucket.GERMLINE
         else:
             return AlleleOriginBucket.UNKNOWN
+
+
+class LabExternalFilter(TextChoices):
+    """ Classification grid filter for labs whose records came from elsewhere, e.g. synced down from Shariant """
+    ALL = "A", "All"
+    INTERNAL = "I", "Internal"
+    EXTERNAL = "E", "External"
+
+    def filter_q(self, lab_path: str = "lab") -> Optional[Q]:
+        """ Q to apply against the given path to Lab, None if all labs should be included """
+        if self in _LAB_EXTERNAL_VALUES:
+            return Q(**{f"{lab_path}__external": _LAB_EXTERNAL_VALUES[self]})
+
+
+# ALL is absent so that it doesn't filter on Lab.external at all
+_LAB_EXTERNAL_VALUES = {
+    LabExternalFilter.INTERNAL: False,
+    LabExternalFilter.EXTERNAL: True
+}
 
 
 class SpecialEKeys:

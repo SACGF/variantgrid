@@ -537,6 +537,7 @@ CLASSIFICATION_STATS_USE_SHARED = False  # False=Use visible to user. True = Sha
 CLASSIFICATION_GRID_SHOW_PHGVS = True
 CLASSIFICATION_GRID_SHOW_SAMPLE = True
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
+CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER = True  # Toggle to show only internal/external (e.g. synced from Shariant) labs
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
 CLASSIFICATION_NEW_GROUPING = False
 CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where Lab.research=True

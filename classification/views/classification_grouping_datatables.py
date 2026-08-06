@@ -7,7 +7,7 @@ from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
 
-from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel
+from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel, LabExternalFilter
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
     Classification, DiscordanceReport, DiscordanceReportClassification
@@ -194,6 +194,11 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
                 filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+
+        if settings.CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER:
+            if lab_external := self.get_query_param("lab_external"):
+                if q := LabExternalFilter(lab_external).filter_q():
+                    filters.append(q)
 
         # for view gene symbol
         if protein_position := self.get_query_param("protein_position"):
