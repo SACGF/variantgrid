@@ -2063,6 +2063,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
             if value := data.get(field):
                 list_values[field] = value.split("&")
 
+        if not list_values:
+            return []
+
         # Ensure they are all same length
         first_field_len = len(next(iter(list_values.values())))
         field_lengths = {k: len(v) for k, v in list_values.items()}
@@ -2083,33 +2086,42 @@ class VariantAnnotation(AbstractVariantAnnotation):
             records.append(values_dict)
         return records
 
-    @property
-    def gnomad_sv_overlap(self) -> list[dict]:
-        sv_overlap_list = []
-        for sv_overlap in self.vep_multi_fields_to_list_of_dicts(self.__dict__,
-                                                      VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS):
-            sv_overlap['gnomad_sv_overlap_af'] = float(sv_overlap['gnomad_sv_overlap_af'])
+    @staticmethod
+    def get_gnomad_sv_overlap(data: dict, gnomad_sv_version: str) -> list[dict]:
+        """ data contains the GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS (VEP '&' separated multi values)
+            gnomad_sv_version is VariantAnnotationVersion.gnomad_sv (parsed from the annotation settings
+            data file by vep_config.vep_component_version_kwargs) """
+        dataset = None
+        remove_prefix = None
+        gnomad_sv_version = gnomad_sv_version or ""
+        if gnomad_sv_version.startswith("2.1"):
+            dataset = "gnomad_sv_r2_1"
+            remove_prefix = "gnomAD-SV_v2.1_"
+        elif gnomad_sv_version.startswith("4"):
+            dataset = "gnomad_sv_r4"
+            # gnomAD v4 ships the v3 SV call set, whose records keep their v3 names
+            remove_prefix = "gnomAD-SV_v3_"
 
-            dataset = None
-            remove_prefix = None
-            if self.version.gnomad.startswith("2.1"):
-                dataset = "gnomad_sv_r2_1"
-                remove_prefix = "gnomAD-SV_v2.1_"
-            elif self.version.gnomad.startswith("4"):
-                dataset = "gnomad_sv_r4"
-                remove_prefix = "gnomAD-SV_v3_"
+        sv_overlap_list = []
+        for sv_overlap in VariantAnnotation.vep_multi_fields_to_list_of_dicts(
+                data, VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS):
+            sv_overlap['gnomad_sv_overlap_af'] = float(sv_overlap['gnomad_sv_overlap_af'])
 
             gnomad_variant = sv_overlap["gnomad_sv_overlap_name"]
             if remove_prefix:
                 gnomad_variant = gnomad_variant.replace(remove_prefix, "")
 
-            sv_overlap['gnomad_sv_overlap_url'] = self.get_gnomad_url(gnomad_variant, dataset)
+            sv_overlap['gnomad_sv_overlap_url'] = VariantAnnotation.get_gnomad_url(gnomad_variant, dataset)
             if coords := sv_overlap.get("gnomad_sv_overlap_coords"):
                 _chrom, start, end = parse_gnomad_coord(coords)
                 sv_overlap['gnomad_sv_overlap_length'] = end - start
 
             sv_overlap_list.append(sv_overlap)
         return sv_overlap_list
+
+    @property
+    def gnomad_sv_overlap(self) -> list[dict]:
+        return self.get_gnomad_sv_overlap(self.__dict__, self.version.gnomad_sv)
 
     @staticmethod
     def get_hgvs_g(variant: Variant) -> Optional[str]:
