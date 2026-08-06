@@ -26,8 +26,9 @@ const VariantSampleInformation = (function () {
     const OMIM_COLOR = "#22529e";
     const MONDO_COLOR = "#99CD83";
     const AF_COLOR = "#1f77b4";
+    // Graphs share a line, sizing themselves to their flex column - see .graph-row
+    const RESPONSIVE = {responsive: true};
     const MAX_GRAPH_TERMS = 20;
-    const GRAPH_WIDTH = 512;
     const GRAPH_HEIGHT = 384;
     const ALLELE_VARIANTS_EVENT = "allele-variants-loaded";
 
@@ -136,6 +137,7 @@ const VariantSampleInformation = (function () {
             columns: columns(),
             pageLength: 20,
             order: [],
+            scrollX: true,  // Wide grid scrolls itself rather than the variant details page
             dom: 'Bfrtip',
             buttons: [{
                 extend: 'csv',
@@ -338,10 +340,10 @@ const VariantSampleInformation = (function () {
             y: alleleFrequencies,
             text: labels,
         };
-        const layout = defaultLayout(config.variantLabel + " Allele Frequency");
+        const layout = defaultLayout(config.variantLabel + " Allele Frequency", null, GRAPH_HEIGHT);
         layout.xaxis = Object.assign(layout.xaxis || {}, {zeroline: false, showgrid: false, showticklabels: false});
         layout.yaxis = Object.assign(layout.yaxis || {}, {range: [0, 1.05], showgrid: false, zeroline: false});
-        Plotly.newPlot('sample-allele-frequency-scatter', [scatterData], layout);
+        Plotly.newPlot('sample-allele-frequency-scatter', [scatterData], layout, RESPONSIVE);
 
         // Need to clamp 100 so that histo fits in 10 bins
         const clampedAf = alleleFrequencies.map(af => af >= 1 ? 0.99 : af);
@@ -354,10 +356,10 @@ const VariantSampleInformation = (function () {
             histnorm: "count",
             xbins: {start: 0, size: .05, end: 1},
         };
-        const histogramLayout = defaultLayout(config.variantLabel + " Allele Frequency Histogram");
+        const histogramLayout = defaultLayout(config.variantLabel + " Allele Frequency Histogram", null, GRAPH_HEIGHT);
         histogramLayout.xaxis = {autotick: true, range: [0, 1]};
         histogramLayout.yaxis = {showline: false, zeroline: false, showticklabels: false};
-        Plotly.newPlot('sample-allele-frequency-histogram', [histogramData], histogramLayout);
+        Plotly.newPlot('sample-allele-frequency-histogram', [histogramData], histogramLayout, RESPONSIVE);
     }
 
     function plotPatientTermCounts(rows, selector, title, color, rowField) {
@@ -373,6 +375,8 @@ const VariantSampleInformation = (function () {
         }
 
         const counts = Object.entries(patientsByTerm).map(([term, patients]) => [term, patients.size]);
+        // An empty graph would still take up a column of the flex row
+        $("#" + selector).toggle(counts.length > 0);
         if (!counts.length) {
             Plotly.purge(selector);
             return false;
@@ -380,15 +384,17 @@ const VariantSampleInformation = (function () {
         counts.sort((a, b) => b[1] - a[1]);
         const top = counts.slice(0, MAX_GRAPH_TERMS).reverse();  // Plotly draws h-bars bottom up
         plotHBarArrays(selector, title + "<br>Patient Count", top.map(c => c[1]), top.map(c => c[0]),
-            GRAPH_WIDTH, GRAPH_HEIGHT, color, {l: 200});
+            null, GRAPH_HEIGHT, color, {l: 200});
         return true;
     }
 
     function drawPhenotypeGraphs(rows) {
+        // The graphs size themselves to their container, so it has to be visible before we plot into it
+        const container = $("#variant-sample-phenotype-graphs").show();
         const hpo = plotPatientTermCounts(rows, 'sample-hpo-graph', "Human Phenotype Ontology", HPO_COLOR, 'patient_hpo');
         const omim = plotPatientTermCounts(rows, 'sample-omim-graph', "OMIM", OMIM_COLOR, 'patient_omim');
         const mondo = plotPatientTermCounts(rows, 'sample-mondo-graph', "MONDO", MONDO_COLOR, 'patient_mondo');
-        $("#variant-sample-phenotype-graphs").toggle(hpo || omim || mondo);
+        container.toggle(hpo || omim || mondo);
     }
 
     function drawGraphs() {
@@ -417,6 +423,7 @@ const VariantSampleInformation = (function () {
             drawZygosityFilters();
             dataTable.column('genome_build:name').visible(new Set(allRows.map(r => r.genome_build)).size > 1, false);
             dataTable.rows.add(data.rows).draw();  // 'draw' redraws the graphs
+            dataTable.columns.adjust();  // Grid was hidden when created, so scrollX header/body need re-sizing
         }
     }
 

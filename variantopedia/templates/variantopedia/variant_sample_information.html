@@ -19,8 +19,15 @@
 <script type="text/javascript" src="{% static 'js/variant_sample_information.js' %}"></script>
 
 <style>
-    .matches-graph {
-        float: left;
+    .graph-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .graph-row > div {
+        flex: 1 1 380px;
+        min-width: 0;
     }
 
     .grid-term-link {
@@ -31,6 +38,7 @@
 
     td.no-word-wrap {
         white-space: normal !important;
+        max-width: 300px;  /* Ontology terms wrap rather than making the grid scroll further */
     }
 
     .separator {
@@ -50,7 +58,7 @@
 
 <div id='other-loci-variants-by-multiallelic' class="container"></div>
 
-<div id="variant-samples" class="container">
+<div id="variant-samples" class="container-table">
     <h3>Samples</h3>
 
     <div id="samples-loading"><i class="fas fa-spinner fa-spin"></i> Loading samples...</div>
@@ -65,9 +73,10 @@
     </div>
 
     <div id="allele-frequency-graphs-container" style="display: none">
-        <div id='sample-allele-frequency-scatter' class="left"></div>
-        <div id='sample-allele-frequency-histogram' class="left"></div>
-        <div class="clear"></div>
+        <div class="graph-row">
+            <div id='sample-allele-frequency-scatter'></div>
+            <div id='sample-allele-frequency-histogram'></div>
+        </div>
     </div>
 
     {% comment %} A lot of patient phenotype code is duplicated from patients.html, TODO: maybe consolidate it? {% endcomment %}
@@ -75,10 +84,11 @@
         <h3>Phenotypes/OMIM</h3>
         <p>Requires that samples have been matched to patients, and patient phenotype information has been entered.
 
-        <div id='sample-hpo-graph' class="matches-graph"></div>
-        <div id='sample-omim-graph' class="matches-graph"></div>
-        <div id='sample-mondo-graph' class="matches-graph"></div>
-        <div class='clear'></div>
+        <div class="graph-row">
+            <div id='sample-hpo-graph'></div>
+            <div id='sample-omim-graph'></div>
+            <div id='sample-mondo-graph'></div>
+        </div>
     </div>
 </div>
 
