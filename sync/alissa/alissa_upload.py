@@ -125,24 +125,24 @@ class AlissaUploadSyncer(SyncRunner):
 
                 try:
                     if response_json := response.json():
-                        total_failed += int(response_json.get("numberFailed"))
-                        total_differs += int(response_json.get("numberDiffers"))
-                        total_imported += int(response_json.get("numberImported"))
+                        total_failed += int(response_json.get("numberFailed", 0))
+                        total_differs += int(response_json.get("numberDiffers", 0))
+                        total_imported += int(response_json.get("numberImported", 0))
 
                         response_jsons.append(response_json)
                         if response_error := response_json.get("error"):
                             notify = AdminNotificationBuilder(message="Error Uploading")
                             notify.add_field("Sync Destination", sync_run_instance.name)
-                            notify.add_field("Error", response_error)
+                            notify.add_field("Error", str(response_error)[:500])
                             notify.send()
-                        elif numberFailed := int(response_json.get("numberFailed")):
+                        elif numberFailed := int(response_json.get("numberFailed", 0)):
                             if numberFailed > 0:
                                 notify = AdminNotificationBuilder(message="Error Uploading")
                                 notify.add_field("Sync Destination", sync_run_instance.sync_destination.name)
                                 notify.add_field("Failures", numberFailed)
 
                                 failure: str
-                                for failure in response_json.get("failures"):
+                                for failure in response_json.get("failures", []):
                                     if "\t" in failure:
                                         parts = failure.split("\t")
                                         message = parts[0]
