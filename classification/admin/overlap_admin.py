@@ -24,16 +24,38 @@ from snpdb.models import AlleleOrigin, Allele
 #     def has_delete_permission(self, request, obj=None):
 #         return False
 
+class OverlapContributionSpecial(admin.SimpleListFilter):
+    title = 'Special'
+    parameter_name = 'special'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [
+            ("A", "Has Amend Value"),
+            ("C", "Has Continued Discordance Value"),
+        ]
+
+    def queryset(self, request, queryset: QuerySet[Overlap]):
+        match self.value():
+            case "A": return queryset.exclude(triage_state__amend_value=None)
+            case "C": return queryset.exclude(review_agreed_value__isnull=True)
+        return queryset
+
+
 @admin.register(OverlapContribution)
 class OverlapContributionAdmin(AuditlogHistoryAdminMixin, ModelAdminBasics):
     show_auditlog_history_link = True
     search_fields = ("id", "scv", "value")
-    list_display = ['pk', 'source', 'allele', 'classification_grouping', 'value_type', 'value', 'testing_context_bucket', 'effective_date__date', 'classification_grouping__lab']
-    list_filter = ('source', 'value_type', 'testing_context_bucket', 'classification_grouping__lab')
+    list_display = ['pk', 'source', 'allele', 'triage_state_formatted', 'classification_grouping', 'value_type', 'value', 'testing_context_bucket', 'effective_date__date', 'classification_grouping__lab']
+    list_filter = ('source', 'value_type', 'testing_context_bucket', 'classification_grouping__lab', OverlapContributionSpecial)
 
     @admin_list_column(short_description="Effective Date", order_field="effective_date__date")
     def effective_date__date(self, obj: OverlapContribution):
         return obj.effective_date_obj
+
+    @admin_list_column(order_field="triage_state__status")
+    def triage_state_formatted(self, obj: OverlapContribution):
+        return obj.triage_state_obj
 
 
 @admin.register(OverlapContributionSkew)

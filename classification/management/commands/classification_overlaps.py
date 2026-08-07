@@ -56,7 +56,6 @@ class Command(BaseCommand):
         if options["dates"]:
             self.populate_overlap_change_date()
 
-
     def recalc_overlaps(self):
         print("Recalcing Overlaps")
         for overlap in Overlap.objects.all().iterator():
