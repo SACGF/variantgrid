@@ -634,8 +634,7 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def _get_sample_genotype_stats(sample):
     """ Resolve the per-sample CohortGenotypeStats row (passing_filter=False,
-        filter_key NULL) for the template, replacing the old `sample.samplestats`
-        reverse accessor. Returns None if missing (e.g. legacy data). """
+        filter_key NULL) for the template. Returns None if missing (e.g. legacy data). """
     try:
         cgc = sample.vcf.cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
