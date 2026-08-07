@@ -133,7 +133,7 @@ class VariantGrid(AbstractVariantGrid):
         self.extra_config['postData'] = post_data
 
     def _grid_row_count(self) -> Optional[int]:
-        """ Current view's row count (mirrors get_count's source of truth), or None if unknown """
+        """ Current view's row count, or None if unknown """
         if self.node_count:
             return self.node_count.count
         return self.node.count
@@ -175,22 +175,12 @@ class VariantGrid(AbstractVariantGrid):
                                                                             annotation_gnomad_version=annotation_gnomad_version))
         return annotation_kwargs
 
-    def get_count(self, request):  # pylint: disable=unused-argument
-        """ Used by paginator, set from stored value so that we don't
-            have to make another SQL query """
-        if self.node_count:
-            count = self.node_count.count
-        elif self.node.count is not None:
-            count = self.node.count
-        else:
-            class_name = self.node.get_class_name()
-            node_details_list = [f"pk: {self.node.pk}",
-                                 f"version: {self.node.version}",
-                                 f"status: {self.node.status}"]
-            node_details = ", ".join(node_details_list)
-            msg = f"Node {class_name} ({node_details}) does not have count set"
-            raise ValueError(msg)
-        return count
+    def get_known_count(self, request, items) -> Optional[int]:
+        """ The node load pipeline has already counted this node version, so the paginator doesn't
+            have to count the annotated grid queryset again """
+        if self.get_filters(request):
+            return None  # jqGrid column filters narrow the rows the stored count was taken over
+        return self._grid_row_count()
 
     def get_column_colmodel(self, column_name):
         for cm in self.get_colmodels():

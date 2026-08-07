@@ -600,9 +600,6 @@ class AbstractVariantGrid(JqGridUserRowConfig):
 
         return field_names
 
-    def get_count(self, request):
-        raise NotImplementedError()
-
 
 class TagColorsCollectionColumns(DatatableConfig[TagColorsCollection]):
 

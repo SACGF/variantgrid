@@ -4,7 +4,6 @@ from functools import cached_property, reduce
 from typing import Any, Optional
 
 from django.conf import settings
-from django.core.paginator import InvalidPage, Paginator
 from django.db import connection
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
@@ -160,30 +159,21 @@ class AllVariantsGrid(AbstractVariantGrid):
             raise ValueError(f"Could not parse row estimate from EXPLAIN output: {first_line!r}")
         return int(match.group(1))
 
-    def paginate_items(self, request, items):
-        paginate_by = self.get_paginate_by(request)
-        if not paginate_by:
-            return None, None, items
+    def get_known_count(self, request, items) -> Optional[int]:
+        """ A COUNT(*) over a huge table costs more than the page itself - hand the paginator the
+            planner's estimate instead, and tell the user it's approximate """
+        if self.get_filters(request):
+            return None  # jqGrid column filters narrow the rows the estimate was taken over
 
-        if not self.get_filters(request):
-            try:
-                estimate = self._get_approx_count(items)
-            except Exception:
-                estimate = 0
+        try:
+            estimate = self._get_approx_count(items)
+        except Exception:
+            return None
 
-            if estimate >= 1_000_000:
-                self._used_approx_count = True
-                paginator = Paginator(items, paginate_by, allow_empty_first_page=self.allow_empty)
-                # Pre-set the cached_property to avoid COUNT(*) on a huge table
-                paginator.__dict__['count'] = estimate
-                page_num = request.GET.get('page', 1)
-                try:
-                    page = paginator.page(int(page_num))
-                except (ValueError, InvalidPage):
-                    page = paginator.page(1)
-                return paginator, page, page.object_list
-
-        return super().paginate_items(request, items)
+        if estimate >= 1_000_000:
+            self._used_approx_count = True
+            return estimate
+        return None
 
     def get_data(self, request) -> dict:
         self._used_approx_count = False

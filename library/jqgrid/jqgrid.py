@@ -32,6 +32,7 @@ import logging
 import operator
 from copy import deepcopy
 from functools import reduce
+from typing import Optional
 
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.core.paginator import InvalidPage, Paginator
@@ -70,6 +71,15 @@ def format_operation(op):
         'le': "less than or equal to",
     }
     return ops[op]
+
+
+class KnownCountPaginator(Paginator):
+    """ For querysets whose row count is already known (a stored node count, a planner estimate) -
+        stops Paginator.count running a COUNT(*) to re-derive it """
+
+    def __init__(self, *args, count: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count  # shadows Paginator.count, a non-data descriptor
 
 
 class JqGrid:
@@ -307,13 +317,23 @@ class JqGrid:
             paginate_by = 10
         return paginate_by
 
+    def get_known_count(self, request, items) -> Optional[int]:
+        """ Row count for this request when it's already known, so the paginator can skip the COUNT(*).
+            None means count the queryset """
+        return None
+
     def paginate_items(self, request, items):
         paginate_by = self.get_paginate_by(request)
         if not paginate_by:
             return None, None, items
 
-        paginator = Paginator(items, paginate_by,
-                              allow_empty_first_page=self.allow_empty)
+        known_count = self.get_known_count(request, items)
+        if known_count is not None:
+            paginator = KnownCountPaginator(items, paginate_by,
+                                            allow_empty_first_page=self.allow_empty, count=known_count)
+        else:
+            paginator = Paginator(items, paginate_by,
+                                  allow_empty_first_page=self.allow_empty)
         page = request.GET.get('page', 1)
 
         try:

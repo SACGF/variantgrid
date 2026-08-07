@@ -1,14 +1,17 @@
 import json
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneSymbolAliasSource
+from library.django_utils import FakeRequest
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import (
     AllVariantsFilter,
@@ -24,7 +27,7 @@ from snpdb.variant_filters import (
     get_contig_ids_for_gene_symbols,
     get_default_all_variants_filters,
 )
-from variantopedia.grids import AllVariantsGrid
+from variantopedia.grids import AllVariantsGrid, NearbyVariantsGrid
 
 
 class AllVariantsGridFilterTest(TestCase):
@@ -232,6 +235,89 @@ class AllVariantsGridSortTest(TestCase):
         grid = self._grid()
         self.assertEqual("locus__position", grid.extra_config["sortname"])
         self.assertEqual("asc", grid.extra_config["sortorder"])
+
+
+class AllVariantsGridApproximateCountTest(TestCase):
+    """ A COUNT(*) over the whole variant table costs more than the page it's counting - past a
+        million rows the grid reports the planner's estimate and says it's approximate """
+
+    APPROX_COUNT = 5_000_000
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username="test_all_variants_approx_count")[0]
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.genome_build)
+        create_fake_variants(cls.genome_build)
+        cls.variant = Variant.objects.get(locus__contig__name='13', locus__position=95839002,
+                                          locus__ref__seq='C', alt__seq='T')
+        cls.contig = cls.variant.locus.contig
+
+    def _grid(self) -> AllVariantsGrid:
+        return AllVariantsGrid(self.user, self.genome_build.name,
+                               extra_filters={"contig_ids": [self.contig.pk]})
+
+    def _get_data(self, request=None) -> tuple[dict, list[str]]:
+        """ (grid data, the COUNT(*) queries it ran) """
+        if request is None:
+            request = FakeRequest(user=self.user)
+        with CaptureQueriesContext(connection) as queries:
+            data = self._grid().get_data(request)
+        count_queries = [q["sql"] for q in queries.captured_queries if q["sql"].startswith("SELECT COUNT(")]
+        return data, count_queries
+
+    def _filtered_request(self) -> FakeRequest:
+        request = FakeRequest(user=self.user)
+        rules = [{"op": "lt", "field": "locus__position", "data": "100000000"}]
+        request.GET = {"_search": "true", "filters": json.dumps({"groupOp": "AND", "rules": rules})}
+        return request
+
+    @mock.patch.object(AllVariantsGrid, "_get_approx_count", return_value=APPROX_COUNT)
+    def test_large_estimate_is_reported_as_approximate(self, _mock_approx_count):
+        data, count_queries = self._get_data()
+        self.assertEqual(self.APPROX_COUNT, data["records"])
+        self.assertEqual("~5.0M", data["approximate_records"])
+        self.assertEqual([], count_queries)
+
+    @mock.patch.object(AllVariantsGrid, "_get_approx_count", return_value=999)
+    def test_small_estimate_counts_the_queryset(self, _mock_approx_count):
+        data, count_queries = self._get_data()
+        self.assertNotIn("approximate_records", data)
+        self.assertEqual(len(data["rows"]), data["records"])
+        self.assertEqual(1, len(count_queries))
+
+    @mock.patch.object(AllVariantsGrid, "_get_approx_count", return_value=APPROX_COUNT)
+    def test_filtered_request_counts_the_queryset(self, mock_approx_count):
+        """ A jqGrid column filter narrows the rows the estimate was taken over """
+        data, count_queries = self._get_data(self._filtered_request())
+        mock_approx_count.assert_not_called()
+        self.assertNotIn("approximate_records", data)
+        self.assertEqual(len(data["rows"]), data["records"])
+        self.assertEqual(1, len(count_queries))
+
+
+class NearbyVariantsGridCountTest(TestCase):
+    """ A grid that knows nothing about its row count counts its queryset, as it always has """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username="test_nearby_variants_grid_count")[0]
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.genome_build)
+        create_fake_variants(cls.genome_build)
+        cls.variant = Variant.objects.get(locus__contig__name='13', locus__position=95839002,
+                                          locus__ref__seq='C', alt__seq='T')
+
+    def test_records_come_from_the_queryset(self):
+        grid = NearbyVariantsGrid(self.user, self.variant.pk, self.genome_build.name, "range")
+        request = FakeRequest(user=self.user)
+        with CaptureQueriesContext(connection) as queries:
+            data = grid.get_data(request)
+        count_queries = [q["sql"] for q in queries.captured_queries if q["sql"].startswith("SELECT COUNT(")]
+        self.assertEqual(len(data["rows"]), data["records"])
+        self.assertEqual(1, len(count_queries))
 
 
 class AllVariantsFilterPersistenceTest(TestCase):
