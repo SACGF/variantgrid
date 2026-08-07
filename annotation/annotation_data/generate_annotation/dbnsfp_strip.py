@@ -164,7 +164,7 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
         # pipe early, zcat's SIGPIPE doesn't trip `set -o pipefail` (it would if
         # we used `zcat | head -n1 | ...`).
         f"read -r _hdr < <(zcat {shlex.quote(files[0])})",
-        f"printf '%s\\n' \"$_hdr\" \\",
+        "printf '%s\\n' \"$_hdr\" \\",
         f"    | cut -f {cut_arg} \\",
         f"    | awk 'BEGIN{{OFS=\"\\t\"}}{{ $1=\"#\"$1; print }}' > {header_file}",
         "",

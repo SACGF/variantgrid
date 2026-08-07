@@ -10,15 +10,29 @@ from django.db.models import QuerySet
 from django.dispatch import receiver
 from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from classification.enums import SpecialEKeys
-from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
-from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
-    EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
-    ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger
-from classification.models.classification_groups import ClassificationGroupUtils, ClassificationGroups
+from classification.enums.discordance_enums import (
+    ContinuedDiscordanceReason,
+    DiscordanceReportResolution,
+)
+from classification.models import (
+    ClassificationFlagTypes,
+    ClassificationModification,
+    ClinicalContext,
+    ClinicalContextChangeData,
+    ClinicalContextRecalcTrigger,
+    DiscordanceReportClassification,
+    EvidenceKeyMap,
+    classification_flag_types,
+    discordance_change_signal,
+)
+from classification.models.classification_groups import (
+    ClassificationGroups,
+    ClassificationGroupUtils,
+)
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.evidence_key import EvidenceKeyOption
@@ -29,11 +43,11 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from genes.hgvs import CHGVS
 from library.log_utils import log_admin_change
-from library.preview_request import preview_extra_signal, PreviewKeyValue
+from library.preview_request import PreviewKeyValue, preview_extra_signal
 from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab, GenomeBuild, Allele
+from snpdb.models import Allele, GenomeBuild, Lab
 from uicore.views.ajax_form_view import LazyRender
 
 

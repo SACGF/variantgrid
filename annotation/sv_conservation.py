@@ -167,7 +167,7 @@ def write_conservation_sidecar(filename: str, results: dict[int, dict[str, float
                                tracks: list[ConservationTrack]) -> None:
     """ Write {variant_id: {db_column: value}} as a TSV keyed by variant_id, one column per track. """
     columns = [t.db_column for t in tracks]
-    with open(filename, "wt", encoding="utf-8") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         f.write("\t".join(["variant_id", *columns]) + "\n")
         for variant_id, values in results.items():
             cells = ["" if values.get(c) is None else repr(values[c]) for c in columns]
@@ -177,7 +177,7 @@ def write_conservation_sidecar(filename: str, results: dict[int, dict[str, float
 def read_conservation_sidecar(filename: str) -> dict[int, dict[str, float]]:
     """ Read a sidecar written by write_conservation_sidecar back into {variant_id: {db_column: value}}. """
     results: dict[int, dict[str, float]] = {}
-    with open(filename, "rt", encoding="utf-8") as f:
+    with open(filename, encoding="utf-8") as f:
         header = f.readline().rstrip("\n").split("\t")
         columns = header[1:]
         for line in f:

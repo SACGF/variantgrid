@@ -5,8 +5,8 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 
 from classification.tests.models.test_utils import ClassificationTestUtils
-from mme.models import MMEInboundQuery, MMEInboundMatch
-from mme.notifications import record_inbound_matches, notify_depositors
+from mme.models import MMEInboundMatch, MMEInboundQuery
+from mme.notifications import notify_depositors, record_inbound_matches
 from mme.tests.fakes import make_classification
 from user_messages.models import Message
 

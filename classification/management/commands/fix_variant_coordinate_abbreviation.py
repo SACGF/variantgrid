@@ -1,6 +1,6 @@
 from django.core.management import BaseCommand
 
-from classification.enums import SubmissionSource, SpecialEKeys
+from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import Classification
 from library.guardian_utils import admin_bot
 

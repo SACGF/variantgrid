@@ -1,6 +1,5 @@
 from annotation import views, views_rest
-from annotation.grids import AnnotationRunColumns, \
-    VariantAnnotationVersionColumns
+from annotation.grids import AnnotationRunColumns, VariantAnnotationVersionColumns
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 

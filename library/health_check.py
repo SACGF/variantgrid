@@ -1,8 +1,8 @@
 import itertools
 from abc import ABC
 from dataclasses import dataclass
-from datetime import timedelta, datetime
-from typing import Union, Optional, Type
+from datetime import datetime, timedelta
+from typing import Optional, Union
 
 import django.dispatch
 from django.db.models import Model, Q
@@ -11,7 +11,7 @@ from django.utils.timezone import localtime
 
 from library.log_utils import NotificationBuilder
 from library.preview_request import PreviewData
-from library.utils import flatten_nested_lists, model_has_field, limit_str
+from library.utils import flatten_nested_lists, limit_str, model_has_field
 
 """
 HealthChecks are generated nightly and posted in Slack.
@@ -103,7 +103,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
     @staticmethod
     def simple_report(
             health_request: HealthCheckRequest,
-            model: Type[Model],
+            model: type[Model],
             emoji: str,
             created: bool = False,
             modified: bool = False) -> list['HealthCheckRecentActivity']:

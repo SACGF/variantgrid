@@ -1,23 +1,24 @@
 import copy
 import socket
-from typing import Any, Iterable, Optional, TypeVar, Union
+from collections.abc import Iterable
+from typing import Any, Optional, TypeVar, Union
 from urllib.parse import quote, urljoin
 
 from django.db.models import QuerySet
 from django.urls import reverse
 
 from classification.enums.classification_enums import ShareLevel, SpecialEKeys
-from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_utils import ClassificationJsonParams
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from snpdb.models import Lab
 from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
-from sync.shariant.query_json_filter import QueryJsonFilter, SOMATIC_FILTER_KEY
-from sync.sync_runner import register_sync_runner, ClassificationUploadSyncRunner, SyncRunInstance
+from sync.shariant.query_json_filter import SOMATIC_FILTER_KEY, QueryJsonFilter
+from sync.sync_runner import ClassificationUploadSyncRunner, SyncRunInstance, register_sync_runner
 
 # add variant_type to private fields as the key has been deprecated
 SHARIANT_PRIVATE_FIELDS = [

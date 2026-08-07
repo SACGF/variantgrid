@@ -5,9 +5,10 @@ Fetching only - the caller stores what comes back, so this stays free of the ORM
 an implementation that serves recorded sequences (@see genes.tests.utils.mock_transcript_sequence_retrieval)
 """
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from io import StringIO
-from typing import Iterable, Optional
+from typing import Optional
 from urllib.error import HTTPError
 
 import requests

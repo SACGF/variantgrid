@@ -1,17 +1,22 @@
 from functools import cached_property
 from typing import Optional
 
-from django.db.models import QuerySet, OuterRef, Subquery
+from django.db.models import OuterRef, QuerySet, Subquery
 from django.http import HttpRequest
 
 from classification.enums import AlleleOriginBucket
-from classification.models import AlleleOriginGrouping, ClassificationGrouping, OverlapStatus, AlleleGrouping
+from classification.models import (
+    AlleleGrouping,
+    AlleleOriginGrouping,
+    ClassificationGrouping,
+    OverlapStatus,
+)
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.utils import JsonDataType
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import GenomeBuild, UserSettings, Lab
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
+from snpdb.models import GenomeBuild, Lab, UserSettings
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
 @timed_cache(size_limit=1, ttl=60)
@@ -61,7 +66,7 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
         for ag in ag.allele_origin_dict.values():
             for cg in ag.classificationgrouping_set.all():
                 labs.add(cg.lab)
-        labs_list = list(sorted(labs))
+        labs_list = sorted(labs)
         return "".join("<div>" + str(lab) +"</div>" for lab in labs_list)
 
     def c_hgvs_for(self, cg: ClassificationGrouping) -> CHGVS:
@@ -82,7 +87,7 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
         allele_group = _allele_group(row.get("allele"))
         # FIXME cache this
         cgs = ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping=allele_group.pk, dirty=False)
-        all_chgvs = list(sorted({self.c_hgvs_for(cg) for cg in cgs}))
+        all_chgvs = sorted({self.c_hgvs_for(cg) for cg in cgs})
         c_hgvs_json: JsonDataType
         if all_chgvs:
             c_hgvs_json = all_chgvs[0].to_json()

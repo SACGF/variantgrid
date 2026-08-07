@@ -5,12 +5,14 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from classification.enums import SubmissionSource
-from classification.enums.classification_enums import SpecialEKeys, ShareLevel, ClinicalSignificance
+from classification.enums.classification_enums import ClinicalSignificance, ShareLevel, SpecialEKeys
 from classification.models.classification import (
-    ConditionResolved, Classification, ClassificationModification,
+    Classification,
+    ClassificationModification,
+    ConditionResolved,
 )
 from genes.models import Gene, GeneAnnotationImport, GeneSymbol, GeneVersion
-from ontology.models import OntologyTerm, OntologyService
+from ontology.models import OntologyService, OntologyTerm
 from snpdb.models import GenomeBuild
 
 

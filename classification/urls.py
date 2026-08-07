@@ -1,41 +1,86 @@
 from rest_framework import routers
 
-from classification.views import clinvar_export_view, search_view_metrics, classification_candidate_search_view
-from classification.views import views, classification_dashboard_view, \
-    classification_export_view, views_autocomplete, \
-    classification_accumulation_graph
+from classification.views import (
+    classification_accumulation_graph,
+    classification_candidate_search_view,
+    classification_dashboard_view,
+    classification_export_view,
+    clinvar_export_view,
+    search_view_metrics,
+    views,
+    views_autocomplete,
+)
 from classification.views.allele_grouping_datatables import AlleleGroupingColumns
 from classification.views.classification_dashboard_view import issues_download
 from classification.views.classification_datatables import ClassificationColumns
-from classification.views.classification_email_view import summary_email_preview_html, \
-    summary_email_preview_text
+from classification.views.classification_email_view import (
+    summary_email_preview_html,
+    summary_email_preview_text,
+)
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
-from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
-    view_clinical_context, view_overlaps_detail
-from classification.views.classification_overlaps_vus_view import view_overlaps_vus, view_overlaps_vus_detail
-from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
-from classification.views.classification_view_metrics import view_classification_metrics, \
-    view_page_metrics_detail
+from classification.views.classification_overlaps_view import (
+    post_clinical_context,
+    view_clinical_context,
+    view_overlaps,
+    view_overlaps_detail,
+)
+from classification.views.classification_overlaps_vus_view import (
+    view_overlaps_vus,
+    view_overlaps_vus_detail,
+)
+from classification.views.classification_view import (
+    ClassificationView,
+    LabGeneClassificationCountsView,
+)
+from classification.views.classification_view_metrics import (
+    view_classification_metrics,
+    view_page_metrics_detail,
+)
 from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
-from classification.views.condition_match_test_view import condition_match_test_view, \
-    condition_match_test_download_view, condition_obsoletes_view
-from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
-    ConditionTextColumns, ConditionTextMatchingAPI
+from classification.views.condition_match_test_view import (
+    condition_match_test_download_view,
+    condition_match_test_view,
+    condition_obsoletes_view,
+)
+from classification.views.condition_matching_view import (
+    ConditionTextColumns,
+    ConditionTextMatchingAPI,
+    condition_matching_view,
+    condition_matchings_view,
+)
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
-from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
-    discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
-    discordance_report_review, action_discordance_report_review, discordance_reports_download
+from classification.views.discordance_report_views import (
+    action_discordance_report_review,
+    discordance_report_review,
+    discordance_report_view,
+    discordance_reports_active_detail,
+    discordance_reports_download,
+    discordance_reports_history_detail,
+    discordance_reports_view,
+    export_discordance_report,
+)
 from classification.views.evidence_keys_view import EvidenceKeysView
-from classification.views.exports.classification_export_formatter_redcap import redcap_data_dictionary
-from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
-    view_imported_allele_info_detail, download_allele_info
-from classification.views.views import classification_import_tool, AutopopulateView
+from classification.views.exports.classification_export_formatter_redcap import (
+    redcap_data_dictionary,
+)
+from classification.views.imported_allele_info_view import (
+    ImportedAlleleInfoColumns,
+    download_allele_info,
+    view_imported_allele_info,
+    view_imported_allele_info_detail,
+)
+from classification.views.views import AutopopulateView, classification_import_tool
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
-from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
-    UploadedClassificationsUnmappedColumns, download_classification_unmapped_file, \
-    view_uploaded_classification_unmapped, view_uploaded_classification_unmapped_detail, \
-    view_uploaded_classification_unmapped_validation_detail, upload_classification_unmapped_download_validation
+from classification.views.views_uploaded_classifications_unmapped import (
+    UploadedClassificationsUnmappedColumns,
+    UploadedClassificationsUnmappedView,
+    download_classification_unmapped_file,
+    upload_classification_unmapped_download_validation,
+    view_uploaded_classification_unmapped,
+    view_uploaded_classification_unmapped_detail,
+    view_uploaded_classification_unmapped_validation_detail,
+)
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 

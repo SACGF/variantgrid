@@ -6,7 +6,8 @@
     uses the same canonical_filter_key helper to populate filter-keyed rows. A
     silent mismatch between the two would produce cache misses forever.
 """
-from typing import Iterable, Optional, Union
+from collections.abc import Iterable
+from typing import Optional, Union
 
 from django.core.exceptions import ObjectDoesNotExist
 

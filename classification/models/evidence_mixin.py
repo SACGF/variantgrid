@@ -1,14 +1,15 @@
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
+from typing import Any, Optional, TypedDict, Union
 
 from django.conf import settings
 
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
-from classification.enums import SpecialEKeys, AlleleOriginBucket
+from classification.enums import AlleleOriginBucket, SpecialEKeys
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
 from library.utils import empty_to_none
@@ -36,8 +37,8 @@ class VCBlobDict(TypedDict, total=False):
     note: str
     explain: str
     immutable: str
-    db_refs: List[VCDbRefDict]
-    validation: List[VCValidation]
+    db_refs: list[VCDbRefDict]
+    validation: list[VCValidation]
 
 
 class SomaticValueDict(TypedDict):
@@ -107,8 +108,8 @@ _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
 
 VCStoreValue = VCBlobDict
 VCPatchValue = Union[None, VCStoreValue]
-VCStore = Dict[str, VCStoreValue]
-VCPatch = Dict[str, VCPatchValue]
+VCStore = dict[str, VCStoreValue]
+VCPatch = dict[str, VCPatchValue]
 
 
 class EvidenceMixin:
@@ -188,7 +189,7 @@ class EvidenceMixin:
             raise ValueError("Classification does not have a value for genome build")
 
     @cached_property
-    def db_refs(self) -> List[VCDbRefDict]:
+    def db_refs(self) -> list[VCDbRefDict]:
         all_db_refs = []
         for blob in self._evidence.values():
             db_refs = blob.get('db_refs')
@@ -213,7 +214,7 @@ class EvidenceMixin:
         if not e_keys:
             e_keys = EvidenceKeyMap.instance()
 
-        criteria: List[CriteriaStrength] = []
+        criteria: list[CriteriaStrength] = []
         for ek in e_keys.criteria():
             if strength := self.get(ek.key):
                 criteria.append(CriteriaStrength(ek, strength))
@@ -299,7 +300,7 @@ class EvidenceMixin:
         return key
 
     @staticmethod
-    def to_patch(raw: Dict[str, Any]) -> VCPatch:
+    def to_patch(raw: dict[str, Any]) -> VCPatch:
         """
         Cleans up a dictionary significantly ready for processing.
         Converts keys to numbers and letters, and all whitespace to underscores.

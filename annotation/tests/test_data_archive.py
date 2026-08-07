@@ -15,7 +15,11 @@ from annotation.annotation_version_querysets import (
     get_variants_qs_for_annotation,
 )
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
-from annotation.models import AnnotationVersion, VariantAnnotationVersion, VariantTranscriptAnnotation
+from annotation.models import (
+    AnnotationVersion,
+    VariantAnnotationVersion,
+    VariantTranscriptAnnotation,
+)
 from genes.models import Gene
 from genes.models_enums import AnnotationConsortium
 from snpdb.archive import DataArchivedError

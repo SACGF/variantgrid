@@ -19,11 +19,24 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
-from annotation.models import AnnotationRangeLock, AnnotationRun, AnnotationVersion, VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.annotation_versions import _absorb_range_lock, merge_pending_range_locks
+from annotation.annotsv_annotation import get_annotsv_tsv_filename
+from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    VariantAnnotationVersion,
+)
+from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.sv_conservation import conservation_sidecar_filename
 from annotation.tasks import annotation_scheduler_task
+from annotation.tasks.annotate_variants import (
+    annotate_variants,
+    get_annotated_filename,
+    get_annotsv_dir,
+    import_annotation_run,
+)
 from annotation.tasks.annotation_scheduler_task import (
     _IMPORT_RUNNING_STATUSES,
     _VEP_RUNNING_STATUSES,
@@ -34,10 +47,6 @@ from annotation.tasks.annotation_scheduler_task import (
     dispatch_annotation_runs,
     reclaim_stalled_annotation_runs,
 )
-from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run, \
-    get_annotated_filename, get_annotsv_dir
-from annotation.annotsv_annotation import get_annotsv_tsv_filename
-from annotation.sv_conservation import conservation_sidecar_filename
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

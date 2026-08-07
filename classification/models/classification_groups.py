@@ -1,16 +1,23 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from itertools import groupby
-from typing import Optional, Iterable, TypeVar, Generic
+from typing import Generic, Optional, TypeVar
 
 import deprecation
 from django.contrib.auth.models import User
 from more_itertools import first
 
 from classification.criteria_strengths import CriteriaStrength
-from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
-from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved, \
-    classification_flag_types, ImportedAlleleInfo
+from classification.enums import CriteriaEvaluation, ShareLevel, SpecialEKeys
+from classification.models import (
+    ClassificationModification,
+    ConditionResolved,
+    CuratedDate,
+    EvidenceKeyMap,
+    ImportedAlleleInfo,
+    classification_flag_types,
+)
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS, PHGVS
@@ -231,7 +238,7 @@ class ClassificationGroup:
 
     @property
     def allele_infos(self) -> list[ImportedAlleleInfo]:
-        return list(sorted({mod.classification.allele_info for mod in self.modifications if mod.classification.allele_info}))
+        return sorted({mod.classification.allele_info for mod in self.modifications if mod.classification.allele_info})
 
     def diff_ids(self) -> str:
         return ",".join([str(cm.classification_id) for cm in self.modifications])

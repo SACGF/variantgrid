@@ -149,7 +149,7 @@ class VEPComponentVersionBackfillTests(TestCase):
     def _make_unpinned_vav(self, status) -> VariantAnnotationVersion:
         kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = status
-        kwargs.update({field: None for field in self.PIN_FIELDS})
+        kwargs.update(dict.fromkeys(self.PIN_FIELDS))
         return VariantAnnotationVersion.objects.create(**kwargs)
 
     def _run_backfill(self):

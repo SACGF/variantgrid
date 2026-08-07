@@ -1,6 +1,6 @@
 from library.django_utils.jqgrid_view import JQGridView
 from pathtests import views, views_autocomplete, views_rest
-from pathtests.grids import PathologyTestOrdersGrid, CasesGrid, PathologyTestsGrid
+from pathtests.grids import CasesGrid, PathologyTestOrdersGrid, PathologyTestsGrid
 from variantgrid.perm_path import path
 
 urlpatterns = [

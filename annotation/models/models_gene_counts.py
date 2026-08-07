@@ -2,16 +2,16 @@ import logging
 from typing import Optional
 
 from django.db import models
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from django.db.models.deletion import CASCADE
 from model_utils.managers import InheritanceManager
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models.models import VariantAnnotationVersion, VariantAnnotation
+from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
 from classification.models import Classification, ClassificationModification
 from genes.models import Gene
 from library.utils import rgb_invert
-from snpdb.models import Sample, Cohort, ShareLevel, GenomeBuild, Variant
+from snpdb.models import Cohort, GenomeBuild, Sample, ShareLevel, Variant
 from snpdb.models.models_enums import ProcessingStatus
 from variantgrid.celery import app
 

@@ -1,21 +1,22 @@
 import datetime
 from collections import defaultdict
-from typing import Iterable, Any, Union, Optional
+from collections.abc import Iterable
+from typing import Any, Optional, Union
 
 from django.conf import settings
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.contrib.auth.models import User
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from flags.models import Flag, FlagComment, FlagType, FlagCollection, FlagPermissionLevel
+from flags.models import Flag, FlagCollection, FlagComment, FlagPermissionLevel, FlagType
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagResolution, FlagTypeResolution, fetch_flag_infos
 from library.django_utils import ensure_timezone_aware
 from library.utils import empty_to_none
-from snpdb.models import Lab, AvatarDetails
+from snpdb.models import AvatarDetails, Lab
 
 
 class CommentDetails:

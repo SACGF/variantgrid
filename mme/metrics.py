@@ -11,9 +11,11 @@ from django.utils import timezone
 
 from library.constants import DAY_SECS, HOUR_SECS
 from mme.genes import canonical_gene_key
-from mme.models import MMEInboundQuery, MMEInboundMatch
+from mme.models import MMEInboundMatch, MMEInboundQuery
 from mme.serializers.patient_profile import (
-    mme_eligible_classifications, classification_genomic_feature, classification_ontology_slots,
+    classification_genomic_feature,
+    classification_ontology_slots,
+    mme_eligible_classifications,
 )
 
 MME_METRICS_CACHE_KEY = "mme_metrics"

@@ -1,8 +1,8 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from snpdb.models import VCF, log_traceback, SomalierVCFExtract, GenomeBuild, SomalierRelatePairs
-from snpdb.tasks.somalier_tasks import somalier_vcf_id, somalier_all_samples
+from snpdb.models import VCF, GenomeBuild, SomalierRelatePairs, SomalierVCFExtract, log_traceback
+from snpdb.tasks.somalier_tasks import somalier_all_samples, somalier_vcf_id
 
 
 class Command(BaseCommand):

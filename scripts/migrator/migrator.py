@@ -4,10 +4,11 @@ import socket
 import subprocess
 import sys
 import traceback
+from collections.abc import Callable
 from enum import Enum, auto
 from functools import partial
 from subprocess import Popen
-from typing import Optional, Callable
+from typing import Optional
 
 import requests
 
@@ -293,7 +294,7 @@ class Migrator:
             else:
                 print(f"Failed to record deployment in Rollbar. Response: {response.text}")
         except Exception as e:
-            print(f"Error recording deployment in Rollbar: {str(e)}")
+            print(f"Error recording deployment in Rollbar: {e!s}")
 
         return MigrationResult.success()
 
@@ -454,7 +455,7 @@ class Migrator:
                 print("****** SPECIAL STEPS ******")
             tag = migration.status_tag()
             prefix = f"{color(YELLOW, tag)} " if tag else ""
-            print(f"{migration.key}: {prefix}{str(migration)}")
+            print(f"{migration.key}: {prefix}{migration!s}")
             keys.append(migration.key)
             if status := migration.status_line():
                 print_yellow(f"    ⧗ {status}")

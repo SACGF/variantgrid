@@ -1,5 +1,5 @@
 from collections import Counter
-from functools import lru_cache
+from functools import cache
 
 from django.core.management.base import BaseCommand
 from django.db.models import Q
@@ -7,10 +7,10 @@ from django.db.models.functions import Length
 
 from annotation.models import AnnotationRangeLock, ClinVar
 from genes.hgvs import HGVSMatcher
-from snpdb.models import Variant, Sequence, GenomeBuild, Locus
+from snpdb.models import GenomeBuild, Locus, Sequence, Variant
 
 
-@lru_cache(maxsize=None)
+@cache
 def _get_sequence(seq: str) -> Sequence:
     """ Sequences are created on first sight, so eg <DEL> won't exist yet on a legacy DB """
     sequence, _ = Sequence.objects.get_or_create(seq=seq)

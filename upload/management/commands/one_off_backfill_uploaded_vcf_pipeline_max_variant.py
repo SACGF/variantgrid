@@ -6,7 +6,7 @@ from django.db.models import Max
 from annotation.annotation_version_querysets import pipeline_type_variant_q
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from snpdb.archive import DataArchivedError
-from snpdb.models import Variant, CohortGenotypeCollection
+from snpdb.models import CohortGenotypeCollection, Variant
 from upload.models import UploadedVCF, UploadedVCFPipelineMaxVariant
 
 

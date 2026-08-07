@@ -1,22 +1,36 @@
 import re
 import urllib.parse
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable, Iterable, Union, Optional, Any
+from typing import Any, Optional, Union
 
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
 from genes.models import GeneSymbol, PanelAppServer
-from genes.panel_app import get_panel_app_results_by_gene_symbol_json, get_request, \
-    get_hgnc_pk_from_api_record, PANEL_APP_SEARCH_BY_GENES_BASE_PATH
+from genes.panel_app import (
+    PANEL_APP_SEARCH_BY_GENES_BASE_PATH,
+    get_hgnc_pk_from_api_record,
+    get_panel_app_results_by_gene_symbol_json,
+    get_request,
+)
 from library.cache import timed_cache
 from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str
-from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, OntologyImport, OntologyTermRelation, \
-    OntologyTermStatus, OntologyIdNormalized, OntologyService, PanelAppClassification
+from ontology.models import (
+    OntologyIdNormalized,
+    OntologyImport,
+    OntologyImportSource,
+    OntologyRelation,
+    OntologyService,
+    OntologyTerm,
+    OntologyTermRelation,
+    OntologyTermStatus,
+    PanelAppClassification,
+)
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 # increment if you change the logic of parsing ontology terms from PanelApp
@@ -54,7 +68,7 @@ class PanelAppResult:
         for phenotype_row in phenotypes:
             hash_str += phenotype_row + ";"
             found_term = False
-            from annotation.regexes import db_ref_regexes, DbRegexes
+            from annotation.regexes import DbRegexes, db_ref_regexes
             for result in db_ref_regexes.search(phenotype_row):
                 if result.cregx in (DbRegexes.OMIM, DbRegexes.MONDO):
                     all_terms.add(result.id_fixed)

@@ -6,12 +6,14 @@ Both implementations share the BFS body in ``bfs_to_ontology``; only the
 once.
 """
 from collections import defaultdict
-from typing import Callable, Optional, Protocol, Union
+from collections.abc import Callable
+from typing import Protocol, Union
 
 from django.db.models import Q
 
 from genes.models import GeneSymbol
 from ontology.models import (
+    ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
     GeneDiseaseClassification,
     OntologyImportSource,
     OntologyRelation,
@@ -21,9 +23,7 @@ from ontology.models import (
     OntologyTermRelation,
     OntologyVersion,
     PanelAppClassification,
-    ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
 )
-
 
 _EXCLUDED_RELATIONS = frozenset({
     OntologyRelation.IS_A,

@@ -1,14 +1,14 @@
 import operator
 import re
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from functools import reduce
 
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Q, Sum
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models import VariantTranscriptAnnotation, AnnotationVersion
+from annotation.models import AnnotationVersion, VariantTranscriptAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models import Classification
 from genes.models import GeneSymbol

@@ -3,6 +3,7 @@ import gzip
 import json
 import os
 import tempfile
+from unittest.mock import patch
 
 from django.conf import settings
 from django.core.management import call_command
@@ -10,8 +11,6 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
-
-from unittest.mock import patch
 
 from annotation.external_annotation import (
     ANNOTATED_VCF_SUFFIX,

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from ontology.models import OntologyTerm, OntologyImport, OntologyTermRelation
+from ontology.models import OntologyImport, OntologyTerm, OntologyTermRelation
 from snpdb.admin_utils import ModelAdminBasics
 
 

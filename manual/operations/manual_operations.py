@@ -1,4 +1,5 @@
-from typing import Optional, Union, Callable
+from collections.abc import Callable
+from typing import Optional, Union
 
 from django.db.migrations.operations.base import Operation
 

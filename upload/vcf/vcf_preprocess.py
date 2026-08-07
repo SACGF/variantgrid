@@ -1,7 +1,7 @@
 import glob
 import logging
 import os
-from subprocess import Popen, PIPE, CalledProcessError
+from subprocess import PIPE, CalledProcessError, Popen
 
 import pandas as pd
 from django.conf import settings
@@ -11,10 +11,22 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.genomics.vcf_utils import write_cleaned_vcf_header
 from library.utils.file_utils import name_from_filename
-from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
-    UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput, VCFPipelineStage, \
-    SimpleVCFImportInfo, ModifiedImportedVariant
-from upload.tasks.vcf.unknown_variants_task import SeparateUnknownVariantsTask, AnnotateImportedVCFTask
+from upload.models import (
+    ModifiedImportedVariant,
+    ModifiedImportedVariants,
+    SimpleVCFImportInfo,
+    ToolVersion,
+    UploadStep,
+    UploadStepMultiFileOutput,
+    UploadStepTaskType,
+    VCFPipelineStage,
+    VCFSkippedContig,
+    VCFSkippedContigs,
+)
+from upload.tasks.vcf.unknown_variants_task import (
+    AnnotateImportedVCFTask,
+    SeparateUnknownVariantsTask,
+)
 
 
 def get_bcftools_tool_version(bcftools_command):
@@ -30,7 +42,7 @@ def get_bcftools_tool_version(bcftools_command):
     if not bcftools_version.startswith("bcftools"):
         raise CalledProcessError(f"Expected to find bcftools on 1st line of output of '{bcftools_command} --version' output: {bcftools_version}")
     htslib_version = output_list[1]
-    if not "htslib" in htslib_version:
+    if "htslib" not in htslib_version:
         raise CalledProcessError(f"Expected to find htslib version on 2nd line of '{bcftools_command} --version' output: {htslib_version}")
 
     version = f"{bcftools_version}, {htslib_version}"
@@ -212,7 +224,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
             stderr_output = None
             stderr_filename = stderr_filenames.get(sub_step_name)
             if stderr_filename:
-                with open(stderr_filename, "r") as sf:
+                with open(stderr_filename) as sf:
                     stderr_output = sf.read()
                 if stderr_output and len(stderr_output) > MAX_STDERR_OUTPUT:
                     half = MAX_STDERR_OUTPUT // 2

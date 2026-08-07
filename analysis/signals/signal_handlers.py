@@ -3,10 +3,16 @@ import logging
 import celery
 from django.db import transaction
 
-from analysis.tasks.auto_analysis_tasks import auto_run_analyses_for_vcf, auto_run_analyses_for_sample, \
-    reload_auto_analyses_for_vcf
-from analysis.tasks.variant_tag_tasks import variant_tag_created_task, variant_tag_deleted_in_analysis_task, \
-    analysis_tag_nodes_set_dirty
+from analysis.tasks.auto_analysis_tasks import (
+    auto_run_analyses_for_sample,
+    auto_run_analyses_for_vcf,
+    reload_auto_analyses_for_vcf,
+)
+from analysis.tasks.variant_tag_tasks import (
+    analysis_tag_nodes_set_dirty,
+    variant_tag_created_task,
+    variant_tag_deleted_in_analysis_task,
+)
 from snpdb.models import ImportStatus
 
 

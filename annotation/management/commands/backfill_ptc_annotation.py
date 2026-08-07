@@ -13,10 +13,12 @@ meaning to DamageNode.
 """
 from django.core.management.base import BaseCommand
 
-from annotation.models import VariantAnnotationVersion, VariantAnnotation
+from annotation.models import VariantAnnotation, VariantAnnotationVersion
 from annotation.models.models import VariantTranscriptAnnotation
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import (
-    FRAMESHIFT_CONSEQUENCE, TranscriptGeometryCache, add_calculated_ptc,
+    FRAMESHIFT_CONSEQUENCE,
+    TranscriptGeometryCache,
+    add_calculated_ptc,
 )
 
 BATCH_SIZE = 5000

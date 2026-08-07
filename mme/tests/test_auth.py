@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from django.test import TestCase, override_settings
 from rest_framework.exceptions import AuthenticationFailed
 
-from mme.auth import peer_node_id_for_token, authenticate_mme_peer
+from mme.auth import authenticate_mme_peer, peer_node_id_for_token
 
 TOKENS = {"genematcher": "gm-secret", "decipher": "dc-secret"}
 

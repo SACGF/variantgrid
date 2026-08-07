@@ -1,6 +1,6 @@
 from django.template import Library
 
-from genes.models import PanelAppServer, GeneSymbol
+from genes.models import GeneSymbol, PanelAppServer
 
 register = Library()
 

@@ -3,8 +3,12 @@ from typing import Optional
 
 from django.core.management import BaseCommand
 
-from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, AbstractVariantAnnotation
-from genes.hgvs import HGVSMatcher, HGVSException
+from annotation.models import (
+    AbstractVariantAnnotation,
+    VariantAnnotation,
+    VariantTranscriptAnnotation,
+)
+from genes.hgvs import HGVSException, HGVSMatcher
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 
@@ -33,7 +37,7 @@ class Command(BaseCommand):
                     try:
                         hgvs_c = matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
                         va_list.append(va)
-                    except (ValueError, HGVSException) as e:
+                    except (ValueError, HGVSException):
                         # print(f"FAILED: {transcript_accession}: {e} - {quick_reject=}")
                         pass
 

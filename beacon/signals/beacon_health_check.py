@@ -3,8 +3,11 @@ from django.db.models import Count
 from django.dispatch import receiver
 
 from beacon.models import BeaconInboundQuery
-from library.health_check import HealthCheckRequest, HealthCheckRecentActivity, \
-    health_check_overall_stats_signal
+from library.health_check import (
+    HealthCheckRecentActivity,
+    HealthCheckRequest,
+    health_check_overall_stats_signal,
+)
 
 
 @receiver(signal=health_check_overall_stats_signal)

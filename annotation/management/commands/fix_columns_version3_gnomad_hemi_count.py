@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.db.models import F
 
-from annotation.models import VariantAnnotationVersion, VariantAnnotation
+from annotation.models import VariantAnnotation, VariantAnnotationVersion
 
 
 class Command(BaseCommand):

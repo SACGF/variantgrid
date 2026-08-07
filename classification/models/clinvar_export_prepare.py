@@ -1,13 +1,19 @@
 import itertools
 from collections import defaultdict
-from typing import List, Optional, Set, Iterable
+from collections.abc import Iterable
+from typing import Optional
 
 from django.utils import timezone
 from django.utils.timezone import now
 
-from classification.enums import ShareLevel, AlleleOriginBucket
-from classification.models import ClinVarAllele, ClassificationModification, ClinVarExport, \
-    ConditionResolved, ClinVarExportStatus
+from classification.enums import AlleleOriginBucket, ShareLevel
+from classification.models import (
+    ClassificationModification,
+    ClinVarAllele,
+    ClinVarExport,
+    ClinVarExportStatus,
+    ConditionResolved,
+)
 from classification.models.abstract_utils import ConsolidatingMerger
 from library.utils import pretty_collection
 from snpdb.lab_picker import LabPickerData
@@ -26,11 +32,11 @@ class ClassificationModificationCandidate:
                  modification: ClassificationModification,
                  allele_origin_bucket: Optional[AlleleOriginBucket] = None,
                  condition_umbrella: Optional[ConditionResolved] = None,
-                 failed_candidates: Optional[Set[ClassificationModification]] = None):
+                 failed_candidates: Optional[set[ClassificationModification]] = None):
         self.modification = modification
         self.allele_origin_bucket = allele_origin_bucket or modification.classification.allele_origin_bucket
         self.condition_umbrella: ConditionResolved = condition_umbrella or modification.classification.condition_resolution_obj.as_mondo_if_possible()
-        self.failed_candidates: Set[ClassificationModification] = failed_candidates or set()
+        self.failed_candidates: set[ClassificationModification] = failed_candidates or set()
 
         if self.condition_umbrella is None or not bool(self.condition_umbrella.terms):
             raise ValueError("Candidate must have a resolved condition associated with it")
@@ -47,11 +53,11 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, Classificati
                  force_update: bool = True):
         self.clinvar_allele = clinvar_allele
         self.allele_origin_bucket = allele_origin_bucket
-        self.log: List[str] = []
+        self.log: list[str] = []
         self.force_update = force_update
         super().__init__()
 
-    def retrieve_established(self) -> Set[ClinVarExport]:
+    def retrieve_established(self) -> set[ClinVarExport]:
         return set(ClinVarExport.objects.filter(clinvar_allele=self.clinvar_allele))
 
     def establish_new_candidate(self, new_candidate: ClassificationModificationCandidate) -> ClinVarExport:
@@ -124,14 +130,14 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, Classificati
         return False
 
 
-ClinVarAlleleExportLog = List[str]
+ClinVarAlleleExportLog = list[str]
 
 
 class ClinvarExportPrepare:
 
     @staticmethod
     def update_export_records(perspective: Optional[LabPickerData] = None):
-        clinvar_keys: Set[ClinVarKey]
+        clinvar_keys: set[ClinVarKey]
         if perspective:
             clinvar_keys = {lab.clinvar_key for lab in perspective.selected_labs if lab.clinvar_key}
         else:
@@ -151,7 +157,7 @@ class ClinvarExportPrepare:
             clinvar_key: ClinVarKey,
             allele: Allele,
             allele_origin_bucket: AlleleOriginBucket,
-            modifications: Iterable[ClassificationModification]) -> List[str]:
+            modifications: Iterable[ClassificationModification]) -> list[str]:
 
         clinvar_allele, _ = ClinVarAllele.objects.get_or_create(
             clinvar_key=clinvar_key,
@@ -192,7 +198,7 @@ class ClinvarExportPrepare:
         return log
 
     @staticmethod
-    def update_export_records_for_keys(clinvar_keys: Set[ClinVarKey]) -> ClinVarAlleleExportLog:
+    def update_export_records_for_keys(clinvar_keys: set[ClinVarKey]) -> ClinVarAlleleExportLog:
         # work on clinvar keys, not on labs, as a user could have access to one lab but the clinvar key might be for 2
         # and a clinvar key has to get all labs updated or none, can't deal with partial
         clinvar_labs = Lab.objects.filter(clinvar_key__in=clinvar_keys)

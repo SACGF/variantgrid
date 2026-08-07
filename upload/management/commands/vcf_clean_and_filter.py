@@ -68,7 +68,7 @@ class Command(BaseCommand):
 
         vcf_header_lines = []
         if replace_header:
-            with open(replace_header, "r") as rh_f:
+            with open(replace_header) as rh_f:
                 vcf_header_lines = rh_f.readlines()
 
         first_non_header_line = True

@@ -15,9 +15,15 @@ from collections import defaultdict
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.git import Git
+
 # if certain user settings are not relevant for the environment, list the columns in this
 from variantgrid.settings.components.secret_settings import get_secret, get_secrets
-from variantgrid.settings.components.settings_paths import BASE_DIR, PRIVATE_DATA_ROOT, SETTINGS_DIR, ANNOTATION_BASE_DIR
+from variantgrid.settings.components.settings_paths import (
+    ANNOTATION_BASE_DIR,
+    BASE_DIR,
+    PRIVATE_DATA_ROOT,
+    SETTINGS_DIR,
+)
 
 CSRF_FAILURE_VIEW = 'variantgrid.views.csrf_error'
 

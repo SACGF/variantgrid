@@ -2,9 +2,24 @@ import os.path
 
 from rest_framework import serializers
 
-from seqauto.models import Sequencer, Experiment, VariantCaller, SequencingRun, SequencerModel, SampleSheet, \
-    SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, JointCalledVCF, SingleSampleVCF, \
-    BamFile, Fastq, Aligner, PairedEnd
+from seqauto.models import (
+    Aligner,
+    BamFile,
+    Experiment,
+    Fastq,
+    Flagstats,
+    JointCalledVCF,
+    PairedEnd,
+    SampleSheet,
+    Sequencer,
+    SequencerModel,
+    SequencingRun,
+    SequencingSample,
+    SequencingSampleData,
+    SingleSampleVCF,
+    UnalignedReads,
+    VariantCaller,
+)
 from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
 from snpdb.models import Manufacturer
 

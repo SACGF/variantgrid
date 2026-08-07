@@ -1,11 +1,10 @@
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Value, CharField
-from django.db.models.functions import Lower, Concat
+from django.db.models import CharField, Value
+from django.db.models.functions import Concat, Lower
 
 from snpdb.models import UserPreview
-from snpdb.search import search_receiver, SearchInputInstance, \
-    HAS_ALPHA_PATTERN, SearchExample
+from snpdb.search import HAS_ALPHA_PATTERN, SearchExample, SearchInputInstance, search_receiver
 
 
 @search_receiver(

@@ -3,16 +3,22 @@ import operator
 import os
 import re
 from collections import defaultdict
-from typing import Optional, Iterable, IO, Union
+from collections.abc import Iterable
+from typing import IO, Optional, Union
 
 import cyvcf2
 import vcf
 from django.conf import settings
 
 from library.genomics.vcf_enums import VCFSymbolicAllele
-from library.genomics.vcf_writer import VCFInfoHeader, build_header_lines, symbolic_alt_info, VCFWriter
-from library.utils import open_handle_gzip, open_file_or_filename
-from snpdb.models import Variant, Sequence, GenomeFasta, SequenceRole, VariantCoordinate
+from library.genomics.vcf_writer import (
+    VCFInfoHeader,
+    VCFWriter,
+    build_header_lines,
+    symbolic_alt_info,
+)
+from library.utils import open_file_or_filename, open_handle_gzip
+from snpdb.models import GenomeFasta, Sequence, SequenceRole, Variant, VariantCoordinate
 
 
 def cyvcf2_header_types(cyvcf2_reader) -> defaultdict:

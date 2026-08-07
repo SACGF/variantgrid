@@ -5,13 +5,22 @@ from django.utils.timezone import localdate
 from analysis.models.models_variant_tag import VariantTagsImport
 from annotation.models.models import ClinVarVersion, ManualVariantEntryCollection
 from classification.models.classification import ClassificationImport
-from snpdb.models import ImportedWikiCollection, ImportSource, VCF
+from snpdb.models import VCF, ImportedWikiCollection, ImportSource
 from snpdb.models.models_enums import AlleleConversionTool
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import LiftoverRun
-from upload.models import FileUpload, UploadedClassificationImport, UploadedClinVarVersion, UploadedFileTypes, \
-    UploadedLiftover, UploadedManualVariantEntryCollection, UploadedVariantTags, UploadedVCF, \
-    UploadedWikiCollection, UploadPipeline
+from upload.models import (
+    FileUpload,
+    UploadedClassificationImport,
+    UploadedClinVarVersion,
+    UploadedFileTypes,
+    UploadedLiftover,
+    UploadedManualVariantEntryCollection,
+    UploadedVariantTags,
+    UploadedVCF,
+    UploadedWikiCollection,
+    UploadPipeline,
+)
 
 
 class UploadPipelineGenomeBuildTest(TestCase):

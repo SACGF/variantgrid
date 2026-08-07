@@ -5,8 +5,14 @@ from collections import Counter
 
 from django.core.management.base import BaseCommand
 
-from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, \
-    TranscriptVersion, AnnotationRun, VariantAnnotationPipelineType, AnnotationStatus
+from annotation.models import (
+    AnnotationRun,
+    AnnotationStatus,
+    TranscriptVersion,
+    VariantAnnotation,
+    VariantAnnotationPipelineType,
+    VariantTranscriptAnnotation,
+)
 from genes.hgvs import HGVSMatcher
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -55,7 +61,7 @@ class Command(BaseCommand):
                             hgvs_c = hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate,
                                                                                      transcript_accession)
                             hgvs_c_results["ok"] += 1
-                        except Exception as e:
+                        except Exception:
                             hgvs_c = None  # c.HGVS is ok to be blank
                             hgvs_c_results["error"] += 1
 

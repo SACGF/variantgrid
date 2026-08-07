@@ -1,7 +1,6 @@
 from abc import abstractmethod
 from collections.abc import Hashable
-from typing import TypeVar, Generic, Optional
-
+from typing import Generic, Optional, TypeVar
 
 CandidateType = TypeVar("CandidateType")
 EstablishedType = TypeVar("EstablishedType", bound=Hashable)

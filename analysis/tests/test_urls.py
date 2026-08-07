@@ -7,14 +7,26 @@ from django.test.client import Client
 from django.urls.base import reverse
 from django.utils import timezone
 
-from analysis.models import Analysis, SampleNode, KaryomappingAnalysis, GeneListNode, GeneListNodeGeneList
+from analysis.models import (
+    Analysis,
+    GeneListNode,
+    GeneListNodeGeneList,
+    KaryomappingAnalysis,
+    SampleNode,
+)
 from analysis.models.enums import SNPMatrix
 from annotation.fake_annotation import get_fake_annotation_version
 from genes.models import GeneList
-from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
+from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import Variant
-from snpdb.models.models_cohort import Cohort, Trio, CohortSample, CohortGenotypeCollection, CohortGenotype
+from snpdb.models.models_cohort import (
+    Cohort,
+    CohortGenotype,
+    CohortGenotypeCollection,
+    CohortSample,
+    Trio,
+)
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, Sample

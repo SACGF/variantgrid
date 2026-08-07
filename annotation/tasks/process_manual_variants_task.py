@@ -5,9 +5,12 @@ from django.db.models.query_utils import Q
 from annotation.models import ManualVariantEntryType
 from annotation.models.models import ManualVariantEntry
 from genes.hgvs import HGVSMatcher
-from snpdb.clingen_allele import populate_clingen_alleles_for_variants, get_clingen_alleles_from_external_code
+from snpdb.clingen_allele import (
+    get_clingen_alleles_from_external_code,
+    populate_clingen_alleles_for_variants,
+)
 from snpdb.models import Variant, VariantCoordinate
-from snpdb.models.models_enums import ImportStatus, ClinGenAlleleExternalRecordType
+from snpdb.models.models_enums import ClinGenAlleleExternalRecordType, ImportStatus
 from upload.models import SimpleVCFImportInfo
 from upload.models.models_enums import VCFImportInfoSeverity
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask

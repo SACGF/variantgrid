@@ -3,7 +3,8 @@ import io
 import math
 import re
 import string
-from typing import Collection, Any, Optional, Callable
+from collections.abc import Callable, Collection
+from typing import Any, Optional
 
 from rich.text import Text
 

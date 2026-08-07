@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import permissions
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
@@ -16,12 +16,29 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import Gene, GeneList, GeneAnnotationRelease, GeneSymbol, \
-    ReleaseGeneSymbolGene, PanelAppServer, SampleGeneList, ActiveSampleGeneList, create_fake_gene_list
-from genes.panel_app import get_panel_app_panel_as_gene_list_json
-from genes.panel_app import get_panel_app_results_by_gene_symbol_json
-from genes.serializers import GeneDetailSerializer, GeneListGeneSymbolSerializer, \
-    GeneListSerializer, GeneAnnotationReleaseSerializer, GeneSymbolDetailSerializer, SampleGeneListSerializer
+from genes.models import (
+    ActiveSampleGeneList,
+    Gene,
+    GeneAnnotationRelease,
+    GeneList,
+    GeneSymbol,
+    PanelAppServer,
+    ReleaseGeneSymbolGene,
+    SampleGeneList,
+    create_fake_gene_list,
+)
+from genes.panel_app import (
+    get_panel_app_panel_as_gene_list_json,
+    get_panel_app_results_by_gene_symbol_json,
+)
+from genes.serializers import (
+    GeneAnnotationReleaseSerializer,
+    GeneDetailSerializer,
+    GeneListGeneSymbolSerializer,
+    GeneListSerializer,
+    GeneSymbolDetailSerializer,
+    SampleGeneListSerializer,
+)
 from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils.django_rest_utils import MultipleFieldLookupMixin
 from library.guardian_utils import DjangoPermission
@@ -114,7 +131,7 @@ class ModifyGeneListView(APIView):
         gene_additions, gene_deletions = self.get_gene_list_modifications(request.data)
 
         modification_info = f"Added manually by {request.user} on {timezone.now()}"
-        gene_additions_modification_info = {gene: modification_info for gene in gene_additions}
+        gene_additions_modification_info = dict.fromkeys(gene_additions, modification_info)
         num_added, num_deleted = gene_list.add_and_remove_gene_symbols(gene_additions, gene_deletions,
                                                                        gene_additions_modification_info)
         return Response(status=HTTP_200_OK, data={"num_added": num_added, "num_deleted": num_deleted})

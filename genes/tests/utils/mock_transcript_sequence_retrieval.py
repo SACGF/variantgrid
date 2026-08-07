@@ -13,7 +13,7 @@ from django.conf import settings
 from genes.models_enums import AnnotationConsortium
 from genes.transcript_errors import BadTranscript
 from genes.transcript_parts import get_transcript_id_and_version
-from genes.transcript_sequence_retrieval import TranscriptSequenceFetcher, FetchedTranscriptSequence
+from genes.transcript_sequence_retrieval import FetchedTranscriptSequence, TranscriptSequenceFetcher
 
 TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "genes", "tests", "test_data")
 TRANSCRIPT_SEQUENCE_FASTAS = {

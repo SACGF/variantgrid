@@ -2,9 +2,12 @@ import unittest
 
 from django.contrib.auth.models import User
 
-from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
-    create_fake_variant_annotation
-from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation, AnnotationRun
+from annotation.fake_annotation import (
+    create_fake_clinvar_data,
+    create_fake_variant_annotation,
+    get_fake_annotation_version,
+)
+from annotation.models import AnnotationRun, Citation, ClinVar, HumanProteinAtlasTissueSample
 from annotation.models.models_citations import CitationSource
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
@@ -40,8 +43,8 @@ class Test(URLTestCase):
 
         cls.clinvar_id = clinvar.pk
         cls.variant_string = str(variant)
-        cls.pubmed_citations = "&".join((str(c) for c in Citation.objects.all().values_list("id", flat=True)[:2]))
-        cls.citations_ids_list = "/".join((str(c) for c in Citation.objects.all().values_list("id", flat=True)[:2]))
+        cls.pubmed_citations = "&".join(str(c) for c in Citation.objects.all().values_list("id", flat=True)[:2])
+        cls.citations_ids_list = "/".join(str(c) for c in Citation.objects.all().values_list("id", flat=True)[:2])
         cls.citations_ids_list_pubmed = pubmed_citation
 
     def testUrls(self):

@@ -5,9 +5,14 @@ from django.db.models import QuerySet
 from django.dispatch import receiver
 
 from classification.models import Classification, variants_classification_changed_signal
-from classification.models.classification_import_run import ClassificationImportRun, \
-    classification_imports_complete_signal
-from snpdb.common_variants import get_classified_high_frequency_variants_qs, get_common_filters_in_use
+from classification.models.classification_import_run import (
+    ClassificationImportRun,
+    classification_imports_complete_signal,
+)
+from snpdb.common_variants import (
+    get_classified_high_frequency_variants_qs,
+    get_common_filters_in_use,
+)
 from snpdb.models import CohortGenotypeCommonFilterVersion, Variant, VariantAllele
 
 """

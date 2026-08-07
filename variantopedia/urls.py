@@ -2,8 +2,15 @@ from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 from variantopedia import views
-from variantopedia.grids import AllVariantsGrid, NearbyVariantsGrid, TaggedVariantGrid, \
-    VariantTagsGrid, VariantWikiColumns, VariantTagCountsColumns, VariantTagDetailColumns
+from variantopedia.grids import (
+    AllVariantsGrid,
+    NearbyVariantsGrid,
+    TaggedVariantGrid,
+    VariantTagCountsColumns,
+    VariantTagDetailColumns,
+    VariantTagsGrid,
+    VariantWikiColumns,
+)
 
 urlpatterns = [
     path('variants', views.variants, name='variants'),

@@ -16,8 +16,17 @@ from library.log_utils import log_traceback
 from library.unit_percent import format_af
 from ontology.models import OntologyService
 from patients.models_enums import Zygosity
-from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, CohortGenotype, CohortSample, \
-    VariantZygosityCount, VariantZygosityCountCollection, VCFFilter
+from snpdb.models import (
+    CohortGenotype,
+    CohortGenotypeCollection,
+    CohortSample,
+    Locus,
+    Sample,
+    Variant,
+    VariantZygosityCount,
+    VariantZygosityCountCollection,
+    VCFFilter,
+)
 from upload.models import ModifiedImportedVariant
 
 SAMPLE_ENRICHMENT_KIT_PATH = "samplefromsequencingsample__sequencing_sample__enrichment_kit__name"

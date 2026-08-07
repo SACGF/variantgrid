@@ -4,8 +4,20 @@ from django.test import TestCase
 from rest_framework.exceptions import ValidationError
 
 from seqauto.grids.sequencing_data_grids import BamFileListGrid
-from seqauto.models import BamFile, EnrichmentKit, Fastq, QC, QCGeneCoverage, SampleSheet, Sequencer, SequencerModel, \
-    SequencingRun, SequencingRunCurrentSampleSheet, SequencingSample, UnalignedReads
+from seqauto.models import (
+    QC,
+    BamFile,
+    EnrichmentKit,
+    Fastq,
+    QCGeneCoverage,
+    SampleSheet,
+    Sequencer,
+    SequencerModel,
+    SequencingRun,
+    SequencingRunCurrentSampleSheet,
+    SequencingSample,
+    UnalignedReads,
+)
 from seqauto.models.models_enums import DataGeneration
 from seqauto.serializers.seqauto_qc_serializers import QCSerializer
 from seqauto.serializers.sequencing_serializers import SequencingFilesBulkCreateSerializer

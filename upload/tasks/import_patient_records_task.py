@@ -1,5 +1,5 @@
 from patients.import_records import import_patient_records
-from patients.models import PatientRecords, PatientImport
+from patients.models import PatientImport, PatientRecords
 from upload.models import UploadedPatientRecords
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app

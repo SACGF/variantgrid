@@ -3,8 +3,14 @@ from django.utils import timezone
 
 from genes.models import PanelAppServer
 from genes.panel_app import get_hgnc_pk_from_api_record
-from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyRelation, OntologyTermRelation, \
-    OntologyTermStatus
+from ontology.models import (
+    OntologyImport,
+    OntologyRelation,
+    OntologyService,
+    OntologyTerm,
+    OntologyTermRelation,
+    OntologyTermStatus,
+)
 from ontology.panel_app_ontology import _update_gene_relations, hgnc_ontology_terms_by_pk
 
 

@@ -4,7 +4,11 @@ from collections import Counter
 from django.core.management.base import BaseCommand
 from django.db.models import Count
 
-from annotation.models.models_phenotype_match import TextPhenotype, PatientTextPhenotype, TextPhenotypeMatch
+from annotation.models.models_phenotype_match import (
+    PatientTextPhenotype,
+    TextPhenotype,
+    TextPhenotypeMatch,
+)
 from annotation.phenotype_matching import bulk_patient_phenotype_matching
 
 

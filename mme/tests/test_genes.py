@@ -7,12 +7,18 @@ from django.test import TestCase, override_settings
 from genes.models import GeneSymbol, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from mme.genes import (
-    clear_gene_identity_cache, gene_identity_from_id, resolve_gene, canonical_gene_key,
+    canonical_gene_key,
+    clear_gene_identity_cache,
+    gene_identity_from_id,
+    resolve_gene,
 )
 from mme.matching import find_matches
-from mme.serializers.patient_profile import classification_genomic_feature, build_patient_profile
+from mme.serializers.patient_profile import build_patient_profile, classification_genomic_feature
 from mme.tests.fakes import (
-    FakeAlleleInfo, FakeClassification, FakeResolvedVariantInfo, FakeSubmission,
+    FakeAlleleInfo,
+    FakeClassification,
+    FakeResolvedVariantInfo,
+    FakeSubmission,
     make_gene_version,
 )
 

@@ -1,8 +1,11 @@
 from django.conf import settings
 from django.dispatch import receiver
 
-from library.health_check import HealthCheckRequest, HealthCheckCapacity, \
-    health_check_overall_stats_signal
+from library.health_check import (
+    HealthCheckCapacity,
+    HealthCheckRequest,
+    health_check_overall_stats_signal,
+)
 from variantgrid.deployment_validation.disk_usage import get_disk_usage_objects
 
 

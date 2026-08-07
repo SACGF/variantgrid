@@ -1,7 +1,7 @@
 import re
 from enum import Enum
-from re import RegexFlag
-from typing import Union, Match, Optional
+from re import Match, RegexFlag
+from typing import Optional, Union
 
 from annotation.models.models_citations import CitationIdNormalized
 from ontology.models import OntologyService
@@ -212,7 +212,7 @@ class DbRefRegexes:
                 return False
 
             result = DbRefRegexResult(cregx=db_regex, idx=id_group, match=match)
-            if not result in already_added:
+            if result not in already_added:
                 results.append(result)
                 already_added.add(result)
             return True

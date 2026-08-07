@@ -15,8 +15,13 @@ from mme.models import MMEInboundQuery
 from mme.notifications import record_inbound_matches
 from mme.tasks import notify_mme_depositors_task
 from mme.versioning import (
-    MME_MEDIA_TYPE, MMEContentNegotiation, MMEJSONParser, MMEJSONRenderer, check_request_version,
-    software_version, supported_media_types,
+    MME_MEDIA_TYPE,
+    MMEContentNegotiation,
+    MMEJSONParser,
+    MMEJSONRenderer,
+    check_request_version,
+    software_version,
+    supported_media_types,
 )
 
 

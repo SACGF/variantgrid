@@ -7,8 +7,10 @@ from django.core.management import BaseCommand, CommandError
 from django.db.models import Q
 
 from annotation.models import CachedWebResource
-from classification.management.commands.fix_migrate_flags_to_imported_allele_info import FlagDatabase
-from classification.models import Classification, ImportedAlleleInfo, ClassificationImportRun
+from classification.management.commands.fix_migrate_flags_to_imported_allele_info import (
+    FlagDatabase,
+)
+from classification.models import Classification, ClassificationImportRun, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
 from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from library.guardian_utils import admin_bot

@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional, Union
+from typing import Optional, Union
 
 from annotation import vep_field_formatters as fmt
 from annotation.models.damage_enums import (

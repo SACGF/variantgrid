@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Set
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
@@ -182,7 +181,7 @@ class AlleleOriginFilterDefault(models.TextChoices):
     SOMATIC = "S", "Somatic"
 
     @property
-    def buckets(self) -> Set[AlleleOriginBucket]:
+    def buckets(self) -> set[AlleleOriginBucket]:
         if self == AlleleOriginFilterDefault.SHOW_ALL:
             return {AlleleOriginBucket.values}
         elif self == AlleleOriginFilterDefault.GERMLINE:

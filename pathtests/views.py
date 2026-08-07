@@ -7,21 +7,35 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.models.query_utils import Q
-from django.http.response import JsonResponse, HttpResponse
-from django.shortcuts import render, get_object_or_404, redirect
+from django.http.response import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from genes.models import GeneListCategory, GeneList, GeneSymbol
+from genes.models import GeneList, GeneListCategory, GeneSymbol
 from genes.views.views import add_gene_list_unmatched_genes_message
 from library.django_utils import add_save_message
-from pathtests.forms import SelectPathologyTestForm, SelectPathologyTestVersionForm, \
-    PathologyTestOrderForm, CaseForm, CreatePathologyTestForm, PathologyTestVersionForm
-from pathtests.models import PathologyTest, PathologyTestVersion, \
-    PathologyTestGeneModificationRequest, PathologyTestGeneModificationOutcome, get_cases_qs, PathologyTestOrder, \
-    Case, get_external_order_system_last_checked, ActivePathologyTestVersion
+from pathtests.forms import (
+    CaseForm,
+    CreatePathologyTestForm,
+    PathologyTestOrderForm,
+    PathologyTestVersionForm,
+    SelectPathologyTestForm,
+    SelectPathologyTestVersionForm,
+)
+from pathtests.models import (
+    ActivePathologyTestVersion,
+    Case,
+    PathologyTest,
+    PathologyTestGeneModificationOutcome,
+    PathologyTestGeneModificationRequest,
+    PathologyTestOrder,
+    PathologyTestVersion,
+    get_cases_qs,
+    get_external_order_system_last_checked,
+)
 from patients.forms import external_pk_autocomplete_form_factory
-from patients.models import Clinician, get_lead_scientist_users_for_user, FollowLeadScientist
+from patients.models import Clinician, FollowLeadScientist, get_lead_scientist_users_for_user
 from snpdb.models.models_enums import ImportStatus
 
 

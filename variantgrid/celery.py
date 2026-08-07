@@ -44,7 +44,7 @@ if SYNC_DETAILS and any(sd["enabled"] for sd in SYNC_DETAILS.values()):
         'schedule': HOUR_SECS,
     }
 
-SAPATH_ENABLED = any((a.startswith("sapath") for a in settings.INSTALLED_APPS))
+SAPATH_ENABLED = any(a.startswith("sapath") for a in settings.INSTALLED_APPS)
 if SAPATH_ENABLED:
     helix_user = getattr(settings, "SAPATH_HELIX_USER", None)
     if helix_user:

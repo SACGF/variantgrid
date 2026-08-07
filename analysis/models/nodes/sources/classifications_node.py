@@ -2,7 +2,7 @@ from typing import Optional
 
 from auditlog.registry import auditlog
 from django.db import models
-from django.db.models import Q, CASCADE
+from django.db.models import CASCADE, Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from classification.enums import ClinicalSignificance

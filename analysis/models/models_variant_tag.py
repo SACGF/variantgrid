@@ -1,15 +1,15 @@
 from typing import Union
 
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.db import models
-from django.db.models import CASCADE, SET_NULL, PROTECT, Q, QuerySet, Count, Max
+from django.db.models import CASCADE, PROTECT, SET_NULL, Count, Max, Q, QuerySet
 from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.enums import TagLocation
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from snpdb.models import Variant, GenomeBuild, Tag, VariantAllele, Allele
+from snpdb.models import Allele, GenomeBuild, Tag, Variant, VariantAllele
 
 
 class VariantTagsImport(TimeStampedModel):

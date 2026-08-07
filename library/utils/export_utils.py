@@ -1,11 +1,12 @@
 import inspect
 import json
 import re
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from itertools import chain
-from typing import Iterable, Optional, Any, Type, Iterator, Callable, Protocol
+from typing import Any, Optional, Protocol
 
 from dateutil.tz import gettz
 from django.conf import settings
@@ -26,7 +27,7 @@ class ExportDataType(str, Enum):
 class ExportCellMethod(Protocol):
     line_number: int
     label: str
-    sub_data: Optional[Type['ExportRow']]
+    sub_data: Optional[type['ExportRow']]
     categories: Optional[dict[Any, Any]]
     data_type: ExportDataType
     def __call__(self, *args) -> Any: ...
@@ -34,7 +35,7 @@ class ExportCellMethod(Protocol):
 
 def export_column(
         label: Optional[str] = None,
-        sub_data: Optional[Type] = None,
+        sub_data: Optional[type] = None,
         categories: dict[str, Any] = None,
         data_type: ExportDataType = ExportDataType.any):
     """
@@ -227,7 +228,7 @@ class ExportRow:
         return get_decorated_methods(cls, categories=export_tweak.categories, attribute="is_export")
 
     @classmethod
-    def _data_generator(cls: Type, data: Iterable[Any]) -> Iterator[Any]:
+    def _data_generator(cls: type, data: Iterable[Any]) -> Iterator[Any]:
         for row_data in data:
             if row_data is None:
                 continue

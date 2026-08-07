@@ -1,7 +1,8 @@
-from typing import Iterable, Any
+from collections.abc import Iterable
+from typing import Any
 
 from snpdb.models import Lab
-from uicore.widgets.radio_other_widget import MultiChoiceFieldWithOther, CheckboxOtherWidget
+from uicore.widgets.radio_other_widget import CheckboxOtherWidget, MultiChoiceFieldWithOther
 
 
 class MultiChoiceLabWidget(CheckboxOtherWidget):

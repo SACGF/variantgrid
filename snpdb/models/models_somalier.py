@@ -2,8 +2,8 @@ import logging
 import os
 import shutil
 import uuid
+from collections.abc import Iterable
 from subprocess import CalledProcessError
-from typing import Iterable
 
 from django.conf import settings
 from django.db import models
@@ -17,8 +17,8 @@ from model_utils.managers import InheritanceManager
 from library.django_utils import get_url_from_media_root_filename
 from library.utils import execute_cmd
 from patients.models_enums import Sex
-from pedigree.ped.export_ped import write_unrelated_ped, write_trio_ped
-from snpdb.models import Sample, VCF, Cohort, Trio, SuperPopulationCode, ImportStatus
+from pedigree.ped.export_ped import write_trio_ped, write_unrelated_ped
+from snpdb.models import VCF, Cohort, ImportStatus, Sample, SuperPopulationCode, Trio
 from snpdb.models.models_enums import ProcessingStatus
 
 

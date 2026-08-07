@@ -1,10 +1,13 @@
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
-from upload.grids import UploadPipelineModifiedVariantsGrid, UploadPipelineSkippedAnnotationGrid, \
-    UploadStepColumns
+from upload.grids import (
+    UploadPipelineModifiedVariantsGrid,
+    UploadPipelineSkippedAnnotationGrid,
+    UploadStepColumns,
+)
 from upload.views import views
 from upload.views.views import view_upload_step_detail
-from upload.views.views_rest import APIFileUploadView, APIUploadStatusView, APIAnnotatedDownloadView
+from upload.views.views_rest import APIAnnotatedDownloadView, APIFileUploadView, APIUploadStatusView
 from variantgrid.perm_path import path
 
 urlpatterns = [

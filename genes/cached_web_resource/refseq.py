@@ -8,12 +8,19 @@ import requests
 from Bio import Entrez, SeqIO
 
 from annotation.models import CachedWebResource, GenePubMedCount
-from genes.models import Gene, GeneSymbol, GeneSymbolAlias, TranscriptVersionSequenceInfoFastaFileImport, Transcript, \
-    TranscriptVersionSequenceInfo, TranscriptVersion
+from genes.models import (
+    Gene,
+    GeneSymbol,
+    GeneSymbolAlias,
+    Transcript,
+    TranscriptVersion,
+    TranscriptVersionSequenceInfo,
+    TranscriptVersionSequenceInfoFastaFileImport,
+)
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import MINUTE_SECS
 from library.django_utils import chunked_queryset
-from library.utils import sha256sum_str, iter_http_lines
+from library.utils import iter_http_lines, sha256sum_str
 
 
 def store_refseq_gene_summary_from_web(cached_web_resource: CachedWebResource):

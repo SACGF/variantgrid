@@ -2,12 +2,17 @@ import logging
 import sys
 
 from django.db import transaction
-from django.db.models.aggregates import Max, Min, Count
+from django.db.models.aggregates import Count, Max, Min
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.models import AnnotationRun, AnnotationRangeLock, Variant, AnnotationStatus
-from annotation.models import VariantAnnotationVersion
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationStatus,
+    Variant,
+    VariantAnnotationVersion,
+)
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
 from library.django_utils import highest_pk
 from snpdb.models.models_genome import GenomeBuild

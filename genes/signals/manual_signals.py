@@ -4,11 +4,20 @@ from django.conf import settings
 
 from annotation.models.models import CachedWebResource
 from genes.models import GeneListCategory
-from genes.tasks.cached_web_resource_tasks import PanelAppEnglandPanelsWebResourceTask, \
-    PanelAppAustraliaPanelsWebResourceTask, GnomADGeneConstraintWebResourceTask, PfamWebResourceTask, \
-    UniProtWebResourceTask, RefSeqGeneSummaryWebResourceTask, HGNCWebResourceTask, LRGRefSeqGeneWebResourceTask, \
-    RefSeqGeneInfoWebResourceTask, RefSeqSequenceInfoWebResourceTask, MANEWebResourceTask, \
-    RefSeqGenePubMedCountWebResourceTask
+from genes.tasks.cached_web_resource_tasks import (
+    GnomADGeneConstraintWebResourceTask,
+    HGNCWebResourceTask,
+    LRGRefSeqGeneWebResourceTask,
+    MANEWebResourceTask,
+    PanelAppAustraliaPanelsWebResourceTask,
+    PanelAppEnglandPanelsWebResourceTask,
+    PfamWebResourceTask,
+    RefSeqGeneInfoWebResourceTask,
+    RefSeqGenePubMedCountWebResourceTask,
+    RefSeqGeneSummaryWebResourceTask,
+    RefSeqSequenceInfoWebResourceTask,
+    UniProtWebResourceTask,
+)
 
 # Remember to connect these handlers up in apps.GenesConfig
 # For some reason this doesn't work as a variable, has to be stored here...

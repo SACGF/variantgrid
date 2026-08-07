@@ -4,8 +4,9 @@
     AllVariantsNode, so both compose the same queries.
 """
 import operator
+from collections.abc import Iterable
 from functools import reduce
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User

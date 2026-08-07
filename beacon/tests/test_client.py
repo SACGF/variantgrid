@@ -1,15 +1,15 @@
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import requests
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from beacon.client import query_node, query_external_beacons_for_variant
+from beacon.client import query_external_beacons_for_variant, query_node
 from beacon.models import BeaconQueryCache
 from beacon.query_targets import eligible_queries, evaluate_queries
-from beacon.variant_mapping import variant_to_beacon_query_params, parse_beacon_response
+from beacon.variant_mapping import parse_beacon_response, variant_to_beacon_query_params
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 

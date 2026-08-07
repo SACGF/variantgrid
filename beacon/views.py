@@ -15,7 +15,7 @@ from django.utils import timezone
 from beacon.client import query_node
 from beacon.models import BeaconQueryCache
 from beacon.query_targets import evaluate_queries
-from snpdb.models import Variant, GenomeBuild
+from snpdb.models import GenomeBuild, Variant
 
 
 def external_beacons(request, variant_id: int, genome_build_name: str):

@@ -4,8 +4,15 @@ from django.test import TestCase
 
 from analysis.models import VariantTag
 from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.models import Allele, AlleleOrigin, GenomeBuild, Tag, VariantAllele, VariantZygosityCount, \
-    VariantZygosityCountCollection
+from snpdb.models import (
+    Allele,
+    AlleleOrigin,
+    GenomeBuild,
+    Tag,
+    VariantAllele,
+    VariantZygosityCount,
+    VariantZygosityCountCollection,
+)
 from snpdb.signals.variant_zygosity_preview_extra import allele_preview_zygosity_extra
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 

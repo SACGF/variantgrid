@@ -9,8 +9,12 @@ from django.conf import settings
 from django.db import transaction
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models import AnnotationVersion, CohortGenotypeVariantAnnotationStats, \
-    CohortGenotypeGeneAnnotationStats, CohortGenotypeClinVarAnnotationStats
+from annotation.models import (
+    AnnotationVersion,
+    CohortGenotypeClinVarAnnotationStats,
+    CohortGenotypeGeneAnnotationStats,
+    CohortGenotypeVariantAnnotationStats,
+)
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import VCFAnnotationStats
 from eventlog.models import create_event
@@ -20,9 +24,19 @@ from library.genomics.vcf_enums import VariantClass, VCFSymbolicAllele
 from library.git import Git
 from library.log_utils import get_traceback
 from library.utils.json_utils import canonical_filter_key
-from snpdb.models import Cohort, CohortGenotypeCollection, CohortGenotypeStats, ImportStatus, VCF, Variant, \
-    SampleStatsCodeVersion, Sequence, VCFLengthStatsCollection, VCFLengthStats
-from snpdb.models import Zygosity
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CohortGenotypeCollection,
+    CohortGenotypeStats,
+    ImportStatus,
+    SampleStatsCodeVersion,
+    Sequence,
+    Variant,
+    VCFLengthStats,
+    VCFLengthStatsCollection,
+    Zygosity,
+)
 
 
 @celery.shared_task

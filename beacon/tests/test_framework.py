@@ -1,7 +1,7 @@
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from beacon.schema import OBSERVATIONS_DATASET_ID, CLASSIFICATIONS_DATASET_ID
+from beacon.schema import CLASSIFICATIONS_DATASET_ID, OBSERVATIONS_DATASET_ID
 
 
 @override_settings(BEACON_ENABLED=True)

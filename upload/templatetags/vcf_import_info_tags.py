@@ -1,7 +1,7 @@
 from django.template import Library
 
 from snpdb.models import VCF
-from upload.models import UploadedVCF, SimpleVCFImportInfo
+from upload.models import SimpleVCFImportInfo, UploadedVCF
 
 register = Library()
 

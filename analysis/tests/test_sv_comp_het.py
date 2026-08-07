@@ -14,8 +14,11 @@ from analysis.models.nodes.sources.trio_node import CompHet
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import AnnotationRun, VariantGeneOverlap
 from annotation.models.models import VariantAnnotationVersion, VariantTranscriptAnnotation
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version, _create_fake_gene_version, \
-    _insert_transcript_data
+from annotation.tests.test_data_fake_genes import (
+    _create_fake_gene_version,
+    _insert_transcript_data,
+    create_fake_transcript_version,
+)
 from genes.models_enums import AnnotationConsortium
 from library.utils import sha256sum_str
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant

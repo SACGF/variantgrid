@@ -17,20 +17,35 @@ from django.test.utils import override_settings
 from django.utils import timezone
 
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
-from annotation.models import AnnotationRangeLock, AnnotationRun, AnnotationVersion, VariantAnnotationVersion
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    VariantAnnotationVersion,
+)
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.signals.annotation_run_cleanup import remove_annotation_run_output
 from annotation.signals.manual_signals import annotation_run_complete_signal
 from annotation.tasks import annotation_scheduler_task
-from annotation.tasks.annotate_variants import _cleanup_reclaimed_run_files, annotate_variants, \
-    annotation_run_retry, conservation_sidecar_filename, get_annotated_filename, get_annotsv_dir, \
-    get_annotsv_tsv_filename, import_annotation_run
-from annotation.tasks.annotation_scheduler_task import count_annotation_run, dispatch_annotation_runs, \
-    has_free_disk_for_annotation
+from annotation.tasks.annotate_variants import (
+    _cleanup_reclaimed_run_files,
+    annotate_variants,
+    annotation_run_retry,
+    conservation_sidecar_filename,
+    get_annotated_filename,
+    get_annotsv_dir,
+    get_annotsv_tsv_filename,
+    import_annotation_run,
+)
+from annotation.tasks.annotation_scheduler_task import (
+    count_annotation_run,
+    dispatch_annotation_runs,
+    has_free_disk_for_annotation,
+)
 from genes.models_enums import AnnotationConsortium
+from library.utils.file_utils import DiskUsage
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
-from library.utils.file_utils import DiskUsage
 
 STANDARD = VariantAnnotationPipelineType.STANDARD
 

@@ -7,10 +7,12 @@ from django.db.models.deletion import SET_NULL
 
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.sources._stats_cache import (
-    get_cached_label_count_for_cohort, get_handler_for_node, UNCACHEABLE,
+    UNCACHEABLE,
+    get_cached_label_count_for_cohort,
+    get_handler_for_node,
 )
 from patients.models_enums import Zygosity
-from pedigree.models import Pedigree, PedigreeInheritance, CohortSamplePedFileRecord
+from pedigree.models import CohortSamplePedFileRecord, Pedigree, PedigreeInheritance
 
 
 class PedigreeNode(AbstractCohortBasedNode):

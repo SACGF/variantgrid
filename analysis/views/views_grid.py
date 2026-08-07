@@ -4,7 +4,7 @@ from urllib.parse import urlencode
 
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.cache import cache
-from django.http.response import StreamingHttpResponse, HttpResponseRedirect
+from django.http.response import HttpResponseRedirect, StreamingHttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -14,14 +14,17 @@ from django.views.decorators.vary import vary_on_cookie
 from analysis import grids
 from analysis.grid_export import node_grid_get_export_iterator
 from analysis.models import AnalysisNode
-from analysis.tasks.analysis_grid_export_tasks import export_cohort_to_downloadable_file, \
-    export_sample_to_downloadable_file, get_grid_downloadable_file_params_hash
+from analysis.tasks.analysis_grid_export_tasks import (
+    export_cohort_to_downloadable_file,
+    export_sample_to_downloadable_file,
+    get_grid_downloadable_file_params_hash,
+)
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from library.constants import WEEK_SECS
-from library.django_utils.major_operation import major_operation, TooManyMajorOperationsError
+from library.django_utils.major_operation import TooManyMajorOperationsError, major_operation
 from library.utils.hash_utils import sha256sum_str
-from snpdb.models import Sample, Cohort, CachedGeneratedFile
+from snpdb.models import CachedGeneratedFile, Cohort, Sample
 from snpdb.models.models_variant import Variant
 
 _NODE_GRID_ALLOWED_PARAMS = {
@@ -47,7 +50,7 @@ def _add_allowed_node_grid_params(url: str, params: dict) -> str:
         if key in _NODE_GRID_ALLOWED_PARAMS:
             cleaned_params[key] = value
         else:
-            logging.warning(f"Node redirect had disallowed GET param: %s", key)
+            logging.warning("Node redirect had disallowed GET param: %s", key)
     return f"{url}?" + urlencode(cleaned_params)
 
 

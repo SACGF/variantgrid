@@ -1,8 +1,17 @@
 import vcf
 
 from library.utils import sha256sum_str
-from snpdb.models import Locus, Variant, Sequence, GenomeBuild, Allele, VariantAllele, AlleleOrigin, \
-    AlleleConversionTool, VariantCoordinate
+from snpdb.models import (
+    Allele,
+    AlleleConversionTool,
+    AlleleOrigin,
+    GenomeBuild,
+    Locus,
+    Sequence,
+    Variant,
+    VariantAllele,
+    VariantCoordinate,
+)
 
 
 def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build: GenomeBuild) -> Variant:

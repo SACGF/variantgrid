@@ -3,8 +3,12 @@ import logging
 from django.core.management.base import BaseCommand
 
 from annotation.annotation_versions import get_or_create_variant_annotation_version_from_current_vep
-from annotation.models import VariantAnnotationVersion, AnnotationVersion, GeneAnnotationVersion, \
-    InvalidAnnotationVersionError
+from annotation.models import (
+    AnnotationVersion,
+    GeneAnnotationVersion,
+    InvalidAnnotationVersionError,
+    VariantAnnotationVersion,
+)
 from snpdb.models.models_genome import GenomeBuild
 
 INSTALL_RELEASE_COMMAND = "python3 manage.py import_cdot_gene_annotation_release --genome-build="

@@ -1,8 +1,11 @@
 import os
 
 from variantgrid.settings.components.secret_settings import get_secret
-from variantgrid.settings.components.settings_paths import ANNOTATION_BASE_DIR, VARIANTGRID_REPO_REFERENCE_DIR, \
-    PRIVATE_DATA_ROOT
+from variantgrid.settings.components.settings_paths import (
+    ANNOTATION_BASE_DIR,
+    PRIVATE_DATA_ROOT,
+    VARIANTGRID_REPO_REFERENCE_DIR,
+)
 
 # GeneAnnotation is only in analyses, as an optimisation to stpre e.g. per-gene ontology records.
 ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = True

@@ -28,8 +28,11 @@ import shutil
 
 from django.conf import settings
 
-from annotation.tasks.annotate_variants import conservation_sidecar_filename, get_annotsv_dir, \
-    get_run_output_paths
+from annotation.tasks.annotate_variants import (
+    conservation_sidecar_filename,
+    get_annotsv_dir,
+    get_run_output_paths,
+)
 
 
 def get_all_run_output_paths(annotation_run) -> list[str]:

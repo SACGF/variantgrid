@@ -1,7 +1,7 @@
 import csv
 import io
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 from django.db.models import OrderBy
 from django.db.models.expressions import RawSQL
@@ -9,14 +9,25 @@ from django.http import HttpRequest, HttpResponse
 from django.http.response import HttpResponseBase
 
 from classification.enums import EvidenceKeyValueType
-from classification.models import EvidenceKey, Classification, EvidenceKeyMap, ClassificationModification
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    EvidenceKey,
+    EvidenceKeyMap,
+)
 from classification.views.classification_export_utils import KeyValueFormatter, UsedKeyTracker
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
 from classification.views.exports.classification_export_utils import CitationCounter
 from library.utils import delimited_row
-
 
 # WARNING: REDCap export ignores the since parameter
 # WARNING: REDCap export ignores variant warnings

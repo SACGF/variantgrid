@@ -6,23 +6,23 @@ failures indicate real bugs in the production code.
 No DB needed for most tests (pure Python / mock-based).
 """
 import types
+
 from django.test import TestCase
 
+from genes.gene_matching import tokenize_gene_symbols
 from genes.hgvs.hgvs import (
     CHGVS,
     PHGVS,
     CHGVSDiff,
     chgvs_diff_description,
 )
-from genes.gene_matching import tokenize_gene_symbols
+from genes.models import TranscriptVersion
 from genes.transcripts_utils import (
     get_refseq_type,
-    looks_like_transcript,
     looks_like_hgvs_prefix,
+    looks_like_transcript,
     transcript_is_lrg,
 )
-from genes.models import TranscriptVersion
-
 
 # ---------------------------------------------------------------------------
 # Helpers

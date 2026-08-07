@@ -1,8 +1,9 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import List, Optional, Iterable
+from typing import Optional
 
-from classification.models import Classification, ClinicalContextRecalcTrigger, ClinicalContext
+from classification.models import Classification, ClinicalContext, ClinicalContextRecalcTrigger
 from library.utils import first
 
 
@@ -25,7 +26,7 @@ class DirtyClinicalContext:
         for dc in dirty_contexts:
             by_clinical_contexts[dc.clinical_context].append(dc)
 
-        flattened_dc: List[DirtyClinicalContext] = []
+        flattened_dc: list[DirtyClinicalContext] = []
         for dcc_list in by_clinical_contexts.values():
             if len(dcc_list) == 1:
                 flattened_dc.append(dcc_list[0])
@@ -55,7 +56,7 @@ def _assign_new_cc_reason(classification: Classification) -> Optional[ClinicalCo
 
 def _update_clinical_context(
         classification: Classification,
-        force_recalc_text: Optional[str] = None) -> List[DirtyClinicalContext]:
+        force_recalc_text: Optional[str] = None) -> list[DirtyClinicalContext]:
     """
     :param classification: The classification to check the clinical context for
     :param force_recalc_text: If this has a value, and the classification is assigned to an allele, it's
@@ -74,7 +75,7 @@ def _update_clinical_context(
             existing_clinical_context.recalc_and_save(cause=force_recalc_text, cause_code=ClinicalContextRecalcTrigger.SUBMISSION)
         return []
 
-    contexts_to_recalculate: List[ClinicalContext] = []
+    contexts_to_recalculate: list[ClinicalContext] = []
 
     if existing_clinical_context:
         # since we're changing the clinical context, we're going to need to call recalc on the old one after
@@ -126,7 +127,7 @@ def update_clinical_contexts(
         classifications: Iterable[Classification],
         force_recalc_text: Optional[str] = None):
 
-    all_dcs: List[DirtyClinicalContext] = []
+    all_dcs: list[DirtyClinicalContext] = []
     for classification in classifications:
         all_dcs += _update_clinical_context(classification, force_recalc_text)
 

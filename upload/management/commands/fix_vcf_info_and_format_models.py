@@ -11,7 +11,7 @@ from django.db.models.query_utils import Q
 from library.genomics.vcf_utils import cyvcf2_header_types
 from library.utils.file_utils import mk_path
 from snpdb.models import VCF
-from upload.vcf.vcf_import import create_vcf_info, create_vcf_format
+from upload.vcf.vcf_import import create_vcf_format, create_vcf_info
 
 
 class Command(BaseCommand):

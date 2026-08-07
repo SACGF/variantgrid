@@ -4,11 +4,20 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django.dispatch import receiver
 
-from classification.models import DiscordanceReportTriage, ClinVarExportBatch, ClinVarExportBatchStatus
+from classification.models import (
+    ClinVarExportBatch,
+    ClinVarExportBatchStatus,
+    DiscordanceReportTriage,
+)
 from eventlog.models import Event, ViewEvent
 from library.guardian_utils import bot_group
-from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckRecentActivity, \
-    health_check_overall_stats_signal, HealthCheckTotalAmount
+from library.health_check import (
+    HealthCheckRecentActivity,
+    HealthCheckRequest,
+    HealthCheckTotalAmount,
+    health_check_overall_stats_signal,
+    health_check_signal,
+)
 from snpdb.models import UserPreview
 
 

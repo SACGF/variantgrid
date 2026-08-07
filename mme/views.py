@@ -1,21 +1,21 @@
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http import HttpRequest, Http404
-from django.shortcuts import render, get_object_or_404, redirect
+from django.http import Http404, HttpRequest
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from classification.enums.classification_enums import ShareLevel, ClinicalSignificance
+from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
 from classification.models.classification import Classification, ClassificationModification
 from mme.disclaimers import connected_nodes, effective_disclaimer, node_disclaimer
 from mme.metrics import get_metrics
-from mme.models import MMESubmission, MMESubmissionStatus, MMEMatchResult, MMEInboundMatch
+from mme.models import MMEInboundMatch, MMEMatchResult, MMESubmission, MMESubmissionStatus
 from mme.serializers.patient_profile import (
-    mme_eligible_classifications,
+    build_patient_profile,
     classification_genomic_feature,
     classification_ontology_slots,
-    build_patient_profile,
+    mme_eligible_classifications,
 )
 from mme.tasks import submit_mme_submission_task
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder

@@ -2,8 +2,8 @@ from django.test import TestCase, override_settings
 
 from mme.contact import (
     lab_mme_contact,
-    settings_mme_contact,
     mme_contact_for_classification,
+    settings_mme_contact,
 )
 from mme.tests.fakes import FakeClassification, FakeLab, FakeOrganization
 

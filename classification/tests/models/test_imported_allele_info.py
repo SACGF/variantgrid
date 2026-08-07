@@ -1,7 +1,10 @@
 from django.test import TestCase
 
 from classification.models import ImportedAlleleInfo
-from classification.models.classification_variant_info_models import ImportedAlleleInfoStatus, ResolvedVariantInfo
+from classification.models.classification_variant_info_models import (
+    ImportedAlleleInfoStatus,
+    ResolvedVariantInfo,
+)
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
 
 

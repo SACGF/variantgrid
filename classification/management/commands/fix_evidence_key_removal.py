@@ -27,7 +27,7 @@ def remove_evidence_key(key: str):
         if fixed_records % 10 == 0:
             print(f"Fixed {fixed_records}")
 
-    print(f"Complete")
+    print("Complete")
 
 
 class Command(BaseCommand):

@@ -1,7 +1,7 @@
 from typing import Any
 
 from genes.hgvs import HGVSException
-from snpdb.models import Variant, GenomeBuild
+from snpdb.models import GenomeBuild, Variant
 
 
 def variant_link_info(variant: Variant, genome_build: GenomeBuild) -> dict[str, Any]:

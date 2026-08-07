@@ -1,7 +1,11 @@
 from rest_framework import serializers
 
 from genes.serializers import GeneListSerializer, GeneSymbolSerializer
-from pathtests.models import PathologyTestVersion, PathologyTest, PathologyTestGeneModificationRequest
+from pathtests.models import (
+    PathologyTest,
+    PathologyTestGeneModificationRequest,
+    PathologyTestVersion,
+)
 from snpdb.serializers import UserSerializer
 
 

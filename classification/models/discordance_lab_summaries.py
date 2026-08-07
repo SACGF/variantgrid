@@ -4,8 +4,15 @@ from functools import cached_property
 from typing import Optional
 
 from classification.enums import SpecialEKeys
-from classification.models import ClassificationLabSummary, DiscordanceReport, ClassificationLabSummaryEntry, \
-    classification_flag_types, ClassificationFlagTypes, DiscordanceReportClassification, DiscordanceReportTriage
+from classification.models import (
+    ClassificationFlagTypes,
+    ClassificationLabSummary,
+    ClassificationLabSummaryEntry,
+    DiscordanceReport,
+    DiscordanceReportClassification,
+    DiscordanceReportTriage,
+    classification_flag_types,
+)
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 
@@ -18,7 +25,9 @@ class DiscordanceLabSummary(ClassificationLabSummary):
     @cached_property
     def embedded(self):
         if triage := self.triage:
-            from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
+            from classification.views.discordance_report_triage_view import (
+                DiscordanceReportTriageView,
+            )
             return DiscordanceReportTriageView.lazy_render(triage)
 
     def _with_triage(self, triage: Optional[DiscordanceReportTriage]) -> 'DiscordanceLabSummary':
@@ -67,12 +76,12 @@ class DiscordanceLabSummary(ClassificationLabSummary):
                 pending=pending
             )].append(drc)
 
-        dlses: list[DiscordanceLabSummary] = list(sorted([DiscordanceLabSummary(
+        dlses: list[DiscordanceLabSummary] = sorted([DiscordanceLabSummary(
             group=group,
             is_internal=group.lab in perspective.labs_if_not_admin,
             count=len(drcs),
             drcs=drcs
-        ) for group, drcs in group_counts.items()]))
+        ) for group, drcs in group_counts.items()])
 
         triage_by_lab: dict[Lab, DiscordanceReportTriage] = {}
         for triage in discordance_report.discordancereporttriage_set.select_related('lab').all():

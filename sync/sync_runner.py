@@ -1,9 +1,10 @@
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Callable
+from typing import Optional
 
 from django.db.models import QuerySet
 

@@ -13,7 +13,7 @@ from typing import Optional
 
 from beacon.variant_mapping import variant_to_beacon_query_params
 from library.genomics.vcf_enums import VCFSymbolicAllele
-from snpdb.models import Variant, GenomeBuild
+from snpdb.models import GenomeBuild, Variant
 
 
 class BeaconQueryTarget(ABC):

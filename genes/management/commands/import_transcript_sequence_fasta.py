@@ -25,7 +25,7 @@ class Command(BaseCommand):
         filename = options['fasta']
         annotation_consortium = {ac.label: ac for ac in AnnotationConsortium}[options['annotation_consortium']]
 
-        handle = gzip.open(filename, "rt") if filename.endswith(".gz") else open(filename, "rt")
+        handle = gzip.open(filename, "rt") if filename.endswith(".gz") else open(filename)
         with handle:
             num_records = store_transcript_sequence_info_fasta(handle, filename, annotation_consortium)
         print(f"Loaded {num_records} TranscriptVersionSequenceInfo records from {filename}")

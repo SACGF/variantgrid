@@ -10,19 +10,28 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count, \
-    merge_pending_range_locks
+from annotation.annotation_versions import (
+    get_annotation_range_lock_and_unannotated_count,
+    merge_pending_range_locks,
+)
 from annotation.celery_utils import annotation_worker_slots
-from annotation.models import AnnotationRun, AnnotationStatus, VariantAnnotationPipelineType, \
-    VariantAnnotationVersion
-from annotation.models.models import AnnotationVersion, AnnotationRangeLock
+from annotation.models import (
+    AnnotationRun,
+    AnnotationStatus,
+    VariantAnnotationPipelineType,
+    VariantAnnotationVersion,
+)
+from annotation.models.models import AnnotationRangeLock, AnnotationVersion
 from annotation.signals.manual_signals import annotation_run_discarded_signal
-from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run, \
-    get_annotated_filename
+from annotation.tasks.annotate_variants import (
+    annotate_variants,
+    get_annotated_filename,
+    import_annotation_run,
+)
 from library.constants import HOUR_SECS, MINUTE_SECS
 from library.log_utils import log_traceback, report_message
 from library.utils.file_utils import DiskUsage, get_disk_usage_for_directory
-from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF, Variant, JobsControl
+from snpdb.models import VCF, GenomeBuild, ImportStatus, JobsControl, Sample, Variant
 
 # #1646: max count_annotation_run tasks the dispatcher kicks per cycle, so creating a new annotation
 # version (thousands of runs at once) doesn't burst the count queue - the rest drain over later cycles.

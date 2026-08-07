@@ -3,8 +3,8 @@ from typing import Optional
 
 from classification.autopopulate_evidence_keys.evidence_from_variant import AutopopulateData
 from classification.enums import SpecialEKeys
-from patients.models_enums import Zygosity, Sex
-from snpdb.models import Sample, Specimen, SampleGenotype
+from patients.models_enums import Sex, Zygosity
+from snpdb.models import Sample, SampleGenotype, Specimen
 from snpdb.models.models_variant import Variant
 
 

@@ -1,7 +1,7 @@
 from django.db.models import QuerySet
 
 from classification.enums import EvidenceKeyValueType
-from classification.models import EvidenceKey, Classification, ClassificationModification
+from classification.models import Classification, ClassificationModification, EvidenceKey
 
 
 class EvidenceKeyToUnit:

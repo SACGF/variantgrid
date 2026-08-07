@@ -8,7 +8,6 @@ from django.contrib.auth.models import User
 
 from library.utils import text_utils
 
-
 ###
 # Uptime Check is similar to health check but
 # The results is to be displayed to a public web page, so it needs to not show sensitive information

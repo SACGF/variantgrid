@@ -12,15 +12,15 @@ Ideally, this could have been done via Django FilteredRelation - but that doesn'
 
 import operator
 from functools import reduce
-from typing import TypeVar, Optional
+from typing import Optional, TypeVar
 
-from django.db.models import QuerySet, Model
+from django.db.models import Model, QuerySet
 from django.db.models.query_utils import Q
 
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from snpdb.archive import DataArchivedError
-from snpdb.models import Variant, GenomeBuild
+from snpdb.models import GenomeBuild, Variant
 
 
 def pipeline_type_variant_q(pipeline_type: VariantAnnotationPipelineType) -> Q:

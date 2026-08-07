@@ -3,13 +3,18 @@ from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
 from library.utils import sha256sum_str
-from snpdb.models import Sequence, GenomeBuild
+from snpdb.models import GenomeBuild, Sequence
 from snpdb.models.models_enums import ImportSource
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from upload.models import (
-    FileUpload, UploadPipeline, UploadStep, UploadedFileTypes,
-    SimpleVCFImportInfo, ModifiedImportedVariants, ModifiedImportedVariant,
+    FileUpload,
+    ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
+    ModifiedImportedVariants,
+    SimpleVCFImportInfo,
+    UploadedFileTypes,
+    UploadPipeline,
+    UploadStep,
 )
 
 

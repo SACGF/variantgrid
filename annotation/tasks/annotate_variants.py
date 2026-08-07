@@ -14,23 +14,31 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.annotsv_annotation import run_annotsv, annotsv_check_command_line_version_match, \
-    get_annotsv_tsv_filename
+from annotation.annotsv_annotation import (
+    annotsv_check_command_line_version_match,
+    get_annotsv_tsv_filename,
+    run_annotsv,
+)
 from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
-from annotation.signals.manual_signals import annotation_run_complete_signal, \
-    annotation_run_discarded_signal
-from annotation.sv_conservation import score_sv_vcf, get_sv_conservation_tracks, \
-    write_conservation_sidecar, conservation_sidecar_filename
+from annotation.signals.manual_signals import (
+    annotation_run_complete_signal,
+    annotation_run_discarded_signal,
+)
+from annotation.sv_conservation import (
+    conservation_sidecar_filename,
+    get_sv_conservation_tracks,
+    score_sv_vcf,
+    write_conservation_sidecar,
+)
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_command, vep_check_command_line_version_match
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
-from library.log_utils import get_traceback, report_message, log_traceback
+from library.log_utils import get_traceback, log_traceback, report_message
 from library.utils import execute_cmd
-from library.utils.file_utils import name_from_filename, mk_path_for_file
-from snpdb.variants_to_vcf import write_contig_sorted_values_to_vcf_file, VARIANT_GRID_INFO_DICT
-
+from library.utils.file_utils import mk_path_for_file, name_from_filename
+from snpdb.variants_to_vcf import VARIANT_GRID_INFO_DICT, write_contig_sorted_values_to_vcf_file
 
 # #2667: kick the single-authority dispatcher by name to avoid importing annotation_scheduler_task
 # (which imports this module). Mirror of analysis _trigger_rescheduling (#346).
@@ -646,7 +654,7 @@ def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_
     if vcf_filename.endswith(".gz"):
         f = gzip.open(vcf_filename, "wt", compresslevel=6)
     else:
-        f = open(vcf_filename, "wt")
+        f = open(vcf_filename, "w")
     with f:
         return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=info_dict,
                                                       use_accession=use_accession)

@@ -2,11 +2,18 @@ from collections import defaultdict
 
 from django.conf import settings
 
-from classification.enums import ShareLevel, EvidenceKeyValueType, SpecialEKeys
-from classification.models import Classification, ClassificationJsonParams, ClassificationModification, EvidenceKeyMap, \
-    ImportedAlleleInfo
-from classification.models.classification_json_definitions import ClassificationJsonAlleleDict, \
-    ClassificationJsonAlleleRevolvedDict
+from classification.enums import EvidenceKeyValueType, ShareLevel, SpecialEKeys
+from classification.models import (
+    Classification,
+    ClassificationJsonParams,
+    ClassificationModification,
+    EvidenceKeyMap,
+    ImportedAlleleInfo,
+)
+from classification.models.classification_json_definitions import (
+    ClassificationJsonAlleleDict,
+    ClassificationJsonAlleleRevolvedDict,
+)
 from genes.hgvs import CHGVS
 from library.django_utils import get_url_from_view_path
 

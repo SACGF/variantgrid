@@ -1,8 +1,10 @@
 from django.test import TestCase
 
 from annotation.models import AnnotationVersion, VariantAnnotationVersion
-from classification.autopopulate_evidence_keys.evidence_from_variant import _get_gnomad_sv_overlap_note, \
-    _gnomad_sv_sourced_columns
+from classification.autopopulate_evidence_keys.evidence_from_variant import (
+    _get_gnomad_sv_overlap_note,
+    _gnomad_sv_sourced_columns,
+)
 
 
 class GnomADSVOverlapNoteTest(TestCase):

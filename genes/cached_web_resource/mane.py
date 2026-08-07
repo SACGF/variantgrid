@@ -6,7 +6,7 @@ import pandas as pd
 import requests
 
 from annotation.models import CachedWebResource
-from genes.models import TranscriptVersion, GeneSymbol, GeneVersion, MANE, HGNC
+from genes.models import HGNC, MANE, GeneSymbol, GeneVersion, TranscriptVersion
 from genes.models_enums import MANEStatus
 from library.constants import MINUTE_SECS
 from snpdb.models import GenomeBuild

@@ -1,9 +1,8 @@
-from variantgrid.celery import app
-
 from mme.client import submit
 from mme.metrics import get_metrics
 from mme.models import MMESubmission
 from mme.notifications import notify_depositors
+from variantgrid.celery import app
 
 
 @app.task(queue='web_workers')

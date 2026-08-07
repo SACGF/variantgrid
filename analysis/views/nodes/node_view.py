@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 from django.views.generic.edit import UpdateView
 
 from analysis.exceptions import NonFatalNodeError
-from analysis.forms import GraphTypeChoiceForm, ColumnSummaryForm, SNPMatrixForm
+from analysis.forms import ColumnSummaryForm, GraphTypeChoiceForm, SNPMatrixForm
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisTemplateType
 from analysis.models.nodes.node_utils import update_analysis

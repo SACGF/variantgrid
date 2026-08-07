@@ -7,15 +7,17 @@ from typing import Optional
 from classification.enums import ShareLevel
 from classification.views.exports import ClassificationExportFormatterMVL
 from classification.views.exports.classification_export_filter import ClassificationFilter
-from classification.views.exports.classification_export_formatter_mvl import FormatDetailsMVL, \
-    FormatDetailsMVLFileFormat
+from classification.views.exports.classification_export_formatter_mvl import (
+    FormatDetailsMVL,
+    FormatDetailsMVLFileFormat,
+)
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder, report_exc_info
 from library.utils import ExportRow, export_column
-from snpdb.models import Lab, GenomeBuild, Organization
+from snpdb.models import GenomeBuild, Lab, Organization
 from sync.models import SyncRun
-from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
+from sync.sync_runner import SyncRunInstance, SyncRunner, register_sync_runner
 
 
 class AlissaImportOption(str, Enum):
@@ -217,5 +219,5 @@ class AlissaUploadSyncer(SyncRunner):
                     )
                 )
 
-        sorted_data = list(sorted(all_issues, key=lambda x: (x.severity, x.c_hgvs)))
+        sorted_data = sorted(all_issues, key=lambda x: (x.severity, x.c_hgvs))
         return AlissaRowInfoExport.streaming_csv(data=sorted_data, filename=f"sync_run_{sync_run.pk}")

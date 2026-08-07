@@ -2,15 +2,15 @@
 Regression tests for confirmed bugs in the annotation app, plus sentinels for
 known fragile code paths that are likely to break when related code changes.
 """
+from types import SimpleNamespace
+
 from django.test import TestCase
 
 from annotation.models.models import ClinVar, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.models_enums import ClinVarReviewStatus
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from classification.enums import AlleleOriginBucket
-from library.genomics import overlap_fraction, Range
-from types import SimpleNamespace
-
+from library.genomics import Range, overlap_fraction
 
 # ---------------------------------------------------------------------------
 # Bug: amino_acid_3_to_1 did not convert stop codon "Ter" → "*"

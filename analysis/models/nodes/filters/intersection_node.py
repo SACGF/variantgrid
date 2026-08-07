@@ -2,8 +2,8 @@ import logging
 import operator
 import os
 import subprocess
-from io import TextIOWrapper
 from functools import cached_property, reduce
+from io import TextIOWrapper
 from typing import Optional
 
 from auditlog.registry import auditlog
@@ -17,8 +17,14 @@ from django.dispatch.dispatcher import receiver
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from genes.hgvs import get_hgvs_variant
-from snpdb.models import GenomicIntervalsCollection, GenomicInterval, Sample, \
-    VCFBedIntersection, Cohort, VariantCollection
+from snpdb.models import (
+    Cohort,
+    GenomicInterval,
+    GenomicIntervalsCollection,
+    Sample,
+    VariantCollection,
+    VCFBedIntersection,
+)
 from snpdb.models.models_genome import Contig
 from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically

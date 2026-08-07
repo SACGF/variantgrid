@@ -4,8 +4,14 @@ from collections import Counter, defaultdict
 from celery.app.task import Task
 
 from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
-from annotation.models.models_gene_counts import GeneCountType, GeneValue, CohortGeneCounts, \
-    SampleAnnotationVersionVariantSource, GeneValueCountCollection, GeneValueCount
+from annotation.models.models_gene_counts import (
+    CohortGeneCounts,
+    GeneCountType,
+    GeneValue,
+    GeneValueCount,
+    GeneValueCountCollection,
+    SampleAnnotationVersionVariantSource,
+)
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from classification.models import Classification
 from eventlog.models import create_event

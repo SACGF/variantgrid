@@ -2,7 +2,14 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
-from genes.models import GeneSymbol, PanelAppServer, PanelAppPanel, PanelAppPanelLocalCacheGeneSymbol, HGNC, HGNCImport
+from genes.models import (
+    HGNC,
+    GeneSymbol,
+    HGNCImport,
+    PanelAppPanel,
+    PanelAppPanelLocalCacheGeneSymbol,
+    PanelAppServer,
+)
 from genes.models_enums import HGNCStatus
 from genes.panel_app import get_panel_app_local_cache, get_panel_app_panel_as_gene_list_json
 

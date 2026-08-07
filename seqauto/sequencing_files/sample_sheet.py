@@ -8,8 +8,12 @@ import logging
 import os
 
 from library.log_utils import log_traceback
-from seqauto.models import JointCalledVCF, IlluminaFlowcellQC, SampleFromSequencingSample, \
-    get_samples_by_sequencing_sample
+from seqauto.models import (
+    IlluminaFlowcellQC,
+    JointCalledVCF,
+    SampleFromSequencingSample,
+    get_samples_by_sequencing_sample,
+)
 from seqauto.signals.signals_list import sequencing_run_current_sample_sheet_changed_signal
 from upload.models import BackendVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing

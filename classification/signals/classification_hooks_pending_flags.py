@@ -1,7 +1,11 @@
 from django.dispatch import receiver
 
-from classification.models import classification_flag_types, Classification, ClassificationSummaryCalculator
-from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
+from classification.models import (
+    Classification,
+    ClassificationSummaryCalculator,
+    classification_flag_types,
+)
+from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
 
 
 @receiver(flag_comment_action, sender=Flag)

@@ -23,7 +23,12 @@ from django.test.utils import override_settings
 from django.utils import timezone
 
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
-from annotation.models import AnnotationRangeLock, AnnotationRun, AnnotationVersion, VariantAnnotationVersion
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    VariantAnnotationVersion,
+)
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.tasks import annotate_variants as annotate_variants_module
 from annotation.tasks.annotate_variants import (
@@ -156,7 +161,7 @@ class AnnotationRunUnwindOwnershipTest(AnnotationRunLeaseTestCase):
         loser_annotated = os.path.join(
             self._dump_dir, f"{name_from_filename(loser_dump)}.vep_annotated_{self.grch37.name}.vcf.gz")
         for path in (loser_dump, loser_annotated):
-            with open(path, "wt") as f:
+            with open(path, "w") as f:
                 f.write("partial VEP output\n")
 
         def _reclaimed_then_killed(annotation_run, **kwargs):

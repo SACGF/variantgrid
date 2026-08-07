@@ -7,7 +7,11 @@ from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.matching import _our_patient_object
 from mme.serializers.patient_profile import build_patient_profile
 from mme.tests.fakes import (
-    FakeClassification, FakeSubmission, FakeLab, FakeOrganization, make_term,
+    FakeClassification,
+    FakeLab,
+    FakeOrganization,
+    FakeSubmission,
+    make_term,
 )
 from ontology.models import OntologyService
 

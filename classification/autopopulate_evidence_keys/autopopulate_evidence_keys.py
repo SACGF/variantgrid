@@ -10,15 +10,20 @@ from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 
 from annotation.models.models import AnnotationVersion
-from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import \
-    get_evidence_fields_for_sample_and_patient
-from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant, \
-    AutopopulateData
-from classification.enums import SubmissionSource, SpecialEKeys
-from classification.models import EvidenceKey, Classification, ClassificationImport
-from classification.tasks.classification_import_process_variants_task import liftover_classification_import
+from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import (
+    get_evidence_fields_for_sample_and_patient,
+)
+from classification.autopopulate_evidence_keys.evidence_from_variant import (
+    AutopopulateData,
+    get_evidence_fields_for_variant,
+)
+from classification.enums import SpecialEKeys, SubmissionSource
+from classification.models import Classification, ClassificationImport, EvidenceKey
+from classification.tasks.classification_import_process_variants_task import (
+    liftover_classification_import,
+)
 from library.git import Git
-from snpdb.models import GenomeBuild, ImportSource, Sample, Variant, Lab
+from snpdb.models import GenomeBuild, ImportSource, Lab, Sample, Variant
 
 
 def create_classification_for_sample_and_variant_objects(

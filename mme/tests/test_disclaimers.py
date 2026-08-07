@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -6,7 +6,12 @@ from django.urls import reverse
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.django_utils.unittest_utils import URLTestCase
 from mme.client import submit
-from mme.disclaimers import node_disclaimer, effective_disclaimer, connected_nodes, mme_response_body
+from mme.disclaimers import (
+    connected_nodes,
+    effective_disclaimer,
+    mme_response_body,
+    node_disclaimer,
+)
 from mme.models import MMESubmission
 from mme.tests.fakes import make_classification
 

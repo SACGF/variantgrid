@@ -2,7 +2,8 @@ import functools
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any, Optional
 
 import Levenshtein
 from cache_memoize import cache_memoize
@@ -10,7 +11,7 @@ from cache_memoize import cache_memoize
 from library.constants import DAY_SECS
 from library.log_utils import log_traceback
 from library.utils import is_not_none
-from ontology.models import OntologyTerm, OntologyService, OntologyTermRelation, OntologyVersion
+from ontology.models import OntologyService, OntologyTerm, OntologyTermRelation, OntologyVersion
 
 # There can be more than 1 term matching a string, eg OMIM has 1849 terms that match 2 or more IDs
 CodePK = Any

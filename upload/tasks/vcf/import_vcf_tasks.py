@@ -12,13 +12,18 @@ from library.log_utils import log_traceback
 from library.utils import import_class
 from snpdb.bcftools_liftover import bcftools_liftover
 from snpdb.models import AlleleLiftover
-from snpdb.models.models_enums import ProcessingStatus, AlleleConversionTool
-from upload.models import UploadStep, UploadedVCF, ModifiedImportedVariants
+from snpdb.models.models_enums import AlleleConversionTool, ProcessingStatus
+from upload.models import ModifiedImportedVariants, UploadedVCF, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_vcf_file
-from upload.vcf.bulk_allele_linking_vcf_processor import BulkAlleleLinkingVCFProcessor, FailedLiftoverVCFProcessor
+from upload.vcf.bulk_allele_linking_vcf_processor import (
+    BulkAlleleLinkingVCFProcessor,
+    FailedLiftoverVCFProcessor,
+)
 from upload.vcf.bulk_clingen_allele_vcf_processor import BulkClinGenAlleleVCFProcessor
-from upload.vcf.bulk_manual_variant_entry_linking_vcf_processor import BulkManualVariantEntryLinkingVCFProcessor
+from upload.vcf.bulk_manual_variant_entry_linking_vcf_processor import (
+    BulkManualVariantEntryLinkingVCFProcessor,
+)
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 from upload.vcf.vcf_import import import_vcf_file
 from upload.vcf.vcf_preprocess import preprocess_vcf

@@ -1,9 +1,22 @@
 from rest_framework import serializers
 
-from genes.serializers import SampleGeneListSerializer, GeneCoverageCollectionSerializer
-from seqauto.models import IlluminaFlowcellQC, QCGeneList, QC, QCGeneCoverage, QCExecSummary, FastQC, SingleSampleVCF
-from seqauto.serializers.sequencing_serializers import SampleSheetLookupSerializer, FastqSerializer, \
-    BamFilePathSerializer, SingleSampleVCFPathSerializer, SequencingSampleLookupSerializer
+from genes.serializers import GeneCoverageCollectionSerializer, SampleGeneListSerializer
+from seqauto.models import (
+    QC,
+    FastQC,
+    IlluminaFlowcellQC,
+    QCExecSummary,
+    QCGeneCoverage,
+    QCGeneList,
+    SingleSampleVCF,
+)
+from seqauto.serializers.sequencing_serializers import (
+    BamFilePathSerializer,
+    FastqSerializer,
+    SampleSheetLookupSerializer,
+    SequencingSampleLookupSerializer,
+    SingleSampleVCFPathSerializer,
+)
 
 
 class FastQCSerializer(serializers.ModelSerializer):

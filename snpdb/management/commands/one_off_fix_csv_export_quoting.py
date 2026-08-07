@@ -18,7 +18,7 @@ class Command(BaseCommand):
                             quoting=csv.QUOTE_NONE)
 
         logging.info("Fixing in file: %s", fixed_csv_filename)
-        with open(fixed_csv_filename, "wt") as out_csv_file:
+        with open(fixed_csv_filename, 'w') as out_csv_file:
             writer = csv.writer(out_csv_file, dialect='excel', quoting=csv.QUOTE_MINIMAL)
             for r in reader:
                 writer.writerow(r)

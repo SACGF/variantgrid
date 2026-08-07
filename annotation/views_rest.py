@@ -2,13 +2,16 @@ from django.http.response import Http404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from annotation.models.models import VariantAnnotationVersion, ManualVariantEntryCollection
-from annotation.serializers import VariantAnnotationSerializer, ManualVariantEntryCollectionSerializer
+from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
+from annotation.serializers import (
+    ManualVariantEntryCollectionSerializer,
+    VariantAnnotationSerializer,
+)
 from snpdb.models import GenomeBuild, Variant
 
 

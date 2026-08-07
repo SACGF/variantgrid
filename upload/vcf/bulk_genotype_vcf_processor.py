@@ -15,17 +15,24 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_enums import VCFConstant
 from library.git import Git
-from library.utils import double_quote, json_default_converter, AsciiValue
+from library.utils import AsciiValue, double_quote, json_default_converter
 from library.utils.database_utils import postgres_arrays
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
 from snpdb.models.models_enums import ProcessingStatus
-from upload.models import UploadPipeline, PipelineFailedJobTerminateEarlyException, \
-    VCFImporter, UploadStep, UploadStepTaskType, VCFPipelineStage, ModifiedImportedVariantOperation
+from upload.models import (
+    ModifiedImportedVariantOperation,
+    PipelineFailedJobTerminateEarlyException,
+    UploadPipeline,
+    UploadStep,
+    UploadStepTaskType,
+    VCFImporter,
+    VCFPipelineStage,
+)
 from upload.tasks.vcf.import_sql_copy_task import ImportCohortGenotypeSQLCopyTask
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
-from upload.vcf.sql_copy_files import write_sql_copy_csv, COHORT_GENOTYPE_HEADER
+from upload.vcf.sql_copy_files import COHORT_GENOTYPE_HEADER, write_sql_copy_csv
 
 
 class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
@@ -317,7 +324,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         else:
             # TODO: In Python3.10 we can replace this check with zip(strict=True)
             if len(self.locus_cohort_genotypes) != len(self.locus_allele_depths):
-                raise ValueError(f"Locus cohort genotype and locus Allele depths not equal!")
+                raise ValueError("Locus cohort genotype and locus Allele depths not equal!")
 
             # Calculate ourselves across locus
             for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths):

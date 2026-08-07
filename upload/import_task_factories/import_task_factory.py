@@ -1,7 +1,7 @@
 import importlib
 import inspect
 from abc import ABC, abstractmethod
-from typing import Iterable, Type
+from collections.abc import Iterable
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -19,7 +19,7 @@ class ImportTaskFactory(ABC):
         pass
 
     @abstractmethod
-    def get_data_classes(self) -> Iterable[Type[models.Model]]:
+    def get_data_classes(self) -> Iterable[type[models.Model]]:
         """ e.g. return UploadedVCF, UploadedGeneList """
         pass
 

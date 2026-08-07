@@ -7,8 +7,15 @@ from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from patients.models_enums import Zygosity
-from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild, Sample, VariantZygosityCount, \
-    VariantZygosityCountCollection, VCFFilter
+from snpdb.models import (
+    CohortGenotype,
+    CohortGenotypeCollection,
+    GenomeBuild,
+    Sample,
+    VariantZygosityCount,
+    VariantZygosityCountCollection,
+    VCFFilter,
+)
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 from snpdb.variant_sample_information import VariantSampleGenotypes

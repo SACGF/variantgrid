@@ -1,11 +1,9 @@
 from django.contrib.auth.models import User
 from django.dispatch.dispatcher import receiver
 
-from classification.enums.classification_enums import SpecialEKeys, \
-    ValidationCode
+from classification.enums.classification_enums import SpecialEKeys, ValidationCode
 from classification.models import PatchMeta
-from classification.models.classification import Classification, \
-    classification_validation_signal
+from classification.models.classification import Classification, classification_validation_signal
 from classification.models.classification_utils import ValidationMerger
 
 

@@ -40,7 +40,7 @@ def model_to_insert_sql(model_list: list[Model], db_table: str = None, ignore_fi
 
     compiler = q.get_compiler('default')
     # Normally, execute sets this, but we don't want to call execute
-    setattr(compiler, 'return_id', False)
+    compiler.return_id = False
     raw_statements = compiler.as_sql()
     model._meta.db_table = old_table  # Put table name back
 

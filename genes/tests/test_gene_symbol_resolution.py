@@ -4,9 +4,9 @@ Tests for VG's gene-symbol -> transcript resolution path (the code VG owns):
  - _get_search_hgvs_gene_symbol_transcripts() candidate selection across MANE/all settings,
    which drives VG's provider + override through cdot end-to-end.
 """
+from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
-from django.db import connection
 
 from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
 from genes.hgvs import HGVSMatcher

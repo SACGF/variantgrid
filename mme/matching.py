@@ -14,9 +14,9 @@ from django.conf import settings
 from mme.contact import mme_contact_for_classification
 from mme.genes import gene_match_keys
 from mme.serializers.patient_profile import (
-    mme_eligible_classifications,
-    classification_ontology_slots,
     classification_genomic_feature,
+    classification_ontology_slots,
+    mme_eligible_classifications,
 )
 
 # v1 iterates our PUBLIC classifications in Python; cap the scan so an inbound query

@@ -1,8 +1,13 @@
 from django.contrib.auth.models import User
 from django.test.testcases import TestCase
 
-from genes.gene_matching import GeneSymbolMatcher, HGNCMatcher, MAX_GENE_SYMBOL_LENGTH, tokenize_gene_symbols
-from genes.models import GeneList, GeneSymbol, GeneSymbolAlias, HGNC, HGNCImport
+from genes.gene_matching import (
+    MAX_GENE_SYMBOL_LENGTH,
+    GeneSymbolMatcher,
+    HGNCMatcher,
+    tokenize_gene_symbols,
+)
+from genes.models import HGNC, GeneList, GeneSymbol, GeneSymbolAlias, HGNCImport
 from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 
 

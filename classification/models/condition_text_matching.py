@@ -1,16 +1,17 @@
 import json
 import operator
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property, reduce
 from operator import attrgetter
-from typing import Optional, Iterable
+from typing import Optional
 
 import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
-from django.db.models import CASCADE, QuerySet, SET_NULL, Q
+from django.db.models import CASCADE, SET_NULL, Q, QuerySet
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
@@ -18,19 +19,40 @@ from guardian.shortcuts import assign_perm
 from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
-from classification.enums import SpecialEKeys, ShareLevel
-from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
-    flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolved, classification_flag_types
+from classification.enums import ShareLevel, SpecialEKeys
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    ConditionResolved,
+    ConditionResolvedDict,
+    EvidenceKeyMap,
+    classification_flag_types,
+    classification_post_publish_signal,
+    flag_types,
+)
 from classification.models.condition_text_search import condition_text_search
-from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
+from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from library.utils import ArrayLength, get_timer
-from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
-from ontology.ontology_matching import normalize_condition_text, \
-    OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS, NON_PR_TERMS
+from ontology.models import (
+    OntologyRelation,
+    OntologyService,
+    OntologySnake,
+    OntologyTerm,
+    OntologyTermRelation,
+)
+from ontology.ontology_matching import (
+    IGNORE_TERMS,
+    NON_PR_TERMS,
+    OPRPHAN_OMIM_TERMS,
+    PREFIX_SKIP_TERMS,
+    SearchText,
+    normalize_condition_text,
+    pretty_set,
+)
 from snpdb.models import Lab
 
 condition_set_signal = django.dispatch.Signal()  # args: "classification", "resolved_condition"

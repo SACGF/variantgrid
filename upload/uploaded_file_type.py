@@ -5,7 +5,7 @@ from typing import Optional
 
 from library.utils.file_utils import get_extension_without_gzip
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import UploadedFileTypes, UploadData
+from upload.models import UploadData, UploadedFileTypes
 from upload.tasks.vcf.genotype_vcf_tasks import reload_vcf_task
 from upload.upload_processing import process_upload_pipeline
 

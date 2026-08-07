@@ -5,8 +5,12 @@ import numpy as np
 from django.conf import settings
 
 from analysis.models.enums import MinimisationResultType
-from analysis.models.mutational_signatures import MutationalSignatureCalculator, \
-    MutationalSignature, MutationalSignatureMinimisationResult, MutationalSignatureMutationCount
+from analysis.models.mutational_signatures import (
+    MutationalSignature,
+    MutationalSignatureCalculator,
+    MutationalSignatureMinimisationResult,
+    MutationalSignatureMutationCount,
+)
 from library.genomics.calculate_cancer_mutation_signatures import MutationSignatures, invert_muttype
 from snpdb.models import Sample, Variant
 from snpdb.models.models_enums import ImportStatus

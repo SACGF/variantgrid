@@ -4,13 +4,15 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from classification.enums import SpecialEKeys, SubmissionSource
-from classification.enums.classification_enums import ShareLevel, ClinicalSignificance
+from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
 from classification.models.classification import Classification, ClassificationModification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.client import submit
 from mme.models import MMESubmission, MMESubmissionStatus
 from mme.serializers.patient_profile import (
-    mme_eligible_classifications, assert_mme_eligible, build_patient_profile,
+    assert_mme_eligible,
+    build_patient_profile,
+    mme_eligible_classifications,
 )
 
 NODES = {"testnode": {"base_url": "https://node.test", "token": "secret-token", "api_version": "1.1"}}

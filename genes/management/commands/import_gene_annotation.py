@@ -6,7 +6,15 @@ from django.core.management.base import BaseCommand
 from django.db.models.functions import Upper
 
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
-from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript, HGNC
+from genes.models import (
+    HGNC,
+    Gene,
+    GeneAnnotationImport,
+    GeneSymbol,
+    GeneVersion,
+    Transcript,
+    TranscriptVersion,
+)
 from genes.models_enums import AnnotationConsortium
 from library.utils import invert_dict
 from library.utils.file_utils import open_handle_gzip

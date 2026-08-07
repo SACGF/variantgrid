@@ -13,8 +13,8 @@ A requires entry is resolved as:
   - a name in GATES    -> that registered gate
   - anything else      -> UnknownGate (always blocks, so a typo is noticed rather than skipped)
 """
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from django.conf import settings
 

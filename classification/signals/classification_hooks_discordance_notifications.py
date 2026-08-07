@@ -8,10 +8,17 @@ from django.urls import reverse
 from django.utils import timezone
 
 from classification.enums import SpecialEKeys
-from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap, \
-    ClassificationLabSummary
-from classification.models.clinical_context_models import DiscordanceNotification, ClinicalContextChangeData, \
-    ClinicalContextRecalcTrigger
+from classification.models import (
+    ClassificationLabSummary,
+    DiscordanceReport,
+    EvidenceKeyMap,
+    discordance_change_signal,
+)
+from classification.models.clinical_context_models import (
+    ClinicalContextChangeData,
+    ClinicalContextRecalcTrigger,
+    DiscordanceNotification,
+)
 from classification.models.discordance_models_utils import DiscordanceReportRowData
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
@@ -68,7 +75,7 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
                 dr_id = outstanding_notification.discordance_report_id
                 unique_ids.add(dr_id)
 
-            dr_ids: list[int] = list(sorted(unique_ids))
+            dr_ids: list[int] = sorted(unique_ids)
             drs: list[DiscordanceReport] = DiscordanceReport.objects.filter(pk__in=dr_ids).order_by('pk')
 
             dr_count = len(dr_ids)
@@ -111,7 +118,7 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
 
                 lab_notification.add_field(label="Discordance Detected On", value=report_summary.date_detected_str)
 
-                c_hgvs_str = "\n".join((str(chgvs) for chgvs in report_summary.c_hgvses))
+                c_hgvs_str = "\n".join(str(chgvs) for chgvs in report_summary.c_hgvses)
                 lab_notification.add_field(label="c.HGVS", value=c_hgvs_str)
 
                 sig_lab: ClassificationLabSummary

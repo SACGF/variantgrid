@@ -10,18 +10,18 @@ from typing import Optional
 
 from django.conf import settings
 
-from beacon.schema import OBSERVATIONS_DATASET_ID, CLASSIFICATIONS_DATASET_ID
+from beacon.schema import CLASSIFICATIONS_DATASET_ID, OBSERVATIONS_DATASET_ID
 from beacon.variant_mapping import variant_to_g_variant
 from classification.enums.classification_enums import SpecialEKeys
 from classification.models.evidence_key import EvidenceKeyMap
 from mme.contact import lab_contact
 from mme.serializers.patient_profile import (
-    mme_eligible_classifications,
     classification_ontology_slots,
+    mme_eligible_classifications,
 )
 from patients.models import Patient
-from snpdb.models import Variant, GenomeBuild, Allele
-from snpdb.models.models_zygosity_counts import VariantZygosityCountCollection, VariantZygosityCount
+from snpdb.models import Allele, GenomeBuild, Variant
+from snpdb.models.models_zygosity_counts import VariantZygosityCount, VariantZygosityCountCollection
 from snpdb.variant_sample_information import VariantZygosityCounts
 
 

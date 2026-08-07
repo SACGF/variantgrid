@@ -5,7 +5,12 @@ from django.contrib.auth.models import User
 from guardian.shortcuts import assign_perm
 
 from library.genomics.bed_file import BedFileReader
-from snpdb.models import GenomicIntervalsCollection, ImportStatus, GenomicIntervalsCategory, GenomeBuild
+from snpdb.models import (
+    GenomeBuild,
+    GenomicIntervalsCategory,
+    GenomicIntervalsCollection,
+    ImportStatus,
+)
 from upload.models import UploadedBed
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app

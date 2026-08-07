@@ -1,13 +1,17 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable, Any
+from typing import Any
 
 from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
 from classification.views.classification_export_utils import TranscriptGroup, VariantWithChgvs
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+)
 from genes.hgvs import CHGVS
 from library.log_utils import report_message
 

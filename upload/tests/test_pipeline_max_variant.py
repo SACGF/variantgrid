@@ -12,18 +12,40 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import pipeline_type_variant_q
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
-from annotation.models import AnnotationRangeLock, AnnotationRun, AnnotationVersion, VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
+from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    VariantAnnotationVersion,
+)
+from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from genes.models_enums import AnnotationConsortium
 from library.utils import sha256sum_str
-from snpdb.models import GenomeBuild, Locus, Sequence, Variant, VCF, Cohort, CohortSample, Sample, \
-    CohortGenotype, CohortGenotypeCollection, ImportStatus
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CohortGenotype,
+    CohortGenotypeCollection,
+    CohortSample,
+    GenomeBuild,
+    ImportStatus,
+    Locus,
+    Sample,
+    Sequence,
+    Variant,
+)
 from snpdb.models.models_enums import ImportSource
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
-from upload.models import FileUpload, UploadedVCF, UploadedVCFPipelineMaxVariant, UploadPipeline, \
-    UploadedFileTypes, ProcessingStatus
+from upload.models import (
+    FileUpload,
+    ProcessingStatus,
+    UploadedFileTypes,
+    UploadedVCF,
+    UploadedVCFPipelineMaxVariant,
+    UploadPipeline,
+)
 from upload.vcf.vcf_import import update_uploaded_vcf_max_variant
 
 STANDARD = VariantAnnotationPipelineType.STANDARD

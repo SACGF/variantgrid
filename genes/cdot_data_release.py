@@ -15,9 +15,10 @@ import gzip
 import logging
 import re
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Optional, Iterator
+from typing import Optional
 
 import requests
 from cdot.data_release import get_latest_data_release

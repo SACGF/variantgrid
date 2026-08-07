@@ -8,9 +8,13 @@ from django.db.models import Q, Subquery
 from django.utils.timezone import now
 
 from classification.enums import SubmissionSource
-from classification.models import ClassificationModification, Classification, classification_flag_types
-from flags.models import FlagComment, Flag, FlagResolution
-from library.utils import IterableTransformer, IterableStitcher
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    classification_flag_types,
+)
+from flags.models import Flag, FlagComment, FlagResolution
+from library.utils import IterableStitcher, IterableTransformer
 from snpdb.models import Allele, Lab
 
 

@@ -9,11 +9,12 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants
-from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
-    create_classification_for_sample_and_variant_objects
+from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
+    create_classification_for_sample_and_variant_objects,
+)
 from library.django_utils.unittest_utils import URLTestCase, production_query_count
-from snpdb.models import GenomeBuild, Variant, Country, Lab, Organization
+from snpdb.models import Country, GenomeBuild, Lab, Organization, Variant
 
 
 class ClassificationDatatableScalingTest(URLTestCase):

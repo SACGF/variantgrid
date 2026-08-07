@@ -18,6 +18,7 @@ from rest_framework.renderers import JSONRenderer
 
 from manual.models import Deployment
 
+
 def _media_type(version: str) -> str:
     return f"application/vnd.ga4gh.matchmaker.v{version}+json"
 

@@ -1,9 +1,10 @@
 import json
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import cached_property
-from typing import Union, Any, Mapping, Optional
+from typing import Any, Optional, Union
 
 
 def canonical_filter_key(filter_dict: Optional[dict]) -> Optional[str]:
@@ -176,7 +177,7 @@ class JsonDiffs:
 
     @staticmethod
     def differences(obj1: JsonDataType, obj2: JsonDataType) -> 'JsonDiffs':
-        diffs: list['JsonDiff'] = []
+        diffs: list[JsonDiff] = []
         JsonDiffs._differences(obj1, obj2, [], diffs)
         diffs.sort()
         return JsonDiffs(diffs)

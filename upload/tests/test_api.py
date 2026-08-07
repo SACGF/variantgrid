@@ -15,7 +15,7 @@ from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import CachedGeneratedFile, GenomeBuild
 from snpdb.models.models_enums import ImportSource, ProcessingStatus
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
-from upload.models import FileUpload, UploadedVCF, UploadPipeline, UploadedFileTypes
+from upload.models import FileUpload, UploadedFileTypes, UploadedVCF, UploadPipeline
 
 COHORT_EXPORT_TEMPLATE_NAME = "Cohort VCF Export auto analysis"  # settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT
 

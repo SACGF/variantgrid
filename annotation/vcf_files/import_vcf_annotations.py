@@ -7,7 +7,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.models import AnnotationRun, re, VEPSkippedReason
+from annotation.models import AnnotationRun, VEPSkippedReason, re
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.vcf_files.bulk_annotsv_tsv_inserter import import_annotsv_tsv
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
@@ -22,6 +22,7 @@ def import_vcf_annotations(
         vep_version_check: bool = True,
         delete_temp_files: Optional[bool] = None):
     import cyvcf2
+
     from library.genomics.vcf_utils import cyvcf2_header_types
 
     if delete_temp_files is None:

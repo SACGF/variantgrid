@@ -1,15 +1,14 @@
 import json
 import logging
 import urllib
-from typing import Optional, Callable
+from collections.abc import Callable
+from typing import Optional
 
 import requests
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.template.loader import render_to_string
 from requests import Response
 
-from email_manager.models import EmailLog
 from library.constants import MINUTE_SECS
 from library.email import Email
 from library.oauth import ServerAuth

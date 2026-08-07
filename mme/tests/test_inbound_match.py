@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 from classification.enums.classification_enums import ClinicalSignificance
 from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.matching import find_matches
-from mme.models import MMEInboundQuery, MMEInboundMatch
+from mme.models import MMEInboundMatch, MMEInboundQuery
 from mme.tests.fakes import FakeClassification, make_classification
 
 TOKEN = "inbound-secret"

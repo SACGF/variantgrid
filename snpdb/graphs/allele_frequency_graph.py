@@ -6,7 +6,7 @@ from django.db.models import Q
 
 from library.utils import sha256sum_str
 from snpdb.graphs.graphcache import CacheableGraph
-from snpdb.models import Sample, Variant, CohortGenotype
+from snpdb.models import CohortGenotype, Sample, Variant
 
 
 class AlleleFrequencyHistogramGraph(CacheableGraph):

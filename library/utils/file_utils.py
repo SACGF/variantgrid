@@ -2,9 +2,10 @@ import gzip
 import logging
 import os
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 
 def open_file_or_filename(f, mode='r', **kwargs):

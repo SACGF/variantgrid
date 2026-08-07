@@ -3,7 +3,7 @@ from subprocess import check_output
 from typing import Optional
 
 from library.log_utils import log_traceback
-from snpdb.models import SomalierConfig, GenomeBuild
+from snpdb.models import GenomeBuild, SomalierConfig
 
 
 def verify_somalier_config() -> Optional[str]:
@@ -31,7 +31,7 @@ def check_somalier() -> dict:
         try:
             somalier_cfg.get_sites_vcf(genome_build)
             valid = True
-        except Exception as e:
+        except Exception:
             valid = False
         somalier_data[f"somalier_sites_vcf_{genome_build.name}"] = {
             "valid": valid,

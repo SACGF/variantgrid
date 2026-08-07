@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 from library.common_dir import get_common_prefix_dirs
-from snpdb.models import Sample, UserDataPrefix, SampleFilePath
+from snpdb.models import Sample, SampleFilePath, UserDataPrefix
 
 
 def get_bam_paths_and_user_data_paths(user, bam_file_paths):

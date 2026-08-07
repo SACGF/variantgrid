@@ -2,12 +2,13 @@ from django.contrib.auth.models import User
 from django.dispatch.dispatcher import receiver
 
 from classification.models import ClinicalContext
-from classification.models.classification_import_run import ClassificationImportRun, \
-    classification_imports_complete_signal
+from classification.models.classification_import_run import (
+    ClassificationImportRun,
+    classification_imports_complete_signal,
+)
 from classification.models.clinical_context_models import ClinicalContextRecalcTrigger
 from classification.signals import send_prepared_discordance_notifications
-from flags.models.models import FlagCollection, \
-    flag_collection_extra_info_signal, FlagInfos
+from flags.models.models import FlagCollection, FlagInfos, flag_collection_extra_info_signal
 
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)

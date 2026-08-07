@@ -5,28 +5,48 @@ from dataclasses import dataclass
 from functools import cached_property, lru_cache
 from typing import Optional, Union
 
-from cdot.hgvs import clean_hgvs as cdot_clean_hgvs, rank_transcript_versions, \
-    rank_transcripts_for_gene, VersionStrategy, warning_messages
+from cdot.hgvs import (
+    VersionStrategy,
+    rank_transcript_versions,
+    rank_transcripts_for_gene,
+    warning_messages,
+)
+from cdot.hgvs import clean_hgvs as cdot_clean_hgvs
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
 from django.utils.timezone import now
 
-from genes.hgvs import HGVSVariant, CHGVS, HGVSImplementationException, HGVSNomenclatureException
+from genes.hgvs import CHGVS, HGVSImplementationException, HGVSNomenclatureException, HGVSVariant
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
-from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele, HGVSConverter, HgvsOriginallyNormalized
+from genes.hgvs.hgvs_converter import (
+    HGVSConverter,
+    HGVSConverterType,
+    HgvsMatchRefAllele,
+    HgvsOriginallyNormalized,
+)
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
-from genes.models import TranscriptVersion, Transcript, LRGRefSeqGene, BadTranscript, \
-    NoTranscript, TranscriptParts
+from genes.models import (
+    BadTranscript,
+    LRGRefSeqGene,
+    NoTranscript,
+    Transcript,
+    TranscriptParts,
+    TranscriptVersion,
+)
 from genes.transcripts_utils import transcript_is_lrg
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
-from snpdb.clingen_allele import get_clingen_allele_from_hgvs, \
-    ClinGenAlleleServerException, ClinGenAlleleAPIException, get_clingen_allele_for_variant_coordinate, \
-    clingen_check_variant_length
-from snpdb.models import Variant, ClinGenAllele
+from snpdb.clingen_allele import (
+    ClinGenAlleleAPIException,
+    ClinGenAlleleServerException,
+    clingen_check_variant_length,
+    get_clingen_allele_for_variant_coordinate,
+    get_clingen_allele_from_hgvs,
+)
+from snpdb.models import ClinGenAllele, Variant
 from snpdb.models.models_enums import AssemblyMoleculeType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate

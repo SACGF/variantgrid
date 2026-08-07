@@ -15,11 +15,11 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from classification.enums import ShareLevel
-from classification.models import ClassificationModification, Classification
-from genes.models import Transcript, Gene, TranscriptVersion
+from classification.models import Classification, ClassificationModification
+from genes.models import Gene, Transcript, TranscriptVersion
 from library.constants import MINUTE_SECS
 from library.utils import segment
-from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection
+from snpdb.models import Cohort, CohortGenotypeCollection, VariantZygosityCountCollection
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 
@@ -105,7 +105,7 @@ class HotspotGraphView(TemplateView):
                 raise ValueError("At least one of 'gene_symbol', 'gene_id' or 'transcript_id' must be in url kwargs")
 
             # Sort by canonical then choose higher version if any ties
-            tv_list = list(sorted(tv_qs, key=lambda tv: (tv.canonical_score, tv.version), reverse=True))
+            tv_list = sorted(tv_qs, key=lambda tv: (tv.canonical_score, tv.version), reverse=True)
             if tv_list:
                 # First, we look for canonical in our gene annotation release
                 canonical, non_canonical = segment(tv_list, filter_func=lambda tv: tv.canonical_score)

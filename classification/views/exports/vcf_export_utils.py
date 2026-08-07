@@ -1,13 +1,14 @@
 import inspect
 import urllib
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional, Iterable, TypeAlias, Protocol
+from typing import Any, Optional, Protocol, TypeAlias
 
 from django.conf import settings
 
-from library.utils import ExportTweak, local_date_str_no_dash, get_decorated_methods
-from snpdb.models import Variant, GenomeBuild, GenomeBuildContig, Contig, Allele
+from library.utils import ExportTweak, get_decorated_methods, local_date_str_no_dash
+from snpdb.models import Allele, Contig, GenomeBuild, GenomeBuildContig, Variant
 
 """
 This works much like ExportRow @export_column but for VCFs

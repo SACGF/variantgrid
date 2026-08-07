@@ -2,7 +2,11 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
-from genes.cdot_data_release import parse_release_asset_url, get_latest_release_assets, find_latest_release_asset
+from genes.cdot_data_release import (
+    find_latest_release_asset,
+    get_latest_release_assets,
+    parse_release_asset_url,
+)
 
 DOWNLOAD_URL = "https://github.com/SACGF/cdot/releases/download/data_v0.2.33"
 

@@ -3,8 +3,7 @@ from collections import Counter, defaultdict
 from functools import reduce
 
 import pandas as pd
-from django.db import connection
-from django.db import models
+from django.db import connection, models
 from django.db.models.deletion import CASCADE
 from django.utils.timesince import timesince
 from model_utils.managers import InheritanceManager

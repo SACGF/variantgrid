@@ -1,12 +1,19 @@
 import itertools
 import uuid
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from typing import Optional, Union, Iterable, Iterator
+from typing import Optional, Union
 
 from django.template import Library
 
-from ontology.models import OntologyTerm, OntologyTermRelation, GeneDiseaseClassification, OntologyService, \
-    OntologySnake, PanelAppClassification
+from ontology.models import (
+    GeneDiseaseClassification,
+    OntologyService,
+    OntologySnake,
+    OntologyTerm,
+    OntologyTermRelation,
+    PanelAppClassification,
+)
 from ontology.ontology_matching import OntologyMatch
 
 register = Library()

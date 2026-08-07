@@ -6,11 +6,22 @@ from typing import Optional
 from django.conf import settings
 from django.http import HttpRequest
 
-from classification.models import ClassificationJsonParams, ClassificationModification, EvidenceKeyMap
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData, \
-    DiscordanceReportStatus
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.models import (
+    ClassificationJsonParams,
+    ClassificationModification,
+    EvidenceKeyMap,
+)
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+    DiscordanceReportStatus,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,7 @@
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
-from seqauto.models import Library, Sequencer, Aligner, Assay, VariantCaller, VariantCallingPipeline
+from seqauto.models import Aligner, Assay, Library, Sequencer, VariantCaller, VariantCallingPipeline
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 

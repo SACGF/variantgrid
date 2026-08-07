@@ -1,17 +1,23 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import IntEnum, Enum
+from enum import Enum, IntEnum
 from functools import total_ordering
-from typing import Any, Optional, Union, Iterable
+from typing import Any, Optional, Union
 
 import pandas as pd
 from django.http import StreamingHttpResponse
 
-from classification.enums import ShareLevel, AlleleOriginBucket
-from classification.models import classification_flag_types, Classification, ClassificationModification, EvidenceKeyMap
+from classification.enums import AlleleOriginBucket, ShareLevel
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    EvidenceKeyMap,
+    classification_flag_types,
+)
 from flags.models import FlagComment
-from library.utils import delimited_row, IterableStitcher, IterableTransformer
+from library.utils import IterableStitcher, IterableTransformer, delimited_row
 from snpdb.models import Lab
 
 

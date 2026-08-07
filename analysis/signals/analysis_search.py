@@ -1,7 +1,7 @@
 import re
 
 from analysis.models import Analysis
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 ANALYSIS_PREFIX_PATTERN = re.compile(r"^an(\d+)$")
 

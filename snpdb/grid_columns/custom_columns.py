@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.contrib.postgres.aggregates import StringAgg
-from django.db.models import Q, OuterRef, Subquery, Max, Value
+from django.db.models import Max, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Coalesce
 
 from analysis.models import VariantTag
@@ -58,7 +58,7 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
                                     "clinvar__highest_pathogenicity",
                                     "clinvar__clinical_significance"]
     for field in ID_FORMATTER_REQUIRED_FIELDS:
-        if not field in fields:
+        if field not in fields:
             fields.append(field)
             ov = override.get(field, {})
             ov["hidden"] = True

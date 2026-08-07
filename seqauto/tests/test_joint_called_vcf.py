@@ -16,8 +16,8 @@ from seqauto.models import (
     SequencingRun,
     SequencingRunCurrentSampleSheet,
     SequencingSample,
-    UnalignedReads,
     SingleSampleVCF,
+    UnalignedReads,
     VariantCaller,
     VCFFromSequencingRun,
 )

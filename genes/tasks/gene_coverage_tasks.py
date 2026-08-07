@@ -7,7 +7,7 @@ from django.db.models.query_utils import Q
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import GeneCoverageCollection, GeneCoverageCanonicalTranscript, TranscriptVersion
+from genes.models import GeneCoverageCanonicalTranscript, GeneCoverageCollection, TranscriptVersion
 from seqauto.models import EnrichmentKit
 from snpdb.models import DataState
 

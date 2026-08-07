@@ -1,8 +1,21 @@
 from rest_framework import serializers
 
-from genes.models import GeneListCategory, GeneList, Gene, Transcript, GeneListGeneSymbol, \
-    GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList, GeneSymbol, TranscriptVersion, GeneVersion, HGNC, \
-    GeneCoverageCollection, GeneCoverageCanonicalTranscript
+from genes.models import (
+    HGNC,
+    ActiveSampleGeneList,
+    Gene,
+    GeneAnnotationRelease,
+    GeneCoverageCanonicalTranscript,
+    GeneCoverageCollection,
+    GeneList,
+    GeneListCategory,
+    GeneListGeneSymbol,
+    GeneSymbol,
+    GeneVersion,
+    SampleGeneList,
+    Transcript,
+    TranscriptVersion,
+)
 from snpdb.models import Company, Contig
 from snpdb.serializers import GenomeBuildSerializer
 

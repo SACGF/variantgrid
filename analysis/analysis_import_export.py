@@ -5,7 +5,13 @@ from typing import Optional
 from django.contrib.auth.models import User
 from django.core.serializers import serialize
 
-from analysis.models import Analysis, GenomeBuild, AnnotationVersion, AnalysisEdge, AnalysisTemplateType
+from analysis.models import (
+    Analysis,
+    AnalysisEdge,
+    AnalysisTemplateType,
+    AnnotationVersion,
+    GenomeBuild,
+)
 from analysis.models.nodes.node_utils import reload_analysis_nodes
 from analysis.serializers import AnalysisNodeSerializer, AnalysisSerializer
 

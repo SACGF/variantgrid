@@ -3,12 +3,16 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 
 from mme.serializers.patient_profile import (
-    classification_ontology_slots,
-    classification_genomic_feature,
     build_patient_profile,
+    classification_genomic_feature,
+    classification_ontology_slots,
 )
 from mme.tests.fakes import (
-    FakeClassification, FakeSubmission, FakeCoordinate, FakeVariant, make_term,
+    FakeClassification,
+    FakeCoordinate,
+    FakeSubmission,
+    FakeVariant,
+    make_term,
 )
 from ontology.models import OntologyService
 

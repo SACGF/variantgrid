@@ -1,7 +1,7 @@
 from typing import Optional
 
 from django.conf import settings
-from django.core.mail import send_mail, get_connection, EmailMultiAlternatives
+from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import models
 from django.urls import reverse
 from model_utils.models import TimeStampedModel

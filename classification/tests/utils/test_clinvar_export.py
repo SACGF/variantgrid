@@ -3,17 +3,28 @@ from unittest import mock
 
 from django.test import TestCase, override_settings
 
-from classification.enums import SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import Classification, ClinVarExport, ClinVarExportBatch, ClinVarExportStatus, \
-    ClinVarExportRequestType, ClinVarExportRequest, ClinVarExportBatchStatus, ImportedAlleleInfo
-from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
+from classification.models import (
+    Classification,
+    ClinVarExport,
+    ClinVarExportBatch,
+    ClinVarExportBatchStatus,
+    ClinVarExportRequest,
+    ClinVarExportRequestType,
+    ClinVarExportStatus,
+    ImportedAlleleInfo,
+)
+from classification.models.classification_variant_info_models import (
+    ImportedAlleleInfoValidation,
+    ResolvedVariantInfo,
+)
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
-from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarResponseOutcome
+from classification.models.clinvar_export_sync import ClinVarResponseOutcome, clinvar_export_sync
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot
 from library.utils import JsonObjType
-from snpdb.models import GenomeBuild, ClinVarKey, GenomeBuildPatchVersion
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant, create_mock_allele
+from snpdb.models import ClinVarKey, GenomeBuild, GenomeBuildPatchVersion
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 
 def mock_send_data(

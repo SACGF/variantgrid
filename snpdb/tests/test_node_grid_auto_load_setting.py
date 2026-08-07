@@ -2,9 +2,13 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from snpdb.models import UserSettings, Lab, Organization, Country
-from snpdb.models.models_user_settings import GlobalSettings, OrganizationUserSettingsOverride, \
-    LabUserSettingsOverride, UserSettingsOverride
+from snpdb.models import Country, Lab, Organization, UserSettings
+from snpdb.models.models_user_settings import (
+    GlobalSettings,
+    LabUserSettingsOverride,
+    OrganizationUserSettingsOverride,
+    UserSettingsOverride,
+)
 
 
 class NodeGridAutoLoadSettingTest(TestCase):

@@ -3,22 +3,25 @@ import re
 from functools import reduce
 from typing import Optional
 
-from django.db.models import QuerySet, Q, Count
+from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from requests import Response
 
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus, Classification, \
-    ClassificationModification
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
+)
 from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
 from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
-from library.django_utils import get_url_from_view_path
-from library.django_utils import require_superuser
-from library.utils import MultiDiff, MultiDiffInput, ExportRow, export_column
+from library.django_utils import get_url_from_view_path, require_superuser
+from library.utils import ExportRow, MultiDiff, MultiDiffInput, export_column
 from library.utils.django_utils import render_ajax_view
 from snpdb.admin_utils import get_admin_url
-from snpdb.models import GenomeBuild, Lab, Allele
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
+from snpdb.models import Allele, GenomeBuild, Lab
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):

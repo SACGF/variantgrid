@@ -8,7 +8,7 @@ from django.db.models.deletion import CASCADE
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from library.jqgrid.jqgrid import JqGrid, format_operation
-from snpdb.models import VariantGridColumn, Variant
+from snpdb.models import Variant, VariantGridColumn
 
 
 # TODO: This node has quite a few redundant operations - e.g. it will filter the queryset

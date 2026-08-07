@@ -12,7 +12,7 @@ from django.utils import timezone
 from library.constants import MINUTE_SECS
 from library.django_utils import get_url_from_view_path
 from library.log_utils import AdminNotificationBuilder
-from mme.models import MMESubmissionStatus, MMEMatchResult
+from mme.models import MMEMatchResult, MMESubmissionStatus
 from mme.notifications import notify_match
 from mme.serializers.patient_profile import build_patient_profile
 

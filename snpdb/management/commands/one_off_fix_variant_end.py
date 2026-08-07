@@ -3,8 +3,8 @@ import os
 import numpy as np
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db.models import OuterRef, Subquery, F
-from django.db.models.functions import Length, Abs
+from django.db.models import F, OuterRef, Subquery
+from django.db.models.functions import Abs, Length
 
 from annotation.models import AnnotationRangeLock
 from library.utils import mk_path

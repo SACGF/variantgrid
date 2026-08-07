@@ -4,7 +4,7 @@ from http import HTTPStatus
 from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.http import JsonResponse, FileResponse, Http404
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -13,14 +13,16 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 
 from analysis.models import AnalysisTemplate
-from analysis.tasks.analysis_grid_export_tasks import export_cohort_to_downloadable_file, \
-    get_grid_downloadable_file_params_hash
+from analysis.tasks.analysis_grid_export_tasks import (
+    export_cohort_to_downloadable_file,
+    get_grid_downloadable_file_params_hash,
+)
 from library.log_utils import report_exc_info
-from snpdb.models import Cohort, CachedGeneratedFile
+from snpdb.models import CachedGeneratedFile, Cohort
 from snpdb.models.models_enums import ImportStatus
 from upload.models import FileUpload
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
-from upload.views.views import handle_file_upload, get_upload_status_dict
+from upload.views.views import get_upload_status_dict, handle_file_upload
 
 
 def _get_file_upload_for_user(user, *, file_upload_id=None, sha256_hash=None) -> FileUpload:

@@ -1,9 +1,14 @@
 from django.db.models import Max
 from django.dispatch import receiver
 
-from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckRecentActivity, \
-    health_check_overall_stats_signal, HealthCheckTotalAmount
-from snpdb.models import VCF, Variant, Sample
+from library.health_check import (
+    HealthCheckRecentActivity,
+    HealthCheckRequest,
+    HealthCheckTotalAmount,
+    health_check_overall_stats_signal,
+    health_check_signal,
+)
+from snpdb.models import VCF, Sample, Variant
 from variantgrid.perm_path import get_visible_url_names
 
 

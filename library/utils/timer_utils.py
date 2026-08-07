@@ -1,4 +1,4 @@
-from dataclasses import field, dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import reduce
 
@@ -47,7 +47,7 @@ class DebugTimer:
         self.start = now
 
     def __str__(self):
-        return "\n".join((str(debug_time) for debug_time in self.times.values()))
+        return "\n".join(str(debug_time) for debug_time in self.times.values())
 
 
 class NullTimer(DebugTimer):

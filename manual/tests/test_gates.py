@@ -9,10 +9,15 @@ from django.core.management import CommandError, call_command
 from django.test import TestCase
 
 from manual import gates
-from manual.models import ManualGateSatisfied, ManualMigrationAttempt, ManualMigrationOutstanding, \
-    ManualMigrationRequired, ManualMigrationTask
+from manual.models import (
+    ManualGateSatisfied,
+    ManualMigrationAttempt,
+    ManualMigrationOutstanding,
+    ManualMigrationRequired,
+    ManualMigrationTask,
+)
 from manual.operations.manual_operations import ManualOperation
-from scripts.migrator.migrator import Migrator, MigrationStatus, ObsoleteSubMigration, run_scheduler
+from scripts.migrator.migrator import MigrationStatus, Migrator, ObsoleteSubMigration, run_scheduler
 
 # Migration module names start with a digit, so they can't be imported with normal import syntax.
 complete_obsolete_tasks = import_module(

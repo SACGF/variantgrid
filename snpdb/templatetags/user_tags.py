@@ -1,7 +1,7 @@
 import datetime
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Union, Any
+from typing import Any, Union
 
 from django import template
 from django.contrib.auth.models import User

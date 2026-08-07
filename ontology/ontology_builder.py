@@ -1,15 +1,16 @@
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import cached_property
-from typing import Optional, TypeVar, Generic, Iterable, Type
+from typing import Generic, Optional, TypeVar
 
 from django.db.models import Model
 from django.utils import timezone
 from model_utils.models import now
 
-from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport, OntologyTermStatus
+from ontology.models import OntologyImport, OntologyTerm, OntologyTermRelation, OntologyTermStatus
 
 
 class OntologyBuilderDataUpToDateException(Exception):
@@ -66,7 +67,7 @@ class CachedObj(Generic[T]):
             self.obj.modified = timezone.now()
 
     @staticmethod
-    def bulk_apply(model: Type[Model], cache: Iterable['CachedObj'], fields: list[str], verbose=False):
+    def bulk_apply(model: type[Model], cache: Iterable['CachedObj'], fields: list[str], verbose=False):
         created = [c.obj for c in cache if c.status == ModifiedStatus.CREATED]
         modified = [c.obj for c in cache if c.status == ModifiedStatus.MODIFIED]
         if verbose:

@@ -1,7 +1,11 @@
 from django.test import TestCase, override_settings
 
-from classification.enums import SubmissionSource, SpecialEKeys
-from classification.models.classification import Classification, ClassificationModification, VCBlobKeys
+from classification.enums import SpecialEKeys, SubmissionSource
+from classification.models.classification import (
+    Classification,
+    ClassificationModification,
+    VCBlobKeys,
+)
 from classification.models.classification_ref import ClassificationRef
 from classification.models.classification_utils import ClassificationJsonParams
 from classification.tests.models.test_utils import ClassificationTestUtils

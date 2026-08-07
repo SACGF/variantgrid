@@ -7,20 +7,30 @@ from typing import Optional
 
 from cache_memoize import cache_memoize
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields import DecimalRangeField
 from django.core.cache import cache
 from django.db import models
 from django.db.models import Max
-from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
+from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils.timezone import make_aware
 from django_extensions.db.models import TimeStampedModel
 
-from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
-    Transcript, GeneSymbol, SampleGeneList, TranscriptVersion, GeneCoverageCanonicalTranscript, ActiveSampleGeneList
+from genes.models import (
+    ActiveSampleGeneList,
+    CustomTextGeneList,
+    GeneCoverageCanonicalTranscript,
+    GeneCoverageCollection,
+    GeneList,
+    GeneListCategory,
+    GeneSymbol,
+    SampleGeneList,
+    Transcript,
+    TranscriptVersion,
+)
 from library.constants import DAY_SECS
 from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
 from library.preview_request import PreviewModelMixin
@@ -28,11 +38,11 @@ from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename
 from patients.models import FakeData, Patient
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
-from seqauto.models.models_enums import DataGeneration, SequencerRead, PairedEnd
-from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
+from seqauto.models.models_enums import DataGeneration, PairedEnd, SequencerRead
+from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequencer
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
-from snpdb.models import VCF, Sample, GenomeBuild, InheritanceManager, Wiki
+from snpdb.models import VCF, GenomeBuild, InheritanceManager, Sample, Wiki
 from snpdb.models.models_enums import ImportStatus
 
 

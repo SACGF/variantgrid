@@ -2,9 +2,19 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
-from pedigree.models import Pedigree, PedFileFamily, PedFile
-from snpdb.models import CohortGenotypeCollection, Trio, Quad, CohortSample, ImportStatus, Sample, VCF, GenomeBuild, \
-    Cohort, VCFFilter
+from pedigree.models import PedFile, PedFileFamily, Pedigree
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CohortGenotypeCollection,
+    CohortSample,
+    GenomeBuild,
+    ImportStatus,
+    Quad,
+    Sample,
+    Trio,
+    VCFFilter,
+)
 
 
 def create_fake_cohort(user: User, genome_build: GenomeBuild) -> Cohort:

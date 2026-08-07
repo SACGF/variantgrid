@@ -4,7 +4,7 @@ from django.template import Library, loader
 from django.urls.base import reverse
 from django.urls.exceptions import NoReverseMatch
 
-from snpdb.models import UserSettings, UserGridConfig
+from snpdb.models import UserGridConfig, UserSettings
 
 register = Library()
 

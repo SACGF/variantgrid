@@ -2,7 +2,13 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from snpdb.models.models_enums import ImportSource
-from upload.models import FileUpload, UploadedVCF, UploadPipeline, UploadedFileTypes, ProcessingStatus
+from upload.models import (
+    FileUpload,
+    ProcessingStatus,
+    UploadedFileTypes,
+    UploadedVCF,
+    UploadPipeline,
+)
 from upload.vcf.vcf_import import create_backend_vcf_links
 
 

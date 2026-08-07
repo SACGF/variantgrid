@@ -9,8 +9,21 @@ from django.views.decorators.vary import vary_on_cookie
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
-from snpdb.models import VCF, Sample, Cohort, CustomColumnsCollection, CustomColumn, Tag, Trio, Quad, \
-    Lab, GenomicIntervalsCollection, GenomeBuild, ImportStatus, Project
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CustomColumn,
+    CustomColumnsCollection,
+    GenomeBuild,
+    GenomicIntervalsCollection,
+    ImportStatus,
+    Lab,
+    Project,
+    Quad,
+    Sample,
+    Tag,
+    Trio,
+)
 from snpdb.models.models_genome import Contig
 
 

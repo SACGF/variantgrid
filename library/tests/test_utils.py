@@ -17,13 +17,13 @@ from library.unit_percent import (
     server_side_format_percent,
 )
 from library.utils.collection_utils import (
-    LimitedCollection,
     IterableStitcher,
+    LimitedCollection,
     batch_iterator,
     flatten_nested_lists,
     group_by_key,
 )
-from library.utils.date_utils import calculate_age, parse_yymm, month_range
+from library.utils.date_utils import calculate_age, month_range, parse_yymm
 from library.utils.file_utils import IteratorFile, file_to_array
 from library.utils.hash_utils import sha256sum_str, string_deterministic_hash
 from library.utils.json_utils import JsonDiffs, make_json_safe_in_place, strip_json
@@ -34,7 +34,6 @@ from library.utils.text_utils import (
     pretty_label,
     split_dict_multi_values,
 )
-
 
 # ---------------------------------------------------------------------------
 # unit_percent.py

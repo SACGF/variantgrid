@@ -5,14 +5,25 @@ from django.db import connection
 from django.test import TestCase
 from django.urls import reverse
 
-from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants
+from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneSymbolAliasSource
 from library.genomics.vcf_enums import VCFSymbolicAllele
-from snpdb.models import AllVariantsFilter, GenomeBuild, Locus, Sequence, Variant, VariantZygosityCountCollection
-from snpdb.variant_filters import VariantType, get_all_variant_types, get_contig_ids_for_gene_symbols, \
-    get_default_all_variants_filters
+from snpdb.models import (
+    AllVariantsFilter,
+    GenomeBuild,
+    Locus,
+    Sequence,
+    Variant,
+    VariantZygosityCountCollection,
+)
+from snpdb.variant_filters import (
+    VariantType,
+    get_all_variant_types,
+    get_contig_ids_for_gene_symbols,
+    get_default_all_variants_filters,
+)
 from variantopedia.grids import AllVariantsGrid
 
 

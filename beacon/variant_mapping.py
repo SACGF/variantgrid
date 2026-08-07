@@ -13,7 +13,7 @@ from typing import Optional
 
 from django.db.models import QuerySet
 
-from snpdb.models import Variant, GenomeBuild
+from snpdb.models import GenomeBuild, Variant
 
 
 class BeaconQueryError(ValueError):

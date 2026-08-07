@@ -8,5 +8,5 @@ class BeaconConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
-        from beacon.signals import beacon_health_check
+        pass
         # pylint: enable=import-outside-toplevel,unused-import

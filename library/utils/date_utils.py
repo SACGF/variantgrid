@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Optional
 
 from dateutil import tz
@@ -76,4 +76,4 @@ def parse_http_header_date(date_str: str):
 
 
 def utc_from_timestamp(ts) -> datetime:
-    return datetime.fromtimestamp(ts, tz=timezone.utc)
+    return datetime.fromtimestamp(ts, tz=UTC)

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from django.test import TestCase
 
@@ -28,5 +28,5 @@ class TestUtils(TestCase):
 
     def test_utc_from_timestamp(self):
         ts = 0
-        expected = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        expected = datetime(1970, 1, 1, tzinfo=UTC)
         self.assertEqual(utc_from_timestamp(ts), expected)

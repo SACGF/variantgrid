@@ -1,24 +1,32 @@
 import operator
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Set, Self, Tuple
+from typing import Optional, Self
 
 import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
-from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet
+from django.db.models import CASCADE, SET_NULL, IntegerChoices, Q, QuerySet, TextChoices
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
 
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
-from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved
-from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
-    ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    ConditionResolved,
+    EvidenceKeyMap,
+    ImportedAlleleInfo,
+)
+from classification.models.evidence_mixin_summary_cache import (
+    ClassificationSummaryCacheDict,
+    ClassificationSummaryCacheDictPathogenicity,
+    ClassificationSummaryCacheDictSomatic,
+)
 from genes.models import GeneSymbol
 from library.utils import strip_json
 from ontology.models import OntologyTerm
@@ -279,7 +287,7 @@ class ClassificationGrouping(TimeStampedModel):
         return reverse('classification_grouping_detail', kwargs={"classification_grouping_id": self.pk})
 
     @staticmethod
-    def _desired_grouping_for_classification(classification: Classification) -> Tuple[Optional['ClassificationGrouping'], bool]:
+    def _desired_grouping_for_classification(classification: Classification) -> tuple[Optional['ClassificationGrouping'], bool]:
         # withdrawn classifications are removed from groupings
         if classification.withdrawn:
             return None, False
@@ -350,7 +358,7 @@ class ClassificationGrouping(TimeStampedModel):
         all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
         all_modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True)
         all_modifications = all_modifications.select_related("classification")
-        return list(sorted(all_modifications, key=lambda mod: mod.curated_date_check))
+        return sorted(all_modifications, key=lambda mod: mod.curated_date_check)
 
     @cached_property
     def allele(self) -> Allele:
@@ -379,8 +387,8 @@ class ClassificationGrouping(TimeStampedModel):
             self.latest_allele_info = best_classification.classification.allele_info
 
             # TODO check for dirty values
-            all_terms: Set[OntologyTerm] = set()
-            all_free_text_conditions: Set[str] = set()
+            all_terms: set[OntologyTerm] = set()
+            all_free_text_conditions: set[str] = set()
 
             # UPDATE CLASSIFICATION / CLINICAL SIGNIFICANCE
             # TODO - CLINICAL SIGNIFICANCE
@@ -424,12 +432,12 @@ class ClassificationGrouping(TimeStampedModel):
             if None in all_zygosities:
                 all_zygosities.remove(None)
 
-            all_zygosities = list(sorted(evidence_map[SpecialEKeys.ZYGOSITY].sort_values(all_zygosities)))
+            all_zygosities = sorted(evidence_map[SpecialEKeys.ZYGOSITY].sort_values(all_zygosities))
             self.zygosity_values = all_zygosities
 
             self.conditions = strip_json(ConditionResolved(
-                terms=list(sorted(all_terms)),
-                plain_text_terms=list(sorted(all_free_text_conditions))
+                terms=sorted(all_terms),
+                plain_text_terms=sorted(all_free_text_conditions)
             ).to_json(include_join=False))
 
             self.classification_count = len(all_modifications)

@@ -1,11 +1,11 @@
 from typing import Optional
 
 from django.conf import settings
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
-from snpdb.models import CohortGenotypeCommonFilterVersion, Variant, Allele, CommonVariantClassified
+from snpdb.models import Allele, CohortGenotypeCommonFilterVersion, CommonVariantClassified, Variant
 
 
 def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersion]:

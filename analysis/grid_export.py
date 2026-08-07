@@ -1,7 +1,8 @@
 import operator
 import re
 from collections import Counter
-from typing import Iterator, Optional
+from collections.abc import Iterator
+from typing import Optional
 
 from analysis.grids import ExportVariantGrid
 from analysis.models import AnalysisNode

@@ -1,6 +1,6 @@
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_SEARCH_REGEX
 from seqauto.models import SequencingRun
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 
 @search_receiver(

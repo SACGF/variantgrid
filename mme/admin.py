@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from mme.models import MMESubmission, MMEMatchResult, MMEInboundQuery, MMEInboundMatch
+from mme.models import MMEInboundMatch, MMEInboundQuery, MMEMatchResult, MMESubmission
 from snpdb.admin_utils import ModelAdminBasics
 
 

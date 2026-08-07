@@ -4,7 +4,7 @@ from collections import defaultdict
 from django.utils.timesince import timesince
 
 from analysis.grids import AnalysesColumns
-from analysis.models import Analysis, Candidate, AnalysisNode
+from analysis.models import Analysis, AnalysisNode, Candidate
 from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import AnnotationVersion

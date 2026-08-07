@@ -1,15 +1,22 @@
+import json
 from enum import Enum, auto
 from functools import cached_property
-from typing import TypedDict, Optional, Tuple
-import json
+from typing import Optional, TypedDict
+
 import requests
 from django.conf import settings
 from django.db import transaction
 from requests import Response
 
 from classification.enums import AlleleOriginBucket
-from classification.models import ClinVarExportBatch, ClinVarExportRequest, ClinVarExportRequestType, \
-    ClinVarExportBatchStatus, ClinVarExportSubmission, ClinVarExportSubmissionStatus
+from classification.models import (
+    ClinVarExportBatch,
+    ClinVarExportBatchStatus,
+    ClinVarExportRequest,
+    ClinVarExportRequestType,
+    ClinVarExportSubmission,
+    ClinVarExportSubmissionStatus,
+)
 from library.constants import MINUTE_SECS
 from library.log_utils import report_message
 from library.utils import JsonObjType
@@ -160,7 +167,7 @@ class ClinVarExportSync:
             response_status_code=response.status_code
         )
 
-    def next_request(self, batch: ClinVarExportBatch) -> Tuple[ClinVarExportRequest, ClinVarResponseOutcome]:
+    def next_request(self, batch: ClinVarExportBatch) -> tuple[ClinVarExportRequest, ClinVarResponseOutcome]:
         if batch.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
             raise ClinVarRequestException(
                 exception_type=ClinVarRequestExceptionType.NOT_SUPPORTED_YET,
@@ -304,7 +311,7 @@ class ClinVarExportSync:
             if response_json := clinvar_request.response_json:
                 response_body_str = json.dumps(response_json)
             report_message(
-                f"Clinvar server error code",
+                "Clinvar server error code",
                 level='error',
                 extra_data={
                     "target": f"Error code {clinvar_request.response_status_code}",

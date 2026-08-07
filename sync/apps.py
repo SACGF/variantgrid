@@ -7,5 +7,5 @@ class SyncConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
-        from sync.signals import sync_health_check
+        pass
         # pylint: enable=import-outside-toplevel,unused-import

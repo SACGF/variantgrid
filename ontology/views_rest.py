@@ -4,7 +4,7 @@ from django.http import Http404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
@@ -12,8 +12,11 @@ from rest_framework.views import APIView
 from genes.models import GeneListGeneSymbol, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import WEEK_SECS
-from ontology.models import OntologyTerm, OntologyVersion, \
-    ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER
+from ontology.models import (
+    ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER,
+    OntologyTerm,
+    OntologyVersion,
+)
 from ontology.ontology_matching import OntologyMatching
 from ontology.serializers import OntologyTermRelationSerializer
 

@@ -11,7 +11,7 @@ from annotation.models import CachedWebResource
 from library.constants import MINUTE_SECS
 from library.pandas_utils import df_nan_to_none
 from library.utils import md5sum_str
-from ontology.models import OntologyRelation, GeneDiseaseClassification
+from ontology.models import GeneDiseaseClassification, OntologyRelation
 from ontology.ontology_builder import OntologyBuilder
 
 

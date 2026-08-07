@@ -4,10 +4,10 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Optional, List, Dict
+from typing import Optional
 
 import requests
-from dataclasses_json import dataclass_json, config
+from dataclasses_json import config, dataclass_json
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
@@ -43,7 +43,7 @@ class SequencingSample:
     sample_project: Optional[str] = None
     is_control: bool = False
     failed: bool = False
-    data: List[dict] = field(default_factory=lambda: [], metadata=config(field_name="sequencingsampledata_set"))
+    data: list[dict] = field(default_factory=lambda: [], metadata=config(field_name="sequencingsampledata_set"))
 
 
 @dataclass_json
@@ -53,7 +53,7 @@ class SampleSheet:
     sequencing_run: SequencingRun
     file_last_modified: datetime
     hash: str
-    sequencing_samples: List[SequencingSample] = field(metadata=config(field_name="sequencingsample_set"))
+    sequencing_samples: list[SequencingSample] = field(metadata=config(field_name="sequencingsample_set"))
 
 
 @dataclass_json
@@ -140,7 +140,7 @@ class QC:
 class QCGeneList:
     path: str
     qc: QC
-    gene_list: List[str]
+    gene_list: list[str]
 
 
 @dataclass_json
@@ -243,7 +243,7 @@ class VariantGridAPI:
     # Backwards-compat alias (predates the JointCalledVCF rename)
     create_sample_sheet_combined_vcf_file = create_joint_called_vcf
 
-    def create_sequencing_data(self, sample_sheet_lookup: SampleSheetLookup, sequencing_files: List[SequencingFile]):
+    def create_sequencing_data(self, sample_sheet_lookup: SampleSheetLookup, sequencing_files: list[SequencingFile]):
         records = []
         for sf in sequencing_files:
             data = sf.to_dict()
@@ -268,7 +268,7 @@ class VariantGridAPI:
         return self._post("seqauto/api/v1/qc_gene_list/",
                           json_data)
 
-    def create_multiple_qc_gene_lists(self, qc_gene_lists: List[QCGeneList]):
+    def create_multiple_qc_gene_lists(self, qc_gene_lists: list[QCGeneList]):
         json_data = {
             "records": [
                 qcgl.to_dict() for qcgl in qc_gene_lists
@@ -282,7 +282,7 @@ class VariantGridAPI:
         return self._post("seqauto/api/v1/qc_exec_summary/",
                           json_data)
 
-    def create_multiple_qc_exec_stats(self, qc_exec_stats: List[QCExecStats]):
+    def create_multiple_qc_exec_stats(self, qc_exec_stats: list[QCExecStats]):
         json_data = {
             "records": [
                 qces.to_dict() for qces in qc_exec_stats
@@ -291,7 +291,7 @@ class VariantGridAPI:
         return self._post("seqauto/api/v1/qc_exec_summary/bulk_create",
                           json_data)
 
-    def create_multiple_qc_gene_coverage(self, qc_gene_coverage_list: List[QCGeneCoverage]):
+    def create_multiple_qc_gene_coverage(self, qc_gene_coverage_list: list[QCGeneCoverage]):
         json_data = {
             "records": [
                 qcgc.to_dict() for qcgc in qc_gene_coverage_list
@@ -501,7 +501,7 @@ class Command(BaseCommand):
             print("-" * 50)
 
     @staticmethod
-    def _get_qc_by_sample_name(sample_sheet_lookup: SampleSheetLookup, sequencing_files: List[SequencingFile]) -> Dict[
+    def _get_qc_by_sample_name(sample_sheet_lookup: SampleSheetLookup, sequencing_files: list[SequencingFile]) -> dict[
         str, QC]:
         bam_and_vcf_by_name = {}
         for sf in sequencing_files:

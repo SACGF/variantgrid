@@ -1,7 +1,7 @@
 from functools import partial
 
 from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import TextField, QuerySet
+from django.db.models import QuerySet, TextField
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
@@ -10,10 +10,10 @@ from django.shortcuts import get_object_or_404
 from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from ontology.grids import AbstractOntologyGenesGrid
-from ontology.models import OntologyTerm, OntologyService
-from patients.models import PatientRecords, Patient, PatientRecord
+from ontology.models import OntologyService, OntologyTerm
+from patients.models import Patient, PatientRecord, PatientRecords
 from patients.models_enums import PatientRecordMatchType
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn
 
 
 class PatientListGrid(JqGridUserRowConfig):

@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.db.models import Model, QuerySet
-from guardian.shortcuts import get_groups_with_perms, get_users_with_perms, remove_perm, assign_perm
+from guardian.shortcuts import assign_perm, get_groups_with_perms, get_users_with_perms, remove_perm
 
 
 def is_superuser(user):
@@ -25,7 +25,7 @@ def public_group():
     return g
 
 
-@lru_cache()
+@lru_cache
 def _cached_admin_bot() -> User:
     return User.objects.get(username='admin_bot')
 

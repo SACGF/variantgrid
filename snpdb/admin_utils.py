@@ -1,23 +1,24 @@
 import inspect
+from collections.abc import Iterator
 from functools import cached_property
-from typing import Optional, Iterator, Type
+from typing import Optional
 
 from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
-from django.db.models import AutoField, ForeignKey, DateTimeField, Model
+from django.db.models import AutoField, DateTimeField, ForeignKey, Model
 from django.forms import Widget
-from django.http import StreamingHttpResponse, HttpResponseRedirect
+from django.http import HttpResponseRedirect, StreamingHttpResponse
 from django.http.response import HttpResponseBase
-from django.urls import path, NoReverseMatch, reverse
+from django.urls import NoReverseMatch, path, reverse
 from django.utils.encoding import smart_str
 from django.utils.safestring import SafeString
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
 
 from library.log_utils import log_admin_change
-from library.utils import delimited_row, WrappablePartial, limit_str
+from library.utils import WrappablePartial, delimited_row, limit_str
 
 
 class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
@@ -354,7 +355,7 @@ def get_admin_url(obj: Model):
     except NoReverseMatch:
         return None
 
-def get_admin_model_url(model_type: Type[Model]):
+def get_admin_model_url(model_type: type[Model]):
     try:
         meta = model_type._meta
         path = f"admin:{meta.app_label}_{meta.model_name}_changelist"

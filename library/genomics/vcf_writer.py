@@ -9,8 +9,9 @@ Shared low-level VCF writing:
 
 Parsing / header-rewriting of existing VCFs lives in ``library.genomics.vcf_utils``.
 """
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional, Union
+from typing import Optional, Union
 
 DEFAULT_FILE_FORMAT = "VCFv4.1"
 

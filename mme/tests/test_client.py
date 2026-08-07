@@ -1,11 +1,11 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import requests
 from django.test import TestCase, override_settings
 
 from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.client import submit
-from mme.models import MMESubmission, MMESubmissionStatus, MMEMatchResult
+from mme.models import MMEMatchResult, MMESubmission, MMESubmissionStatus
 from mme.tests.fakes import make_classification
 from user_messages.models import Message
 

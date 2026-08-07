@@ -9,15 +9,15 @@ import logging
 from django.conf import settings
 from django.urls import reverse
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from beacon import schema
-from beacon.datasets import observations_dataset, classifications_dataset
+from beacon.datasets import classifications_dataset, observations_dataset
 from beacon.models import BeaconInboundQuery
-from beacon.response import clamp_granularity, query_response, info_response, RECORD
+from beacon.response import RECORD, clamp_granularity, info_response, query_response
 from beacon.variant_mapping import (
     BeaconQueryError,
     genome_build_from_assembly,

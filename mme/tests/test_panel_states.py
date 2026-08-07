@@ -5,10 +5,10 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from classification.enums.classification_enums import ShareLevel, ClinicalSignificance
+from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.django_utils.unittest_utils import URLTestCase
-from mme.models import MMEInboundQuery, MMEInboundMatch
+from mme.models import MMEInboundMatch, MMEInboundQuery
 from mme.tests.fakes import make_classification
 
 NODES = {"testnode": {"base_url": "https://node.test", "token": "secret-token", "api_version": "1.1"}}

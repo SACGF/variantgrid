@@ -1,7 +1,9 @@
-from typing import Iterable, Optional, Any
+from collections.abc import Iterable
+from typing import Any, Optional
 
 import sqlparse
 from django.db import connection, transaction
+
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
 

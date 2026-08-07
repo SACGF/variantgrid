@@ -1,6 +1,6 @@
 """ `notify_match` is the recipient policy for both directions - the authoring curator AND
 the lab, because a case can sit unmatched for years and the author may be long gone. """
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured

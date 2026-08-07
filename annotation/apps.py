@@ -12,16 +12,25 @@ class AnnotationConfig(AppConfig):
 
         from Bio import Entrez
         from django.conf import settings
+
         from annotation.models import AnnotationRun, CachedWebResource
-        from annotation.signals.manual_signals import clinvar_citations_post_save_handler, \
-            annotation_run_complete_signal, annotation_run_discarded_signal
-        from annotation.signals.annotation_run_cleanup import annotation_run_complete_cleanup_handler, \
-            annotation_run_discarded_cleanup_handler, annotation_run_post_delete_handler
-        from annotation.signals import citation_preview, citation_search, clinvar_annotation_health_check
-        from annotation.signals.manual_signals import gene_counts_classification_withdraw_handler, \
-            gene_counts_classification_publish_handler
-        from classification.models import Classification, classification_withdraw_signal, \
-            classification_post_publish_signal
+        from annotation.signals.annotation_run_cleanup import (
+            annotation_run_complete_cleanup_handler,
+            annotation_run_discarded_cleanup_handler,
+            annotation_run_post_delete_handler,
+        )
+        from annotation.signals.manual_signals import (
+            annotation_run_complete_signal,
+            annotation_run_discarded_signal,
+            clinvar_citations_post_save_handler,
+            gene_counts_classification_publish_handler,
+            gene_counts_classification_withdraw_handler,
+        )
+        from classification.models import (
+            Classification,
+            classification_post_publish_signal,
+            classification_withdraw_signal,
+        )
         # pylint: enable=import-outside-toplevel,unused-import
 
         # Entrez wants both email and API key

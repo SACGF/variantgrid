@@ -8,12 +8,22 @@ from django.utils import timezone
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import CachedWebResource
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.models import CanonicalTranscriptCollection, GeneCoverageCollection, GeneCoverage, GeneList, PanelAppPanel, \
-    GeneListCategory, Gene, CanonicalTranscript, GeneListGeneSymbol, PanelAppServer
+from genes.models import (
+    CanonicalTranscript,
+    CanonicalTranscriptCollection,
+    Gene,
+    GeneCoverage,
+    GeneCoverageCollection,
+    GeneList,
+    GeneListCategory,
+    GeneListGeneSymbol,
+    PanelAppPanel,
+    PanelAppServer,
+)
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
-from ontology.models import OntologyService, OntologyImport, OntologyTerm
-from snpdb.models import ImportStatus, DataState
+from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from snpdb.models import DataState, ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 

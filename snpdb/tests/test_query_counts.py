@@ -14,7 +14,10 @@ from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils.unittest_utils import URLTestCase, production_query_count
 from snpdb.models import GenomeBuild, Trio
 from snpdb.templatetags.model_tags import trio_short_description
-from snpdb.templatetags.related_data_tags import TRIO_SAMPLES_SELECT_RELATED, related_data_for_samples
+from snpdb.templatetags.related_data_tags import (
+    TRIO_SAMPLES_SELECT_RELATED,
+    related_data_for_samples,
+)
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
 

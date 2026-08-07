@@ -4,15 +4,27 @@ import json
 from django.core.management import BaseCommand, call_command
 from django.db.models import Max
 
-from annotation.models import VariantAnnotationVersion, AnnotationVersion, GeneAnnotationVersion, \
-    InvalidAnnotationVersionError
-from genes.cdot_data_release import find_latest_release_asset, download_cdot_json
+from annotation.models import (
+    AnnotationVersion,
+    GeneAnnotationVersion,
+    InvalidAnnotationVersionError,
+    VariantAnnotationVersion,
+)
+from genes.cdot_data_release import download_cdot_json, find_latest_release_asset
 from genes.gene_matching import ReleaseGeneMatcher
-from genes.management.commands.import_cdot_latest import cdot_data_needs_update, import_latest_combo_file
-from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand, \
-    GeneAnnotationImportManager
-from genes.models import GeneAnnotationRelease, GeneVersion, TranscriptVersion, ReleaseGeneVersion, \
-    ReleaseTranscriptVersion
+from genes.management.commands.import_cdot_latest import (
+    cdot_data_needs_update,
+    import_latest_combo_file,
+)
+from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand
+from genes.management.commands.import_gene_annotation import GeneAnnotationImportManager
+from genes.models import (
+    GeneAnnotationRelease,
+    GeneVersion,
+    ReleaseGeneVersion,
+    ReleaseTranscriptVersion,
+    TranscriptVersion,
+)
 from genes.models_enums import AnnotationConsortium
 from library.utils.file_utils import open_handle_gzip
 from snpdb.models import GenomeBuild

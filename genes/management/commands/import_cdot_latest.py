@@ -1,6 +1,10 @@
 import logging
 
-from cdot.data_release import get_latest_combo_file_urls, get_latest_data_release_tag_name, _get_version_from_tag_name
+from cdot.data_release import (
+    _get_version_from_tag_name,
+    get_latest_combo_file_urls,
+    get_latest_data_release_tag_name,
+)
 from django.core.management import BaseCommand
 
 from genes.cdot_data_release import download_cdot_json

@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from analysis.models import Analysis, AllVariantsNode
+from analysis.models import AllVariantsNode, Analysis
 from analysis.models.nodes.analysis_node import NodeCount
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import GenomeBuild

@@ -5,8 +5,8 @@ from rest_framework.test import APIClient
 
 from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
 from classification.tests.models.test_utils import ClassificationTestUtils
-from mme.metrics import build_metrics, get_metrics, MME_METRICS_CACHE_KEY
-from mme.models import MMEInboundQuery, MMEInboundMatch
+from mme.metrics import MME_METRICS_CACHE_KEY, build_metrics, get_metrics
+from mme.models import MMEInboundMatch, MMEInboundQuery
 from mme.tests.fakes import make_classification
 
 TOKEN = "inbound-secret"

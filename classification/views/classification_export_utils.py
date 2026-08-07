@@ -1,7 +1,8 @@
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import Iterable, Optional, Any, Mapping, Callable
+from typing import Any, Optional
 
 from django.contrib.auth.models import User
 from django.db.models import Count
@@ -9,7 +10,7 @@ from django.db.models.query import QuerySet
 
 from classification.enums import CriteriaEvaluation
 from classification.models.classification import ClassificationModification
-from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from genes.hgvs import CHGVS
 from library.cache import clear_cached_property
 
@@ -33,7 +34,7 @@ class KeyValueFormatter:
             value = ekey.pretty_value(value)
         else:
             if isinstance(value, list):
-                value = ', '.join((str(item) for item in value))
+                value = ', '.join(str(item) for item in value)
             elif value is True:
                 return 'TRUE'
             elif value is False:
