@@ -129,6 +129,35 @@ def vcf_allele_is_symbolic(allele: str) -> bool:
     return allele.startswith("<") and allele.endswith(">")
 
 
+class UnsortedVCFError(ValueError):
+    pass
+
+
+class VCFSortChecker:
+    """ Streaming check that records are grouped by contig, and ascending in position within a contig.
+        This is what 'bcftools index' requires - see #127 """
+
+    ADVICE = "VCF records must be sorted - please sort (eg 'bcftools sort') and re-upload."
+
+    def __init__(self):
+        self._seen_contigs = set()
+        self._contig = None
+        self._position = None
+
+    def check(self, contig, position: int, chrom: str, line_number: int):
+        """ contig identifies the contig (so aliases compare equal), chrom is how it's written in the VCF """
+        if contig != self._contig:
+            if contig in self._seen_contigs:
+                raise UnsortedVCFError(f"Line {line_number}: '{chrom}' records are not all grouped together. "
+                                       f"{self.ADVICE}")
+            self._seen_contigs.add(contig)
+            self._contig = contig
+        elif position < self._position:
+            raise UnsortedVCFError(f"Line {line_number}: {chrom}:{position} comes after {chrom}:{self._position}. "
+                                   f"{self.ADVICE}")
+        self._position = position
+
+
 def vcf_get_ref_alt_svlen_and_modification(variant: cyvcf2.Variant, old_variant_info: str) -> tuple[str, str, Optional[int], Optional[str]]:
     """ old_variant_info: name of INFO created via bcftools norm --old-rec-tag=INFO_NAME
 

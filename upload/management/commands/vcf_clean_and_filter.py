@@ -1,5 +1,8 @@
 """
-Uploaded VCFs are first passed through this command to fix things that will cause VT to die (eg bad contigs)
+Uploaded VCFs are first passed through this command to fix things that will cause bcftools to die (eg bad contigs)
+
+It also fails the import early on unsorted VCFs, which would otherwise only be noticed by 'bcftools index'
+several pipeline stages later.
 
 We also rename chromosomes to the RefSeq contig IDs used in our fasta file
 
@@ -13,10 +16,11 @@ from collections import Counter
 from io import StringIO
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from vcf import Reader
 
 from library.genomics.vcf_enums import VCFColumns
+from library.genomics.vcf_utils import UnsortedVCFError, VCFSortChecker
 from snpdb.models import GenomeBuild, GenomeFasta
 
 
@@ -73,7 +77,8 @@ class Command(BaseCommand):
 
         first_non_header_line = True
         defined_filters = None
-        for line in f:
+        sort_checker = VCFSortChecker()
+        for line_number, line in enumerate(f, start=1):
             if line[0] == '#':
                 if not replace_header:
                     vcf_header_lines.append(line)
@@ -136,6 +141,12 @@ class Command(BaseCommand):
                     else:
                         filter_column = "."
                     columns[VCFColumns.FILTER] = filter_column
+
+                # Only the records we write need to be sorted - skipped ones can't break the downstream index
+                try:
+                    sort_checker.check(contig_id, position, chrom, line_number)
+                except UnsortedVCFError as e:
+                    raise CommandError(f"VCF is not sorted. {e}") from e
 
                 sys.stdout.write("\t".join(columns))
 

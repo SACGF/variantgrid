@@ -10,7 +10,7 @@ from django.db.models.expressions import F
 from django.utils import timezone
 
 from library.log_utils import get_traceback
-from library.utils import full_class_name, import_class
+from library.utils import format_called_process_error, full_class_name, import_class
 from upload.models import (
     PipelineFailedJobTerminateEarlyException,
     ProcessingStatus,
@@ -106,7 +106,7 @@ class ImportVCFStepTask(Task):
         except SkipUploadStepException:
             upload_step.status = ProcessingStatus.SKIPPED
         except subprocess.CalledProcessError as e:
-            error_message = f"Error executing: {e}"
+            error_message = f"Error executing: {format_called_process_error(e)}"
             self._error(upload_step, error_message)
         except Exception as e:
             self._error(upload_step, e)

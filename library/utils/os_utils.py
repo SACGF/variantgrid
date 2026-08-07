@@ -17,6 +17,22 @@ class CmdOutput(FormerTuple):
         return self.return_code, self.std_out, self.std_err
 
 
+def format_called_process_error(e: subprocess.CalledProcessError) -> str:
+    """ str(CalledProcessError) is only the command and exit status - tools like bcftools put the
+        diagnostics the user actually needs on stderr, so include whatever was captured """
+
+    def _decode(output) -> str:
+        if isinstance(output, bytes):
+            output = output.decode(errors="replace")
+        return (output or "").strip()
+
+    message = str(e)
+    for label, output in (("stderr", _decode(e.stderr)), ("stdout", _decode(e.stdout))):
+        if output:
+            message += f"\n{label}: {output}"
+    return message
+
+
 def execute_cmd(cmd: list, **kwargs) -> CmdOutput:
     # The shell=True branch is opt-in and currently used by exactly one caller
     # (snpdb.bcftools_liftover) to build a trusted, server-side command pipeline -

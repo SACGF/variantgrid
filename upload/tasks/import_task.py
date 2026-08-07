@@ -5,6 +5,7 @@ import time
 from celery.app.task import Task
 
 from library.log_utils import get_traceback
+from library.utils import format_called_process_error
 from upload.models import UploadPipeline
 
 
@@ -38,7 +39,7 @@ class ImportTask(Task):
                                     processing_seconds_wall_time=processing_seconds_wall_time,
                                     processing_seconds_cpu_time=processing_seconds_cpu_time)
         except subprocess.CalledProcessError as e:
-            error_message = e.output
+            error_message = format_called_process_error(e)
         except:
             error_message = get_traceback()
 

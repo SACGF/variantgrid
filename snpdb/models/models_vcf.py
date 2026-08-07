@@ -79,7 +79,7 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     source = models.TextField(blank=True)
     # Most callers put allele depths in AD e.g. AD=[10,12] but some can split into separate ref/alt fields
     allele_depth_field = models.TextField(null=True)
-    # If AF is provided, we use it, otherwise if it is null we calculate it ourselves (post normalization w/VT)
+    # If AF is provided, we use it, otherwise if it is null we calculate it ourselves (post normalization w/bcftools)
     # which can sometimes cause issues with splitting multi-alts
     allele_frequency_field = models.TextField(null=True)
     ref_depth_field = models.TextField(null=True)

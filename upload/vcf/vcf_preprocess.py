@@ -30,20 +30,21 @@ from upload.tasks.vcf.unknown_variants_task import (
 
 
 def get_bcftools_tool_version(bcftools_command):
-    p = Popen([bcftools_command, "--version"], stdout=PIPE, stderr=PIPE)
+    cmd = [bcftools_command, "--version"]
+    p = Popen(cmd, stdout=PIPE, stderr=PIPE)
     stdout, stderr = p.communicate()
     stdout = stdout.decode()
     stderr = stderr.decode()
     if p.returncode:
-        raise CalledProcessError(f"Error running '{bcftools_command} --version': {stderr=}, returned: {p.returncode}")
+        raise CalledProcessError(p.returncode, cmd, output=stdout, stderr=stderr)
 
     output_list = stdout.split("\n")
     bcftools_version = output_list[0]
     if not bcftools_version.startswith("bcftools"):
-        raise CalledProcessError(f"Expected to find bcftools on 1st line of output of '{bcftools_command} --version' output: {bcftools_version}")
-    htslib_version = output_list[1]
+        raise ValueError(f"Expected to find bcftools on 1st line of '{' '.join(cmd)}' output: {bcftools_version}")
+    htslib_version = output_list[1] if len(output_list) > 1 else ""
     if "htslib" not in htslib_version:
-        raise CalledProcessError(f"Expected to find htslib version on 2nd line of '{bcftools_command} --version' output: {htslib_version}")
+        raise ValueError(f"Expected to find htslib version on 2nd line of '{' '.join(cmd)}' output: {htslib_version}")
 
     version = f"{bcftools_version}, {htslib_version}"
     tool_version, _ = ToolVersion.objects.get_or_create(name='bcftools', version=version)
@@ -197,7 +198,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
             logging.error(p_stderr)
 
         if p.returncode:
-            raise CalledProcessError(p.returncode, piped_command, output=p_stderr)
+            raise CalledProcessError(p.returncode, piped_command, stderr=p_stderr)
 
     else:
         pipes = {}
@@ -238,7 +239,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
                     logging.warning(stderr_output)
 
             if p.returncode:
-                raise CalledProcessError(p.returncode, p_cmd, output=stderr_output)
+                raise CalledProcessError(p.returncode, p_cmd, stderr=stderr_output)
 
     clean_sub_step = sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP]
     if os.path.exists(skipped_contigs_stats_file):

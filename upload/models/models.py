@@ -697,7 +697,7 @@ class ModifiedImportedVariants(VCFImportInfo):
 
 
 class ModifiedImportedVariant(models.Model):
-    """ Keep track of variants that were modified during import pre-processing by vt,
+    """ Keep track of variants that were modified during import pre-processing by bcftools,
         so people can find out why a variant they expected didn't turn up.  """
     BCFTOOLS_OLD_VARIANT_TAG = "BCFTOOLS_OLD_VARIANT"
     VT_OLD_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+):([^/]+)/([^/]+)$")
@@ -708,9 +708,11 @@ class ModifiedImportedVariant(models.Model):
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     operation = models.CharField(max_length=1, choices=ModifiedImportedVariantOperation.choices,
                                  default=ModifiedImportedVariantOperation.NORMALIZATION)
-    # OLD_MULTIALLELIC from vt: @see https://genome.sph.umich.edu/wiki/Vt#Decompose
+    # Set from bcftools --old-rec-tag when the record was a multi-allelic
+    # Legacy rows hold vt OLD_MULTIALLELIC: @see https://genome.sph.umich.edu/wiki/Vt#Decompose
     old_multiallelic = models.TextField(null=True)
-    # OLD_VARIANT from vt: @see https://genome.sph.umich.edu/wiki/Vt#Normalization
+    # Set from bcftools --old-rec-tag when the record was normalized
+    # Legacy rows hold vt OLD_VARIANT: @see https://genome.sph.umich.edu/wiki/Vt#Normalization
     old_variant = models.TextField(null=True)
     old_variant_formatted = models.TextField(null=True)  # consistently format for retrieval
 
@@ -734,18 +736,6 @@ class ModifiedImportedVariant(models.Model):
             alt = full_match.group(4)
             return VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
         raise ValueError(f"{old_variant} didn't match regex {ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN}")
-
-    @staticmethod
-    def vt_format_old_variant(old_variant: str, genome_build: GenomeBuild) -> list[str]:
-        """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
-            May return multiple values """
-        formatted_old_variants = []
-        for ov in ModifiedImportedVariant._vt_split_old_variant(old_variant):
-            vc = ModifiedImportedVariant._to_variant_coordinate(ov)
-            contig = genome_build.chrom_contig_mappings[vc.chrom]
-            variant_coordinate = VariantCoordinate(chrom=contig.name, position=vc.position, ref=vc.ref, alt=vc.alt, svlen=vc.svlen)
-            formatted_old_variants.append(ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate))
-        return formatted_old_variants
 
     @staticmethod
     def bcftools_format_old_variant(old_variant: str, svlen: Optional[str], genome_build: GenomeBuild) -> list[str]:

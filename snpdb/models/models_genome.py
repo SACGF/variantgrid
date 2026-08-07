@@ -440,7 +440,7 @@ class GenomeBuildContig(models.Model):
 
 
 class GenomeFasta(models.Model):
-    """ Incoming VCF chroms are mapped to contigs from VCF header then converted to fasta names (for VT) """
+    """ Incoming VCF chroms are mapped to contigs from VCF header then converted to fasta names (for bcftools) """
     filename = models.TextField(unique=True)
     index_filename = models.TextField()
     index_sha256sum = models.TextField()

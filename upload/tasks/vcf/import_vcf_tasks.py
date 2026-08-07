@@ -31,8 +31,8 @@ from variantgrid.celery import app
 
 
 class PreprocessVCFTask(ImportVCFStepTask):
-    """ * Decompose (multi-alts to different lines) using vt
-        * Normalise (@see https://genome.sph.umich.edu/wiki/Variant_Normalization) using vt
+    """ * Decompose (multi-alts to different lines) using bcftools
+        * Normalise (@see https://genome.sph.umich.edu/wiki/Variant_Normalization) using bcftools
         * Split VCF file into sub files (so it can be processed in parallel)
 
         This VCFStepTask has multi-file output, get via upload_step.get_input_filenames() """
