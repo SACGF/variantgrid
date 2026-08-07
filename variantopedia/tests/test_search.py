@@ -5,6 +5,7 @@ from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from snpdb.models import GenomeBuild, ClinGenAllele
 from snpdb.search import search_data
+from snpdb.tests.utils.fake_cohort_data import create_fake_trio, create_fake_quad
 from variantopedia.models import SearchTypes
 
 
@@ -115,3 +116,18 @@ class TestSearch(TestCase):
         for transcript_version in TRANSCRIPT_VERSION:
             search_results = search_data(self.user, transcript_version, False)
             self._verify_all_of_type(search_results, "Transcript Version")
+
+    def _assert_found_of_type(self, search_results, obj, search_type):
+        matches = [sr for sr in search_results.results if sr.search_type == search_type]
+        self.assertIn(obj, [sr.preview.obj for sr in matches],
+                      f"{obj} not found in {search_type} search results")
+
+    def test_search_trio(self):
+        trio = create_fake_trio(self.user, GenomeBuild.grch38())
+        search_results = search_data(self.user, trio.name, False)
+        self._assert_found_of_type(search_results, trio, SearchTypes.TRIO)
+
+    def test_search_quad(self):
+        quad = create_fake_quad(self.user, GenomeBuild.grch38())
+        search_results = search_data(self.user, quad.name, False)
+        self._assert_found_of_type(search_results, quad, SearchTypes.QUAD)

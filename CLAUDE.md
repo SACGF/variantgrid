@@ -84,9 +84,19 @@ There are per-app research documents generated in claude/research
 ## Security
 
 ### Authentication
-The project uses `global_login_required.GlobalLoginRequiredMiddleware`, which enforces login on **all** views globally. Individual views do **not** need `@login_required` decorators — their absence is intentional, not a security gap. Do not flag missing `@login_required` as a security issue during audits.
+The project enforces two protections via global middleware, so individual views do **not** need per-view decorators for either — their absence is intentional, not a security gap, and must not be flagged during audits:
+
+- **Login:** `global_login_required.GlobalLoginRequiredMiddleware` enforces login on **all** views globally, so no view needs `@login_required`.
+- **CSRF:** Django's `CsrfViewMiddleware` is active globally, so all state-changing views (POST/PUT/DELETE), including jQGrid and DataTables handlers, are CSRF-protected without `@csrf_protect`.
 
 DRF is configured with `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`, so all REST API endpoints require authentication by default. Individual API views do not need explicit `permission_classes` — their absence is intentional, not a security gap.
+
+## Python Style
+
+### Imports
+All imports go at the top of the file. Do not add inline imports inside functions, methods, or conditional blocks — not for "lazy loading", not to keep a function self-contained, not because the import is only used in one branch. The only legitimate reason to inline an import is to break a genuine circular import cycle, and even then you must stop, flag the cycle to the user, and ask whether to refactor the code instead of papering over it with an inline import.
+
+If you are about to write `from … import …` anywhere except the top of the file, that is a signal to go back and add it to the top-level import block.
 
 ## Key Patterns
 
@@ -104,6 +114,9 @@ Two systems coexist:
 ### Celery task queues
 Four worker queues: `analysis_workers`, `annotation_workers`, `db_workers` (default), `web_workers`, plus `scheduling_single_worker`. Assign tasks to appropriate queues via `@app.task(queue='...')`.
 
+### Manual migrations (management commands on deploy)
+If a new management command needs to be run on existing deployments as part of an upgrade, add a migration containing a `ManualOperation` (from `manual/operations/manual_operations.py`) — the upgrade script surfaces these as required tasks. Use `ManualOperation.task_id_manage(["command_name"])` (or the `operation_manage`/`operation_other` helpers) and pass an optional `test=` callable (receives `apps`) so the task is only registered when the deployment actually has data needing it. Example: `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`.
+
 ### Preview system
 Models implement `PreviewModelMixin` to support hover-card previews. Apps connect to `preview_request_signal` and `preview_extra_signal` (in `library/preview_request.py`) to register their handlers. The `PreviewKeyValue` dataclass carries key/value pairs for the preview.
 
@@ -112,11 +125,26 @@ Several apps have `__<app>_readme.md` files documenting architecture (e.g., `snp
 
 ## Git Commits
 
+Do NOT commit unless the user explicitly asks you to commit. Instructions like "apply the fix", "make the change", or "implement X" mean edit the code only — not commit.
+
 Do NOT add "Co-Authored-By: Claude" or any similar co-author trailer to commit messages.
 
 Reference GitHub issues in commit messages (e.g., `#1400`) but do NOT use keywords that auto-close issues (e.g., "fix", "close", "resolve"). Issues must go through a testing pipeline before being closed manually.
 
 Before committing, check `git status` for already-staged changes unrelated to the current task. If any exist, stop and confirm with the user before proceeding — do not include them in the commit.
+
+## Implementation Prompts
+
+When asked to draft a prompt for an agent to implement a plan in another conversation:
+
+- The plan file is the spec. Reference it; don't restate it.
+- Phrase everything positively. Do not include "do not", "don't", "no X", or any "Constraints" section listing things to avoid — even for defaults the agent would otherwise do, and even for ideas that came up and were rejected during planning. Naming the unwanted thing plants it ("don't think of an elephant"). If a default needs to be overridden, either fix the plan to carry the positive instruction, or state the positive behaviour you want ("update all callers to use the new kwarg" rather than "don't add a backwards-compat shim").
+- The plan reflects the final decision; the agent reading it won't see the alternatives. Mentioning rejected options only confuses or implies the plan is incomplete.
+- Keep prompts short: read-list, "follow plan §X-§Y", any positive overrides, report-back format. No "pre-resolved decisions" section.
+
+## Code comments
+
+Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't write comments about failed paths or reverted decisions, just let the existing code stand. If you are tempted to write a lot of comments, perhaps you could make the code clearer by extracting logic into better named variables
 
 ## GitHub Comments
 
@@ -133,6 +161,8 @@ Tests extend `django.test.TestCase`. URL tests use `URLTestCase` from `library/d
 Fake/fixture data helpers are in `annotation/tests/test_data_fake_genes.py`, `snpdb/tests/utils/`, etc.
 
 `UNIT_TEST = sys.argv[1:2] == ['test']` is set in default_settings and used to conditionally skip expensive setup.
+
+It's great to write tests while you are writing code to ensure correctness. At the end, you should audit the tests and decide whether they are worth their costs (code to run and maintain, and possibly hampering refactoring)
 
 ## Database
 

@@ -70,7 +70,6 @@ class Migration(migrations.Migration):
                 ('essential_gene_crispr2', models.CharField(blank=True, choices=[('E', 'Essential'), ('N', 'Non-essential phenotype-changing'), ('S', 'Context-Specific essential')], max_length=1, null=True)),
                 ('essential_gene_gene_trap', models.CharField(blank=True, choices=[('E', 'Essential'), ('N', 'Non-essential phenotype-changing'), ('H', 'HAP1-Specific essential'), ('K', 'KBM7-Specific essential')], max_length=1, null=True)),
                 ('ensembl_transcript', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='ensembl_dbnsfp_gene', to='genes.transcript')),
-                ('gene_symbol', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genes.genesymbol')),
                 ('refseq_transcript', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='refseq_dbnsfp_gene', to='genes.transcript')),
                 ('version', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='annotation.dbnsfpgeneannotationversion')),
             ],
@@ -80,6 +79,33 @@ class Migration(migrations.Migration):
             },
             managers=[
                 ('objects', psqlextra.manager.manager.PostgresManager()),
+            ],
+        ),
+        # gene_symbol pulled out of the CreateModel above: Django 6 emits CITextField as `text`,
+        # but genes_genesymbol.symbol is still `citext` here (genes.0078 converts the graph to
+        # text later), so a `text` FK cannot reference the citext PK. Create the column as citext;
+        # the table is otherwise Django-created and empty, so NOT NULL is safe.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql='''
+                        ALTER TABLE "annotation_dbnsfpgeneannotation"
+                            ADD COLUMN "gene_symbol_id" citext NOT NULL;
+                        ALTER TABLE "annotation_dbnsfpgeneannotation"
+                            ADD FOREIGN KEY ("gene_symbol_id")
+                            REFERENCES "genes_genesymbol" ("symbol") DEFERRABLE INITIALLY DEFERRED;
+                        CREATE INDEX ON "annotation_dbnsfpgeneannotation" ("gene_symbol_id");
+                    ''',
+                    reverse_sql='ALTER TABLE "annotation_dbnsfpgeneannotation" '
+                                'DROP COLUMN "gene_symbol_id";',
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='dbnsfpgeneannotation',
+                    name='gene_symbol',
+                    field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genes.genesymbol'),
+                ),
             ],
         ),
         migrations.AddField(

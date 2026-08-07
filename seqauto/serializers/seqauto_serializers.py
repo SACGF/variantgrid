@@ -26,7 +26,7 @@ class GoldCoverageSummarySerializer(serializers.ModelSerializer):
         model = GoldCoverageSummary
         fields = '__all__'
 
-    def get_standard_error(self, obj):
+    def get_standard_error(self, obj) -> float:
         """ This can occasionally be NaN which isn't valid JSON """
         standard_error = obj.standard_error
         if np.isnan(standard_error):

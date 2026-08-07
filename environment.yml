@@ -92,7 +92,6 @@ dependencies:
       - easy_thumbnails==2.8.5
       - fontawesomefree==6.4.0
       - django_json_widget==2.0.1
-      - git+https://github.com/davmlaw/django-jfu#egg=django-jfu
       - git+https://github.com/davmlaw/django-messages/#egg=django-messages
       - git+https://github.com/davmlaw/django-starfield#egg=django_starfield
       - django-js-reverse==0.10.2

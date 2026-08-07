@@ -1,4 +1,5 @@
 from django.template.library import Library
+from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 from snpdb.models import Trio, Quad
@@ -18,5 +19,5 @@ def quad_table(quad: Quad):
 
 @register.simple_tag
 def trio_short_description(trio: Trio):
-    params = (trio.mother_details, trio.father_details, trio.proband)
+    params = (escape(trio.mother_details), escape(trio.father_details), escape(trio.proband))
     return mark_safe("<b>M:</b> %s/<b>F:</b> %s/<b>P:</b> %s" % params)

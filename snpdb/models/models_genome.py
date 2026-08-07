@@ -6,7 +6,7 @@ from functools import cached_property, reduce
 from typing import Optional, Iterable
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
@@ -455,8 +455,13 @@ class GenomeFasta(models.Model):
     def get_contig_id_to_name_mappings(self):
         contig_id_to_name_mappings = dict(self.genomefastacontig_set.all().values_list("contig_id", "name"))
         if not contig_id_to_name_mappings:
-            msg = f"Contig/Fasta names empty for {self}"
-            raise ValueError(msg)
+            # A previous index load must have died after this record was created (eg missing/bad .fai file)
+            # Retry it, so we recover once the underlying problem is fixed, and raise the real error if not
+            load_genome_fasta_index(self, self.genome_build)
+            contig_id_to_name_mappings = dict(self.genomefastacontig_set.all().values_list("contig_id", "name"))
+            if not contig_id_to_name_mappings:
+                msg = f"Contig/Fasta names empty for {self} - no fasta index contigs matched build contigs"
+                raise ValueError(msg)
         return contig_id_to_name_mappings
 
     def __str__(self):
@@ -464,10 +469,13 @@ class GenomeFasta(models.Model):
 
     @staticmethod
     def get_for_genome_build(genome_build: GenomeBuild):
-        genome_fasta, created = GenomeFasta.objects.get_or_create(filename=genome_build.reference_fasta,
-                                                                  genome_build=genome_build)
-        if created:
-            load_genome_fasta_index(genome_fasta, genome_build)
+        # Atomic so a failed index load rolls back the GenomeFasta record, rather than leaving behind an
+        # empty one that get_or_create will keep returning (created=False, so index is never loaded)
+        with transaction.atomic():
+            genome_fasta, created = GenomeFasta.objects.get_or_create(filename=genome_build.reference_fasta,
+                                                                      genome_build=genome_build)
+            if created:
+                load_genome_fasta_index(genome_fasta, genome_build)
         return genome_fasta
 
     def convert_chrom_to_fasta_sequence(self, chrom: str) -> str:

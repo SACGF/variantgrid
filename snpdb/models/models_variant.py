@@ -1,5 +1,6 @@
 import logging
 import re
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Iterable, Union, Any
 
@@ -23,6 +24,7 @@ from pydantic import field_validator
 
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
+from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
@@ -183,6 +185,19 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     def build_names(self) -> str:
         return ", ".join(sorted(self.variantallele_set.values_list("genome_build__name", flat=True)))
 
+    @property
+    def variant_ids(self) -> list[int]:
+        """ The same mutation as a variant in each build it's been linked to """
+        return list(self.variantallele_set.order_by("genome_build__name").values_list("variant_id", flat=True))
+
+    @cached_property
+    def all_genome_builds(self) -> set['GenomeBuild']:
+        """ Every build this allele's variants are in. Wider than the builds it's been lifted over to -
+            builds that share a contig (MT, unplaced scaffolds) share the one variant """
+        gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),
+                                                  contig__locus__variant__variantallele__allele=self)
+        return {gbc.genome_build for gbc in gbc_qs}
+
     @staticmethod
     def missing_variants_for_build(genome_build) -> QuerySet['Allele']:
         alleles_with_variants_qs = Allele.objects.filter(variantallele__isnull=False)
@@ -218,6 +233,29 @@ class AlleleMergeLog(TimeStampedModel):
     allele_linking_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     success = models.BooleanField(default=True)
     message = models.TextField(null=True)
+
+
+@dataclass(frozen=True)
+class GenomicCoordinates:
+    """ A location on the genome - a contig and a range on it, optionally stranded.
+        start/end are stored and displayed as-is, in whatever convention the caller uses (the codebase
+        keeps genomic coordinates 1-based). Like VariantCoordinate, the string is the raw coordinates
+        with no 'humanizing' offset, so it round-trips into search. """
+    contig: Contig
+    chrom: str
+    start: int
+    end: int
+    strand: Optional[str] = None
+
+    @property
+    def coordinates(self) -> str:
+        location = f"{self.chrom}:{self.start}-{self.end}"
+        if self.strand:
+            location += f" ({self.strand})"
+        return location
+
+    def __str__(self):
+        return self.coordinates
 
 
 class VariantCoordinate(FormerTuple, pydantic.BaseModel):
@@ -341,6 +379,15 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
 
+    @property
+    def can_be_made_explicit(self) -> bool:
+        """ <CNV> (copy-number-variable region) and <INS> have no unambiguous explicit ref/alt
+            expansion (cf. Variant.can_make_g_hgvs), so as_external_explicit() will raise for them.
+            Their external VCF representation stays symbolic. """
+        if not self.is_symbolic:
+            return True
+        return self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
+
     def calculated_reference(self, genome_build) -> str:
         contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
         # reference sequence is 0-based
@@ -407,7 +454,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                     # Possible dup
                     # TODO: Can probably remove HGVS dependency from here - just look directly at sequence
                     from genes.hgvs import HGVSMatcher
-                    matcher = HGVSMatcher(genome_build)
+                    matcher = HGVSMatcher.instance(genome_build)
                     hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(self)
                     if hgvs_variant.mutation_type == 'dup':
                         ref = self.ref[0]
@@ -434,7 +481,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         vc_symbolic = self.as_internal_symbolic(genome_build)
         if vc_symbolic.svlen and abs(vc_symbolic.svlen) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
             vc = vc_symbolic
-        elif self.is_symbolic:
+        elif self.is_symbolic and self.can_be_made_explicit:
             vc = self.as_external_explicit(genome_build)
         else:
             vc = self
@@ -642,6 +689,24 @@ class Variant(PreviewModelMixin, models.Model):
         gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),
                                                   contig__locus__variant=self)
         return {gbc.genome_build for gbc in gbc_qs}
+
+    @cached_property
+    def all_build_variants(self) -> list['Variant']:
+        """ The same mutation in every build it's been linked to, this variant first.
+
+            A Variant is per-build, so the others come via the allele. Builds that share a contig
+            (MT, unplaced scaffolds) share the one variant, so this can be shorter than all_genome_builds """
+        variants = [self]
+        if allele := self.allele:
+            variants += [va.variant for va in allele.variant_alleles() if va.variant_id != self.pk]
+        return variants
+
+    @cached_property
+    def all_genome_builds(self) -> set['GenomeBuild']:
+        """ Every build this mutation is in - genome_builds is only the builds sharing this variant's contig """
+        if allele := self.allele:
+            return allele.all_genome_builds
+        return self.genome_builds
 
     @property
     def any_genome_build(self) -> GenomeBuild:
@@ -861,7 +926,7 @@ class VariantAllele(TimeStampedModel):
         return s
 
 
-class VariantCollection(RelatedModelsPartitionModel):
+class VariantCollection(DataArchiveMixin, RelatedModelsPartitionModel):
     """ A set of variants - usually used as a cached result """
 
     RECORDS_BASE_TABLE_NAMES = ["snpdb_variantcollectionrecord"]
@@ -880,6 +945,9 @@ class VariantCollection(RelatedModelsPartitionModel):
         return {self.variant_collection_alias: FilteredRelation('variantcollectionrecord', condition=vcr_condition)}
 
     def get_arg_q_dict(self) -> dict[Optional[str], set[Q]]:
+        if self.data_archived:
+            from snpdb.archive import DataArchivedError
+            raise DataArchivedError(self)
         if self.status != ProcessingStatus.SUCCESS:
             raise ValueError(f"{self}: status {self.get_status_display()} != SUCCESS")
 
@@ -910,9 +978,6 @@ class AlleleSource(models.Model):
 
     def get_allele_qs(self):
         return Allele.objects.filter(variantallele__variant__in=self.get_variants_qs())
-
-    def liftover_complete(self, genome_build: GenomeBuild):
-        """ This is called at the end of a liftover pipeline (once per build) """
 
 
 class VariantAlleleSource(AlleleSource):
@@ -955,7 +1020,7 @@ class LiftoverRun(TimeStampedModel):
 
         Alleles must have already been created - allele_source used to retrieve them
 
-        The VCF (in genome_build build) is set in UploadedFile for the UploadPipeline """
+        The VCF (in genome_build build) is set in FileUpload for the UploadPipeline """
     user = models.ForeignKey(User, on_delete=CASCADE)
     allele_source = models.ForeignKey(AlleleSource, null=True, on_delete=CASCADE)
     conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)

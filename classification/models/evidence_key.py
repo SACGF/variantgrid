@@ -881,6 +881,14 @@ class VCDataDict:
     def __str__(self):
         return str(self.data)
 
+    def items(self):
+        mapped = {}
+        for key, value in self.data.items():
+            e_key = self.e_keys.get(key)
+            value_cell = self[e_key]
+            mapped[e_key] = value_cell
+        return mapped.items()
+
     def __getitem__(self, item: Union[str, EvidenceKey]) -> VCDataCell:
         """
         Note this will always return a VCDataCell even if there's no entry for it
@@ -888,6 +896,10 @@ class VCDataDict:
         """
         if isinstance(item, str):
             item = self.e_keys.get(item)
+        elif isinstance(item, EvidenceKey):
+            pass
+        else:
+            raise ValueError(f"Cant get item for key {item}")
         return VCDataCell(data=self.data, e_key=item)
 
     def __contains__(self, item: Union[str, EvidenceKey]):

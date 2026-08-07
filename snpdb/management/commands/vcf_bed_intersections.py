@@ -34,5 +34,5 @@ class Command(BaseCommand):
                     logging.warning(str(pbi))
 
         # This will create a lot of warnings for duplicates if already run
-        for backend_vcf in BackendVCF.objects.all():  # filter(combo_vcf__sample_sheet__sequencing_sample__enrichment_kit__in=enrichment_kit_ids):
+        for backend_vcf in BackendVCF.objects.all():  # filter(joint_called_vcf__sample_sheet__sequencing_sample__enrichment_kit__in=enrichment_kit_ids):
             create_backend_vcf_bed_intersections(backend_vcf)

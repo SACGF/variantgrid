@@ -1,7 +1,6 @@
 from django.db import models
 from django.db.models import CASCADE
 from django.urls import reverse
-from django_dag.models import node_factory, edge_factory
 
 from snpdb.models import SoftwareVersion
 
@@ -39,22 +38,3 @@ class VariantCallingPipeline(SoftwareVersion):
 
     def __str__(self):
         return f"{self.description} (Algn: {self.aligner}, V. Caller: {self.variant_caller})"
-
-# Software Pipeline Models replace VariantCallingPipeline and use the acyclic
-# graph module from django_dag
-
-
-class SoftwarePipeline(SoftwareVersion):
-    description = models.TextField(null=True, blank=True)
-
-
-class SoftwarePipelineNode(node_factory('SoftwarePipelineEdge')):
-    softwarepipeline = models.ForeignKey(SoftwarePipeline, on_delete=CASCADE)
-    name = models.TextField()
-    version = models.TextField()
-    parameters = models.TextField()
-    description = models.TextField()
-
-
-class SoftwarePipelineEdge(edge_factory(SoftwarePipelineNode, concrete=False)):
-    name = models.CharField(max_length=32, blank=True, null=True)

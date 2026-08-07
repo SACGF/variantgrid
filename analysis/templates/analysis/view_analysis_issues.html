@@ -73,6 +73,25 @@
 
     <div class="container-table">
         <h3>Analysis Issues</h3>
+
+        {% if jobs_paused %}
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading"><i class="fas fa-pause-circle"></i> Analysis &amp; annotation jobs are PAUSED</h4>
+                <p class="mb-1">No new analysis or annotation work is being leased or launched - in-flight tasks finish, everything else (including newly started analyses) waits until resumed.</p>
+                {% if jobs_control.reason %}<p class="mb-1"><strong>Reason:</strong> {{ jobs_control.reason }}</p>{% endif %}
+                {% if jobs_control.paused_at %}<p class="mb-2"><small>Paused {{ jobs_control.paused_at }}{% if jobs_control.paused_by %} by {{ jobs_control.paused_by }}{% endif %}</small></p>{% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <button name="unpause-jobs" class="btn btn-success">Unpause jobs</button>
+                </form>
+            </div>
+        {% else %}
+            <form method="post" class="mb-3">
+                {% csrf_token %}
+                <button name="pause-jobs" class="btn btn-outline-warning">Pause jobs</button>
+            </form>
+        {% endif %}
+
         <div class="container">
             <div id="analysis-node-summary-graph"></div>
             {% for field, count in field_counts.items %}

@@ -3,7 +3,6 @@
 
 {% if has_classifications %}
 {% load static %}
-{% load datatable_tags %}
 {% load js_tags %}
 <div>
     <script>
@@ -13,20 +12,18 @@
     }
 
     $(document).ready(function() {
-        let tableDom = $('#vc-datatable');
-        if (tableDom.length) {
-            EKeys.load().then(() => {
-                {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %};
-                let vcDatatable = $('#vc-datatable');
-                vcDatatable.on('draw.dt', () => {
-                    Flags.instance.init({userId: '{{user.id}}'});
-                });
-            });
-        }
+        let vcDatatable = $('#vc-datatable');
+        vcDatatable.on('draw.dt', () => {
+            Flags.instance.init({userId: '{{user.id}}'});
+        });
     });
     </script>
 
     <h3>Classifications</h3>
-    {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
+    <table id="vc-datatable"
+           data-datatable-url="{% url 'classification_datatables' %}"
+           data-datatable-data="classificationFilter"
+           data-datatable-filter-count="hide"
+           class="classification-table"></table>
 </div>
 {% endif %}

@@ -6,7 +6,7 @@ from typing import Any, Optional
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, TextField, QuerySet
+from django.db.models import Count, TextField, QuerySet, OuterRef, Subquery, IntegerField
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -19,7 +19,7 @@ from genes.models import CanonicalTranscript, GeneList, GeneSymbol, \
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import update_dict_of_dict_values, JsonDataType
+from library.utils import update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import UserSettings, Q, VariantGridColumn, Tag, ImportStatus
@@ -51,7 +51,12 @@ class GeneListColumns(DatatableConfig[GeneList]):
     def get_initial_queryset(self) -> QuerySet[GeneList]:
         qs = GeneList.filter_for_user(self.user, success_only=False)
         qs = qs.filter(category__isnull=True)  # only show non-special ones
-        return qs.annotate(num_genes=Count("genelistgenesymbol"))
+        qs = qs.select_related("user")  # 'user__username' column - avoid a query per row
+        # Count genes via a subquery rather than Count() + GROUP BY: the GROUP BY makes DataTables'
+        # unfiltered .count() aggregate every gene list's symbols just to count the lists themselves.
+        num_genes_qs = GeneListGeneSymbol.objects.filter(gene_list=OuterRef("pk")) \
+            .order_by().values("gene_list").annotate(c=Count("pk")).values("c")
+        return qs.annotate(num_genes=Subquery(num_genes_qs, output_field=IntegerField()))
 
     def filter_queryset(self, qs: QuerySet[GeneList]) -> QuerySet[GeneList]:
         if gene_symbol_id := self.get_query_param('gene_symbol'):  # This is on gene page
@@ -110,6 +115,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         self.gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
         user_settings = UserSettings.get_for_user(user)
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build = genome_build
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
@@ -323,7 +329,7 @@ class QCGeneCoverageGrid(JqGridUserRowConfig):
             gene_list_ids = gene_list_id_list.split("/")
             if gene_list_ids:
                 for gene_list_id in gene_list_ids:
-                    gene_list = get_object_or_404(GeneList, pk=gene_list_id)
+                    gene_list = GeneList.get_for_user(user, gene_list_id, success_only=False)
                     gene_symbols.update(gene_list.get_gene_names())
 
         q = self.get_coverage_q(gene_coverage_collection, gene_symbols)
@@ -359,19 +365,13 @@ class GeneSymbolWikiColumns(DatatableConfig[GeneSymbolWiki]):
         self.download_csv_button_enabled = True
 
         self.rich_columns = [
-            RichColumn('gene_symbol', orderable=True,
-                       renderer=self.render_gene_symbol, client_renderer="renderGeneSymbol"),
+            RichColumn('gene_symbol', orderable=True, client_renderer="renderGeneSymbol"),
             RichColumn('markdown'),
             RichColumn('last_edited_by__username', name='user', orderable=True),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn('modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
         ]
-
-    @staticmethod
-    def render_gene_symbol(row: dict[str, Any]) -> JsonDataType:
-        gene_symbol = row["gene_symbol"]
-        return {"id": gene_symbol}
 
     def get_initial_queryset(self) -> QuerySet[GeneSymbolWiki]:
         return GeneSymbolWiki.objects.all()

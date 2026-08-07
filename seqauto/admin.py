@@ -27,11 +27,6 @@ class SequencerModelAdmin(ModelAdminBasics):
     pass
 
 
-@admin.register(models.SeqAutoRun)
-class SeqAutoRunAdmin(ModelAdminBasics):
-    pass
-
-
 @admin.register(models.SequencingRun)
 class SequencingRunAdmin(ModelAdminBasics):
     pass
@@ -67,8 +62,8 @@ class FlagstatsAdmin(ModelAdminBasics):
     pass
 
 
-@admin.register(models.VCFFile)
-class VCFFileAdmin(ModelAdminBasics):
+@admin.register(models.SingleSampleVCF)
+class SingleSampleVCFAdmin(ModelAdminBasics):
     pass
 
 

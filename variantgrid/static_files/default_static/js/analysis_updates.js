@@ -35,7 +35,7 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 
 		const error_function = function(data) {
 			that.stop_polling();
-		}
+		};
 
 		const data = 'nodes=' + JSON.stringify(nodes);
 		$.ajax({
@@ -48,10 +48,10 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 
         if (this.task_status_url) {
             const on_task_status_success_function = function (data, status, xhr) {
-                let analysisTasksSpan = $("#analysis-tasks");
-                let errorSpan = $("#analysis-tasks-error", analysisTasksSpan);
-                let analysisActiveSpan = $("#analysis-tasks-active", analysisTasksSpan);
-                let analysisQueueSpan = $("#analysis-tasks-queued", analysisTasksSpan);
+                const analysisTasksSpan = $("#analysis-tasks");
+                const errorSpan = $("#analysis-tasks-error", analysisTasksSpan);
+                const analysisActiveSpan = $("#analysis-tasks-active", analysisTasksSpan);
+                const analysisQueueSpan = $("#analysis-tasks-queued", analysisTasksSpan);
 
                 if (data.error) {
                     errorSpan.text(data.error);
@@ -60,8 +60,8 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
                     analysisTasksSpan.show();
                 } else {
                     errorSpan.hide();
-                    let numActive = data["ACTIVE"] || 0;
-                    let numQueued = data["QUEUED"] || 0;
+                    const numActive = data["ACTIVE"] || 0;
+                    const numQueued = data["QUEUED"] || 0;
                     if (numActive || numQueued) {
                         analysisActiveSpan.text(numActive);
                         if (numQueued) {
@@ -69,14 +69,14 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
                         } else {
                             analysisQueueSpan.empty();
                         }
-                        let title = `Active tasks: ${numActive}, Queued: ${numQueued}`;
+                        const title = `Active tasks: ${numActive}, Queued: ${numQueued}`;
                         analysisTasksSpan.attr("title", title);
                         analysisTasksSpan.show();
                     } else {
                         analysisTasksSpan.hide();
                     }
                 }
-            }
+            };
 
             $.ajax({
                 type: "GET",
@@ -93,7 +93,7 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 			node_id = nodeStatus.id;
 			const node_actions = this.observed_nodes[node_id];
 			const invalid = nodeStatus.valid === false;
-			for (let action in node_actions) {
+			for (const action in node_actions) {
 //				console.log("looking for action: " + action);
 				if (invalid || this.can_dispatch[action](nodeStatus)) {
 //					console.log("can dispatch");

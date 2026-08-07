@@ -2,7 +2,7 @@ import os
 
 
 class AttachmentFileType:
-    """ JFU file attached to some other object """
+    """ File attached to some other object """
     IMAGE = "I"
     PDF = "P"
     WORD_DOC = "W"

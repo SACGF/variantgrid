@@ -7,7 +7,7 @@ from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
 
-from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel
+from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel, LabExternalFilter
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
     Classification, DiscordanceReport, DiscordanceReportClassification
@@ -55,6 +55,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "classification_count": row.get('classification_count'),
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
             "lab_name": row.get('lab__name'),
+            "research": settings.CLASSIFICATION_DISTINGUISH_RESEARCH and bool(row.get('lab__research')),
+            "research_icon": settings.RESEARCH_ICON,
             "share_level": row.get('share_level'),
             "allele_origin_bucket": row.get('allele_origin_bucket'),
             "matches": matches,
@@ -106,7 +108,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     @cached_property
     def genome_build_prefs(self) -> List[GenomeBuild]:
         builds = GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
-        return [gb for gb in builds if gb in ImportedAlleleInfo.supported_genome_builds]
+        return [gb for gb in builds if gb in ImportedAlleleInfo.supported_genome_builds()]
 
     def render_c_hgvs(self, row: CellData) -> JsonDataType:
         def get_preferred_chgvs_json() -> Dict:
@@ -192,6 +194,11 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
                 filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+
+        if settings.CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER:
+            if lab_external := self.get_query_param("lab_external"):
+                if q := LabExternalFilter(lab_external).filter_q():
+                    filters.append(q)
 
         # for view gene symbol
         if protein_position := self.get_query_param("protein_position"):
@@ -344,6 +351,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'lab__organization__short_name',
                     'lab__organization__name',
                     'lab__name',
+                    'lab__research',
                     'allele_origin_bucket',
                     'share_level',
                     'dirty'

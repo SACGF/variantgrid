@@ -1,42 +1,24 @@
 from library.genomics.vcf_utils import get_contigs_header_lines
+from library.genomics.vcf_writer import VCFInfoHeader, build_header_lines
 
 
 def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contig_lines=None, samples=None):
-    """ info_dict - values = dict with keys of 'type', 'description' (optional 'number' default = 1) """
+    """ info_dict - values = dict with keys of 'type', 'description' (optional 'number' default = 1)
 
-    if samples is None:
-        samples = []
+        Thin wrapper over library.genomics.vcf_writer.build_header_lines (issue #1068) """
 
-    header_lines = ['##fileformat=VCFv4.1']
-    if top_lines:
-        header_lines.extend(top_lines)
+    info = None
     if info_dict:
+        info = []
         for info_id, data in info_dict.items():
             data['id'] = info_id
             if data.get("number") is None:
                 data["number"] = 1
-            if description := data.get("description"):
-                # Using double quotes so need to change to singles inside
-                data["description"] = description.replace('"', "'")
+            info.append(VCFInfoHeader(id=info_id, type=data["type"],
+                                      description=data.get("description") or "", number=data["number"]))
 
-            line_template = '##INFO=<ID=%(id)s,Number=%(number)s,Type=%(type)s,Description="%(description)s">'
-            line = line_template % data
-            header_lines.append(line)
-
-    use_format = samples and formats
-    if use_format:
-        header_lines.extend(formats)
-
-    if contig_lines:
-        header_lines.extend(contig_lines)
-
-    colnames = ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']
-    if use_format:
-        colnames += ['FORMAT'] + samples
-
-    header_lines.append('#' + '\t'.join(colnames))
-
-    return header_lines
+    return build_header_lines(meta_lines=top_lines, info=info, formats=formats,
+                              contig_lines=contig_lines, samples=samples)
 
 
 def get_vcf_header_from_contigs(genome_build, info_dict=None, samples=None, use_accession=True):

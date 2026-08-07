@@ -36,8 +36,9 @@ def check_vep() -> dict:
         create_vav_cmd = f"python3 manage.py create_new_variant_annotation_version --genome-build={genome_build}"
         fix_vav = create_vav_cmd
         if vav is None:
-            if vav_inactive := VariantAnnotationVersion.latest(genome_build, active=False):
-                fix_vav = f"Your systems admin needs to set VAV.pk={vav_inactive.pk} to active."
+            if vav_new := VariantAnnotationVersion.latest(genome_build,
+                                                         status=VariantAnnotationVersion.Status.NEW):
+                fix_vav = f"Your systems admin needs to promote VAV.pk={vav_new.pk} to ACTIVE."
 
         vep_data[f"have_variant_annotation_version_{genome_build}"] = {
             "valid": vav is not None,
@@ -46,7 +47,7 @@ def check_vep() -> dict:
 
         run_vep_ok = False
         try:
-            if vav.active:
+            if vav.status == VariantAnnotationVersion.Status.ACTIVE:
                 vep_vav_kwargs = get_vep_variant_annotation_version_kwargs(genome_build)
                 run_vep_ok = True
                 if vav:

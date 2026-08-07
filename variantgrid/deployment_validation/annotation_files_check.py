@@ -6,17 +6,19 @@ from annotation.vep_annotation import VEPConfig
 from genes.models import TranscriptVersion
 from snpdb.models import GenomeBuild
 
-_VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation/VEP"
+_VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation"
 
 
 def _get_fix_instructions(filename) -> str:
+    # Anchor at ANNOTATION_BASE_DIR (not the narrower VEP subdir) so files outside
+    # /data/annotation/VEP - eg reference_fasta in fasta/, liftover chains - map to a real URL
     dirname = os.path.dirname(filename)
-    vg_path = filename.replace(settings.ANNOTATION_VEP_BASE_DIR, _VARIANTGRID_DOWNLOAD_BASE_DIR)
+    vg_path = filename.replace(settings.ANNOTATION_BASE_DIR, _VARIANTGRID_DOWNLOAD_BASE_DIR)
     fix_instructions = f"cd {dirname};wget {vg_path}"
     return fix_instructions
 
 
-def annotation_data_exists(flat=False) -> dict:
+def annotation_data_exists(flat=False, include_tbi_for_gz=False) -> dict:
     all_build_data = {}
     # We can sometimes use files twice, only report once
     unique_filenames = set()
@@ -37,8 +39,10 @@ def annotation_data_exists(flat=False) -> dict:
                 check_files[key] = filename
 
         if settings.LIFTOVER_BCFTOOLS_ENABLED:
-            annotation_build_config = settings.ANNOTATION[genome_build.name]
-            for dest_genome_build, chain_filename in annotation_build_config["liftover"].items():
+            liftover_config = settings.ANNOTATION[genome_build.name]["liftover"]
+            if liftover_fasta := liftover_config.get("fasta"):
+                check_files["liftover_fasta"] = liftover_fasta
+            for dest_genome_build, chain_filename in liftover_config["chain"].items():
                 if dest_genome_build in active_build_names:
                     key = f"bcftools_chain_{genome_build.name}_to_{dest_genome_build}"
                     check_files[key] = chain_filename
@@ -54,7 +58,9 @@ def annotation_data_exists(flat=False) -> dict:
 
             unique_filenames.add(base_filename)
             files = {base_key: base_filename}
-            if ".vcf" in base_filename:
+            tbi_for_gz = (include_tbi_for_gz and base_filename.endswith((".gz", ".bgz"))
+                          and base_filename.startswith(settings.ANNOTATION_VEP_BASE_DIR))
+            if ".vcf" in base_filename or tbi_for_gz:
                 files[f"{base_key}_tbi"] = base_filename + ".tbi"
 
             for key, filename in files.items():
@@ -82,7 +88,7 @@ def check_cdot_data() -> dict:
     for genome_build in GenomeBuild.builds_with_annotation():
         cdot_checks[f"cdot_{genome_build}"] = {
             "valid": TranscriptVersion.objects.filter(genome_build=genome_build).exists(),
-            "fix": f"python manage import_gene_annotation --genome-build={genome_build.name}",
+            "fix": f"python3 manage.py import_cdot_latest --genome-build={genome_build.name}",
         }
 
     try:

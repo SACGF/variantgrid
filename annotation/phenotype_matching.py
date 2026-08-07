@@ -1,11 +1,14 @@
 import logging
+import multiprocessing as mp
 import time
 from typing import Optional, Iterable
 
 import nltk
+from django.conf import settings
+from django.db import connections
 
 from annotation.models.models_phenotype_match import TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, \
-    TextPhenotypeSentence
+    TextPhenotypeSentence, filter_ambiguous_acronym_matches
 from annotation.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
 from annotation.phenotype_tokenizer import PhenotypeTokenizer
 from patients.models import Patient
@@ -32,16 +35,16 @@ def _get_word_combos_and_spans_sorted_by_length(words_and_spans, max_combo_lengt
 
 
 def _get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher: PhenotypeMatcher):
+    """ Returns unsaved TextPhenotypeMatch instances; caller bulk_creates them. """
     offset_start = words_and_spans_subset[0][1][0]
     offset_end = words_and_spans_subset[-1][1][1]
 
     results = []
     for ontology_term_id in phenotype_matcher.get_matches(words_and_spans_subset):
-        tpm = TextPhenotypeMatch.objects.create(text_phenotype=text_phenotype,
-                                                ontology_term_id=ontology_term_id,
-                                                offset_start=offset_start,
-                                                offset_end=offset_end)
-        results.append(tpm)
+        results.append(TextPhenotypeMatch(text_phenotype=text_phenotype,
+                                          ontology_term_id=ontology_term_id,
+                                          offset_start=offset_start,
+                                          offset_end=offset_end))
 
     return results
 
@@ -137,7 +140,10 @@ def _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_match
     words_and_spans = _transform_words(words, tags, spans)
 
     try:
-        parse_words(text_phenotype, words_and_spans, phenotype_matcher)
+        matches = parse_words(text_phenotype, words_and_spans, phenotype_matcher)
+        matches = filter_ambiguous_acronym_matches(matches)
+        if matches:
+            TextPhenotypeMatch.objects.bulk_create(matches)
     except SkipAllPhenotypeMatchException:
         logging.info("Completely skipping: %s", text_phenotype.text)
 
@@ -168,10 +174,12 @@ def _replace_comments_with_spaces(text):
     return ''.join(cleaned_chars)
 
 
-def create_phenotype_description(text, phenotype_matcher=None):
+def create_phenotype_description(text, phenotype_matcher=None, defer_processing=False):
     """ PhenotypeMatcher takes a while to initialize, so can create once and pass in for
-        faster bulk processing """
-    if phenotype_matcher is None:
+        faster bulk processing.
+        If defer_processing is True the PhenotypeDescription/TextPhenotype rows are created but NLP matching is
+        skipped (used by bulk_patient_phenotype_matching to batch the heavy work for parallel execution). """
+    if not defer_processing and phenotype_matcher is None:
         phenotype_matcher = PhenotypeMatcher()
     phenotype_tokenizer = PhenotypeTokenizer()
     phenotype_description = PhenotypeDescription.objects.create(original_text=text)
@@ -198,7 +206,7 @@ def create_phenotype_description(text, phenotype_matcher=None):
         else:
             known_sentences.append(tps)
 
-    if unknown_sentences:
+    if not defer_processing and unknown_sentences:
         for sentence in unknown_sentences:
             try:
                 _process_text_phenotype(sentence.text_phenotype, phenotype_tokenizer, phenotype_matcher)
@@ -210,33 +218,84 @@ def create_phenotype_description(text, phenotype_matcher=None):
     return phenotype_description
 
 
-def bulk_patient_phenotype_matching(patients=None):
+_WORKER_PHENOTYPE_TOKENIZER: Optional[PhenotypeTokenizer] = None
+_WORKER_PHENOTYPE_MATCHER: Optional[PhenotypeMatcher] = None
+
+
+def _phenotype_worker_init():
+    """Pool initializer: drop inherited DB connections, warm NLTK models, build a per-worker PhenotypeMatcher."""
+    connections.close_all()
+    # Warm NLTK so the averaged-perceptron tagger + tokenizer aren't loaded
+    # lazily on the first sentence each worker processes.
+    nltk.pos_tag(nltk.word_tokenize("warm up"))
+    global _WORKER_PHENOTYPE_TOKENIZER, _WORKER_PHENOTYPE_MATCHER
+    _WORKER_PHENOTYPE_TOKENIZER = PhenotypeTokenizer()
+    _WORKER_PHENOTYPE_MATCHER = PhenotypeMatcher()
+
+
+def _process_text_phenotype_by_pk(text_phenotype_pk):
+    text_phenotype = TextPhenotype.objects.get(pk=text_phenotype_pk)
+    _process_text_phenotype(text_phenotype, _WORKER_PHENOTYPE_TOKENIZER, _WORKER_PHENOTYPE_MATCHER)
+
+
+def bulk_patient_phenotype_matching(patients=None, cores=1):
     if patients is None:
         patients = Patient.objects.filter(phenotype__isnull=False).exclude(phenotype='')
-
-    start = time.time()
-    phenotype_matcher = PhenotypeMatcher()
-    loaded = time.time()
-    logging.info("load references: %.2d secs", loaded - start)
+        exclude_string = getattr(settings, "PATIENT_PHENOTYPE_EXCLUDE_STRING", None)
+        if exclude_string:
+            patients = patients.exclude(phenotype__contains=exclude_string)
 
     patients = list(patients)
     num_patients = len(patients)
-    num_parsed_phenotypes = 0
-    if num_patients:
-        for i, p in enumerate(patients):
-            parsed_phenotypes = p.process_phenotype_if_changed(phenotype_matcher=phenotype_matcher)
-            num_parsed_phenotypes += parsed_phenotypes
-            if not i % 50:
-                perc_complete = 100.0 * i / num_patients
-                logging.info("%d patients %0.2f%% complete", i, perc_complete)
-
-        bulk_start = time.time()
-        match_time = bulk_start - loaded
-        logging.info("bulk_patient_phenotype_matching: %.2d", match_time)
-        if num_parsed_phenotypes:
-            time_per_patient = match_time / num_parsed_phenotypes
-            pps = 1.0 / time_per_patient
-            logging.info("%d parsed patient phenotypes - %.2f parsed per second/%.2f seconds per patient",
-                         num_parsed_phenotypes, pps, time_per_patient)
-    else:
+    if not num_patients:
         logging.info("No patients")
+        return
+
+    # Phase 1: walk patients and register PhenotypeDescription/TextPhenotype/TextPhenotypeSentence rows.
+    # No NLP runs here, so this stays single-threaded and avoids races on TextPhenotype.get_or_create.
+    start = time.time()
+    num_parsed_phenotypes = 0
+    for i, p in enumerate(patients):
+        parsed_phenotypes = p.process_phenotype_if_changed(defer_processing=True)
+        num_parsed_phenotypes += parsed_phenotypes
+        if not i % 50:
+            perc_complete = 100.0 * i / num_patients
+            logging.info("Registering patient sentences: %d/%d (%0.2f%%)", i, num_patients, perc_complete)
+    logging.info("bulk_patient_phenotype_matching: register sentences took %.2f secs", time.time() - start)
+
+    # Phase 2: NLP-process each unique unprocessed sentence exactly once, optionally in parallel.
+    unprocessed_pks = list(TextPhenotype.objects.filter(processed=False).values_list("pk", flat=True))
+    num_sentences = len(unprocessed_pks)
+    if not num_sentences:
+        logging.info("No unprocessed sentences to match")
+        return
+
+    logging.info("Matching %d unique sentences across %d core(s)", num_sentences, cores)
+    start = time.time()
+    if cores > 1:
+        connections.close_all()  # ensure no live parent connection is inherited across fork
+        ctx = mp.get_context("fork")
+        with ctx.Pool(cores, initializer=_phenotype_worker_init) as pool:
+            for done, _ in enumerate(
+                pool.imap_unordered(_process_text_phenotype_by_pk, unprocessed_pks, chunksize=10),
+                start=1,
+            ):
+                if not done % 50:
+                    perc_complete = 100.0 * done / num_sentences
+                    logging.info("Sentences processed: %d/%d (%0.2f%%)", done, num_sentences, perc_complete)
+    else:
+        phenotype_tokenizer = PhenotypeTokenizer()
+        phenotype_matcher = PhenotypeMatcher()
+        for j, pk in enumerate(unprocessed_pks):
+            text_phenotype = TextPhenotype.objects.get(pk=pk)
+            _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_matcher)
+            if not j % 50:
+                perc_complete = 100.0 * j / num_sentences
+                logging.info("Sentences processed: %d/%d (%0.2f%%)", j, num_sentences, perc_complete)
+
+    ts = time.time() - start
+    logging.info("bulk_patient_phenotype_matching: NLP took %.2f secs", ts)
+    time_per_sentence = ts / num_sentences
+    sps = 1.0 / time_per_sentence if time_per_sentence else 0
+    logging.info("%d sentences matched - %.2f per second/%.4f seconds per sentence",
+                 num_sentences, sps, time_per_sentence)

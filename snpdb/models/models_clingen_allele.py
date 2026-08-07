@@ -231,9 +231,13 @@ class ClinGenAllele(TimeStampedModel):
         msg = f"{self}/{genome_build} not in ClinGenAllele genomicAlleles response"
         raise ClinGenAllele.ClinGenBuildNotInResponseError(msg)
 
-    def get_variant_coordinate(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
+    def get_variant_coordinate(self, genome_build: GenomeBuild, hgvs_matcher=None) -> 'VariantCoordinate':
+        """ Optionally pass in hgvs_matcher to save re-instantiating it all the time
+            (each one opens genome FASTA file handles) """
         from genes.hgvs import get_hgvs_variant_coordinate
         g_hgvs = self.get_g_hgvs(genome_build)
+        if hgvs_matcher:
+            return hgvs_matcher.get_variant_coordinate(g_hgvs)
         return get_hgvs_variant_coordinate(g_hgvs, genome_build)
 
     def get_variant_string(self, genome_build: GenomeBuild, abbreviate=False):
@@ -241,7 +245,7 @@ class ClinGenAllele(TimeStampedModel):
         return Variant.format_tuple(*self.get_variant_coordinate(genome_build), abbreviate=abbreviate)
 
     @property
-    def human_url(self):
+    def human_url(self) -> str:
         return f"{settings.CLINGEN_ALLELE_REGISTRY_DOMAIN}/redmine/projects/registry/genboree_registry/by_caid?caid={self}"
 
     @staticmethod

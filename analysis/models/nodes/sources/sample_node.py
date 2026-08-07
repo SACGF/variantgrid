@@ -1,7 +1,6 @@
 from typing import Optional
 
 from auditlog.registry import auditlog
-from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import SET_NULL
 from django.db.models.query_utils import Q
@@ -9,13 +8,10 @@ from django.db.models.query_utils import Q
 from analysis.models import GeneCoverageMixin
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAlleleFrequencyFilter
 from analysis.models.nodes.cohort_mixin import SampleMixin
-from annotation.models import SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, \
-    SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter, \
-    SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter
+from analysis.models.nodes.sources._stats_cache import get_cached_label_count_for_cohort
 from genes.models import SampleGeneList
 from patients.models_enums import Zygosity
-from snpdb.models import SampleStats, SampleStatsPassingFilter, Sample
-from snpdb.models.models_enums import BuiltInFilters
+from snpdb.models import Sample
 
 
 class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
@@ -163,31 +159,29 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         return any(getattr(self, f) for f in self.FIELDS_THAT_CHANGE_QUERYSET)
 
     def _get_cached_label_count(self, label):
-        """ Input counts can be static, so use cached AnnotationStats if we can """
+        """ Input counts can be static, so use cached CohortGenotype*Stats if we can. """
         if self._has_filters_that_affect_label_counts():
             return None  # Have to do counts
+        if self.sample is None:
+            return None
 
-        CLASSES = {
-            BuiltInFilters.TOTAL: (SampleStats, SampleStatsPassingFilter),
-            BuiltInFilters.CLINVAR: (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter),
-            BuiltInFilters.OMIM: (SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter),
-            BuiltInFilters.IMPACT_HIGH_OR_MODERATE: (SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter),
-        }
-        annotation_version = self.analysis.annotation_version
-        count = None
-        try:
-            filter_code = self.get_filter_code()
-            klazz = CLASSES[label][filter_code]  # Maybe exception and out of range
-            obj = klazz.load_version(self.sample, annotation_version)
-            zygosities = [self.zygosity_ref, self.zygosity_het, self.zygosity_hom, self.zygosity_unk]
-            if self.sample and not self.sample.has_genotype:
-                zygosities = [True] * len(zygosities)  # Show everything
+        filter_code = self.get_filter_code()
+        if filter_code not in (0, 1):
+            return None  # Custom filters defeat the cache
 
-            count = obj.count_for_zygosity(*zygosities, label=label)
-        except (IndexError, KeyError, ObjectDoesNotExist):
-            pass  # OK, will just calculate it
+        zygosities = [self.zygosity_ref, self.zygosity_het, self.zygosity_hom, self.zygosity_unk]
+        if not self.sample.has_genotype:
+            zygosities = [True] * len(zygosities)  # Show everything
 
-        return count
+        return get_cached_label_count_for_cohort(
+            cohort=self.sample.vcf.cohort,
+            sample=self.sample,
+            filter_key=None,  # SampleNode never applies a node-side filter
+            annotation_version=self.analysis.annotation_version,
+            passing_filter=bool(filter_code),
+            zygosities=zygosities,
+            label=label,
+        )
 
     @staticmethod
     def get_node_class_label():

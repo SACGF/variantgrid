@@ -1,11 +1,11 @@
 import operator
-import re
 from functools import reduce
 from typing import Any
 
 from django.db.models import Q
 
-_SAFE_KEY_RE = re.compile(r'^[a-zA-Z]\w*$')
+# legacy filter key that tests allele origin rather than an evidence key of its own
+SOMATIC_FILTER_KEY = 'somatic'
 
 
 class QueryJsonFilter:
@@ -45,7 +45,7 @@ class QueryJsonFilter:
 
     def convert_to_q_w_key(self, key: str, value) -> Q:
         # special hardcoded segment, should migrate
-        if key == 'somatic':
+        if key == SOMATIC_FILTER_KEY:
             if value is False:
                 # old code also allowed value to be isnull
                 return ~self.q('allele_origin', ['somatic'], 'in') | self.q('allele_origin', True, 'isnull')
@@ -61,8 +61,6 @@ class QueryJsonFilter:
                 return self.convert_to_q(value, operator.__and__)
             else:
                 # key is assumed to be regular value key
-                if not _SAFE_KEY_RE.match(key):
-                    raise ValueError(f"Filter key contains unsafe characters: {key!r}")
                 if isinstance(value, list):
                     handle_none = False
                     is_not = False

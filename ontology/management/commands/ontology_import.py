@@ -1,15 +1,19 @@
 import csv
 import itertools
 import json
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Optional
 
 import pandas as pd
 import pronto
 from django.core.management import BaseCommand
+from django.utils import timezone
 
+from annotation.models import InvalidAnnotationVersionError
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC, HGNCImport
 from library.utils import file_md5sum
@@ -290,9 +294,9 @@ def load_hpo(filename: str, force: bool):
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
-    print("About to pronto the file")
+    logging.info("About to pronto the file")
     ot = pronto.Ontology(filename)
-    print("Pronto complete")
+    logging.info("Pronto complete")
     scope_lookup = {v.upper(): k for k, v in HPOSynonymScope.choices}
 
     for term in ot.terms():
@@ -342,7 +346,7 @@ def load_hpo(filename: str, force: bool):
                 relation=OntologyRelation.IS_A
             )
     ontology_builder.complete(verbose=True)
-    print("Committing...")
+    logging.info("Committing...")
 
 
 def load_phenotype_to_genes(filename: str, force: bool):
@@ -526,14 +530,26 @@ def load_omim(filename: str, force: bool):
     ontology_builder.complete(purge_old_terms=True)
 
 
-def sync_hgnc():
+HGNC_IMPORT_STALE_AGE = timedelta(days=30)
+
+
+def sync_hgnc(force=False):
 
     latest_hgnc_import = HGNCImport.objects.order_by('-pk').first()
+    if latest_hgnc_import is None:
+        print("No HGNCImport found. Run the 'Update from web' task for HGNC on the annotation admin page first.")
+        return
+    age = timezone.now() - latest_hgnc_import.created
+    if age > HGNC_IMPORT_STALE_AGE:
+        print(f"WARNING: latest HGNCImport (pk={latest_hgnc_import.pk}) is {age.days} days old "
+              f"(created {latest_hgnc_import.created:%Y-%m-%d}). "
+              f"Consider running the 'Update from web' HGNC task on the annotation admin page for fresher data.")
     builder = OntologyBuilder(
         filename=f"hgnc_import_{latest_hgnc_import.pk}",
         context="hgnc sync",
         import_source="HGNC Sync",
         processor_version=1,
+        force_update=force,
         versioned=False
     )
     builder.ensure_hash_changed(f"{latest_hgnc_import.pk}")
@@ -572,7 +588,10 @@ class Command(BaseCommand):
 
         if options.get("hgnc_sync"):
             print("Syncing HGNC")
-            sync_hgnc()
+            try:
+                sync_hgnc(force=force)
+            except OntologyBuilderDataUpToDateException:
+                print("HGNC latest import PK is the same as last sync")
 
         if filename := options.get("gencc"):
             try:
@@ -619,4 +638,14 @@ class Command(BaseCommand):
         print("*** To make sure no matched terms have become obsolete")
 
         # Create a new OntologyVersion with all the new imports
-        OntologyVersion.latest()
+        try:
+            OntologyVersion.latest()
+        except InvalidAnnotationVersionError as e:
+            # The imports above are all committed by now, so this is a warning not a failure - the new
+            # OntologyVersion exists, it's only the AnnotationVersion bump that needs gene annotation first
+            print("*** Ontology import finished, but the AnnotationVersion was left as-is:")
+            print(f"    {e}")
+            if ontology_version := OntologyVersion.objects.order_by("pk").last():
+                if OntologyVersion.objects.count() > 1:
+                    print(f"*** Add --ontology-version {ontology_version.pk} to build gene annotation "
+                          "against the ontology just imported")

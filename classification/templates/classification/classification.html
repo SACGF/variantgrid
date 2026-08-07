@@ -11,6 +11,13 @@
 {% block title %}Classification Record{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
+{% if record and attachments_enabled %}
+<link href="{% static 'js/lib/filepond/4.32.12/filepond.min.css' %}" rel="stylesheet">
+<link href="{% static 'js/lib/filepond/file-poster/2.5.2/filepond-plugin-file-poster.min.css' %}" rel="stylesheet">
+<link href="{% static 'js/lib/filepond/filepond-overrides.css' %}" rel="stylesheet">
+<script src="{% static 'js/lib/filepond/4.32.12/filepond.min.js' %}"></script>
+<script src="{% static 'js/lib/filepond/file-poster/2.5.2/filepond-plugin-file-poster.min.js' %}"></script>
+{% endif %}
 <script>
     let vcform = new VCForm();
 
@@ -43,6 +50,7 @@
                     attachmentsEnabled: {{ attachments_enabled | jsonify }},
                     withdrawReasons: {{ withdraw_reasons | jsonify }},
                     conditionMatchingIsViewEnabled: {{ "condition_matching" | is_view_enabled | jsonify }},
+                    mmeEnabled: {{ mme_enabled | jsonify }},
                 },
                 keys,
                 record,
@@ -51,23 +59,58 @@
             document.title = getPageTitle(record);
         });
     });
-    window.fileupload_ready = function () {
-        $(document).ready(() => {
-            let $form = $('#fileupload');
-            {% if existing_files %}
-                let existingFiles = {{ existing_files | jsonify }};
-                $form.fileupload('option', 'done').call($form, $.Event('done'), {result: {files: existingFiles}});
-            {% endif %}
-        });
-    };
+    {% if mme_enabled %}
+    // Fetched separately so its ontology/variant resolution doesn't tax every page view.
     $(document).ready(() => {
-        {% if not record.can_write %}
-            $('#fileupload button').remove();
-            $('#fileupload input').remove();
-            $('#fileupload .progress').remove();
-            $('#fileupload .btn').remove();
-        {% endif %}
+        $('#vcform-mme .card-body').load(
+            "{% url 'mme_classification_panel' classification_id=record.id %}?fragment=1",
+            function(response, status) {
+                if (status === 'error') {
+                    $(this).html('<span class="text-muted">MatchMaker Exchange status unavailable.</span>');
+                }
+            });
     });
+    {% endif %}
+    {% if record and attachments_enabled %}
+    $(document).ready(() => {
+        const inputElement = document.querySelector('#classification-file-upload');
+        if (!inputElement || typeof FilePond === 'undefined') {
+            return;
+        }
+        if (typeof FilePondPluginFilePoster !== 'undefined') {
+            FilePond.registerPlugin(FilePondPluginFilePoster);
+        }
+        const csrftoken = getCookie('csrftoken');
+        const pond = FilePond.create(inputElement, {
+            allowMultiple: true,
+            credits: false,
+            server: {
+                process: {
+                    url: "{% url 'classification_file_upload' classification_id=record.id %}",
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrftoken},
+                },
+                revert: (uniqueFileId, load, error) => {
+                    fetch("/classification/classification_file_delete/" + uniqueFileId, {
+                        method: 'DELETE',
+                        headers: {'X-CSRFToken': csrftoken},
+                    }).then((resp) => {
+                        if (resp.ok) {
+                            load();
+                        } else {
+                            error('Could not revert');
+                        }
+                    }).catch(() => error('Could not revert'));
+                },
+            },
+        });
+
+        const browseButton = document.querySelector('#classification-file-browse');
+        if (browseButton) {
+            browseButton.addEventListener('click', () => pond.browse());
+        }
+    });
+    {% endif %}
 
     function getPageTitle(record) {
         // Not much space in tabs so move gene symbol to front
@@ -114,9 +157,20 @@
             {% if record and attachments_enabled %}
                 <div class="d-none">
                     <div id='upload-section' class="content">
-                        <div id="jfu-container">
-                            {% load jfutags %}
-                            {% jfu 'classification/classification_file_upload.html' 'classification_file_upload' classification_id=record.id %}
+                        {% if record.can_write %}
+                            <button type="button" id="classification-file-browse" class="btn btn-success mb-2">Add files...</button>
+                            <input type="file" id="classification-file-upload" name="filepond" multiple>
+                        {% endif %}
+                        <div id="classification-attachments-list" class="mt-2">
+                            {% for fd in existing_files %}
+                                <div class="d-inline-block mr-2 mb-2" data-attachment-pk="{{ fd.pk }}">
+                                    {% if fd.thumbnailUrl %}
+                                        <a href="{{ fd.url }}"><img src="{{ fd.thumbnailUrl }}" class="thumbnail" alt="{{ fd.name }}" title="{{ fd.name }}" /></a>
+                                    {% else %}
+                                        <a href="{{ fd.url }}">{{ fd.name }}</a>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -128,8 +182,34 @@
         </div>
         <div id="vc-extras">
             <div id="vcform-summary" class="card m-2">
-                <div class="card-header">{{ record.org_name }} / {{ record.lab_name }} / {{ record.cr_lab_id }}</div>
+                <div class="card-header">{{ record.org_name }} / {{ record.lab_name }} / {{ record.cr_lab_id }}{% if classification_distinguish_research and vc.lab.research %} <span class="badge badge-info" title="Research lab">{{ research_icon }} Research</span>{% endif %}</div>
                 <div class="card-body"></div>
+                {% if sync_statuses %}
+                    {# Footer rather than a second card-body, which updateTitle() would empty. Sits directly #}
+                    {# under the share level message, and only moves when the hourly sync task runs.        #}
+                    <div id="vcform-sync" class="card-footer">
+                        {% for status in sync_statuses %}
+                            <div class="{% if not forloop.first %}mt-3 {% endif %}sync-status">
+                                <div><i class="{{ status.icon }}"></i> {{ status.label }} - {{ status.destination_name }}</div>
+                                {% if status.last_synced %}
+                                    <div class="text-muted">Last uploaded {{ status.last_synced|timesince }} ago</div>
+                                {% endif %}
+                                {% if status.reasons %}
+                                    <ul class="mb-0 pl-4">
+                                        {% for reason in status.reasons %}<li>{{ reason }}</li>{% endfor %}
+                                    </ul>
+                                {% endif %}
+                                {% if status.note %}
+                                    <div class="text-muted">{{ status.note }}</div>
+                                {% endif %}
+                                {% if status.remote_url %}
+                                    <div><a href="{{ status.remote_url }}" target="_blank" rel="noopener">View remote record <i class="fas fa-external-link-alt"></i></a></div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        <div class="text-muted mt-2" style="font-size:11px">As at {% now "j M Y H:i" %}</div>
+                    </div>
+                {% endif %}
             </div>
         {% if duplicate_records %}
             <div class="card m-2">
@@ -179,6 +259,17 @@
                 <div class="card-header">Links</div>
                 <div class="card-body card-body-list"></div>
             </div>
+
+            {% if mme_enabled %}
+                {# Every classification, not just eligible ones - the card explains why a #}
+                {# record doesn't qualify. Body loaded lazily, see above.                   #}
+                <div id="vcform-mme" class="card m-2">
+                    <div class="card-header">MatchMaker Exchange</div>
+                    <div class="card-body">
+                        <span class="text-muted">Loading…</span>
+                    </div>
+                </div>
+            {% endif %}
 
             <div class="card m-2">
                 <div class="card-header">Criteria Summary</div>

@@ -123,8 +123,12 @@ class SearchInput:
         from annotation.models import AnnotationVersion
         from classification.models import Classification
 
-        annotation_version = AnnotationVersion.latest(genome_build)
-        variant_qs = get_variant_queryset_for_annotation_version(annotation_version)
+        # Search receivers filter Variants by locus/position/pk/alt and don't join to annotation
+        # partitions, so a plain queryset returns identical results without the partition transformer.
+        if annotation_version := AnnotationVersion.latest_or_none(genome_build, context="Search"):
+            variant_qs = get_variant_queryset_for_annotation_version(annotation_version)
+        else:
+            variant_qs = Variant.objects.all()
         variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
         if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not self.user.is_superuser:
             variant_qs = variant_qs.filter(Classification.get_variant_q(self.user, genome_build))

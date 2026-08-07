@@ -1,6 +1,6 @@
 import operator
 import re
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Optional, Any
 
 from django.conf import settings
@@ -20,6 +20,7 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag, VariantWiki
 from snpdb.models.models_user_settings import UserSettings, UserGridConfig
+from snpdb.variant_filters import get_all_variants_filters, get_variant_filter_q, is_selective
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from variantopedia.interesting_nearby import get_nearby_qs
 
@@ -71,10 +72,20 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
 
 class AllVariantsGrid(AbstractVariantGrid):
     caption = 'All Variants'
+    # Sorting on a joined or unindexed column full-sorts the whole result set before LIMIT, blowing the
+    # statement_timeout (@see issues #1279, #1651). Nothing is user-sortable - every page is served in genomic
+    # order (see DEFAULT_ORDER_BY), which is the one ordering a contig-filtered page can stream. @see issue #1663
+    SORTABLE_FIELDS: set[str] = set()
+    # (contig, position) is the leading edge of the snpdb_locus(contig_id, position, ref_id) unique index, so a
+    # contig-filtered page streams straight off it via an incremental sort instead of full-sorting the result set
+    # (id-descending walks the whole variant table under a contig filter - measured 100-1000x slower). The pk
+    # tiebreaker makes pagination stable. @see issue #1663
+    DEFAULT_ORDER_BY = ("locus__contig_id", "locus__position", "pk")
 
     def __init__(self, user, genome_build_name, **kwargs):
         user_settings = UserSettings.get_for_user(user)
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build = genome_build
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
@@ -85,28 +96,57 @@ class AllVariantsGrid(AbstractVariantGrid):
         update_dict_of_dict_values(self._overrides, override)
         self.vzcc = VariantZygosityCountCollection.get_global_germline_counts()
         self.extra_filters = kwargs.pop("extra_filters", {})
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': "desc",
+        self.extra_config.update({'sortname': 'locus__position',
+                                  'sortorder': "asc",
                                   'shrinkToFit': False})
 
     def _get_base_queryset(self) -> QuerySet:
         return get_variant_queryset_for_annotation_version(self.annotation_version)
 
-    def _get_q(self) -> Optional[Q]:
-        filter_list = [
-            Variant.get_contigs_q(self.annotation_version.genome_build),
-        ]
+    @cached_property
+    def filters(self) -> dict:
+        """ The page sends the current selection as extra_filters. A direct grid hit (CSV export, bookmarked
+            grid URL) has none, so fall back to what the user last chose on the page """
         if self.extra_filters:
-            if min_count := int(self.extra_filters.get("min_count", 0)):
-                filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gte": min_count}))
-        else:
+            return self.extra_filters
+        return get_all_variants_filters(self.user, self.genome_build)
+
+    def _get_q(self) -> Optional[Q]:
+        filters = self.filters
+        if not is_selective(filters):
+            # Match nothing rather than scanning the whole variant table - the page explains why
+            return Q(pk__isnull=True)
+
+        filter_list = [
+            get_variant_filter_q(self.genome_build, self.annotation_version,
+                                 contig_ids=filters.get("contig_ids"),
+                                 non_standard_contigs=filters.get("non_standard_contigs", False),
+                                 gene_symbols=filters.get("gene_symbols"),
+                                 variant_types=filters.get("variant_types")),
+            Variant.get_no_reference_q(),
+        ]
+        if min_count := int(filters.get("min_count") or 0):
             # benchmarking - I found it much faster to do both of these queries (seems redundant)
             hom_nonzero = Q(**{f"{self.vzcc.hom_alias}__gt": 0})
             het_nonzero = Q(**{f"{self.vzcc.het_alias}__gt": 0})
             filter_list.append(hom_nonzero | het_nonzero)
-            filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gt": 0}))
+            filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gte": min_count}))
 
         return reduce(operator.and_, filter_list)
+
+    def get_colmodels(self, remove_server_side_only=False):
+        """ Only the allowlisted columns keep their sort arrows """
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
+        for cm in colmodels:
+            if cm.get("name") not in self.SORTABLE_FIELDS:
+                cm["sortable"] = False
+        return colmodels
+
+    def _sort_items(self, items, sidx, sord):
+        """ Serve every page in genomic order regardless of any sidx a hand-crafted grid URL supplies. Emitted as
+            a plain order_by so it matches the snpdb_locus(contig_id, position, ref_id) btree exactly - the base
+            class's F(sidx).asc(nulls_first=...) path defeats that index. @see issue #1663 """
+        return items.order_by(*self.DEFAULT_ORDER_BY)
 
     def _get_approx_count(self, qs) -> int:
         sql, params = qs.query.sql_with_params()
@@ -263,6 +303,7 @@ class TaggedVariantGrid(AbstractVariantGrid):
 
     def __init__(self, user, genome_build_name, extra_filters=None):
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build = genome_build
         tag_ids = []
         if extra_filters:
             if tag_id := extra_filters.get("tag"):

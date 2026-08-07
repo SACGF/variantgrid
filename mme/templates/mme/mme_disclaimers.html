@@ -1,0 +1,32 @@
+{# base_external - served anonymously, so the logged-in page chrome is unavailable #}
+{% extends "uicore/page/base_external.html" %}
+{% block title %}MatchMaker Exchange disclaimers{% endblock title %}
+{% block content %}
+    <div class="container">
+        <h3>MatchMaker Exchange — connected database disclaimers</h3>
+        <p class="text-muted">
+            Published disclaimers and terms of each database we are connected to by API. A
+            disclaimer returned live with a query response supersedes the text below, and is
+            displayed with those results.
+        </p>
+
+        {% for node in nodes %}
+            <div class="card mb-3">
+                <div class="card-header">{{ node.node_id }}</div>
+                <div class="card-body">
+                    {% if node.disclaimer %}<p>{{ node.disclaimer }}</p>{% endif %}
+                    {% if node.terms %}<p><strong>Terms:</strong> {{ node.terms }}</p>{% endif %}
+                    {% if not node.disclaimer and not node.terms %}
+                        <p class="text-muted">
+                            This node publishes no disclaimer or terms in
+                            <a href="https://github.com/ga4gh/mme-apis/tree/master/disclaimers" target="_blank">the
+                            MME disclaimers repository</a>.
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        {% empty %}
+            <p class="text-muted">No MatchMaker Exchange nodes are currently connected.</p>
+        {% endfor %}
+    </div>
+{% endblock content %}

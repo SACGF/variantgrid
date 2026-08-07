@@ -26,6 +26,11 @@ input.narrow {
             {{ hidden }}
         {% endfor %}
 		<span class="fieldWrapper">
+			{{ form.contigs.errors }}
+			<label for="{{ form.contigs.id_for_label }}">Chromosomes:</label>
+			{{ form.contigs }}
+		</span>
+		<span class="fieldWrapper">
 			{{ form.gene_symbol.errors }}
 			<label for="{{ form.gene_symbol.id_for_label }}">Gene:</label>
 			{{ form.gene_symbol }}

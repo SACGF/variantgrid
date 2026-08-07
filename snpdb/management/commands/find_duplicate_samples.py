@@ -5,14 +5,20 @@ from collections import defaultdict
 
 from django.core.management.base import BaseCommand
 
-from snpdb.models import Sample
+from snpdb.models import CohortGenotypeStats
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
         duplicate_samples = defaultdict(list)
-        qs = Sample.objects.filter(no_dna_control=False, samplestats__variant_count__isnull=False)
-        for sample_id, name, vcf_name, variant_count in qs.values_list("pk", "name", "vcf__name", "samplestats__variant_count"):
+        # Per-sample CohortGenotypeStats rows (sample IS NOT NULL, filter_key NULL,
+        # passing_filter=False) carry variant_count for each Sample.
+        stats_qs = (CohortGenotypeStats.objects
+                    .filter(sample__isnull=False, filter_key__isnull=True,
+                            passing_filter=False, sample__no_dna_control=False,
+                            variant_count__isnull=False)
+                    .values_list("sample_id", "sample__name", "sample__vcf__name", "variant_count"))
+        for sample_id, name, vcf_name, variant_count in stats_qs:
             if "_NDC_" in name:
                 continue
             key = f"{name}_{variant_count}"

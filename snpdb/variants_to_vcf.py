@@ -1,8 +1,9 @@
+import io
 from collections import Counter
 
 from bgzip import BGZipWriter
 
-from library.genomics.vcf_utils import vcf_allele_is_symbolic
+from library.genomics.vcf_writer import VCFWriter, symbolic_alt_info
 from snpdb.models import VCF, Zygosity, Sample
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs, get_vcf_header_lines
 
@@ -36,7 +37,7 @@ VARIANT_GRID_INFO_DICT = {
 
 
 def qs_info_dict_field_values(qs, info_dict):
-    args = {"locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq"}
+    args = {"locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "end", "svlen"}
     for data in info_dict.values():
         variant_path = data.get(VARIANT_PATH)
         if variant_path:
@@ -64,24 +65,15 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, 
     else:
         chrom_key = "locus__contig__name"
 
-    for line in header_lines:
-        line_bytes = (line + '\n').encode()
-        f.write(line_bytes)
-
+    writer = VCFWriter(f, header_lines)
     i = 0
     for data in sorted_values:
         chrom = data[chrom_key]
         pos = data["locus__position"]
         ref = data["locus__ref__seq"]
         alt = data["alt__seq"]
-        end = data["end"]
-        svlen = data["svlen"]
-        info = {}
-
-        if vcf_allele_is_symbolic(alt):
-            info["END"] = end
-            info["SVLEN"] = svlen
-            info["SVTYPE"] = alt[1:-1]  # Strip off brackets
+        # END/SVLEN/SVTYPE are only needed (and only selected) for symbolic alts
+        info = symbolic_alt_info(alt, svlen=data.get("svlen"), end=data.get("end"))
 
         if info_dict:
             for info_name, info_data in info_dict.items():
@@ -90,13 +82,7 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, 
                     value = func(variant_path, data)
                     info[info_name] = value
 
-        if info:
-            info_str = ';'.join([f"{k}={v}" for k, v in info.items()])
-        else:
-            info_str = '.'
-        line = '\t'.join(map(str, (chrom, pos, '.', ref, alt or ref, '.', '.', info_str)))
-        line_bytes = (line + '\n').encode()
-        f.write(line_bytes)
+        writer.write_record(chrom, pos, ref, alt or ref, info=info or None)
         i += 1
 
     return i
@@ -132,10 +118,10 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
     empty = [None] * len(samples)
 
     with open(exported_vcf_filename, "wb") as raw:
-        with BGZipWriter(raw) as f:
-            for line in header_lines:
-                line_bytes = (line + '\n').encode()
-                f.write(line_bytes)
+        with BGZipWriter(raw) as bgzip_f:
+            # bgzip is binary; wrap as text so VCFWriter only ever deals with str
+            f = io.TextIOWrapper(bgzip_f, encoding="utf-8", write_through=True)
+            writer = VCFWriter(f, header_lines)
 
             values = qs.values_list(*columns)
             for pk, chrom, position, ref, alt, samples_zygosity, allele_depth, read_depth, allele_frequency in values:
@@ -170,9 +156,11 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
                             sample = ":".join((str(s) for s in (gt, ad, dp)))
                         samples_list.append(sample)
 
-                row = [chrom, str(position), str(pk), ref, alt or ref, '.', '.', '.', vcf_format] + samples_list
-                line = '\t'.join(row)
-                line_bytes = (line + '\n').encode()
-                f.write(line_bytes)
+                writer.write_record(chrom, position, ref, alt or ref, vcf_id=pk,
+                                    fmt=vcf_format, sample_calls=samples_list)
+
+            # flush + detach so the BGZipWriter (closed by its 'with') is closed exactly once
+            f.flush()
+            f.detach()
 
     return {s: zc for s, zc, w in zip(samples, sample_zygosity_count, sample_whitelist) if w}

@@ -223,7 +223,7 @@ class PreviewData:
             try:
                 internal_url = obj.get_absolute_url()
             except NoReverseMatch:
-                internal_url = "javascript:alert('Could not load a view for this type of result')"
+                internal_url = None
 
         if genome_builds is None:
             if hasattr(obj, "genome_build") and (genome_build := obj.genome_build):

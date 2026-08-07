@@ -20,7 +20,10 @@ class EventLogHandler(logging.Handler):  # Inherit from logging.Handler
             # or else was imported before its application was loaded. This will no longer be supported in Django 1.9.
             Event = import_class('eventlog.models.Event')
 
-            user = record.request.user
+            request = getattr(record, 'request', None)
+            user = getattr(request, 'user', None)
+            if user is None or not getattr(user, 'is_authenticated', False):
+                return
             app_name = record.module.split('.')[0]
             if record.levelname == 'WARNING':
                 severity = LogLevel.WARNING

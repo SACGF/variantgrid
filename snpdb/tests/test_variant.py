@@ -4,8 +4,8 @@ from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
-from snpdb.models import GenomeBuild, Variant, VariantCoordinate
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.models import AlleleOrigin, GenomeBuild, Variant, VariantAllele, VariantCoordinate
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 
 class VariantTestCase(TestCase):
@@ -145,6 +145,24 @@ class VariantTestCase(TestCase):
         vc_from_explicit = vc_explicit.as_internal_canonical_form(self.grch37)
         self.assertEqual(vc_from_symbolic, vc_from_explicit)
 
+    def test_cnv_cannot_be_made_explicit(self):
+        """ <CNV> is a copy-number-variable region with no unambiguous explicit ref/alt expansion -
+            as_external_explicit() must keep its contract and raise rather than return symbolic """
+        vc_cnv = VariantCoordinate(chrom='1', position=1000000, ref='T', alt=VCFSymbolicAllele.CNV, svlen=5000)
+        self.assertFalse(vc_cnv.can_be_made_explicit)
+        with self.assertRaises(ValueError):
+            vc_cnv.as_external_explicit(self.grch37)
+
+        vc_dup = VariantCoordinate(chrom='1', position=1000000, ref='T', alt=VCFSymbolicAllele.DUP, svlen=999)
+        self.assertTrue(vc_dup.can_be_made_explicit)
+
+    def test_cnv_canonical_form_stays_symbolic(self):
+        """ Even a small <CNV> (below VARIANT_SYMBOLIC_ALT_SIZE) has no explicit form, so the
+            canonical form must stay symbolic rather than raising """
+        vc_cnv = VariantCoordinate(chrom='1', position=1000000, ref='T', alt=VCFSymbolicAllele.CNV, svlen=10)
+        vc_canonical = vc_cnv.as_internal_canonical_form(self.grch37)
+        self.assertEqual(vc_canonical.alt, VCFSymbolicAllele.CNV)
+
     def test_is_deletion(self):
         """ Issue #1449 BUG 1 - len(self.locus.ref) was missing .seq, causing TypeError """
         self.assertTrue(self.deletion_variant.is_deletion)
@@ -216,3 +234,46 @@ class VariantTestCase(TestCase):
         self.assertTrue(self._in_qs(Variant.get_indel_q(), self.deletion_variant))
         self.assertTrue(self._in_qs(Variant.get_indel_q(), self.insertion_variant))
         self.assertFalse(self._in_qs(Variant.get_indel_q(), self.variant))
+
+
+class VariantAcrossGenomeBuildsTestCase(TestCase):
+    """ The same mutation is a separate Variant in each build - all_build_variants/all_genome_builds
+        pull them together via the allele """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+
+    def _linked_variants(self, chrom, position) -> tuple[Variant, Variant]:
+        variant_37 = slowly_create_test_variant(chrom, position, 'A', 'T', self.grch37)
+        variant_38 = slowly_create_test_variant(chrom, position, 'A', 'T', self.grch38)
+        allele = create_mock_allele(variant_37, self.grch37)
+        VariantAllele.objects.create(variant=variant_38, genome_build=self.grch38, allele=allele,
+                                     origin=AlleleOrigin.IMPORTED_TO_DATABASE)
+        return variant_37, variant_38
+
+    def test_without_allele_is_just_this_variant(self):
+        variant = slowly_create_test_variant("3", 5000, 'A', 'T', self.grch37)
+        self.assertEqual([variant], variant.all_build_variants)
+        self.assertEqual({self.grch37}, variant.all_genome_builds)
+
+    def test_lifted_over_variant(self):
+        variant_37, variant_38 = self._linked_variants("3", 5100)
+
+        self.assertEqual(variant_37, variant_37.all_build_variants[0], "This variant is first")
+        self.assertEqual({variant_37, variant_38}, set(variant_37.all_build_variants))
+        self.assertEqual({variant_37, variant_38}, set(variant_38.all_build_variants))
+        self.assertEqual({self.grch37, self.grch38}, variant_37.all_genome_builds)
+
+    def test_shared_contig_is_one_variant_in_both_builds(self):
+        """ MT is the same contig in both builds, so there's nothing to lift over """
+        variant = slowly_create_test_variant("MT", 5000, 'A', 'T', self.grch37)
+        self.assertEqual({self.grch37, self.grch38}, variant.genome_builds)
+
+        self.assertEqual([variant], variant.all_build_variants, "Both builds share the one variant")
+        self.assertEqual({self.grch37, self.grch38}, variant.all_genome_builds)
+
+    def test_allele_all_genome_builds(self):
+        variant_37, _ = self._linked_variants("3", 5200)
+        self.assertEqual({self.grch37, self.grch38}, variant_37.allele.all_genome_builds)

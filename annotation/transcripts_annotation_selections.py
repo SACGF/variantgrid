@@ -7,6 +7,7 @@ from django.forms.models import model_to_dict
 from django.utils.timesince import timesince
 
 from annotation.models import VEPSkippedReason, AnnotationStatus
+from annotation.models.models_enums import NMDEscapeStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
     InvalidAnnotationVersionError, VariantTranscriptAnnotation, AnnotationRun
 from genes.hgvs import HGVSMatcher, HGVSException
@@ -25,6 +26,9 @@ class VariantTranscriptSelections:
     REFSEQ_TRANSCRIPT = "refseq_transcript_accession"
     REPRESENTATIVE = "representative"
     NO_TRANSCRIPT = ''  # Can't be None as needs to be sortable
+    # CSS classes used to collapse rows behind their respective toggle links (see template)
+    OTHER_CONSORTIUM_COLLAPSE_CLASS = "other-annotation-consortium-transcripts"
+    OVERFLOW_COLLAPSE_CLASS = "overflow-transcripts"
 
     def __init__(self, variant: Variant,
                  genome_build: GenomeBuild, annotation_version=None,
@@ -47,6 +51,7 @@ class VariantTranscriptSelections:
         self.warning_messages = []
         self.error_messages = []
         self.initial_transcript_id = self.NO_TRANSCRIPT
+        self.num_hidden_overflow_transcripts = 0  # set in _apply_transcript_limit
         self._populate(variant, annotation_version)
         self.other_annotation_consortium_transcripts_warning = None  # set in _add_other_annotation_consortium_transcripts
         self._add_other_annotation_consortium_transcripts(variant)
@@ -56,6 +61,7 @@ class VariantTranscriptSelections:
             sort_order = [self.ENSEMBL_TRANSCRIPT]
         self.transcript_data.sort(key=operator.itemgetter(*sort_order), reverse=True)
         self._set_initial_and_selected()
+        self._apply_transcript_limit()
 
     def get_annotation_consortium_display(self):
         return AnnotationConsortium(self.annotation_consortium).label
@@ -129,6 +135,11 @@ class VariantTranscriptSelections:
             except AttributeError:
                 pass
 
+        # The PTC columns (#579) only say something for frameshifts - every other transcript
+        # is deliberately NOT_APPLICABLE, which would just be noise down the table.
+        if data.get("nmd_escape_status") == NMDEscapeStatus.NOT_APPLICABLE.label:
+            data["nmd_escape_status"] = None
+
         # Split/clean aggregate fields
         VEP_JOINED_FIELDS = ["domains"]
         for field in VEP_JOINED_FIELDS:
@@ -192,6 +203,35 @@ class VariantTranscriptSelections:
                 selected_transcript_data["selected"] = True
                 self.initial_transcript_id = selected_transcript_data["transcript_id"]
 
+    def _apply_transcript_limit(self):
+        """ When there are too many annotated transcripts, collapse the least important ones behind a
+            toggle (see issue #1573). A hard limit of VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN are shown,
+            ranked by: selected, representative, MANE (canonical_score), canonical, tagged, then largest
+            protein (Ensembl '--pick' falls back to length). """
+        max_shown = settings.VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN
+        if not max_shown:
+            return
+
+        # Only limit annotated (this-consortium) transcripts - other-consortium ones have their own toggle
+        annotated = [td for td in self.transcript_data if not td.get("collapse_class")]
+        if len(annotated) <= max_shown:
+            return
+
+        def _importance(td) -> tuple:
+            return (
+                bool(td.get("selected")),
+                bool(td.get(self.REPRESENTATIVE)),
+                td.get("canonical_score") or 0,
+                bool(td.get("canonical")),
+                bool(td.get("tags")),
+                td.get("protein_length") or 0,
+            )
+
+        ranked = sorted(annotated, key=_importance, reverse=True)
+        for td in ranked[max_shown:]:
+            td["collapse_class"] = self.OVERFLOW_COLLAPSE_CLASS
+            self.num_hidden_overflow_transcripts += 1
+
     def _add_other_annotation_consortium_transcripts(self, variant: Variant):
         """ VariantAnnotation is populated from VEP as either RefSeq or Ensembl
             Whichever one is used will have molecular consequences etc.
@@ -220,7 +260,7 @@ class VariantTranscriptSelections:
             if gene_symbol:
                 gene_symbols.add(gene_symbol)
 
-        hgvs_matcher = HGVSMatcher(self.genome_build)
+        hgvs_matcher = HGVSMatcher.instance(self.genome_build)
         kwargs = {
             "transcript__annotation_consortium": self.other_annotation_consortium,
             "genome_build": self.genome_build,
@@ -244,8 +284,9 @@ class VariantTranscriptSelections:
                     self.REPRESENTATIVE: False,
                     "consequence": "?",
                     "canonical_score": -1,
-                    "hidden": self.hide_other_annotation_consortium_transcripts,
                 }
+                if self.hide_other_annotation_consortium_transcripts:
+                    t_data["collapse_class"] = self.OTHER_CONSORTIUM_COLLAPSE_CLASS
                 try:
                     # Transcript data may not be well formed
                     t_data["protein_length"] = transcript_version.protein_length

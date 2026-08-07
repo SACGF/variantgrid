@@ -9,7 +9,8 @@ from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
 from django.http import HttpRequest
 
-from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket, ClinicalSignificance
+from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket, ClinicalSignificance, \
+    LabExternalFilter
 from classification.models import ClassificationModification, EvidenceKeyMap, \
     ImportedAlleleInfo, DiscordanceReport
 from classification.models.classification_utils import classification_gene_symbol_filter
@@ -453,6 +454,11 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         if cs_filters:
             if q := self.get_clinical_significance_q(cs_filters):
                 filters.append(q)
+
+        if settings.CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER:
+            if lab_external := self.get_query_param("lab_external"):
+                if q := LabExternalFilter(lab_external).filter_q("classification__lab"):
+                    filters.append(q)
 
         if self.get_query_param("internal_requires_sample"):
             filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))

@@ -9,25 +9,27 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import Q
-from django.http.response import HttpResponseRedirect, JsonResponse
+from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timesince import timesince
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django_downloadview import PathDownloadView
-from jfu.http import upload_receive, UploadResponse, JFUResponse
 
+from analysis.models import AnalysisTemplate
 from annotation.models import AnnotationRun
 from annotation.views import get_build_contigs
 from eventlog.models import create_event
+from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
 from library.utils.django_utils import render_ajax_view
 from snpdb.models import VCF
+from snpdb.models.models_enums import ImportStatus
 from upload import forms, upload_processing, upload_stats
-from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
+from upload.models import UploadPipeline, FileUpload, ProcessingStatus, UploadedFileTypes, \
     UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, \
     VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant, TimeFilterMethod
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
@@ -48,67 +50,66 @@ def get_status_icon(status):
     }
     return ICONS.get(status, {})
 
-def _get_basic_uploaded_file_context(uploaded_file) -> dict:
-    data_url, upload_data = get_url_and_data_for_uploaded_file_data(uploaded_file)
+def _get_basic_uploaded_file_context(file_upload) -> dict:
+    data_url, upload_data = get_url_and_data_for_uploaded_file_data(file_upload)
     file_type = None
-    if uploaded_file.file_type:
-        file_type = UploadedFileTypes(uploaded_file.file_type).label
+    if file_upload.file_type:
+        file_type = UploadedFileTypes(file_upload.file_type).label
 
     data = {
         'file_type': file_type,
-        'file_type_code': uploaded_file.file_type,
+        'file_type_code': file_upload.file_type,
         'data_url': data_url,
     }
     if upload_data:
-        try:
-            data["upload_data"] = upload_data.get_upload_context()
-        except:
-            pass
+        data["upload_data"] = upload_data.get_upload_context()
     return data
 
 
-def uploadedfile_dict(uploaded_file) -> dict:
+def uploadedfile_dict(file_upload) -> dict:
     try:
-        size = uploaded_file.uploaded_file.size
-    except:
+        size = file_upload.file_field.size
+    except Exception:
         size = None
 
-    time_since = timesince(uploaded_file.created)
+    time_since = timesince(file_upload.created)
 
+    file_upload_id = file_upload.pk
     data = {
-        'uploaded_file_id': uploaded_file.pk,
-        'name': uploaded_file.name,
+        'file_upload_id': file_upload_id,
+        'uploaded_file_id': file_upload_id,  # deprecated alias
+        'name': file_upload.name,
         'size': size,
-        'user': uploaded_file.user.get_full_name(),
+        'user': file_upload.user.get_full_name(),
         'time_since': f"{time_since} ago",
-        'deleteUrl': reverse('jfu_delete', kwargs={'pk': uploaded_file.pk}),
+        'deleteUrl': reverse('upload_file_delete', kwargs={'pk': file_upload.pk}),
         'deleteType': 'POST',
     }
-    data.update(_get_basic_uploaded_file_context(uploaded_file))
+    data.update(_get_basic_uploaded_file_context(file_upload))
 
-    if not uploaded_file.file_type:
-        data['error'] = f'Could not determine how to read file: "{uploaded_file.name}"'
+    if not file_upload.file_type:
+        data['error'] = f'Could not determine how to read file: "{file_upload.name}"'
 
     try:
-        upload_pipeline = UploadPipeline.objects.get(uploaded_file=uploaded_file)
+        upload_pipeline = UploadPipeline.objects.get(file_upload=file_upload)
         data["upload_pipeline_id"] = upload_pipeline.pk
         try:
             if upload_pipeline.genome_build:
                 data["genome_build"] = str(upload_pipeline.genome_build)
                 if upload_pipeline.status == ProcessingStatus.PROCESSING:
                     try:
-                        uploaded_vcf = uploaded_file.uploadedvcf
+                        uploaded_vcf = file_upload.uploadedvcf
                         data['remaining_annotation_runs'] = get_remaining_annotation_runs(uploaded_vcf, upload_pipeline.genome_build)
                     except ObjectDoesNotExist:
                         pass
-        except:
+        except Exception:
             pass  # Genome build is optional
 
         status = upload_pipeline.status
         url = reverse('view_upload_pipeline', kwargs={'upload_pipeline_id': upload_pipeline.pk})
-    except:
+    except Exception:
         status = ProcessingStatus.ERROR
-        url = reverse('view_uploaded_file', kwargs={'uploaded_file_id': uploaded_file.pk})
+        url = reverse('view_uploaded_file', kwargs={'file_upload_id': file_upload.pk})
 
     data['processing_status'] = status
     data['status_icon'] = get_status_icon(status)
@@ -117,71 +118,138 @@ def uploadedfile_dict(uploaded_file) -> dict:
 
 
 def get_remaining_annotation_runs(uploaded_vcf, genome_build) -> int:
+    max_variant_id = uploaded_vcf.max_variant_id
+    if max_variant_id is None:
+        # VCF not fully imported yet, so highest known variant is unknown - no remaining runs to report
+        return 0
     ar_qs = AnnotationRun.get_active_runs(genome_build)
-    return ar_qs.filter(annotation_range_lock__max_variant__lte=uploaded_vcf.max_variant).count()
+    return ar_qs.filter(annotation_range_lock__max_variant_id__lte=max_variant_id).count()
 
 
-def handle_file_upload(user, django_uploaded_file, path=None) -> UploadedFile:
+def handle_file_upload(user, django_uploaded_file, path=None) -> FileUpload:
     original_filename = django_uploaded_file._name
     kwargs = {
         "name": original_filename,
-        "uploaded_file": django_uploaded_file,
+        "file_field": django_uploaded_file,
         "import_source": ImportSource.WEB_UPLOAD,
         "user": user,
         "path": path,
     }
-    uploaded_file = UploadedFile.objects.create(**kwargs)
+    file_upload = FileUpload.objects.create(**kwargs)
     # Save 1st to actually create file (need to open handling unicode)
-    uploaded_file.file_type = get_uploaded_file_type(uploaded_file, original_filename)
-    uploaded_file.save()
+    file_upload.file_type = get_uploaded_file_type(file_upload, original_filename)
+    file_upload.save()
 
-    if uploaded_file.file_type:
-        upload_processing.process_uploaded_file(uploaded_file)
-    return uploaded_file
+    # File is on disk now - store hash so uploads can be de-duped / polled by content (API + web)
+    file_upload.store_sha256_hash()
+
+    if file_upload.file_type:
+        upload_processing.process_uploaded_file(file_upload)
+    return file_upload
+
+
+def _cohort_export_templates_configured() -> bool:
+    """ Whether this deployment can produce annotated cohort downloads (VCF/CSV export). """
+    try:
+        AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
+        return True
+    except ValueError:
+        return False
+
+
+def get_upload_status_dict(file_upload) -> dict:
+    """ Token-API status payload for a FileUpload - import + annotation progress and, for VCFs,
+        the resulting vcf/samples plus whether annotated downloads are ready. """
+    file_type = None
+    if file_upload.file_type:
+        file_type = UploadedFileTypes(file_upload.file_type).label
+
+    file_upload_id = file_upload.pk
+    data = {
+        "file_upload_id": file_upload_id,
+        "uploaded_file_id": file_upload_id,  # deprecated alias
+        "sha256_hash": file_upload.sha256_hash,
+        "file_type": file_type,
+        "pipeline_status": None,
+        "progress_percent": None,
+        "import_status": None,
+        "remaining_annotation_runs": None,
+        "annotation_complete": False,
+        "vcf_id": None,
+        "samples": [],
+        "error": None,
+        "downloads_available": False,
+    }
+
+    upload_pipeline = UploadPipeline.objects.filter(file_upload=file_upload).first()
+    if upload_pipeline is None:
+        data["error"] = f'Could not determine how to read file: "{file_upload.name}"'
+        return data
+
+    data["pipeline_status"] = ProcessingStatus(upload_pipeline.status).label
+    data["progress_percent"] = upload_pipeline.progress_percent
+    if upload_pipeline.status == ProcessingStatus.ERROR:
+        data["error"] = upload_pipeline.progress_status
+
+    try:
+        uploaded_vcf = file_upload.uploadedvcf
+    except ObjectDoesNotExist:
+        uploaded_vcf = None
+
+    remaining_annotation_runs = None
+    if uploaded_vcf:
+        # uploadedvcf can exist before its vcf is created (import still starting) - guard against
+        # the resulting race, as UploadPipeline.genome_build dereferences uploadedvcf.vcf
+        if vcf := uploaded_vcf.vcf:
+            data["vcf_id"] = vcf.pk
+            data["import_status"] = ImportStatus(vcf.import_status).label
+            data["samples"] = [{"sample_id": s.pk, "name": s.name}
+                               for s in vcf.sample_set.all()]
+            if genome_build := upload_pipeline.genome_build:
+                remaining_annotation_runs = get_remaining_annotation_runs(uploaded_vcf, genome_build)
+            data["remaining_annotation_runs"] = remaining_annotation_runs
+
+    annotation_complete = (upload_pipeline.status == ProcessingStatus.SUCCESS
+                           and (remaining_annotation_runs or 0) == 0)
+    data["annotation_complete"] = annotation_complete
+    data["downloads_available"] = annotation_complete and _cohort_export_templates_configured()
+    return data
 
 @require_POST
-def jfu_upload(request):
-    # The assumption here is that jQuery File Upload
-    # has been configured to send files one at a time.
-    # If multiple files can be uploaded simulatenously,
-    # 'file' may be a list of files.
-
+def upload_file(request):
+    """ FilePond ``process`` endpoint: receive one file and start the import pipeline. """
     if not settings.UPLOAD_ENABLED:
         raise PermissionDenied("Uploads are currently disabled (settings.UPLOAD_ENABLED=False)")
 
     try:
-        message = "jfu_upload POST had empty FILES - this is often due to running out of disk space for Nginx temp file storage."
-        if not request.FILES:
-            create_event(request.user, message, severity=LogLevel.ERROR)
-            raise ValueError(message)
+        try:
+            django_uploaded_file = filepond_upload_receive(request)
+        except ValueError as e:
+            create_event(request.user, str(e), severity=LogLevel.ERROR)
+            raise
 
-        django_uploaded_file = upload_receive(request)
-        uploaded_file = handle_file_upload(request.user, django_uploaded_file)
-
-        file_dict = uploadedfile_dict(uploaded_file)
+        file_upload = handle_file_upload(request.user, django_uploaded_file)
     except Exception as e:
         logging.error(e)
         log_traceback()
-        file_dict = {"error": str(e)}
+        return HttpResponse("Upload failed. Please try again or contact support.", status=500)
 
-    logging.debug("views.upload() END")
-    return UploadResponse(request, file_dict)
+    return filepond_process_response(file_upload.pk)
 
 
-@require_POST
-def jfu_upload_delete(request, pk):
+@require_http_methods(["DELETE", "POST"])
+def upload_file_delete(request, pk):
+    """ FilePond ``revert`` endpoint (also used by table-row delete on already-processed files). """
     try:
-        instance = UploadedFile.objects.get(pk=pk)
-        if not (request.user.is_superuser or request.user == instance.user):
-            msg = f"You don't own uploaded file {pk}"
-            raise PermissionDenied(msg)
+        instance = FileUpload.objects.get(pk=pk)
+    except FileUpload.DoesNotExist:
+        return HttpResponse(status=404)
 
-        data = {'uploaded_file_id': instance.pk}
-        instance.delete()
-    except UploadedFile.DoesNotExist:
-        data = False
+    if not (request.user.is_superuser or request.user == instance.user):
+        raise PermissionDenied(f"You don't own uploaded file {pk}")
 
-    return JFUResponse(request, data)
+    instance.delete()
+    return HttpResponse(status=200)
 
 
 def get_file_dicts_list(upload_settings):
@@ -195,14 +263,14 @@ def get_file_dicts_list(upload_settings):
         filters.append(Q(created__gte=start_date))
 
     q = reduce(operator.and_, filters)
-    qs = UploadedFile.objects.filter(q).order_by("-created")
+    qs = FileUpload.objects.filter(q).order_by("-created")
     if upload_settings.time_filter_method == TimeFilterMethod.RECORDS:
         qs = qs[:upload_settings.time_filter_value]
 
     file_dicts = []
-    for uploaded_file in qs:
-        file_dicts.append(uploadedfile_dict(uploaded_file))
-    file_dicts = list(reversed(file_dicts))  # JFU adds most recent at the end
+    for file_upload in qs:
+        file_dicts.append(uploadedfile_dict(file_upload))
+    file_dicts = list(reversed(file_dicts))  # render newest-first
     return file_dicts
 
 
@@ -230,10 +298,10 @@ def upload(request):
     return render(request, 'upload/upload.html', context)
 
 
-def view_uploaded_file(request, uploaded_file_id):
-    uploaded_file = get_object_or_404(UploadedFile, pk=uploaded_file_id)
-    uploaded_file.check_can_view(request.user)
-    context = {'uploaded_file': uploaded_file}
+def view_uploaded_file(request, file_upload_id):
+    file_upload = get_object_or_404(FileUpload, pk=file_upload_id)
+    file_upload.check_can_view(request.user)
+    context = {'file_upload': file_upload}
     return render(request, 'upload/view_uploaded_file.html', context)
 
 
@@ -254,7 +322,7 @@ def view_upload_stats(request):
 
 def view_upload_step_detail(request, upload_step_id: int):
     upload_step = get_object_or_404(UploadStep, pk=upload_step_id)
-    upload_step.upload_pipeline.uploaded_file.check_can_view(request.user)
+    upload_step.upload_pipeline.file_upload.check_can_view(request.user)
     return render_ajax_view(request, 'upload/upload_step.html', {
         "upload_step": upload_step
     })
@@ -262,12 +330,12 @@ def view_upload_step_detail(request, upload_step_id: int):
 
 def view_upload_pipeline(request, upload_pipeline_id):
     upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
-    uploaded_file = upload_pipeline.uploaded_file
-    uploaded_file.check_can_view(request.user)
+    file_upload = upload_pipeline.file_upload
+    file_upload.check_can_view(request.user)
 
-    filename = uploaded_file.get_filename()
+    filename = file_upload.get_filename()
     file_exists = filename and os.path.exists(filename)
-    allow_retry_import = (uploaded_file.user == request.user or request.user.is_superuser) and file_exists
+    allow_retry_import = (file_upload.user == request.user or request.user.is_superuser) and file_exists
 
     if not file_exists:
         status = messages.WARNING
@@ -295,12 +363,12 @@ def view_upload_pipeline(request, upload_pipeline_id):
         "step_order": list(step_order),
         "step_start_end_lines": step_start_end_lines,
     }
-    context.update(_get_basic_uploaded_file_context(uploaded_file))
+    context.update(_get_basic_uploaded_file_context(file_upload))
 
     context_name = UPLOADED_FILE_CONTEXT.get(upload_pipeline.file_type)
     if context_name:
         try:
-            context[context_name] = get_upload_data_for_uploaded_file(upload_pipeline.uploaded_file)
+            context[context_name] = get_upload_data_for_uploaded_file(upload_pipeline.file_upload)
         except Exception:
             pass
 
@@ -309,7 +377,7 @@ def view_upload_pipeline(request, upload_pipeline_id):
 
 def view_upload_pipeline_warnings_and_errors(request, upload_pipeline_id):
     upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
-    upload_pipeline.uploaded_file.check_can_view(request.user)
+    upload_pipeline.file_upload.check_can_view(request.user)
 
     skipped_contigs = VCFSkippedContigs.objects.filter(upload_step__upload_pipeline=upload_pipeline).first()
 
@@ -351,7 +419,7 @@ def upload_retry_import(request, upload_pipeline_id):
 @require_POST
 def accept_vcf_import_info_tag(request, vcf_import_info_id):
     vii = VCFImportInfo.objects.get_subclass(pk=vcf_import_info_id)
-    vcf_id = vii.upload_step.upload_pipeline.uploaded_file.uploadedvcf.vcf.pk
+    vcf_id = vii.upload_step.upload_pipeline.file_upload.uploadedvcf.vcf.pk
     VCF.get_for_user(request.user, vcf_id)  # Permission check
     vii.accepted_date = timezone.now()
     vii.save()
@@ -361,15 +429,15 @@ def accept_vcf_import_info_tag(request, vcf_import_info_id):
 
 class DownloadUploadedFile(PathDownloadView):
     @cached_property
-    def uploaded_file(self):
-        uploaded_file_id = self.kwargs["pk"]
-        uploaded_file = get_object_or_404(UploadedFile, pk=uploaded_file_id)
-        upload_data = get_upload_data_for_uploaded_file(uploaded_file)
+    def file_upload(self):
+        file_upload_id = self.kwargs["pk"]
+        file_upload = get_object_or_404(FileUpload, pk=file_upload_id)
+        upload_data = get_upload_data_for_uploaded_file(file_upload)
         data = upload_data.get_data()
         # TODO: use check_can_view once everything implements GuardianPermissionsMixin
         if not data.can_view(self.request.user):
             raise PermissionDenied(f"You do not have permission to access: {data}")
-        return uploaded_file
+        return file_upload
 
     def get_mimetype(self):
         """ Firefox 86 downloads XX.vcf.gz as XX.vcf.vcf - so provide mimetype to force .gz extension
@@ -381,4 +449,4 @@ class DownloadUploadedFile(PathDownloadView):
         return mimetype
 
     def get_path(self):
-        return self.uploaded_file.get_filename()
+        return self.file_upload.get_filename()

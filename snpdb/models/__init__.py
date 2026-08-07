@@ -1,4 +1,5 @@
 from .models import *
+from .models_jobs_control import *
 from .models_cohort import *
 from .models_columns import *
 from .models_dbsnp import *
@@ -9,4 +10,6 @@ from .models_somalier import *
 from .models_user_settings import *
 from .models_variant import *
 from .models_vcf import *
+from .models_cohort_stats import *
+from .models_partition_archive import *
 from .models_zygosity_counts import *

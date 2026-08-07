@@ -10,7 +10,7 @@ from auditlog.models import LogEntry
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Max, F, Q, QuerySet
+from django.db.models import Max, F, Q, QuerySet, Case, When, Value, IntegerField
 from django.db.models.functions import Substr
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -53,15 +53,13 @@ class VariantGrid(AbstractVariantGrid):
         if af_show_in_percent is None:
             af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
 
+        self.genome_build = node.analysis.genome_build
         self.cohorts, self.visibility = node.get_cohorts_and_sample_visibility()
         self.fields, override = self._get_fields_and_overrides(node, af_show_in_percent)
         super().__init__(user)  # Need to call init after setting fields
 
         self.url = SimpleLazyObject(lambda: reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id}))
         self.extra_config.update(node.get_extra_grid_config())
-        default_sort_by_column = node.analysis.default_sort_by_column
-        if default_sort_by_column:
-            self.extra_config['sortname'] = default_sort_by_column.variant_column
 
         update_dict_of_dict_values(self._overrides, override)
 
@@ -73,6 +71,14 @@ class VariantGrid(AbstractVariantGrid):
         except NodeCount.DoesNotExist:
             node_count = None
         self.node_count = node_count
+
+        # Only set an initial sort column when sorting is allowed (below the row limit) - otherwise the
+        # first grid load would request a sort on default_sort_by_column and blow the statement_timeout.
+        if not self.sorting_disabled():
+            default_sort_by_column = node.analysis.default_sort_by_column
+            if default_sort_by_column:
+                self.extra_config['sortname'] = default_sort_by_column.variant_column
+
         self._set_post_data(node, extra_filters)
 
     def _get_permission_user(self):
@@ -97,12 +103,27 @@ class VariantGrid(AbstractVariantGrid):
             post_data['zygosity_samples_hash'] = sha256sum_str(samples_str)
         self.extra_config['postData'] = post_data
 
+    def _grid_row_count(self) -> Optional[int]:
+        """ Current view's row count (mirrors get_count's source of truth), or None if unknown """
+        if self.node_count:
+            return self.node_count.count
+        return self.node.count
+
+    def sorting_disabled(self) -> bool:
+        """ Disable sorting on large nodes - sorting by joined/unindexed columns full-sorts the whole
+            result set before LIMIT, blowing the statement_timeout (see issue #1651) """
+        count = self._grid_row_count()
+        return count is None or count >= settings.ANALYSIS_GRID_SORT_MAX_ROWS
+
     def get_colmodels(self, remove_server_side_only=False):
         """ Put 'analysisNode' into every colmodel """
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         global_colmodel = {"analysisNode": {"visible": self.node.visible}}
+        sorting_disabled = self.sorting_disabled()
         for cm in colmodels:
             cm.update(global_colmodel)
+            if sorting_disabled:
+                cm["sortable"] = False
         return colmodels
 
     def _get_q(self) -> Optional[Q]:
@@ -117,7 +138,12 @@ class VariantGrid(AbstractVariantGrid):
         annotation_kwargs = get_variantgrid_extra_annotate(self.user, exclude_analysis=self.node.analysis)
         cohorts, _visibility = self.node.get_cohorts_and_sample_visibility()
         common_variants = self.node._has_common_variants()
-        annotation_kwargs.update(get_variantgrid_zygosity_annotation_kwargs(cohorts, common_variants))
+        try:
+            annotation_gnomad_version = self.node.analysis.annotation_version.variant_annotation_version.gnomad
+        except AttributeError:
+            annotation_gnomad_version = None
+        annotation_kwargs.update(get_variantgrid_zygosity_annotation_kwargs(cohorts, common_variants,
+                                                                            annotation_gnomad_version=annotation_gnomad_version))
         return annotation_kwargs
 
     def get_count(self, request):  # pylint: disable=unused-argument
@@ -274,6 +300,10 @@ class VariantGrid(AbstractVariantGrid):
 
     def _sort_items(self, items, sidx, sord):
         """ Special case to handle sort by CohortGenotype packed fields """
+        if self.sorting_disabled():
+            # Ignore any requested sort - order by -pk only (indexed scan + LIMIT). See issue #1651
+            return super()._sort_items(items, None, sord)
+
         if sidx is not None:
             # For special fields, we pack sorting info into the 'index' which doesn't map to a field
             # looks like 'cohortgenotype_134:1:samples_zygosity'
@@ -323,11 +353,36 @@ class ExportVariantGrid(VariantGrid):
             contig_items = items.filter(locus__contig=contig).iterator()
             yield from contig_items
 
+    def _get_export_variant_ids(self) -> Optional[list[int]]:
+        """ Explicit-PK substitution for small nodes @see AnalysisNode.get_cached_node_pks.
+            None means the node is too big (or its count is unknown) to materialise """
+        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
+        if max_size and self.node.count is not None and self.node.count <= max_size:
+            return AnalysisNode.get_cached_node_pks(self.node)
+        return None
+
+    @staticmethod
+    def _iter_by_variant_ids(genome_build, items, variant_ids):
+        """ Known PKs bound the work, so the annotation joins only run for those rows - one query, no timeout
+            risk. Ordered by contig then position to match the genomic order _iter_by_contigs produces """
+        standard_contigs = list(genome_build.standard_contigs)
+        contig_order = Case(*[When(locus__contig=contig, then=Value(i)) for i, contig in enumerate(standard_contigs)],
+                            output_field=IntegerField())
+        items = items.filter(pk__in=variant_ids, locus__contig__in=standard_contigs)
+        items = items.annotate(contig_export_order=contig_order)
+        return items.order_by("contig_export_order", "locus__position").iterator()
+
     def paginate_items(self, request, items):
         # This is the step after queryset is sorted
-        # We want everything, but will retrieve contig at a time to reduce DB query
+        # We want everything, but retrieve a contig at a time so each query stays under the statement timeout -
+        # the node queryset joined to variant annotation is too slow to run across the whole genome in one go.
+        # Small nodes skip that by substituting their (cached) variant PKs, which bounds the query instead.
         genome_build = self.node.analysis.genome_build
-        items = self._iter_by_contigs(genome_build, items)
+        variant_ids = self._get_export_variant_ids()
+        if variant_ids is not None:
+            items = self._iter_by_variant_ids(genome_build, items, variant_ids)
+        else:
+            items = self._iter_by_contigs(genome_build, items)
         # items = self._iter_time(items)
         return None, None, items
 

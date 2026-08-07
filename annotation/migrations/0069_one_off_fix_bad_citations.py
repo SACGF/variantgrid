@@ -5,6 +5,12 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _has_citations_to_fix(apps):
+    # Only loaded citations (with old IDs) can have the bad data this fixes - none on a fresh install
+    Citation = apps.get_model("annotation", "Citation")
+    return Citation.objects.filter(old_id__isnull=False, data_json__isnull=False).exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -12,5 +18,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["citations", "--fix"]))
+        ManualOperation(task_id=ManualOperation.task_id_manage(["citations", "--fix"]),
+                        test=_has_citations_to_fix)
     ]

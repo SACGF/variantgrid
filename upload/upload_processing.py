@@ -4,7 +4,7 @@ from celery.result import AsyncResult
 
 from eventlog.models import create_event
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import UploadPipeline, ProcessingStatus, UploadedFileTypes, UploadedFile, UploadStepOrigin
+from upload.models import UploadPipeline, ProcessingStatus, UploadedFileTypes, FileUpload, UploadStepOrigin
 
 
 def get_upload_processing_task(file_type, upload_pipeline):
@@ -23,27 +23,27 @@ def get_upload_processing_task(file_type, upload_pipeline):
     raise ValueError(f"No ImportTaskFactory found for file type '{file_type}'")
 
 
-def process_uploaded_file(uploaded_file, run_async=True) -> tuple[UploadPipeline, AsyncResult]:
+def process_uploaded_file(file_upload, run_async=True) -> tuple[UploadPipeline, AsyncResult]:
     """ returns (UploadPipeline, result) """
-    logging.debug("process_uploaded_file: filetype = %s", uploaded_file.file_type)
+    logging.debug("process_uploaded_file: filetype = %s", file_upload.file_type)
 
     try:
-        upload_pipeline = UploadPipeline.objects.get(uploaded_file=uploaded_file)
-        msg = f"There is already an UploadPipeline (pk={upload_pipeline.pk}) for uploaded file (pk='{uploaded_file.pk}')"
+        upload_pipeline = UploadPipeline.objects.get(file_upload=file_upload)
+        msg = f"There is already an UploadPipeline (pk={upload_pipeline.pk}) for uploaded file (pk='{file_upload.pk}')"
         raise ValueError(msg)
     except UploadPipeline.DoesNotExist:
         pass
 
-    upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+    upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
     return process_upload_pipeline(upload_pipeline, run_async=run_async)
 
 
 def process_upload_pipeline(upload_pipeline: UploadPipeline,
                             run_async=True) -> tuple[UploadPipeline, AsyncResult]:
-    """ Reuses the same upload_pipeline - relies on uploaded_file being set """
+    """ Reuses the same upload_pipeline - relies on file_upload being set """
 
-    if not upload_pipeline.uploaded_file:
-        msg = "UploadPipeline.uploaded_file not set"
+    if not upload_pipeline.file_upload:
+        msg = "UploadPipeline.file_upload not set"
         raise ValueError(msg)
 
     # Only delete the steps that are in factory (will be recreated)
@@ -61,11 +61,11 @@ def process_upload_pipeline(upload_pipeline: UploadPipeline,
     upload_pipeline.progress_percent = 0
     upload_pipeline.save()
 
-    uploaded_file = upload_pipeline.uploaded_file
-    user = uploaded_file.user
-    create_event(user, f"upload_file_{uploaded_file.file_type}")
+    file_upload = upload_pipeline.file_upload
+    user = file_upload.user
+    create_event(user, f"upload_file_{file_upload.file_type}")
 
-    task = get_upload_processing_task(uploaded_file.file_type, upload_pipeline)
+    task = get_upload_processing_task(file_upload.file_type, upload_pipeline)
     if task:
         if run_async:
             result = task.apply_async()
@@ -81,12 +81,12 @@ def process_upload_pipeline(upload_pipeline: UploadPipeline,
 
 def process_vcf_file(vcf_filename, name, user, import_source, run_async=True, file_type=UploadedFileTypes.VCF) -> tuple[UploadPipeline, AsyncResult]:
     logging.info("process_vcf_file, path=%s", vcf_filename)
-    uploaded_file = UploadedFile.objects.create(path=vcf_filename,
-                                                import_source=import_source,
-                                                name=name,
-                                                user=user,
-                                                file_type=file_type)
-    ufpj, result = process_uploaded_file(uploaded_file, run_async)
+    file_upload = FileUpload.objects.create(path=vcf_filename,
+                                            import_source=import_source,
+                                            name=name,
+                                            user=user,
+                                            file_type=file_type)
+    ufpj, result = process_uploaded_file(file_upload, run_async)
 
     if not run_async:  # Should be done by now...
         ufpj = UploadPipeline.objects.get(pk=ufpj.pk)

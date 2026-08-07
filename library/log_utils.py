@@ -89,13 +89,15 @@ def log_admin_change(obj: Model, message: Union[str, dict], user: Optional[User]
     if isinstance(message, dict):
         message = json.dumps(message)
 
-    return LogEntry.objects.log_action(
+    return LogEntry.objects.log_actions(
         user_id=user.pk,
-        content_type_id=get_content_type_for_model(obj).pk,
-        object_id=obj.pk,
-        object_repr=str(obj),
+        queryset=[obj],
+        #content_type_id=get_content_type_for_model(obj).pk,
+        #object_id=obj.pk,
+        #object_repr=str(obj),
         action_flag=CHANGE,
         change_message=message,
+        single_object=True
     )
 
 

@@ -14,7 +14,10 @@ SITE_NAME = "Shariant"
 
 # HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m788641874-4c58c98a716180f36670e551a0bd03fff47abfea'
 SEND_EMAILS = True
-OIDC_RP_CLIENT_ID = 'shariant'
+
+# OIDC
 OIDC_REQUIRED_GROUP = '/variantgrid/shariant_production'
-LOGIN_URL = '/oidc_login/'
+OIDC_RP_CLIENT_ID = 'shariant'
+LOGOUT_REDIRECT_URL = "https://shariant.org.au"
+
 LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fshariant.org.au'

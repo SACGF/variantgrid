@@ -67,7 +67,7 @@ def get_sequencing_run_columns(ss_path, columns):
 def get_sequencing_run_data(sequencing_run, qc_compare_type, include_passed_sequencing_run=False):
     sequencing_runs_ids = get_sequencing_runs(sequencing_run, qc_compare_type, include_passed_sequencing_run)
     run_data = defaultdict(list)
-    flowcell_qc_qs = IlluminaFlowcellQC.objects.filter(data_state='C', sample_sheet__sequencing_run__in=sequencing_runs_ids)
+    flowcell_qc_qs = IlluminaFlowcellQC.objects.filter(sample_sheet__sequencing_run__in=sequencing_runs_ids)
     flowcell_qc_qs = flowcell_qc_qs.order_by("sample_sheet__sequencing_run__name")
     ss_path = IlluminaFlowcellQC.get_sequencing_run_path()
     values = ILLUMINA_FLOWCELL_QC_COLUMNS + get_sequencing_run_columns(ss_path, ['name', 'gold_standard'])
@@ -90,8 +90,7 @@ def get_qc_exec_summary_data(sequencing_run, qc_compare_type, qc_exec_summary, i
     ss_path = QCExecSummary.get_sequencing_run_path()
     run_data = defaultdict(list)
 
-    kwargs = {"data_state": 'C',
-              ss_path + "__in": sequencing_runs_ids}
+    kwargs = {ss_path + "__in": sequencing_runs_ids}
     qc_exec_qs = QCExecSummary.objects.filter(**kwargs)
     if not include_passed_qc_exec_summary:
         qc_exec_qs = qc_exec_qs.exclude(pk=qc_exec_summary.pk)
@@ -100,7 +99,7 @@ def get_qc_exec_summary_data(sequencing_run, qc_compare_type, qc_exec_summary, i
     qc_exec_summary_columns = list(exec_summary_qc.qccolumn_set.all().values_list("field", flat=True))
 
     coverage_columns = qc_exec_summary.get_coverage_columns()
-    sequencing_sample = "qc__bam_file__unaligned_reads__sequencing_sample__sample_name"
+    sequencing_sample = "qc__bam_file__sequencing_sample__sample_name"
     sequencing_run_columns = get_sequencing_run_columns(ss_path, ['name', 'gold_standard'])
     values = ["pk", sequencing_sample] + qc_exec_summary_columns + coverage_columns + sequencing_run_columns
     non_null_kwargs = {f"{f}__isnull": False for f in coverage_columns}

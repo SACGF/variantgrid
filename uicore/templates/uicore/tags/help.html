@@ -12,6 +12,7 @@
             <div id="help-{{ page_id }}" class="collapse" aria-labelledby="heading-{{ page_id }}">
                 <div class="card-body">
                     {{ page_help_html | safe }}
+                    {% comment %}Page help HTML is taken from trusted pages{% endcomment %}
                 </div>
                 {% if help_url %}
                 <div class="card-footer text-muted">

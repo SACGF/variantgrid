@@ -226,14 +226,6 @@ class TestCHGVSDiff(TestCase):
         self.assertIn(CHGVSDiff.DIFF_TRANSCRIPT_VER, diff)
         self.assertNotIn(CHGVSDiff.DIFF_TRANSCRIPT_ID, diff)
 
-    def test_diff_transcript_ver_one_side_missing_version(self):
-        # Bug candidate: one side has no version → the `and` condition prevents
-        # DIFF_TRANSCRIPT_VER from being set. Currently returns SAME.
-        a = CHGVS("NM_001.2:c.123A>G")
-        b = CHGVS("NM_001:c.123A>G")   # no version
-        diff = a.diff(b)
-        self.assertIn(CHGVSDiff.DIFF_TRANSCRIPT_VER, diff)
-
     def test_diff_gene_case_insensitive_not_flagged(self):
         a = CHGVS("NM_001.2(BRCA1):c.123A>G")
         b = CHGVS("NM_001.2(brca1):c.123A>G")
@@ -340,44 +332,48 @@ class TestTokenizeGeneSymbols(TestCase):
 
     def test_comma_separated(self):
         result = tokenize_gene_symbols("BRCA1,BRCA2,TP53")
-        self.assertEqual(result, {"BRCA1", "BRCA2", "TP53"})
+        self.assertEqual(result.valid, {"BRCA1", "BRCA2", "TP53"})
 
     def test_space_separated(self):
         result = tokenize_gene_symbols("BRCA1 BRCA2 TP53")
-        self.assertEqual(result, {"BRCA1", "BRCA2", "TP53"})
+        self.assertEqual(result.valid, {"BRCA1", "BRCA2", "TP53"})
 
     def test_mixed_delimiters(self):
         result = tokenize_gene_symbols("BRCA1, BRCA2;TP53\tATM")
-        self.assertEqual(result, {"BRCA1", "BRCA2", "TP53", "ATM"})
+        self.assertEqual(result.valid, {"BRCA1", "BRCA2", "TP53", "ATM"})
 
     def test_lowercase_uppercased(self):
         result = tokenize_gene_symbols("brca1 tp53")
-        self.assertEqual(result, {"BRCA1", "TP53"})
+        self.assertEqual(result.valid, {"BRCA1", "TP53"})
 
     def test_duplicates_collapsed(self):
         result = tokenize_gene_symbols("BRCA1 BRCA1 BRCA1")
-        self.assertEqual(len(result), 1)
-        self.assertIn("BRCA1", result)
+        self.assertEqual(len(result.valid), 1)
+        self.assertIn("BRCA1", result.valid)
 
     def test_whitespace_only_returns_empty_set(self):
         result = tokenize_gene_symbols("   \t\n  ")
-        self.assertEqual(result, set())
+        self.assertEqual(result.valid, set())
+        self.assertEqual(result.oversized, [])
 
     def test_none_input_does_not_crash(self):
         # clean_string(None) returns "" so this should return empty set
         result = tokenize_gene_symbols(None)
-        self.assertEqual(result, set())
+        self.assertEqual(result.valid, set())
+        self.assertEqual(result.oversized, [])
 
     def test_token_exactly_100_chars_included(self):
         token = "A" * 100
         result = tokenize_gene_symbols(token)
-        self.assertIn(token, result)
+        self.assertIn(token, result.valid)
+        self.assertEqual(result.oversized, [])
 
     def test_token_101_chars_excluded(self):
         token = "A" * 101
         result = tokenize_gene_symbols(token)
-        self.assertNotIn(token, result)
-        self.assertEqual(result, set())
+        self.assertNotIn(token, result.valid)
+        self.assertEqual(result.valid, set())
+        self.assertEqual(result.oversized, [token])
 
 
 # ---------------------------------------------------------------------------

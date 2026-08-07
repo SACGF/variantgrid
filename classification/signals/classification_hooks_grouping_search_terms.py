@@ -55,7 +55,11 @@ def _gene_symbol_search_for(grouping: ClassificationGrouping, **kwargs) -> Optio
 
     # gene symbols from allele
     for genome_build, variants in genome_build_to_variants.items():
-        vav = AnnotationVersion.latest(genome_build=genome_build).variant_annotation_version
+        av = AnnotationVersion.latest_or_none(genome_build,
+                                              context=f"ClassificationGrouping {grouping.pk} search terms")
+        if av is None:
+            continue
+        vav = av.variant_annotation_version
         for va in VariantAnnotation.objects.filter(variant__in=variants, version=vav).select_related("gene"):
             if gene := va.gene:
                 for gene_symbol in gene.get_symbols():

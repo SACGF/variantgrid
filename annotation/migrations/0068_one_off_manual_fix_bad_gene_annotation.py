@@ -2,12 +2,26 @@
 
 from django.db import migrations
 
-from annotation.management.commands.gene_annotation import bad_gene_annotation
 from manual.operations.manual_operations import ManualOperation
 
 
-def _check_has_bad_gene_annotation(_apps):
-    return bad_gene_annotation()
+def _check_has_bad_gene_annotation(apps):
+    """ Replicates annotation.management.commands.gene_annotation.bad_gene_annotation() against
+    the historical model so the test query doesn't reference columns added by later migrations
+    (e.g. data_archived_date from 0145) when applied to a fresh DB. """
+    GeneAnnotationVersion = apps.get_model('annotation', 'GeneAnnotationVersion')
+    Gene = apps.get_model('genes', 'Gene')
+    bad = []
+    for gav in GeneAnnotationVersion.objects.all():
+        if gav.dbnsfp_gene_version and not gav.geneannotation_set.filter(dbnsfp_gene__isnull=False).exists():
+            bad.append(gav)
+            continue
+        try:
+            if ga := gav.geneannotation_set.first():
+                _ = ga.gene
+        except Gene.DoesNotExist:
+            bad.append(gav)
+    return bad
 
 
 class Migration(migrations.Migration):

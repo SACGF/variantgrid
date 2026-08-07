@@ -86,7 +86,7 @@ class LiftoverPreprocessVCFTask(ImportVCFStepTask):
                     allele_ids.append(int(parts[0]))
         if not allele_ids:
             return
-        liftover = upload_step.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_step.upload_pipeline.file_upload.uploadedliftover.liftover
         records = []
         for al in AlleleLiftover.objects.filter(liftover=liftover, allele__in=allele_ids):
             al.status = ProcessingStatus.ERROR
@@ -100,8 +100,7 @@ class CheckStartAnnotationTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         if upload_step.pipeline_inserted_unknown_variants():
-            task = annotation_scheduler.si(active=False)
-            task.apply_async()  # @UndefinedVariable
+            annotation_scheduler.si().apply_async()  # @UndefinedVariable
         return 0
 
 
@@ -135,8 +134,8 @@ class ImportCreateUploadedVCFTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         upload_pipeline = upload_step.upload_pipeline
-        uploaded_file = upload_pipeline.uploaded_file
-        UploadedVCF.objects.create(uploaded_file=uploaded_file,
+        file_upload = upload_pipeline.file_upload
+        UploadedVCF.objects.create(file_upload=file_upload,
                                    upload_pipeline=upload_pipeline)
         return 0
 
@@ -196,7 +195,7 @@ class DoNothingVCFTask(ImportVCFStepTask):
 class LiftoverCreateVCFTask(ImportVCFStepTask):
     def process_items(self, upload_step: UploadStep):
         upload_pipeline = upload_step.upload_pipeline
-        liftover = upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_pipeline.file_upload.uploadedliftover.liftover
         AlleleLiftover.objects.filter(liftover=liftover).update(status=ProcessingStatus.PROCESSING)
 
         if liftover.conversion_tool == AlleleConversionTool.BCFTOOLS_LIFTOVER:
@@ -210,7 +209,7 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
 
     def _error(self, upload_step: UploadStep, error_message: str):
         super()._error(upload_step, error_message)
-        liftover = upload_step.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_step.upload_pipeline.file_upload.uploadedliftover.liftover
         liftover.error()
 
 
@@ -225,7 +224,7 @@ class LiftoverCompleteTask(ImportVCFStepTask):
 
     def process_items(self, upload_step: UploadStep):
         upload_pipeline = upload_step.upload_pipeline
-        liftover = upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_pipeline.file_upload.uploadedliftover.liftover
         liftover.complete()
 
 

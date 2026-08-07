@@ -1,13 +1,16 @@
+import functools
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 import Levenshtein
+from cache_memoize import cache_memoize
 
+from library.constants import DAY_SECS
 from library.log_utils import log_traceback
 from library.utils import is_not_none
-from ontology.models import OntologyTerm, OntologyService
+from ontology.models import OntologyTerm, OntologyService, OntologyTermRelation, OntologyVersion
 
 # There can be more than 1 term matching a string, eg OMIM has 1849 terms that match 2 or more IDs
 CodePK = Any
@@ -22,6 +25,9 @@ HGNC_PATTERN = re.compile(r"HGNC:(\d+)$")
 
 MIN_MATCH_LENGTH = 3
 MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH = 5
+
+AMBIGUOUS_ACRONYM_MAX_LEN = 5
+AMBIGUOUS_ACRONYM_CONCEPT_RELATIONS = frozenset({"exact", "exact_synonym", "xref"})
 
 
 def load_by_id(accession, ontology_service: OntologyService) -> OntologyResults:
@@ -47,6 +53,104 @@ def load_omim_by_id(accession) -> OntologyResults:
 
 class SkipAllPhenotypeMatchException(Exception):
     pass
+
+
+@cache_memoize(timeout=DAY_SECS)
+def _build_ambiguous_acronym_denylist(ontology_version_pk: int) -> dict[str, tuple[tuple[str, str], ...]]:
+    """Lowercased short ontology lookup keys that match multiple distinct concept
+    clusters - building these matches would silently mean the wrong thing.
+    Each key maps to a tuple of (term_id, name) pairs covering every concept
+    cluster the key matched, so callers can show users what was ambiguous.
+    Cached on the latest OntologyVersion so reimports invalidate automatically."""
+    _ = ontology_version_pk  # cache key only
+
+    parent: dict[str, str] = {}
+
+    def find(x):
+        root = x
+        while parent.get(root, root) != root:
+            root = parent[root]
+        while parent.get(x, x) != root:
+            nxt = parent.get(x, x)
+            parent[x] = root
+            x = nxt
+        return root
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    rel_qs = OntologyTermRelation.objects.filter(
+        relation__in=AMBIGUOUS_ACRONYM_CONCEPT_RELATIONS
+    ).values_list("source_term_id", "dest_term_id")
+    for s, d in rel_qs.iterator():
+        if s.startswith("HGNC:") or d.startswith("HGNC:"):
+            continue  # Genes are their own concept - never merge into disease clusters
+        if s not in parent:
+            parent[s] = s
+        if d not in parent:
+            parent[d] = d
+        union(s, d)
+
+    def concept_root(term_id: str) -> str:
+        if term_id.startswith("HGNC:"):
+            return term_id
+        return find(term_id) if term_id in parent else term_id
+
+    keys: dict[str, dict[str, str]] = defaultdict(dict)  # text -> {term_id: name}
+    services = (OntologyService.HPO, OntologyService.MONDO, OntologyService.OMIM,
+                OntologyService.HGNC)
+    for service in services:
+        qs = OntologyTerm.objects.filter(ontology_service=service)
+        for pk, name, aliases in qs.values_list("pk", "name", "aliases"):
+            for term in filter(is_not_none, (aliases or []) + [name]):
+                k = term.lower().replace(",", "")
+                if 2 <= len(k) <= AMBIGUOUS_ACRONYM_MAX_LEN:
+                    stripped = k.replace(" ", "").replace("-", "")
+                    if stripped.isalnum() and any(c.isalpha() for c in stripped):
+                        keys[k][pk] = name or pk
+
+    denylist: dict[str, tuple[tuple[str, str], ...]] = {}
+    for text, pk_to_name in keys.items():
+        if len(pk_to_name) < 2:
+            continue
+        if len({concept_root(p) for p in pk_to_name}) >= 2:
+            denylist[text] = tuple(sorted(pk_to_name.items()))
+    return denylist
+
+
+_EXPLICIT_OVERRIDE_KEYS: Optional[frozenset] = None
+
+
+def _get_explicit_override_keys() -> frozenset:
+    """Lowercased keys with hardcoded or case-insensitive overrides defined in
+    PhenotypeMatcher._get_special_case_lookups. These win over the denylist
+    because the developer has already chosen the right disambiguation."""
+    global _EXPLICIT_OVERRIDE_KEYS
+    if _EXPLICIT_OVERRIDE_KEYS is None:
+        # The loader closures need ontology dicts, but we never CALL them - we
+        # just want the keys - so empty dicts are fine.
+        hardcoded, case_insens, _ = PhenotypeMatcher._get_special_case_lookups({}, {}, {})
+        _EXPLICIT_OVERRIDE_KEYS = frozenset(
+            {k.lower() for k in hardcoded.keys()} | set(case_insens.keys())
+        )
+    return _EXPLICIT_OVERRIDE_KEYS
+
+
+def get_ambiguous_acronym_denylist() -> Mapping[str, tuple[tuple[str, str], ...]]:
+    """Returns the lowercased ambiguous-acronym mapping for the current
+    OntologyVersion, minus keys that have explicit hardcoded overrides
+    (those have a known correct meaning). Values are tuples of (term_id, name)
+    pairs so callers can display the conflicting candidates. Cached in Redis
+    via cache_memoize and rebuilt only when a new OntologyVersion is imported."""
+    ov = OntologyVersion.latest(validate=False)
+    raw = _build_ambiguous_acronym_denylist(ov.pk if ov else 0)
+    overrides = _get_explicit_override_keys()
+    if isinstance(raw, Mapping):
+        return {k: v for k, v in raw.items() if k not in overrides}
+    # Fallback for legacy frozenset return values (used in some test mocks)
+    return {k: () for k in raw if k not in overrides}
 
 
 class PhenotypeMatcher:
@@ -106,7 +210,13 @@ class PhenotypeMatcher:
         self.hardcoded_lookups, self.case_insensitive_lookups, self.disease_families = special_case_lookups
 
     def get_matches(self, words_and_spans_subset) -> list[str]:
-        words = [ws[0] for ws in words_and_spans_subset]
+        words = tuple(ws[0] for ws in words_and_spans_subset)
+        return self._get_matches_for_words(words)
+
+    @functools.lru_cache(maxsize=10000)
+    def _get_matches_for_words(self, words: tuple[str, ...]) -> list[str]:
+        # Memoised: same joined text recurs across sentences (boilerplate phrasing)
+        # and inside the recursive parse_words walk that re-tests overlapping subsets.
         text = ' '.join(words)
         lower_text = text.lower()
 
@@ -115,6 +225,10 @@ class PhenotypeMatcher:
         if any(special_case_match):
             ontology_term_ids = special_case_match
         else:
+            # Ambiguous acronyms (short strings matching multiple distinct concept
+            # clusters) are matched here but dropped before persistence by
+            # filter_ambiguous_acronym_matches(), and surfaced as warning-only
+            # results by TextPhenotypeSentence.get_results().
             if len(lower_text) < MIN_MATCH_LENGTH:
                 return []
 
@@ -446,6 +560,7 @@ class PhenotypeMatcher:
             "FSGS": (load_hpo_by_name, "focal segmental glomerulosclerosis"),
             "FTT": (load_hpo_by_name, "Failure to thrive"),
             "GAII": (load_omim_by_name, "GLUTARIC ACIDURIA II"),
+            "GDD": DEVELOPMENTAL_DELAY,
             "GEFS": GEFS,
             "GEFS+": GEFS,
             "GSD": GLYCOGEN_STORAGE_DISEASE,

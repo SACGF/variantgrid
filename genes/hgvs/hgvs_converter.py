@@ -87,9 +87,9 @@ class HGVSConverter(abc.ABC):
         """ raise exceptions on any errors """
 
         if "ins" in hgvs_string:
-            if re.match(r".*ins\d+$", hgvs_string):
+            if re.search(r"ins\d+$", hgvs_string):
                 raise HGVSNomenclatureException("Insertions require inserted sequence, not an integer length")
-            if re.match(".*ins$", hgvs_string):
+            if hgvs_string.endswith("ins"):
                 raise HGVSNomenclatureException("Insertions require inserted sequence")
         if ":" not in hgvs_string:
             raise HGVSNomenclatureException("No colon (':') provided")

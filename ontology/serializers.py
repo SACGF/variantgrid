@@ -11,10 +11,10 @@ class OntologyTermSerializer(serializers.ModelSerializer):
         model = OntologyTerm
         fields = ["id", "ontology_service", "name", "definition", "absolute_url"]
 
-    def get_ontology_service(self, obj: OntologyTerm):
+    def get_ontology_service(self, obj: OntologyTerm) -> str:
         return obj.get_ontology_service_display()
 
-    def get_absolute_url(self, obj: OntologyTerm):
+    def get_absolute_url(self, obj: OntologyTerm) -> str:
         return obj.get_absolute_url()
 
 

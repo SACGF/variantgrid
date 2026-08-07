@@ -1,28 +1,17 @@
 from django.contrib.auth.views import PasswordChangeView, PasswordChangeDoneView
 from django.urls import include
 from django.urls.conf import path as path_standard
-from rest_framework.permissions import AllowAny
-from rest_framework.renderers import OpenAPIRenderer
-from rest_framework.schemas import get_schema_view
+from django.views.generic import RedirectView
 
 from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
 from snpdb.grids import CohortListColumns, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListColumns, \
     CustomColumnsCollectionColumns, QuadsListColumns, TriosListColumns, VCFListGrid, TagColorsCollectionColumns, \
     LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, \
-    ManualVariantEntryCollectionColumns, SampleColumns
+    ManualVariantEntryCollectionColumns, SampleColumns, SampleSkippedAnnotationGrid, VCFSkippedAnnotationGrid
 from snpdb.views import views, views_json, views_rest, views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
-
-schema = get_schema_view(
-    title="VariantGrid API",
-    version="4.0.0",
-    public=True,
-    permission_classes=[AllowAny],
-    renderer_classes=[OpenAPIRenderer],  # raw OpenAPI JSON
-)
-
 
 urlpatterns = [
     # public pages
@@ -39,12 +28,15 @@ urlpatterns = [
     path('cohort/create_sub_cohort/<int:cohort_id>', views_json.create_sub_cohort, name='create_sub_cohort'),
     path('cohorts', views.cohorts, name='cohorts'),
     path('view_vcf/<int:vcf_id>', views.view_vcf, name='view_vcf'),
+    path('vcf/<int:vcf_id>/archive', views.archive_vcf_view, name='archive_vcf'),
+    path('vcf/<int:vcf_id>/restore', views.restore_vcf_view, name='restore_vcf'),
     path('vcf/<int:vcf_id>/populate_clingen_alleles', views_json.vcf_populate_clingen_alleles, name='vcf_populate_clingen_alleles'),
     path('vcf/<int:vcf_id>/change_zygosity_count/<int:vzcc_id>/<operation>', views_json.vcf_change_zygosity_count, name='vcf_change_zygosity_count'),
     path('get_patient_upload_csv_for_vcf/<int:pk>', views.get_patient_upload_csv_for_vcf, name='get_patient_upload_csv_for_vcf'),
 
     path('view_sample/<int:sample_id>', views.view_sample, name='view_sample'),
     path('view_genomic_intervals/<int:genomic_intervals_collection_id>', views.view_genomic_intervals, name='view_genomic_intervals'),
+    path('genomic_intervals_graphs_tab/<int:genomic_intervals_collection_id>', views.genomic_intervals_graphs_tab, name='genomic_intervals_graphs_tab'),
     path('view_cohort_details_tab/<int:cohort_id>', views.view_cohort_details_tab, name='view_cohort_details_tab'),
     path('view_cohort/<int:cohort_id>', views.view_cohort, name='view_cohort'),
     path('cohort/hotspot/<int:cohort_id>', views.cohort_hotspot, name='cohort_hotspot'),
@@ -73,6 +65,8 @@ urlpatterns = [
     path('settings/custom_columns/clone/<int:custom_columns_collection_id>', views_json.clone_custom_columns, name='clone_custom_columns'),
     path('settings/set_user_row_config', views.set_user_row_config, name='set_user_row_config'),
     path('settings/set_user_data_grid_config', views.set_user_data_grid_config, name='set_user_data_grid_config'),
+    path('settings/set_all_variants_filter/<genome_build_name>', views.set_all_variants_filter,
+         name='set_all_variants_filter'),
     path('settings/tags', views.tag_settings, name='tag_settings'),
     path('settings/tags/collection/datatable', DatabaseTableView.as_view(column_class=TagColorsCollectionColumns),
          name='tag_color_collections_datatable'),
@@ -123,6 +117,8 @@ urlpatterns = [
     path('cohort/datatable/', DatabaseTableView.as_view(column_class=CohortListColumns), name='cohort_datatable'),
     path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),
     path('sample/grid/<slug:op>/', JQGridView.as_view(grid=SamplesListGrid, delete_row=True), name='samples_grid'),
+    path('sample/skipped_annotation/grid/<int:sample_id>/<slug:op>/',
+         JQGridView.as_view(grid=SampleSkippedAnnotationGrid), name='sample_skipped_annotation_grid'),
     path('genomic_intervals/datatable/', DatabaseTableView.as_view(column_class=GenomicIntervalsListColumns), name='genomic_intervals_datatable'),
     path('liftover/liftover_runs/datatable', DatabaseTableView.as_view(column_class=LiftoverRunColumns),
          name='liftover_runs_datatable'),
@@ -143,9 +139,12 @@ urlpatterns = [
     path('trio/datatable/', DatabaseTableView.as_view(column_class=TriosListColumns), name='trio_datatable'),
     path('quad/datatable/', DatabaseTableView.as_view(column_class=QuadsListColumns), name='quad_datatable'),
     path('vcfs/grid/<slug:op>/', JQGridView.as_view(grid=VCFListGrid, delete_row=True), name='vcfs_grid'),
+    path('vcf/skipped_annotation/grid/<int:vcf_id>/<slug:op>/',
+         JQGridView.as_view(grid=VCFSkippedAnnotationGrid), name='vcf_skipped_annotation_grid'),
 
     # Autocompletes
     path('autocomplete/Cohort/', views_autocomplete.CohortAutocompleteView.as_view(), name='cohort_autocomplete'),
+    path('autocomplete/Contig/', views_autocomplete.ContigAutocompleteView.as_view(), name='contig_autocomplete'),
     path('autocomplete/CustomColumn/', views_autocomplete.CustomColumnAutocompleteView.as_view(), name='custom_column_autocomplete'),
     path('autocomplete/GenomicIntervalsCollection/', views_autocomplete.GenomicIntervalsCollectionAutocompleteView.as_view(), name='genomic_intervals_collection_autocomplete'),
     path('autocomplete/Project/', views_autocomplete.ProjectAutocompleteView.as_view(), name='project_autocomplete'),
@@ -170,6 +169,9 @@ urlpatterns = [
     path('api/quad/<pk>', views_rest.QuadView.as_view(), name='api_view_quad'),
     path('api/variant_allele_for_variant/<int:variant_id>/<genome_build_name>',
          views_rest.VariantAlleleForVariantView.as_view(), name='variant_allele_for_variant'),
+    path('api/variant_sample_genotypes/<int:variant_id>',
+         views_rest.VariantSampleGenotypesView.as_view(), name='variant_sample_genotypes'),
     path('api/project/create', views_rest.ProjectViewSet.as_view({"post": "create"}), name='api_project_create'),
-    path("docs/", schema, name="openapi-schema"),
+    # Schema/docs moved to drf-spectacular at /api/schema and /api/docs (see variantgrid/urls.py)
+    path_standard("docs/", RedirectView.as_view(pattern_name="api-docs", permanent=True)),
 ]

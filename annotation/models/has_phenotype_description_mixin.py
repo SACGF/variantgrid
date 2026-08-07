@@ -1,4 +1,12 @@
+from django.conf import settings
 from django.db.models import QuerySet
+
+
+def phenotype_text_is_excluded(text: str) -> bool:
+    """ True if text contains settings.PATIENT_PHENOTYPE_EXCLUDE_STRING — caller should skip
+        persisting auto-matched phenotype terms (human review required first). """
+    exclude_string = getattr(settings, "PATIENT_PHENOTYPE_EXCLUDE_STRING", None)
+    return bool(exclude_string and text and exclude_string in text)
 
 
 class HasPhenotypeDescriptionMixin:
@@ -50,16 +58,19 @@ class HasPhenotypeDescriptionMixin:
             gene_qs = Gene.objects.none()
         return gene_qs
 
-    def process_phenotype_if_changed(self, phenotype_matcher=None, phenotype_approval_user=None):
+    def process_phenotype_if_changed(self, phenotype_matcher=None, phenotype_approval_user=None,
+                                     defer_processing=False):
         """ pass in phenotype_matcher to save re-loading
             if you don't pass in phenotype_approval_user assumed it is done automatically and thus needs user approval
+            if defer_processing is True the PhenotypeDescription/TextPhenotype rows are created but NLP matching is
+            skipped (used by bulk_patient_phenotype_matching to batch the heavy work for parallel execution)
             returns whether phenotype changed """
 
         # Stop circular import
         from annotation.phenotype_matcher import PhenotypeMatcher
         from annotation.phenotype_matching import create_phenotype_description
 
-        if phenotype_matcher is None:
+        if not defer_processing and phenotype_matcher is None:
             phenotype_matcher = PhenotypeMatcher()
 
         phenotype_input_text = self.phenotype_input_text
@@ -80,9 +91,13 @@ class HasPhenotypeDescriptionMixin:
         if phenotype_input_text:
             if phenotype_description:  # Not deleted - so no change needed
                 pass
+            elif phenotype_text_is_excluded(phenotype_input_text):
+                # Marker present — defer persistence until a human cleans up the text.
+                pass
             else:
                 # TODO: Do as async job??
-                phenotype_description_relation.phenotype_description = create_phenotype_description(phenotype_input_text, phenotype_matcher)
+                phenotype_description_relation.phenotype_description = create_phenotype_description(
+                    phenotype_input_text, phenotype_matcher, defer_processing=defer_processing)
                 phenotype_description_relation.approved_by = phenotype_approval_user
                 phenotype_description_relation.save()
 

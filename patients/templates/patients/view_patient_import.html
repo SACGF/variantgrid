@@ -18,25 +18,32 @@
         <div>
             <a href="{% url 'patient_imports' %}">Back to Patient Imports</a>
         </div>
-        {% with uploaded_file=patient_records.uploadedpatientrecords.uploaded_file %}
+        {% with file_upload=patient_records.file_upload %}
             <div class="card mb-4">
-                <div class="card-header">Patient Import {{ uploaded_file.uploadpipeline.pk }} {% admin_link uploaded_file.uploadpipeline %}</div>
-                <div class="card-body">
-                    {% labelled label="User" %}<a href="{% url 'view_user' uploaded_file.user.pk %}">{{ uploaded_file.user }}</a>{% endlabelled %}
-                    {% labelled label="Created" %}{{ uploaded_file.created }}{% endlabelled %}
-                    {% labelled label="Status" %}{{ uploaded_file.uploadpipeline.get_status_display | severity_icon }}{{ uploaded_file.uploadpipeline.get_status_display }}{% endlabelled %}
-                    {% labelled label="Upload Pipeline" %}
-                        {% if uploaded_file.uploadpipeline %}
-                            <a href="{% url 'view_upload_pipeline' uploaded_file.uploadpipeline.pk %}">View upload pipeline</a>
-                        {% endif %}
-                    {% endlabelled %}
-                    {% labelled label="Download" %}
-                        <a href="{% url 'download_uploaded_file' uploaded_file.pk %}">
-                            <div class="icon24 left margin-r-5 csv-icon">
-                            </div> Uploaded CSV
-                        </a> ({{ uploaded_file.size|filesizeformat }})
-                    {% endlabelled %}
-                </div>
+                {% if file_upload %}
+                    <div class="card-header">Patient Import {{ file_upload.uploadpipeline.pk }} {% admin_link file_upload.uploadpipeline %}</div>
+                    <div class="card-body">
+                        {% labelled label="User" %}<a href="{% url 'view_user' file_upload.user.pk %}">{{ file_upload.user }}</a>{% endlabelled %}
+                        {% labelled label="Created" %}{{ file_upload.created }}{% endlabelled %}
+                        {% labelled label="Status" %}{{ file_upload.uploadpipeline.get_status_display | severity_icon }}{{ file_upload.uploadpipeline.get_status_display }}{% endlabelled %}
+                        {% labelled label="Upload Pipeline" %}
+                            {% if file_upload.uploadpipeline %}
+                                <a href="{% url 'view_upload_pipeline' file_upload.uploadpipeline.pk %}">View upload pipeline</a>
+                            {% endif %}
+                        {% endlabelled %}
+                        {% labelled label="Download" %}
+                            <a href="{% url 'download_uploaded_file' file_upload.pk %}">
+                                <div class="icon24 left margin-r-5 csv-icon">
+                                </div> Uploaded CSV
+                            </a> ({{ file_upload.size|filesizeformat }})
+                        {% endlabelled %}
+                    </div>
+                {% else %}
+                    <div class="card-header">Patient Import {{ patient_records.pk }}</div>
+                    <div class="card-body">
+                        {% labelled label="Uploaded File" %}{{ "W"|severity_icon }} The uploaded file for this import is no longer available{% endlabelled %}
+                    </div>
+                {% endif %}
             </div>
         {% endwith %}
         <div class="container-table">

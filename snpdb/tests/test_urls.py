@@ -78,6 +78,7 @@ class Test(URLTestCase):
 
             # Data objects
             ('view_genomic_intervals', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
+            ('genomic_intervals_graphs_tab', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
 
             # Grids for objects
             ("cohort_sample_grid", {"cohort_id": cls.cohort.pk, "op": "config"}, 200),

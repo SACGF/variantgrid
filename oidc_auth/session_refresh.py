@@ -11,5 +11,8 @@ class VariantGridSessionRefresh(SessionRefresh):
 
     def is_refreshable_url(self, request):
         if '/api/' in request.path or VariantGridSessionRefresh.is_ajax(request):
+            # API requests use token-based auth (OIDCAuthentication in DRF) and do not need
+            # browser-based session refresh. AJAX requests are excluded to avoid interrupting
+            # in-flight XHR calls with an OIDC redirect.
             return False
         return super().is_refreshable_url(request)

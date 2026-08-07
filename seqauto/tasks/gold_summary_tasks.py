@@ -23,7 +23,6 @@ from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
 from library.utils import get_single_element
 from seqauto.models import SequencingRun, GoldReference, GoldCoverageSummary, GoldGeneCoverageCollection, EnrichmentKit
-from snpdb.models import DataState
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -51,11 +50,6 @@ def calculate_gold_summary(enrichment_kit_id):
                     else:
                         try:
                             qc_gene_coverage = qc.qcgenecoverage
-                            if qc_gene_coverage.data_state != DataState.COMPLETE:
-                                msg = f"{sequencing_run} - {ss} QCGeneCoverage status = {qc_gene_coverage.get_data_state_display()}"
-                                problems.append(msg)
-                                continue
-
                             # Track what's used
                             GoldGeneCoverageCollection.objects.create(gold_reference=gold_reference,
                                                                       gene_coverage_collection=qc_gene_coverage.gene_coverage_collection)

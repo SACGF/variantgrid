@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.template import Library
 
 from genes.forms import GeneSymbolForm
@@ -38,6 +39,12 @@ def phenotype_entry(context, form_entry_field, phenotype_description,
     if show_genes:
         gene_symbol_form = GeneSymbolForm()
 
+    phenotype_exclude_string = getattr(settings, "PATIENT_PHENOTYPE_EXCLUDE_STRING", None)
+    phenotype_excluded = bool(
+        phenotype_exclude_string and initial_phenotype_text
+        and phenotype_exclude_string in initial_phenotype_text
+    )
+
     return {
         'flattened_uuid': flattened_uuid,
         'user': context['user'],
@@ -51,5 +58,7 @@ def phenotype_entry(context, form_entry_field, phenotype_description,
         "patient_results": patient_results,
         "show_grid": show_grid,
         "has_patient_results": bool(patient_results),
-        "show_page_help": show_page_help
+        "show_page_help": show_page_help,
+        "phenotype_exclude_string": phenotype_exclude_string,
+        "phenotype_excluded": phenotype_excluded,
     }

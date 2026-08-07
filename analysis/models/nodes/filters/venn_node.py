@@ -112,37 +112,46 @@ class VennNode(AnalysisNode):
         return [t[0] for t in SetOperations.choices].index(self.set_operation)
 
     def get_cache_task_args_set(self, force_cache=False):
-        """ Override from AnalysisNode - returns Celery tasks which are called
-            in node_utils.get_analysis_update_task before children are loaded  """
+        """ Override from AnalysisNode - returns Celery tasks chained ahead of this node's update
+            in analysis_update_tasks._node_launch_signature (before the node, and so its children,
+            are loaded).
+
+            Idempotent (issue #346): a re-lease (lease expiry) or a sibling Venn that shares these
+            parents must NOT destroy an in-flight cache. We only discard a terminally-failed (ERROR)
+            collection; a SUCCESS one is reused, and a CREATED/PROCESSING one is left alone for the
+            already-scheduled venn_cache_count. We (re-)emit venn_cache_count whenever the cache
+            isn't SUCCESS yet, so the per-node chain keeps gating this node's update until the count
+            finishes - venn_cache_count itself is idempotent. """
 
         task_args_set = set()
         if self.is_valid:
             try:
                 a, b = self.ordered_parents
                 for intersection_type in self.get_vennodecache_intersection_types():
-                    vennode_cache, created = VennNodeCache.objects.get_or_create(parent_a_node_version=a.node_version,
-                                                                                 parent_b_node_version=b.node_version,
-                                                                                 intersection_type=intersection_type)
+                    vennode_cache, _ = VennNodeCache.objects.get_or_create(parent_a_node_version=a.node_version,
+                                                                           parent_b_node_version=b.node_version,
+                                                                           intersection_type=intersection_type)
 
-                    if not created:
-                        # Check variant collection is valid, otherwise set to None so it'll be regenerated
-                        if vennode_cache.variant_collection.status == ProcessingStatus.SUCCESS:
-                            logging.debug("Venn Cache %s still valid...", vennode_cache)
-                        else:
-                            status = vennode_cache.variant_collection.get_status_display()
-                            logging.debug("Venn Cache %s had status %s, regenerating", vennode_cache, status)
-                            vennode_cache.variant_collection.delete()
-                            vennode_cache.variant_collection = None
+                    variant_collection = vennode_cache.variant_collection
+                    if variant_collection and variant_collection.status == ProcessingStatus.ERROR:
+                        # A previous build failed terminally - discard and rebuild from scratch.
+                        logging.debug("Venn Cache %s had ERROR, regenerating", vennode_cache)
+                        vennode_cache.variant_collection = None
+                        vennode_cache.save()
+                        variant_collection.delete_related_objects()
+                        variant_collection.delete()
+                        variant_collection = None
 
-                    if vennode_cache.variant_collection:
-                        task = None
-                        cache_args = None
-                    else:
-                        # Create all VariantCollections in a loop to avoid race condition
+                    if variant_collection is None:
                         name = f"Venn Count for {vennode_cache}"
                         variant_collection = VariantCollection.objects.create(name=name)
                         vennode_cache.variant_collection = variant_collection
                         vennode_cache.save()
+
+                    if variant_collection.status == ProcessingStatus.SUCCESS:
+                        task = None
+                        cache_args = None
+                    else:
                         task = venn_cache_count
                         cache_args = (vennode_cache.pk, )
 
@@ -248,6 +257,13 @@ def venn_cache_count(vennode_cache_id):
     except VennNodeCache.DoesNotExist:
         return  # obsolete
     vc = vennode_cache.variant_collection
+    if vc is None:
+        return  # Collection was regenerated elsewhere - a newer task will build the replacement
+    if vc.status == ProcessingStatus.SUCCESS:
+        return  # Idempotent: already built (eg by a sibling Venn's chain that shares these parents)
+
+    # Clear any partial records left by an interrupted earlier attempt so a rebuild can't double-count
+    vc.truncate_related_objects()
     vc.status = ProcessingStatus.PROCESSING
     vc.save()
 

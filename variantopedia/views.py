@@ -11,6 +11,7 @@ from typing import Any, Optional
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
@@ -22,6 +23,7 @@ from django.views.decorators.http import require_POST
 from analysis.models import VariantTag
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
     VariantAnnotationVersion, VariantAnnotation, AnnotationStatus, ClinVarRecordCollection
+from annotation.manual_variant_entry import check_can_create_variants
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
@@ -55,8 +57,9 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
-from snpdb.variant_sample_information import VariantSampleInformation
-from upload.models import ModifiedImportedVariant
+from snpdb.utils import get_genome_build_or_404
+from snpdb.variant_filters import get_all_variant_types, get_all_variants_filters, get_gene_symbol_alias_strs, \
+    get_variant_type_label, resolve_gene_symbols
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
@@ -69,7 +72,26 @@ from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
 def variants(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    context = {"genome_build": genome_build}
+    initial_filters = get_all_variants_filters(request.user, genome_build)
+
+    selected_gene_symbols = resolve_gene_symbols(initial_filters.get("gene_symbols"))
+    # Aliases are traversed when querying, so tell the user which extra symbols that brought in
+    gene_symbol_aliases = {}
+    for gene_symbol in selected_gene_symbols:
+        alias_symbol_strs = get_gene_symbol_alias_strs(gene_symbol)
+        if extra_symbols := [s for s in alias_symbol_strs if s != gene_symbol.symbol]:
+            gene_symbol_aliases[gene_symbol.symbol] = extra_symbols
+
+    gene_symbol_form = forms.AllVariantsGeneSymbolForm(initial={"gene_symbols": selected_gene_symbols})
+    context = {
+        "genome_build": genome_build,
+        "standard_contigs": genome_build.standard_contigs,
+        "variant_types": [(vt, get_variant_type_label(vt)) for vt in get_all_variant_types()],
+        "initial_filters": initial_filters,
+        "initial_filters_json": json.dumps(initial_filters),
+        "gene_symbol_form": gene_symbol_form,
+        "gene_symbol_aliases": gene_symbol_aliases,
+    }
     return render(request, "variantopedia/variants.html", context)
 
 
@@ -145,8 +167,6 @@ def server_status(request):
         worker_names = settings.CELERY_WORKER_NAMES.copy()
         if settings.URLS_APP_REGISTER["analysis"]:
             worker_names.extend(settings.CELERY_ANALYSIS_WORKER_NAMES)
-        if settings.SEQAUTO_ENABLED:
-            worker_names.extend(settings.CELERY_SEQAUTO_WORKER_NAMES)
 
         i = app.control.inspect()
         ping = strip_celery_from_keys(i.ping())
@@ -362,8 +382,10 @@ def database_statistics(request):
 def variant_tag_detail(request, variant_id, tag):
     """ Loaded via tags grid on variant page """
 
-    variant = Variant.objects.get(pk=variant_id)
+    variant = get_object_or_404(Variant, pk=variant_id)
     tag = get_object_or_404(Tag, pk=tag)
+    if not VariantTag.filter_for_user(request.user).filter(variant=variant, tag=tag).exists():
+        raise PermissionDenied
     context = {
         "variant": variant,
         "tag": tag,
@@ -379,7 +401,7 @@ def view_variant(request, variant_id, genome_build_name=None):
     in_multiple_genome_builds = len(variant.genome_builds) > 1
     genome_build = None
     if genome_build_name:
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        genome_build = get_genome_build_or_404(genome_build_name)
         if genome_build not in variant.genome_builds:
             return redirect(reverse('view_variant', kwargs={'variant_id': variant_id}))
     else:
@@ -610,7 +632,7 @@ def export_classifications_allele(request, allele_id: int):
     """
     CSV export of what is currently filtered into the classification grid
     """
-    allele = Allele.objects.get(pk=allele_id)
+    allele = get_object_or_404(Allele, pk=allele_id)
     return ClassificationExportFormatterCSV(
         ClassificationFilter(
             user=request.user,
@@ -625,8 +647,9 @@ def export_classifications_allele(request, allele_id: int):
 @require_POST
 def create_variant_for_allele(request, allele_id, genome_build_name):
     """ Shortcut to create manual variant, but as a POST """
+    check_can_create_variants(request.user)
     allele = get_object_or_404(Allele, pk=allele_id)
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    genome_build = get_genome_build_or_404(genome_build_name)
     non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
     if variant_allele := allele.variantallele_set.filter(origin__in=non_liftover_origin).first():
         create_liftover_pipelines(admin_bot(), [allele], ImportSource.WEB, variant_allele.genome_build, [genome_build])
@@ -657,7 +680,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                                        extra_context: dict = None):
     """ Main Variant Details page """
     variant = get_object_or_404(Variant, pk=variant_id)
-    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
     genome_build = annotation_version.genome_build
     latest_annotation_version = AnnotationVersion.latest(genome_build)
     variant_annotation = None
@@ -728,6 +751,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
+        "visible_fields": variant_annotation.visible_columns if variant_annotation else frozenset(),
         "vts": vts,
     }
     if extra_context:
@@ -736,18 +760,16 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
 
 def variant_sample_information(request, variant_id, genome_build_name):
+    """ Shell only - the samples grid, locus counts and multi-allelic list are drawn client side
+        from the variant_sample_genotypes API, one request per variant """
     variant = get_object_or_404(Variant, pk=variant_id)
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    vsi = VariantSampleInformation(request.user, variant, genome_build)
-    other_loci_variants_by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(variant)
-    g_hgvs = VariantAnnotation.get_hgvs_g(variant)
+    get_genome_build_or_404(genome_build_name)  # Validate, builds we search come from the variants' contigs
 
     context = {
         "variant": variant,
-        "vsi": vsi,
-        "g_hgvs": g_hgvs,
-        "other_loci_variants_by_multiallelic": other_loci_variants_by_multiallelic,
-        "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build=genome_build).exists(),
+        "variant_ids": [v.pk for v in variant.all_build_variants],
+        "has_samples_in_other_builds":
+            Sample.objects.exclude(vcf__genome_build__in=variant.all_genome_builds).exists(),
     }
     return render(request, "variantopedia/variant_sample_information.html", context)
 
@@ -784,7 +806,7 @@ def nearby_variants_tab(request, variant_id, annotation_version_id):
 
 def nearby_variants(request, variant_id, annotation_version_id):
     variant = get_object_or_404(Variant, pk=variant_id)
-    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
 
     variant_annotation_version = annotation_version.variant_annotation_version
     variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()

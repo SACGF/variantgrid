@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, Union
+import urllib.parse
+from typing import NamedTuple, Optional, Union
 
 import requests
 from rest_framework.exceptions import NotFound
@@ -7,7 +8,7 @@ from rest_framework.exceptions import NotFound
 from annotation.models import CachedWebResource
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelAppServer, PanelAppPanelLocalCache, \
-    PanelAppPanelLocalCacheGeneSymbol, GeneSymbol, create_fake_gene_list
+    PanelAppPanelLocalCacheGeneSymbol, GeneSymbol, HGNC, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import MINUTE_SECS
 
@@ -28,7 +29,7 @@ def get_request(url):
 
 
 def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol: Union[str, GeneSymbol]) -> Optional[dict]:
-    url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + str(gene_symbol)
+    url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + urllib.parse.quote(str(gene_symbol), safe="")
     r = get_request(url)
     results = None
     if r.ok:
@@ -38,13 +39,86 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
     return results
 
 
+def get_hgnc_pk_from_api_record(api_record: dict) -> Optional[int]:
+    """ PanelApp gene records carry an HGNC ID e.g. "HGNC:10593" - return the numeric part, which is
+        our HGNC pk. This is the stable identifier PanelApp asks integrators to use, as their gene
+        symbols come from a dated Ensembl/HGNC snapshot. """
+    gene_data = api_record.get("gene_data") or {}
+    if hgnc_id := gene_data.get("hgnc_id"):
+        try:
+            return int(str(hgnc_id).replace("HGNC:", ""))
+        except ValueError:
+            logging.warning("PanelApp returned unparsable hgnc_id: %s", hgnc_id)
+    return None
+
+
+class ResolvedPanelAppGene(NamedTuple):
+    api_record: dict
+    hgnc_pk: Optional[int]  # HGNC pk we hold a record for, else None
+    gene_symbol: str  # our approved symbol where their HGNC ID resolves, else the one they reported
+
+
+def resolve_panel_app_genes(genes: list[dict], context: str = "") -> list[ResolvedPanelAppGene]:
+    """ Identify PanelApp gene records by their HGNC ID rather than their gene symbol, which comes from
+        a dated Ensembl/HGNC snapshot and so can lag - or mean a different gene than - our current
+        approved symbol. Falls back to the symbol they reported where we have no record of the HGNC ID.
+        Resolves the whole batch in one query. """
+    records_with_hgnc_pk = [(api_record, get_hgnc_pk_from_api_record(api_record)) for api_record in genes]
+    api_hgnc_pks = {hgnc_pk for _, hgnc_pk in records_with_hgnc_pk if hgnc_pk}
+    symbol_by_hgnc_pk = dict(HGNC.objects.filter(pk__in=api_hgnc_pks).values_list("pk", "gene_symbol_id"))
+
+    resolved = []
+    for api_record, hgnc_pk in records_with_hgnc_pk:
+        approved_symbol = symbol_by_hgnc_pk.get(hgnc_pk)
+        reported_symbol = (api_record.get("gene_data") or {}).get("gene_symbol") or ""
+        resolved.append(ResolvedPanelAppGene(api_record=api_record,
+                                             hgnc_pk=hgnc_pk if approved_symbol else None,
+                                             gene_symbol=approved_symbol or reported_symbol))
+
+    if unknown := api_hgnc_pks - set(symbol_by_hgnc_pk):
+        logging.warning("PanelApp %s referenced %d HGNC ID(s) we have no record of: %s",
+                        context, len(unknown), sorted(unknown)[:10])
+    return resolved
+
+
+def _mark_panel_deleted(panel_app_panel: PanelAppPanel):
+    """ Soft-delete: panel was confirmed missing on PanelApp - see issue #405 """
+    if not panel_app_panel.deleted:
+        panel_app_panel.deleted = True
+        panel_app_panel.save(update_fields=["deleted", "modified"])
+
+
 def _get_panel_app_panel_api_json(panel_app_panel):
     r = get_request(panel_app_panel.url)
-    json_data: dict = r.json()
-    # Panel App isn't very REST-ful - returns 200 for missing data, but we'll return 404
-    if detail := json_data.get("detail"):
-        if detail == "Not found.":
-            raise NotFound(detail=f"PanelApp couldn't find {panel_app_panel.panel_id} ({r.url})")
+
+    # PanelApp sometimes returns 200 with {"detail": "Not found."} and sometimes returns HTTP 404.
+    # Treat both as a soft-deletion (issue #405).
+    json_data: Optional[dict] = None
+    if r.status_code == 200:
+        try:
+            json_data = r.json()
+        except ValueError:
+            json_data = None
+
+    deleted = False
+    if r.status_code == 404:
+        deleted = True
+    elif json_data is not None:
+        if json_data.get("detail") == "Not found.":
+            deleted = True
+
+    if deleted:
+        logging.warning("PanelApp couldn't find panel %s at %s", panel_app_panel.panel_id, r.url)
+        _mark_panel_deleted(panel_app_panel)
+        raise NotFound(
+            detail=f"PanelApp panel '{panel_app_panel.name}' (id={panel_app_panel.panel_id}) "
+                   f"has been deleted from PanelApp. See {panel_app_panel.web_url}"
+        )
+
+    if json_data is None:
+        r.raise_for_status()
+        # Status was 2xx but body wasn't JSON — treat as a hard error.
+        raise ValueError(f"PanelApp returned non-JSON body for panel {panel_app_panel.panel_id}")
 
     return json_data
 
@@ -59,10 +133,9 @@ def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
     # Need to build evidence from panel app but using our gene names
     panel_app_gene_evidence = {}
     gene_names_list = []
-    for gene_record in genes:
-        gene_symbol = gene_record["gene_data"]["gene_symbol"]
-        panel_app_gene_evidence[gene_symbol] = gene_record
-        gene_names_list.append(gene_symbol)
+    for resolved_gene in resolve_panel_app_genes(genes, context=f"panel {panel_app_panel.panel_id}"):
+        panel_app_gene_evidence[resolved_gene.gene_symbol] = resolved_gene.api_record
+        gene_names_list.append(resolved_gene.gene_symbol)
 
     gene_matcher = GeneSymbolMatcher()
     gene_list = create_fake_gene_list(name=name, user=None)
@@ -113,6 +186,7 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 
     # Now uses paging
     num_panels = 0
+    seen_panel_ids: set[int] = set()
     url = server.url + PANEL_APP_LIST_PANELS_PATH
     while url:
         logging.debug("Calling %s", url)
@@ -122,14 +196,33 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 
         for result in data["results"]:
             num_panels += 1
-            _get_or_update_panel_app_panel(server, result)
+            seen_panel_ids.add(result["id"])
+            pap = _get_or_update_panel_app_panel(server, result)
+            if pap.deleted:
+                # Resurrected: PanelApp returned it again after a previous soft-delete (issue #405)
+                pap.deleted = False
+                pap.save(update_fields=["deleted", "modified"])
 
-    cached_web_resource.description = f"{num_panels} panel app panels."
+    # Soft-delete any panels we didn't see in the full listing (issue #405).
+    missing_qs = PanelAppPanel.objects.filter(server=server, deleted=False).exclude(panel_id__in=seen_panel_ids)
+    num_deleted = missing_qs.update(deleted=True)
+
+    description = f"{num_panels} panel app panels."
+    if num_deleted:
+        description += f" Soft-deleted {num_deleted} missing panel(s)."
+    cached_web_resource.description = description
     cached_web_resource.save()
 
 
 def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLocalCache:
     """ Gets or creates local cache of a panel app panel, so it can be used as a GeneList """
+
+    if panel_app_panel.deleted:
+        # Skip the API call — PanelApp will return Not Found and we already know it (issue #405).
+        raise NotFound(
+            detail=f"PanelApp panel '{panel_app_panel.name}' (id={panel_app_panel.panel_id}) "
+                   f"has been deleted from PanelApp. See {panel_app_panel.web_url}"
+        )
 
     # Attempt to use cache if recent and present, otherwise fall through and do a query
     try:
@@ -152,20 +245,15 @@ def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
 
     pap_lc = PanelAppPanelLocalCache.objects.create(panel_app_panel=panel_app_panel,
                                                     version=version)
-    existing_uc_symbols = GeneSymbol.get_upper_case_lookup()
-    new_symbols = []
     pap_lc_genes = []
-    for api_record in genes:
-        gene_symbol = api_record["gene_data"]["gene_symbol"]
-        if gene_symbol.upper() not in existing_uc_symbols:
-            new_symbols.append(gene_symbol)
+    for resolved_gene in resolve_panel_app_genes(genes, context=f"panel {panel_app_panel.panel_id}"):
+        gene_data = resolved_gene.api_record.get("gene_data") or {}
         record = PanelAppPanelLocalCacheGeneSymbol(panel_app_local_cache=pap_lc,
-                                                   gene_symbol_id=gene_symbol,
-                                                   data=api_record)
+                                                   hgnc_id=resolved_gene.hgnc_pk,
+                                                   gene_symbol_reported=gene_data.get("gene_symbol") or "",
+                                                   data=resolved_gene.api_record)
         pap_lc_genes.append(record)
 
-    if new_symbols:
-        GeneSymbol.objects.bulk_create(new_symbols, ignore_conflicts=True, batch_size=2000)
     if pap_lc_genes:
         PanelAppPanelLocalCacheGeneSymbol.objects.bulk_create(pap_lc_genes, batch_size=2000)
     return pap_lc

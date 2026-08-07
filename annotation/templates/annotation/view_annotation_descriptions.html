@@ -98,7 +98,6 @@
 	{% page_help page_id='annotation/view_annotation_descriptions_help' title="VariantGrid Annotations"%}
 
     <ul>
-    <li><a class="hover-link" href="{% url 'about_new_vep_columns' %}">Column changes switching to VEP</a>
     <li>To customise how these annotations appear in analysis grids, see <a class="hover-link" href="{% url 'custom_columns' %}">VariantGrid Columns</a><br>
     <li>To see an example of annotations in use, <a class="hover-link" href="{% url 'search' %}">search</a> for a variant in the top right box.
     </ul>
@@ -197,7 +196,7 @@
                             <td>
                             {% if columnvepfield %}
                                 <div class='vep-category vep-category-{{ columnvepfield.category }}'>
-                                    {{ columnvepfield.get_category_display }}
+                                    {{ columnvepfield.category.label }}
                                 </div>
                             {% endif %}
                             </td>
@@ -215,7 +214,7 @@
                             {% if columnvepfield %}
                                 <div class='vep-source-field'>
                                     {% if columnvepfield.vep_plugin %}
-                                        Plugin: <b>{{ columnvepfield.get_vep_plugin_display }}</b>
+                                        Plugin: <b>{{ columnvepfield.vep_plugin.label }}</b>
                                     {% endif %}
 
                                     {% if columnvepfield.vep_custom %}

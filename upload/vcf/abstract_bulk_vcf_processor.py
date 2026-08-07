@@ -5,10 +5,13 @@ from typing import Optional
 
 import cyvcf2
 from django.conf import settings
+from django.db.models import Max
 
+from annotation.annotation_version_querysets import pipeline_type_variant_q
+from annotation.models.models_enums import VariantAnnotationPipelineType
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
-from snpdb.models import VariantCoordinate
+from snpdb.models import VariantCoordinate, Variant
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadStep, ModifiedImportedVariant, UploadStepTaskType, VCFPipelineStage, \
     SimpleVCFImportInfo, ModifiedImportedVariantOperation
@@ -27,7 +30,8 @@ class AbstractBulkVCFProcessor(abc.ABC):
         self.batch_size = batch_size
 
         self.rows_processed = 0
-        self.max_variant_id = 0  # Non reference variant (ie that will be annotated)
+        # Non reference variants (ie that will be annotated), tracked per annotation pipeline type
+        self.max_variant_id_by_pipeline_type: dict[str, int] = {}
         self.set_max_variant_called = False
         self.modified_imported_variants_file_id = 0
         self.variant_hashes = []
@@ -67,24 +71,31 @@ class AbstractBulkVCFProcessor(abc.ABC):
         return ref, alt, svlen
 
     def set_max_variant(self, variant_hashes, variant_ids):
-        # Keep track of max annotated variant (only non-reference are annotated)
+        # Keep track of max annotated variant per pipeline type (only non-reference are annotated).
+        # A stuck run of one type must not block a VCF whose variants of another type are annotated (#1656)
         self.set_max_variant_called = True
         non_ref_variant_ids = self.variant_pk_lookup.filter_non_reference(variant_hashes, variant_ids)
         if non_ref_variant_ids:
-            max_returned_variant_id = max(map(int, non_ref_variant_ids))
-            self.max_variant_id = max(self.max_variant_id, max_returned_variant_id)
+            base_qs = Variant.objects.filter(pk__in=non_ref_variant_ids)
+            for pipeline_type in VariantAnnotationPipelineType:
+                data = base_qs.filter(pipeline_type_variant_q(pipeline_type)).aggregate(m=Max("pk"))
+                max_returned_variant_id = data["m"]
+                if max_returned_variant_id is not None:
+                    current = self.max_variant_id_by_pipeline_type.get(pipeline_type.value)
+                    if current is None or max_returned_variant_id > current:
+                        self.max_variant_id_by_pipeline_type[pipeline_type.value] = max_returned_variant_id
 
-    def get_max_variant_id(self):
-        """ 0 means it was never set, so we return None """
+    def get_max_variant_id_by_pipeline_type(self) -> dict[str, int]:
+        """ {pipeline_type: max_variant_id}. Empty dict means it was never set (no variants, or reference only) """
 
-        if self.max_variant_id:
-            return self.max_variant_id
+        if self.max_variant_id_by_pipeline_type:
+            return self.max_variant_id_by_pipeline_type
 
         if self.rows_processed and self.set_max_variant_called is False:
             msg = "max_variant_id not set, importers must call set_max_variant() if you process any variants!"
             raise ValueError(msg)
 
-        return None  # No variants, or only reference
+        return {}  # No variants, or only reference
 
     def add_modified_imported_variant(self, variant: cyvcf2.Variant, variant_hash, miv_hash_list=None, miv_list=None):
         # This used to handle VT tags: OLD_MULTIALLELIC / OLD_VARIANT but now we handle BCFTOOLS only

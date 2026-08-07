@@ -19,8 +19,12 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
 class PatientListGrid(JqGridUserRowConfig):
     model = Patient
     caption = 'Patients'
-    fields = ["id", "external_pk__code", "family_code", "phenotype", "modified", "affected", "consanguineous"]
-    colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewPatientLink'}}
+    fields = ["id", "patient_code", "external_pk__code", "family_code", "phenotype", "modified",
+              "affected", "consanguineous"]
+    colmodel_overrides = {
+        'id': {'width': 20, 'formatter': 'viewPatientLink'},
+        'patient_code': {'label': 'Patient Code'},
+    }
 
     def __init__(self, **kwargs):
         user = kwargs.get("user")
@@ -92,17 +96,17 @@ class PatientRecordsColumns(DatatableConfig[PatientRecords]):
         self.rich_columns = [
             RichColumn('id', orderable=True, renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
-            RichColumn('uploadedpatientrecords__uploaded_file__created', label="Created",
+            RichColumn('uploadedpatientrecords__file_upload__created', label="Created",
                        client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn('uploadedpatientrecords__uploaded_file__user__username', label="User", orderable=True),
-            RichColumn('uploadedpatientrecords__uploaded_file__name', orderable=True, label="Filename"),
+            RichColumn('uploadedpatientrecords__file_upload__user__username', label="User", orderable=True),
+            RichColumn('uploadedpatientrecords__file_upload__name', orderable=True, label="Filename"),
         ]
 
     def get_initial_queryset(self) -> QuerySet[PatientRecords]:
         # show_group_data = self.get_query_param("patient_records")
         qs = PatientRecords.objects.all()
         if not self.user.is_superuser:
-            qs = qs.filter(uploadedpatientrecords__uploaded_file__user=self.user)
+            qs = qs.filter(uploadedpatientrecords__file_upload__user=self.user)
         return qs
 
 
@@ -119,6 +123,7 @@ class PatientRecordColumns(DatatableConfig[PatientRecord]):
             RichColumn('validation_message', orderable=True),
             RichColumn('sample_id', orderable=True),
             RichColumn('patient_id', orderable=True),
+            RichColumn('patient__patient_code', label='Patient Code', orderable=True),
             RichColumn('patient__first_name', orderable=True),
             RichColumn('patient__last_name', orderable=True),
             RichColumn('patient_match', orderable=True,
@@ -129,6 +134,7 @@ class PatientRecordColumns(DatatableConfig[PatientRecord]):
             RichColumn('sample_identifier', orderable=True),
             RichColumn('sample_name', orderable=True),
             RichColumn('patient_family_code', orderable=True),
+            RichColumn('patient_code', label='Patient Code (de-identified)', orderable=True),
             RichColumn('patient_first_name', orderable=True),
             RichColumn('patient_last_name', orderable=True),
             RichColumn('date_of_birth', orderable=True, client_renderer='TableFormat.timestamp'),
@@ -146,7 +152,7 @@ class PatientRecordColumns(DatatableConfig[PatientRecord]):
     def get_initial_queryset(self) -> QuerySet[PatientRecord]:
         patient_records_id = self.get_query_param("patient_records")
         patient_records = get_object_or_404(PatientRecords, pk=patient_records_id)
-        patient_records.uploaded_file.check_can_view(self.user)
+        patient_records.check_can_view(self.user)
         return PatientRecord.objects.filter(patient_records=patient_records)
 
 

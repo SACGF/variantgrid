@@ -27,11 +27,6 @@ class Command(BaseCommand):
     """
 
     def handle(self, *args, **options):
-        genome_build_matchers = {}
-
-        for genome_build in GenomeBuild.builds_with_annotation():
-            genome_build_matchers[genome_build] = HGVSMatcher(genome_build)
-
         regex_span_plus_provided = r"\d+_\d+(del|dup)[GATC]+"
         filters = [
             Q(imported_c_hgvs__regex=regex_span_plus_provided),
@@ -41,7 +36,7 @@ class Command(BaseCommand):
         iai_qs = ImportedAlleleInfo.objects.all()
         iai_ids_with_hgvs_errors = set()
         for iai in iai_qs.filter(q).iterator():
-            matcher = genome_build_matchers[iai.imported_genome_build]
+            matcher = HGVSMatcher.instance(iai.imported_genome_build)
             hgvs_name = iai.imported_c_hgvs or iai.imported_g_hgvs
             try:
                 matcher.get_variant_coordinate(hgvs_name)

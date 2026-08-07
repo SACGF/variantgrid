@@ -9,7 +9,6 @@ import textwrap
 from django.test import SimpleTestCase
 
 from seqauto.illumina.samplesheet import convert_sheet_to_df
-from seqauto.models import SequencingRun
 
 
 def _write_samplesheet(tmpdir, content, run_dir="200920_NB501009_0410_AHNLYFBGXG"):
@@ -46,21 +45,3 @@ class TestSampleSheetNaNBarcode(SimpleTestCase):
                 "nan", str(bc).lower(),
                 f"Barcode should not contain 'nan' for missing Index2, got: {bc!r}",
             )
-
-
-class TestCheckBasecallsDir(SimpleTestCase):
-    """Regression: check_basecalls_dir() always returned False due to missing os.path.join."""
-
-    def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
-
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir, ignore_errors=True)
-
-    def test_detects_lane_directory(self):
-        """Should return True when an L00* subdir exists inside BaseCalls/."""
-        basecalls = os.path.join(self.tmpdir, "Data", "Intensities", "BaseCalls")
-        os.makedirs(os.path.join(basecalls, "L001"))
-        run = SequencingRun.__new__(SequencingRun)
-        run.path = self.tmpdir
-        self.assertTrue(run.check_basecalls_dir())

@@ -76,6 +76,7 @@
 {% block content %}
     {% settings_value 'VARIANT_VCF_DB_PREFIX' as variant_vcf_db_prefix %}
     {% settings_value 'SEARCH_SUMMARY' as show_search_summary %}
+    {% settings_value 'MAX_STRING_DISPLAY_LENGTH' as max_string_display_length %}
     <script>
         function updateSearchMode() {
             let feeling_lucky = $("#feeling-lucky").is(':checked')
@@ -148,9 +149,9 @@
             <div id='results' class="mt-4">
                 <div class="row">
                     {% if search_results.results %}
-                        <h4 class="col-8">{{ search_results.results|length }}{% if search_results.has_excluded_records %}*{% endif %}{% if search_results.results|length == 1 %} Result{% else %} Results{% endif %} Found for "{{ search }}"</h4>
+                        <h4 class="col-8">{{ search_results.results|length }}{% if search_results.has_excluded_records %}*{% endif %}{% if search_results.results|length == 1 %} Result{% else %} Results{% endif %} Found for "{{ search|truncatechars:max_string_display_length }}"</h4>
                     {% else %}
-                        <h4 class="col-8 no-value">No Results Found For "{{ search }}"</h4>
+                        <h4 class="col-8 no-value">No Results Found For "{{ search|truncatechars:max_string_display_length }}"</h4>
                     {% endif %}
                     <div class="col-4 text-right">
                         <a class="hover-link" href="{% url 'view_user_settings' %}" title="Default Genome Build can be changed on the User Details page under Settings">Preferred Genome Build</a> : {{ search_results.search_input.genome_build_preferred }}
@@ -297,7 +298,7 @@
             </div>
             {% if search %}
                 <div class="card-footer">
-                     <i class="fa-solid fa-info-circle text-primary mr-2"></i> The search text "<span class="text-secondary">{{ search }}</span>" activated the searches marked <span class="searched">in green</span>.
+                     <i class="fa-solid fa-info-circle text-primary mr-2"></i> The search text "<span class="text-secondary">{{ search|truncatechars:max_string_display_length }}</span>" activated the searches marked <span class="searched">in green</span>.
                 </div>
             {% endif %}
         </div>

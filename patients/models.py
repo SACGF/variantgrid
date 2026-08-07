@@ -4,6 +4,7 @@ from typing import Optional
 import nameparser
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import CASCADE, SET_NULL
@@ -121,6 +122,7 @@ def patient_name_surname_first(first_name, last_name):
 
 class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, ExternallyManagedModel, PreviewModelMixin):
     family_code = models.TextField(null=True, blank=True)
+    patient_code = models.TextField(null=True, blank=True)
     first_name = models.TextField(null=True, blank=True)
     last_name = models.TextField(null=True)
     date_of_birth = models.DateField(null=True, blank=True)
@@ -162,7 +164,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             parts.append(PreviewKeyValue(value="deceased"))
 
         return self.preview_with(
-            identifier=self.external_pk or f"({self.pk})",
+            identifier=self.patient_code or self.external_pk or f"({self.pk})",
             title=self.name_last_name_first,
             summary_extra=parts
         )
@@ -170,9 +172,14 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     def can_write(self, user) -> bool:
         return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
 
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        # Deletable via the group_permissions delete view (can_write() still blocks externally-managed ones)
+        return True
+
     @property
     def code(self):
-        return self.external_pk or f"Patient:{self.pk}"
+        return self.patient_code or self.external_pk or f"Patient:{self.pk}"
 
     @property
     def name(self):
@@ -347,10 +354,11 @@ class PatientAttachment(models.Model):
             size = 0
 
         return {
+            'pk': self.pk,
             'name': basename,
             'size': size,
             'url': image_url,
-            'thumbnailUrl': thumb_url,  # If thumbnail set, JFU displays in gallery
+            'thumbnailUrl': thumb_url,  # rendered as a poster thumbnail
             'deleteUrl': reverse('patient_file_delete', kwargs={'pk': self.pk}),
             'deleteType': 'POST',
         }
@@ -401,8 +409,9 @@ class PatientComment(models.Model):
 
 class PatientColumns:
     PATIENT_FAMILY_CODE = 'Family Code'
+    PATIENT_CODE = 'Patient Code (de-identified)'
     PATIENT_FIRST_NAME = 'Patient First Name'
-    PATIENT_LAST_NAME = 'Patient Last Name (or code) (required)'
+    PATIENT_LAST_NAME = 'Patient Last Name (required)'
     DATE_OF_BIRTH = 'Date of Birth (DD-MM-YYYY)'
     DATE_OF_DEATH = 'Date of Death (DD-MM-YYYY)'
     DECEASED = 'Deceased (Y/N) (mutually exclusive to date of death)'
@@ -423,6 +432,7 @@ class PatientColumns:
 
     COLUMN_DETAILS = [
         (PATIENT_FAMILY_CODE, "String", "Family Code"),
+        (PATIENT_CODE, "String", "De-identified code safe to display in grids"),
         (PATIENT_FIRST_NAME, "String", "First Name to match/create a patient"),
         (PATIENT_LAST_NAME, "String", "Last Name to match/create a patient"),
         (DATE_OF_BIRTH, "Date", "Date to match/create a patient"),
@@ -448,6 +458,7 @@ class PatientColumns:
 
     SAMPLE_QUERYSET_PATH = {
         PATIENT_FAMILY_CODE: "patient__family_code",
+        PATIENT_CODE: "patient__patient_code",
         PATIENT_FIRST_NAME: "patient__first_name",
         PATIENT_LAST_NAME: "patient__last_name",
         DATE_OF_BIRTH: "patient__date_of_birth",
@@ -534,15 +545,26 @@ class PatientRecords(models.Model):
     patient_import = models.OneToOneField(PatientImport, on_delete=CASCADE)
 
     def can_view(self, user) -> bool:
-        return user.is_superuser or user == self.user
+        return user.is_superuser or (self.user is not None and user == self.user)
+
+    def check_can_view(self, user):
+        if not self.can_view(user):
+            msg = f"You do not have permission to access PatientRecords pk={self.pk}"
+            raise PermissionDenied(msg)
 
     @property
-    def user(self):
-        return self.uploaded_file.user
+    def user(self) -> Optional[User]:
+        if file_upload := self.file_upload:
+            return file_upload.user
+        return None
 
     @property
-    def uploaded_file(self):
-        return self.uploadedpatientrecords.uploaded_file
+    def file_upload(self):
+        """ Records from old imports may have had their FileUpload removed """
+        try:
+            return self.uploadedpatientrecords.file_upload
+        except ObjectDoesNotExist:
+            return None
 
     def get_absolute_url(self):
         return reverse('view_patient_import', kwargs={"patient_records_id": self.pk})
@@ -567,6 +589,7 @@ class PatientRecord(models.Model):
     sample_identifier = models.IntegerField(null=True)
     sample_name = models.TextField(null=True)
     patient_family_code = models.TextField(null=True)
+    patient_code = models.TextField(null=True)
     patient_first_name = models.TextField(null=True)
     patient_last_name = models.TextField()
     date_of_birth = models.DateField(null=True)

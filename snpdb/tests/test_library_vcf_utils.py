@@ -1,3 +1,4 @@
+import operator
 import tempfile
 
 import cyvcf2
@@ -8,6 +9,20 @@ from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, vcf_t
     vcf_to_variant_coordinates_and_records, vcf_get_ref_alt_svlen_and_modification
 from snpdb.models import VariantCoordinate, Sequence
 from upload.models import ModifiedImportedVariant
+
+
+def _read_variant_coordinates(filename) -> list[tuple[VariantCoordinate, str]]:
+    """ Read (VariantCoordinate, id) tuples from a VCF, deriving svlen for symbolic alts.
+        id is None when the VCF ID column is '.' """
+    records = []
+    for v in cyvcf2.Reader(filename):
+        svlen = v.INFO.get("SVLEN")
+        if isinstance(svlen, tuple):  # SVLEN declared Number=. comes back as a tuple
+            svlen = svlen[0]
+        vc = VariantCoordinate(chrom=v.CHROM, position=v.POS, ref=v.REF, alt=v.ALT[0],
+                               svlen=int(svlen) if svlen is not None else None)
+        records.append((vc, v.ID))
+    return records
 
 
 class TestVCFUtils(TestCase):
@@ -121,3 +136,20 @@ class TestVCFUtils(TestCase):
         for v in cyvcf2.Reader(filename):
             _ref, alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(v, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
             self._assert_del_svlen(alt, svlen)
+
+    def test_write_vcf_roundtrip(self):
+        """ Round-trip real VCFs (a plain indel and Manta symbolic SVs) through
+            write_vcf_from_variant_coordinates: read the records, write them back, and confirm
+            the re-read coordinates/ids match. Safety net for the issue #1068 consolidation. """
+        for filename in ["upload/test_data/vcf/indel_GRCh37.vcf",
+                         "upload/test_data/vcf/symbolic_alt/manta.vcf"]:
+            with self.subTest(filename=filename):
+                source = _read_variant_coordinates(filename)
+                variant_coordinates = [vc for vc, _ in source]
+                vcf_ids = [vid if vid is not None else "." for _, vid in source]
+                with tempfile.NamedTemporaryFile(mode="wt", suffix=".vcf", delete=True) as temp_file:
+                    write_vcf_from_variant_coordinates(temp_file.name,
+                                                       variant_coordinates=variant_coordinates, vcf_ids=vcf_ids)
+                    written = _read_variant_coordinates(temp_file.name)
+                # the writer sorts by coordinate, so compare against the sorted source
+                self.assertEqual(sorted(source, key=operator.itemgetter(0)), written)

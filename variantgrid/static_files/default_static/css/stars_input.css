@@ -1,0 +1,43 @@
+/*
+ * Interactive FontAwesome star-rating input (replaces django_starfield.css).
+ *
+ * Radio inputs are hidden; each label shows a FontAwesome star. The stars are
+ * rendered highest-value-first and laid out right-to-left, so the sibling
+ * selectors below fill the selected/hovered star and every lower one.
+ *
+ * Filled stars match the read-only `clinvar_stars` template tag: a solid
+ * FontAwesome star in Bootstrap's text-success green. FontAwesome's regular
+ * and solid star share a glyph and font-family, differing only by font-weight
+ * (400 = hollow, 900 = filled), so we toggle weight rather than swap classes.
+ */
+
+.stars-input {
+    display: inline-block;
+    unicode-bidi: bidi-override;
+    direction: rtl;
+}
+
+.stars-input input {
+    display: none;
+}
+
+.stars-input label {
+    margin: 0;
+    padding: 0 1px;
+    cursor: pointer;
+}
+
+.stars-input label i {
+    font-size: 18px;
+    opacity: 0.25;
+    font-weight: 400; /* FontAwesome regular = hollow star */
+}
+
+/* Selected star + all lower ones, plus hover preview */
+.stars-input input:checked ~ label i,
+.stars-input label:hover i,
+.stars-input label:hover ~ label i {
+    opacity: 1;
+    font-weight: 900; /* FontAwesome solid = filled star */
+    color: #28a745;   /* Bootstrap text-success */
+}

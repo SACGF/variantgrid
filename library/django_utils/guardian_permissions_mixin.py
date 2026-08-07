@@ -35,6 +35,15 @@ class GuardianPermissionsMixin:
         """ Object can use another objects permissions """
         return queryset
 
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        """ Whether instances may be deleted via the generic group_permissions_object_delete view.
+            Default False: deletion through that generic endpoint is opt-in per class, because having
+            WRITE permission on an object doesn't mean it should be hard-deletable there - e.g.
+            audit/version records (ClassificationModification) must never be deletable this way.
+            User-created objects opt in (see GuardianPermissionsAutoInitialSaveMixin, or override). """
+        return False
+
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
         if not user_or_group:
             return False
@@ -111,6 +120,12 @@ class GuardianPermissionsMixin:
 class GuardianPermissionsAutoInitialSaveMixin(GuardianPermissionsMixin):
     """ Automatically assigns permissions on initial save (unless you specify 'assign_permissions')
         This *must* be inherited from before Model in the class definition to call this save not model's """
+
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        # These are user-created objects (permissions auto-assigned to the creator on save), so a
+        # user with WRITE permission deleting one via the group_permissions delete view is fine.
+        return True
 
     def save(self, *args, **kwargs):
         assign_permissions = kwargs.pop("assign_permissions", None)

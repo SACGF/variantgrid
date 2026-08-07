@@ -1,17 +1,15 @@
-import re
 import time
 from typing import Optional
 
 import ijson
 
+from classification.models.classification_inserter import BulkClassificationInserter
 from classification.models.evidence_key import EvidenceKeyMap
-from classification.views.classification_view import BulkClassificationInserter
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from library.oauth import ServerAuth
 from library.utils import make_json_safe_in_place, batch_iterator
 from snpdb.models.models import Lab, Organization, Country
-from sync.models.models import SyncRun
 from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 
 
@@ -22,7 +20,7 @@ class VariantGridDownloadSyncer(SyncRunner):
         if sync_run_instance.max_rows:
             raise ValueError("VariantGridDownloadSyncer does not support max_rows")
 
-        sync_destination = self.sync_destination
+        sync_destination = sync_run_instance.sync_destination
 
         config = sync_destination.config
         other_variant_grid = ServerAuth.for_sync_details(sync_destination.sync_details)
@@ -32,24 +30,15 @@ class VariantGridDownloadSyncer(SyncRunner):
                   'type': 'json',
                   'build': required_build}
 
-        _safe_identifier = re.compile(r'^[\w\-]+$')
-
         exclude_labs = config.get('exclude_labs', None)
         if exclude_labs:
-            for lab in exclude_labs:
-                if not _safe_identifier.match(str(lab)):
-                    raise ValueError(f"exclude_labs contains unsafe value: {lab!r}")
             params['exclude_labs'] = ','.join(exclude_labs)
 
         exclude_orgs = config.get('exclude_orgs', None)
         if exclude_orgs:
-            for org in exclude_orgs:
-                if not _safe_identifier.match(str(org)):
-                    raise ValueError(f"exclude_orgs contains unsafe value: {org!r}")
             params['exclude_orgs'] = ','.join(exclude_orgs)
 
         if not sync_run_instance.full_sync:
-            last_download: SyncRun
             if since := sync_run_instance.last_success_server_date():
                 params['since'] = str(since.timestamp())
 
@@ -101,18 +90,12 @@ class VariantGridDownloadSyncer(SyncRunner):
                 return None
 
             if not lab:
-                _lab_group_name_re = re.compile(r'^[\w\-]+/[\w\-]+$')
-                if not _lab_group_name_re.match(lab_group_name):
-                    raise ValueError(f"lab_group_name has unexpected format: {lab_group_name!r}")
                 parts = lab_group_name.split('/')
-                lab_name = meta.get('lab_name') or parts[1]
-                if not isinstance(lab_name, str) or len(lab_name) > 255:
-                    raise ValueError(f"lab_name is invalid: {lab_name!r}")
                 org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
                 australia, _ = Country.objects.get_or_create(name='Australia')
                 Lab.objects.create(
                     group_name=lab_group_name,
-                    name=lab_name,
+                    name=meta.get('lab_name'),
                     organization=org,
                     city='Unknown',
                     country=australia,

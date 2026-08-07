@@ -32,7 +32,9 @@ def _new_vep_110_ekeys(apps, _schema_editor):
                'evidence_category': category_func_data, 'value_type': FREE_ENTRY,
                'see': "https://www.mavedb.org", 'variantgrid_column_id': "mavedb_urn"}),
     ]
-    EvidenceKey.objects.bulk_create(new_ekeys)
+    # ignore_conflicts: the restored DB may already carry some of these keys (its snapshot
+    # predates this migration's record), so skip any that already exist rather than collide.
+    EvidenceKey.objects.bulk_create(new_ekeys, ignore_conflicts=True)
 
     # Hemi count already exists - we can populate it now
     EvidenceKey.objects.filter(pk='gnomad_hemi_count').update(variantgrid_column_id='gnomad_hemi_count')

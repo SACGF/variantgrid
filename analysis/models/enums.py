@@ -11,6 +11,7 @@ class AnalysisType(models.TextChoices):
     SINGLETON = 'S', 'Singleton'
     COHORT = 'C', 'Cohort'
     TRIO = 'T', 'Trio'
+    QUAD = 'Q', 'Quad'
     PEDIGREE = 'P', 'Pedigree'
 
 
@@ -38,18 +39,22 @@ class SNPMatrix(models.TextChoices):
 
 class TrioInheritance(models.TextChoices):
     RECESSIVE = 'R', 'Recessive'
+    ALL_RECESSIVE = 'A', 'All Recessive (AR + XLR)'
     COMPOUND_HET = 'C', 'C. Het'
     DOMINANT = 'D', 'Dominant'
     DENOVO = 'N', "Denovo"
     XLINKED_RECESSIVE = 'X', "X-Linked Recessive"
+    ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'
 
 
 class QuadInheritance(models.TextChoices):
     RECESSIVE = 'R', 'Recessive'
+    ALL_RECESSIVE = 'A', 'All Recessive (AR + XLR)'
     COMPOUND_HET = 'C', 'C. Het'
     DOMINANT = 'D', 'Dominant'
     DENOVO = 'N', 'Denovo'
     XLINKED_RECESSIVE = 'X', 'X-Linked Recessive'
+    ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'
 
 
 class GroupOperation(models.TextChoices):

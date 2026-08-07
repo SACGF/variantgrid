@@ -2308,6 +2308,10 @@ a.clinical-context {
   background-image: url(/static/icons/sequencers/miseq_icon.png);
 }
 
+.iseq-100 {
+  background-image: url(/static/icons/sequencers/iseq_icon.png);
+}
+
 .patient-icon {
   background-image: url(/static/icons/patient-icon-png-3.png);
 }
@@ -2332,14 +2336,6 @@ a.clinical-context {
   background-image: url(/static/icons/hidden_eye.png);
 }
 
-.gene-icon {
-  width: 24px;
-  height: 24px;
-  background-size: 24px 24px;
-  margin: auto;
-  float: left;
-}
-
 .gene-grid-icon {
   background-image: url("/static/images/gene_grid.png");
   cursor: pointer;
@@ -2354,18 +2350,6 @@ a.clinical-context {
 
 .expression-icon {
   background-image: url("/static/images/node_icons/expression.png");
-}
-
-.alt-haplotype-icon {
-  background-image: url(/static/icons/alt_haplotype.png);
-}
-
-.pseudogene-icon {
-  background-image: url(/static/icons/pseudogene.png);
-}
-
-.triplet-repeat-icon {
-  background-image: url(/static/icons/triplet_repeat.png);
 }
 
 .show-grid-icon {

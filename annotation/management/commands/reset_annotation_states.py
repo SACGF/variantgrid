@@ -15,7 +15,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options["clear"]:
             logging.info("Clearing Everything")
-            AnnotationRun.objects.all().update(annotation_range_lock=None)
+            # #2667: also clear the dispatcher lease so nothing is left looking in-flight
+            AnnotationRun.objects.all().update(annotation_range_lock=None, task_id=None,
+                                               leased_by=None, lease_expires=None)
             AnnotationRangeLock.objects.all().delete()
         else:
             logging.info("Clearing incomplete runs and locks")

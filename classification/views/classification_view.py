@@ -5,6 +5,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.utils.decorators import method_decorator
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR, HTTP_400_BAD_REQUEST
@@ -20,8 +22,16 @@ from snpdb.models import Lab
 
 
 class ClassificationView(APIView):
+    """ Retrieve a single classification record, or create/update classification records.
+    Served at /record/ (list/bulk) and /record/<record_id> (detail) across API versions v1/v2/v3. """
     api_version = 1
 
+    @extend_schema(
+        summary="Retrieve a classification record by ID (empty response if no ID given)",
+        responses=OpenApiTypes.OBJECT,
+        parameters=[OpenApiParameter("record_id", OpenApiTypes.STR, OpenApiParameter.PATH,
+                                     description="Classification record reference, e.g. lab/lab_record_id or classification ID")]
+    )
     @method_decorator(login_required)
     def get(self, request, **kwargs) -> Response:
         """
@@ -52,6 +62,13 @@ class ClassificationView(APIView):
 
             return Response(status=HTTP_200_OK, data=response_data)
 
+    @extend_schema(
+        summary="Create or update classification records (single record, or bulk via a 'records' list)",
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+        parameters=[OpenApiParameter("record_id", OpenApiTypes.STR, OpenApiParameter.PATH,
+                                     description="Classification record reference, e.g. lab/lab_record_id or classification ID")]
+    )
     @method_decorator(login_required)
     def post(self, request, **kwargs) -> Response:
         """ Create a new record """
@@ -117,6 +134,12 @@ class ClassificationView(APIView):
 class LabGeneClassificationCountsView(APIView):
     """ Returns a dict of {gene_symbol: {clinical_significance: classification_counts}} """
 
+    @extend_schema(
+        summary="Get per-gene classification counts (total and clinical significance summary) for a lab",
+        responses=OpenApiTypes.OBJECT,
+        parameters=[OpenApiParameter("lab_id", OpenApiTypes.INT, OpenApiParameter.PATH,
+                                     description="Lab primary key")]
+    )
     def get(self, request, *args, **kwargs):
         lab = get_object_or_404(Lab, pk=kwargs["lab_id"])
 

@@ -2,11 +2,19 @@ from typing import Optional
 
 from cdot.hgvs.dataproviders import LocalDataProvider, FastaSeqFetcher, ChainedSeqFetcher
 from django.conf import settings
+from django.db.models import Q
 from hgvs.exceptions import HGVSDataNotAvailableError
 
-from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo, NoTranscript
+from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo, NoTranscript, MANE
+from genes.models_enums import MANEStatus
 from genes.transcripts_utils import get_refseq_type
 from snpdb.models import Contig
+
+# cdot tag spellings expected by cdot's DEFAULT_TAG_PRIORITY list
+_MANE_STATUS_TO_CDOT_TAG = {
+    MANEStatus.MANE_SELECT: "MANE_Select",
+    MANEStatus.MANE_PLUS_CLINICAL: "MANE_Plus_Clinical",
+}
 
 
 def is_contig(ac):
@@ -83,6 +91,34 @@ class DjangoTranscriptDataProvider(LocalDataProvider):
     def _get_transcript(self, tx_ac):
         tv = TranscriptVersion.get_transcript_version(self.genome_build, tx_ac)
         return tv.data
+
+    def _get_tags_by_tx_ac(self, tx_acs: list[str], genome_build: str) -> dict[str, list[str]]:
+        """ Batch tag lookup for gene-symbol resolution.
+
+            Start from cdot's JSON tags (the per-transcript default), then for any
+            transcript that has none, supplement from VG's MANE table in a single
+            query (older VG imports may have no JSON `tag` data). MANE matching is
+            version-insensitive: VG stores transcript versions separately, so the
+            incoming accessions are typically versionless (e.g. "NM_000059") and we
+            match on transcript id, ignoring any ".N" version. """
+        tags_by_ac = super()._get_tags_by_tx_ac(tx_acs, genome_build)
+
+        missing = [ac for ac in tx_acs if not tags_by_ac.get(ac)]
+        if missing:
+            # Map versionless transcript id -> the accession the caller asked for
+            versionless_to_ac = {ac.split(".", 1)[0]: ac for ac in missing}
+            mane_qs = MANE.objects.filter(
+                Q(refseq_transcript_version__transcript_id__in=versionless_to_ac) |
+                Q(ensembl_transcript_version__transcript_id__in=versionless_to_ac)
+            ).values_list("refseq_transcript_version__transcript_id",
+                          "ensembl_transcript_version__transcript_id", "status")
+            for refseq_tid, ensembl_tid, status in mane_qs:
+                if tag := _MANE_STATUS_TO_CDOT_TAG.get(MANEStatus(status)):
+                    for tid in (refseq_tid, ensembl_tid):
+                        if ac := versionless_to_ac.get(tid):
+                            if not tags_by_ac.get(ac):
+                                tags_by_ac[ac] = [tag]
+        return tags_by_ac
 
     def _get_gene(self, gene):
         # TODO: Do we need this? We could always store this from cdot in the DB

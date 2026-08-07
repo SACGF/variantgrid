@@ -1,4 +1,5 @@
 import copy
+import logging
 import re
 import uuid
 from collections import Counter, namedtuple
@@ -46,16 +47,15 @@ from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from genes.hgvs import HGVSMatcher, CHGVS
-from genes.models import Gene
+from genes.models import Gene, NoTranscript
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
-from library.log_utils import report_exc_info, report_event
+from library.log_utils import report_exc_info
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, \
     invalidate_cached_property, md5sum_str, get_timer, utc_from_timestamp
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
-from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
@@ -128,18 +128,6 @@ class ClassificationImportAlleleSource(AlleleSource):
         variants_qs = self.classification_import.get_variants_qs()
         return Allele.objects.filter(variantallele__variant__in=variants_qs)
 
-    def liftover_complete(self, genome_build: GenomeBuild):
-        allele_qs = self.get_allele_qs()
-        # Populate ClinGen for newly created variants as well as it's possible that old one failed but new could work
-        build_variants = Variant.objects.filter(variantallele__genome_build=genome_build,
-                                                variantallele__allele__in=allele_qs)
-        populate_clingen_alleles_for_variants(genome_build, build_variants)
-
-        ImportedAlleleInfo.relink_variants(self.classification_import)
-
-        report_event('Completed import liftover',
-                     extra_data={'liftover_id': self.pk, 'allele_count': allele_qs.count()})
-
 
 class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
     """ Used to reload all Classifications (for upgrades etc.) """
@@ -156,9 +144,6 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
         # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
         return Variant.objects.filter(contigs_q, importedalleleinfo__isnull=False)
-
-    def liftover_complete(self, genome_build: GenomeBuild):
-        ImportedAlleleInfo.relink_variants()
 
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
@@ -440,6 +425,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     Based on ACMG criteria and evidence - @see https://www.nature.com/articles/gim201530
     """
+
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        # Classifications are not hard-deleted via the generic group_permissions delete view -
+        # their lifecycle is withdrawal/flagging, and ClassificationModification keeps the history.
+        return False
 
     # TODO - remove variant and allele in favour of having that accessed via  variant_info
     variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
@@ -2165,7 +2156,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def _generate_c_hgvs(self, genome_build: GenomeBuild) -> str:
         variant = self.get_variant_for_build(genome_build)
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
 
         c_hgvs: str = None
         if variant:
@@ -2174,6 +2165,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 transcript_id = self.transcript
                 hgvs_variant = hgvs_matcher.variant_to_hgvs_variant(variant, transcript_id)
                 c_hgvs = hgvs_variant.format()
+            except NoTranscript as nt:
+                # Transcript missing/invalid in our DB — data issue, not a bug. See #1478.
+                logging.warning("Could not generate c.HGVS for variant %s (%s, transcript %s): %s",
+                                variant, genome_build.name, transcript_id, nt)
             except Exception:
                 # can't map between builds
                 report_exc_info(extra_data={
@@ -2219,6 +2214,11 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         It's this record (not raw Classifications) that appear on grids, so that only correctly saved/shared
         classifications are shown (ie not partially edited ones)
     """
+
+    @classmethod
+    def allow_group_permission_delete(cls) -> bool:
+        # Immutable audit/version history - must never be deletable via the group_permissions delete view
+        return False
 
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)  # One who did last change, may not be classification.user

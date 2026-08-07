@@ -46,6 +46,7 @@ SEND_EMAILS = False
 HEALTH_CHECK_ENABLED = True
 
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
+CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER = False  # Nothing is curated on Shariant, so there's no internal/external split
 CLASSIFICATION_NEW_GROUPING = True
 CLASSIFICATION_ALLOW_DELETE = False
 CLASSIFICATION_ALLOW_UNKNOWN_KEYS = False
@@ -87,11 +88,13 @@ LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes", "ontol
 
 # OIDC SETTINGS
 USE_OIDC = True
+OIDC_STORE_ID_TOKEN = True  # needed so we can pass the token back to keycloak for an automatic logout
 LOGIN_URL = '/oidc_login/'
+OIDC_USE_PKCE = True
+OIDC_PKCE_CODE_CHALLENGE_METHOD = 'S256'
 OIDC_RP_SIGN_ALGO = 'RS256'
-# TODO, change this then move it to
 OIDC_RP_CLIENT_SECRET = get_secret('OIDC.client_secret')
-KEY_CLOAK_BASE = 'https://shariant.org.au/auth'
+KEY_CLOAK_BASE = 'https://auth.shariant.org.au'
 KEY_CLOAK_REALM = 'agha'
 KEY_CLOAK_PROTOCOL_BASE = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/protocol/openid-connect'
 OIDC_OP_JWKS_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/certs'
@@ -99,8 +102,7 @@ OIDC_OP_AUTHORIZATION_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/auth'
 OIDC_OP_TOKEN_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/token'
 OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
-OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
-
+OIDC_OP_LOGOUT_URL_METHOD = 'oidc_auth.backend.provider_logout'
 # login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
@@ -112,12 +114,22 @@ EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'
 
 DEBUG = False
 ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS=['https://test.shariant.org.au', 'https://shariant.org.au', 'https://www.shariant.org.au', 'https://demo.shariant.org.au']
+# Allowed Hosts set to wildcard as Shariant environments are accessed via tunneled services in AWS
+
+CSRF_TRUSTED_ORIGINS=['https://test.shariant.org.au', 'https://test2.shariant.org.au', 'https://shariant.org.au', 'https://www.shariant.org.au', 'https://demo.shariant.org.au']
 
 ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = False  # Only used for analysis optimisation
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'annotation_scratch')
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
+
+# Stay on the historical annotation config (package default is now latest - see #1625)
+ANNOTATION_VEP_VERSION = "110"
+ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
+ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
+ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
+pin_annotation_to_columns_version_3(ANNOTATION)
+use_pre_vep112_fasta(ANNOTATION)
 
 ANNOTATION[BUILD_GRCH37].update({
     "annotation_consortium": "RefSeq",
@@ -127,6 +139,7 @@ ANNOTATION[BUILD_GRCH38].update({
     "annotation_consortium": "RefSeq",
 })
 
+SITE_DESCRIPTION = "Shariant - Australian Genomics Variant Curation sharing project."
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
@@ -213,8 +226,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "upload_pipeline_modified_variants_grid": False,
     "view_upload_stats_detail": False,
     "accept_vcf_import_info_tag": False,
-    "jfu_upload": False,
-    "jfu_delete": False,
+    "upload_file": False,
+    "upload_file_delete": False,
     "download_uploaded_file": False,
 
     # discordance
@@ -241,6 +254,9 @@ VARIANT_MANUAL_CREATE_BY_NON_ADMIN = False
 # Don't show annotation or samples on variant page - don't want to be responsible for it
 VARIANT_DETAILS_SHOW_ANNOTATION = False
 VARIANT_DETAILS_SHOW_SAMPLES = False
+# Keep variant coordinates inside Shariant - viewing a variant page must not egress a query
+# to external Beacons (the panel is otherwise on by default).
+BEACON_OUTBOUND_ENABLED = False
 VARIANT_VCF_DB_PREFIX = "stv"
 VARIANT_SYMBOLIC_ALT_ENABLED = True
 

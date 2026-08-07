@@ -8,7 +8,7 @@
 <link href="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.theme.css' %}" rel="stylesheet">
 
 <link rel="shortcut icon" href="{% static 'favicon.ico' %}" />
-<script type="text/javascript" src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/jquery-3.7.1/jquery-3.7.1.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.min.js' %}"></script>
 <script src="{% static 'js/lib/jquery.blockUI.js' %}"></script>
 {% include "analysis/analysis_includes.html" %}
@@ -80,6 +80,20 @@
 /* Grid keeps getting cut off, make a bottom margin size of top bar */
 #node-grid-container {
     margin-bottom: 50px;
+    position: relative; /* so a grid-only loading overlay fills just this section, leaving the editor usable */
+    min-height: 200px;  /* keep the grid area (and its loading overlay/helix) from collapsing while a deferred grid loads */
+}
+#grid-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    min-height: 200px;  /* JS sets an explicit height to the visible grid area; this is the fallback */
+    z-index: 10000;
+    background-color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>
 <div id="grid-and-editor-container">

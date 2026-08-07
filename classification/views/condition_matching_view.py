@@ -4,6 +4,8 @@ from typing import Optional, Union
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.shortcuts import render, get_object_or_404
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -93,7 +95,12 @@ def condition_matching_view(request, pk: int):
 
 
 class ConditionTextMatchingAPI(APIView):
+    """ Retrieve and update ontology term matches for a ConditionText (free-text condition). """
 
+    @extend_schema(
+        summary="Get condition matching suggestions and outstanding count for a ConditionText",
+        responses=OpenApiTypes.OBJECT
+    )
     def get(self, request, **kwargs) -> Response:
         ct_id = kwargs['pk']
         ct: ConditionText = ConditionText.objects.get(pk=ct_id)
@@ -106,6 +113,11 @@ class ConditionTextMatchingAPI(APIView):
             "suggestions": [cms.as_json() for cms in suggestions]
         })
 
+    @extend_schema(
+        summary="Apply ontology term changes to ConditionTextMatch records and return updated suggestions",
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT
+    )
     def post(self, request, **kwargs) -> Response:
         ct_id = kwargs['pk']
         ct: ConditionText = ConditionText.objects.get(pk=ct_id)

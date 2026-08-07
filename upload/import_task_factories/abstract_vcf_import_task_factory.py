@@ -128,7 +128,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
         return clazz.si(preprocess_step.pk, 0)
 
     def _get_vcf_filename(self, upload_pipeline) -> str:
-        return upload_pipeline.uploaded_file.get_filename()
+        return upload_pipeline.file_upload.get_filename()
 
     def create_import_task(self, upload_pipeline):
         vcf_filename = self._get_vcf_filename(upload_pipeline)

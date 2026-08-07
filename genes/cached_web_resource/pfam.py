@@ -20,23 +20,15 @@ PFAM_SEQUENCE_PATTERN = re.compile(r"(.+?)-\d+$")
 
 
 def store_pfam_from_web(cached_web_resource):
-    """ Pfam-A.clans.tsv
-      This file contains a list of all Pfam-A families that are in clans.
-      The columns are: Pfam accession, clan accession, clan ID, Pfam
-      ID, Pfam description. """
-
-    if not Transcript.objects.exists():
-        raise ValueError("No transcripts - you need to import them first.")
-
-    # Clear existing records + recreate
-    Pfam.objects.all().delete()
-    PfamSequence.objects.all().delete()
-
-    num_pfam = store_pfam()
-    num_domains = store_pfam_sequences_and_domains()
-
-    cached_web_resource.description = f"{num_pfam} Pfam. {num_domains} Domains."
-    cached_web_resource.save()
+    """ Disabled: the upstream per-organism file
+        ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/9606.tsv.gz
+        was discontinued (no proteomes/ subdirectory in Pfam38.1, Jan 2025).
+        Tracked in https://github.com/SACGF/variantgrid/issues/1554 — pick a replacement
+        source (Pfam-A.regions.tsv.gz or InterPro protein2ipr.dat.gz) before re-enabling. """
+    raise NotImplementedError(
+        "Pfam web update is disabled: upstream proteomes/9606.tsv.gz no longer exists. "
+        "See https://github.com/SACGF/variantgrid/issues/1554"
+    )
 
 
 def store_pfam() -> int:

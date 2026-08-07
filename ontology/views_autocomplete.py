@@ -46,7 +46,13 @@ class AbstractOntologyTermAutocompleteView(abc.ABC, AutocompleteView):
 class OntologyTermAutocompleteView(AbstractOntologyTermAutocompleteView):
     def _get_ontology_service(self):
         # Passed ontology_service in forward
-        return self.forwarded.get('ontology_service')
+        value = self.forwarded.get('ontology_service')
+        if value is None:
+            return None
+        try:
+            return OntologyService(value)
+        except ValueError:
+            return None
 
 
 @method_decorator(cache_page(HOUR_SECS), name='dispatch')

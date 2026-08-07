@@ -17,7 +17,8 @@ SLACK['emoji'] = ':tv:'
 # OIDC SETTINGS
 OIDC_RP_CLIENT_ID = 'shariant-demo'
 OIDC_REQUIRED_GROUP = '/variantgrid/shariant_demo'
-LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fdemo.shariant.org.au'
+LOGOUT_REDIRECT_URL = "https://test2.shariant.org.au"
+
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'demo_annotation_scratch')
 

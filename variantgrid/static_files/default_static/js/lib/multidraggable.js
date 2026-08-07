@@ -29,13 +29,17 @@
                     var item = $(this);
                     var pos = item.position();
 				    var items = getItems(this);
+                    var dragged = this;
                     //console.log("start",ui,event)
 					if (items.length) {
                         $.each(items, function (key, value) {
                             var elemPos = $(value).position();
                             initLeftOffset[key] = elemPos.left - pos.left;
                             initTopOffset[key] = elemPos.top - pos.top;
-                            opts.startAll ? opts.startAll.call(this, event, ui) : {};
+                            // The dragged element is in items too - startNative handles it below
+                            if (value !== dragged) {
+                                opts.startAll ? opts.startAll.call(this, event, ui) : {};
+                            }
                         });
                         jsPlumb.repaint(items);
                     }
@@ -66,6 +70,7 @@
                     var item = $(this);
                     var pos = $(this).offset();
 					var items = getItems(this);
+                    var dragged = this;
              //         console.log("stop",ui,event)
 					if (items.length) {
                         $.each(items, function (key, value) {
@@ -73,7 +78,10 @@
                                 left: pos.left + initLeftOffset[key],
                                 top: pos.top + initTopOffset[key]
                             });
-                            opts.stopAll ? opts.stopAll.call(this, event, ui) : {};
+                            // The dragged element is in items too - stopNative handles it below
+                            if (value !== dragged) {
+                                opts.stopAll ? opts.stopAll.call(this, event, ui) : {};
+                            }
                         });
                         jsPlumb.repaint(items);
                     }

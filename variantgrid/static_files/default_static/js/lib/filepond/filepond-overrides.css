@@ -1,0 +1,11 @@
+/* The "Add files..." button lives outside the FilePond widget; hide FilePond's
+   own drop label so the pond shows only the item list. The pond root still
+   accepts drops. */
+
+.filepond--root .filepond--drop-label {
+    display: none;
+}
+
+.filepond--root {
+    min-height: 0;
+}

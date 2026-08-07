@@ -123,8 +123,7 @@ def _variant_hgvs_extra(variant: Variant, genome_build: GenomeBuild) -> list[Pre
     hgvs_extras = []
     if c_hgvs := variant.get_canonical_c_hgvs(genome_build):
         hgvs_extras.append(PreviewKeyValue(None, c_hgvs, dedicated_row=True))
-    else:
-        vav = VariantAnnotationVersion.latest(genome_build)
+    elif vav := VariantAnnotationVersion.latest(genome_build):
         if va := variant.variantannotation_set.filter(version=vav).first():
             variant_summary = "intergenic"
             if va.distance:

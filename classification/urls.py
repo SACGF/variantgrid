@@ -116,6 +116,9 @@ urlpatterns = [
     path('classification/<classification_id>/classification.csv', classification_export_view.record_csv, name='classification_csv'),
     path('classification/<classification_id>/report.html', classification_export_view.template_report, name='view_template_report'),
     path('classification/<classification_id>/history', views.classification_history, name='classification_history'),
+    # lab group names contain slashes (org/lab), so match the lot and split on the final one
+    path('classification/lab_record/<path:classification_ref>', views.view_classification_lab_record,
+         name='view_classification_lab_record'),
     # classification ID might have a version in it (e.g. a dot)
     path('classification/<classification_id>', views.view_classification, name='view_classification'),
 

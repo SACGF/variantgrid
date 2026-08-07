@@ -179,7 +179,7 @@ class MutationSignatures:
         self.Results = None
 
         NUMPY_DTYPE_TOL = {
-            "float": (np.float, None),
+            "float": (float, None),
             "float64": (np.float64, 1e-15),
             "float128": (np.float128, 1e-30)}
         (self.dtype, self.tolerance) = NUMPY_DTYPE_TOL[precision]

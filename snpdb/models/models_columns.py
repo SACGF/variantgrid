@@ -12,7 +12,7 @@ from model_utils.models import TimeStampedModel
 
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import public_group
-from snpdb.models.models_enums import ColumnAnnotationLevel, VCFInfoTypes
+from snpdb.models.models_enums import ColumnAnnotationLevel
 
 
 class VariantGridColumn(models.Model):
@@ -46,9 +46,10 @@ class VariantGridColumn(models.Model):
 
     @cached_property
     def columns_version_description(self) -> str:
-        q = Q(min_columns_version__isnull=False) | Q(max_columns_version__isnull=False)
-        if cvf := self.columnvepfield_set.filter(q).first():
-            return cvf.columns_version_description
+        from annotation.vep_columns import for_variant_grid_column
+        for c in for_variant_grid_column(self.pk):
+            if c.min_columns_version is not None or c.max_columns_version is not None:
+                return c.columns_version_description
         return ""
 
     @property
@@ -70,19 +71,6 @@ class VariantGridColumn(models.Model):
 
     def __str__(self):
         return self.grid_column_name
-
-
-class ColumnVCFInfo(models.Model):
-    """ Used to export columns to VCF (vcf_export_utils) """
-    info_id = models.TextField(primary_key=True)
-    column = models.OneToOneField(VariantGridColumn, on_delete=CASCADE)
-    number = models.IntegerField(null=True, blank=True)
-    type = models.CharField(max_length=1, choices=VCFInfoTypes.choices)
-    description = models.TextField(null=True)
-
-    def __str__(self):
-        number = self.number or '.'
-        return f"ID={self.info_id},number={number},type={self.type},descr: {self.description}"
 
 
 class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):

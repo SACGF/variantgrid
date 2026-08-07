@@ -15,20 +15,20 @@ class ImportBedFileTask(ImportTask):
     """ It's not always possible to know what genome build a bed file is, so this may
         not be able to complete the processing (leaving at import_status REQUIRES_USER_INPUT) """
 
-    def process_items(self, uploaded_file):
+    def process_items(self, file_upload):
         logging.debug("ImportBedFileTask: process items")
 
         uploaded_category = GenomicIntervalsCategory.objects.get(name="Uploaded")
-        user = uploaded_file.user
-        genomic_intervals_collection = GenomicIntervalsCollection.objects.create(name=uploaded_file.name,
+        user = file_upload.user
+        genomic_intervals_collection = GenomicIntervalsCollection.objects.create(name=file_upload.name,
                                                                                  category=uploaded_category,
                                                                                  user=user,
                                                                                  import_status=ImportStatus.IMPORTING)
         assign_perm('snpdb.view_genomicintervalscollection', user, genomic_intervals_collection)
-        uploaded_bed = UploadedBed.objects.create(uploaded_file=uploaded_file,
+        uploaded_bed = UploadedBed.objects.create(file_upload=file_upload,
                                                   genomic_intervals_collection=genomic_intervals_collection)
 
-        bed_file = uploaded_file.get_filename()
+        bed_file = file_upload.get_filename()
         genome_build = self._get_genome_build(user, bed_file)
         if genome_build:
             genomic_intervals_collection.genome_build = genome_build

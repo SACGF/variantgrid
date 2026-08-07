@@ -23,7 +23,9 @@ from library.guardian_utils import DjangoPermission
 from snpdb import models
 from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
     ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
-    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath
+    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath, \
+    GridLoadingAnimation, DEFAULT_GRID_LOADING_ANIMATIONS
+from patients.models import Patient, Specimen
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal, FormHelperHelper
@@ -56,6 +58,9 @@ class BaseModelForm(forms.ModelForm):
 
 class GenomeBuildAutocompleteForwardMixin:
     genome_build_fields = []
+    # Subclasses set exclude_archived=True to forward exclude_archived to the
+    # underlying autocomplete view, dropping rows whose source data is archived.
+    exclude_archived = False
 
     def __init__(self, *args, **kwargs):
         genome_build = kwargs.pop("genome_build", None)
@@ -64,6 +69,8 @@ class GenomeBuildAutocompleteForwardMixin:
             widget_forward = []
             if genome_build:
                 widget_forward.append(forward.Const(genome_build.pk, "genome_build_id"))
+            if self.exclude_archived:
+                widget_forward.append(forward.Const(True, "exclude_archived"))
             self.fields[f].widget.forward = widget_forward
 
 
@@ -145,7 +152,7 @@ class LabForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = Lab
         # fields = '__all__'
-        exclude = ("classification_config", "css_class")
+        exclude = ("classification_config", "css_class", "research")
         read_only = ("name", "external", "group_name", "organization", "upload_location", "upload_automatic", "upload_instructions", "clinvar_key")
         widgets = {
             "name": TextInput(),
@@ -173,8 +180,16 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "slack_webhook": "Slack Webhook",
             "contact_name": "Contact Name",
             "contact_email": "Contact Email",
-            "contact_phone": "Contact Phone"
+            "contact_phone": "Contact Phone",
+            "mme_enabled": "MatchMaker Exchange Enabled — shares VUS and above at "
+                           "3rd Party Databases level"
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Labs on non-MME deployments never see the opt-in toggle.
+        if not settings.MME_ENABLED:
+            self.fields.pop("mme_enabled", None)
         help_texts = {
             "email": "Lab wide email for discordance and general communications.",
             "contact_name": "Name of contact person available for other labs to contact (if applicable)",
@@ -183,8 +198,16 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
             "upload_auto_pattern": "If provided, then uploading files that match this pattern will be automatically processed, otherwise there will be a delay for manual review.",
             "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI",
-            "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit."
+            "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit.",
+            "mme_enabled": "Opt this lab into MatchMaker Exchange, a federated rare-disease "
+                           "patient-matching network. Classifications of VUS and above that are "
+                           "shared at '3rd Party Databases' level become candidate genes other "
+                           "labs can match against, and a match results in a person-to-person "
+                           "email to your Contact Email.",
         }
+        for field_name, help_text in help_texts.items():
+            if field := self.fields.get(field_name):
+                field.help_text = help_text
 
 
 class OrganizationForm(forms.ModelForm, ROFormMixin):
@@ -478,6 +501,7 @@ class SettingsOverrideForm(BaseModelForm):
             "allele_origin_exclude_filter": "Allele Origin (filter by default)",
             "grid_sample_label_template": "Grid Sample Label Template",
             "initially_show_zygosity_table": "Initially Show Trio/Quad Zygosity Table",
+            "node_grid_auto_load_max_variants": "Node Grid Auto Load Max Variants",
         }
 
     def __init__(self, *args, **kwargs):
@@ -490,10 +514,28 @@ class SettingsOverrideForm(BaseModelForm):
         data = self.cleaned_data["grid_sample_label_template"]
         if data:
             try:
-                Sample._validate_sample_formatter_func(data)
+                self._validate_sample_formatter_func(data)
             except (ValueError, KeyError) as e:
                 raise ValidationError(e) from e
         return data
+
+    @staticmethod
+    def _validate_sample_formatter_func(sample_label_template):
+        """ Throws error if invalid """
+        specimen = Specimen(reference_id='refId', description='description')
+        patient = Patient(pk=2, first_name='first_name', last_name='last_name',
+                          patient_code='patient_code')
+        sample = Sample(pk=1, name="sample", patient=patient, specimen=specimen)
+        params = sample._get_sample_formatter_params()
+        errors = []
+        for i, t in enumerate(sample_label_template.split("||")):
+            try:
+                t % params
+            except (ValueError, KeyError) as exception:
+                errors.append(f"{i+1}: '{t}: {exception=}'")
+        if errors:
+            error_msg = '\n'.join(errors)
+            raise ValueError(f"Sample formatter function failed: {error_msg}")
 
     def _hide_unused_fields(self):
         settings_config = get_settings_form_features()
@@ -514,6 +556,7 @@ class SettingsOverrideForm(BaseModelForm):
             "show_candidates_cross_sample_classification":  settings_config.cross_sample_classification_enabled,
             "show_candidates_classification_evidence_update": settings_config.classification_evidence_update_enabled,
             "initially_show_zygosity_table": settings_config.analysis_enabled,
+            "node_grid_auto_load_max_variants": settings_config.analysis_enabled,
         }
 
         for f, visible in field_visibility.items():
@@ -534,6 +577,14 @@ class LabUserSettingsOverrideForm(SettingsOverrideForm):
 
 
 class UserSettingsOverrideForm(SettingsOverrideForm):
+    # Personal preference - checkboxes rather than the JSONField's default textarea.
+    loading_animations = forms.MultipleChoiceField(
+        choices=GridLoadingAnimation.choices,
+        widget=forms.CheckboxSelectMultiple(),
+        required=False,
+        label="Grid Loading Animations",
+        help_text="DNA animations randomly shown while a node's variant grid loads.")
+
     class Meta(SettingsOverrideForm.Meta):
         model = UserSettingsOverride
         exclude = ['user', 'oauth_sub']
@@ -545,6 +596,12 @@ class UserSettingsOverrideForm(SettingsOverrideForm):
         if "columns" in self.fields:
             self.fields['columns'].queryset = models.CustomColumnsCollection.filter_for_user(user)
         self.fields['default_lab'].queryset = Lab.valid_labs_qs(user)
+
+        if not get_settings_form_features().analysis_enabled:
+            del self.fields['loading_animations']
+        elif self.instance.loading_animations is None:
+            # Not chosen yet - show the defaults ticked
+            self.initial['loading_animations'] = list(DEFAULT_GRID_LOADING_ANIMATIONS)
 
 
 class CreateCohortForm(BaseModelForm):

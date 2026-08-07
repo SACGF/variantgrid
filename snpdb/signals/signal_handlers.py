@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import transaction
-from django_messages.models import Message
+from user_messages.models import Message
 
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
 from library.guardian_utils import admin_bot

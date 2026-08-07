@@ -2,19 +2,29 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
+
+REDUNDANT_FLAG_TYPES = [
+    'classification_matching_variant',
+    'classification_matching_variant_warning',
+    'classification_transcript_version_change',
+    'allele_37_not_38',
+    'allele_missing_38',
+    'allele_missing_37',
+]
 
 
-def _check_has_flags(apps):
+def _delete_redundant_flags(apps, _schema_editor):
     FlagType = apps.get_model("flags", "FlagType")
-    return FlagType.objects.filter(id__in=[
-        'classification_matching_variant',
-        'classification_matching_variant_warning',
-        'classification_transcript_version_change',
-        'allele_37_not_38',
-        'allele_missing_38',
-        'allele_missing_37'
-    ])
+    Flag = apps.get_model("flags", "Flag")
+
+    for type_str in REDUNDANT_FLAG_TYPES:
+        if type_obj := FlagType.objects.filter(pk=type_str).first():
+            type_obj_count = Flag.objects.filter(flag_type=type_obj).count()
+            print(f"{type_str} has {type_obj_count} flags... deleting")
+            type_obj.delete()
+            # cascade delete will delete all the flags of that type
+        else:
+            print(f"{type_str} flag already deleted")
 
 
 class Migration(migrations.Migration):
@@ -24,8 +34,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(
-            task_id=ManualOperation.task_id_manage(["remove_redundant_flags"]),
-            test=_check_has_flags
-        )
+        migrations.RunPython(_delete_redundant_flags, migrations.RunPython.noop)
     ]

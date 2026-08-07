@@ -1,15 +1,30 @@
+import re
+
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import QuerySet, OuterRef, Count, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 
+from annotation.phenotype_matcher import get_ambiguous_acronym_denylist
 from library.constants import DAY_SECS
 from ontology.models import OntologyTerm, OntologyVersion
 from patients.models import Patient
 
 PATIENT_TPM_PATH = "patient_text_phenotype__phenotype_description__textphenotypesentence__text_phenotype__textphenotypematch"
 PATIENT_ONTOLOGY_TERM_PATH = PATIENT_TPM_PATH + "__ontology_term"
+
+
+def filter_ambiguous_acronym_matches(matches: list["TextPhenotypeMatch"]) -> list["TextPhenotypeMatch"]:
+    """Drop unsaved TextPhenotypeMatch instances whose matched text is an ambiguous
+    acronym (one short string mapping to multiple distinct concept clusters). These
+    are surfaced as warning-only entries by TextPhenotypeSentence.get_results()
+    rather than persisted, so downstream ontology-term queries can't silently pick
+    the wrong concept."""
+    denylist = get_ambiguous_acronym_denylist()
+    if not denylist:
+        return matches
+    return [m for m in matches if m.match_text.lower().replace(",", "") not in denylist]
 
 
 class DescriptionProcessingStatus(models.Model):
@@ -42,10 +57,20 @@ class PhenotypeDescription(models.Model):
 
     @cache_memoize(timeout=DAY_SECS, args_rewrite=lambda s: (s.pk, ))
     def get_ontology_term_ids(self) -> list[int]:
-        ot_qs = self.textphenotypesentence_set.filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
-        # Sort so can be cached
-        ot_qs = ot_qs.order_by("text_phenotype__textphenotypematch__ontology_term_id")
-        return ot_qs.values_list("text_phenotype__textphenotypematch__ontology_term_id", flat=True)
+        denylist = get_ambiguous_acronym_denylist()
+        ot_qs = (self.textphenotypesentence_set
+                 .filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
+                 .select_related("text_phenotype")
+                 .prefetch_related("text_phenotype__textphenotypematch_set"))
+        term_ids = set()
+        for sentence in ot_qs:
+            sentence_text = sentence.text_phenotype.text
+            for tpm in sentence.text_phenotype.textphenotypematch_set.all():
+                match_text = sentence_text[tpm.offset_start:tpm.offset_end].lower()
+                if match_text in denylist:
+                    continue  # Ambiguous acronym - refuse to feed downstream queries
+                term_ids.add(tpm.ontology_term_id)
+        return sorted(term_ids)
 
     def get_gene_symbols(self, ontology_version) -> QuerySet:
         terms = tuple(self.get_ontology_term_ids())
@@ -90,8 +115,9 @@ class TextPhenotypeSentence(models.Model):
 
     def get_results(self):
         results = []
-
         ambiguous = set(self.text_phenotype.get_ambiguous_matches())
+        denylist = get_ambiguous_acronym_denylist()
+        sentence_text = self.text_phenotype.text
         for tpm in self.text_phenotype.textphenotypematch_set.all():
             tpm.offset_start += self.sentence_offset
             tpm.offset_end += self.sentence_offset
@@ -99,7 +125,35 @@ class TextPhenotypeSentence(models.Model):
             if tpm in ambiguous:
                 data["ambiguous"] = tpm.match_text
             results.append(data)
+
+        # Ambiguous acronyms are no longer persisted as TextPhenotypeMatch rows,
+        # so synthesize warning-only entries by rescanning the sentence text.
+        results.extend(self._ambiguous_acronym_results(sentence_text, denylist))
         return results
+
+    def _ambiguous_acronym_results(self, sentence_text, denylist):
+        if not denylist:
+            return []
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(k) for k in denylist) + r")\b",
+            re.IGNORECASE,
+        )
+        out = []
+        for m in pattern.finditer(sentence_text):
+            match_text = m.group(0)
+            key = match_text.lower()
+            candidates = denylist.get(key) or ()
+            entry = {
+                "ambiguous_alias": match_text,
+                "offset_start": m.start() + self.sentence_offset,
+                "offset_end": m.end() + self.sentence_offset,
+            }
+            if candidates:
+                entry["ambiguous_alias_candidates"] = [
+                    {"accession": acc, "name": name} for acc, name in candidates
+                ]
+            out.append(entry)
+        return out
 
 
 class TextPhenotypeMatch(models.Model):

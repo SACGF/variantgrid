@@ -3,7 +3,18 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import cached_property
-from typing import Union, Any, Mapping
+from typing import Union, Any, Mapping, Optional
+
+
+def canonical_filter_key(filter_dict: Optional[dict]) -> Optional[str]:
+    """ Deterministic string encoding of a stats-filter config (used to key
+        precomputed CohortGenotype*Stats rows). None ↔ None. Sorted keys, no
+        whitespace; round-trip stable. Both readers and writers MUST use this
+        single helper — a silent encoding mismatch produces cache misses
+        forever. """
+    if not filter_dict:
+        return None
+    return json.dumps(filter_dict, sort_keys=True, separators=(",", ":"))
 
 
 # Inclusion of this code snippet will cause "to_json()" to be called on classes by the JSONEncoder, allowing them to become serializable

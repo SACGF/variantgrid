@@ -5,6 +5,12 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _has_classifications(apps):
+    # Builds groupings/summaries for existing classifications - none on a fresh install
+    Classification = apps.get_model("classification", "Classification")
+    return Classification.objects.exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -12,5 +18,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_manage(["classification_groupings", "--summary", "--all"])
+        ManualOperation.operation_manage(["classification_groupings", "--summary", "--all"],
+                                         test=_has_classifications)
     ]

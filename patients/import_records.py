@@ -208,6 +208,7 @@ def process_record(patient_records, record_id, row):
 
     validation_messages = []
     family_code = row[PatientColumns.PATIENT_FAMILY_CODE]
+    patient_code = row[PatientColumns.PATIENT_CODE]
     first_name = row[PatientColumns.PATIENT_FIRST_NAME]
     last_name = row[PatientColumns.PATIENT_LAST_NAME]
     date_of_birth = parse_date(row, PatientColumns.DATE_OF_BIRTH, validation_messages)
@@ -287,6 +288,7 @@ def process_record(patient_records, record_id, row):
 
     # Fields that can change (ie not used to match)
     PATIENT_FIELDS = {"family_code": family_code,
+                      "patient_code": patient_code,
                       "affected": affected,
                       "consanguineous": consanguineous}
 
@@ -393,6 +395,7 @@ def process_record(patient_records, record_id, row):
                                  sample_identifier=sample_id,
                                  sample_name=sample_name,
                                  patient_family_code=family_code,
+                                 patient_code=patient_code,
                                  patient_first_name=first_name,
                                  patient_last_name=last_name,
                                  date_of_birth=date_of_birth,
@@ -440,8 +443,8 @@ def get_patient_record_imports_dataframe(f):
 
 
 def import_patient_records(patient_records):
-    uploaded_file = patient_records.uploaded_file
-    filename = uploaded_file.get_filename()
+    file_upload = patient_records.file_upload
+    filename = file_upload.get_filename()
     df = get_patient_record_imports_dataframe(filename)
     missing_columns = set(PatientColumns.COLUMNS) - set(df.columns)
     if missing_columns:

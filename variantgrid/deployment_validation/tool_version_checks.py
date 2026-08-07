@@ -5,6 +5,7 @@ import subprocess
 
 from django.conf import settings
 
+from pedigree.graphs.pedigree_chart import get_ped_parser_command
 from snpdb.models import SomalierConfig
 from upload.vcf.vcf_preprocess import get_bcftools_tool_version
 
@@ -52,7 +53,7 @@ def check_tool_versions() -> dict:
         tools["somalier"] = (lambda: _run_ensure_success([somalier_bin]), "https://github.com/brentp/somalier")
 
     if madeline2_cmd := settings.PEDIGREE_MADELINE2_COMMAND:
-        tools["ped_parser"] = (lambda: _run_ensure_success(["ped_parser", "--version"]), _INSTALL_PED_PARSER_MADELINE2)
+        tools["ped_parser"] = (lambda: _run_ensure_success([*get_ped_parser_command(), "--version"]), _INSTALL_PED_PARSER_MADELINE2)
         tools["madeline2"] = (lambda: _run_ensure_success([madeline2_cmd, "--version"]), _INSTALL_PED_PARSER_MADELINE2)
 
     if settings.LIFTOVER_BCFTOOLS_ENABLED:

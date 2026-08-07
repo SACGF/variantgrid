@@ -20,6 +20,8 @@ def _get_ontology_text_match_counts() -> dict:
 class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--clear', action='store_true')
+        parser.add_argument('--cores', type=int, default=1,
+                            help='Number of parallel workers for sentence NLP matching (default 1)')
 
     def handle(self, *args, **options):
         before_counts = _get_ontology_text_match_counts()
@@ -29,7 +31,7 @@ class Command(BaseCommand):
             TextPhenotype.objects.all().delete()  # Cascade deletes TextPhenotypeMatch
             PatientTextPhenotype.objects.all().delete()
 
-        bulk_patient_phenotype_matching()
+        bulk_patient_phenotype_matching(cores=options["cores"])
 
         # This is a very blunt count (ie individual stuff may have changed)
         after_counts = _get_ontology_text_match_counts()

@@ -12,7 +12,8 @@ from django.utils import timezone
 from annotation.models import ClinVarReviewStatus, GeneAnnotationRelease
 from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, \
     HumanProteinAtlasAnnotationVersion, AnnotationVersion, ClinVar, ClinVarCitation, \
-    ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion
+    ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion, \
+    SubVersionPartition
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport
@@ -28,19 +29,63 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
                                               "test", str(uuid4()))
 
     TEST_ANNOTATION = copy.deepcopy(settings.ANNOTATION)
-    # I didn't have the phasCons/phyloP data on my laptop when I generated the test VCFs, so need to disable
-    TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
-        "phastcons100way": None,
-        "phastcons46way": None,
-        "phylop100way": None,
-        "phylop46way": None,
-    })
-    TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
-        "phastcons100way": None,
-        "phastcons30way": None,
-        "phylop100way": None,
-        "phylop30way": None,
-    })
+    # phastCons/phyloP custom tracks: v1-v3 fixtures were generated without the bigwig data, so disable
+    # to keep importer bindings clean. v4 fixtures include them, so pin the paths (has_data_files gates
+    # the columns on a non-None vep_config path) - a developer's local override nulling the bigwig tracks
+    # would otherwise drop the columns and leave the scores unset. The files aren't opened: the importer
+    # reads the scores straight from the pre-annotated CSQ.
+    if columns_version < 4:
+        TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
+            "phastcons100way": None,
+            "phastcons46way": None,
+            "phylop100way": None,
+            "phylop46way": None,
+        })
+        TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
+            "phastcons100way": None,
+            "phastcons30way": None,
+            "phylop100way": None,
+            "phylop30way": None,
+        })
+    else:
+        TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
+            "phastcons100way": "annotation_data/GRCh37/hg19.100way.phastCons.bw",
+            "phastcons46way": "annotation_data/GRCh37/hg19.phastCons46way.placental.bw",
+            "phylop100way": "annotation_data/GRCh37/hg19.100way.phyloP100way.bw",
+            "phylop46way": "annotation_data/GRCh37/hg19.phyloP46way.placental.bw",
+        })
+        TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
+            "phastcons100way": "annotation_data/GRCh38/hg38.phastCons100way.bw",
+            "phastcons30way": "annotation_data/GRCh38/hg38.phastCons30way.bw",
+            "phylop100way": "annotation_data/GRCh38/hg38.phyloP100way.bw",
+            "phylop30way": "annotation_data/GRCh38/hg38.phyloP30way.bw",
+        })
+
+    # columns_version 4 fixtures were generated against gnomAD 4.1 (the FILTER column shifts
+    # VEPConfig.gnomad4_minor_version, which gates which gnomAD CSQ fields apply); earlier
+    # fixtures used gnomAD 4.0. Plugin/version-only data files (denovo_db, mave, etc.) are
+    # gated through vep_columns column-defs (min_columns_version), so we don't need to null
+    # them out per-version here.
+    if columns_version >= 4:
+        gnomad4_path = "annotation_data/GRCh38/gnomad4.1_GRCh38_contigs.vcf.gz"
+    else:
+        gnomad4_path = "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz"
+
+    # Pin gnomAD so a developer's local override doesn't shift VEP CSQ fields and break fixture parsing.
+    TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"]["gnomad4"] = gnomad4_path
+
+    # Same for the columns_version 5 plugin data (#1638) - a deployment pinned below cv5 calls
+    # _disable_columns_version_5_plugins(), which nulls these and would drop the columns entirely.
+    if columns_version >= 5:
+        TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"]["protvar"] = \
+            "annotation_data/all_builds/ProtVar_data.db"
+        TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
+            "protvar": "annotation_data/all_builds/ProtVar_data.db",
+            "open_targets": "annotation_data/GRCh38/open_targets_26.03_vep.tsv.bgz",
+            "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",
+            "popeve": "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz",
+            "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",
+        })
 
     ANNOTATION_COLUMNS = copy.deepcopy(TEST_ANNOTATION)
     ANNOTATION_COLUMNS[settings.BUILD_GRCH37]["columns_version"] = columns_version
@@ -50,6 +95,9 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
         "IMPORT_PROCESSING_DIR": TEST_IMPORT_PROCESSING_DIR,
         "VARIANT_ZYGOSITY_GLOBAL_COLLECTION": "global",
         "ANNOTATION_VEP_FAKE_VERSION": True,
+        # AnnotSV is off in the shipped defaults - pin it so a developer who enables it locally doesn't
+        # trip the SV guards. Tests that want it on override at the method level.
+        "ANNOTATION_ANNOTSV_ENABLED": False,
         "ANNOTATION": ANNOTATION_COLUMNS,
     }
 
@@ -95,28 +143,38 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     gene_annotation_import = GeneAnnotationImport.objects.get_or_create(genome_build=genome_build,
                                                                         annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                         url="fake")[0]
-    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version=42,
+    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version="42",  # TextField
                                                                           genome_build=genome_build,
                                                                           annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                           defaults={
                                                                               "gene_annotation_import": gene_annotation_import,
                                                                           })[0]
 
-    vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
-    vav_kwargs["gene_annotation_release"] = gene_annotation_release
-    variant_annotation_version = VariantAnnotationVersion.objects.create(**vav_kwargs)
     create_ontology_test_data()
     ontology_version = create_test_ontology_version()
 
-    gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
-                                                                          ontology_version=ontology_version,
-                                                                          gnomad_import_date=timezone.now())[0]
-    clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
-                                                           sha256_hash="not_a_real_hash",
-                                                           genome_build=genome_build)[0]
-    human_protein_atlas_version = HumanProteinAtlasAnnotationVersion.objects.get_or_create(filename="fake_hpa",
-                                                                                           sha256_hash="not_a_real_hash",
-                                                                                           hpa_version=0.42)[0]
+    # Each sub-version save() would otherwise bump AnnotationVersion, so we'd build and discard 4 of
+    # them on the way to the one we create below.
+    with SubVersionPartition.defer_new_sub_version():
+        gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
+                                                                              ontology_version=ontology_version,
+                                                                              gnomad_import_date=timezone.now())[0]
+
+        vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
+        vav_kwargs["gene_annotation_release"] = gene_annotation_release
+        vav_defaults = {k: vav_kwargs.pop(k) for k in list(vav_kwargs) if k != "genome_build"}
+        vav_defaults["status"] = VariantAnnotationVersion.Status.ACTIVE
+        variant_annotation_version, _ = VariantAnnotationVersion.objects.get_or_create(
+            genome_build=genome_build,
+            status=VariantAnnotationVersion.Status.ACTIVE,
+            defaults=vav_defaults,
+        )
+        clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
+                                                               sha256_hash="not_a_real_hash",
+                                                               genome_build=genome_build)[0]
+        human_protein_atlas_version = HumanProteinAtlasAnnotationVersion.objects.get_or_create(filename="fake_hpa",
+                                                                                               sha256_hash="not_a_real_hash",
+                                                                                               hpa_version=0.42)[0]
 
     av, _ = AnnotationVersion.objects.get_or_create(genome_build=genome_build,
                                                     variant_annotation_version=variant_annotation_version,

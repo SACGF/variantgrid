@@ -13,7 +13,9 @@ def _one_off_allele_37_not_38_data(apps, _schema_editor):
     FlagType = apps.get_model("flags", "FlagType")
     FLAG_STATUS_OPEN = 'O'
 
-    allele_37_not_38 = FlagType.objects.get(pk='allele_37_not_38')
+    allele_37_not_38 = FlagType.objects.filter(pk='allele_37_not_38').first()
+    if allele_37_not_38 is None:
+        return  # FlagType never existed (or already removed) - nothing to back-fill
 
     for flag in Flag.objects.filter(flag_type=allele_37_not_38, resolution__status=FLAG_STATUS_OPEN):
         contains_both = Q(text__contains='GRCh37') & Q(text__contains='GRCh38')

@@ -8,6 +8,8 @@ from snpdb.models import VCF, Sample
 @celery.shared_task
 def auto_run_analyses_for_sample(sample_id: int, analysis_description: str, skip_already_analysed: bool):
     sample = Sample.objects.get(pk=sample_id)
+    if sample.vcf.data_archived:
+        return  # Don't auto-launch analyses against archived data
     user = sample.vcf.user
     auto_launch_analysis_templates_for_sample(user, sample,
                                               analysis_description=analysis_description,
@@ -17,6 +19,8 @@ def auto_run_analyses_for_sample(sample_id: int, analysis_description: str, skip
 @celery.shared_task
 def auto_run_analyses_for_vcf(vcf_id: int, analysis_description: str, skip_already_analysed: bool):
     vcf = VCF.objects.get(pk=vcf_id)
+    if vcf.data_archived:
+        return  # Don't auto-launch analyses against archived data
 
     for sample in vcf.sample_set.all():
         auto_launch_analysis_templates_for_sample(vcf.user, sample,

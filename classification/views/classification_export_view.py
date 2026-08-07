@@ -11,6 +11,8 @@ from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render, redirect
 from django.urls.base import reverse
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from htmlmin.decorators import not_minified_response
 from requests.models import Response
 from rest_framework.views import APIView
@@ -203,6 +205,8 @@ def export_view_redirector(request: HttpRequest) -> Response:
 
 
 class ClassificationApiExportView(APIView):
+    """ Exports classification records in a requested format (e.g. CSV, JSON, MVL),
+    filtered/configured via query parameters. """
 
     @staticmethod
     def string_to_labs(lab_str: str) -> list[Lab]:
@@ -218,6 +222,10 @@ class ClassificationApiExportView(APIView):
         orgs = [o for o in orgs if o]
         return orgs
 
+    @extend_schema(
+        summary="Download classification records as an export file in the format specified by query parameters",
+        responses=OpenApiTypes.OBJECT
+    )
     def get(self, request: HttpRequest, **kwargs) -> HttpResponseBase:
         # will throw a UnsupportedExportType if
         try:

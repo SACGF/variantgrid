@@ -1,14 +1,11 @@
-import logging
 from typing import Optional
 
-from celery.canvas import Signature
 from django.conf import settings
 from django.db.models import QuerySet, Q
-from django.dispatch import receiver
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from classification.models import Classification, variants_classification_changed_signal
-from snpdb.models import CohortGenotypeCommonFilterVersion, Variant, Allele, VariantAllele, CommonVariantClassified
+from classification.models import Classification
+from snpdb.models import CohortGenotypeCommonFilterVersion, Variant, Allele, CommonVariantClassified
 
 
 def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersion]:
@@ -20,7 +17,12 @@ def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersio
             "clinical_significance_max": cf_data["clinical_significance_max"],
             "genome_build": genome_build,
         }
-        common_filter, created = CohortGenotypeCommonFilterVersion.objects.get_or_create(**kwargs)
+        additional_gnomad_versions = cf_data.get("additional_gnomad_versions", [])
+        common_filter, created = CohortGenotypeCommonFilterVersion.objects.get_or_create(
+            defaults={"additional_gnomad_versions": additional_gnomad_versions}, **kwargs)
+        if not created and common_filter.additional_gnomad_versions != additional_gnomad_versions:
+            common_filter.additional_gnomad_versions = additional_gnomad_versions
+            common_filter.save(update_fields=["additional_gnomad_versions"])
         if created:
             # At this point - no VCFs have been imported, and all future ones will handle current classifications
             # So we can mark all as handled
@@ -66,21 +68,8 @@ def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterV
     return qs.filter(q_classification & q_gnomad_af)
 
 
-@receiver(variants_classification_changed_signal, sender=Classification)
-def variants_classification_changed(sender, **kwargs):  # pylint: disable=unused-argument
-    variants = kwargs['variants']
-    genome_build = kwargs['genome_build']
-
-    logging.info("variants_classification_changed_signal!! %s, %s", genome_build, variants)
-
-    # Look to see if any of these are used in a common filter (and not already handled)
-    for cgcfv in CohortGenotypeCommonFilterVersion.objects.filter(genome_build=genome_build,
-                                                                  cohortgenotypecollection__isnull=False):
-        va_qs = VariantAllele.objects.filter(variant__in=variants,
-                                             genome_build=genome_build)
-        va_qs = va_qs.exclude(variant__commonvariantclassified__common_filter=cgcfv)
-        alleles = va_qs.values_list("allele")
-        for variant in get_classified_high_frequency_variants_qs(cgcfv, alleles=alleles):
-            task_name = "snpdb.tasks.cohort_genotype_tasks.common_variant_classified_task"
-            task = Signature(task_name, args=(variant.pk, cgcfv.pk), immutable=True)
-            task.apply_async()
+def get_common_filters_in_use(genome_build=None) -> QuerySet[CohortGenotypeCommonFilterVersion]:
+    qs = CohortGenotypeCommonFilterVersion.objects.filter(cohortgenotypecollection__isnull=False)
+    if genome_build:
+        qs = qs.filter(genome_build=genome_build)
+    return qs

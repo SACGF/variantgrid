@@ -35,6 +35,7 @@ def email_detail(request, email_id: int):
     )
 
 
+@require_superuser
 def email_pure(request, email_id: int):
     email_log = EmailLog.objects.get(pk=email_id)
     return render(request, 'email_pure.html', context={"email": email_log})

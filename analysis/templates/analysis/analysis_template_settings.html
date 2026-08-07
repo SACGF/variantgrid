@@ -26,10 +26,18 @@
 
     <p>
 
-        <form id="active-template-version-form" method="post">
+        <form id="analysis-template-form" method="post">
             {% csrf_token %}
 
             {{ at_form|crispy }}
+
+            {% if has_write_permission %}
+            <button type="submit" name="{{at_form.prefix}}" class="btn btn-primary">save</button>
+            {% endif %}
+        </form>
+
+        <form id="auto-launch-form" method="post">
+            {% csrf_token %}
 
             <h3>Auto Launch Config</h3>
 
@@ -67,9 +75,12 @@
             {{  at_formset.media }}
 
             {% if has_write_permission %}
-            <button type="submit" name="{{at_form.prefix}}" class="btn btn-primary">save</button>
+            <button type="submit" name="auto-launch" class="btn btn-primary">save</button>
             {% endif %}
+        </form>
 
+        <form id="active-template-version-form" method="post">
+            {% csrf_token %}
         {%  if analysis_template_versions.exists %}
             <h4>Historical versions:</h4>
 

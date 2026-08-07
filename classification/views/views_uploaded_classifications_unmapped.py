@@ -1,11 +1,16 @@
 import datetime
+import io
+import tarfile
+import zipfile
 from dataclasses import dataclass
 from typing import Iterable, Any, Optional
+from zipfile import BadZipFile
 
 import django
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db.models import QuerySet, Q
 from django.http import HttpResponseRedirect, HttpRequest, StreamingHttpResponse
 from django.shortcuts import render
@@ -160,6 +165,11 @@ class FileMeta:
 
 
 class UploadedClassificationsUnmappedView(View):
+
+    BANNED_EXTENSIONS = {
+        "bat", "sh", "exe", "cmd", "msi", "scr"
+    }
+
     def get(self, request, **kwargs):
         lab_picker = LabPickerData.from_request(
             request=request,
@@ -189,6 +199,41 @@ class UploadedClassificationsUnmappedView(View):
 
         return render(request, 'classification/classification_upload_file_unmapped.html', context)
 
+    @staticmethod
+    def get_extension(filename: str):
+        return filename.split(".")[-1].lower()
+
+    def check_zip(self, in_memory_file: InMemoryUploadedFile):
+        """
+        Inspect the file if it's a zip, check all the files inside it for a banned extension, thow an Exception
+        :param in_memory_file: An uploaded file
+        :return:
+        """
+        file_name = in_memory_file.name.lower()
+        extension = UploadedClassificationsUnmappedView.get_extension(file_name)
+        detected_banned_extensions = set()
+        try:
+            if extension == 'zip':
+                file_stream = io.BytesIO(in_memory_file.read())
+                with zipfile.ZipFile(file_stream, 'r') as zf:
+                    for filename in zf.namelist():
+                        sub_extension = UploadedClassificationsUnmappedView.get_extension(filename)
+                        if sub_extension in UploadedClassificationsUnmappedView.BANNED_EXTENSIONS:
+                            detected_banned_extensions.add(sub_extension)
+            elif extension in {'gz', 'tgz', 'tar'}:
+                file_stream = io.BytesIO(in_memory_file.read())
+                mode = 'r:gz' if file_name.endswith(('gz', 'tgz')) else 'r'
+                with tarfile.open(fileobj=file_stream, mode=mode) as tf:
+                    for filename in tf.getnames():
+                        sub_extension = UploadedClassificationsUnmappedView.get_extension(filename)
+                        if sub_extension in UploadedClassificationsUnmappedView.BANNED_EXTENSIONS:
+                            detected_banned_extensions.add(sub_extension)
+        except Exception:
+            raise ValueError(f"File doesn't appear to be a valid {extension}")
+
+        if detected_banned_extensions:
+            raise ValueError(f"Detected banned file extension {', '.join(sorted(detected_banned_extensions))}")
+
     def post(self, request, **kwargs):
         # lazily have s3boto3 requirements
 
@@ -210,9 +255,15 @@ class UploadedClassificationsUnmappedView(View):
                         raise ValueError(f"File {existing_file} does not appear to exist")
 
                 else:
-                    file_obj = request.FILES.get('file')
+                    file_obj: InMemoryUploadedFile = request.FILES.get('file')
                     if not file_obj:
-                        raise ValueError("No File Provided")
+                        raise ValueError("No file was provided")
+                    if "." not in file_obj.name:
+                        raise ValueError("File must have an Extension")
+                    extension = file_obj.name.split(".")[-1].lower()
+                    if extension in UploadedClassificationsUnmappedView.BANNED_EXTENSIONS:
+                        raise ValueError(f"Cannot upload a file with that extension")
+                    self.check_zip(file_obj)
                     sub_file = server_address.save(file_obj)
 
                 status = UploadedClassificationsUnmappedStatus.Pending if lab.upload_automatic else UploadedClassificationsUnmappedStatus.Manual

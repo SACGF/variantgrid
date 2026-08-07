@@ -5,6 +5,12 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _has_classifications(apps):
+    # Only fixes the allele origin bucket of existing classifications - none on a fresh install
+    Classification = apps.get_model("classification", "Classification")
+    return Classification.objects.exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -14,5 +20,5 @@ class Migration(migrations.Migration):
     operations = [
         ManualOperation(task_id=ManualOperation.task_id_manage(
             ["classification_set_allele_context"]
-        ))
+        ), test=_has_classifications)
     ]

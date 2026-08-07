@@ -11,6 +11,7 @@
 {% block head %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/annotated_file_download.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 
 <style>
@@ -198,14 +199,8 @@ function addCreateProjectButtonAndForm() {
     $("select#id_project").addClass("left").after(createProjectButton);
 }
 
-function showVCFHeader() {
-    $("#show-vcf-header").hide();
-    $("#vcf-header").show();
-}
-
-function hideVCFHeader() {
-    $("#show-vcf-header").show();
-    $("#vcf-header").hide();
+function toggleVCFSection(id) {
+    $("#" + id).slideToggle();
 }
 
 function drawStatsGraphs() {
@@ -267,6 +262,12 @@ $(document).ready(function() {
 
     initSubCohort();
     $("#vcf-tabs").tabs({cache: true});  // need to avoid let/const redeclaration in Somalier html
+
+    // Skipped-annotation warning message (issue #1409) links to its tab
+    $(".activate-tab").click(function() {
+        $("#vcf-tabs > ul a[href='" + $(this).attr("href") + "']").trigger("click");
+        return false;
+    });
 
     addCreateProjectButtonAndForm();
 
@@ -339,7 +340,10 @@ $(document).ready(function() {
     {% endfor %}
 });
 </script>
+<!-- jqGrid is used in skipped annotation tab -->
+<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
 {% endblock %}
 
 
@@ -349,6 +353,7 @@ $(document).ready(function() {
 {% load vcf_history_trail_tags %}
 {% vcf_history_trail vcf %}
 <h1>VCF: {{ vcf.name }}</h1>
+{% include "snpdb/data/_data_archived_banner.html" with obj=vcf restore_url_name='restore_vcf' %}
 <div id="vcf-tabs">
     <ul>
         <li><a href="#details">Details</a></li>
@@ -360,6 +365,9 @@ $(document).ready(function() {
         {% if somalier_enabled and vcf.somaliervcfextract.somalierancestryrun %}
         <li><a href="#vcf-ancestry">Ancestry</a></li>
         {% endif %}
+        {% if skipped_annotation_count %}
+        <li><a href="#vcf-skipped-annotation">Skipped Annotation ({{ skipped_annotation_count }})</a></li>
+        {% endif %}
         {% if has_write_permission %}
         <li><a href="{% url 'group_permissions' 'snpdb.models.VCF' vcf.pk %}">Sharing / Permissions</a></li>
         {% endif %}
@@ -369,16 +377,18 @@ $(document).ready(function() {
         {% csrf_token %}
         {% crispy vcf_form form_helper.horizontal %}
 
-        {% if annotated_download_files or vcf.uploadedvcf.uploaded_file.exists %}
+        {% if vcf.uploadedvcf.file_upload.exists or annotated_download_files and not vcf.data_archived %}
             <div class="form-group-row row">
                 <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
                 <div class="d-flex flex-row">
-                    {% if vcf.uploadedvcf.uploaded_file.exists %}
-                        <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
+                    {% if vcf.uploadedvcf.file_upload.exists %}
+                        <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.file_upload.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.file_upload.size|filesizeformat }})</div>
                     {% endif %}
-                    {% for file_type in annotated_download_files %}
-                        <div id="generate-{{ file_type }}-download" class="p-2"></div>
-                    {% endfor %}
+                    {% if not vcf.data_archived %}
+                        {% for file_type in annotated_download_files %}
+                            <div id="generate-{{ file_type }}-download" class="p-2"></div>
+                        {% endfor %}
+                    {% endif %}
                 </div>
             </div>
         {% endif %}
@@ -490,13 +500,14 @@ $(document).ready(function() {
     </div>
     <div id="vcf-info">
         <fieldset class="form-fields">
-            {% if vcf.uploadedvcf.uploaded_file.uploadpipeline %}
+            {% if vcf.uploadedvcf.file_upload.uploadpipeline %}
                 {% if url_name_visible.view_upload_pipeline and can_view_upload_pipeline %}
                 <p>
                     <label>Processing</label>
-                    <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.uploaded_file.uploadpipeline.pk %}">View upload processing</a></span>
+                    <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.file_upload.uploadpipeline.pk %}">View upload processing</a></span>
                 </p>
                 {% endif %}
+                {% include "snpdb/data/_archive_action.html" with obj=vcf archive_url_name='archive_vcf' %}
                 {% if vcf.uploadedvcf.vcf_importer %}
                 <p>
                     <label>Importer Version</label>
@@ -549,6 +560,7 @@ $(document).ready(function() {
                     </table>
                 </span>
             </p>
+            {% if not vcf.data_archived %}
             <p>
                 <label>Common </label>
                 <span>
@@ -558,6 +570,7 @@ $(document).ready(function() {
 
                 </span>
             </p>
+            {% endif %}
             <p>
                 <label>Variant Zygosity Count</label>
                 <span>
@@ -592,10 +605,9 @@ $(document).ready(function() {
             <p>
                 <label>Header</label>
                 <span>
-                    <a id='show-vcf-header' href="javascript:showVCFHeader()">Show VCF header...</a>
+                    <a href="javascript:toggleVCFSection('vcf-header')">Show / hide VCF header...</a>
                 </span>
                 <div id='vcf-header' style='display: none'>
-                    <div><a href="javascript:hideVCFHeader()">Hide VCF header...</a></div>
                     <pre>{{ vcf.header }}</pre>
                 </div>
             </p>
@@ -606,55 +618,67 @@ $(document).ready(function() {
             {% if vcf.vcfinfo_set.exists %}
             <p>
                 <label>INFO</label>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Description</th>
-                    </tr>
-
-                {% for vcf_info in vcf.vcfinfo_set.all %}
-                    <tr>
-                        <td>{{ vcf_info.identifier }}</td>
-                        <td>{{ vcf_info.description }}</td>
-                    </tr>
-                {% endfor %}
-                </table>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-info-table')">Show / hide INFO...</a>
+                </span>
+                <div id='vcf-info-table' style='display: none'>
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Description</th>
+                        </tr>
+                    {% for vcf_info in vcf.vcfinfo_set.all %}
+                        <tr>
+                            <td>{{ vcf_info.identifier }}</td>
+                            <td>{{ vcf_info.description }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                </div>
             </p>
             {% endif %}
             {% if vcf.vcffilter_set.exists %}
             <p>
                 <label>FILTER</label>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Description</th>
-                    </tr>
-
-                {% for vcf_filter in vcf.vcffilter_set.all %}
-                    <tr>
-                        <td>{{ vcf_filter.filter_id }}</td>
-                        <td>{{ vcf_filter.description }}</td>
-                    </tr>
-                {% endfor %}
-                </table>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-filter-table')">Show / hide FILTER...</a>
+                </span>
+                <div id='vcf-filter-table' style='display: none'>
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Description</th>
+                        </tr>
+                    {% for vcf_filter in vcf.vcffilter_set.all %}
+                        <tr>
+                            <td>{{ vcf_filter.filter_id }}</td>
+                            <td>{{ vcf_filter.description }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                </div>
             </p>
             {% endif %}
             {% if vcf.vcfformat_set.exists %}
             <p>
                 <label>FORMAT</label>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Description</th>
-                    </tr>
-
-                {% for vcf_format in vcf.vcfformat_set.all %}
-                    <tr>
-                        <td>{{ vcf_format.identifier }}</td>
-                        <td>{{ vcf_format.description }}</td>
-                    </tr>
-                {% endfor %}
-                </table>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-format-table')">Show / hide FORMAT...</a>
+                </span>
+                <div id='vcf-format-table' style='display: none'>
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Description</th>
+                        </tr>
+                    {% for vcf_format in vcf.vcfformat_set.all %}
+                        <tr>
+                            <td>{{ vcf_format.identifier }}</td>
+                            <td>{{ vcf_format.description }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                </div>
             </p>
             {% endif %}
         </fieldset>
@@ -673,6 +697,13 @@ $(document).ready(function() {
 {% if somalier_enabled and vcf.somaliervcfextract.somalierancestryrun %}
     <div id="vcf-ancestry">
         <iframe width="100%" height="100%" src="{{ vcf.somaliervcfextract.somalierancestryrun.url }}"></iframe>
+    </div>
+{% endif %}
+{% if skipped_annotation_count %}
+    <div id="vcf-skipped-annotation">
+        <p>Variants that Variant Effect Predictor (VEP) was unable to annotate.</p>
+        {% load jqgrid_tags %}
+        {% jqgrid 'vcf_skipped_annotation_grid' name='VCF Skipped Annotation' search=False vcf_id=vcf.pk %}
     </div>
 {% endif %}
 </div>

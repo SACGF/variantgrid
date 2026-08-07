@@ -175,7 +175,8 @@ class TestPopulationNodeGroupOperationQ(AnalysisSetupMixin, TestCase):
 
     def _pop_node_q(self, group_operation):
         """Create a saved node using gnomad_af + af_1kg + af_uk10k at 1% and return _get_node_q().
-        Must be saved so that self.populationnodegnomadpopulation_set.all() can run."""
+        Must be saved so that self.populationnodegnomadpopulation_set.all() can run.
+        """
         node = PopulationNode.objects.create(
             analysis=self.analysis,
             percent=1.0,

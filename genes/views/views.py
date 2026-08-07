@@ -12,7 +12,7 @@ from django.db.models import QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.http.response import JsonResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.datastructures import OrderedSet
 from django.views.decorators.cache import cache_page
@@ -29,8 +29,9 @@ from classification.views.exports.classification_export_formatter_csv import For
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
+from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
 from genes.hgvs import HGVSMatcher
-from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
+from genes.models import CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
     PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, NoTranscript, GnomADGeneConstraint
@@ -38,10 +39,11 @@ from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import WEEK_SECS
 from library.django_utils import get_field_counts, add_save_message
-from library.utils import defaultdict_to_dict, LazyAttribute
+from library.utils import defaultdict_to_dict, LazyAttribute, full_class_name
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
 from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.graphs import graphcache
 from snpdb.models import VariantZygosityCountCollection, Sample, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -306,10 +308,6 @@ class GeneSymbolViewInfo:
         return gene_in_gene_lists
 
     @cached_property
-    def gene_infos(self):
-        return GeneInfo.get_for_gene_symbol(self.gene_symbol)
-
-    @cached_property
     def classifications(self) -> QuerySet[ClassificationModification]:
         # Note this is loaded in Ajax
         classifications_qs = ClassificationModification.objects.none()
@@ -391,7 +389,6 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "gene_external_urls",
             "gene_constraint",
             "gene_in_gene_lists",
-            "gene_infos",
             "gene_summary",
             "genome_build",
             "has_classified_variants",
@@ -463,12 +460,11 @@ def view_transcript(request, transcript_id):
     genome_build_genes = [GenomeBuildGenes(genome_build, sorted(gene_by_build.get(genome_build))) for genome_build in genome_builds]
     transcript_version_details: list[TranscriptVersionDetails] = []
 
-    build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
     for version in sorted(versions):
         transcript_accession = f"{transcript}.{version}"
         for genome_build in genome_builds:
             tv = transcripts_versions_by_build.get(genome_build, {}).get(version)
-            matcher = build_matcher[genome_build]
+            matcher = HGVSMatcher.instance(genome_build)
             hgvs_method = matcher.filter_best_transcripts_and_converter_type_by_accession(transcript_accession)
 
             transcript_version_details.append(
@@ -622,6 +618,7 @@ def view_gene_list(request, gene_list_id):
     gene_list = GeneList.get_for_user(request.user, gene_list_id, success_only=False)
     gl_form = GeneListForm(request.POST or None, instance=gene_list)
     if request.method == "POST":
+        gene_list.check_can_write(request.user)
         valid = gl_form.is_valid()
         if valid:
             gene_list = gl_form.save()
@@ -630,8 +627,11 @@ def view_gene_list(request, gene_list_id):
 
     add_gene_list_unmatched_genes_message(request, gene_list)
 
+    gene_symbols = sorted(gene_list.get_gene_names())
     context = {'gene_list': gene_list,
                'gene_list_form': gl_form,
+               'gene_symbols_text': "\n".join(gene_symbols),
+               'num_gene_symbols': len(gene_symbols),
                'has_write_permission': gene_list.can_write(request.user)}
     return render(request, 'genes/view_gene_list.html', context)
 
@@ -654,7 +654,7 @@ def view_canonical_transcript_collection(request, pk):
     summary = None
     qs = canonical_transcript_collection.genecoveragecanonicaltranscript_set.all()
     if qs.exists():
-        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit__name")
+        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit__name")
 
     is_system_default = pk == str(settings.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID)
     context = {"canonical_transcript_collection": canonical_transcript_collection,
@@ -706,7 +706,7 @@ def gene_coverage_graphs(request, genome_build, gene_symbols: Iterable[str]):
         has_coverage = has_coverage or base_gene_coverage_qs.exists()
 
         for enrichment_kit in enrichment_kits:
-            filter_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit=enrichment_kit)
+            filter_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit=enrichment_kit)
             enrichment_kit_data = get_coverage_stats(base_gene_coverage_qs, filter_q, fields)
             enrichment_kit_name = str(enrichment_kit)
             for field_name in fields:
@@ -810,3 +810,16 @@ def sample_gene_lists_tab(request, sample_id):
 
 def gene_wiki(request):
     return render(request, "genes/gene_wiki.html")
+
+
+def gene_list_graphs_tab(request, gene_list_id):
+    gene_list = GeneList.get_for_user(request.user, gene_list_id, success_only=False)
+    context = {'gene_list': gene_list}
+    return render(request, 'genes/gene_list_graphs_tab.html', context)
+
+
+def gene_list_chromosome_graph(request, gene_list_id):
+    GeneList.get_for_user(request.user, gene_list_id)  # permission check
+    graph_class_name = full_class_name(GeneListChromosomeGraph)
+    cached_graph = graphcache.async_graph(graph_class_name, gene_list_id)
+    return redirect(cached_graph)

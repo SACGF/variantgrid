@@ -1,3 +1,5 @@
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -9,7 +11,12 @@ from classification.models.evidence_key import EvidenceKeyMap
 
 @permission_classes((AllowAny, ))
 class EvidenceKeysView(APIView):
+    """ Lists all classification EvidenceKeys (the fields that make up classification evidence) as JSON. """
 
+    @extend_schema(
+        summary="List all classification evidence keys",
+        responses=OpenApiTypes.OBJECT
+    )
     def get(self, request, **kwargs) -> Response:
         key_map = EvidenceKeyMap.instance()
         data = [k.to_json() for k in key_map.all_keys]

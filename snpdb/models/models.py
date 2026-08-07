@@ -22,7 +22,7 @@ from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet, TextChoices
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
@@ -204,8 +204,15 @@ class Wiki(TimeStampedModel):
         return klass
 
     @staticmethod
-    def get_or_create(class_name, unique_keyword, unique_value):
+    def get_or_create(class_name, unique_keyword, unique_value, user=None):
         klass = Wiki.get_subclass_by_name(class_name)
+        try:
+            klass._meta.get_field(unique_keyword)
+        except FieldDoesNotExist:
+            raise PermissionDenied(f"'{unique_keyword}' is not a valid field for {class_name}")
+        if user is not None:
+            # Check permission on an unsaved instance before creating the row (throws 403)
+            klass(**{unique_keyword: unique_value}).check_user_edit_permission(user)
         wiki, _ = klass.objects.get_or_create(**{unique_keyword: unique_value})
         return wiki
 
@@ -474,6 +481,7 @@ class ContactDetails:
 class Lab(models.Model, PreviewModelMixin):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, e.g. Shariant
+    research = models.BooleanField(default=False, blank=True)
     city = models.TextField()
     state = models.ForeignKey(State, null=True, on_delete=PROTECT)
     country = models.ForeignKey(Country, null=True, on_delete=PROTECT)
@@ -485,6 +493,11 @@ class Lab(models.Model, PreviewModelMixin):
     contact_name = models.TextField(blank=True)
     contact_phone = models.TextField(blank=True)
     contact_email = models.TextField(blank=True)
+
+    # Opt-in to participate in MatchMaker Exchange (patient matchmaking). Distinct from
+    # a record's share_level=PUBLIC (which only means "publicly shareable"); enabling MME
+    # is a deliberate lab decision and requires a resolvable MME contact (see clean()).
+    mme_enabled = models.BooleanField(default=False, blank=True)
 
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=SET_NULL)
 
@@ -527,6 +540,15 @@ class Lab(models.Model, PreviewModelMixin):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-flask"
+
+    def clean(self):
+        super().clean()
+        # An MME match is an invitation to a person-to-person clinical conversation, so a
+        # lab can't opt in without an address a matching lab can reply to.
+        if self.mme_enabled and not (self.contact_email or "").strip():
+            raise ValidationError({
+                "mme_enabled": "Set an MME contact email before enabling MatchMaker Exchange."
+            })
 
     @property
     def contact_details(self) -> ContactDetails:
@@ -633,6 +655,11 @@ class Lab(models.Model, PreviewModelMixin):
 
         group_names = list(user.groups.values_list('name', flat=True))
         return Lab.objects.select_related('organization').filter(group_name__in=group_names).order_by('name')
+
+    @staticmethod
+    def has_active_lab(user: User, admin_check=False) -> bool:
+        """ Whether the user has access to any lab belonging to an active organization """
+        return Lab.valid_labs_qs(user=user, admin_check=admin_check).filter(organization__active=True).exists()
 
     """
     # these methods have been superseeded by having full classification activity by lab

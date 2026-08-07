@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 
 from library.django_utils.unittest_utils import URLTestCase
 from seqauto.models import QCColumn, EnrichmentKit, SequencingRun, SequencerModel, DataGeneration, Sequencer
-from snpdb.models import Manufacturer, DataState
+from snpdb.models import Manufacturer
 
 
 class Test(URLTestCase):
@@ -24,8 +24,7 @@ class Test(URLTestCase):
                                                                manufacturer=illumina)[0]
         sequencer = Sequencer.objects.get_or_create(name='NB501008', sequencer_model=sequencer_model)[0]
         cls.sequencing_run = SequencingRun.objects.get_or_create(name="200626_NB501009_0391_AHFHLJBGXG",
-                                                                 sequencer=sequencer,
-                                                                 data_state=DataState.COMPLETE)[0]
+                                                                 sequencer=sequencer)[0]
 
         cls.enrichment_kit = EnrichmentKit.objects.get_or_create(name="fake_kit", version=1, manufacturer=illumina)[0]
         cls.qc_column = QCColumn.objects.first()

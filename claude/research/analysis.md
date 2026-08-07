@@ -494,7 +494,7 @@ Combines variants from multiple parent nodes using set union (OR logic).
 **Configuration:**
 - `min_inputs=1`, `max_inputs=PARENT_CAP_NOT_SET` (unlimited parents).
 
-**Optimisation:** If the total combined count is at or below `ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX`, the variant IDs are stored explicitly and the Q object becomes a simple `variant_id__in=[...]` lookup. For larger result sets, the individual parent querysets are OR-combined.
+**Optimisation:** If the total combined count is at or below `ANALYSIS_NODE_STORE_ID_SIZE_MAX`, the variant IDs are stored explicitly and the Q object becomes a simple `variant_id__in=[...]` lookup. For larger result sets, the individual parent querysets are OR-combined.
 
 #### `VennNode`
 Performs set operations on exactly two parent nodes.

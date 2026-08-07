@@ -132,12 +132,19 @@ cd ${gene_annotation_dir}
                     <a href="https://github.com/SACGF/variantgrid/wiki/Gene-and-Transcript-Version-Data#gene-annotation-release---install">See Wiki for details</a>
 
                     {% with vav=details.latest.variant_annotation_version %}
-                        {% if vav.cdot_gene_release_filename %}
+                        {% if vav.cdot_gene_release_token %}
+                            <p>
+                            Your VEP used {{ vav.get_annotation_consortium_display }} release
+                            <b>{{ vav.cdot_gene_release_token }}</b>. This downloads the matching
+                            <a href="https://github.com/SACGF/cdot/releases">cdot</a> file, imports it, links it
+                            to the annotation version and creates the gene annotation:
+                            </p>
 <code>
-wget http://cdot.cc/download/{{ vav.get_annotation_consortium_display }}/{{ build_name }}/{{ vav.cdot_gene_release_filename }}
-{{ python_command }} manage.py import_gene_annotation --annotation-consortium={{ vav.get_annotation_consortium_display }} --genome-build={{ build_name }} --json-file {{ vav.cdot_gene_release_filename }} --release={{ vav.suggested_gene_annotation_release_name }}
+{{ python_command }} manage.py import_cdot_gene_annotation_release --genome-build={{ build_name }}
 </code>
-                            If it doesn't auto-link, go to <a href="{% url 'admin:annotation_variantannotationversion_change' vav.pk %}">Admin</a> then set the gene annotation release.
+                            To override the release it picks, go to
+                            <a href="{% url 'admin:annotation_variantannotationversion_change' vav.pk %}">Admin</a>
+                            then set the gene annotation release.
                         {% endif %}
                     {% endwith %}
 

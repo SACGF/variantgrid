@@ -126,7 +126,7 @@ def sql_delete_qs(qs, batch_size: Optional[int] = None) -> int:
     pk_qs = qs.values_list("pk", flat=True)
     meta = qs.model._meta
     if batch_size:
-        limit = f"LIMIT {batch_size}"
+        limit = f"LIMIT {int(batch_size)}"
     else:
         limit = ""
 

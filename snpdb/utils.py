@@ -3,11 +3,22 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
+from django.http import Http404
 
 from email_manager.models import EmailLog
 from library.log_utils import NotificationBuilder, send_notification
 from library.utils import empty_to_none
-from snpdb.models import Lab, UserSettings, Tag, TagColorsCollection
+from snpdb.models import GenomeBuild, Lab, UserSettings, Tag, TagColorsCollection
+
+
+def get_genome_build_or_404(build_name) -> GenomeBuild:
+    """ Resolve a genome build name/alias, raising Http404 (rather than GenomeBuild.DoesNotExist -> 500)
+        for an unknown/misspelled build. The get_object_or_404 equivalent for GenomeBuild.get_name_or_alias;
+        kept here rather than on the model so the models layer doesn't import django.http. """
+    try:
+        return GenomeBuild.get_name_or_alias(build_name)
+    except GenomeBuild.DoesNotExist:
+        raise Http404(f"Unknown genome build: '{build_name}'")
 
 
 class LabNotificationBuilder(NotificationBuilder):

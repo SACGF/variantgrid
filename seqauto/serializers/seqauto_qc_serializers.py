@@ -1,11 +1,9 @@
 from rest_framework import serializers
 
 from genes.serializers import SampleGeneListSerializer, GeneCoverageCollectionSerializer
-from seqauto.models import IlluminaFlowcellQC, QCGeneList, QC, QCGeneCoverage, QCExecSummary, FastQC, SequencingSample, \
-    SampleSheet, SequencingRun, VCFFile
+from seqauto.models import IlluminaFlowcellQC, QCGeneList, QC, QCGeneCoverage, QCExecSummary, FastQC, SingleSampleVCF
 from seqauto.serializers.sequencing_serializers import SampleSheetLookupSerializer, FastqSerializer, \
-    BamFilePathSerializer, VCFFilePathSerializer, SequencingSampleLookupSerializer
-from snpdb.models import DataState
+    BamFilePathSerializer, SingleSampleVCFPathSerializer, SequencingSampleLookupSerializer
 
 
 class FastQCSerializer(serializers.ModelSerializer):
@@ -30,7 +28,7 @@ class QCSerializer(serializers.ModelSerializer):
     # assume we're using the latest ones associated with that
     sequencing_sample = SequencingSampleLookupSerializer()
     bam_file = BamFilePathSerializer()
-    vcf_file = VCFFilePathSerializer()
+    vcf_file = SingleSampleVCFPathSerializer()
 
     class Meta:
         model = QC
@@ -39,12 +37,8 @@ class QCSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_object(data):
         # We are passed "sequencing_sample" - which we can use to get what we really want
-        sequencing_sample_data = data.pop("sequencing_sample")
-        sheet_data = sequencing_sample_data["sample_sheet"]
-        sequencing_run = SequencingRun.objects.get(pk=sheet_data["sequencing_run"])
-        sample_sheet = SampleSheet.objects.get(hash=sheet_data["hash"], sequencing_run=sequencing_run)
-        sample_name = sequencing_sample_data["sample_name"]
-        sequencing_sample = SequencingSample.objects.get(sample_sheet=sample_sheet, sample_name=sample_name)
+        sequencing_sample = SequencingSampleLookupSerializer.get_object(data.pop("sequencing_sample"))
+        sequencing_run = sequencing_sample.sequencing_run
         # Occasionally we could have multiple bam and VCF files in there that match path
         # we want to make sure we get the bam out that is linked to the VCF file we pull out
         bam_file_data = data.pop("bam_file")
@@ -54,12 +48,12 @@ class QCSerializer(serializers.ModelSerializer):
             # Make sure bam file also matches
             "bam_file__path": bam_file_data["path"],
             "bam_file__sequencing_run": sequencing_run,
-            "bam_file__unaligned_reads__sequencing_sample": sequencing_sample
+            "bam_file__sequencing_sample": sequencing_sample
 
         }
-        vcf_file = VCFFile.objects.filter(**vcf_file_kwargs).first()
+        vcf_file = SingleSampleVCF.objects.filter(**vcf_file_kwargs).first()
         if not vcf_file:
-            raise VCFFile.DoesNotExist(f"No vcf file for {vcf_file_kwargs=}")
+            raise SingleSampleVCF.DoesNotExist(f"No vcf file for {vcf_file_kwargs=}")
 
         defaults = {}
         qc_path = data.get("path")
@@ -75,8 +69,6 @@ class QCSerializer(serializers.ModelSerializer):
             vcf_file=vcf_file,
             defaults=defaults
         )
-        qc.data_state = DataState.COMPLETE
-        qc.save()
         return qc
 
 
@@ -114,7 +106,6 @@ class QCGeneListCreateSerializer(serializers.ModelSerializer):
         custom_text_gene_list = QCGeneList.create_gene_list(gene_list_text,
                                                             sequencing_sample=qc.sequencing_sample)
         defaults = {
-            "data_state": DataState.COMPLETE,
             "custom_text_gene_list": custom_text_gene_list,
         }
         instance, _created = QCGeneList.objects.update_or_create(qc=qc,
@@ -166,7 +157,6 @@ class QCGeneCoverageSerializer(serializers.ModelSerializer):
 
 class QCExecSummarySerializer(serializers.ModelSerializer):
     qc = QCSerializer()
-    data_state = serializers.CharField(read_only=True)
 
     class Meta:
         model = QCExecSummary
@@ -175,7 +165,6 @@ class QCExecSummarySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         qc_data = validated_data.pop("qc")
         qc = QCSerializer.get_object(qc_data)
-        validated_data["data_state"] = DataState.COMPLETE
         validated_data["sequencing_run"] = qc.sequencing_run
         instance, _created = QCExecSummary.objects.update_or_create(qc=qc,
                                                                     defaults=validated_data)

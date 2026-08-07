@@ -8,7 +8,7 @@ from annotation.fake_annotation import get_fake_annotation_version, create_fake_
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant, ClinGenAllele, Allele, VariantAllele, AlleleOrigin, Tag, \
-    VariantZygosityCountCollection, VariantZygosityCount, VariantWiki
+    VariantZygosityCountCollection, VariantZygosityCount, VariantWiki, AllVariantsFilter
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 
@@ -53,6 +53,11 @@ class Test(URLTestCase):
         vzcc = VariantZygosityCountCollection.objects.get_or_create(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)[0]
         VariantZygosityCount.objects.get_or_create(variant=cls.variant, collection=vzcc, het_count=1)
 
+        # The All Variants grid requires a selective filter - pin it to the test variant's contig
+        AllVariantsFilter.objects.update_or_create(
+            user=cls.user, genome_build=cls.grch37,
+            defaults={"filters": {"contig_ids": [cls.variant.locus.contig_id]}})
+
         # not sure how to test this properly
         cls.variant_wiki_obj = VariantWiki.objects.get_or_create(variant=cls.variant)
 
@@ -75,6 +80,9 @@ class Test(URLTestCase):
             ('gene_coverage', {"gene_symbol_id": self.gene_symbol.symbol}, 200),
             ("variant_sample_information", {"variant_id": self.variant.pk,
                                             "genome_build_name": self.grch37.name}, 200),
+            ("variant_sample_genotypes", {"variant_id": self.variant.pk}, 200),
+            ("variant_sample_genotypes", {"variant_id": self.variant.pk, "GET_PARAMS": {"limit": 0}}, 200),
+            ("variant_sample_genotypes", {"variant_id": self.variant.pk, "GET_PARAMS": {"limit": "all"}}, 400),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
 

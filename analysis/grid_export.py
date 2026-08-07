@@ -1,12 +1,7 @@
-import csv
 import operator
 import re
 from collections import Counter
-from io import StringIO
 from typing import Iterator, Optional
-
-from vcf import Writer, Reader
-from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
 
 from analysis.grids import ExportVariantGrid
 from analysis.models import AnalysisNode
@@ -14,10 +9,14 @@ from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
 from library.django_utils.jqgrid_view import grid_export_csv
-from library.utils import StashFile
+from library.genomics.vcf_writer import VCFWriter
+from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
-from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes
+from snpdb.models import Sample, VariantGridColumn
+from snpdb.vcf_export_columns import COLUMN_VCF_INFO
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
+
+TRANSCRIPT_REPLACE_BATCH_SIZE = 1000
 
 
 def node_grid_get_export_iterator(request, node, export_type, canonical_transcript_collection=None,
@@ -43,7 +42,7 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
 
     if canonical_transcript_collection:
         basename += f"_{canonical_transcript_collection}"
-        items = _replace_transcripts_iterator(request, grid, canonical_transcript_collection, items)
+        items = _replace_transcripts_iterator(grid, canonical_transcript_collection, items)
 
     items = format_items_iterator(sample_ids, items, variant_tags_dict)
 
@@ -89,33 +88,34 @@ def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by
 
     use_accession = False
     info_dict = _get_colmodel_info_dict(colmodels)
-    vcf_template_file = _colmodels_to_vcf_header(genome_build, info_dict, samples, use_accession=use_accession)
-    vcf_reader = Reader(vcf_template_file, strict_whitespace=True)
+    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession)
 
     pseudo_buffer = StashFile()
-
-    vcf_writer = Writer(pseudo_buffer, vcf_reader)
-    # Need to pass escapechar
-    vcf_writer.writer = csv.writer(
-        pseudo_buffer,
-        delimiter="\t",
-        lineterminator="\n",
-        quoting=csv.QUOTE_NONE,
-        escapechar="\\",
-    )
+    writer = VCFWriter(pseudo_buffer, header_lines)
+    yield pseudo_buffer.value  # header
 
     for obj in items:
-        record = _grid_item_to_vcf_record(info_dict, obj, sample_ids, samples, use_accession=use_accession)
-        vcf_writer.write_record(record)
+        chrom, pos, vcf_id, ref, alt, info, fmt, sample_calls = \
+            _grid_item_to_vcf_row(info_dict, obj, sample_ids, samples, use_accession=use_accession)
+        writer.write_record(chrom, pos, ref, alt, vcf_id=vcf_id, info=info, fmt=fmt, sample_calls=sample_calls)
         yield pseudo_buffer.value
 
 
 def _get_column_vcf_info():
+    columns = [c.column for c in COLUMN_VCF_INFO]
+    variant_column_by_name = dict(
+        VariantGridColumn.objects.filter(pk__in=columns).values_list("grid_column_name", "variant_column")
+    )
     column_vcf_info = {}
-    for cvi in ColumnVCFInfo.objects.all().values('column__variant_column', 'info_id', 'number', 'type', 'description'):
-        cvi['type'] = VCFInfoTypes(cvi['type']).label
-        index = cvi['column__variant_column']
-        column_vcf_info[index] = cvi
+    for c in COLUMN_VCF_INFO:
+        if variant_column := variant_column_by_name.get(c.column):
+            column_vcf_info[variant_column] = {
+                "column__variant_column": variant_column,
+                "info_id": c.info_id,
+                "number": c.number,
+                "type": c.type.label,
+                "description": c.description,
+            }
     return column_vcf_info
 
 
@@ -134,55 +134,60 @@ def _get_colmodel_info_dict(colmodels):
     return info_dict
 
 
-def _colmodels_to_vcf_header(genome_build, info_dict, samples, use_accession=True):
-    """ returns file which contains header """
+VCF_INFO_REPLACE = {
+    ";": ",:",  # semi-colon used as INFO delimiter
+    ",": "|",  # commas forbidden except as list
+}
 
-    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession)
-    return StringIO('\n'.join(header_lines))
+VCF_SAMPLE_FORMAT = ['GT', 'AD', 'AF', 'PL', 'DP', 'GQ']
 
 
-def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names, use_accession=True):
+def _vcf_info_encode(val):
+    if isinstance(val, str):
+        for old, new in VCF_INFO_REPLACE.items():
+            val = val.replace(old, new)
+    return val
+
+
+def _format_sample_value(value):
+    """ Mirror how the value is rendered in a sample column ('.' for missing) """
+    if value is None:
+        return "."
+    return str(value)
+
+
+def _format_sample_call(gt, ad, af, pl, dp, gq) -> str:
+    # GT leads whenever present; the remaining fields follow VCF_SAMPLE_FORMAT order
+    parts = [gt] if gt else []
+    parts.extend(_format_sample_value(v) for v in (ad, af, pl, dp, gq))
+    return ":".join(parts)
+
+
+def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accession=True):
     if use_accession:
-        CHROM = obj.get("locus__contig__refseq_accession", ".")
+        chrom = obj.get("locus__contig__refseq_accession", ".")
     else:
-        CHROM = obj.get("locus__contig__name", ".")
+        chrom = obj.get("locus__contig__name", ".")
 
-    POS = obj.get("locus__position", ".")
-    ID = obj.get("variantannotation__dbsnp_rs_id")
-    REF = obj.get("locus__ref__seq", ".")
-    ALT = obj.get("alt__seq", ".")
-    QUAL = '.'  # QUAL = obj.get("annotation__quality", ".")
-    FILTER = None
-    INFO = {}
+    pos = obj.get("locus__position", ".")
+    vcf_id = obj.get("variantannotation__dbsnp_rs_id")
+    if vcf_id is None:
+        vcf_id = "."
+    ref = obj.get("locus__ref__seq", ".")
+    alt = obj.get("alt__seq", ".")
 
-    INFO_REPLACE = {
-        ";": ",:",  # semi-colon used as INFO delimiter
-        ",": "|",  # commas forbidden except as list
-    }
-
+    info = {}
     for info_id, data in info_dict.items():
         col = data['column__variant_column']
         if val := obj.get(col):
-            if isinstance(val, str):
-                for old, new in INFO_REPLACE.items():
-                    val = val.replace(old, new)
-            INFO[info_id] = val
+            info[info_id] = _vcf_info_encode(val)
 
-    FORMAT = None
-    MY_FORMAT = ['GT', 'AD', 'AF', 'PL', 'DP', 'GQ']
-    CallData = make_calldata_tuple(MY_FORMAT)
-    sample_indexes = {}
-    samples = []
-
+    fmt = None
+    sample_calls = None
     if sample_ids:
-        FORMAT = ':'.join(MY_FORMAT)
-
-    alts = [_Substitution(ALT)]
-    ALT = alts
-    record = _Record(CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, sample_indexes)
-
-    if sample_ids:
-        for i, (sample_id, sample) in enumerate(zip(sample_ids, sample_names)):
+        fmt = ':'.join(VCF_SAMPLE_FORMAT)
+        sample_calls = []
+        for sample_id in sample_ids:
             sample_prefix = f"sample_{sample_id}_samples"
             ad = obj[f"{sample_prefix}_allele_depth"]
             zygosity = obj[f"{sample_prefix}_zygosity"]
@@ -190,25 +195,11 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names, use_acces
             dp = obj[f"{sample_prefix}_read_depth"]
             af = obj[f"{sample_prefix}_allele_frequency"]
             # GQ/PL/FT are optional now
-            # TODO: Ideally, we'd not write them out
             pl = obj.get(f"{sample_prefix}_phred_likelihood", ".")
             gq = obj.get(f"{sample_prefix}_genotype_quality", ".")
-            # These are all number=1
-            data_args = {'AD': [ad],
-                         'GT': gt,
-                         'PL': [pl],
-                         'DP': [dp],
-                         'GQ': [gq],
-                         'AF': [af]}
+            sample_calls.append(_format_sample_call(gt, ad, af, pl, dp, gq))
 
-            data = CallData(**data_args)
-            call = _Call(record, sample, data)
-            samples.append(call)
-            sample_indexes[sample] = i
-
-        record.samples = samples
-
-    return record
+    return chrom, pos, vcf_id, ref, alt, info or None, fmt, sample_calls
 
 
 def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] = None):
@@ -248,8 +239,12 @@ def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] =
         yield item
 
 
-def _replace_transcripts_iterator(request, grid, ctc: CanonicalTranscriptCollection, items):
-    """ This uses a large amount of RAM - reading a whole  """
+def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items):
+    """ Overwrite the representative ('pick') variantannotation__ values with the canonical transcript ones.
+
+        Transcript rows are looked up in batches of variant IDs taken off the streamed items, so we hit the
+        (version, variant, transcript_version) index directly rather than re-running the node queryset as an
+        'IN' subquery, and only hold one batch in RAM """
 
     variant_transcript_annotation_variant_id_field = "variant_id"
 
@@ -267,30 +262,27 @@ def _replace_transcripts_iterator(request, grid, ctc: CanonicalTranscriptCollect
                 transcript_replace_fields[suffix] = f
 
     # We only need things from VariantTranscriptAnnotation - so join there directly
-    variants_qs = grid.get_queryset(request).values_list("id")
     version = grid.node.analysis.annotation_version.variant_annotation_version
     ct_qs = ctc.canonicaltranscript_set
     transcript_versions = ct_qs.values_list("transcript_version", flat=True)
-    vta_qs = VariantTranscriptAnnotation.objects.filter(version=version, variant__in=variants_qs,
-                                                        transcript_version__in=transcript_versions)
-    transcript_values = vta_qs.values(*transcript_replace_fields.keys())
 
-    # Read into a massive dictionary
-    transcript_items_by_id = {}
+    def _transcript_items_by_id(variant_ids: list[int]) -> dict[int, dict]:
+        vta_qs = VariantTranscriptAnnotation.objects.filter(version=version, variant__in=variant_ids,
+                                                           transcript_version__in=transcript_versions)
 
-    def transcript_items():
-        for transcript_data in transcript_values:
-            transcript_item = {}
-            for before, after in transcript_replace_fields.items():
-                transcript_item[after] = transcript_data[before]
-            yield transcript_item
+        def transcript_items():
+            for transcript_data in vta_qs.values(*transcript_replace_fields.keys()):
+                transcript_item = {}
+                for before, after in transcript_replace_fields.items():
+                    transcript_item[after] = transcript_data[before]
+                yield transcript_item
 
-    for item in grid.iter_format_items(transcript_items()):
-        transcript_items_by_id[item["id"]] = item
+        return {item["id"]: item for item in grid.iter_format_items(transcript_items())}
 
     # Loop through items and changeroo
-    for item in items:
-        variant_id = item["id"]
-        if transcript_data := transcript_items_by_id.get(variant_id):
-            item.update(transcript_data)
-        yield item
+    for batch in iter_fixed_chunks(items, TRANSCRIPT_REPLACE_BATCH_SIZE):
+        transcript_items_by_id = _transcript_items_by_id([item["id"] for item in batch])
+        for item in batch:
+            if transcript_data := transcript_items_by_id.get(item["id"]):
+                item.update(transcript_data)
+            yield item

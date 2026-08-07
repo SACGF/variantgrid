@@ -4,7 +4,6 @@ from functools import cached_property
 
 import numpy as np
 from django.db.models import Count, ExpressionWrapper, F, IntegerField
-from matplotlib import cm
 
 from library.genomics import get_genomic_size_description
 from library.graphs.chromosomes_graph import plot_chromosomes
@@ -111,7 +110,6 @@ class HomozygosityPercentGraph(CacheableGraph):
 
         logging.debug("HomozygosityPercentGraph: %d bins", num_bins)
 
-        cmap = cm.get_cmap(self.cmap)
         for chrom, (xranges, yranges) in chrom_ranges.items():
             bins = chrom_homo_percent[chrom]
             num_bins = len(bins) + 1
@@ -133,7 +131,7 @@ class HomozygosityPercentGraph(CacheableGraph):
             c = np.array(bins)
 
             masked_c = np.ma.masked_invalid(c)
-            quadmesh = ax.pcolormesh(x, y, masked_c, cmap=cmap, alpha=density_alpha)
+            quadmesh = ax.pcolormesh(x, y, masked_c, cmap=self.cmap, alpha=density_alpha)
             quadmesh.set_clim(vmin=0, vmax=100.0)
             self.im = quadmesh  # Just need one
 

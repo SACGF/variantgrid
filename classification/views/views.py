@@ -13,16 +13,17 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
-from django.http import StreamingHttpResponse
+from django.http import StreamingHttpResponse, Http404
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.timezone import now
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.views.generic import TemplateView
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from global_login_required import login_not_required
-from jfu.http import upload_receive, UploadResponse, JFUResponse
 from more_itertools import first
 from requests.models import Response
 from rest_framework.status import HTTP_200_OK
@@ -34,7 +35,8 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
 from classification.classification_changes import ClassificationChanges
 from classification.classification_stats import get_grouped_classification_counts, \
     get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason, AlleleOriginBucket
+from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason, AlleleOriginBucket, \
+    LabExternalFilter
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
@@ -55,6 +57,7 @@ from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
 from genes.hgvs import HGVSMatcher
 from library.django_utils import require_superuser, get_url_from_view_path
+from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
 from library.log_utils import log_traceback
 from library.utils import delimited_row
 from library.utils.django_utils import render_ajax_view
@@ -65,6 +68,7 @@ from snpdb.lab_picker import LabPickerData
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
+from sync.classification_sync_status import classification_sync_status
 from uicore.utils.form_helpers import form_helper_horizontal
 from variantopedia.forms import SearchAndClassifyForm
 
@@ -256,12 +260,20 @@ def classification_groupings(request):
         "labs": Lab.valid_labs_qs(request.user),
         "genome_build": user_settings.default_genome_build,
         "user_settings": user_settings,
+        "lab_external_choices": LabExternalFilter.choices,
+        "lab_external_default": LabExternalFilter.ALL,
     }
     return render(request, 'classification/classification_groupings.html', context)
 
 
 class AutopopulateView(APIView):
+    """ Generates auto-populated evidence key values for a variant (from annotation, sample data,
+    and optionally an existing classification to copy from), used to pre-fill the classification form. """
 
+    @extend_schema(
+        summary="Auto-populate classification evidence key values for a variant (query params: variant_id, genome_build_name, transcript accessions, sample_id, copy_from_vcm_id)",
+        responses=OpenApiTypes.OBJECT
+    )
     def get(self, request):
         variant_id = request.GET.get("variant_id")
         genome_build_name = request.GET.get("genome_build_name")
@@ -468,9 +480,23 @@ def view_classification(request: HttpRequest, classification_id: str):
         'attachments_enabled': settings.CLASSIFICATION_FILE_ATTACHMENTS,
         'delete_enabled': settings.CLASSIFICATION_ALLOW_DELETE,
         'duplicate_records': duplicate_records,
-        'withdraw_reasons': withdraw_reasons
+        'withdraw_reasons': withdraw_reasons,
+        'mme_enabled': settings.MME_ENABLED,   # shows the MatchMaker Exchange card
+        'sync_statuses': classification_sync_status(vc),
     }
     return render(request, 'classification/classification.html', context)
+
+
+def view_classification_lab_record(request: HttpRequest, classification_ref: str):
+    """ Resolve a classification from "lab_group_name/lab_record_id" and redirect to its canonical URL """
+    lab_group_name, _, lab_record_id = classification_ref.rpartition('/')
+    if not lab_group_name or not lab_record_id:
+        raise Http404(f"Expected a classification reference of lab_group_name/lab_record_id, got ({classification_ref})")
+
+    classification = get_object_or_404(Classification, lab__group_name=lab_group_name, lab_record_id=lab_record_id)
+    # same view permission as landing on the record directly - writable, or has a version we can see
+    ClassificationRef.init_from_obj(request.user, classification).check_security()
+    return redirect(classification.get_absolute_url())
 
 
 def view_classification_diff(request):
@@ -644,38 +670,34 @@ def classification_file_upload(request, classification_id):
     try:
         classification = get_object_or_404(Classification, pk=classification_id)
         if not classification.can_write(request.user):
-            raise Exception('User can not edit this variant classification')
-        uploaded_file = upload_receive(request)
+            raise PermissionDenied('User can not edit this variant classification')
+        django_uploaded_file = filepond_upload_receive(request)
 
         vc_attachment = ClassificationAttachment(classification=classification,
-                                                 file=uploaded_file)
+                                                 file=django_uploaded_file)
         vc_attachment.save()
-
-        file_dict = vc_attachment.get_file_dict()
-    except Exception as e:
+    except Exception:
         log_traceback()
-        file_dict = {"error": str(e)}
+        return HttpResponse("Upload failed", status=500)
 
-    return UploadResponse(request, file_dict)
+    return filepond_process_response(vc_attachment.pk)
 
 
-@require_POST
+@require_http_methods(["DELETE", "POST"])
 def classification_file_delete(request, pk):
-    success = False
     try:
         vc_attachment = ClassificationAttachment.objects.get(pk=pk)
-        if not vc_attachment.classification.can_write(request.user):
-            raise Exception('User can not edit this variant classification')
-
-        rm_if_exists(vc_attachment.file.path)
-        if vc_attachment.thumbnail_path:
-            rm_if_exists(vc_attachment.thumbnail_path)
-        vc_attachment.delete()
-        success = True
     except ClassificationAttachment.DoesNotExist:
-        pass
+        return HttpResponse(status=404)
 
-    return JFUResponse(request, success)
+    if not vc_attachment.classification.can_write(request.user):
+        raise PermissionDenied('User can not edit this variant classification')
+
+    rm_if_exists(vc_attachment.file.path)
+    if vc_attachment.thumbnail_path:
+        rm_if_exists(vc_attachment.thumbnail_path)
+    vc_attachment.delete()
+    return HttpResponse(status=200)
 
 
 def get_classification_attachment_file_dicts(classification) -> list[dict]:
@@ -684,7 +706,7 @@ def get_classification_attachment_file_dicts(classification) -> list[dict]:
     for vca in classification.classificationattachment_set.all():
         file_dicts.append(vca.get_file_dict())
 
-    file_dicts = list(reversed(file_dicts))  # JFU adds most recent at the end
+    file_dicts = list(reversed(file_dicts))  # render newest-first
     return file_dicts
 
 
@@ -736,8 +758,7 @@ class CreateClassificationForVariantView(TemplateView):
             raise ValueError(msg)
 
         genome_build = self._get_genome_build()
-        vts = VariantTranscriptSelections(variant, genome_build,
-                                          hide_other_annotation_consortium_transcripts=False)
+        vts = VariantTranscriptSelections(variant, genome_build)
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
         consensuses = ClassificationConsensus.all_consensus_candidates(allele=variant.allele, user=self.request.user)
@@ -768,7 +789,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     refseq_transcript_accession = ""
     ensembl_transcript_accession = ""
-    matcher = HGVSMatcher(genome_build)
+    matcher = HGVSMatcher.instance(genome_build)
     hgvs_variant = matcher.create_hgvs_variant(hgvs_string)
     evidence = {}
     if hgvs_variant.transcript:
@@ -964,7 +985,8 @@ def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
 
 
 def view_classification_grouping_detail(request, classification_grouping_id: int):
-    grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
+    grouping = get_object_or_404(ClassificationGrouping.objects.select_related('latest_allele_info'),
+                                 pk=classification_grouping_id)
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
         "classification_grouping": grouping
@@ -972,7 +994,8 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
 
 
 def view_classification_grouping_records_detail(request, classification_grouping_id: int):
-    grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
+    grouping = get_object_or_404(ClassificationGrouping.objects.select_related('latest_allele_info'),
+                                 pk=classification_grouping_id)
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_records_detail.html', {
         "classification_grouping": grouping

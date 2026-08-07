@@ -1,9 +1,7 @@
 {% load static %}
 {% load model_helpers %}
-{% load seqauto_record_tags %}
 <link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
-<script src="{% static 'js/cached_generated_files.js' %}"></script>
 <script>
 	var DELETE_URL = "{% url 'cached_generated_file_delete' %}";
 	var BASE_QC_POLL_URL = "{% url 'sequencing_run_qc_graph' sequencing_run.pk 'QC_COMPARE_TYPE' %}";
@@ -57,10 +55,6 @@ $(document).ready(function() {
 		</tr>
 	</table>
 {% else %}
-	{% if sequencing_run.can_generate_qc %}
-		{% record_data_state_helper illumina_qc %}
-	{% else %}
-	    Can't generate QC for this SequencingRun due to missing metrics files.
-	{% endif %} 
+	No stats available.
 {% endif %}
 </div>

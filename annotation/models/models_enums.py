@@ -32,6 +32,9 @@ class AnnotationStatus(models.TextChoices):
     DELETING = 'x', "Deleting"
     DUMP_STARTED = 'd', "Dump Started"
     DUMP_COMPLETED = 'D', "Dump Completed"
+    # External annotation (#1568): dump written, parked waiting for the operator to run VEP externally
+    # and re-import the annotated VCF. NOT a completed state - genuinely waiting on the operator.
+    EXTERNAL_DUMP_COMPLETED = 'e', "Awaiting external annotation"
     ANNOTATION_STARTED = 'a', "Annotation Started"
     ANNOTATION_COMPLETED = 'A', "Annotation Completed"
     UPLOAD_STARTED = 'U', "Upload Started"
@@ -48,6 +51,7 @@ class AnnotationStatus(models.TextChoices):
     @classmethod
     def get_summary_state(cls, annotation_status):
         SUMMARY_STATES = {cls.CREATED: "Queued",
+                          cls.EXTERNAL_DUMP_COMPLETED: "External",
                           cls.FINISHED: "Finished",
                           cls.ERROR: "Error"}
         return SUMMARY_STATES.get(annotation_status, "Running")
@@ -76,6 +80,16 @@ class VariantAnnotationPipelineType(models.TextChoices):
     STRUCTURAL_VARIANT = "C", "Structural Variant"
 
 
+class NMDEscapeStatus(models.TextChoices):
+    """ PTC-aware NMD prediction (#579) - the NMD.pm rules anchored on the premature
+        termination codon rather than the variant. NOT_APPLICABLE means we ran the
+        calculation and it doesn't apply (eg not a frameshift, or VEP couldn't locate
+        the new stop) - null means the row predates the calculation. """
+    ESCAPING = "E", "Escapes NMD"
+    PREDICTED_NMD = "N", "NMD predicted"
+    NOT_APPLICABLE = "A", "Not applicable"
+
+
 class ColumnAnnotationCategory(models.TextChoices):
     """ Based on categories from:
         https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html """
@@ -99,12 +113,16 @@ class ColumnAnnotationCategory(models.TextChoices):
 class VEPPlugin(models.TextChoices):
     DBNSFP = 'd', 'dbNSFP'
     DBSCSNV = 'v', 'dbscSNV'
+    EVE = 'E', 'EVE'
     GRANTHAM = 'g', 'Grantham'
     LOFTOOL = 'l', 'LoFtool'
     MASTERMIND = 'n', 'Mastermind'
     MAVEDB = 'V', "MaveDb"
     MAXENTSCAN = 'm', 'MaxEntScan'
     NMD = "N", 'NMD'
+    OPEN_TARGETS = 'O', 'OpenTargets'
+    PROMOTER_AI = 'A', 'PromoterAI'
+    PROTVAR = 'p', 'ProtVar'
     SPLICEAI = 'a', 'SpliceAI'
     SPLICEREGION = 's', 'SpliceRegion'
 
@@ -126,6 +144,7 @@ class VEPCustom(models.TextChoices):
     TOPMED = 't', 'TopMed'
     UK10K = 'u', 'UK10k'
     COSMIC = 'c', 'COSMIC'
+    DENOVO_DB = 'D', 'denovo_db'
 
 
 class VEPSkippedReason(models.TextChoices):

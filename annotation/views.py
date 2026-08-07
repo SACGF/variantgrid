@@ -17,23 +17,29 @@ from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
-    VariantAnnotationVersionDiff, Citation
+    VariantAnnotationVersionDiff, Citation, InvalidAnnotationVersionError
+from annotation import vep_columns
+from annotation.pathogenicity_predictions import TOOLS
 from annotation.models.models import CachedWebResource, HumanProteinAtlasAnnotationVersion, \
-    HumanProteinAtlasAnnotation, ColumnVEPField, DBNSFPGeneAnnotationVersion
+    HumanProteinAtlasAnnotation, DBNSFPGeneAnnotationVersion
 from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
-from annotation.tasks.annotation_scheduler_task import annotation_scheduler, subdivide_annotation_range_lock
-from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
+from annotation.tasks.annotation_scheduler_task import annotation_scheduler, subdivide_annotation_range_lock, \
+    dispatch_annotation_runs
+from annotation.vep_annotation import VEPConfig, get_vep_command, get_vep_variant_annotation_version_kwargs
 from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
 from library.utils import first
 from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyVersion
-from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
+from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel, \
+    JobsControl
 from variantgrid.celery import app
+from variantgrid.deployment_validation.annotation_status_checks import \
+    is_variant_annotation_version_populated, get_variant_annotation_progress
 from variantgrid.deployment_validation.somalier_check import verify_somalier_config
 
 
@@ -91,7 +97,11 @@ def annotation_build_detail(request, genome_build_name):
     except Exception as e:
         annotation_details["reference_fasta_error"] = str(e)
 
-    if av := AnnotationVersion.latest(genome_build, active=False, validate=False):
+    # Show the latest annotation version regardless of status (NEW while being built, or ACTIVE once
+    # promoted) - otherwise on a working deployment (ACTIVE) av would be None and every install-instructions
+    # block below would render as "not installed"
+    latest_av_qs = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("annotation_date")
+    if av := latest_av_qs.last():
         annotation_details["latest"] = av
 
         sync_with_current_vep = False
@@ -237,8 +247,10 @@ def annotation_detail(request):
     annotations_all_imported = all(annotations_ok)  # Any unset will show instructions header
 
     cached_web_resources = []
+    disabled_cwr = settings.DISABLED_CACHED_WEB_RESOURCES
     for cwr_name in settings.ANNOTATION_CACHED_WEB_RESOURCES:
         cwr, _ = CachedWebResource.objects.get_or_create(name=cwr_name)
+        cwr.disabled_url = disabled_cwr.get(cwr_name)
         cached_web_resources.append(cwr)
 
     context = {
@@ -282,11 +294,16 @@ def annotation_versions(request):
             latest = None
         qs = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date")
         has_annotation = qs.exists()
-        has_active = qs.filter(variant_annotation_version__active=True).exists()
+        has_active = qs.filter(variant_annotation_version__status=VariantAnnotationVersion.Status.ACTIVE).exists()
+        latest_vav = VariantAnnotationVersion.objects.filter(
+            genome_build=genome_build,
+            status=VariantAnnotationVersion.Status.ACTIVE,
+        ).first()
         vep_commands = {}
         for pt in VariantAnnotationPipelineType:
             vep_command = get_vep_command("in.vcf", "out.vcf", genome_build,
-                                          genome_build.annotation_consortium, pt)
+                                          genome_build.annotation_consortium, pt,
+                                          variant_annotation_version=latest_vav)
             vep_command = " ".join(vep_command).replace(" -", "\n")
             vep_commands[pt.value] = vep_command
 
@@ -343,12 +360,44 @@ def variant_annotation_runs(request):
 
     genome_build_field_counts = defaultdict(dict)
     genome_build_summary = defaultdict(dict)
+    genome_build_summary_combined = defaultdict(dict)
 
     if request.method == "POST":
+        if "unpause-jobs" in request.POST:
+            JobsControl.resume(by=str(request.user))
+            messages.add_message(request, messages.INFO,
+                                 "Resumed analysis + annotation job dispatch")
+        if "pause-jobs" in request.POST:
+            JobsControl.pause(reason=f"Paused from annotation runs page by {request.user}",
+                              by=str(request.user))
+            messages.add_message(request, messages.WARNING,
+                                 "Paused analysis + annotation job dispatch")
+
         if "annotation-scheduler" in request.POST:
             annotation_scheduler.si().apply_async()
 
+        if "run-scheduler-new" in request.POST:
+            annotation_scheduler.si(status=VariantAnnotationVersion.Status.NEW).apply_async()
+            messages.add_message(request, messages.INFO, "Queued annotation scheduler against NEW")
+
         for genome_build in GenomeBuild.builds_with_annotation():
+            if f"promote-to-active-{genome_build.name}" in request.POST:
+                new_vav = VariantAnnotationVersion.latest(genome_build,
+                                                         status=VariantAnnotationVersion.Status.NEW)
+                if new_vav is None:
+                    messages.add_message(request, messages.ERROR,
+                                         f"{genome_build} - no NEW VariantAnnotationVersion to promote")
+                elif not is_variant_annotation_version_populated(new_vav):
+                    messages.add_message(request, messages.ERROR,
+                                         f"{genome_build} - NEW VAV pk={new_vav.pk} is not yet populated")
+                else:
+                    try:
+                        new_vav.promote_to_active()
+                        messages.add_message(request, messages.INFO,
+                                             f"{genome_build} - promoted VAV pk={new_vav.pk} to ACTIVE")
+                    except (ValueError, InvalidAnnotationVersionError) as e:
+                        messages.add_message(request, messages.ERROR, str(e))
+
             for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build):
                 annotation_runs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
                 message = None
@@ -375,29 +424,83 @@ def variant_annotation_runs(request):
 
     for genome_build in GenomeBuild.builds_with_annotation():
         for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date"):
-            qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
-            field_counts = get_field_counts(qs, "status")
-            summary_data = Counter()
-            for field, count in field_counts.items():
-                summary = AnnotationStatus.get_summary_state(field)
-                summary_data[summary] += count
+            base_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
+            # Split by pipeline type so standard-variant work (the bottleneck) is shown separately from
+            # structural-variant runs (mostly empty/instant). Only include types that have runs.
+            summary_by_type = {}
+            field_counts_by_type = {}
+            combined_summary = Counter()  # across pipeline types - drives the per-VAV action buttons
+            for pipeline_type in VariantAnnotationPipelineType:
+                field_counts = get_field_counts(base_qs.filter(pipeline_type=pipeline_type), "status")
+                if not field_counts:
+                    continue
+                summary_data = Counter()
+                for field, count in field_counts.items():
+                    summary = AnnotationStatus.get_summary_state(field)
+                    summary_data[summary] += count
+                    combined_summary[summary] += count
+                summary_by_type[pipeline_type.value] = summary_data
+                field_counts_by_type[pipeline_type.value] = {as_display[k]: v for k, v in field_counts.items()}
 
-            genome_build_summary[genome_build.pk][vav.pk] = summary_data
-            genome_build_field_counts[genome_build.pk][vav] = {as_display[k]: v for k, v in field_counts.items()}
+            genome_build_summary[genome_build.pk][vav.pk] = summary_by_type
+            genome_build_summary_combined[genome_build.pk][vav.pk] = combined_summary
+            genome_build_field_counts[genome_build.pk][vav] = field_counts_by_type
 
     current_variant_annotation_versions = VariantAnnotationVersion.latest_for_all_builds()
-    current_pks = current_variant_annotation_versions.values_list("pk", flat=True)
-    historical_variant_annotation_versions = VariantAnnotationVersion.objects.exclude(pk__in=current_pks)
+    new_variant_annotation_versions = VariantAnnotationVersion.objects.filter(
+        status=VariantAnnotationVersion.Status.NEW).order_by("genome_build__name", "annotation_date")
+    historical_variant_annotation_versions = VariantAnnotationVersion.objects.filter(
+        status=VariantAnnotationVersion.Status.HISTORICAL).order_by("genome_build__name", "-annotation_date")
+
+    genome_build_status_panel = {}
+    for genome_build in GenomeBuild.builds_with_annotation():
+        active_vav = VariantAnnotationVersion.latest(genome_build,
+                                                    status=VariantAnnotationVersion.Status.ACTIVE)
+        new_vav = VariantAnnotationVersion.latest(genome_build,
+                                                 status=VariantAnnotationVersion.Status.NEW)
+        new_progress = None
+        new_populated = False
+        new_gene_annotation_blocker = None
+        if new_vav is not None:
+            new_progress = get_variant_annotation_progress(new_vav)
+            new_populated = is_variant_annotation_version_populated(new_vav)
+            new_gene_annotation_blocker = new_vav.get_gene_annotation_promote_blocker()
+        historical_count = VariantAnnotationVersion.objects.filter(
+            genome_build=genome_build, status=VariantAnnotationVersion.Status.HISTORICAL
+        ).count()
+        genome_build_status_panel[genome_build.name] = {
+            "active": active_vav,
+            "new": new_vav,
+            "new_progress": new_progress,
+            "new_populated": new_populated,
+            "new_gene_annotation_blocker": new_gene_annotation_blocker,
+            "historical_count": historical_count,
+        }
+
+    any_new_vav = VariantAnnotationVersion.objects.filter(
+        status=VariantAnnotationVersion.Status.NEW
+    ).exists()
+
+    # Don't force-create the singleton just by viewing the page
+    jobs_control = JobsControl.objects.filter(pk=JobsControl.SINGLETON_PK).first()
 
     context = {
         "genome_build_summary": dict(genome_build_summary),
+        "genome_build_summary_combined": dict(genome_build_summary_combined),
         "genome_build_field_counts": dict(genome_build_field_counts),
+        "pipeline_type_labels": dict(VariantAnnotationPipelineType.choices),
         "current_variant_annotation_versions": current_variant_annotation_versions,
+        "new_variant_annotation_versions": new_variant_annotation_versions,
         "historical_variant_annotation_versions": historical_variant_annotation_versions,
+        "genome_build_status_panel": genome_build_status_panel,
+        "any_new_vav": any_new_vav,
+        "jobs_control": jobs_control,
+        "jobs_paused": bool(jobs_control and jobs_control.paused),
     }
     return render(request, "annotation/variant_annotation_runs.html", context)
 
 
+@require_superuser
 def view_annotation_run(request, annotation_run_id):
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
 
@@ -416,10 +519,12 @@ def view_annotation_run(request, annotation_run_id):
         "can_retry_annotation_run": can_retry_annotation_run,
         "can_retry_annotation_run_upload": can_retry_annotation_run_upload,
         "can_subdivide_annotation_run": can_subdivide_annotation_run,
+        "can_make_annotation_run_local": annotation_run.get_status() == AnnotationStatus.EXTERNAL_DUMP_COMPLETED,
     }
     return render(request, "annotation/view_annotation_run.html", context)
 
 
+@require_superuser
 @require_POST
 def retry_annotation_run(request, annotation_run_id, upload_only=False):
     """ Deletes - then re-tries using annotation lock """
@@ -434,25 +539,52 @@ def retry_annotation_run(request, annotation_run_id, upload_only=False):
     return redirect(annotation_run)
 
 
+@require_superuser
 @require_POST
 def retry_annotation_run_upload(request, annotation_run_id):
     return retry_annotation_run(request, annotation_run_id, upload_only=True)
 
 
+@require_superuser
+@require_POST
+def make_annotation_run_local(request, annotation_run_id):
+    """ #1568: revert an external annotation run back to the local pipeline so it is annotated
+        locally, regardless of size. Clears external + dump state (-> CREATED) and kicks the dispatcher. """
+    annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
+    if annotation_run.get_status() == AnnotationStatus.EXTERNAL_DUMP_COMPLETED:
+        annotation_run.revert_external_to_local()
+        dispatch_annotation_runs.si(annotation_run.variant_annotation_version.pk).apply_async()
+        messages.add_message(request, messages.INFO,
+                             "Reverted to local pipeline - will be annotated locally",
+                             extra_tags='import-message')
+    else:
+        messages.add_message(request, messages.WARNING,
+                             "Annotation run is not awaiting external annotation - nothing to do",
+                             extra_tags='import-message')
+    return redirect(annotation_run)
+
+
+@require_superuser
 @require_POST
 def subdivide_annotation_run(request, annotation_run_id):
     """ Sometimes runs fail w/out of memory etc (perhaps due to too many transcripts) - be able to subdivide """
 
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
-    new_range_lock = subdivide_annotation_range_lock(annotation_run.annotation_range_lock)
+    pipeline_type = annotation_run.pipeline_type
+    old_range_lock = annotation_run.annotation_range_lock
+    version_id = old_range_lock.version_id
 
-    new_annotation_run = AnnotationRun.objects.create(annotation_range_lock=new_range_lock,
-                                                      pipeline_type=annotation_run.pipeline_type)
+    # subdivide_annotation_range_lock deletes the run(s) on this lock, shrinks it to the bottom half and
+    # returns a new lock for the top half. Create a fresh CREATED run per half (each with its lock set,
+    # so no rangeless run is ever committed - #1654) and hand back to the dispatcher.
+    new_range_lock = subdivide_annotation_range_lock(old_range_lock)
+    bottom_half_run = AnnotationRun.objects.create(annotation_range_lock=old_range_lock,
+                                                   pipeline_type=pipeline_type)
+    AnnotationRun.objects.create(annotation_range_lock=new_range_lock, pipeline_type=pipeline_type)
+    dispatch_annotation_runs.si(version_id).apply_async()
 
-    # These runs will get deleted and new ones made during retry
-    annotation_run = annotation_run_retry(annotation_run)
-    _new_annotation_run = annotation_run_retry(new_annotation_run)
-    return redirect(annotation_run)
+    # The original run was deleted by the subdivision - land on the bottom-half replacement.
+    return redirect(bottom_half_run)
 
 
 @cache_page(WEEK_SECS)
@@ -463,11 +595,20 @@ def view_annotation_descriptions(request, genome_build_name=None):
     vep_annotation_levels = [ColumnAnnotationLevel.TRANSCRIPT_LEVEL, ColumnAnnotationLevel.VARIANT_LEVEL]
     columns_and_vep_by_annotation_level = {al.label: {} for al in vep_annotation_levels}
 
-    vep_qs = ColumnVEPField.filter_for_build(genome_build)
+    # Use a VEPConfig so we hide columns whose data file isn't configured for this build
+    # (e.g. dbNSFP under T2T) - same source of truth as get_vep_command/BulkVEPVCFAnnotationInserter.
+    vep_config = VEPConfig(genome_build)
+
+    def _first_for_build(vgc_id, build_name):
+        for c in vep_columns.for_variant_grid_column(vgc_id, vep_config=vep_config):
+            if c.applies_to(genome_build_name=build_name):
+                return c
+        return None
+
     for vgc in VariantGridColumn.objects.all().order_by("grid_column_name"):
         if vgc.annotation_level in vep_annotation_levels:
             # For Transcript/Variant that use VEP - only show if visible in that build
-            if vep := vep_qs.filter(variant_grid_column=vgc).first():
+            if vep := _first_for_build(vgc.pk, genome_build.name):
                 columns_and_vep_by_annotation_level[vgc.get_annotation_level_display()][vgc] = vep
         else:
             variantgrid_columns_by_annotation_level[vgc.annotation_level].append(vgc)
@@ -480,11 +621,19 @@ def view_annotation_descriptions(request, genome_build_name=None):
     return render(request, "annotation/view_annotation_descriptions.html", context)
 
 
-@cache_page(WEEK_SECS)
-@vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
-def about_new_vep_columns(request):
-    # Keep this around for another upgrade cycle
-    return render(request, "annotation/about_new_vep_columns.html")
+def view_pathogenicity_thresholds(request):
+    """ Reference page for the ClinGen-calibrated PP3/BP4 raw-score cutoffs used by DamageNode and
+    the variant details page - driven by the TOOLS registry so it stays in sync with the filters. """
+    tools = [t for t in TOOLS if t.raw_field]
+    references = {}  # source_detail -> source_url, first-seen order, for the citations section
+    for t in tools:
+        if t.source_detail and t.source_detail not in references:
+            references[t.source_detail] = t.source_url
+    context = {
+        "tools": tools,
+        "references": references,
+    }
+    return render(request, "annotation/view_pathogenicity_thresholds.html", context)
 
 
 def view_annotation_version_details(request, annotation_version_id):
