@@ -600,7 +600,7 @@ class BackendVCF(models.Model):
         return record.variant_caller
 
     def get_samples_by_sequencing_sample(self):
-        return get_samples_by_sequencing_sample(self.filesystem_vcf.sample_sheet, self.vcf)
+        return get_samples_by_sequencing_sample(self.filesystem_vcf.get_sequencing_samples(), self.vcf)
 
     def __str__(self):
         backend = self.single_sample_vcf or self.joint_called_vcf or 'None'

@@ -149,7 +149,7 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         except SequencingRunCurrentSampleSheet.DoesNotExist:
             return False
 
-        for joint_called_vcf in current_sample_sheet.jointcalledvcf_set.all():
+        for joint_called_vcf in current_sample_sheet.get_joint_called_vcfs():
             if joint_called_vcf.needs_to_be_linked():
                 return True
 
@@ -228,6 +228,12 @@ class SampleSheet(SeqAutoRecord):
     def get_sorted_sequencing_samples(self):
         samples_by_name = self.get_sequencing_samples_by_name()
         return [samples_by_name[name] for name in sorted_nicely(samples_by_name)]
+
+    def get_joint_called_vcfs(self):
+        """ VCFs owned by this sheet, plus cross-run ones drawing members from it """
+        return JointCalledVCF.objects.filter(
+            models.Q(sample_sheet=self) | models.Q(sequencing_samples__sample_sheet=self)
+        ).distinct()
 
     def get_sample_enrichment_kits(self):
         qs = self.sequencingsample_set.filter(enrichment_kit__isnull=False)
@@ -572,6 +578,18 @@ class SingleSampleVCF(SeqAutoRecord):
     def get_params(self):
         return self.bam_file.get_params()
 
+    def get_sequencing_samples(self):
+        """ The sequencing samples this VCF is allowed to link against """
+        return SequencingSample.objects.filter(pk=self.bam_file.sequencing_sample_id)
+
+    @property
+    def enrichment_kit(self) -> Optional[EnrichmentKit]:
+        return self.bam_file.sequencing_sample.sample_sheet.sequencing_run.enrichment_kit
+
+    @property
+    def has_mixed_enrichment_kits(self) -> bool:
+        return False
+
     @property
     def name(self):
         return name_from_filename(self.path)
@@ -595,9 +613,42 @@ class SingleSampleVCF(SeqAutoRecord):
 class JointCalledVCF(SeqAutoRecord):
     sample_sheet = models.ForeignKey(SampleSheet, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
+    # Set when the joint call draws samples from runs other than sample_sheet's.
+    # Empty means "every sequencing sample on sample_sheet" (the common single-run case).
+    sequencing_samples = models.ManyToManyField(SequencingSample, blank=True,
+                                                related_name="joint_called_vcfs")
 
     def get_params(self):
         return self.sample_sheet.get_params()
+
+    def get_sequencing_samples(self):
+        """ The sequencing samples this VCF is allowed to link against """
+        explicit = self.sequencing_samples.all()
+        if explicit.exists():
+            return explicit
+        return self.sample_sheet.sequencingsample_set.all()
+
+    @property
+    def sequencing_runs(self) -> list['SequencingRun']:
+        """ Every run contributing samples, owning run first """
+        runs = {self.sample_sheet.sequencing_run: None}
+        for ss in self.get_sequencing_samples():
+            runs[ss.sample_sheet.sequencing_run] = None
+        return list(runs)
+
+    @property
+    def is_cross_run(self) -> bool:
+        return len(self.sequencing_runs) > 1
+
+    @property
+    def enrichment_kit(self) -> Optional[EnrichmentKit]:
+        """ The kit shared by every contributing run, or None when they differ """
+        kits = {r.enrichment_kit for r in self.sequencing_runs}
+        return kits.pop() if len(kits) == 1 else None
+
+    @property
+    def has_mixed_enrichment_kits(self) -> bool:
+        return len({r.enrichment_kit for r in self.sequencing_runs}) > 1
 
     @property
     def name(self):
@@ -626,11 +677,18 @@ class JointCalledVCF(SeqAutoRecord):
         return None
 
     @property
+    def sequencing_sample_count(self) -> int:
+        """ How many sequencing samples this VCF could link against """
+        return self.get_sequencing_samples().count()
+
+    @property
     def is_full_sheet(self) -> Optional[bool]:
         count = self.sample_count
         if count is None:
             return None
-        return count == self.sample_sheet.sequencingsample_set.count()
+        if self.is_cross_run:
+            return False
+        return count == self.sequencing_sample_count
 
     def needs_to_be_linked(self):
         try:
@@ -644,8 +702,9 @@ class JointCalledVCF(SeqAutoRecord):
         return False
 
     def __str__(self):
-        num_samples = self.sample_sheet.sequencingsample_set.count()
-        return f"{self.variant_caller} JointCalledVCF ({self.pk}) for {self.sequencing_run} ({num_samples} samples)"
+        num_samples = self.sequencing_sample_count
+        runs = ", ".join(str(sr) for sr in self.sequencing_runs)
+        return f"{self.variant_caller} JointCalledVCF ({self.pk}) for {runs} ({num_samples} samples)"
 
 
 class QC(SeqAutoRecord):
@@ -944,8 +1003,10 @@ class QCColumn(models.Model):
         return self.name
 
 
-def get_samples_by_sequencing_sample(sample_sheet, vcf):
-    sequencing_samples_by_name = sample_sheet.get_sequencing_samples_by_name()
+def get_samples_by_sequencing_sample(sequencing_samples, vcf):
+    """ sequencing_samples is the candidate pool - a sample sheet's rows, or the explicit members
+        of a joint call that spans runs """
+    sequencing_samples_by_name = {ss.sample_name: ss for ss in sequencing_samples}
 
     def clean_sample_name(s):
         return s.upper().replace("-", "_")

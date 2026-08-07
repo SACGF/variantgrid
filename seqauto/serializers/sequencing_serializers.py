@@ -537,12 +537,15 @@ class SequencingFilesBulkCreateSerializer(serializers.Serializer):
 class JointCalledVCFSerializer(serializers.ModelSerializer):
     sample_sheet = SampleSheetLookupSerializer()
     variant_caller = VariantCallerSerializer()
+    # Set for joint calls drawing samples from more than one sequencing run, eg a family trio
+    sequencing_samples = SequencingSampleLookupSerializer(many=True, required=False)
 
     class Meta:
         model = JointCalledVCF
-        fields = ("path", "sample_sheet", "variant_caller")
+        fields = ("path", "sample_sheet", "variant_caller", "sequencing_samples")
 
     def create(self, validated_data):
+        sequencing_sample_lookups = validated_data.pop("sequencing_samples", None)
         sample_sheet = SampleSheetLookupSerializer.get_object(validated_data.pop('sample_sheet'))
         variant_caller = VariantCallerSerializer().create(validated_data.pop('variant_caller'))
         path = validated_data["path"]
@@ -556,4 +559,8 @@ class JointCalledVCFSerializer(serializers.ModelSerializer):
             path=path,
             defaults={**kwargs},
         )
+        if sequencing_sample_lookups is not None:
+            sequencing_samples = [SequencingSampleLookupSerializer.get_object(d)
+                                  for d in sequencing_sample_lookups]
+            joint_called_vcf.sequencing_samples.set(sequencing_samples)
         return joint_called_vcf

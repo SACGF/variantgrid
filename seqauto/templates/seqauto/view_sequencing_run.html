@@ -331,9 +331,10 @@
 
         <div id='data'>
             <h3>Made from this data</h3>
-            {% if sample_sheet.jointcalledvcf_set.exists %}
+            {% with joint_called_vcfs=sample_sheet.get_joint_called_vcfs %}
+            {% if joint_called_vcfs %}
                 <ul><b>Joint Called VCFs</b>
-                {% for joint_called_vcf in sample_sheet.jointcalledvcf_set.all %}
+                {% for joint_called_vcf in joint_called_vcfs %}
                     <li class='seqauto-record vcf-file'>
                         <a href="{% url 'view_joint_called_vcf' joint_called_vcf.pk %}">{{ joint_called_vcf }}</a>
                         <div class='sample-sheet-icon'></div>
@@ -342,7 +343,7 @@
                             {% if sample_count is None %}
                                 loading…
                             {% else %}
-                                {{ sample_count }} / {{ joint_called_vcf.sample_sheet.sequencingsample_set.count }} samples
+                                {{ sample_count }} / {{ joint_called_vcf.sequencing_sample_count }} samples
                                 {% if joint_called_vcf.is_full_sheet %}
                                     [full sheet]
                                 {% else %}
@@ -350,9 +351,13 @@
                                 {% endif %}
                             {% endif %}
                         {% endwith %}
+                        {% if joint_called_vcf.is_cross_run %}
+                            [cross-run]
+                        {% endif %}
                 {% endfor %}
                 </ul>
             {% endif %}
+            {% endwith %}
     
             <ul>        
             {% for ss in sample_sheet.sequencingsample_set.all %}

@@ -47,6 +47,7 @@ from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from upload.models import (
     BackendVCF,
     PipelineFailedJobTerminateEarlyException,
+    SimpleVCFImportInfo,
     UploadedVCF,
     UploadedVCFPipelineMaxVariant,
     UploadStep,
@@ -57,6 +58,9 @@ from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantS
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
 from user_messages.models import Message
+
+MIXED_ENRICHMENT_KIT_MESSAGE = "Joint called VCF spans sequencing runs with different enrichment kits - " \
+                               "enrichment kit settings were not applied to this VCF"
 
 
 def get_format_field(vcf_formats, wanted_format_id):
@@ -215,7 +219,7 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     backend_vcf = create_backend_vcf_links(uploaded_vcf)
     if backend_vcf:
         logging.info("Handle backend VCF")
-        link_samples_and_vcfs_to_sequencing(backend_vcf)
+        link_samples_and_vcfs_to_sequencing(backend_vcf, upload_step=upload_step)
         backend_vcf_import_start_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
 
     return vcf
@@ -388,20 +392,28 @@ def create_backend_vcf_links(uploaded_vcf):
     return backend_vcf
 
 
-def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
+def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upload_step=None):
     if backend_vcf:
         logging.info("link_samples_and_vcfs_to_sequencing backend_vcf: %s", backend_vcf.pk)
+        filesystem_vcf = backend_vcf.filesystem_vcf
         sequencing_run = backend_vcf.sample_sheet.sequencing_run
         vcf = backend_vcf.vcf
-        if ek := sequencing_run.enrichment_kit:
+        if ek := filesystem_vcf.enrichment_kit:
             vcf.variant_zygosity_count = ek.variant_zygosity_count
             logging.info("Setting %s variant_zygosity_count to %s", vcf, vcf.variant_zygosity_count)
+        elif filesystem_vcf.has_mixed_enrichment_kits:
+            logging.warning("%s: %s", vcf, MIXED_ENRICHMENT_KIT_MESSAGE)
+            if upload_step:
+                SimpleVCFImportInfo.objects.create(upload_step=upload_step,
+                                                   message_string=MIXED_ENRICHMENT_KIT_MESSAGE)
         vcf.fake_data = sequencing_run.fake_data
         vcf.save()
 
         samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
         if not samples_by_sequencing_sample:
-            raise ValueError("Couldn't link VCF samples to sequencing samples. VCF samples must start with sample names in SampleSheet.csv")
+            expected = ", ".join(str(ss) for ss in filesystem_vcf.get_sequencing_samples())
+            raise ValueError("Couldn't link VCF samples to sequencing samples. "
+                             f"VCF samples must start with one of: {expected}")
 
         if backend_vcf.joint_called_vcf:
             VCFFromSequencingRun.objects.update_or_create(

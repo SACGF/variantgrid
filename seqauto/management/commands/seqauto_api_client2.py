@@ -85,10 +85,21 @@ class VariantCaller:
 
 @dataclass_json
 @dataclass
+class SequencingSampleLookup:
+    """ Only used as arguments to find existing sequencing sample on server - not enough details to create one """
+    sample_sheet_lookup: SampleSheetLookup = field(metadata=config(field_name="sample_sheet"))
+    sample_name: str
+
+
+@dataclass_json
+@dataclass
 class JointCalledVCF:
     path: str
     sample_sheet_lookup: SampleSheetLookup = field(metadata=config(field_name="sample_sheet"))
     variant_caller: VariantCaller
+    # Set for joint calls that draw samples from more than one sequencing run, eg a family trio
+    sequencing_samples: Optional[list[SequencingSampleLookup]] = \
+        field(default=None, metadata=config(exclude=lambda x: x is None))
 
 
 @dataclass_json
@@ -117,14 +128,6 @@ class SequencingFile:
     fastq_r2: str
     bam_file: BamFile
     vcf_file: SingleSampleVCF
-
-
-@dataclass_json
-@dataclass
-class SequencingSampleLookup:
-    """ Only used as arguments to find existing sequencing sample on server - not enough details to create one """
-    sample_sheet_lookup: SampleSheetLookup = field(metadata=config(field_name="sample_sheet"))
-    sample_name: str
 
 
 @dataclass_json
