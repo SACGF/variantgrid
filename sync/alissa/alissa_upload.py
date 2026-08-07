@@ -132,7 +132,7 @@ class AlissaUploadSyncer(SyncRunner):
                         response_jsons.append(response_json)
                         if response_error := response_json.get("error"):
                             notify = AdminNotificationBuilder(message="Error Uploading")
-                            notify.add_field("Sync Destination", sync_run_instance.name)
+                            notify.add_field("Sync Destination", sync_run_instance.sync_destination.name)
                             notify.add_field("Error", str(response_error)[:500])
                             notify.send()
                         elif numberFailed := int(response_json.get("numberFailed", 0)):

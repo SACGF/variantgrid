@@ -7,6 +7,7 @@ from classification.models.classification_inserter import BulkClassificationInse
 from classification.models.evidence_key import EvidenceKeyMap
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
+from library.log_utils import report_message
 from library.oauth import ServerAuth
 from library.utils import batch_iterator, make_json_safe_in_place
 from snpdb.models.models import Country, Lab, Organization
@@ -91,7 +92,7 @@ class VariantGridDownloadSyncer(SyncRunner):
 
             if not lab:
                 parts = lab_group_name.split('/')
-                org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
+                org, org_created = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
                 australia, _ = Country.objects.get_or_create(name='Australia')
                 Lab.objects.create(
                     group_name=lab_group_name,
@@ -101,6 +102,12 @@ class VariantGridDownloadSyncer(SyncRunner):
                     country=australia,
                     external=True,
                 )
+                report_message("Sync download created external lab", extra_data={
+                    "target": lab_group_name,
+                    "lab_name": meta.get('lab_name'),
+                    "organization_created": org_created,
+                    "sync_destination": sync_run_instance.sync_destination.name,
+                })
             return data
 
         sync_run_instance.run_start()
