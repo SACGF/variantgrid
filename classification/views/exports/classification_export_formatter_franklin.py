@@ -115,9 +115,10 @@ class FranklinExportRow(ExportRow):
         return str(self.mode)
 
     # Franklin (non-free version) only allows a subset of valid conditions, so just leave condition blank
-    # @export_column("Conditions")
-    # def conditions_column(self):
-    #     return f"{settings.SITE_NAME} {self.mode[0]}{self.mode[1:].lower()}"
+    @export_column("Conditions")
+    def conditions_column(self):
+        return ""
+        #return f"{settings.SITE_NAME} {self.mode[0]}{self.mode[1:].lower()}"
 
     def conditions(self) -> list[str]:
         # Don't make condition a column, as if it changes it'll go into a new section in Franklin
@@ -177,6 +178,11 @@ class FranklinExportRow(ExportRow):
     def submitter(self):
         return settings.SITE_NAME
 
+    @export_column("Classification Tags")
+    def classification_tags(self):
+        # TODO make this a setting
+        return "Shariant"
+
     @export_column("Genome Build")
     def genome_build(self):
         genome_build = self.data.source.genome_build
@@ -187,13 +193,11 @@ class FranklinExportRow(ExportRow):
         else:
             raise ValueError(f"Unsupported genome build for Franklin {genome_build}")
 
-    @export_column("Classification Tags")
-    def classification_tags(self):
-        # TODO make this a setting
-        return "Shariant"
-
     # Inheritance is a bit messy, not including in export
     # it also might subdivide the rows
+    # @export_column("Inheritance")
+    # def inheritance(self):
+    #     return ""
 
 
 @register_classification_exporter("franklin")
