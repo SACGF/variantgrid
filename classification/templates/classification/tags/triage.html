@@ -17,13 +17,15 @@
                 <span style="color:#446">{{ last_comment.value.text }}</span>
                 <span style="font-family:monospace;color:#888">"</span>
             </div>
-            <div style="margin-top:6px; position:relative; right: 1px; display:flex">{% user last_comment.user size="tiny" %} <div style="top:2px; position:relative; color: #666">&nbsp;- {% timestamp last_comment.timestamp time_ago=True %}</div></div>
+            <div style="margin-top:6px; position:relative; right: 1px; display:flex">
+                {% if last_comment.user %}{% user last_comment.user size="tiny" %} <div style="top:2px; position:relative; color: #666">&nbsp{% endif %}
+                - {% timestamp last_comment.timestamp time_ago=True %}</div></div>
         </div>
     {% endif %}
 {% elif last_comment %}
     <div class="mt-2">
         <div style="display:inline-block; margin-right: 6px"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i><span class="no-value">No comment provided</span></div>
-        <div style="margin-top:6px; position:relative; right: 1px; display:flex">{% user last_comment.user size="tiny" %} <div style="top:2px; position:relative; color: #666">&nbsp;- {% timestamp last_comment.timestamp time_ago=True %}</div></div>
+        <div style="margin-top:6px; position:relative; right: 1px; display:flex">{% if last_comment.user %}{% user last_comment.user size="tiny" %} <div style="top:2px; position:relative; color: #666">&nbsp;{% endif %}- {% timestamp last_comment.timestamp time_ago=True %}</div></div>
     </div>
 {% endif %}
 </div>
