@@ -68,7 +68,7 @@ ALLELE_ORIGIN_NOT_PROVIDED_BUCKET = "U"
 # "U" for Unknown, "G" for Germline, and "S" for Somatic
 
 UNIT_TEST = sys.argv[1:2] == ['test']
-DEBUG = True
+DEBUG = False  # Development environments opt-in via their env_developers settings file
 # If SEND_EMAILS is False, all emails that would go through EmailLog will still be record but wont be sent
 # Good for test environments where you don't want to spam test accounts
 SEND_EMAILS = False
@@ -753,6 +753,8 @@ MIDDLEWARE = (
     'threadlocals.middleware.ThreadLocalMiddleware',
     # 'querycount.middleware.QueryCountMiddleware',
     # 'mozilla_django_oidc.middleware.SessionRefresh',
+
+    'axes.middleware.AxesMiddleware',  # Must be last
 )
 HTML_MINIFY = True
 EXCLUDE_FROM_MINIFYING = (
@@ -831,6 +833,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 AUTHENTICATION_BACKENDS = (
+    'axes.backends.AxesStandaloneBackend',  # Must be first
     'django.contrib.auth.backends.ModelBackend',  # default
     'guardian.backends.ObjectPermissionBackend',
 )
@@ -845,6 +848,29 @@ LOGIN_USERNAME_PLACEHOLDER = None
 LOGOUT_REDIRECT_URL = '/'
 
 ACCOUNT_ACTIVATION_DAYS = 7  # One-week activation window
+
+# Brute force protection - applies to anything going through Django's authenticate(), which includes the
+# login form, LDAP, and DRF's BasicAuthentication. OIDC deployments authenticate in Keycloak so bypass this.
+AXES_ENABLED = not UNIT_TEST
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # Hours - locked accounts recover without admin intervention
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+# nginx.conf sets X-Real-IP from the connecting address - without this every request looks like it came
+# from the proxy. Deployments behind an additional load balancer need to check what their real client IP is
+AXES_IPWARE_META_PRECEDENCE_ORDER = ("HTTP_X_REAL_IP", "REMOTE_ADDR")
+
+# Only checked when a password is set (registration/change/reset) so existing accounts aren't affected
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 10,
+        }
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+]
 
 # Optional apps have to be switched on before INSTALLED_APPS is built, which is before the env settings files get a
 # chance to run - so they're configured in settings_config.json rather than Python. See #1410
@@ -870,6 +896,7 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     # 3rd party libraries
     'auditlog',
+    'axes',
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
     'user_messages',

@@ -145,6 +145,8 @@ django-autocomplete-light==4.0.3
     # via -r requirements.in
 django-avatar==9.0.0
     # via -r requirements.in
+django-axes==8.3.1
+    # via -r requirements.in
 django-cache-memoize==0.2.1
     # via -r requirements.in
 django-compressor==4.6.0
@@ -169,6 +171,8 @@ django-guardian==3.3.2
     # via -r requirements.in
 django-htmlmin==0.11.0
     # via -r requirements.in
+django-ipware==7.0.1
+    # via django-axes
 django-js-reverse==1.0.0
     # via -r requirements.in
 django-json-widget==2.1.1
@@ -428,6 +432,8 @@ python-dateutil==2.9.0.post0
     #   matplotlib
     #   pandas
     #   pronto
+python-ipware==3.0.0
+    # via django-ipware
 pyvcf3 @ git+https://github.com/dridk/PyVCF3@1fb3789153d1d8e28e2cedf121399f276b5f312a#egg=pyvcf3
     # via -r requirements.in
 pyyaml==6.0.3

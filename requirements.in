@@ -14,6 +14,7 @@ django-amazon-ses
 django-auditlog>=3.0.0
 django_autocomplete_light<5
 django-avatar>=8.0.0
+django-axes[ipware]
 django_cache_memoize
 django-compressor
 django_crispy_forms

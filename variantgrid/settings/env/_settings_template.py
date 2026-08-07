@@ -1,6 +1,7 @@
 from variantgrid.settings.components.annotation_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
+from variantgrid.settings.components.https_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 
 # ANNOTATION_ENTREZ_EMAIL = 'your_email@yourdomain.com'
@@ -9,6 +10,10 @@ WEB_HOSTNAME = 'yourdomain.com'
 WEB_IP = '127.0.0.1'
 
 ALLOWED_HOSTS = ["localhost", WEB_HOSTNAME, WEB_IP]
+
+# DEBUG = True  # Development machines only - exposes tracebacks/settings on any unhandled exception
+
+# Deployments served over plain HTTP (eg intranet) drop the https_settings import above
 
 # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 
