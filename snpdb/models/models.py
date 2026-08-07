@@ -23,7 +23,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
@@ -37,12 +37,16 @@ from model_utils.managers import InheritanceManager
 from more_itertools import first
 
 from classification.enums.classification_enums import ShareLevel
+from eventlog.models import create_event
 from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
+from library.guardian_utils import admin_bot
+from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
 from library.utils import JsonObjType, import_class
 from snpdb.models.models_enums import UserAwardLevel
+from user_messages.models import Message
 
 
 class Tag(models.Model):
@@ -277,8 +281,30 @@ class Organization(models.Model, PreviewModelMixin):
     def sharing_labs(self) -> list['Lab']:
         return [lab for lab in self.lab_set.all().order_by('name') if lab.total_shared_classifications > 0]
 
+    @property
+    def group(self) -> Optional[Group]:
+        if self.group_name:
+            group, _ = Group.objects.get_or_create(name=self.group_name)
+            return group
+        return None
+
     def is_member(self, user: User) -> bool:
         return Lab.valid_labs_qs(user).filter(organization=self).exists()
+
+    def add_member(self, user: User):
+        """ Org group membership only - it grants no lab. A user already in the group is a no-op,
+            so this is safe to call on every login """
+        group = self.group
+        if group is None or group.user_set.filter(pk=user.pk).exists():
+            return
+
+        group.user_set.add(user)
+        org_message = getattr(settings, "USER_CREATE_ORG_MESSAGE", {})
+        if message := org_message.get(self.group_name):
+            Message.objects.create(subject="Your initial lab / organisation",
+                                   body=message,
+                                   sender=admin_bot(),
+                                   recipient=user)
 
     def can_write(self, user: User) -> bool:
         return user.is_superuser or self.lab_set.filter(labhead__user=user).exists()
@@ -289,12 +315,21 @@ class Organization(models.Model, PreviewModelMixin):
             raise PermissionDenied(msg)
 
 
+class LabUserRole(TextChoices):
+    HEAD = "head", "Lab Head"
+    USER = "user", "User"
+
+
 @total_ordering
 class LabUser:
 
-    def __init__(self, user: User, role: str):
+    def __init__(self, user: User, role: LabUserRole):
         self.user = user
         self.role = role
+
+    @property
+    def is_head(self) -> bool:
+        return self.role == LabUserRole.HEAD
 
     @cached_property
     def preferred_label(self) -> str:
@@ -585,9 +620,9 @@ class Lab(models.Model, PreviewModelMixin):
         heads = set(self.labhead_set.values_list('user_id', flat=True))
         lab_users: list[LabUser] = []
         for user in users:
-            role = 'user'
+            role = LabUserRole.USER
             if user.id in heads:
-                role = 'head'
+                role = LabUserRole.HEAD
             lab_users.append(LabUser(user=user, role=role))
         lab_users.sort()
         return lab_users
@@ -676,13 +711,113 @@ class Lab(models.Model, PreviewModelMixin):
     def is_member(self, user: User, admin_check=False) -> bool:
         return self.valid_labs_qs(user=user, admin_check=admin_check).filter(pk=self.pk).exists()
 
+    def is_head(self, user: User) -> bool:
+        return self.labhead_set.filter(user=user).exists()
+
     def can_write(self, user: User) -> bool:
-        return user.is_superuser or self.labhead_set.filter(user=user).exists()
+        return user.is_superuser or self.is_head(user)
 
     def check_can_write(self, user):
         if not self.can_write(user):
             msg = f"You do not have WRITE permission for {self.pk}"
             raise PermissionDenied(msg)
+
+    def can_manage_members(self, user: User) -> bool:
+        return settings.LAB_HEAD_MANAGE_MEMBERS and (user.is_superuser or self.is_head(user))
+
+    def check_can_manage_members(self, user: User):
+        if not self.can_manage_members(user):
+            msg = f"You do not have permission to manage members of {self.pk}"
+            raise PermissionDenied(msg)
+
+    @property
+    def external_membership(self) -> Optional[str]:
+        """ Why membership of this lab is decided outside VariantGrid (eg an Active Directory group) """
+        return settings.LAB_EXTERNAL_MEMBERSHIP.get(self.group_name)
+
+    def candidate_members_qs(self, for_user: User) -> QuerySet[User]:
+        """ Active users that for_user may add to this lab - their organisation, or everyone for a superuser """
+        group = self.group
+        if group is None:
+            return User.objects.none()
+
+        qs = User.objects.filter(is_active=True)
+        if not for_user.is_superuser:
+            group_institution = self.group_institution
+            if group_institution is None:
+                return User.objects.none()
+            qs = qs.filter(groups=group_institution)
+        return qs.exclude(groups=group).order_by('last_name', 'first_name', 'username')
+
+    def _clear_member_caches(self):
+        for cached in ("active_users", "lab_users"):
+            self.__dict__.pop(cached, None)
+
+    @transaction.atomic
+    def add_member(self, user: User, added_by: User):
+        """ Lab group membership, plus the organisation group that goes with it. Already a member is a no-op """
+        group = self.group
+        if group is None or group.user_set.filter(pk=user.pk).exists():
+            return
+
+        group.user_set.add(user)
+        if group_institution := self.group_institution:
+            group_institution.user_set.add(user)
+
+        from snpdb.models.models_user_settings import UserSettingsOverride  # Circular import
+        user_settings_override, _ = UserSettingsOverride.objects.get_or_create(user=user)
+        user_settings_override.auto_set_default_lab()
+        user_settings_override.save()
+
+        self._clear_member_caches()
+        self._log_membership_change(user, added_by, added=True)
+
+        Message.objects.create(subject=f"You have been added to {self}",
+                               body=f"You are now a member of the lab [{self}]({self.get_absolute_url()}).",
+                               sender=admin_bot(),
+                               recipient=user)
+
+    def remove_member_blocked_reason(self, user: User, removed_by: User) -> Optional[str]:
+        """ Why removed_by may not remove user from this lab, or None if they may. Superusers bypass """
+        if removed_by.is_superuser:
+            return None
+        if reason := self.external_membership:
+            return f"Membership of {self} is managed outside {settings.SITE_NAME}. {reason}"
+        if user == removed_by:
+            return "You cannot remove yourself from a lab"
+        if self.is_head(user) and self.labhead_set.count() == 1:
+            return f"{user} is the only lab head of {self}"
+        return None
+
+    @transaction.atomic
+    def remove_member(self, user: User, removed_by: User):
+        """ Removes the lab group only - organisation membership is the user's standing in the org, not the lab """
+        group = self.group
+        if group is None:
+            return
+
+        if reason := self.remove_member_blocked_reason(user, removed_by):
+            raise PermissionDenied(reason)
+
+        group.user_set.remove(user)
+        self.labhead_set.filter(user=user).delete()
+
+        self._clear_member_caches()
+        self._log_membership_change(user, removed_by, added=False)
+
+    def _log_membership_change(self, user: User, changed_by: User, added: bool):
+        """ Membership is a permission change, so it's logged for the lab and notified to admins """
+        verb = "added to" if added else "removed from"
+        details = f"{user} ({user.username}) {verb} lab {self} by {changed_by} ({changed_by.username})"
+        event_name = "lab_member_added" if added else "lab_member_removed"
+        create_event(user=changed_by, name=event_name, details=details, app_name="snpdb")
+
+        nb = AdminNotificationBuilder(message="Lab Membership Changed")
+        nb.add_markdown(details)
+        nb.add_field("Lab", str(self))
+        nb.add_field("User", user.username)
+        nb.add_field("Changed by", changed_by.username)
+        nb.send()
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

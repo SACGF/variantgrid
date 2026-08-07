@@ -92,6 +92,7 @@ from snpdb.archive import (
 )
 from snpdb.forms import (
     LabForm,
+    LabMemberForm,
     LabUserSettingsOverrideForm,
     OrganizationForm,
     OrganizationUserSettingsOverrideForm,
@@ -1163,6 +1164,7 @@ def view_lab(request, lab_id: int):
         "lab": lab,
         "visibility": visibility,
         "is_member": lab.is_member(request.user) or request.user.is_superuser,
+        "can_manage_members": lab.can_manage_members(request.user),
 
         "lab_form": lab_form,
         'settings_override_form': lab_settings_override_form,
@@ -1173,6 +1175,50 @@ def view_lab(request, lab_id: int):
         'clinvar_export_enabled': clinvar_export_sync.is_enabled
     }
     return render(request, 'snpdb/settings/view_lab.html', context)
+
+
+def lab_members_tab(request, pk):
+    lab = get_object_or_404(Lab, pk=pk)
+    lab.check_can_manage_members(request.user)
+
+    lab_users = lab.lab_users
+    removable_user_pks = {lu.user.pk for lu in lab_users
+                          if not lab.remove_member_blocked_reason(lu.user, request.user)}
+
+    context = {
+        "lab": lab,
+        "lab_users": lab_users,
+        "removable_user_pks": removable_user_pks,
+        "lab_member_form": LabMemberForm(lab=lab, for_user=request.user),
+    }
+    return render(request, 'snpdb/settings/lab_members_tab.html', context)
+
+
+@require_POST
+def lab_add_member(request, pk):
+    lab = get_object_or_404(Lab, pk=pk)
+    lab.check_can_manage_members(request.user)
+
+    form = LabMemberForm(request.POST, lab=lab, for_user=request.user)
+    if form.is_valid():
+        user = form.cleaned_data["user"]
+        lab.add_member(user, added_by=request.user)
+        messages.add_message(request, messages.SUCCESS, f"{user} added to {lab}")
+    else:
+        messages.add_message(request, messages.ERROR, "Could not add that user to the lab")
+    return redirect(reverse('view_lab', kwargs={"lab_id": lab.pk}))
+
+
+@require_POST
+def lab_remove_member(request, pk):
+    lab = get_object_or_404(Lab, pk=pk)
+    lab.check_can_manage_members(request.user)
+
+    members_qs = lab.group.user_set.all() if lab.group else User.objects.none()
+    user = get_object_or_404(members_qs, pk=request.POST.get("user") or 0)
+    lab.remove_member(user, removed_by=request.user)
+    messages.add_message(request, messages.SUCCESS, f"{user} removed from {lab}")
+    return redirect(reverse('view_lab', kwargs={"lab_id": lab.pk}))
 
 
 def view_clinvar_key(request, pk: str):

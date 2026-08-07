@@ -90,6 +90,28 @@ class GenomeBuildAutocompleteForwardMixin:
             self.fields[f].widget.forward = widget_forward
 
 
+class LabMemberForm(forms.Form):
+    """ Pick someone to add to a lab - the pool is whoever the acting user is allowed to add """
+    user = forms.ModelChoiceField(queryset=User.objects.none(),
+                                  label="User",
+                                  widget=ModelSelect2(url='lab_add_member_autocomplete',
+                                                      attrs={'data-placeholder': 'User...'}))
+
+    def __init__(self, *args, **kwargs):
+        self.lab = kwargs.pop("lab")
+        self.for_user = kwargs.pop("for_user")
+        super().__init__(*args, **kwargs)
+        user_field = self.fields['user']
+        user_field.queryset = self.lab.candidate_members_qs(self.for_user)
+        user_field.widget.forward = [forward.Const(self.lab.pk, "lab_id")]
+
+    def clean_user(self):
+        user = self.cleaned_data["user"]
+        if not self.lab.candidate_members_qs(self.for_user).filter(pk=user.pk).exists():
+            raise ValidationError(f"{user} cannot be added to {self.lab}")
+        return user
+
+
 class UserSelectForm(forms.Form):
     user = forms.ModelChoiceField(queryset=User.objects.all(),
                                   required=False,

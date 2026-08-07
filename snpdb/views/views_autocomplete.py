@@ -3,6 +3,7 @@ from abc import ABC
 from django.contrib.auth.models import User
 from django.db.models.functions import Length
 from django.db.models.query_utils import Q
+from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
@@ -50,6 +51,20 @@ class UserAutocompleteView(AutocompleteView):
 
     def get_user_queryset(self, user):
         return User.objects.all()
+
+
+class LabAddMemberAutocompleteView(AutocompleteView):
+    """ Who a lab head can add to their lab. Not cached - cache_page is keyed on URL, which would
+        serve one lab's candidates to another """
+    fields = ['last_name', 'first_name', 'username']
+
+    def get_user_queryset(self, user):
+        lab_id = self.forwarded.get('lab_id')
+        if not lab_id:
+            return User.objects.none()
+        lab = get_object_or_404(Lab, pk=lab_id)
+        lab.check_can_manage_members(user)
+        return lab.candidate_members_qs(user)
 
 
 @method_decorator(cache_page(MINUTE_SECS), name='dispatch')

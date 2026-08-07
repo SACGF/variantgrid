@@ -1,0 +1,35 @@
+{% load crispy_forms_tags %}
+{% load user_tags %}
+
+<div id="lab-members-tab-container">
+    {% if lab.external_membership %}
+        <div class="alert alert-warning">{{ lab.external_membership }}</div>
+    {% endif %}
+
+    <ul class="list-group mb-3">
+        {% for lab_user in lab_users %}
+            <li class="list-group-item d-flex justify-content-between align-items-center p-1">
+                {% user lab_user.user show_avatar=True show_email=True show_last_login=True size='normal' role=lab_user.role %}
+                {% if lab_user.user.pk in removable_user_pks %}
+                    <form method="post" action="{% url 'lab_remove_member' lab.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="user" value="{{ lab_user.user.pk }}" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                    </form>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+
+    <h5>Add Member</h5>
+    <p class="text-info">
+        You can add anyone in the {{ lab.organization }} organisation - that is, anyone who has logged in
+        since their access was configured.
+    </p>
+    <form method="post" action="{% url 'lab_add_member' lab.pk %}">
+        {% csrf_token %}
+        {% crispy lab_member_form form_helper.horizontal %}
+        {{ lab_member_form.media }}
+        <button type="submit" class="btn btn-primary">Add Member</button>
+    </form>
+</div>

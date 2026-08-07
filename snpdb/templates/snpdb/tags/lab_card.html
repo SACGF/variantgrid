@@ -26,7 +26,7 @@
 
         <ul class="list-group mb-3">
             {% for lab_user in lab.lab_users %}
-                {% if lab_user.role == 'head' or is_member %}
+                {% if lab_user.is_head or is_member %}
                     <li class="list-group-item p-1">
                         {% user lab_user.user show_avatar=True show_email=is_member show_last_login=is_member size='normal' role=lab_user.role %}
                     </li>

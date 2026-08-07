@@ -102,6 +102,9 @@ urlpatterns = [
     path('user/<pk>', views.view_user, name='view_user'),
     path('group/<pk>', views.view_group, name='view_group'),
     path('lab/<int:lab_id>', views.view_lab, name='view_lab'),
+    path('lab/members_tab/<int:pk>', views.lab_members_tab, name='lab_members_tab'),
+    path('lab/members/add/<int:pk>', views.lab_add_member, name='lab_add_member'),
+    path('lab/members/remove/<int:pk>', views.lab_remove_member, name='lab_remove_member'),
     path('clinvar_key/<str:pk>', views.view_clinvar_key, name='clinvar_key'),
     path('organization/<int:organization_id>', views.view_organization, name='view_organization'),
     path('help_static_page/<path:page_name>', views.help_static_page, name='help_static_page'),
@@ -169,6 +172,8 @@ urlpatterns = [
     path('autocomplete/User/', views_autocomplete.UserAutocompleteView.as_view(), name='user_autocomplete'),
     path('autocomplete/Username/', views_autocomplete.UsernameAutocompleteView.as_view(), name='username_autocomplete'),
     path('autocomplete/Lab/', views_autocomplete.LabAutocompleteView.as_view(), name='lab_autocomplete'),
+    path('autocomplete/LabAddMember/', views_autocomplete.LabAddMemberAutocompleteView.as_view(),
+         name='lab_add_member_autocomplete'),
     path('autocomplete/VCF/', views_autocomplete.VCFAutocompleteView.as_view(), name='vcf_autocomplete'),
 
     # Previews

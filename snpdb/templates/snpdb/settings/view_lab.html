@@ -72,6 +72,9 @@
                 </form>
             {% end_ui_register_tab_embedded %}
 
+            {% if can_manage_members %}
+                {% ui_register_tab label="Members" url="lab_members_tab" param=lab.pk tab_set="lab_tabs" url_check=True %}
+            {% endif %}
             {% if url_name_visible.analysis %}
                 {% ui_register_tab label="Node Counts" url="lab_settings_node_counts_tab" param=lab.pk tab_set="lab_tabs" url_check=True %}
             {% endif %}

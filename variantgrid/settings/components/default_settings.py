@@ -489,6 +489,17 @@ USER_CREATE_ORG_LABS = {
     # "test_organization": "user_group_%(username)s",
 }
 
+# Lab heads can add/remove users from their own lab. Enabling this in an env file also needs
+# URLS_NAME_REGISTER.update({"lab_members_tab": True}), as URLS_NAME_REGISTER is built while
+# this file is read
+LAB_HEAD_MANAGE_MEMBERS = False
+
+# key/value = Lab.group_name : why membership of this lab is managed outside VariantGrid. Shown on the
+# lab Members page, and removal is disabled for these labs. Name whatever the lab head has to quote to
+# whoever does own it.
+LAB_EXTERNAL_MEMBERSHIP = {
+}
+
 
 # To use SeqAuto, your settings need to have:
 # "from variantgrid.settings.defaults.seqauto_default_settings import *"
@@ -855,6 +866,7 @@ ACCOUNT_ACTIVATION_DAYS = 7  # One-week activation window
 # Brute force protection - applies to anything going through Django's authenticate(), which includes the
 # login form, LDAP, and DRF's BasicAuthentication. OIDC deployments authenticate in Keycloak so bypass this.
 AXES_ENABLED = not UNIT_TEST
+AXES_VERBOSE = False  # Skip the "AXES: BEGIN version..." banner on every shell/management command
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 1  # Hours - locked accounts recover without admin intervention
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
@@ -1124,6 +1136,7 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "discordance_reports": False,
     "vus": False,
     "maps": USE_MAPS,
+    "lab_members_tab": LAB_HEAD_MANAGE_MEMBERS,
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 
