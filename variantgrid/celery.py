@@ -75,6 +75,11 @@ app.conf.beat_schedule['dispatch-annotation-runs'] = {
     'schedule': MINUTE_SECS,
 }
 
+app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
+    'task': 'analysis.tasks.analysis_grid_export_tasks.clear_old_node_export_cached_generated_files',
+    'schedule': crontab(hour=3, minute=15),
+}
+
 
 # send update emails once a day (if there has been activity)
 if settings.DISCORDANCE_EMAIL:

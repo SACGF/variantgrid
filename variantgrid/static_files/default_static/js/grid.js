@@ -2,16 +2,56 @@ function getGrid(nodeId, unique_code) {
 	return $("#grid-" + nodeId, "#" + unique_code);
 }
 
-function export_grid(analysisId, nodeId, unique_code, export_type, use_canonical_transcripts) {
-	const grid = getGrid(nodeId, unique_code);
-	const gridParam = grid.jqGrid('getGridParam', 'postData');
-	gridParam['rows'] = 0; // no pagination
-	gridParam['export_type'] = export_type;
-	gridParam['use_canonical_transcripts'] = use_canonical_transcripts;
+function getAnalysisDownloadTracker() {
+	return getAnalysisWindow().analysisDownloadTracker;
+}
 
-	const querystring = EncodeQueryData(gridParam);
-	const url = Urls.node_grid_export(analysisId) + "?" + querystring;
-	window.location = url;
+/* Everything a node export is identified by, plus the URL that launches it. Built off the grid's live
+   postData so the export sees whatever the user has filtered the grid down to. */
+function nodeGridExportInfo(analysisId, nodeId, unique_code, export_type, use_canonical_transcripts, caption) {
+	const grid = getGrid(nodeId, unique_code);
+	const gridParams = $.extend({}, grid.jqGrid('getGridParam', 'postData'));
+	gridParams['rows'] = 0; // no pagination
+	gridParams['export_type'] = export_type;
+	if (use_canonical_transcripts) {
+		gridParams['use_canonical_transcripts'] = true;
+	}
+
+	const gridCaption = grid.jqGrid('getGridParam', 'caption') || ("Node " + nodeId);
+	return {
+		nodeId: nodeId,
+		nodeVersion: gridParams['version_id'],
+		exportType: export_type,
+		useCanonicalTranscripts: Boolean(use_canonical_transcripts),
+		gridParams: gridParams,
+		caption: caption || export_type.toUpperCase(),
+		label: `${gridCaption} (${export_type.toUpperCase()})`,
+		url: Urls.node_grid_export(analysisId) + "?" + EncodeQueryData(gridParams),
+	};
+}
+
+function export_grid(analysisId, nodeId, unique_code, export_type, use_canonical_transcripts) {
+	const info = nodeGridExportInfo(analysisId, nodeId, unique_code, export_type, use_canonical_transcripts);
+	const tracker = getAnalysisDownloadTracker();
+	if (tracker) {
+		tracker.download(info);
+	} else {
+		window.location = info.url;
+	}
+}
+
+/* Keep a download button in sync with its export - a spinner and percentage while it runs, then a
+   download icon. Safe to call for a node whose export was never started. */
+function registerNodeGridDownloadButton(element, analysisId, nodeId, unique_code, export_type,
+                                        use_canonical_transcripts, caption) {
+	const tracker = getAnalysisDownloadTracker();
+	if (tracker) {
+		// Resolve here - in dual screen mode the tracker lives in the other window's document
+		tracker.registerButton($(element), function() {
+			return nodeGridExportInfo(analysisId, nodeId, unique_code, export_type,
+			                          use_canonical_transcripts, caption);
+		});
+	}
 }
 
 function load_variant_details(variant_id) {
@@ -767,8 +807,10 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
 
 				setRowChangeCallbacks(grid, data["caption"]);
 
+                const csvButtonId = `node-grid-export-csv-${nodeId}`;
                 grid.jqGrid(
 		            'navButtonAdd', pagerId, {
+		            id : csvButtonId,
 		            caption : "CSV",
 		            buttonicon : "ui-icon-arrowthickstop-1-s",
 		            onClickButton : function() {
@@ -777,12 +819,16 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
 		            title : "Download as CSV",
 		            cursor : "pointer"
 		        });
+                registerNodeGridDownloadButton(`#${csvButtonId}`, analysisId, nodeId, unique_code, 'csv',
+                                               false, "CSV");
 
                 const aWin = getAnalysisWindow();
                 if (aWin.ANALYSIS_SETTINGS && aWin.ANALYSIS_SETTINGS.canonical_transcript_collection) {
                     const ctc = aWin.ANALYSIS_SETTINGS.canonical_transcript_collection;
+                    const ctcButtonId = `node-grid-export-canonical-csv-${nodeId}`;
                     grid.jqGrid(
                         'navButtonAdd', pagerId, {
+                        id : ctcButtonId,
                         caption : "Canonical transcript CSV",
                         buttonicon : "ui-icon-arrowthickstop-1-s",
                         onClickButton : function() {
@@ -791,10 +837,14 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
                         title : "Download CSV using transcripts from " + ctc,
                         cursor : "pointer"
                     });
+                    registerNodeGridDownloadButton(`#${ctcButtonId}`, analysisId, nodeId, unique_code, 'csv',
+                                                   true, "Canonical transcript CSV");
                 }
 
+                const vcfButtonId = `node-grid-export-vcf-${nodeId}`;
 		        grid.jqGrid(
 		            'navButtonAdd', pagerId, {
+		            id : vcfButtonId,
 		            caption : "VCF",
 		            buttonicon : "ui-icon-arrowthickstop-1-s",
 		            onClickButton : function() {
@@ -803,6 +853,8 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
 		            title : "Download as VCF",
 		            cursor : "pointer"
 	        	});
+                registerNodeGridDownloadButton(`#${vcfButtonId}`, analysisId, nodeId, unique_code, 'vcf',
+                                               false, "VCF");
 			}
 	    });
 	});

@@ -18,6 +18,8 @@
 <script type="text/javascript" src="{% static 'js/pedigree_node.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_updates.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_nodes.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/analysis_downloads.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis.js' %}"></script>
 
 <link rel="stylesheet" href="{% static 'css/nodes.css' %}">
@@ -99,6 +101,12 @@
         color: #5e5e5e;
     }
 
+    #analysis-downloads {
+        display: none;
+        margin-left: 10px;
+        border-radius: 4px;
+    }
+
     .gutter {
         background-color: #eee;
         background-repeat: no-repeat;
@@ -147,6 +155,9 @@
 	var panelResizeTimeout;
 	var panelResizeUpdateDelay = 150;
 	messagePoller = new AnalysisMessagePoller(Urls.nodes_status(ANALYSIS_ID), Urls.nodes_tasks(ANALYSIS_ID));
+	// Node exports outlive the grid they were launched from (#node-data-container is replaced on every
+	// node click) so they're tracked on the toolbar - see analysis_downloads.js
+	analysisDownloadTracker = new AnalysisDownloadTracker(ANALYSIS_ID, "#analysis-downloads");
 
 	var secondWindow; // set to window in dual screen mode
 	var saveSettingsOnResize = true;
@@ -314,6 +325,7 @@
                                 <span id="analysis-tasks-active"></span>
                                 <span id="analysis-tasks-queued"></span>
                             </span>
+                            <span id="analysis-downloads"></span>
                         </span>
                     </div>
 

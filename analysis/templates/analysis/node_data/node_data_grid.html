@@ -55,6 +55,13 @@ function gridComplete() {
 	$("input.variant-select").click(selectVariant);
     registerComponent(unique_code, GRID);
 
+    // The placeholder is the download route that matters most for big nodes - the user may never load
+    // the grid at all - so keep its links in sync with any export already running for this node
+    registerNodeGridDownloadButton("#placeholder-export-csv-{{ node_id }}", {{ analysis_id }}, {{ node_id }},
+                                   unique_code, 'csv', false, "CSV");
+    registerNodeGridDownloadButton("#placeholder-export-vcf-{{ node_id }}", {{ analysis_id }}, {{ node_id }},
+                                   unique_code, 'vcf', false, "VCF");
+
     // The deferred placeholder fires gridComplete for its empty datatype:'local' init (needed so
     // the editor's everythingLoaded can proceed). Only a genuine row fetch (server datatype) counts
     // as "loaded this session" - otherwise revisiting would auto-fire the query the user never asked for.
@@ -119,11 +126,11 @@ $(document).ready(function() {
 			<a id="load-variants-{{ node_id }}" title="Show Grid" href="javascript:void(0)">
 				<div class="show-grid-icon icon32"></div> Show grid
 			</a>
-			<a title="Download as CSV"
+			<a id="placeholder-export-csv-{{ node_id }}" title="Download as CSV"
 			   href="javascript:export_grid({{ analysis_id }}, {{ node_id }}, '{{ node_id }}_{{ node_version }}', 'csv')">
 				<div class="csv-icon icon32"></div> CSV
 			</a>
-			<a title="Download as VCF"
+			<a id="placeholder-export-vcf-{{ node_id }}" title="Download as VCF"
 			   href="javascript:export_grid({{ analysis_id }}, {{ node_id }}, '{{ node_id }}_{{ node_version }}', 'vcf')">
 				<div class="vcf-icon icon32"></div> VCF
 			</a>

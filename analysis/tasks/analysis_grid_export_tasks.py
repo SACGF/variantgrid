@@ -1,28 +1,37 @@
 import gzip
+import json
 import logging
 import os
 import zipfile
+from datetime import timedelta
 from typing import Optional
 
 import celery
 from celery.exceptions import Retry
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.contrib.postgres.aggregates.general import StringAgg
 from django.utils import timezone
 
 from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
-from analysis.grid_export import node_grid_get_export_iterator
+from analysis.grid_export import get_node_export_basename, node_grid_get_export_iterator
 from analysis.models import AnalysisTemplate, CohortNode, NodeStatus, SampleNode
+from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
+from genes.models import CanonicalTranscriptCollection
 from library.constants import MINUTE_SECS
 from library.django_utils import FakeRequest
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from library.utils import mk_path_for_file, name_from_filename, sha256sum_str
 from snpdb.models import CachedGeneratedFile, Cohort, Sample
+from snpdb.models.models_variant import Variant
 
 # How long (secs) to wait between checks that an export's output node has finished loading.
 # We re-queue the export task (Celery retry) between checks rather than sleeping, so the worker
 # is freed and we don't deadlock when workers are busy loading the parent nodes we're waiting on.
 NODE_WAIT_TIME_BETWEEN_CHECKS = [5, 5, 10, 10, 30, 30, 60, MINUTE_SECS * 2]
+
+NODE_EXPORT_GENERATOR = "export_node_to_downloadable_file"
 
 
 def get_annotated_download_files_cgf(generator, pk) -> dict[str, Optional[CachedGeneratedFile]]:
@@ -47,6 +56,15 @@ def get_grid_downloadable_file_params_hash(pk, export_type):
     return sha256sum_str(f"{pk}-{export_type}")
 
 
+def get_node_grid_downloadable_file_params_hash(node_id, node_version, user_id, export_type,
+                                                canonical_transcript_collection_id, grid_params: dict) -> str:
+    """ Node grid content is user-dependent (tags from other analyses) and filter-dependent, and the node
+        version invalidates the cache when the analysis is edited - so all of it goes into the hash """
+    params = json.dumps([node_id, node_version, user_id, export_type, canonical_transcript_collection_id,
+                         grid_params], sort_keys=True)
+    return sha256sum_str(params)
+
+
 def update_cgf_progress_iterator(iterator, cgf_id, total_records, update_size):
     """ Wraps the export's rows iterator - the file iterator yields a chunk of rows at a time, so
         counting its yields would under-report progress by the chunk size """
@@ -62,10 +80,12 @@ def update_cgf_progress_iterator(iterator, cgf_id, total_records, update_size):
     cgf_qs.update(progress=1)
 
 
-def _write_node_to_cached_generated_file(cgf, analysis, node, name, export_type):
-    basename = "_".join([name_from_filename(name), "annotated", f"v{analysis.annotation_version.pk}",
-                         str(analysis.genome_build)])
-    request = FakeRequest(user=admin_bot())
+def _get_annotated_basename(analysis, name: str) -> str:
+    return "_".join([name_from_filename(name), "annotated", f"v{analysis.annotation_version.pk}",
+                     str(analysis.genome_build)])
+
+
+def _write_node_to_cached_generated_file(cgf, request, node, basename, export_type, **export_kwargs):
     total_records = node.count
     update_size = max(1000, total_records / 100)  # 1% or every 1k records
 
@@ -73,7 +93,7 @@ def _write_node_to_cached_generated_file(cgf, analysis, node, name, export_type)
         return update_cgf_progress_iterator(rows, cgf.pk, total_records, update_size)
 
     basename, file_iterator = node_grid_get_export_iterator(request, node, export_type, basename=basename,
-                                                            row_wrapper=row_wrapper)
+                                                            row_wrapper=row_wrapper, **export_kwargs)
     open_func = open
     if export_type == 'vcf':
         open_func = gzip.open
@@ -96,6 +116,7 @@ def _write_node_to_cached_generated_file(cgf, analysis, node, name, export_type)
             media_root_filename = zip_file_path
         cgf.filename = media_root_filename
         cgf.task_status = "SUCCESS"
+        cgf.progress = 1  # row_wrapper updated the DB directly, so our copy is still at its starting value
         cgf.generate_end = timezone.now()
         logging.info("Wrote %s", media_root_filename)
         # Write CSVs to Zip (requires the file to be there already)
@@ -139,7 +160,9 @@ def export_cohort_to_downloadable_file(self, cohort_id, export_type):
         analysis = get_cohort_analysis(cohort, analysis_template)
         node = CohortNode.objects.get_subclass(analysis=analysis, output_node=True)  # Should only be 1
         node = _wait_for_output_node(self, node)
-        _write_node_to_cached_generated_file(cgf, analysis, node, cohort.name, export_type)
+        request = FakeRequest(user=admin_bot())
+        _write_node_to_cached_generated_file(cgf, request, node, _get_annotated_basename(analysis, cohort.name),
+                                             export_type)
     except Retry:
         raise  # Output node not ready yet - export task re-queued, not an error
     except Exception:
@@ -159,9 +182,56 @@ def export_sample_to_downloadable_file(self, sample_id, export_type):
         analysis = get_sample_analysis(sample, analysis_template)
         node = SampleNode.objects.get_subclass(analysis=analysis, output_node=True)  # Should only be 1
         node = _wait_for_output_node(self, node)
-        _write_node_to_cached_generated_file(cgf, analysis, node, sample.name, export_type)
+        request = FakeRequest(user=admin_bot())
+        _write_node_to_cached_generated_file(cgf, request, node, _get_annotated_basename(analysis, sample.name),
+                                             export_type)
     except Retry:
         raise  # Output node not ready yet - export task re-queued, not an error
     except Exception:
         log_traceback()
         raise
+
+
+@celery.shared_task(bind=True)
+def export_node_to_downloadable_file(self, node_id, node_version, user_id, export_type,
+                                     canonical_transcript_collection_id, grid_params):
+    """ Analysis node CSV/VCF export (issue #1257) - runs under Celery so a big node isn't bound by the
+        gunicorn request timeout. grid_params are the whitelisted grid GET params the browser sent, so
+        the export sees the same filters as the grid the user was looking at. """
+    try:
+        # This should have been created in analysis.views.views_grid.node_grid_export
+        params_hash = get_node_grid_downloadable_file_params_hash(node_id, node_version, user_id, export_type,
+                                                                 canonical_transcript_collection_id, grid_params)
+        cgf = CachedGeneratedFile.objects.get(generator=NODE_EXPORT_GENERATOR, params_hash=params_hash)
+
+        user = User.objects.get(pk=user_id)
+        node = get_node_subclass_or_non_fatal_exception(user, node_id, version=node_version)
+        node = _wait_for_output_node(self, node)
+
+        canonical_transcript_collection = None
+        if canonical_transcript_collection_id:
+            canonical_transcript_collection = CanonicalTranscriptCollection.objects.get(
+                pk=canonical_transcript_collection_id)
+
+        variant_tags_qs = Variant.objects.filter(varianttag__analysis=node.analysis)
+        variant_tags_qs = variant_tags_qs.annotate(tags=StringAgg("varianttag__tag", delimiter=', ', distinct=True))
+        variant_tags_dict = dict(variant_tags_qs.values_list("id", "tags"))
+
+        request = FakeRequest(user=user)
+        request.GET = grid_params
+        _write_node_to_cached_generated_file(cgf, request, node, get_node_export_basename(node), export_type,
+                                             canonical_transcript_collection=canonical_transcript_collection,
+                                             variant_tags_dict=variant_tags_dict)
+    except Retry:
+        raise  # Output node not ready yet - export task re-queued, not an error
+    except Exception:
+        log_traceback()
+        raise
+
+
+@celery.shared_task
+def clear_old_node_export_cached_generated_files():
+    """ Node exports are cached per (node, version, user, filters, export type) so build up far faster than
+        the cohort/sample ones - the pre_delete signal unlinks each file as its row goes """
+    cutoff = timezone.now() - timedelta(days=settings.ANALYSIS_NODE_EXPORT_CACHE_DAYS)
+    CachedGeneratedFile.objects.filter(generator=NODE_EXPORT_GENERATOR, modified__lt=cutoff).delete()

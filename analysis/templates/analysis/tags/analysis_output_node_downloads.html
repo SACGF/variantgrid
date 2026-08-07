@@ -1,7 +1,7 @@
 <div class="output-node-icons">
     {% for node in output_nodes %}
         {% if node.is_ready and node.is_valid %}
-          <a href="#" onclick="downloadNodeCSV({{ node.analysis_id }}, {{ node.pk }}, {{ node.version }}); return false;">
+          <a href="#" onclick="downloadNodeCSV(this, {{ node.analysis_id }}, {{ node.pk }}, {{ node.version }}); return false;">
         {% endif %}
                 <span class="icon-stack" title="{{ node.get_name_or_identifier }}">
                   <i class="icon ui-icon icon-bottom {{ node.get_class_name }}"></i>

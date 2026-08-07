@@ -7,12 +7,17 @@ entry point the view and the Celery export tasks use.
 """
 import csv
 import json
+import tempfile
+import zipfile
 from unittest import mock
+from urllib.parse import urlencode
 
 from django.contrib.auth.models import User
 from django.db import connection
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.test.client import Client
 from django.test.utils import CaptureQueriesContext
+from django.urls.base import resolve, reverse
 
 from analysis.grid_export import format_items_iterator, node_grid_get_export_iterator
 from analysis.grids import ExportVariantGrid
@@ -20,10 +25,14 @@ from analysis.models import Analysis
 from analysis.models.enums import NodeStatus
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.models_variant_tag import VariantTag
+from analysis.tasks.analysis_grid_export_tasks import (
+    NODE_EXPORT_GENERATOR,
+    export_node_to_downloadable_file,
+)
 from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils import FakeRequest
 from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, grid_export_csv
-from snpdb.models import CohortGenotype, GenomeBuild, Tag
+from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.models.models_enums import CohortGenotypeCollectionType
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
@@ -239,3 +248,67 @@ class TestPkBatchedExport(GridExportTestCase):
         # small enough that every contig's PKs span multiple batches
         with mock.patch.object(ExportVariantGrid, "EXPORT_PK_BATCH_SIZE", 1):
             self.assertEqual(self._exported_pks(node), expected)
+
+
+class TestNodeExportLaunch(GridExportTestCase):
+    """ (C) The view launches the export under Celery and redirects to the CachedGeneratedFile poll URL.
+        get_or_create_and_launch de-dupes on the params hash, so a double-click can't start two of them,
+        while a differently filtered view of the same node is a separate download """
+
+    def setUp(self):
+        super().setUp()
+        self.node = self._sample_node()
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def _grid_params(self, **extra_params) -> dict:
+        """ The whitelisted params the view passes on to the export task """
+        params = {
+            "node_id": str(self.node.pk),
+            "version_id": str(self.node.version),
+            "extra_filters": "",
+        }
+        params.update(extra_params)
+        return params
+
+    def _launch_export(self, **extra_params) -> CachedGeneratedFile:
+        params = dict(self._grid_params(**extra_params), export_type="csv")
+        url = reverse("node_grid_export", kwargs={"analysis_id": self.analysis.pk}) + "?" + urlencode(params)
+        with mock.patch.object(export_node_to_downloadable_file, "apply_async") as mock_apply_async:
+            mock_apply_async.return_value = mock.Mock(id="fake-celery-task-id", result=None)
+            response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        cgf_id = resolve(response.url).kwargs["cgf_id"]
+        return CachedGeneratedFile.objects.get(pk=cgf_id)
+
+    def _num_cached_files(self) -> int:
+        return CachedGeneratedFile.objects.filter(generator=NODE_EXPORT_GENERATOR).count()
+
+    def test_identical_launch_reuses_cached_generated_file(self):
+        first = self._launch_export()
+        second = self._launch_export()
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(self._num_cached_files(), 1)
+
+    def test_different_grid_filters_are_separate_downloads(self):
+        unfiltered = self._launch_export()
+        filters = json.dumps({"groupOp": "AND",
+                              "rules": [{"op": "lt", "field": "locus__position", "data": "1500"}]})
+        filtered = self._launch_export(_search="true", filters=filters)
+        self.assertNotEqual(unfiltered.pk, filtered.pk)
+        self.assertEqual(self._num_cached_files(), 2)
+
+    def test_export_task_writes_zipped_csv(self):
+        cgf = self._launch_export()
+        with tempfile.TemporaryDirectory() as generated_dir:
+            with override_settings(GENERATED_DIR=generated_dir):
+                export_node_to_downloadable_file.apply(args=(self.node.pk, self.node.version, self.user.pk,
+                                                             "csv", None, self._grid_params()))
+                cgf.refresh_from_db()
+                self.assertEqual(cgf.task_status, "SUCCESS")
+                self.assertEqual(cgf.progress, 1)
+                self.assertTrue(cgf.filename.endswith(".csv.zip"), cgf.filename)
+                with zipfile.ZipFile(cgf.filename) as zipf:
+                    csv_name = zipf.namelist()[0]
+                    lines = zipf.read(csv_name).decode().splitlines()
+                self.assertEqual(len(lines), self.node.count + 1)  # header

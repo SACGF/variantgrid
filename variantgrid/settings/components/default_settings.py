@@ -535,6 +535,9 @@ ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000
 # large result set forces a full sort that blows the statement_timeout. At/above this row count we
 # disable sorting entirely and fall back to ORDER BY -pk (indexed). Users filter down to re-enable.
 ANALYSIS_GRID_SORT_MAX_ROWS = 10_000
+# Node exports are cached per (node, version, user, filter set, export type) so accumulate much faster
+# than the cohort/sample ones - a beat task drops the CachedGeneratedFile rows (and files) older than this
+ANALYSIS_NODE_EXPORT_CACHE_DAYS = 7
 
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
