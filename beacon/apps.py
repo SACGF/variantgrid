@@ -8,5 +8,7 @@ class BeaconConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
-        pass
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        from beacon.signals import beacon_health_check  # noqa: F401
         # pylint: enable=import-outside-toplevel,unused-import

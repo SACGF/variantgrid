@@ -14,6 +14,14 @@ class AnnotationConfig(AppConfig):
         from django.conf import settings
 
         from annotation.models import AnnotationRun, CachedWebResource
+
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        from annotation.signals import (  # noqa: F401
+            citation_preview,
+            citation_search,
+            clinvar_annotation_health_check,
+        )
         from annotation.signals.annotation_run_cleanup import (
             annotation_run_complete_cleanup_handler,
             annotation_run_discarded_cleanup_handler,

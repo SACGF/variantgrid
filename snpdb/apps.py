@@ -15,9 +15,31 @@ class SnpdbConfig(AppConfig):
         # pylint: disable=import-outside-toplevel,unused-import
         from django.contrib.auth.models import Group, User
 
-        from snpdb import checks  # Registers system checks
         from seqauto.signals.signals_list import backend_vcf_import_success_signal
+        from snpdb import checks  # noqa: F401  # registers system checks on import
         from snpdb.models import Trio
+
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        from snpdb.signals import (  # noqa: F401
+            clinvar_export_search,
+            cohort_search,
+            common_variants_classification_changed,
+            disk_usage_health_check,
+            genomics_search,
+            jobs_autopause,  # registers worker_ready crash-safety auto-pause
+            lab_search,
+            organization_search,
+            quad_search,
+            sample_search,
+            scv_search,
+            trio_search,
+            user_search,
+            variant_search,
+            variant_zygosity_preview_extra,
+            vcf_health_check,
+            vcf_search,
+        )
         from snpdb.signals.signal_handlers import (
             backend_vcf_import_success_handler,
             group_post_save_handler,

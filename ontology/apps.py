@@ -11,6 +11,10 @@ class OntologyConfig(AppConfig):
         # imported to activate receivers
 
         from annotation.models import CachedWebResource
+
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        from ontology.signals import ontology_health_check, ontology_preview  # noqa: F401
         from ontology.signals.signals import gencc_post_save_handler
         # pylint: enable=import-outside-toplevel,unused-import
 

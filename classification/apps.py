@@ -8,6 +8,7 @@ class ClassificationConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel
-        # imported to activate receivers
-        pass  # pylint: disable=unused-import
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        import classification.signals  # noqa: F401  # pylint: disable=unused-import
         # pylint: enable=import-outside-toplevel

@@ -11,6 +11,10 @@ class AnalysisConfig(AppConfig):
         # imported to activate receivers
 
         from analysis.models import VariantTag
+
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        from analysis.signals import analysis_health_check, analysis_search  # noqa: F401
         from analysis.signals.signal_handlers import (
             handle_active_sample_gene_list_created,
             handle_vcf_import_success,
