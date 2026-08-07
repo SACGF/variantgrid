@@ -212,7 +212,7 @@ def classification_changes(changes):
 
 
 @register.inclusion_tag("classification/tags/clinical_significance_values.html")
-def clinical_significance_values(vcm: ClassificationModification):
+def clinical_significance_values(vcm: ClassificationModification, show_pending: bool = False):
     classification = vcm.classification
     always_show_somatic = vcm.classification.allele_origin_bucket != "G"
 
@@ -226,6 +226,17 @@ def clinical_significance_values(vcm: ClassificationModification):
     # if pending_classification_value := pathogenicity.get("pending"):  # FIXME pending values will be in OverlapContribution now not "pending"
     #     pending_from = germline_key.pretty_value(value, value) or "No Data"
     #     value = pending_classification_value
+    grouping: Optional[ClassificationGrouping] = None
+
+    if show_pending:
+        grouping = ClassificationGroupingEntry.grouping_for(classification)
+
+    # if show_pending and grouping:
+    #     onc_path: OverlapContribution
+    #     if onc_path := grouping.contribution_for(ClassificationResultValue.ONC_PATH):
+    #         if onc_path.
+
+
     value_list = [{
         "title": germline_key.pretty_label,
         "pending_from": pending_from,
@@ -332,6 +343,7 @@ def classification_quick(context,
                          show_flags=False,
                          show_imported_c_hgvs=False,
                          show_values=True,
+                         show_pending: bool = False,
                          record_count: Optional[int] = None,
                          mode: Optional[str] = "detailed"):  # other options are "split" and "compact"
     user = context.request.user
@@ -375,6 +387,7 @@ def classification_quick(context,
         "show_flags": show_flags,
         "show_imported_c_hgvs": show_imported_c_hgvs,
         "show_values": show_values,
+        "show_pending": show_pending,
         "record_count": record_count
     }
 

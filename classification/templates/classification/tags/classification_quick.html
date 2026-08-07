@@ -40,7 +40,7 @@
             </span>
             {% if mode == "split" %}
                 <div>
-                    {% if show_values %}{% clinical_significance_values vcm %}{% endif %}
+                    {% if show_values %}{% clinical_significance_values vcm show_pending=show_pending %}{% endif %}
                     {% if record_count and record_count != 1 %}
                         x {{ record_count }}
                     {% endif %}
