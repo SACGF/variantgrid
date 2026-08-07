@@ -1,3 +1,9 @@
+"""
+Settings template for a deployed server - copy to env/<hostname>.py
+
+Development machines copy env_developers/_settings_template.py instead, which is set up for
+runserver over plain HTTP.
+"""
 from variantgrid.settings.components.annotation_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
@@ -11,9 +17,7 @@ WEB_IP = '127.0.0.1'
 
 ALLOWED_HOSTS = ["localhost", WEB_HOSTNAME, WEB_IP]
 
-# DEBUG = True  # Development machines only - exposes tracebacks/settings on any unhandled exception
-
-# Deployments served over plain HTTP (eg intranet) drop the https_settings import above
+# Intranet deployments served over plain HTTP drop the https_settings import above
 
 # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 

@@ -26,8 +26,9 @@ lint.txt
 /source_id_migration.log
 csv-editor.xml
 
-#ignore developers env settings
-/variantgrid/settings/env_developers/
+#ignore developers env settings, but keep the template they copy
+/variantgrid/settings/env_developers/*
+!/variantgrid/settings/env_developers/_settings_template.py
 
 # Installer logs
 pip-log.txt
