@@ -231,29 +231,47 @@ def clinical_significance_values(vcm: ClassificationModification, show_pending: 
     if show_pending:
         grouping = ClassificationGroupingEntry.grouping_for(classification)
 
-    # if show_pending and grouping:
-    #     onc_path: OverlapContribution
-    #     if onc_path := grouping.contribution_for(ClassificationResultValue.ONC_PATH):
-    #         if onc_path.
+    if show_pending and grouping:
+        onc_path: OverlapContribution
+        if onc_path := grouping.contribution_for(ClassificationResultValue.ONC_PATH):
+            if amend_value := onc_path.triage_state_obj.amend_value:
+                pending_from = value
+                value = amend_value
 
+    pending_from_label = None if not pending_from else germline_key.pretty_value(pending_from, pending_from)
+    value_label = "No Data" if not value else germline_key.pretty_value(value, value)
 
     value_list = [{
         "title": germline_key.pretty_label,
-        "pending_from": pending_from,
-        "label": germline_key.pretty_value(value, value) or "No Data",
+        "pending_from": pending_from_label,
+        "label": value_label,
         "css_class": "cs cs-" + (value.lower() if value else "none")
     }]
 
     if always_show_somatic or summary_obj.somatic.clinical_significance:
-        somatic_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+        pending_from = None
+        pending_from_label = None
         value = summary_obj.somatic.clinical_significance
-        label = somatic_key.pretty_value(value, value) or "No Data"
+
+
+        somatic_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+        if show_pending and grouping:
+            som_clin_sig: OverlapContribution
+            if som_clin_sig := grouping.contribution_for(ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE):
+                if amend_value := som_clin_sig.triage_state_obj.amend_value:
+                    pending_from = value
+                    value = amend_value
+
+        pending_from_label = None if not pending_from else somatic_key.pretty_value(pending_from, pending_from)
+        value_label = "No Data" if not value else somatic_key.pretty_value(value, value)
+
         if amp_level := summary_obj.somatic.amp_level:
-            label += amp_level
+            value_label += amp_level
 
         somatic = {
             "title": somatic_key.pretty_label,
-            "label": label,
+            "pending_from": pending_from_label,
+            "label": value_label,
             "css_class": f"scs cs-{value.lower() if value else 'none'}"
         }
         value_list.append(somatic)

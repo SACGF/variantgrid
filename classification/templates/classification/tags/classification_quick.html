@@ -13,7 +13,7 @@
     {% else %}
         <span class="share-level-{{ vcm.share_level_enum.name }} sig-level-{{ vcm.evidence.clinical_significance.value}}">
             {% if mode != "split" %}
-                {% if show_values %}{% clinical_significance_values vcm %}{% endif %}
+                {% if show_values %}{% clinical_significance_values vcm show_pending=show_pending %}{% endif %}
                 {% if record_count and record_count != 1 %}
                     x {{ record_count }}
                 {% endif %}
