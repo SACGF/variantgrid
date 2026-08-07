@@ -1,6 +1,6 @@
 """ The two Beacon datasets served as independent resultSets (§5.5):
     - variantgrid_observations   : sample-genotype presence/count (§5.2), permission-scoped
-    - variantgrid_classifications: published ShareLevel.PUBLIC classifications (the MME set)
+    - variantgrid_classifications: published ShareLevel.PUBLIC classifications
 
 Each builder resolves presence/count/records for one dataset and returns a DatasetResult;
 the view stitches them into the response envelope and clamps to the returned granularity.
@@ -12,13 +12,11 @@ from django.conf import settings
 
 from beacon.schema import CLASSIFICATIONS_DATASET_ID, OBSERVATIONS_DATASET_ID
 from beacon.variant_mapping import variant_to_g_variant
-from classification.enums.classification_enums import SpecialEKeys
+from classification.enums.classification_enums import ShareLevel, SpecialEKeys
+from classification.models.classification import ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap
 from mme.contact import lab_contact
-from mme.serializers.patient_profile import (
-    classification_ontology_slots,
-    mme_eligible_classifications,
-)
+from mme.serializers.patient_profile import classification_ontology_slots
 from patients.models import Patient
 from snpdb.models import Allele, GenomeBuild, Variant
 from snpdb.models.models_zygosity_counts import VariantZygosityCount, VariantZygosityCountCollection
@@ -138,15 +136,34 @@ def _classification_record(modification) -> dict:
     return record
 
 
+def beacon_eligible_classifications():
+    """ Latest published, non-withdrawn, ShareLevel.PUBLIC modifications - PUBLIC is the
+        record-level consent signal for exposure to an external database.
+
+        Beacon derives its own eligibility rather than reusing MME's: MME additionally requires
+        Lab.mme_enabled and restricts to VUS-and-above, both of which encode what an MME
+        submission claims rather than what a Beacon reports, and either service can be enabled
+        on a node where the other is off. """
+    if not settings.BEACON_ENABLED:
+        # Node layer - a Beacon-disabled deployment exposes nothing here even if a caller
+        # reaches this builder without going through the view's check
+        return ClassificationModification.objects.none()
+    return (ClassificationModification.objects
+            .filter(is_last_published=True,
+                    share_level=ShareLevel.PUBLIC.value,
+                    classification__withdrawn=False)
+            .select_related("classification", "classification__lab"))
+
+
 def classifications_dataset(user, allele: Optional[Allele], granularity_is_record: bool) -> DatasetResult:
     """ variantgrid_classifications: published + ShareLevel.PUBLIC classifications for the
-        allele (the same consented set MME submits/serves). No k-anonymity floor - each
-        record is already a deliberate record-level public share. """
+        allele. No k-anonymity floor - each record is already a deliberate record-level
+        public share. """
     result = DatasetResult(dataset_id=CLASSIFICATIONS_DATASET_ID)
     if allele is None:
         return result
 
-    qs = mme_eligible_classifications().filter(classification__allele=allele)
+    qs = beacon_eligible_classifications().filter(classification__allele=allele)
     count = qs.count()
     result.count = count
     result.reportable_count = count

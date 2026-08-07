@@ -191,8 +191,8 @@ class AllVariantsGridFilterTest(TestCase):
 
 
 class AllVariantsGridSortTest(TestCase):
-    """ Only the allowlisted columns are sortable - sorting on a joined/unindexed column full-sorts the whole
-        result set before LIMIT, blowing the statement_timeout (issues #1279, #1651) """
+    """ Every page is served in genomic order - sorting on a joined/unindexed column full-sorts the whole
+        result set before LIMIT, blowing the statement_timeout (issues #1279, #1651, #1663) """
 
     @classmethod
     def setUpTestData(cls):
@@ -204,17 +204,19 @@ class AllVariantsGridSortTest(TestCase):
     def _grid(self) -> AllVariantsGrid:
         return AllVariantsGrid(self.user, self.genome_build.name)
 
-    def test_non_allowlisted_sort_falls_back_to_pk(self):
+    def test_requested_sort_is_replaced_by_genomic_order(self):
+        """ A hand-crafted grid URL can't get a joined column sorted - sidx is ignored either way """
         grid = self._grid()
-        sorted_qs = grid._sort_items(grid._get_base_queryset(), sidx="variantannotation__gene_symbol", sord="asc")
-        self.assertEqual(["-pk"], list(sorted_qs.query.order_by))
+        for sidx in ["variantannotation__gene_symbol", "id"]:
+            sorted_qs = grid._sort_items(grid._get_base_queryset(), sidx=sidx, sord="asc")
+            self.assertEqual(list(AllVariantsGrid.DEFAULT_ORDER_BY), list(sorted_qs.query.order_by),
+                             f"sidx={sidx} should be served in genomic order")
 
-    def test_allowlisted_sort_kept_with_pk_tiebreaker(self):
-        grid = self._grid()
-        sorted_qs = grid._sort_items(grid._get_base_queryset(), sidx="id", sord="asc")
-        order_by = list(sorted_qs.query.order_by)
-        self.assertEqual("-pk", order_by[-1])
-        self.assertGreater(len(order_by), 1)
+    def test_genomic_order_leads_with_the_locus_index_and_ends_with_a_tiebreaker(self):
+        """ (contig, position) is the leading edge of snpdb_locus's unique index, so a contig-filtered
+            page streams off it; the pk tiebreaker keeps pagination stable """
+        self.assertEqual(("locus__contig_id", "locus__position"), AllVariantsGrid.DEFAULT_ORDER_BY[:2])
+        self.assertEqual("pk", AllVariantsGrid.DEFAULT_ORDER_BY[-1])
 
     def test_colmodels_outside_allowlist_not_sortable(self):
         grid = self._grid()
@@ -226,9 +228,10 @@ class AllVariantsGridSortTest(TestCase):
             else:
                 self.assertIs(False, cm.get("sortable"))
 
-    def test_default_sort_is_id(self):
+    def test_default_sort_is_genomic_position(self):
         grid = self._grid()
-        self.assertEqual("id", grid.extra_config["sortname"])
+        self.assertEqual("locus__position", grid.extra_config["sortname"])
+        self.assertEqual("asc", grid.extra_config["sortorder"])
 
 
 class AllVariantsFilterPersistenceTest(TestCase):

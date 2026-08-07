@@ -3,6 +3,8 @@ The classification datatable's query count must not grow with the number of
 classification rows returned - per-row work in server renderers is the main
 N+1 risk in DataTables endpoints (row data itself comes from .values()).
 """
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import Client
@@ -14,7 +16,9 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
     create_classification_for_sample_and_variant_objects,
 )
 from library.django_utils.unittest_utils import URLTestCase, production_query_count
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Variant
+from snpdb.tests.utils.mock_clingen_api import MockServerErrorClinGenAlleleRegistryAPI
 
 
 class ClassificationDatatableScalingTest(URLTestCase):
@@ -36,12 +40,18 @@ class ClassificationDatatableScalingTest(URLTestCase):
 
     @classmethod
     def _create_classifications(cls, variants):
-        for variant in variants:
-            classification = create_classification_for_sample_and_variant_objects(
-                cls.user, cls.lab, None, variant, cls.genome_build,
-                annotation_version=cls.annotation_version)
-            classification.patch_value({"clinical_significance": "VUS"}, user=cls.user, save=True)
-            classification.publish_latest(cls.user)
+        """ Autopopulate asks ClinGen for an allele ID per variant. What's measured here is the
+            datatable's query count, not allele registration, so serve the unreachable-registry
+            response rather than needing a recorded one per fixture variant - autopopulate records
+            the error and carries on. """
+        with mock.patch.object(ClinGenAlleleRegistryAPI, "override_class",
+                               MockServerErrorClinGenAlleleRegistryAPI):
+            for variant in variants:
+                classification = create_classification_for_sample_and_variant_objects(
+                    cls.user, cls.lab, None, variant, cls.genome_build,
+                    annotation_version=cls.annotation_version)
+                classification.patch_value({"clinical_significance": "VUS"}, user=cls.user, save=True)
+                classification.publish_latest(cls.user)
 
     def _datatable_production_query_count(self, client) -> int:
         url = reverse('classification_datatables')
