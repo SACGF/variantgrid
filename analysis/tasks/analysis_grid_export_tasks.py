@@ -48,6 +48,8 @@ def get_grid_downloadable_file_params_hash(pk, export_type):
 
 
 def update_cgf_progress_iterator(iterator, cgf_id, total_records, update_size):
+    """ Wraps the export's rows iterator - the file iterator yields a chunk of rows at a time, so
+        counting its yields would under-report progress by the chunk size """
     update_size = int(update_size)  # make sure int so modulus below will hit
     cgf_qs = CachedGeneratedFile.objects.filter(id=cgf_id)
     cgf_qs.update(progress=0)
@@ -64,23 +66,26 @@ def _write_node_to_cached_generated_file(cgf, analysis, node, name, export_type)
     basename = "_".join([name_from_filename(name), "annotated", f"v{analysis.annotation_version.pk}",
                          str(analysis.genome_build)])
     request = FakeRequest(user=admin_bot())
-    basename, file_iterator = node_grid_get_export_iterator(request, node, export_type, basename=basename)
+    total_records = node.count
+    update_size = max(1000, total_records / 100)  # 1% or every 1k records
+
+    def row_wrapper(rows):
+        return update_cgf_progress_iterator(rows, cgf.pk, total_records, update_size)
+
+    basename, file_iterator = node_grid_get_export_iterator(request, node, export_type, basename=basename,
+                                                            row_wrapper=row_wrapper)
     open_func = open
     if export_type == 'vcf':
         open_func = gzip.open
         basename += ".gz"
-
-    total_records = node.count
-    update_size = max(1000, total_records / 100)  # 1% or every 1k records
-    update_progress_iterator = update_cgf_progress_iterator(file_iterator, cgf.pk, total_records, update_size)
 
     media_root_filename = os.path.join(settings.GENERATED_DIR, cgf.generator, str(cgf.pk), basename)
     logging.info("Starting to write %s", media_root_filename)
     try:
         mk_path_for_file(media_root_filename)
         with open_func(media_root_filename, "wt") as f:
-            for line in update_progress_iterator:
-                f.write(line)  # Already has newline
+            for chunk in file_iterator:
+                f.write(chunk)  # Already has newline
 
         if export_type == 'csv':
             original_filename = media_root_filename

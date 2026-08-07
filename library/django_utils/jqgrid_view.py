@@ -13,6 +13,11 @@ from library.utils import StashFile, nice_class_name
 from library.utils.date_utils import local_date_string
 
 
+# Rows written per yielded chunk - one chunk per row costs far more in WSGI/nginx (and file write)
+# overhead than it saves in memory
+EXPORT_ROWS_PER_CHUNK = 1000
+
+
 class JQGridViewOp:
     CONFIG = "config"
     HANDLER = "handler"
@@ -143,11 +148,14 @@ def grid_export_csv(colmodels, items) -> Iterator[str]:
     writer.writerow(header)
 
     yield pseudo_buffer.value
-    for obj in items:
+    for i, obj in enumerate(items, start=1):
         # labels dict is in same sorted order as header
         row = [obj.get(k) for k in labels]
         writer.writerow(row)
-        yield pseudo_buffer.value
+        if i % EXPORT_ROWS_PER_CHUNK == 0:
+            yield pseudo_buffer.value
+    if remaining := pseudo_buffer.value:
+        yield remaining
 
 
 def colmodel_header_labels(colmodels, label_overrides=None):

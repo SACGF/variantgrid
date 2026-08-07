@@ -1,7 +1,7 @@
 import operator
 import re
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Optional
 
 from analysis.grids import ExportVariantGrid
@@ -9,7 +9,7 @@ from analysis.models import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
-from library.django_utils.jqgrid_view import grid_export_csv
+from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, grid_export_csv
 from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
@@ -21,7 +21,10 @@ TRANSCRIPT_REPLACE_BATCH_SIZE = 1000
 
 
 def node_grid_get_export_iterator(request, node, export_type, canonical_transcript_collection=None,
-                                  variant_tags_dict=None, basename: str = None, grid_kwargs: dict = None) -> tuple[str, Iterator[str]]:
+                                  variant_tags_dict=None, basename: str = None, grid_kwargs: dict = None,
+                                  row_wrapper: Callable = None) -> tuple[str, Iterator[str]]:
+    """ row_wrapper: wraps the rows iterator, e.g. so a Celery task can report progress per row -
+        the file iterator yields a chunk of rows at a time so is no use for counting """
 
     if grid_kwargs is None:
         grid_kwargs = {}
@@ -29,8 +32,7 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
         grid_kwargs = grid_kwargs.copy()
 
     if export_type == 'vcf':
-        # TODO: If we use the contig at a time method in ExportVariantGrid we can remove the sort by contig
-        grid_kwargs["order_by"] = ["locus__contig__name", "locus__position"]
+        # ExportVariantGrid emits genome build contig order, which is what the header declares
         grid_kwargs["af_show_in_percent"] = False
 
     extra_filters = request.GET.get("extra_filters")
@@ -45,7 +47,9 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
         basename += f"_{canonical_transcript_collection}"
         items = _replace_transcripts_iterator(grid, canonical_transcript_collection, items)
 
-    items = format_items_iterator(sample_ids, items, variant_tags_dict)
+    items = format_items_iterator(items, variant_tags_dict)
+    if row_wrapper:
+        items = row_wrapper(items)
 
     colmodels = grid.get_colmodels()
 
@@ -95,11 +99,14 @@ def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by
     writer = VCFWriter(pseudo_buffer, header_lines)
     yield pseudo_buffer.value  # header
 
-    for obj in items:
+    for i, obj in enumerate(items, start=1):
         chrom, pos, vcf_id, ref, alt, info, fmt, sample_calls = \
             _grid_item_to_vcf_row(info_dict, obj, sample_ids, samples, use_accession=use_accession)
         writer.write_record(chrom, pos, ref, alt, vcf_id=vcf_id, info=info, fmt=fmt, sample_calls=sample_calls)
-        yield pseudo_buffer.value
+        if i % EXPORT_ROWS_PER_CHUNK == 0:
+            yield pseudo_buffer.value
+    if remaining := pseudo_buffer.value:
+        yield remaining
 
 
 def _get_column_vcf_info():
@@ -203,8 +210,8 @@ def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accessio
     return chrom, pos, vcf_id, ref, alt, info or None, fmt, sample_calls
 
 
-def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] = None):
-    """ A few things are done in JS formatters, e.g. changing -1 to missing values (? in grid) and tags
+def format_items_iterator(items, variant_tags_dict: Optional[dict] = None):
+    """ A few things are done in JS formatters, e.g. tags
         We can't just add tags via node queryset (in monkey patch func above) as we'll get an issue with
         tacked on zygosity columns etc not being in GROUP BY or aggregate func. So, just patch items via iterator
 
@@ -213,16 +220,7 @@ def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] =
     if variant_tags_dict is None:
         variant_tags_dict = {}
 
-    SAMPLE_FIELDS = ["allele_depth", "allele_frequency", "read_depth", "genotype_quality", "phred_likelihood"]
-
     for item in items:
-        for sample_id in sample_ids:
-            for f in SAMPLE_FIELDS:
-                sample_field = f"sample_{sample_id}_ov_{f}"
-                val = item.get(sample_field)
-                if val and val == -1:
-                    item[sample_field] = "."
-
         if tags_global := item["tags_global"]:
             tag_counts = Counter(tags_global.split("|"))
             summarised_tags = []

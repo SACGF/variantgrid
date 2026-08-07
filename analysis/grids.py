@@ -1,6 +1,4 @@
-import logging
 import operator
-import time
 from collections import defaultdict
 from collections.abc import Callable
 from functools import reduce
@@ -11,7 +9,7 @@ from auditlog.models import LogEntry
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Case, F, IntegerField, Max, Q, QuerySet, Value, When
+from django.db.models import F, Max, Q, QuerySet
 from django.db.models.functions import Substr
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -43,7 +41,12 @@ from library.jqgrid.jqgrid_sql import get_overrides
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import JsonDataType, sha256sum_str, update_dict_of_dict_values
+from library.utils import (
+    JsonDataType,
+    iter_fixed_chunks,
+    sha256sum_str,
+    update_dict_of_dict_values,
+)
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
 from patients.models_enums import Zygosity
@@ -241,6 +244,8 @@ class VariantGrid(AbstractVariantGrid):
 
         server_side_formatter = packed_data_formatter
         if column == "samples_filters" and cohort.vcf:
+            filter_formatter = VCFFilter.get_formatter(sample.vcf)  # Per VCF - look up once, not per row
+
             def sample_filters_formatter(row, field):
                 """ Need to unpack then switch filters """
                 # Sample Filters can be "."
@@ -248,7 +253,6 @@ class VariantGrid(AbstractVariantGrid):
                 if val is None:
                     return '.'
                 # empty string ('') is PASS
-                filter_formatter = VCFFilter.get_formatter(sample.vcf)
                 row[field] = val
                 return filter_formatter(row, field)
 
@@ -356,61 +360,33 @@ class VariantGrid(AbstractVariantGrid):
 class ExportVariantGrid(VariantGrid):
     """ This is for exporting into VCF/CSV - ie not using any paging """
 
-    def __init__(self, *args, **kwargs):
-        self.order_by = kwargs.pop("order_by", None)
-        super().__init__(*args, **kwargs)
+    EXPORT_PK_BATCH_SIZE = 10000
 
     def sort_items(self, request, items):
-        if self.order_by:
-            items = items.order_by(*self.order_by)
+        """ Export order is set by paginate_items (genome build contig, then position), so the grid's
+            requested sidx/sord is ignored - applying it here would be both wrong and expensive """
         return items
 
-    @staticmethod
-    def _iter_time(items):
-        start = time.time()
-        yield from items
-        end = time.time()
-        logging.debug("Download took %s seconds", end - start)
+    def _iter_by_pk_batches(self, items):
+        """ Take the PKs a contig at a time off the node queryset - that has no annotation joins or
+            get_variantgrid_extra_annotate subqueries, so it stays inside the contig/position index -
+            then run the full annotated grid queryset against batches of those PKs.
 
-    @staticmethod
-    def _iter_by_contigs(genome_build, items):
-        for contig in genome_build.standard_contigs:
-            # print(f"getting {contig}")
-            contig_items = items.filter(locus__contig=contig).iterator()
-            yield from contig_items
-
-    def _get_export_variant_ids(self) -> Optional[list[int]]:
-        """ Explicit-PK substitution for small nodes @see AnalysisNode.get_cached_node_pks.
-            None means the node is too big (or its count is unknown) to materialise """
-        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        if max_size and self.node.count is not None and self.node.count <= max_size:
-            return AnalysisNode.get_cached_node_pks(self.node)
-        return None
-
-    @staticmethod
-    def _iter_by_variant_ids(genome_build, items, variant_ids):
-        """ Known PKs bound the work, so the annotation joins only run for those rows - one query, no timeout
-            risk. Ordered by contig then position to match the genomic order _iter_by_contigs produces """
-        standard_contigs = list(genome_build.standard_contigs)
-        contig_order = Case(*[When(locus__contig=contig, then=Value(i)) for i, contig in enumerate(standard_contigs)],
-                            output_field=IntegerField())
-        items = items.filter(pk__in=variant_ids, locus__contig__in=standard_contigs)
-        items = items.annotate(contig_export_order=contig_order)
-        return items.order_by("contig_export_order", "locus__position").iterator()
+            Every query is bounded by the variant PK index and the annotation joins run once per row at
+            any node size. A contig with no variants costs one cheap index probe and no annotated query. """
+        node_qs = self.node.get_queryset()
+        for contig in self.node.analysis.genome_build.standard_contigs:
+            contig_pks_qs = node_qs.filter(locus__contig=contig).order_by("locus__position", "pk")
+            # A node queryset can fan out over a multi-valued join, so de-dupe (keeping order) to stop
+            # a repeated PK straddling a batch boundary and being exported twice
+            contig_pks = list(dict.fromkeys(contig_pks_qs.values_list("pk", flat=True)))
+            for batch in iter_fixed_chunks(contig_pks, self.EXPORT_PK_BATCH_SIZE):
+                batch_items = items.filter(pk__in=batch).order_by("locus__position", "pk")
+                yield from batch_items.iterator()
 
     def paginate_items(self, request, items):
-        # This is the step after queryset is sorted
-        # We want everything, but retrieve a contig at a time so each query stays under the statement timeout -
-        # the node queryset joined to variant annotation is too slow to run across the whole genome in one go.
-        # Small nodes skip that by substituting their (cached) variant PKs, which bounds the query instead.
-        genome_build = self.node.analysis.genome_build
-        variant_ids = self._get_export_variant_ids()
-        if variant_ids is not None:
-            items = self._iter_by_variant_ids(genome_build, items, variant_ids)
-        else:
-            items = self._iter_by_contigs(genome_build, items)
-        # items = self._iter_time(items)
-        return None, None, items
+        # This is the step after queryset is sorted - we want everything, with no paging
+        return None, None, self._iter_by_pk_batches(items)
 
 
 class AnalysesGrid(JqGridUserRowConfig):

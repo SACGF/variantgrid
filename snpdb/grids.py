@@ -491,7 +491,6 @@ class AbstractVariantGrid(JqGridUserRowConfig):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._count = None
         self.queryset_is_sorted = False
 
     def _get_standard_overrides(self, af_show_in_percent):
@@ -570,7 +569,8 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         qs = qs.filter(Q(variantallele__isnull=True) | Q(variantallele__genome_build=self.genome_build))
         # Annotate so we can use global_variant_zygosity in grid columns
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
-        qs = self.filter_items(request, qs)  # JQGrid filtering from request
+        # JQGrid request filtering is applied by JqGrid.get_items on our result - doing it here as well
+        # adds a second JOIN per filtered relation, which multiplies rows
         if q := self._get_q():
             qs = qs.filter(q)
 
@@ -601,10 +601,7 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         return field_names
 
     def get_count(self, request):
-        if self._count is None:
-            queryset = self._get_queryset(request)
-            self._count = queryset.count()
-        return self._count
+        raise NotImplementedError()
 
 
 class TagColorsCollectionColumns(DatatableConfig[TagColorsCollection]):

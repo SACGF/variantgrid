@@ -332,12 +332,33 @@ class JqGrid:
         if field_formatters:
 
             def iter_formatted_items(rows):
+                rows = iter(rows)
+                try:
+                    first_row = next(rows)
+                except StopIteration:
+                    return
+
+                # Rows are .values() dicts so they all have the same keys - try each formatter against
+                # the first row to see which ones apply, rather than raising and swallowing a KeyError
+                # per absent field on every row. Bound per call as callers pass different row shapes.
+                formatters = []
+                for f, formatter in field_formatters.items():
+                    try:
+                        first_row[f] = formatter(first_row, f)
+                    except KeyError:
+                        continue  # field may not be in columns returned...
+                    except ValueError:
+                        pass  # formatter applies, it just can't handle this value
+                    formatters.append((f, formatter))
+                yield first_row
+
                 for row in rows:
-                    for f, formatter in field_formatters.items():
+                    for f, formatter in formatters:
                         try:
                             row[f] = formatter(row, f)
-                        except (KeyError, ValueError):
-                            pass  # field may not be in columns returned...
+                        except ValueError:
+                            pass  # formatter can't handle this value
+
                     yield row
 
             items = iter_formatted_items(items)

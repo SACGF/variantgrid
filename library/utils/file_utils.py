@@ -111,18 +111,21 @@ class IteratorFile:
 
 
 class StashFile:
-    """ File-like object that holds a value """
+    """ File-like object that holds a value.
+
+        Parts are accumulated and joined on read - repeated string concatenation goes quadratic
+        once many writes stack up before a read (as when buffering rows for export) """
 
     def __init__(self):
-        self.data = ''
+        self.parts = []
 
     def write(self, value):
-        self.data += value
+        self.parts.append(value)
 
     @property
     def value(self):
-        data = self.data
-        self.data = ''
+        data = "".join(self.parts)
+        self.parts = []
         return data
 
 
