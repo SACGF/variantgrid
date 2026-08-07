@@ -2,7 +2,9 @@
 Uploaded VCFs are first passed through this command to fix things that will cause bcftools to die (eg bad contigs)
 
 It also fails the import early on unsorted VCFs, which would otherwise only be noticed by 'bcftools index'
-several pipeline stages later.
+several pipeline stages later. When '--unsorted-marker-file' is given, the reason is written there before
+failing, so the caller can tell an unsorted VCF apart from any other failure and retry through 'bcftools sort'
+(pass '--allow-unsorted' on that second pass).
 
 We also rename chromosomes to the RefSeq contig IDs used in our fasta file
 
@@ -33,6 +35,8 @@ class Command(BaseCommand):
         parser.add_argument('--skipped-contigs-stats-file', help='File name')
         parser.add_argument('--skipped-records-stats-file', help='File name')
         parser.add_argument('--skipped-filters-stats-file', help='File name')
+        parser.add_argument('--unsorted-marker-file', help='Write reason here if VCF is unsorted')
+        parser.add_argument('--allow-unsorted', action='store_true', help='Skip the sorted check')
 
     @staticmethod
     def _write_header(vcf_header_lines: list[str]):
@@ -47,6 +51,8 @@ class Command(BaseCommand):
         skipped_contigs_stats_file = options.get("skipped_contigs_stats_file")
         skipped_records_stats_file = options.get("skipped_records_stats_file")
         skipped_filters_stats_file = options.get("skipped_filters_stats_file")
+        unsorted_marker_file = options.get("unsorted_marker_file")
+        allow_unsorted = options.get("allow_unsorted")
 
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         genome_fasta = GenomeFasta.get_for_genome_build(genome_build)
@@ -77,7 +83,7 @@ class Command(BaseCommand):
 
         first_non_header_line = True
         defined_filters = None
-        sort_checker = VCFSortChecker()
+        sort_checker = None if allow_unsorted else VCFSortChecker()
         for line_number, line in enumerate(f, start=1):
             if line[0] == '#':
                 if not replace_header:
@@ -143,10 +149,13 @@ class Command(BaseCommand):
                     columns[VCFColumns.FILTER] = filter_column
 
                 # Only the records we write need to be sorted - skipped ones can't break the downstream index
-                try:
-                    sort_checker.check(contig_id, position, chrom, line_number)
-                except UnsortedVCFError as e:
-                    raise CommandError(f"VCF is not sorted. {e}") from e
+                if sort_checker:
+                    try:
+                        sort_checker.check(contig_id, position, chrom, line_number)
+                    except UnsortedVCFError as e:
+                        reason = f"VCF is not sorted. {e}"
+                        self._write_unsorted_marker(unsorted_marker_file, reason)
+                        raise CommandError(reason) from e
 
                 sys.stdout.write("\t".join(columns))
 
@@ -165,6 +174,12 @@ class Command(BaseCommand):
         reader = Reader(stream)
         defined_filters.update(reader.filters.keys())
         return defined_filters
+
+    @staticmethod
+    def _write_unsorted_marker(filename, reason: str):
+        if filename:
+            with open(filename, "w") as f:
+                f.write(reason + "\n")
 
     @staticmethod
     def _write_skip_counts(counts, filename):

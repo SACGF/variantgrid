@@ -1,7 +1,9 @@
 import glob
 import logging
 import os
+from dataclasses import dataclass
 from subprocess import PIPE, CalledProcessError, Popen
+from typing import Optional
 
 import pandas as pd
 from django.conf import settings
@@ -27,6 +29,16 @@ from upload.tasks.vcf.unknown_variants_task import (
     AnnotateImportedVCFTask,
     SeparateUnknownVariantsTask,
 )
+
+MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
+
+VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
+SORT_VCF_SUB_STEP = "sort_vcf"
+VCF_CLEAN_ALTS_SUB_STEP = "vcf_clean_alts"
+REMOVE_HEADER_SUB_STEP = "remove_header"
+SPLIT_VCF_SUB_STEP = "split_vcf"
+
+UNSORTED_VCF_MESSAGE = "VCF was not sorted - records have been sorted for import"
 
 
 def get_bcftools_tool_version(bcftools_command):
@@ -79,56 +91,86 @@ def _write_cleaned_header(genome_build, upload_pipeline, vcf_filename) -> str:
     return cleaned_vcf_header_filename
 
 
-def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
-    MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
+@dataclass
+class PreprocessFiles:
+    """ Paths the pipe stages read/write. Grouped so a sort retry can clear everything the failed
+        attempt left behind before running again """
+    vcf_filename: str
+    cleaned_vcf_header: str
+    split_vcf_dir: str
+    unsorted_marker: str
+    skipped_contigs_stats: str
+    skipped_records_stats: str
+    skipped_filters_stats: str
+    skipped_alts_stats: str
+    converted_alts_stats: str
+    swap_skipped: Optional[str] = None
 
-    VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
-    VCF_CLEAN_ALTS_SUB_STEP = "vcf_clean_alts"
-    REMOVE_HEADER_SUB_STEP = "remove_header"
-    SPLIT_VCF_SUB_STEP = "split_vcf"
+    @property
+    def written_by_pipe(self) -> list[str]:
+        filenames = [self.unsorted_marker, self.skipped_contigs_stats, self.skipped_records_stats,
+                     self.skipped_filters_stats, self.skipped_alts_stats, self.converted_alts_stats]
+        if self.swap_skipped:
+            filenames.append(self.swap_skipped)
+        return filenames
 
-    genome_build = upload_step.genome_build
-    _ = genome_build.reference_fasta  # Fails if not available.
 
-    vcf_filename = upload_step.input_filename
-    if not os.path.exists(vcf_filename):
-        raise FileNotFoundError(f"Can't access vcf: '{vcf_filename}'")
-
-    pipe_commands = {}  # Use dict order to decide pipeline order
-    sub_steps = {}
-    if vcf_filename.endswith(".gz"):
-        pipe_commands["zcat"] = [settings.BASH_ZCAT, vcf_filename]
-    else:
-        pipe_commands["cat"] = ["cat", vcf_filename]
-
-    upload_pipeline = upload_step.upload_pipeline
+def _get_preprocess_files(upload_pipeline, vcf_filename: str, cleaned_vcf_header: str,
+                          disable_swap: bool) -> PreprocessFiles:
     vcf_name = name_from_filename(vcf_filename, remove_gz=True)
 
-    skipped_contigs_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_contigs.tsv")
-    skipped_records_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_records.tsv")
-    skipped_filters_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_filters.tsv")
-    skipped_alts_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_alts.tsv")
-    converted_alts_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.converted_alts.tsv")
-    swap_skipped_file = None
-    if disable_swap:
-        swap_skipped_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.swap_skipped.tsv")
+    def _processing_filename(suffix):
+        return get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.{suffix}")
 
-    cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_filename)
+    swap_skipped_file = _processing_filename("swap_skipped.tsv") if disable_swap else None
+    return PreprocessFiles(vcf_filename=vcf_filename,
+                           cleaned_vcf_header=cleaned_vcf_header,
+                           split_vcf_dir=upload_pipeline.get_pipeline_processing_subdir("split_vcf"),
+                           unsorted_marker=_processing_filename("unsorted.txt"),
+                           skipped_contigs_stats=_processing_filename("skipped_contigs.tsv"),
+                           skipped_records_stats=_processing_filename("skipped_records.tsv"),
+                           skipped_filters_stats=_processing_filename("skipped_filters.tsv"),
+                           skipped_alts_stats=_processing_filename("skipped_alts.tsv"),
+                           converted_alts_stats=_processing_filename("converted_alts.tsv"),
+                           swap_skipped=swap_skipped_file)
+
+
+def _build_pipe_commands(upload_step, files: PreprocessFiles, disable_swap=False, sort_vcf=False) -> tuple[dict, dict]:
+    """ Returns (pipe_commands, sub_steps) - pipe_commands dict order is the pipeline order.
+        sort_vcf: splice 'bcftools sort' in after the clean/filter stage, which then skips its sorted check """
+    genome_build = upload_step.genome_build
+    upload_pipeline = upload_step.upload_pipeline
+    vcf_name = name_from_filename(files.vcf_filename, remove_gz=True)
+
+    pipe_commands = {}  # Use dict order to decide pipeline order
+    if files.vcf_filename.endswith(".gz"):
+        pipe_commands["zcat"] = [settings.BASH_ZCAT, files.vcf_filename]
+    else:
+        pipe_commands["cat"] = ["cat", files.vcf_filename]
 
     manage_command = settings.MANAGE_COMMAND
     read_variants_cmd = manage_command + ["vcf_clean_and_filter",
                                           "--genome-build",
                                           genome_build.name,
                                           "--replace-header",
-                                          cleaned_vcf_header_filename,
+                                          files.cleaned_vcf_header,
                                           "--skipped-contigs-stats-file",
-                                          skipped_contigs_stats_file,
+                                          files.skipped_contigs_stats,
                                           "--skipped-records-stats-file",
-                                          skipped_records_stats_file,
+                                          files.skipped_records_stats,
                                           "--skipped-filters-stats-file",
-                                          skipped_filters_stats_file]
+                                          files.skipped_filters_stats]
+    if sort_vcf:
+        read_variants_cmd.append("--allow-unsorted")
+    else:
+        read_variants_cmd += ["--unsorted-marker-file", files.unsorted_marker]
     pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
-    sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP] = create_sub_step(upload_step, VCF_CLEAN_AND_FILTER_SUB_STEP, read_variants_cmd)
+
+    if sort_vcf:
+        # Sorts into the order of the cleaned header, whose contigs the stage above has already renamed to.
+        # Trailing separator so bcftools treats this as a directory rather than a temp file prefix
+        sort_temp_dir = os.path.join(upload_pipeline.get_pipeline_processing_subdir("sort_tmp"), "")
+        pipe_commands[SORT_VCF_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "sort", "--temp-dir", sort_temp_dir]
 
     pipe_commands[UploadStep.NORMALIZE_SUB_STEP] = [
         settings.BCFTOOLS_COMMAND, "norm",
@@ -145,30 +187,28 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
     # We have performed multi-allelic splitting above, so that we can now filter out bad alts (but leave rest of record)
     clean_alts_cmd = manage_command + [
         "vcf_clean_alts",
-        "--skipped-records-stats-file", skipped_alts_stats_file,
-        "--converted-records-stats-file", converted_alts_stats_file,
+        "--skipped-records-stats-file", files.skipped_alts_stats,
+        "--converted-records-stats-file", files.converted_alts_stats,
     ]
     if disable_swap:
-        clean_alts_cmd += ["--disable-swap", "--swap-skipped-file", swap_skipped_file]
+        clean_alts_cmd += ["--disable-swap", "--swap-skipped-file", files.swap_skipped]
     pipe_commands[VCF_CLEAN_ALTS_SUB_STEP] = clean_alts_cmd
-
-    norm_substep_names = [UploadStep.NORMALIZE_SUB_STEP]
 
     # Split up the VCF
     split_file_rows = upload_step.split_file_rows or settings.VCF_IMPORT_FILE_SPLIT_ROWS
-    split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
-    # Pass paths via env vars rather than interpolating them into the shell --filter string,
-    # so that metacharacters in paths cannot affect shell parsing.
-    # split runs the filter via sh -c; $VG_HEADER_FILE/$VG_SPLIT_VCF_DIR are expanded there.
-    split_env = {**os.environ, 'VG_HEADER_FILE': cleaned_vcf_header_filename, 'VG_SPLIT_VCF_DIR': split_vcf_dir}
     pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
                                          "--lines", str(split_file_rows),
                                          "--filter='bash -c \"set -eo pipefail; { cat $VG_HEADER_FILE; cat; } | bgzip -c > $VG_SPLIT_VCF_DIR/$FILE\"'"]
 
-    for sub_step_name in norm_substep_names:
-        sub_step_commands = pipe_commands[sub_step_name]
-        sub_steps[sub_step_name] = create_sub_step(upload_step, sub_step_name, sub_step_commands)
+    sub_steps = {}
+    for sub_step_name in [VCF_CLEAN_AND_FILTER_SUB_STEP, SORT_VCF_SUB_STEP, UploadStep.NORMALIZE_SUB_STEP]:
+        if sub_step_commands := pipe_commands.get(sub_step_name):
+            sub_steps[sub_step_name] = create_sub_step(upload_step, sub_step_name, sub_step_commands)
 
+    return pipe_commands, sub_steps
+
+
+def _run_pipe(pipe_commands: dict, sub_steps: dict, split_env: dict, upload_pipeline):
     piped_command = ' | '.join([' '.join(command_with_args) for command_with_args in pipe_commands.values()])
 
     # if POPEN_SHELL=True we're running this all as one command as native shell text
@@ -241,9 +281,62 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
             if p.returncode:
                 raise CalledProcessError(p.returncode, p_cmd, stderr=stderr_output)
 
+
+def _reset_for_retry(files: PreprocessFiles, sub_steps: dict):
+    """ Put the pipeline back to how it was before the failed attempt, so the next one starts clean """
+    for sub_step in sub_steps.values():
+        sub_step.delete()
+
+    for split_filename in glob.glob(os.path.join(files.split_vcf_dir, "*")):
+        os.remove(split_filename)
+
+    for filename in files.written_by_pipe:
+        if os.path.exists(filename):
+            os.remove(filename)
+
+
+def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
+    genome_build = upload_step.genome_build
+    _ = genome_build.reference_fasta  # Fails if not available.
+
+    vcf_filename = upload_step.input_filename
+    if not os.path.exists(vcf_filename):
+        raise FileNotFoundError(f"Can't access vcf: '{vcf_filename}'")
+
+    upload_pipeline = upload_step.upload_pipeline
+    cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_filename)
+    files = _get_preprocess_files(upload_pipeline, vcf_filename, cleaned_vcf_header_filename, disable_swap)
+
+    # Pass paths via env vars rather than interpolating them into the shell --filter string,
+    # so that metacharacters in paths cannot affect shell parsing.
+    # split runs the filter via sh -c; $VG_HEADER_FILE/$VG_SPLIT_VCF_DIR are expanded there.
+    split_env = {**os.environ,
+                 'VG_HEADER_FILE': files.cleaned_vcf_header,
+                 'VG_SPLIT_VCF_DIR': files.split_vcf_dir}
+
+    if os.path.exists(files.unsorted_marker):
+        os.remove(files.unsorted_marker)  # Left behind by an earlier attempt at this step
+
+    pipe_commands, sub_steps = _build_pipe_commands(upload_step, files, disable_swap=disable_swap)
+    sorted_vcf = False
+    try:
+        _run_pipe(pipe_commands, sub_steps, split_env, upload_pipeline)
+    except CalledProcessError:
+        if not os.path.exists(files.unsorted_marker):
+            raise
+        with open(files.unsorted_marker) as f:
+            logging.info("Re-running through '%s sort': %s", settings.BCFTOOLS_COMMAND, f.read().strip())
+        _reset_for_retry(files, sub_steps)
+        pipe_commands, sub_steps = _build_pipe_commands(upload_step, files, disable_swap=disable_swap, sort_vcf=True)
+        _run_pipe(pipe_commands, sub_steps, split_env, upload_pipeline)
+        sorted_vcf = True
+
     clean_sub_step = sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP]
-    if os.path.exists(skipped_contigs_stats_file):
-        df = pd.read_csv(skipped_contigs_stats_file, header=None, sep='\t', index_col=0)
+    if sorted_vcf:
+        SimpleVCFImportInfo.objects.create(upload_step=clean_sub_step, message_string=UNSORTED_VCF_MESSAGE)
+
+    if os.path.exists(files.skipped_contigs_stats):
+        df = pd.read_csv(files.skipped_contigs_stats, header=None, sep='\t', index_col=0)
         if not df.empty:
             import_info = VCFSkippedContigs.objects.create(upload_step=clean_sub_step)
 
@@ -252,16 +345,16 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
                                                 contig=contig,
                                                 num_skipped=count)
 
-    _store_vcf_stats(skipped_records_stats_file, clean_sub_step, "records")
-    _store_vcf_stats(skipped_filters_stats_file, clean_sub_step, "FILTER")
-    _store_vcf_stats(skipped_alts_stats_file, clean_sub_step, "ALTs")
-    _store_vcf_stats(converted_alts_stats_file, clean_sub_step, "ALTs", operation='Converted')
+    _store_vcf_stats(files.skipped_records_stats, clean_sub_step, "records")
+    _store_vcf_stats(files.skipped_filters_stats, clean_sub_step, "FILTER")
+    _store_vcf_stats(files.skipped_alts_stats, clean_sub_step, "ALTs")
+    _store_vcf_stats(files.converted_alts_stats, clean_sub_step, "ALTs", operation='Converted')
 
     # Create this here so downstream tasks (running in parallel) can all link against the same one
     ModifiedImportedVariants.get_for_pipeline(upload_pipeline)
     vcf_import_annotate_dir = upload_pipeline.get_pipeline_processing_subdir("vcf_import_annotate")
     sort_order = upload_pipeline.get_max_step_sort_order()
-    for split_vcf_filename in glob.glob(f"{split_vcf_dir}/*.vcf.gz"):
+    for split_vcf_filename in glob.glob(f"{files.split_vcf_dir}/*.vcf.gz"):
         sort_order += 1
         separate_upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                          name="Separate Unknown Variants Task",
@@ -290,7 +383,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
         UploadStepMultiFileOutput.objects.create(upload_step=upload_step,
                                                  output_filename=output_filename)
 
-    return swap_skipped_file
+    return files.swap_skipped
 
 
 def _store_vcf_stats(filename, upload_step, description, operation='Skipped'):
