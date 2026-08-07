@@ -52,9 +52,6 @@ class FranklinExportRow(ExportRow):
 
     @export_column("Classification Date")
     def classification_date(self):
-        # max_date = max(cm.curated_date_check for cm in self.data.cms)
-        # return max_date.relevant_date.date_str
-
         # hardcoded to 2000-01-01 so as to not change and cause duplicate records
         # as well as be old enough that it shouldn't be suggested to copy the details into a new record
         return "2000-01-01"
@@ -117,9 +114,10 @@ class FranklinExportRow(ExportRow):
     def classification_system(self):
         return str(self.mode)
 
-    @export_column("Conditions")
-    def conditions_column(self):
-        return f"{settings.SITE_NAME} {self.mode[0]}{self.mode[1:].lower()}"
+    # Franklin (non-free version) only allows a subset of valid conditions, so just leave condition blank
+    # @export_column("Conditions")
+    # def conditions_column(self):
+    #     return f"{settings.SITE_NAME} {self.mode[0]}{self.mode[1:].lower()}"
 
     def conditions(self) -> list[str]:
         # Don't make condition a column, as if it changes it'll go into a new section in Franklin
@@ -188,6 +186,11 @@ class FranklinExportRow(ExportRow):
             return "hg19"
         else:
             raise ValueError(f"Unsupported genome build for Franklin {genome_build}")
+
+    @export_column("Classification Tags")
+    def classification_tags(self):
+        # TODO make this a setting
+        return "Shariant"
 
     # Inheritance is a bit messy, not including in export
     # it also might subdivide the rows
