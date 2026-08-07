@@ -165,7 +165,8 @@ class Test(URLTestCase):
             # Test accession has no version
             ("view_transcript_accession", {"transcript_accession": self.transcript_version.transcript_id}, 200),
             # ("api_panel_app_gene_evidence", gene_symbol_kwargs, 200),
-            ("api_gene_info", gene_symbol_kwargs, 200),
+            ("api_gene_detail", {"gene_id": self.gene.pk}, 200),
+            ("api_gene_symbol_detail", gene_symbol_kwargs, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 
@@ -249,7 +250,6 @@ class Test(URLTestCase):
 # ('api/gene_list/modify/<int:pk>', views_rest.ModifyGeneListView.as_view(), name='api_modify_gene_list'),
 # ('api/gene_list/create', views_rest.CreateGeneListView.as_view(), name='api_create_gene_list'),
 # ('api/named_gene_list/<category__name>/<name>', views_rest.NamedGeneListView.as_view(), name='api_named_gene_list'),
-# ('api/gene/batch_info', views_rest.BatchGeneInfoView.as_view(), name='api_batch_gene_info'),
 # ('api/text_to_gene_list', views_rest.TextToGeneListView.as_view(), name='api_text_to_gene_list'),
 
 

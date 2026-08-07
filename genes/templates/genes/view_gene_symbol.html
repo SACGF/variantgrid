@@ -18,7 +18,7 @@
 {% load settings_tags %}
 {% load classification_tags %}
 {% block title %}{{ gene_symbol }}{% endblock title %}
-{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% block submenu %}{% menu_bar_genes %}{% endblock %}
 
 {% block head %}
     {% render_tag_styles_and_formatter %}
@@ -43,9 +43,6 @@
 
         .filter-message {
             margin-right: 10px;
-        }
-        .gene-icon {
-            float: none;
         }
         {% render_node_count_colors_css %}
     </style>
@@ -136,10 +133,6 @@
                 gcContainer.html('<i class="fa fa-spinner"></i>');
                 gcContainer.load("{% url 'gene_symbol_coverage_collection_graphs' genome_build.name gene_symbol.pk %}");
             {% endif %}
-
-            // copy gene info into summary
-            let geneInfo = $(".gene-info-container");
-            geneInfo.clone().appendTo($("#summary-gene-icons-container"));
         });
     </script>
 {% endblock head %}

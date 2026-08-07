@@ -4,6 +4,7 @@ A series of models that currently stores the combination of MONDO, OMIM, HPO & H
 """
 import functools
 import logging
+import operator
 import re
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
@@ -100,6 +101,39 @@ class OntologyService(models.TextChoices):
         MEDGEN[0],
         MeSH[0]
     })
+
+    # Alternate external spellings that differ from our canonical value (e.g. Monarch returns
+    # "Orphanet" for "ORPHA"). These can't be derived from the enum, so they're listed here.
+    # Prefixes that only differ by case are handled automatically by iterating the enum.
+    PREFIX_ALIASES: dict[str, str] = Constant({
+        "ORPHANET": ORPHANET[0],
+        "MIM": OMIM[0],
+        "HPO": HPO[0],
+    })
+
+    @classmethod
+    def resolve_prefix(cls, prefix: str) -> Optional['OntologyService']:
+        """ Map a (possibly aliased or differently-cased) prefix to a supported OntologyService,
+            or None if it isn't one we support (e.g. MPATH from the external Monarch search). """
+        upper = prefix.strip().upper()
+        # Canonical values matched case-insensitively - derived from the enum so a newly added
+        # OntologyService is recognised without touching PREFIX_ALIASES.
+        by_value = {service.value.upper(): service for service in cls}
+        if service := by_value.get(upper):
+            return service
+        if canonical := cls.PREFIX_ALIASES.get(upper):
+            return cls(canonical)
+        return None
+
+    @classmethod
+    def is_supported_id(cls, term_id: str) -> bool:
+        """ True when term_id is a well-formed <prefix>:<postfix> id whose prefix is a supported
+            OntologyService. Unsupported ontologies (e.g. MPATH from the external Monarch search)
+            and malformed ids both return False. """
+        parts = re.split("[:|_]", term_id or "")
+        if len(parts) != 2:
+            return False
+        return cls.resolve_prefix(parts[0]) is not None
 
     @staticmethod
     def index_to_id(ontology_service: 'OntologyService', index: Union[int|str]):
@@ -295,22 +329,15 @@ class OntologyIdNormalized:
         if len(parts) != 2:
             raise ValueError(f"Can not convert {dirty_id} to a proper id")
 
-        prefix = parts[0].strip().upper()
+        raw_prefix = parts[0].strip()
         postfix = parts[1].strip()
 
-        if prefix in ("ORPHA", "ORPHANET"):  # Orphanet is the one ontology (so far) where the standard is sentance case
-            prefix = "ORPHA"
-        elif prefix.upper() == "MIM":
-            prefix = "OMIM"
-        elif prefix.upper() == "MEDGEN":
-            prefix = "MedGen"
+        if raw_prefix.upper() in ("MEDGEN", "MESH"):  # MedGen/MeSH postfixes are upper-cased letters
             postfix = postfix.upper()
-        elif prefix.upper() == "MESH":
-            prefix = "MeSH"
-            postfix = postfix.upper()
-        elif prefix.upper() == "HPO":
-            prefix = "HP"
-        prefix = OntologyService(prefix)
+
+        prefix = OntologyService.resolve_prefix(raw_prefix)
+        if prefix is None:
+            raise ValueError(f"'{raw_prefix}' is not a valid OntologyService")
 
         try:
             if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
@@ -772,6 +799,7 @@ class OntologyVersion(TimeStampedModel):
     ONTOLOGY_IMPORTS = {
         "gencc_import": (OntologyImportSource.GENCC,
                          ['https://search.thegencc.org/download/action/submissions-export-csv',
+                          'submissions-export-csv',  # bare basename some imports stored instead of the full URL
                           'gencc-submissions.csv']),
         "mondo_import": (OntologyImportSource.MONDO, ['mondo.json']),
         "hp_owl_import": (OntologyImportSource.HPO, ['hp.owl']),
@@ -790,14 +818,19 @@ class OntologyVersion(TimeStampedModel):
 
     @staticmethod
     def latest(validate=True) -> Optional['OntologyVersion']:
-        oi_qs = OntologyImport.objects.all()
+        # Fetch candidates for all import fields in one query, then pick the latest per field
+        import_q_list = [Q(import_source=import_source, filename__in=filenames)
+                         for import_source, filenames in OntologyVersion.ONTOLOGY_IMPORTS.values()]
+        candidate_imports = OntologyImport.objects.filter(functools.reduce(operator.or_, import_q_list)).order_by("pk")
+
         kwargs = {}
-        missing_fields = set()
-        for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
-            if ont_import := oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last():
-                kwargs[field] = ont_import
-            elif field not in OntologyVersion.OPTIONAL_IMPORTS:
-                missing_fields.add(field)
+        for ont_import in candidate_imports:  # ordered by pk so the last match per field wins
+            for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
+                if ont_import.import_source == import_source and ont_import.filename in filenames:
+                    kwargs[field] = ont_import
+
+        missing_fields = {field for field in OntologyVersion.ONTOLOGY_IMPORTS
+                          if field not in kwargs and field not in OntologyVersion.OPTIONAL_IMPORTS}
 
         if not missing_fields:
             values = list(kwargs.values())
@@ -816,14 +849,17 @@ class OntologyVersion(TimeStampedModel):
                 ontology_version = None
         return ontology_version
 
-    def get_ontology_imports(self):
-        return [ont_import for ont_import in [
-            self.gencc_import,
-            self.mondo_import,
-            self.hp_owl_import,
-            self.hp_phenotype_to_genes_import,
-            self.omim_import
-        ] if ont_import is not None]
+    def get_ontology_imports(self) -> QuerySet[OntologyImport]:
+        """ Lazy QuerySet - using it in __in filters becomes a subquery (no extra queries,
+            unlike accessing the FK fields which lazy-loads each OntologyImport individually) """
+        import_ids = [import_id for import_id in [
+            self.gencc_import_id,
+            self.mondo_import_id,
+            self.hp_owl_import_id,
+            self.hp_phenotype_to_genes_import_id,
+            self.omim_import_id
+        ] if import_id is not None]
+        return OntologyImport.objects.filter(pk__in=import_ids)
 
     def get_ontology_term_relations(self):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())

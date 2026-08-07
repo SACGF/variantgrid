@@ -1,6 +1,8 @@
 import logging
 import operator
+import re
 from functools import reduce
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -8,6 +10,18 @@ from django.conf import settings
 
 from library.utils.date_utils import get_months_since, month_range, parse_yymm
 from seqauto.models import SequencingRun, SequencingSample
+
+SEQUENCING_RUN_DATE_PATTERN = re.compile(r"^(\d{4})\d{2}[_-]")
+
+
+def get_sequencing_run_yymm(sequencing_run_name) -> Optional[str]:
+    """ Illumina sequencing runs start with a YYMMDD date - returns the YYMM digits (None if unparseable) """
+    if not isinstance(sequencing_run_name, str):
+        return None
+    sr_name = SequencingRun.get_original_illumina_sequencing_run(sequencing_run_name)
+    if m := SEQUENCING_RUN_DATE_PATTERN.match(sr_name):
+        return m.group(1)
+    return None
 
 
 def get_sample_enrichment_kits_df():
@@ -20,28 +34,34 @@ def get_sample_enrichment_kits_df():
     values_qs = SequencingSample.get_current().values(SEQUENCING_RUN_COL, "enrichment_kit__name")
     df = pd.DataFrame.from_records(values_qs)
     # May be no sequencing runs - in which case skip
-    if SEQUENCING_RUN_COL in df.columns:
-        sr = df[SEQUENCING_RUN_COL]
+    if SEQUENCING_RUN_COL not in df.columns:
+        return df
 
-        year_month_series = pd.Series(index=df.index, dtype='i')
-        year_series = pd.Series(index=df.index, dtype='i')
+    years = {}
+    year_months = {}
+    for i, sequencing_run_name in df[SEQUENCING_RUN_COL].items():
+        if yymm := get_sequencing_run_yymm(sequencing_run_name):
+            years[i] = int(yymm[:2])
+            year_months[i] = int(yymm)
+        else:
+            logging.warning("Skipping sequencing run %s - no YYMMDD date at start of name", sequencing_run_name)
 
-        for i, val in sr.items():
-            sr_name = SequencingRun.get_original_illumina_sequencing_run(val)
-            run_date = sr_name.split("_")[0]
-            year_series[i] = int(run_date[:2])
-            year_month_series[i] = int(run_date[:4])
+    # Only keep rows we could date, so callers always see year/year_month/month_offset columns
+    df = df.loc[list(year_months)].copy()
+    if df.empty:
+        return df
 
-        start_month, start_year = parse_yymm(year_month_series.min())
+    year_month_series = pd.Series(year_months, dtype=int)
+    start_month, start_year = parse_yymm(year_month_series.min())
 
-        month_offset = pd.Series(index=df.index, dtype='i')
-        for i, year_month in year_month_series.items():
-            month, year = parse_yymm(year_month)
-            month_offset[i] = get_months_since(start_month, start_year, month, year)
+    month_offsets = {}
+    for i, year_month in year_month_series.items():
+        month, year = parse_yymm(year_month)
+        month_offsets[i] = get_months_since(start_month, start_year, month, year)
 
-        df.loc[:, "year"] = year_series
-        df.loc[:, "year_month"] = year_month_series
-        df.loc[:, "month_offset"] = month_offset
+    df["year"] = pd.Series(years, dtype=int)
+    df["year_month"] = year_month_series
+    df["month_offset"] = pd.Series(month_offsets, dtype=int)
     return df
 
 

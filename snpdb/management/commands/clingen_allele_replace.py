@@ -3,7 +3,7 @@ from datetime import date
 from django.core.management import BaseCommand
 from django.utils import timezone
 
-from snpdb.clingen_allele import ClinGenAlleleRegistryAPI
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models import ClinGenAllele, Variant
 
 
@@ -33,7 +33,7 @@ class Command(BaseCommand):
 
         print(f"There are {len(clingen_allele_by_id)} CA IDs {', '.join(filter_message)}")
 
-        clingen_api = ClinGenAlleleRegistryAPI()
+        clingen_api = ClinGenAlleleRegistryAPI.instance()
         records = clingen_allele_by_id.keys()
         clingen_to_update = []
         now = timezone.now()

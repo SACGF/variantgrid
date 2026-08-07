@@ -449,8 +449,8 @@ def get_patient_record_imports_dataframe(f):
 
 
 def import_patient_records(patient_records):
-    uploaded_file = patient_records.uploaded_file
-    filename = uploaded_file.get_filename()
+    file_upload = patient_records.file_upload
+    filename = file_upload.get_filename()
     df = get_patient_record_imports_dataframe(filename)
     missing_columns = set(PatientColumns.COLUMNS) - set(df.columns)
     if missing_columns:

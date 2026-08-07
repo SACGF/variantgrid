@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
 
+from django.contrib.auth.models import User
 from django.dispatch import receiver
 from django.urls import reverse
-from django_messages.admin import User
 
 from classification.enums import ClinicalSignificance, ShareLevel, SpecialEKeys
 from classification.models import (

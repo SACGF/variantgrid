@@ -8,7 +8,7 @@ from django.test import TestCase
 from annotation.fake_annotation import get_fake_annotation_version
 from library.utils import sha256sum_str
 from snpdb.models import ImportSource, Sequence
-from upload.models import UploadedFile, UploadedFileTypes, UploadedVCF, UploadPipeline, UploadStep
+from upload.models import FileUpload, UploadedFileTypes, UploadedVCF, UploadPipeline, UploadStep
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
 from upload.vcf.sql_copy_files import COHORT_GENOTYPE_HEADER
@@ -28,12 +28,12 @@ class TestVCFProcessors(TestCase):
     @classmethod
     def _create_fake_upload_step_and_vcf(cls, vcf_filename, vcf_reader) -> tuple[UploadStep, UploadedVCF]:
         user = User.objects.get_or_create(username='testuser')[0]
-        uploaded_file = UploadedFile.objects.create(path=vcf_filename,
-                                                    import_source=ImportSource.COMMAND_LINE,
-                                                    user=user,
-                                                    file_type=UploadedFileTypes.VCF)
+        file_upload = FileUpload.objects.create(path=vcf_filename,
+                                                import_source=ImportSource.COMMAND_LINE,
+                                                user=user,
+                                                file_type=UploadedFileTypes.VCF)
 
-        upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+        upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                 input_filename=vcf_filename,
                                                 sort_order=0)

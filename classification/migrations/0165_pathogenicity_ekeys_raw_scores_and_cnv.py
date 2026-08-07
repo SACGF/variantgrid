@@ -192,7 +192,9 @@ def _update_pathogenicity_ekeys(apps, _schema_editor):
             variantgrid_column_id=None,
         ),
     ]
-    EvidenceKey.objects.bulk_create(new_ekeys)
+    # ignore_conflicts: the restored DB may already carry some of these keys (its snapshot
+    # predates this migration's record), so skip any that already exist rather than collide.
+    EvidenceKey.objects.bulk_create(new_ekeys, ignore_conflicts=True)
 
 
 def _reverse_update_pathogenicity_ekeys(apps, _schema_editor):

@@ -9,7 +9,7 @@ from genes.forms import (
     NamedCustomGeneListForm,
     panel_app_server_autocomplete_form_factory,
 )
-from genes.models import GeneAnnotationRelease, GeneInfo, GeneListCategory, PanelAppServer
+from genes.models import GeneAnnotationRelease, GeneListCategory, PanelAppServer
 from library.log_utils import log_traceback
 from ontology.forms import HPOForm, OMIMForm
 from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionForm
@@ -140,7 +140,6 @@ def gene_grid(context, columns_from_url=None,
             return c["name"] in gene_list_categories_whitelist
         categories = filter(in_whitelist, categories)
 
-    has_gene_info = GeneInfo.objects.filter(gene_list__genelistgenesymbol__isnull=False).exists()
     if show_custom_gene_form:
         named_custom_gene_list_form = NamedCustomGeneListForm(username=user)
     else:
@@ -159,7 +158,6 @@ def gene_grid(context, columns_from_url=None,
         "categories": categories,
         "panel_app_servers": panel_app_servers,
         "panel_app_form_ids": panel_app_form_ids,
-        "has_gene_info": has_gene_info,
         "gene_symbol_form": gene_symbol_form,
         "named_custom_gene_list_form": named_custom_gene_list_form,
         "user": user,

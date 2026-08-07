@@ -1,22 +1,22 @@
-let CitationsManager = (function() {
+const CitationsManager = (function() {
 
     function Deferred() {
-        let self = this;
+        const self = this;
         this.promise = new Promise(function(resolve, reject) {
-            self.reject = reject
-            self.resolve = resolve
+            self.reject = reject;
+            self.resolve = resolve;
         });
     }
 
-    let CitationsManager = function () {
+    const CitationsManager = function () {
         this.citationToDeferred = {};
         this.citationsToLoad = {};
-    }
+    };
 
     CitationsManager.prototype = {
 
         citationPromise(citationId) {
-            let existing = this.citationToDeferred[citationId];
+            const existing = this.citationToDeferred[citationId];
             let deferred = null;
             if (existing) {
                 return existing.promise;
@@ -30,7 +30,7 @@ let CitationsManager = (function() {
         },
 
         requestData() {
-            let loadIds = Object.keys(this.citationsToLoad);
+            const loadIds = Object.keys(this.citationsToLoad);
             this.citationsToLoad = {};
             $.ajax({
                 headers: {
@@ -41,28 +41,28 @@ let CitationsManager = (function() {
                 url: Urls.citations_json(loadIds.join('/')),
                 type: 'GET',
                 error: (call, status, text) => {
-                    console.log(text)
+                    console.log(text);
                 },
                 success: (record) => {
-                    let requestedIds = {};
-                    for (let loadId of loadIds) {
+                    const requestedIds = {};
+                    for (const loadId of loadIds) {
                         requestedIds[loadId] = true;
                     }
-                    for (let citationData of record['citations']) {
-                        for (let requestingId of citationData.requested_using) {
+                    for (const citationData of record['citations']) {
+                        for (const requestingId of citationData.requested_using) {
                             delete requestedIds[requestingId];
-                            let deferred = this.citationToDeferred[requestingId];
+                            const deferred = this.citationToDeferred[requestingId];
                             if (deferred) {
                                 deferred.resolve(citationData);
                             }
                         }
                     }
-                    for (let remainingId of Object.keys(requestedIds)) {
-                        let deferred = this.citationToDeferred[remainingId];
+                    for (const remainingId of Object.keys(requestedIds)) {
+                        const deferred = this.citationToDeferred[remainingId];
                         if (deferred) {
                             deferred.resolve({
                                 "title": `Could not load ${remainingId}`
-                            })
+                            });
                         }
                     }
                 }
@@ -72,10 +72,10 @@ let CitationsManager = (function() {
         // debounceRequestData: debounce(this.requestData),
 
         populate(dom) {
-            let $dom = $(dom);
-            let citationId = $dom.attr('data-citation-id');
-            let prettyId = this.prettyId(citationId);
-            $dom.text()
+            const $dom = $(dom);
+            const citationId = $dom.attr('data-citation-id');
+            const prettyId = this.prettyId(citationId);
+            $dom.text();
             $dom.addClass('citation');
             $dom.addClass('loading');
             $dom.html([
@@ -93,27 +93,27 @@ let CitationsManager = (function() {
         },
 
         renderData(citation) {
-            let citDom = $('<div>');
+            const citDom = $('<div>');
 
             if (citation.error) {
                 if (citation.id) {
                     citDom.html([
                         $('<div>', {text: citation.id}),
                         $('<div>', {text: citation.error, class: 'text-danger'})
-                    ])
+                    ]);
                 } else {
                     citDom.html($('<div>', {html: citation.error, class: 'text-danger'}));
                 }
                 return citDom;
             }
 
-            let year = citation.year;
+            const year = citation.year;
 
-            let authorShort = citation.authors_short;
-            let title = citation.title || 'Could not load title';
-            let prettyId = this.prettyId(citation.id);
+            const authorShort = citation.authors_short;
+            const title = citation.title || 'Could not load title';
+            const prettyId = this.prettyId(citation.id);
 
-            let linkRow = [];
+            const linkRow = [];
             if (citation.external_url) {
                 linkRow.push($('<a>', {href: citation.external_url, target: '_blank', class:'source external-link', text: prettyId}));
             } else {
@@ -141,9 +141,9 @@ let CitationsManager = (function() {
             }, linkDom);
             linkDom.appendTo(citDom);
 
-            let safeId = citation.id.replace(':','_');
+            const safeId = citation.id.replace(':','_');
             if (!citation.error) {
-                $('<a>', {'class':'d-block', 'data-toggle':'ajax-modal', 'data-href':Urls.view_citation_detail(citation.id), 'data-title': prettyId, 'text':'Show Detail'}).appendTo(citDom)
+                $('<a>', {'class':'d-block', 'data-toggle':'ajax-modal', 'data-href':Urls.view_citation_detail(citation.id), 'data-title': prettyId, 'text':'Show Detail'}).appendTo(citDom);
             } else {
                 $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(detailContainer);
             }
@@ -169,9 +169,9 @@ let CitationsManager = (function() {
             } else if (renderNonCitations) {
                 let text = dbRef.id;
                 if (dbRef.db == "HTTP" || dbRef.db == "HTTPS") {
-                    text = `${dbRef.db.toLowerCase()}:${dbRef.idx}`
+                    text = `${dbRef.db.toLowerCase()}:${dbRef.idx}`;
                 }
-                let citationDom = $('<div>', {class: 'citation'});
+                const citationDom = $('<div>', {class: 'citation'});
                 if (dbRef.id && dbRef.url) {
                     $('<a>', {class: 'no-details', text: text, href: dbRef.url, target: '_blank'}).appendTo(citationDom);
                 }
@@ -189,7 +189,7 @@ CitationsManager.dbMigration = {
     "PUBMED": "PMID",
     "PMC": "PMCID",
     "NCBIBOOKSHELF": "Bookshelf ID"
-}
+};
 
 CitationsManager.normalizeInPlace = function(dbRef) {
     let dbArray = null;
@@ -199,10 +199,10 @@ CitationsManager.normalizeInPlace = function(dbRef) {
         dbArray = [dbRef];
     }
 
-    for (let dbRef of dbArray) {
+    for (const dbRef of dbArray) {
         // only need to normalize old records, e.g. the ones with internal ID
         if (dbRef.db && dbRef.idx) {
-            let migratedSource = CitationsManager.dbMigration[dbRef.db.toUpperCase()];
+            const migratedSource = CitationsManager.dbMigration[dbRef.db.toUpperCase()];
             if (migratedSource) {
                 let idx = `${dbRef.idx}`;
                 if (migratedSource == "PMID") {
@@ -219,7 +219,7 @@ CitationsManager.normalizeInPlace = function(dbRef) {
         }
     }
     return dbRef;
-}
+};
 
 CitationsManager.prototype.debounceRequestData = debounce(CitationsManager.prototype.requestData);
 CitationsManager.defaultManager = new CitationsManager();

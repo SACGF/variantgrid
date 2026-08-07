@@ -57,12 +57,19 @@
                 <h3>EnrichmentKit</h3>
                 <div>
                     {% if enrichment_kit %}
-                        <b>EnrichmentKit:</b>{{ enrichment_kit }} 
+                        <b>EnrichmentKit:</b>{{ enrichment_kit }}
                     {% else %}
                         Can't determine enrichment_kit from input samples
                     {% endif %}
                 </div>
                 <li>
+                <h3>Contig</h3>
+                    <div id='intersectionnode-contig'>
+                    {{ form.contigs.errors }}
+                    <label for="{{ form.contigs.id_for_label }}">Chromosomes:</label>
+                    {{ form.contigs }}
+                    </div>
+                </li>
 			</ul>
 		</div>
         {{ form.non_field_errors }}

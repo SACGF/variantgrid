@@ -10,6 +10,7 @@
          filter_key=NULL,
          passing_filter=False/True).
 """
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import migrations
 
 
@@ -30,11 +31,16 @@ def _backfill(apps, schema_editor):
         # The Cohort.cohort_genotype_collection cached_property is a real
         # method on the runtime model and isn't available via apps.get_model,
         # so we re-implement the lookup using the underlying fields.
-        cohort = ss.sample.vcf.cohort
+        #
+        # Cohort.vcf is a reverse OneToOne (Cohort.vcf = OneToOneField(VCF)), so vcf.cohort
+        # raises RelatedObjectDoesNotExist when no Cohort points at this VCF - which happens for
+        # VCFs without a cohort (partial imports, or a cohort deleted later). Treat that the same
+        # as a missing CGC below: skip, and let the lazy recompute recreate stats if needed.
         try:
+            cohort = ss.sample.vcf.cohort
             return CohortGenotypeCollection.objects.get(
                 cohort=cohort, cohort_version=cohort.version, collection_type="U")
-        except CohortGenotypeCollection.DoesNotExist:
+        except ObjectDoesNotExist:
             return None
 
     def _copy(old_qs, passing_filter):

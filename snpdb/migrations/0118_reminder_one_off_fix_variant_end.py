@@ -2,13 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
-
-def _existing_deploy_has_variants(apps):
-    Variant = apps.get_model("snpdb", "Variant")
-    return Variant.objects.exists()
-
 
 class Migration(migrations.Migration):
 
@@ -16,7 +9,6 @@ class Migration(migrations.Migration):
         ('snpdb', '0117_one_off_inv_symbolic'),
     ]
 
-    operations = [
-        ManualOperation.operation_other(args=["Run 'python3 manage.py one_off_fix_variant_end' - this can be done outside of migrations (use screen)"],
-                                        test=_existing_deploy_has_variants),
-    ]
+    # The free text reminder registered here was retired in manual/0004_complete_obsolete_manual_tasks -
+    # one_off_fix_variant_end is a real manage task in 0141_one_off_fix_variant_end2.
+    operations = []

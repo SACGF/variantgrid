@@ -1,6 +1,6 @@
 {% load static %}
 {% load js_tags %}
-{% load inbox %}
+{% load user_messages_tags %}
 {% load ui_menu_bars %}
 {% load compress %}
 {% load settings_tags %}
@@ -85,7 +85,7 @@
     </script>
 
     <!-- JQuery, had to move to the top for the sake of autocomplete -->
-    <script src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
+    <script src="{% static 'js/lib/jquery-3.7.1/jquery-3.7.1.min.js' %}"></script>
 
     <!-- DAL (Django Autocomplete Light) - loaded once globally to prevent duplicate registration warning.
          form.media for autocomplete widgets only emits auto_complete_light_reload.js (see autocomplete_utils.py) -->
@@ -95,7 +95,7 @@
     <script src="{% static 'js/lib/js.cookie.min.js' %}"></script>
 
     <!-- lodash for our own usage -->
-    <script src="{% static 'js/lib/lodash/4.17.20/lodash.min.js' %}"></script>
+    <script src="{% static 'js/lib/lodash/4.18.1/lodash.min.js' %}"></script>
 
     <!-- Needed by code that calls ajaxForm -->
     <script src="{% static 'js/lib/jquery.form.min.js' %}"></script>

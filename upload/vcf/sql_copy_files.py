@@ -90,7 +90,10 @@ def gene_coverage_canonical_transcript_sql_copy_csv(input_filename, table_name):
 
 def write_sql_copy_csv(data, filename, **kwargs):
     if os.path.exists(filename):
-        msg = f"We don't want to overwrite '{filename}'"
+        msg = (f"We don't want to overwrite '{filename}' - a file from a previous run already exists. "
+               f"If the import-processing directory is out of sync with the database (eg a dump moved "
+               f"to a new system or a restored backup), remove the stale file/directory to retry. "
+               f"Otherwise this may indicate a real error or race condition - investigate before deleting.")
         raise ValueError(msg)
 
     with open(filename, "w") as f:

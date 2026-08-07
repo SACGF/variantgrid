@@ -1,7 +1,6 @@
 {% extends "seqauto/menu_sequencing_data_base.html" %}
 {% load static %}
 {% load ui_utils %}
-{% load seqauto_record_tags %}
 {% block title %}{{ single_sample_vcf }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
@@ -21,13 +20,14 @@
     {% labelled label="Variant Caller" %}{{ single_sample_vcf.variant_caller }}{% endlabelled %}
     </div>
 
-	{% record_data_state_helper single_sample_vcf %}
-
 	<div>
 		<h3>Input</h3>
 		<ul>
 		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' single_sample_vcf.sequencing_run.pk %}">{{ single_sample_vcf.sequencing_run }}</a></li>
+		<li>Sequencing Sample: {{ single_sample_vcf.bam_file.sequencing_sample }}</li>
+		{% if single_sample_vcf.bam_file.unaligned_reads %}
 		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' single_sample_vcf.bam_file.unaligned_reads.pk %}">{{ single_sample_vcf.bam_file.unaligned_reads }}</a></li>
+		{% endif %}
 		<li>Bam: <a href="{% url 'view_bam_file' single_sample_vcf.bam_file.pk %}">{{ single_sample_vcf.bam_file }}</a></li>
 		</ul>
 
@@ -47,7 +47,7 @@
 		<h3>Made from this data</h3>
 		<ul>
 			{% for qc in single_sample_vcf.qc_set.all %}
-				<li class='seqauto-record qc data-state-{{ qc.data_state }}'><a href="{% url 'view_qc' qc.pk %}">{{ qc }}</a>
+				<li class='seqauto-record qc'><a href="{% url 'view_qc' qc.pk %}">{{ qc }}</a>
 			{% endfor %}
 		</ul>
 	</div>

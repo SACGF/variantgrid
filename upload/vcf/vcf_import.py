@@ -10,7 +10,6 @@ from django.conf import settings
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django.utils import timezone
-from django_messages.models import Message
 
 from library.genomics.vcf_enums import VCFConstant
 from library.genomics.vcf_utils import (
@@ -49,6 +48,7 @@ from upload.models import (
     BackendVCF,
     PipelineFailedJobTerminateEarlyException,
     UploadedVCF,
+    UploadedVCFPipelineMaxVariant,
     UploadStep,
     UploadStepTaskType,
     VCFPipelineStage,
@@ -56,6 +56,7 @@ from upload.models import (
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
+from user_messages.models import Message
 
 
 def get_format_field(vcf_formats, wanted_format_id):
@@ -183,17 +184,17 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     """ Reads header only - returns VCF object """
 
     upload_pipeline = upload_step.upload_pipeline
-    uploaded_file = upload_pipeline.uploaded_file
+    file_upload = upload_pipeline.file_upload
     # There is no VCF file if this method is called, but it could be possible for UploadedVCF
     # to exist if there was an error before previous VCF was created, so re-use if there
     try:
         # Reload as VCF may have been deleted before calling this and still attached
         uploaded_vcf = UploadedVCF.objects.get(upload_pipeline=upload_pipeline)
-        uploaded_vcf.uploaded_file = uploaded_file
+        uploaded_vcf.file_upload = file_upload
         uploaded_vcf.vcf_importer = None
         uploaded_vcf.save()
     except UploadedVCF.DoesNotExist:
-        uploaded_vcf = UploadedVCF.objects.create(uploaded_file=uploaded_file,
+        uploaded_vcf = UploadedVCF.objects.create(file_upload=file_upload,
                                                   upload_pipeline=upload_pipeline)
         logging.info("import_vcf_file: CREATED uploaded_vcf: %d", uploaded_vcf.pk)
 
@@ -224,7 +225,7 @@ def _get_vcf_sample_names(vcf, vcf_reader) -> list[str]:
     if vcf.genotype_samples > 0:
         sample_names = vcf_reader.samples
     else:  # Need at least 1 sample per VCF
-        default_name = vcf.uploadedvcf.uploaded_file.name
+        default_name = vcf.uploadedvcf.file_upload.name
         sample_names = [default_name]
     return sample_names
 
@@ -318,30 +319,37 @@ def import_vcf_file(upload_step, bulk_inserter) -> int:
         raise ValueError(message)
 
     bulk_inserter.finish()
-    update_uploaded_vcf_max_variant(uploaded_vcf.pk, bulk_inserter.get_max_variant_id())
+    update_uploaded_vcf_max_variant(uploaded_vcf.pk, bulk_inserter.get_max_variant_id_by_pipeline_type())
     return bulk_inserter.rows_processed
 
 
-def update_uploaded_vcf_max_variant(pk, max_inserted_variant_id):
-    """ This can be run in parallel """
+def update_uploaded_vcf_max_variant(pk, max_inserted_variant_id_by_pipeline_type: dict):
+    """ Upsert one UploadedVCFPipelineMaxVariant row per pipeline type. This can be run in parallel
+        (multiple import steps) so each type's row is only raised, never lowered. """
 
-    if max_inserted_variant_id is not None:
-        uploaded_vcf_qs = UploadedVCF.objects.filter(pk=pk)
-        q_not_set_or_less_than = Q(max_variant__isnull=True) | Q(max_variant_id__lt=max_inserted_variant_id)
-        uploaded_vcf_qs.filter(q_not_set_or_less_than).update(max_variant_id=max_inserted_variant_id)
+    for pipeline_type, max_inserted_variant_id in max_inserted_variant_id_by_pipeline_type.items():
+        if max_inserted_variant_id is None:
+            continue
+        row, created = UploadedVCFPipelineMaxVariant.objects.get_or_create(
+            uploaded_vcf_id=pk, pipeline_type=pipeline_type,
+            defaults={"max_variant_id": max_inserted_variant_id})
+        if not created:
+            q_not_set_or_less_than = Q(max_variant__isnull=True) | Q(max_variant_id__lt=max_inserted_variant_id)
+            UploadedVCFPipelineMaxVariant.objects.filter(pk=row.pk).filter(q_not_set_or_less_than) \
+                .update(max_variant_id=max_inserted_variant_id)
 
 
 def create_vcf_from_uploaded_vcf(uploaded_vcf, num_genotype_samples):
-    vcf = VCF.objects.create(name=uploaded_vcf.uploaded_file.name,
+    vcf = VCF.objects.create(name=uploaded_vcf.file_upload.name,
                              date=timezone.now(),
-                             user=uploaded_vcf.uploaded_file.user,
+                             user=uploaded_vcf.file_upload.user,
                              genotype_samples=num_genotype_samples,
                              import_status=ImportStatus.IMPORTING)
     logging.debug("Saved vcf %d from uploaded_vcf %d", vcf.pk, uploaded_vcf.pk)
 
     # Assign view permission to all of users groups
     # TODO: Make this a user option (auto share to groups?)
-    user = uploaded_vcf.uploaded_file.user
+    user = uploaded_vcf.file_upload.user
     assign_permission_to_user_and_groups(user, vcf)
 
     return vcf
@@ -351,11 +359,16 @@ def create_backend_vcf_links(uploaded_vcf):
     """ returns backend_vcf if we can link to SeqAuto data (None if Web VCF) """
 
     backend_vcf = None
-    uploaded_file = uploaded_vcf.uploaded_file
-    # APIFileUploadView comes through as WEB_UPLOAD
+    if not settings.SEQAUTO_ENABLED:
+        # Only SeqAuto deployments link uploads to backend sequencing VCFs by path.
+        # Elsewhere 'path' is just an optional client hint (e.g. API dedup), so skip linking.
+        return backend_vcf
+
+    file_upload = uploaded_vcf.file_upload
+    # APIFileUploadView (including the SeqAuto API client) comes through as WEB_UPLOAD
     sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.WEB_UPLOAD}
-    if uploaded_file.path and uploaded_file.import_source in sequencing_vcf_sources:
-        path = uploaded_file.path
+    if file_upload.path and file_upload.import_source in sequencing_vcf_sources:
+        path = file_upload.path
         if path:
             joint_called_vcf = None
             single_sample_vcf = None
@@ -443,7 +456,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
                                                           sequencing_sample=sequencing_sample)
 
             # Link any QCGeneLists
-            for qcgl in QCGeneList.objects.filter(qc__bam_file__unaligned_reads__sequencing_sample=sequencing_sample,
+            for qcgl in QCGeneList.objects.filter(qc__bam_file__sequencing_sample=sequencing_sample,
                                                   custom_text_gene_list__gene_list__isnull=False,
                                                   sample_gene_list__isnull=True).distinct():
                 qcgl.create_and_assign_sample_gene_list(sample)
@@ -452,7 +465,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
 def create_import_success_message(vcf):
     subject = f"VCF '{vcf.name}' import complete"
     url = reverse('view_vcf', kwargs={'vcf_id': vcf.pk})
-    body = f"VCF {vcf.name} imported as <a href='{url}'>vcf #{vcf.pk}</a>"
+    body = f"VCF {vcf.name} imported as [vcf #{vcf.pk}]({url})"
 
     user = vcf.user
     user_settings = UserSettings.get_for_user(user)

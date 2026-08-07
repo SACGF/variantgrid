@@ -49,7 +49,10 @@ VEP-specific version record.
   - `latest(genome_build, active=True)`: Returns the most recent active version for a build
   - `get_pathogenic_prediction_funcs()`: Returns callables for pathogenicity prediction scoring
   - `damage_predictions_description`: Human-readable description of active damage predictors
-  - `cdot_gene_release_filename`: Filename for the cdot gene release associated with this version
+  - `cdot_gene_release_token`: The gene set release VEP used, as cdot names it (eg `RS_2025_08`)
+  - `gene_annotation_release_gff_url`: The GFF/GTF cdot read to build that gene set
+  - `match_gene_annotation_release()` / `link_gene_annotation_release()`: Find and link the
+    `GeneAnnotationRelease` built from this version's gene set
 
 ---
 
@@ -482,7 +485,7 @@ Raises `InvalidAnnotationVersionError` with details if any check fails.
 | `annotate_variants` | Drives VEP execution and result insertion |
 | `annotation_scheduler_task` | Schedules pending annotation jobs |
 | `cached_web_resource_tasks` | Updates HGNC, MANE, Pfam, Panel App cached data |
-| `calculate_sample_stats` | Computes per-sample annotation statistics |
+| `calculate_sample_stats` | Computes cohort/per-sample annotation statistics (eager at VCF import, lazy on cache miss) |
 | `cohort_sample_gene_damage_counts` | Aggregates gene damage counts across cohort samples |
 | `import_clinvar_vcf_task` | Imports a ClinVar VCF file |
 | `process_manual_variants_task` | Processes manually entered variants |

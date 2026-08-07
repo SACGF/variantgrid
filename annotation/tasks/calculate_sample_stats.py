@@ -7,7 +7,6 @@ import celery
 import numpy as np
 from django.conf import settings
 from django.db import transaction
-from django.db.models.query_utils import Q
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import (
@@ -17,7 +16,7 @@ from annotation.models import (
     CohortGenotypeVariantAnnotationStats,
 )
 from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import InvalidAnnotationVersionError, VCFAnnotationStats
+from annotation.models.models import VCFAnnotationStats
 from eventlog.models import create_event
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.enums.log_level import LogLevel
@@ -38,7 +37,6 @@ from snpdb.models import (
     VCFLengthStatsCollection,
     Zygosity,
 )
-from snpdb.models.models_genome import GenomeBuild
 
 
 @celery.shared_task
@@ -214,7 +212,7 @@ def _aggregate_zygosity_priority(zygosities: str) -> str:
     """ For aggregate rows, classify a variant by the highest-priority zygosity
         present across the cohort's samples — hom > het > ref > unk. This makes
         ref+het+hom+unk_count sum to variant_count for the aggregate row, the
-        invariant SampleStats relies on. """
+        invariant CohortGenotypeStats relies on. """
     if Zygosity.HOM_ALT in zygosities:
         return Zygosity.HOM_ALT
     if Zygosity.HET in zygosities:
@@ -707,14 +705,38 @@ def _persist_cohort_stats(cgc, annotation_version, code_version, has_filters,
         _populate(ca, counter, CLINVAR_ANN_FIELDS)
         rows_clinvar.append(ca)
 
+    passing_filter_values = (False, True) if has_filters else (False,)
+
+    # Ensure every sample has a row even if it had no variants, otherwise readers
+    # treat the absence as stale and re-enqueue a recompute on every view.
+    for sample in samples:
+        for pf_pass in passing_filter_values:
+            if (sample.pk, pf_pass) in sample_counters:
+                continue
+            rows_genotype.append(CohortGenotypeStats(
+                cohort_genotype_collection=cgc, sample=sample, filter_key=None,
+                passing_filter=pf_pass, code_version=code_version, import_status=ImportStatus.SUCCESS,
+            ))
+            rows_variant.append(CohortGenotypeVariantAnnotationStats(
+                cohort_genotype_collection=cgc, sample=sample, filter_key=None,
+                passing_filter=pf_pass, code_version=code_version, variant_annotation_version=vav,
+            ))
+            rows_gene.append(CohortGenotypeGeneAnnotationStats(
+                cohort_genotype_collection=cgc, sample=sample, filter_key=None,
+                passing_filter=pf_pass, code_version=code_version, gene_annotation_version=gav,
+            ))
+            rows_clinvar.append(CohortGenotypeClinVarAnnotationStats(
+                cohort_genotype_collection=cgc, sample=sample, filter_key=None,
+                passing_filter=pf_pass, code_version=code_version, clinvar_version=cv,
+            ))
+
     # Ensure every precomputed (key, pf_pass) bucket has a row even if no
     # variants matched it (so reads hit instead of falling back to live count).
     existing_agg_keys = {(fk, pf) for fk, pf in aggregate_counters.keys()}
     for fk in precompute_keys:
-        for pf_pass in ((False, True) if has_filters else (False,)):
+        for pf_pass in passing_filter_values:
             if (fk, pf_pass) in existing_agg_keys:
                 continue
-            zero = _new_counter()
             rows_genotype.append(CohortGenotypeStats(
                 cohort_genotype_collection=cgc, sample=None, filter_key=fk,
                 passing_filter=pf_pass, code_version=code_version, import_status=ImportStatus.SUCCESS,
@@ -731,7 +753,6 @@ def _persist_cohort_stats(cgc, annotation_version, code_version, has_filters,
                 cohort_genotype_collection=cgc, sample=None, filter_key=fk,
                 passing_filter=pf_pass, code_version=code_version, clinvar_version=cv,
             ))
-            del zero  # all-zero row, populated by defaults
 
     CohortGenotypeStats.objects.bulk_create(rows_genotype, batch_size=2000)
     CohortGenotypeVariantAnnotationStats.objects.bulk_create(rows_variant, batch_size=2000)
@@ -764,48 +785,10 @@ def _get_variant_class(alt: str, hgvs_g: str) -> Optional[VariantClass]:
     return variant_type
 
 
-def calculate_needed_stats(run_async=False):
-    """ Works out what needs to be (re)calculated and does so. A VCF needs
-        recompute when its cohort's CGC has no genotype-level stats row, or
-        when any of the three annotation versions on file no longer match
-        AnnotationVersion.latest. """
-
-    logging.info("Deleting CohortGenotypeStats with non-SUCCESS import_status (leftovers)")
-    deleted = CohortGenotypeStats.objects.exclude(import_status=ImportStatus.SUCCESS).delete()
-    logging.info(deleted)
-
-    logging.info("Calculating cohort stats (run_async=%s)", run_async)
-    for genome_build in GenomeBuild.builds_with_annotation():
-        try:
-            annotation_version = AnnotationVersion.latest(genome_build)
-        except InvalidAnnotationVersionError:
-            logging.info(f"Skipping calculating sample stats for incomplete annotation version for build {genome_build}")
-            continue
-
-        vav = annotation_version.variant_annotation_version
-        gav = annotation_version.gene_annotation_version
-        cv = annotation_version.clinvar_version
-
-        # A VCF's stats are stale if any of the per-sample (sample IS NOT NULL,
-        # filter_key NULL) rows for any of the four stat classes is missing
-        # for the latest annotation versions.
-        needs_stats = Q(cohort__cohortgenotypecollection__genotype_stats__isnull=True)
-        needs_stats |= ~Q(
-            cohort__cohortgenotypecollection__variant_annotation_stats__variant_annotation_version=vav)
-        needs_stats |= ~Q(
-            cohort__cohortgenotypecollection__gene_annotation_stats__gene_annotation_version=gav)
-        needs_stats |= ~Q(
-            cohort__cohortgenotypecollection__clinvar_annotation_stats__clinvar_version=cv)
-
-        vcf_qs = VCF.objects.filter(needs_stats, genome_build=genome_build).distinct()
-        logging.info("Build: %s VCFs needing stats: %d", genome_build, vcf_qs.count())
-        for vcf in vcf_qs:
-            task = calculate_vcf_stats.si(vcf.pk, annotation_version.pk)  # @UndefinedVariable
-            if run_async:
-                task.apply_async()
-            else:
-                result = task.apply()
-                if result.successful():
-                    logging.info("Successfully calculated stats for %s", vcf)
-                else:
-                    logging.error("Died for VCF %s: %s", vcf, result.result)
+def enqueue_cohort_stats_recompute(cohort: Cohort, annotation_version: AnnotationVersion) -> None:
+    """ Fire-and-forget recompute for readers that missed the cache. Idempotent —
+        calculate_cohort_stats early-exits if the rows are already fresh. """
+    calculate_cohort_stats_task.apply_async(
+        args=[cohort.pk, annotation_version.pk],
+        queue="annotation_workers",
+    )

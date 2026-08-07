@@ -23,7 +23,7 @@ from classification.models import (
 from genes.hgvs import CHGVS
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
 from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
-from snpdb.models import ClinVarCitationsModes, ClinVarKey
+from snpdb.models import ClinVarCitationsModes, ClinVarKey, GenomeBuild
 from uicore.json.validated_json import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
 
 """
@@ -435,6 +435,7 @@ class ClinVarExportConverter:
                 "localID": local_id,
                 "localKey": local_key,
                 "observedIn": self.observed_in,
+                "submittedAssembly": self.submitted_assembly,
                 "variantSet": self.variant_set
             }
 
@@ -565,6 +566,19 @@ class ClinVarExportConverter:
             data["modeOfInheritance"] = mode_of_inheritance.value(single=True, optional=True)
 
         return ValidatedJson(data, messages)
+
+    @property
+    def submitted_assembly(self) -> ValidatedJson:
+        try:
+            genome_build = self.classification_based_on.get_genome_build()
+            if genome_build == GenomeBuild.grch38():
+                return ValidatedJson("GRCh38")
+            elif genome_build == GenomeBuild.grch37():
+                return ValidatedJson("GRCh37")
+            else:
+                return ValidatedJson(str(genome_build), JsonMessages.error(f"{genome_build} not supported in our ClinVar export"))
+        except ValueError:
+            return ValidatedJson("", JsonMessages.error("Could not determine genome build"))
 
     @property
     def condition_set(self) -> ValidatedJson:

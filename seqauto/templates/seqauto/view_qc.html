@@ -2,12 +2,12 @@
 {% load static %}
 {% load jqgrid_tags %}
 {% load help_tags %}
-{% load seqauto_record_tags %}
 {% load crispy_forms_tags %}
 
 {% block title %}{{ qc }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+<script src="{% static 'js/cached_generated_files.js' %}"></script>
 <style>
 .qc-column-name {
 	text-align: right;
@@ -23,7 +23,6 @@
 
 	<h2>{{ qc }}</h2>
 
-{% if qc.data_state == 'C' %}
 	<div id="qc-tabs">
 		<ul>
 	    	<li><a href="{% url 'view_qc_exec_summary_tab' qc.pk %}">Exec Summary</a></li>
@@ -41,17 +40,14 @@
 			</form>
 		</div>
 	<div>
-{% else %}
 
-    {% seqauto_messages qc.seqautomessage_set.all %}
-	{% record_data_state_helper qc %}
-	
-{% endif %}	
-	
 		<h3>Input</h3>
 		<ul>
 		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' qc.sequencing_run.pk %}">{{ qc.sequencing_run }}</a></li>
+		<li>Sequencing Sample: {{ qc.sequencing_sample }}</li>
+		{% if qc.bam_file.unaligned_reads %}
 		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' qc.bam_file.unaligned_reads.pk %}">{{ qc.bam_file.unaligned_reads }}</a></li>
+		{% endif %}
 		<li>Bam: <a href="{% url 'view_bam_file' qc.bam_file.pk %}">{{ qc.bam_file }}</a></li>
 		<li>VCF: <a href="{% url 'view_single_sample_vcf' qc.vcf_file.pk %}">{{ qc.vcf_file }}</a></li>
 		</ul>

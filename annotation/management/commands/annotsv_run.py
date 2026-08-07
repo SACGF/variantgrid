@@ -16,6 +16,7 @@ from django.core.management.base import BaseCommand, CommandError
 from annotation.annotsv_annotation import run_annotsv
 from annotation.models.models import AnnotationRun
 from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.tasks.annotate_variants import get_annotsv_dir
 from annotation.vcf_files.bulk_annotsv_tsv_inserter import import_annotsv_tsv
 
 
@@ -40,8 +41,7 @@ class Command(BaseCommand):
             if not annotation_run.vcf_dump_filename:
                 raise CommandError(f"AnnotationRun {run_id} has no vcf_dump_filename - run VEP first")
 
-            annotsv_dir = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR,
-                                       f"annotsv_{annotation_run.pk}")
+            annotsv_dir = get_annotsv_dir(annotation_run)
             tsv, rc, stdout, stderr = run_annotsv(
                 annotation_run.vcf_dump_filename, annotsv_dir,
                 annotation_run.genome_build, annotation_run.annotation_consortium,

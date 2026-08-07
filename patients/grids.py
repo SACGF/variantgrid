@@ -96,17 +96,17 @@ class PatientRecordsColumns(DatatableConfig[PatientRecords]):
         self.rich_columns = [
             RichColumn('id', orderable=True, renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
-            RichColumn('uploadedpatientrecords__uploaded_file__created', label="Created",
+            RichColumn('uploadedpatientrecords__file_upload__created', label="Created",
                        client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn('uploadedpatientrecords__uploaded_file__user__username', label="User", orderable=True),
-            RichColumn('uploadedpatientrecords__uploaded_file__name', orderable=True, label="Filename"),
+            RichColumn('uploadedpatientrecords__file_upload__user__username', label="User", orderable=True),
+            RichColumn('uploadedpatientrecords__file_upload__name', orderable=True, label="Filename"),
         ]
 
     def get_initial_queryset(self) -> QuerySet[PatientRecords]:
         # show_group_data = self.get_query_param("patient_records")
         qs = PatientRecords.objects.all()
         if not self.user.is_superuser:
-            qs = qs.filter(uploadedpatientrecords__uploaded_file__user=self.user)
+            qs = qs.filter(uploadedpatientrecords__file_upload__user=self.user)
         return qs
 
 
@@ -152,7 +152,7 @@ class PatientRecordColumns(DatatableConfig[PatientRecord]):
     def get_initial_queryset(self) -> QuerySet[PatientRecord]:
         patient_records_id = self.get_query_param("patient_records")
         patient_records = get_object_or_404(PatientRecords, pk=patient_records_id)
-        patient_records.uploaded_file.check_can_view(self.user)
+        patient_records.check_can_view(self.user)
         return PatientRecord.objects.filter(patient_records=patient_records)
 
 

@@ -13,7 +13,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
-from django.http import StreamingHttpResponse
+from django.http import Http404, StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -42,6 +42,7 @@ from classification.classification_stats import (
 )
 from classification.enums import (
     AlleleOriginBucket,
+    LabExternalFilter,
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
@@ -100,6 +101,7 @@ from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab, Sample, UserSettings, Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
+from sync.classification_sync_status import classification_sync_status
 from uicore.utils.form_helpers import form_helper_horizontal
 from variantopedia.forms import SearchAndClassifyForm
 
@@ -291,6 +293,8 @@ def classification_groupings(request):
         "labs": Lab.valid_labs_qs(request.user),
         "genome_build": user_settings.default_genome_build,
         "user_settings": user_settings,
+        "lab_external_choices": LabExternalFilter.choices,
+        "lab_external_default": LabExternalFilter.ALL,
     }
     return render(request, 'classification/classification_groupings.html', context)
 
@@ -509,9 +513,23 @@ def view_classification(request: HttpRequest, classification_id: str):
         'attachments_enabled': settings.CLASSIFICATION_FILE_ATTACHMENTS,
         'delete_enabled': settings.CLASSIFICATION_ALLOW_DELETE,
         'duplicate_records': duplicate_records,
-        'withdraw_reasons': withdraw_reasons
+        'withdraw_reasons': withdraw_reasons,
+        'mme_enabled': settings.MME_ENABLED,   # shows the MatchMaker Exchange card
+        'sync_statuses': classification_sync_status(vc),
     }
     return render(request, 'classification/classification.html', context)
+
+
+def view_classification_lab_record(request: HttpRequest, classification_ref: str):
+    """ Resolve a classification from "lab_group_name/lab_record_id" and redirect to its canonical URL """
+    lab_group_name, _, lab_record_id = classification_ref.rpartition('/')
+    if not lab_group_name or not lab_record_id:
+        raise Http404(f"Expected a classification reference of lab_group_name/lab_record_id, got ({classification_ref})")
+
+    classification = get_object_or_404(Classification, lab__group_name=lab_group_name, lab_record_id=lab_record_id)
+    # same view permission as landing on the record directly - writable, or has a version we can see
+    ClassificationRef.init_from_obj(request.user, classification).check_security()
+    return redirect(classification.get_absolute_url())
 
 
 def view_classification_diff(request):
@@ -686,10 +704,10 @@ def classification_file_upload(request, classification_id):
         classification = get_object_or_404(Classification, pk=classification_id)
         if not classification.can_write(request.user):
             raise PermissionDenied('User can not edit this variant classification')
-        uploaded_file = filepond_upload_receive(request)
+        django_uploaded_file = filepond_upload_receive(request)
 
         vc_attachment = ClassificationAttachment(classification=classification,
-                                                 file=uploaded_file)
+                                                 file=django_uploaded_file)
         vc_attachment.save()
     except Exception:
         log_traceback()
@@ -773,8 +791,7 @@ class CreateClassificationForVariantView(TemplateView):
             raise ValueError(msg)
 
         genome_build = self._get_genome_build()
-        vts = VariantTranscriptSelections(variant, genome_build,
-                                          hide_other_annotation_consortium_transcripts=False)
+        vts = VariantTranscriptSelections(variant, genome_build)
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
         consensuses = ClassificationConsensus.all_consensus_candidates(allele=variant.allele, user=self.request.user)
@@ -805,7 +822,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     refseq_transcript_accession = ""
     ensembl_transcript_accession = ""
-    matcher = HGVSMatcher(genome_build)
+    matcher = HGVSMatcher.instance(genome_build)
     hgvs_variant = matcher.create_hgvs_variant(hgvs_string)
     evidence = {}
     if hgvs_variant.transcript:
@@ -1001,7 +1018,8 @@ def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
 
 
 def view_classification_grouping_detail(request, classification_grouping_id: int):
-    grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
+    grouping = get_object_or_404(ClassificationGrouping.objects.select_related('latest_allele_info'),
+                                 pk=classification_grouping_id)
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
         "classification_grouping": grouping
@@ -1009,7 +1027,8 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
 
 
 def view_classification_grouping_records_detail(request, classification_grouping_id: int):
-    grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
+    grouping = get_object_or_404(ClassificationGrouping.objects.select_related('latest_allele_info'),
+                                 pk=classification_grouping_id)
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_records_detail.html', {
         "classification_grouping": grouping

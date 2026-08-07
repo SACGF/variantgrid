@@ -17,7 +17,7 @@ from celery.canvas import Signature
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import FieldError
-from django.db import connection, models
+from django.db import connection, models, transaction
 from django.db.models import IntegerField, QuerySet, Value
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
@@ -50,7 +50,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
-from library.log_utils import log_traceback, report_event
+from library.log_utils import log_traceback
 from library.utils import add_exception_note, format_percent
 from library.utils.database_utils import queryset_to_sql
 from library.utils.django_utils import get_model_content_type_dict
@@ -555,15 +555,17 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return arg_q_dict
 
     @staticmethod
-    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda p: (p.pk, p.version))
-    def get_parent_pks(parent) -> list:
+    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda n: (n.pk, n.version))
+    def get_cached_node_pks(node) -> list:
+        """ Materialised variant PKs for a node small enough to hold them - the source for explicit-PK
+            substitution (@see get_small_parent_arg_q_dict) and the grid export """
         max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        if parent.count is None or parent.count > max_size:
+        if node.count is None or node.count > max_size:
             raise ValueError(
-                f"get_parent_pks: refusing to cache {parent} PKs "
-                f"(count={parent.count}, max={max_size})"
+                f"get_cached_node_pks: refusing to cache {node} PKs "
+                f"(count={node.count}, max={max_size})"
             )
-        return list(parent.get_queryset().values_list("pk", flat=True))
+        return list(node.get_queryset().values_list("pk", flat=True))
 
     @staticmethod
     def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
@@ -576,7 +578,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             which case callers fall back to parent.get_arg_q_dict(). """
         max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
         if max_size and parent.count is not None and parent.count <= max_size:
-            variant_ids = AnalysisNode.get_parent_pks(parent)
+            variant_ids = AnalysisNode.get_cached_node_pks(parent)
             q = Q(pk__in=variant_ids)
             return {None: {q: q}}
         return None
@@ -1033,6 +1035,15 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def save(self, *args, **kwargs):
         """ To avoid race conditions, don't use save() in a celery task (unless running in scheduling_single_worker)
             instead use update() method above """
+        with transaction.atomic():
+            # Lock the analysis row first so concurrent node-tree saves serialize in a consistent order.
+            # Saving a node cascades version bumps to its children (see below), and each NodeVersion insert
+            # takes a FOR KEY SHARE lock on the referenced analysisnode row. Without this, two concurrent
+            # saves over overlapping subtrees grab those row locks in opposite orders and deadlock.
+            Analysis.objects.select_related(None).select_for_update().get(pk=self.analysis_id)
+            return self._save(*args, **kwargs)
+
+    def _save(self, *args, **kwargs):
         # logging.debug("save: pk=%s kwargs=%s", self.pk, str(kwargs))
         super_save = super().save
 
@@ -1211,10 +1222,6 @@ class AnalysisNodeAlleleSource(AlleleSource):
         else:
             qs = Variant.objects.none()
         return qs
-
-    def liftover_complete(self, genome_build: GenomeBuild):
-        report_event('Completed AnalysisNode liftover',
-                     extra_data={'node_id': self.node_id, 'allele_count': self.get_allele_qs().count()})
 
 
 class NodeVersion(TimeStampedModel):

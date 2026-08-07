@@ -57,7 +57,6 @@ class Test(URLTestCase):
             # ("version_diffs", {}, 200),
             ("variant_annotation_runs", {}, 403),
             ("view_annotation_descriptions", {}, 200),
-            ("about_new_vep_columns", {}, 200),
             ("view_annotation_version_details", {"annotation_version_id": self.annotation_version_grch37.pk}, 200),
             ("citations_json", {"citations_ids_list": self.citations_ids_list_pubmed}, 200),
             # API

@@ -1,9 +1,11 @@
 import logging
 import os
 import re
+import shutil
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from datetime import datetime
+from contextlib import contextmanager
+from datetime import date, datetime, time
 from functools import cached_property
 from typing import Optional
 
@@ -29,6 +31,11 @@ from annotation.external_search_terms import (
     get_variant_pubmed_search_terms,
     get_variant_search_terms,
 )
+from annotation.gene_annotation_release_matching import (
+    GeneAnnotationReleaseMatch,
+    VepGeneSetVersions,
+    match_gene_annotation_release,
+)
 from annotation.models.damage_enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
@@ -51,11 +58,14 @@ from annotation.models.models_enums import (
     EssentialGeneGeneTrap,
     HumanProteinAtlasAbundance,
     ManualVariantEntryType,
+    NMDEscapeStatus,
     VariantAnnotationPipelineType,
     VEPSkippedReason,
 )
 from annotation.models.repeat_masker import RepeatMaskerSummary
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
+from annotation.vep_columns import visible_columns_for
+from annotation.vep_config import VEPConfig
 from classification.enums import AlleleOriginBucket
 from genes.models import Gene, GeneAnnotationRelease, GeneSymbol, Transcript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
@@ -65,7 +75,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import parse_gnomad_coord
 from library.genomics.vcf_enums import VariantClass
 from library.log_utils import report_message
-from library.utils import all_equal, first, invert_dict, name_from_filename
+from library.utils import all_equal, first, invert_dict
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
 from snpdb.archive import DataArchivedError
@@ -86,16 +96,28 @@ from snpdb.models.models_enums import ImportStatus
 class SubVersionPartition(RelatedModelsPartitionModel):
     RECORDS_FK_FIELD_TO_THIS_MODEL = "version_id"
     PARTITION_LABEL_TEXT = "version"
+    _defer_new_sub_version = False
     created = models.DateTimeField(auto_now_add=True)  # Inserted into DB
     annotation_date = models.DateTimeField(auto_now_add=True)  # Date of annotation (what we sort by)
 
     class Meta:
         abstract = True
 
+    @staticmethod
+    @contextmanager
+    def defer_new_sub_version():
+        """ Create a batch of sub-versions without bumping AnnotationVersion on each save.
+            The caller is responsible for creating the AnnotationVersion afterwards. """
+        SubVersionPartition._defer_new_sub_version = True
+        try:
+            yield
+        finally:
+            SubVersionPartition._defer_new_sub_version = False
+
     def save(self, *args, **kwargs):
         created = not self.pk
         super().save(*args, **kwargs)
-        if created:
+        if created and not SubVersionPartition._defer_new_sub_version:
             genome_build = getattr(self, "genome_build", None)
             AnnotationVersion.new_sub_version(genome_build)
 
@@ -650,6 +672,8 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     REPRESENTATIVE_TRANSCRIPT_ANNOTATION = "annotation_variantannotation"
     TRANSCRIPT_ANNOTATION = "annotation_varianttranscriptannotation"
     VARIANT_GENE_OVERLAP = "annotation_variantgeneoverlap"
+    # Returned by suggested_gene_annotation_release_name when the VEP versions don't tell us the gene set
+    UNKNOWN_GENE_ANNOTATION_RELEASE_NAME = "TODO_RELEASE_NAME"
     RECORDS_BASE_TABLE_NAMES = [REPRESENTATIVE_TRANSCRIPT_ANNOTATION, TRANSCRIPT_ANNOTATION, VARIANT_GENE_OVERLAP]
 
     class Status(models.TextChoices):
@@ -695,8 +719,36 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     dbnsfp = models.TextField(blank=True, null=True)  # 37/38 only
     denovo_db = models.TextField(blank=True, null=True)  # 37/38 only
     mave_db = models.TextField(blank=True, null=True)  # GRCh38 only - date string parsed from MaveDB filename
+    open_targets = models.TextField(blank=True, null=True)  # release parsed from Open Targets filename
+    popeve = models.TextField(blank=True, null=True)  # GRCh38 only - date string parsed from popEVE filename
     spliceai = models.TextField(blank=True, null=True)
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
+
+    # --- remaining VEP command line component pins (#462) ------------------
+    # Data files and settings that go into the VEP command line but aren't reported in the ##VEP=
+    # header. Files whose name carries a version store the parsed version, the rest store the
+    # basename, so installing different data registers as a change - as does removing it, which
+    # drops that data's columns. All derived by vep_config.vep_component_version_kwargs().
+    # NULL on versions created before #462 other than the ones migration 0161 backfilled.
+    conservation = models.TextField(null=True, blank=True)  # phastCons/phyloP bigwig basenames
+    dbscsnv = models.TextField(null=True, blank=True)
+    eve = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
+    fasta = models.TextField(null=True, blank=True)  # whatever _get_vep_fasta passes to --fasta
+    gnomad_sv = models.TextField(null=True, blank=True)
+    mastermind = models.TextField(null=True, blank=True)
+    maxentscan = models.TextField(null=True, blank=True)
+    promoter_ai = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
+    protvar = models.TextField(null=True, blank=True)
+    repeat_masker = models.TextField(null=True, blank=True)
+    topmed = models.TextField(null=True, blank=True)
+    transcript_blocklist = models.TextField(null=True, blank=True)  # --transcript_filter
+    uk10k = models.TextField(null=True, blank=True)
+
+    pick_order = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_PICK_ORDER
+    sift_enabled = models.BooleanField(null=True)  # vep_config "sift" - whether we pass --sift b
+    sv_max_size = models.IntegerField(null=True, blank=True)  # ANNOTATION_VEP_SV_MAX_SIZE
+    sv_overlap_min_fraction = models.FloatField(null=True, blank=True)  # gnomAD SV overlap_cutoff
+    vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
 
     # AnnotSV version pins. Both default to NULL. Populated only on deployments
     # that opt-in to AnnotSV via settings + management command. Either value
@@ -742,6 +794,12 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # Backfill source:
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_pathogenicity_prediction_counts
     backfilled_damage_counts = models.BooleanField(default=True)
+
+    # #579 - DamageNode.ptc_nmd_escaping filters on nmd_escape_status, which is null on
+    # rows annotated before the PTC calculation existed. Flipped by
+    # `manage.py backfill_ptc_annotation`. Backfill source:
+    # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_calculated_ptc
+    backfilled_ptc = models.BooleanField(default=True)
 
     class Meta:
         constraints = [
@@ -802,7 +860,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         av = self.annotationversion_set.order_by("annotation_date").last()
         if av is None:
             return None
-        remediation = "Run 'python3 manage.py gene_annotation --latest-releases'."
+        remediation = "Run 'python3 manage.py gene_annotation --new-releases'."
         if av.gene_annotation_version_id is None:
             return (f"No gene annotation has been created for this GeneAnnotationRelease / current "
                     f"OntologyVersion. {remediation}")
@@ -810,6 +868,15 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             av.validate_gene_annotation()
         except InvalidAnnotationVersionError as e:
             return f"{e} {remediation}"
+        return None
+
+    def get_annotation_run_blocker(self) -> Optional[str]:
+        """ Reason annotation runs against this VAV will fail at pipeline time, or None if OK. Without a
+            GeneAnnotationRelease we can't get transcript/versions into the DB for FK linking, so every
+            AnnotationRun errors (see annotation.tasks.annotate_variants). Surfaced as a warning on the
+            annotation runs page so a misconfigured VAV is caught before pipelines are run. """
+        if self.gene_annotation_release_id is None:
+            return "missing GeneAnnotationRelease"
         return None
 
     @transaction.atomic
@@ -849,7 +916,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
                 'mutation_taster_pred_most_damaging': lambda d: d in MutationTasterPrediction.get_damage_or_greater_levels(),
                 'polyphen2_hvar_pred_most_damaging': lambda d: d in Polyphen2Prediction.get_damage_or_greater_levels(),
             }
-        if self.columns_version in (2, 3, 4):
+        if self.columns_version in (2, 3, 4, 5):
             pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
             pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
                                              'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
@@ -901,67 +968,52 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return self._vep_config.get("phylop46way")
 
     @cached_property
-    def _gene_annotation_release_and_gff_url(self) -> tuple[Optional[str], Optional[str]]:
-        release = None
-        gff_url = None
-        # See issue: https://github.com/Ensembl/ensembl-vep/issues/833 - perhaps this can be done more easily now
-        if self.annotation_consortium == AnnotationConsortium.ENSEMBL:
-            if self.genome_build.name == "GRCh37":
-                # This has remained unchanged (last checked v108)
-                release = "87"
-                gff_url = "ftp://ftp.ensembl.org/pub/grch37/release-87/gff3/homo_sapiens/Homo_sapiens.GRCh37.87.gff3.gz"
-            elif self.genome_build.name == "GRCh38":
-                release = str(self.vep)
-                gff_url = f"ftp://ftp.ensembl.org/pub/release-{self.vep}/gff3/homo_sapiens/Homo_sapiens.GRCh38.{self.vep}.gff3.gz"
-        else:
-            if self.genome_build.name == "GRCh37":
-                # This is the last GRCh37 release (checked VEP v108)
-                if self.refseq == '2020-10-26 17:03:42 - GCF_000001405.25_GRCh37.p13_genomic.gff':
-                    release = "105.20201022"
-                    gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz"
-            elif self.genome_build.name == "GRCh38":
-                if m := re.match(r"(109.20\d{6}) - GCF_000001405.39_GRCh38.p13_genomic.gff", self.refseq):
-                    release = m.group(1)
-                    gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz"
-                else:
-                    (release, gff_filename) = self.refseq.split(" - ", maxsplit=1)
-                    if not gff_filename.endswith(".gz"):
-                        gff_filename += ".gz"
-                    # This is good for VEP v108 (will need to keep on top of this)
-                    patch_version = 14
-                    gff_url = f"https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.40_GRCh38.p{patch_version}/{gff_filename}"
-        return release, gff_url
+    def vep_gene_set_versions(self) -> VepGeneSetVersions:
+        """ The VEP version strings describing which gene set was annotated against """
+        return VepGeneSetVersions.from_variant_annotation_version(self)
 
     @property
-    def gene_annotation_release_gff_url(self):
-        return self._gene_annotation_release_and_gff_url[1]
+    def cdot_gene_release_token(self) -> Optional[str]:
+        """ The release identifier cdot uses in its per-GFF asset names, eg 'RS_2025_08' """
+        return self.vep_gene_set_versions.release_token
 
-    @cached_property
-    def cdot_gene_release_filename(self) -> str:
-        """ returns blank if unknown """
-        name_components = []
-        _release, gff_url = self._gene_annotation_release_and_gff_url
-        if gff_url:
-            name_components = [name_from_filename(gff_url)]
-            # These ones got renamed as the filename wasn't unique
-            if self.annotation_consortium == AnnotationConsortium.REFSEQ:
-                if self.genome_build.name == "GRCh37":
-                    if m := re.match(r"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.20\d{6})/GCF_000001405.25_GRCh37.p13/(GCF_000001405.25_GRCh37.p13_genomic).gff.gz", gff_url):
-                        name_components = [m.group(2), m.group(1), "gff"]
-                elif self.genome_build.name == "GRCh38":
-                    # GCF_000001405.39_GRCh38.p13_genomic.109.20210514.gff.json.gz
-                    if m := re.match(r"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(109.20\d{6})/GCF_000001405.39_GRCh38.p13/(GCF_000001405.39_GRCh38.p13_genomic).gff.gz", gff_url):
-                        name_components = [m.group(2), m.group(1), "gff"]
-            name_components.append("json.gz")
-
-        return ".".join(name_components)
+    @property
+    def gene_annotation_release_gff_url(self) -> Optional[str]:
+        """ The GFF/GTF cdot read to build this gene set """
+        return self.vep_gene_set_versions.gff_url
 
     @property
     def suggested_gene_annotation_release_name(self) -> str:
-        release, _ = self._gene_annotation_release_and_gff_url
-        if release:
-            return f"{self.get_annotation_consortium_display()}_{release}"
-        return "TOOD_RELEASE_NAME"
+        if release_token := self.cdot_gene_release_token:
+            return f"{self.get_annotation_consortium_display()}_{release_token}"
+        return self.UNKNOWN_GENE_ANNOTATION_RELEASE_NAME
+
+    def match_gene_annotation_release(self) -> GeneAnnotationReleaseMatch:
+        """ Existing GeneAnnotationReleases for our build/consortium built from our VEP's gene set """
+        release_urls_by_id = dict(
+            GeneAnnotationRelease.objects.filter(genome_build=self.genome_build,
+                                                 annotation_consortium=self.annotation_consortium)
+            .values_list("pk", "gene_annotation_import__url"))
+        return match_gene_annotation_release(release_urls_by_id, self.vep_gene_set_versions)
+
+    def link_gene_annotation_release(self) -> Optional[GeneAnnotationRelease]:
+        """ Set gene_annotation_release from an existing matching release. Returns what it linked,
+            None if there was no single match (a build's annotation often doesn't change between VEP
+            versions, so the release the previous version used is usually still the right one) """
+        match = self.match_gene_annotation_release()
+        if release_id := match.unique_release_id:
+            self.gene_annotation_release = GeneAnnotationRelease.objects.get(pk=release_id)
+            self.save()
+            logging.info("%s: linked GeneAnnotationRelease '%s' - matched on %s",
+                         self, self.gene_annotation_release, match.description)
+            return self.gene_annotation_release
+
+        if match.release_ids:
+            releases = GeneAnnotationRelease.objects.filter(pk__in=match.release_ids)
+            logging.warning("%s: %d GeneAnnotationReleases match on %s (%s) - leaving unlinked",
+                            self, len(match.release_ids), match.description,
+                            ", ".join(str(r) for r in releases))
+        return None
 
     def short_string(self) -> str:
         """ Short VEP description """
@@ -1043,7 +1095,7 @@ class AnnotationRun(TimeStampedModel):
     lease_expires = models.DateTimeField(null=True)  # for dead-worker reclaim
     attempt_count = models.IntegerField(default=0)  # bounded retries before giving up
     # External annotation (#1568): set by the annotation_external --dump command. The normal scheduler /
-    # annotate_variants skip these so VEP is never auto-run on a run the operator is managing off-VM.
+    # annotate_variants skip these so VEP is never auto-run on a run the operator is managing externally.
     external = models.BooleanField(default=False)
     dump_start = models.DateTimeField(null=True)
     dump_end = models.DateTimeField(null=True)
@@ -1061,6 +1113,9 @@ class AnnotationRun(TimeStampedModel):
     vep_warnings = models.TextField(null=True)
     vcf_dump_filename = models.TextField(null=True)
     vcf_annotated_filename = models.TextField(null=True)
+    # #1646: variants to process, pre-counted off-thread by count_annotation_run (null until counted;
+    # 0 finishes an empty run without a dump). Reset to null when a merge grows the range lock.
+    count = models.IntegerField(null=True)
     dump_count = models.IntegerField(null=True)
     annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
@@ -1121,9 +1176,13 @@ class AnnotationRun(TimeStampedModel):
                 status = AnnotationStatus.DUMP_COMPLETED
             if self.dump_count == 0:
                 status = AnnotationStatus.FINISHED
-            elif self.external and self.dump_end and self.vcf_annotated_filename is None:
-                # External annotation (#1568): once dumped, park awaiting the operator rather than getting
-                # stuck at DUMP_COMPLETED. Once --import sets vcf_annotated_filename the normal flow resumes.
+            elif self.external and self.vcf_annotated_filename is None:
+                # External annotation (#1568): an operator-managed run parks awaiting external annotation for
+                # its whole life (from being claimed external, through the local dump, until --import sets
+                # vcf_annotated_filename and the normal flow resumes) rather than surfacing the transient
+                # local dump states (DUMP_STARTED/DUMP_COMPLETED). This keeps `status` in sync with the
+                # `external` flag - the two never disagree - so a run whose dump is in progress or died
+                # mid-dump still reads "Awaiting external annotation" instead of getting stuck at DUMP_STARTED.
                 status = AnnotationStatus.EXTERNAL_DUMP_COMPLETED
             else:
                 if self.annotation_start:
@@ -1145,7 +1204,11 @@ class AnnotationRun(TimeStampedModel):
 
     def is_dispatchable(self, now=None) -> bool:
         """ #2667: Ready for the dispatcher to lease + launch - pending state with no live lease.
-            External runs (#1568) are operator-managed and never auto-dispatched. """
+            External runs (#1568) are operator-managed and never auto-dispatched.
+
+            #1646: strictly CREATED - a resume-upload run (is_upload_resumable) is dispatched via a
+            separate lane. Keeping this CREATED-only means merge (_range_lock_is_dispatchable) never
+            grows a lock whose run already owns committed VEP output for its exact range. """
         if self.external:
             return False
         if self.task_id is not None:
@@ -1154,11 +1217,88 @@ class AnnotationRun(TimeStampedModel):
             return False
         return not self._lease_is_live(now)
 
+    @property
+    def is_empty_finished(self) -> bool:
+        """ #1646: a run the count task found empty (no variants of its pipeline_type in range) and
+            finished without a dump. Owns no annotation rows, so a merge that grows its range lock can
+            safely reopen it (_absorb_range_lock) for a re-count over the larger range. """
+        return self.status == AnnotationStatus.FINISHED and self.dump_count == 0
+
+    def reopen_to_created(self):
+        """ #1646: return an empty-finished run to an un-counted CREATED state so it is re-counted over
+            a now-larger range (a merge grew its lock). Only valid for empty runs - they own no rows. """
+        self.dump_start = None
+        self.dump_end = None
+        self.dump_count = None
+        self.count = None
+        self.save()  # get_status() -> CREATED
+
+    def reset_for_retry(self):
+        """ #1654: return this run to a clean, un-counted CREATED state so the dispatcher re-counts +
+            re-annotates it from scratch, keeping its existing annotation_range_lock. Reusing the run
+            in place (rather than delete + recreate) means no rangeless AnnotationRun is ever committed
+            and there's no unique_together (annotation_range_lock, pipeline_type) window to work around.
+
+            Clears any partially-imported annotation rows first - which can take a minute or two for a
+            large range - so callers run this on a worker rather than in a request. The flip to CREATED
+            happens only after that delete, so the dispatcher never re-annotates over stale rows; an
+            interrupted delete leaves the run in its current (visible, retryable) state, never orphaned. """
+        with transaction.atomic():
+            self.delete_related_objects()
+            # Overwrite the row in place with a fresh run carrying the same pk + range lock, so every other
+            # field returns to its default (no field-by-field reset to keep in sync as the model grows).
+            # pk is already set -> save() does an UPDATE of all columns; get_status() -> CREATED.
+            fresh = AnnotationRun(annotation_range_lock=self.annotation_range_lock, pipeline_type=self.pipeline_type)
+            fresh.pk = self.pk
+            fresh.created = self.created  # auto_now_add isn't re-applied on the UPDATE below
+            fresh.save()
+        self.refresh_from_db()  # keep this instance consistent with the reset row
+        # #1596: the DB rows are gone, so drop the matching on-disk import-processing scratch dir too.
+        # Otherwise the previous attempt's TSVs survive the reset, and because upload_attempts is back to 0
+        # the upload_attempts>1 cleanup in import_vcf_annotations is skipped - so the leftover files trip
+        # write_sql_copy_csv's "don't want to overwrite" guard, which is meant only for genuinely out-of-sync
+        # dirs (moved dump / double launch). Done outside the transaction (filesystem op) and after the DB
+        # reset commits, so a rolled-back reset leaves the scratch dir intact. Prefix matches
+        # BulkVEPVCFAnnotationInserter.PREFIX.
+        import_processing_dir = os.path.join(settings.IMPORT_PROCESSING_DIR, f"annotation_run_{self.pk}")
+        shutil.rmtree(import_processing_dir, ignore_errors=True)
+
+    def revert_external_to_local(self):
+        """ #1568: return an external run to the normal local pipeline. Clears the external flag and dump
+            state (like reopen_to_created) so get_status() -> CREATED and the dispatcher - which sweeps the
+            latest NEW/ACTIVE versions filtering external=False - re-dumps + annotates it locally. Used when
+            a dump is too small to be worth the external round-trip (see
+            external_annotation.DEFAULT_MIN_EXTERNAL_VARIANTS). """
+        self.external = False
+        self.dump_start = None
+        self.dump_end = None
+        self.dump_count = None
+        self.count = None
+        self.save()  # get_status() -> CREATED
+
+    def is_upload_resumable(self, now=None) -> bool:
+        """ #1646: a stalled run that already has an annotated VCF (past VEP) and only needs the quick
+            DB upload. reclaim_stalled_annotation_runs keeps the annotated file and scrubs partial upload
+            rows, leaving status ANNOTATION_COMPLETED; the dispatcher re-launches it upload-only and
+            annotate_variants skips straight to import_vcf_annotations. """
+        if self.external:
+            return False
+        if self.task_id is not None:
+            return False
+        if self.status != AnnotationStatus.ANNOTATION_COMPLETED:
+            return False
+        if not self.vcf_annotated_filename:
+            return False
+        return not self._lease_is_live(now)
+
     def is_in_flight(self, now=None) -> bool:
         """ #2667: A run that currently occupies a worker slot - live lease, holding the task_id
             execution lock, or part-way through the pipeline (a running, non-completed status). A
             completed run never occupies a slot even if its lease has not been cleared yet. """
         if self.status in AnnotationStatus.get_completed_states():
+            return False
+        # #1646: a reclaimed resume-upload run waits for the dispatcher - it holds no worker slot.
+        if self.is_upload_resumable(now):
             return False
         if self._lease_is_live(now):
             return True
@@ -1187,35 +1327,92 @@ class AnnotationRun(TimeStampedModel):
         VariantAnnotationPipelineType.STRUCTURAL_VARIANT: "structural_variant",
     }
 
-    def get_dump_filename(self, dump_dir=None) -> str:
-        """ Self-describing dump filename (#1568): the stem carries site/build/version/run identity so dumps
-            copied to other machines remain self-explanatory. Matching is driven by the sidecar metadata
-            (get_dump_metadata), not by parsing this name. dump_dir defaults to ANNOTATION_VCF_DUMP_DIR;
-            the annotation_external --dump command passes its --output-dir instead. """
+    def _get_dump_path_stem(self, dump_dir=None, task_token=None) -> str:
+        """ Self-describing dump path without extension (#1568): the stem carries site/build/version/run
+            identity so dumps copied to other machines remain self-explanatory. Matching is driven by the
+            sidecar metadata (get_dump_metadata), not by parsing this name. dump_dir defaults to
+            ANNOTATION_VCF_DUMP_DIR; the annotation_external --dump command passes its --output-dir instead.
+
+            #1658: the local VEP pipeline passes task_token (the executing Celery task_id) so a reclaimed
+            run's new attempt writes to a path distinct from the losing zombie worker's - two concurrent
+            executions always have distinct task_ids by construction, so each VEP owns its own file and
+            neither can corrupt the other. External dumps pass no token, keeping their stable name. """
         type_desc = self.PIPELINE_TYPE_DESC.get(self.pipeline_type, str(self.pipeline_type))
         vav = self.variant_annotation_version
         site = slugify(settings.SITE_NAME) or "site"
         stem = (f"{site}__{vav.genome_build.name}__{vav.get_annotation_consortium_display()}"
                 f"__vep{vav.vep}__cv{vav.columns_version}__gar{vav.gene_annotation_release_id}"
                 f"__run{self.pk}__{type_desc}")
-        vcf_base_name = f"{stem}.vcf"
-        return os.path.join(dump_dir or settings.ANNOTATION_VCF_DUMP_DIR, vcf_base_name)
+        if task_token:
+            stem += f"__task{slugify(task_token)}"
+        return os.path.join(dump_dir or settings.ANNOTATION_VCF_DUMP_DIR, stem)
+
+    def get_dump_filename(self, dump_dir=None, task_token=None) -> str:
+        # External dumps (#1568) are gzipped - smaller to ship to the compute box, and VEP reads gzipped
+        # input natively. In-VM dumps stay plain (fed straight to VEP then deleted).
+        suffix = ".vcf.gz" if self.external else ".vcf"
+        return self._get_dump_path_stem(dump_dir=dump_dir, task_token=task_token) + suffix
 
     def get_dump_metadata_filename(self, dump_dir=None) -> str:
         """ Sidecar metadata path written next to the dump VCF (#1568). """
-        return os.path.splitext(self.get_dump_filename(dump_dir=dump_dir))[0] + ".meta.json"
+        return self._get_dump_path_stem(dump_dir=dump_dir) + ".meta.json"
 
     def delete(self, using=None, keep_parents=False):
         self.delete_related_objects()
         super().delete(using=using, keep_parents=keep_parents)
 
     def set_task_log(self, key, value):
+        """ #1658: append to this task's entry in celery_task_logs (keyed by task_id so a reclaimed run
+            keeps every attempt's log - the audit trail for diagnosing a reclaim).
+
+            Values are coerced to JSON-native types here rather than at the call sites: celery_task_logs is
+            a plain JSONField with no encoder=, and every real caller logs a timezone.now(). Coercing here
+            keeps the field's stored representation unchanged for every other value (adding
+            encoder=DjangoJSONEncoder would need a migration and would alter how they all round-trip). """
         assert self.task_id is not None
-        task_log = self.celery_task_logs.get(self.task_id, {})
-        task_log[key] = value
+        if isinstance(value, (datetime, date, time)):
+            value = value.isoformat()
+        self.celery_task_logs.setdefault(self.task_id, {})[key] = value
+
+    def save_if_owner(self, task_id) -> bool:
+        """ #1658: ownership-guarded counterpart to save(), for the writes that happen after a stage this
+            worker may have lost the run during (VEP / the bulk import). A stalled attempt whose lease
+            expired has its run reclaimed and handed to a fresh attempt, but it still holds the ORM
+            instance it loaded before the reclaim - saving that whole instance writes its status, dump
+            path and traceback onto a row the new attempt now owns, and blanks the new attempt's lease.
+
+            Issues a single conditional UPDATE of all concrete fields, matched on the task_id we believe we
+            hold; returns whether it matched a row. Being one statement it is atomic, so unlike a
+            read-then-write ownership check there is no TOCTOU window. status is recomputed here exactly as
+            save() does, so it can't desynchronise from the dump_*/annotation_* timestamps. """
+        self.status = self.get_status()
+        self.modified = timezone.now()  # auto_now isn't applied by .update()
+        update_kwargs = {f.attname: getattr(self, f.attname)
+                         for f in self._meta.concrete_fields if not f.primary_key}
+        return bool(AnnotationRun.objects.filter(pk=self.pk, task_id=task_id).update(**update_kwargs))
 
     def __str__(self):
         return f"AnnotationRun: {self.pk}/{self.get_pipeline_type_display()}: ({self.get_status_display()})"
+
+
+_PROTVAR_CONFIDENCE_CSS = {"low": "secondary", "high": "info", "very high": "success"}
+
+
+def _protvar_confidence(value, *, low_below: float, high_max: float) -> Optional[dict]:
+    """ ProtVar confidence band for a numeric score (pDockQ or pocket score), matching the ProtVar.pm
+        bands: below `low_below` is 'low', up to and including `high_max` is 'high', above is
+        'very high'. Returns {label, css} for badge display, or None if not numeric. """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    if v < low_below:
+        label = "low"
+    elif v <= high_max:
+        label = "high"
+    else:
+        label = "very high"
+    return {"label": label, "css": _PROTVAR_CONFIDENCE_CSS[label]}
 
 
 class AbstractVariantAnnotation(models.Model):
@@ -1248,6 +1445,18 @@ class AbstractVariantAnnotation(models.Model):
     clinpred_pred = models.CharField(max_length=1, choices=ClinPredPrediction.CHOICES, null=True, blank=True)
     clinpred_score = models.FloatField(null=True, blank=True)
     nmd_escaping_variant = models.BooleanField(null=True, blank=True)
+
+    # #579 - where the frameshift's new premature termination codon lands, and what that
+    # implies for NMD. @see annotation/ptc.py
+    # Codons from the first changed residue to the new stop, read from hgvs_p "fsTer<n>".
+    # 1 = the changed codon is itself the stop (e.g. p.Tyr535Ter)
+    ptc_distance_codons = models.IntegerField(null=True, blank=True)
+    # Nucleotides from the PTC to the last exon-exon junction.
+    # Negative = PTC lies in the final exon. Drives the 50nt rule.
+    ptc_last_junction_distance = models.IntegerField(null=True, blank=True)
+    # PTC-aware NMD prediction - see NMDEscapeStatus
+    nmd_escape_status = models.CharField(max_length=1, choices=NMDEscapeStatus.choices, null=True, blank=True)
+
     codons = models.TextField(null=True, blank=True)
     consequence = models.TextField(null=True, blank=True)
     distance = models.IntegerField(null=True, blank=True)
@@ -1344,7 +1553,7 @@ class AbstractVariantAnnotation(models.Model):
         hgvs_c = self.hgvs_c
         if self.has_hgvs_c and self.symbol:
             from genes.hgvs import HGVSMatcher
-            hgvs_matcher = HGVSMatcher(self.version.genome_build)
+            hgvs_matcher = HGVSMatcher.instance(self.version.genome_build)
             hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_c)
             hgvs_variant.gene = self.symbol
             hgvs_c = str(hgvs_variant)
@@ -1450,6 +1659,27 @@ class VariantAnnotation(AbstractVariantAnnotation):
     denovo_db_primary_phenotypes = models.TextField(null=True, blank=True)
     denovo_db_case_count = models.IntegerField(null=True, blank=True)
     denovo_db_control_count = models.IntegerField(null=True, blank=True)
+    # ProtVar (columns_version >= 5) - https://www.ebi.ac.uk/ProtVar/
+    # ddG protein stability (>2 likely destabilising); pocket/int are '&'-joined compound blobs
+    protvar_stability = models.FloatField(null=True, blank=True)  # ProtVar_stability (ddG)
+    protvar_pocket = models.TextField(null=True, blank=True)  # id&score&MpLDDT&energy&buriedness&RoG&residues
+    protvar_int = models.TextField(null=True, blank=True)  # protein_id&pDockQ
+    # Open Targets (columns_version >= 5, GRCh38) - https://platform.opentargets.org/
+    open_targets_gwas_l2g_score = models.FloatField(null=True, blank=True)  # Locus-to-gene score
+    open_targets_gwas_gene_id = models.TextField(null=True, blank=True)  # Ensembl gene id
+    open_targets_gwas_diseases = models.TextField(null=True, blank=True)
+    open_targets_study_type = models.TextField(null=True, blank=True)
+    open_targets_study_id = models.TextField(null=True, blank=True)  # external lookup key
+    open_targets_variant_id = models.TextField(null=True, blank=True)  # external lookup key
+    open_targets_qtl_gene_id = models.TextField(null=True, blank=True)  # Ensembl gene id
+    open_targets_qtl_biosample = models.TextField(null=True, blank=True)
+    # EVE / popEVE (columns_version >= 5, GRCh38, VEP >= 116) - https://evemodel.org/
+    eve_score = models.FloatField(null=True, blank=True)
+    eve_class = models.TextField(null=True, blank=True)  # Benign / Uncertain / Pathogenic
+    popeve_score = models.FloatField(null=True, blank=True)
+    # PromoterAI (columns_version >= 5, GRCh38, VEP >= 116)
+    promoter_ai_score = models.FloatField(null=True, blank=True)
+    promoter_ai_tss_pos = models.IntegerField(null=True, blank=True)
     pubmed = models.TextField(null=True, blank=True)
     # Mastermind Cited Variants Reference. @see https://www.genomenon.com/cvr/
     mastermind_count_1_cdna = models.IntegerField(null=True, blank=True)
@@ -1631,6 +1861,16 @@ class VariantAnnotation(AbstractVariantAnnotation):
             self.cadd_phred,
         ))
 
+    @cached_property
+    def show_rankscores(self) -> bool:
+        """ dbNSFP rankscores arrived in columns_version 2. Once raw scores exist (columns_version 4+)
+            they're legacy - shown only when ANNOTATION_SHOW_LEGACY_RANKSCORES is set. columns_version
+            2-3 carry only rankscores (no raw scores), so always show them. """
+        cv = self.version.columns_version
+        if cv < 2:
+            return False
+        return settings.ANNOTATION_SHOW_LEGACY_RANKSCORES or cv < 4
+
     @property
     def has_conservation(self) -> bool:
         """ Thanks to summary stats we can now do this in VEP112 """
@@ -1643,6 +1883,22 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @property
     def has_gnomad(self) -> bool:
         return bool(self.gnomad_af or self.gnomad2_liftover_af)
+
+    @cached_property
+    def visible_columns(self) -> frozenset[str]:
+        """ All VariantGrid columns populated for this annotation's build / pipeline / version / data files.
+            Drives variant detail per-row show/hide (via `labelled visible_fields=`) off the same VEP_COLUMNS
+            table that controls what annotation writes, so the two can't drift (#1148). Passing `vep_config`
+            drops columns whose data file isn't configured - matching the `VariantAnnotationVersion.has_*`
+            flags (e.g. PhastCons/PhyloP mammalian tracks). """
+        return visible_columns_for(
+            vep_config=VEPConfig(self.version.genome_build),
+            genome_build_name=self.version.genome_build.name,
+            pipeline_type=self.annotation_run.pipeline_type,
+            columns_version=self.version.columns_version,
+            vep_version=self.version.vep,
+            gnomad4_minor_version=self.version.gnomad,
+        )
 
     @property
     def has_non_gnomad_population_frequency(self) -> bool:
@@ -1657,16 +1913,44 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.is_standard_annotation and self.version.columns_version >= 3
 
     @property
-    def has_gnomad_faf(self) -> bool:
-        return self.is_standard_annotation and self.gnomad4_or_later
+    def protvar_int_parsed(self) -> Optional[dict]:
+        """ ProtVar interface = 'protein_id&pDockQ' - a single interacting protein and its docking
+            confidence (e.g. 'Q6PJI9-2&0.420206'). Split into the interacting protein id + pDockQ,
+            with a UniProt entry link for the protein (isoform suffix dropped for the URL) and the
+            plugin's pDockQ confidence band. Returns None when there's no interface value. """
+        if not self.protvar_int:
+            return None
+        protein_id, _, pdockq = self.protvar_int.partition("&")
+        accession = protein_id.split("-")[0]  # strip isoform suffix (e.g. Q6PJI9-2 -> Q6PJI9) for the link
+        return {
+            "protein_id": protein_id,
+            "pdockq": pdockq,
+            "confidence": _protvar_confidence(pdockq, low_below=0.23, high_max=0.5),  # ProtVar.pm pDockQ bands
+            "uniprot_url": f"https://www.uniprot.org/uniprotkb/{accession}/entry" if accession else "",
+        }
 
-    @cached_property
-    def has_extended_gnomad_fields(self):
-        """ I grabbed a few new fields but haven't patched back to GRCh37 yet
-            TODO: remove this and if statements in variant_details.html once issue #231 is completed """
-        extended_fields = ["gnomad2_liftover_af", "gnomad_ac", "gnomad_an", "gnomad_popmax_ac",
-                           "gnomad_popmax_an", "gnomad_popmax_hom_alt"]
-        return any(getattr(self, f) is not None for f in extended_fields)
+    @property
+    def protvar_pocket_parsed(self) -> Optional[dict]:
+        """ ProtVar pocket = 'id&score&MpLDDT&energy&buriedness&RoG&residues' (e.g.
+            'P123&850&95.2&-1.3&0.7&12.4&p10p20p30'). Residues are 'p'-encoded by ProtVar.pm
+            (comma -> 'p') to survive the VCF field split; we decode them back to a position list.
+            Returns None when there's no pocket value. """
+        if not self.protvar_pocket:
+            return None
+        parts = self.protvar_pocket.split("&")
+        parts += [""] * (7 - len(parts))  # tolerate a short/truncated blob
+        pocket_id, score, mplddt, energy, buriedness, rog, residues = parts[:7]
+        residue_positions = [r for r in residues.lstrip("p").split("p") if r]
+        return {
+            "id": pocket_id,
+            "score": score,
+            "confidence": _protvar_confidence(score, low_below=800, high_max=900),  # ProtVar.pm pocket bands
+            "mplddt": mplddt,
+            "energy": energy,
+            "buriedness": buriedness,
+            "rog": rog,
+            "residues": ", ".join(residue_positions),
+        }
 
     @property
     def gnomad4_or_later(self) -> bool:
@@ -1675,10 +1959,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @property
     def has_hemi(self):
         return self.gnomad4_or_later and self.variant.locus.contig.name == 'X'
-
-    @property
-    def has_mid(self):
-        return self.gnomad4_or_later
 
     @property
     def gnomad_url(self):
@@ -1838,6 +2118,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
             if value := data.get(field):
                 list_values[field] = value.split("&")
 
+        if not list_values:
+            return []
+
         # Ensure they are all same length
         first_field_len = len(next(iter(list_values.values())))
         field_lengths = {k: len(v) for k, v in list_values.items()}
@@ -1858,33 +2141,42 @@ class VariantAnnotation(AbstractVariantAnnotation):
             records.append(values_dict)
         return records
 
-    @property
-    def gnomad_sv_overlap(self) -> list[dict]:
-        sv_overlap_list = []
-        for sv_overlap in self.vep_multi_fields_to_list_of_dicts(self.__dict__,
-                                                      VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS):
-            sv_overlap['gnomad_sv_overlap_af'] = float(sv_overlap['gnomad_sv_overlap_af'])
+    @staticmethod
+    def get_gnomad_sv_overlap(data: dict, gnomad_sv_version: str) -> list[dict]:
+        """ data contains the GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS (VEP '&' separated multi values)
+            gnomad_sv_version is VariantAnnotationVersion.gnomad_sv (parsed from the annotation settings
+            data file by vep_config.vep_component_version_kwargs) """
+        dataset = None
+        remove_prefix = None
+        gnomad_sv_version = gnomad_sv_version or ""
+        if gnomad_sv_version.startswith("2.1"):
+            dataset = "gnomad_sv_r2_1"
+            remove_prefix = "gnomAD-SV_v2.1_"
+        elif gnomad_sv_version.startswith("4"):
+            dataset = "gnomad_sv_r4"
+            # gnomAD v4 ships the v3 SV call set, whose records keep their v3 names
+            remove_prefix = "gnomAD-SV_v3_"
 
-            dataset = None
-            remove_prefix = None
-            if self.version.gnomad.startswith("2.1"):
-                dataset = "gnomad_sv_r2_1"
-                remove_prefix = "gnomAD-SV_v2.1_"
-            elif self.version.gnomad.startswith("4"):
-                dataset = "gnomad_sv_r4"
-                remove_prefix = "gnomAD-SV_v3_"
+        sv_overlap_list = []
+        for sv_overlap in VariantAnnotation.vep_multi_fields_to_list_of_dicts(
+                data, VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS):
+            sv_overlap['gnomad_sv_overlap_af'] = float(sv_overlap['gnomad_sv_overlap_af'])
 
             gnomad_variant = sv_overlap["gnomad_sv_overlap_name"]
             if remove_prefix:
                 gnomad_variant = gnomad_variant.replace(remove_prefix, "")
 
-            sv_overlap['gnomad_sv_overlap_url'] = self.get_gnomad_url(gnomad_variant, dataset)
+            sv_overlap['gnomad_sv_overlap_url'] = VariantAnnotation.get_gnomad_url(gnomad_variant, dataset)
             if coords := sv_overlap.get("gnomad_sv_overlap_coords"):
                 _chrom, start, end = parse_gnomad_coord(coords)
                 sv_overlap['gnomad_sv_overlap_length'] = end - start
 
             sv_overlap_list.append(sv_overlap)
         return sv_overlap_list
+
+    @property
+    def gnomad_sv_overlap(self) -> list[dict]:
+        return self.get_gnomad_sv_overlap(self.__dict__, self.version.gnomad_sv)
 
     @staticmethod
     def get_hgvs_g(variant: Variant) -> Optional[str]:
@@ -1898,7 +2190,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
         if hgvs_g is None:
             # Reference variants have no annotation - so we'll have to fall back to generating it
             from genes.hgvs import HGVSMatcher
-            matcher = HGVSMatcher(variant.any_genome_build)
+            matcher = HGVSMatcher.instance(variant.any_genome_build)
             hgvs_g = matcher.variant_to_g_hgvs(variant)
 
         return hgvs_g
@@ -1970,13 +2262,21 @@ class ManualVariantEntryCollection(models.Model):
                 annotation_run = AnnotationRun.get_for_variant(variant, mve.genome_build)
         return annotation_run
 
-    @staticmethod
-    def get_for_user(user, mvec_id):
-        mvec = ManualVariantEntryCollection.objects.get(pk=mvec_id)
-        if not (user.is_staff or user == mvec.user):
+    @classmethod
+    def filter_for_user(cls, user):
+        """ Superusers see all collections, other users only their own """
+        qs = cls.objects.all()
+        if not user.is_superuser:
+            qs = qs.filter(user=user)
+        return qs
+
+    @classmethod
+    def get_for_user(cls, user, mvec_id):
+        try:
+            return cls.filter_for_user(user).get(pk=mvec_id)
+        except cls.DoesNotExist:
             msg = f"User {user} doesn't have permission to access mvec_id={mvec_id}"
             raise PermissionDenied(msg)
-        return mvec
 
     def __str__(self):
         status = self.get_import_status_display()

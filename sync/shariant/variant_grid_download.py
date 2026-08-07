@@ -3,14 +3,13 @@ from typing import Optional
 
 import ijson
 
+from classification.models.classification_inserter import BulkClassificationInserter
 from classification.models.evidence_key import EvidenceKeyMap
-from classification.views.classification_view import BulkClassificationInserter
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from library.oauth import ServerAuth
 from library.utils import batch_iterator, make_json_safe_in_place
 from snpdb.models.models import Country, Lab, Organization
-from sync.models.models import SyncRun
 from sync.sync_runner import SyncRunInstance, SyncRunner, register_sync_runner
 
 
@@ -21,7 +20,7 @@ class VariantGridDownloadSyncer(SyncRunner):
         if sync_run_instance.max_rows:
             raise ValueError("VariantGridDownloadSyncer does not support max_rows")
 
-        sync_destination = self.sync_destination
+        sync_destination = sync_run_instance.sync_destination
 
         config = sync_destination.config
         other_variant_grid = ServerAuth.for_sync_details(sync_destination.sync_details)
@@ -40,7 +39,6 @@ class VariantGridDownloadSyncer(SyncRunner):
             params['exclude_orgs'] = ','.join(exclude_orgs)
 
         if not sync_run_instance.full_sync:
-            last_download: SyncRun
             if since := sync_run_instance.last_success_server_date():
                 params['since'] = str(since.timestamp())
 

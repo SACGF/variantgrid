@@ -18,7 +18,7 @@ from patients.models import (
 )
 from snpdb.models import ImportSource, Sex
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import UploadedFile, UploadedFileTypes, UploadedPatientRecords
+from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
 
 
 class Test(URLTestCase):
@@ -42,14 +42,14 @@ class Test(URLTestCase):
 
         dirname = os.path.dirname(__file__)
         filename = os.path.join(dirname, "test_data", "fake_patient_records.csv")
-        uploaded_file = UploadedFile.objects.create(user=cls.user_owner,
-                                                    name="fake uploaded file",
-                                                    path=filename,
-                                                    file_type=UploadedFileTypes.PATIENT_RECORDS,
-                                                    import_source=ImportSource.COMMAND_LINE)
+        file_upload = FileUpload.objects.create(user=cls.user_owner,
+                                                name="fake uploaded file",
+                                                path=filename,
+                                                file_type=UploadedFileTypes.PATIENT_RECORDS,
+                                                import_source=ImportSource.COMMAND_LINE)
         patient_import = PatientImport.objects.get_or_create(name="shazbot")[0]
         patient_records = PatientRecords.objects.get_or_create(patient_import=patient_import)[0]
-        UploadedPatientRecords.objects.get_or_create(uploaded_file=uploaded_file, patient_records=patient_records)
+        UploadedPatientRecords.objects.get_or_create(file_upload=file_upload, patient_records=patient_records)
 
         patient_kwargs = {"patient_id": cls.patient.pk}
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
@@ -100,6 +100,24 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
+
+    def testPatientImportWithoutUploadedFile(self):
+        """ #1684 - old imports may have lost their UploadedPatientRecords """
+        self._test_urls(self._no_uploaded_file_url_names_and_kwargs(),
+                        User.objects.create_superuser("admin_user"))
+
+    @prevent_request_warnings
+    def testPatientImportWithoutUploadedFileNoPermission(self):
+        self._test_urls(self._no_uploaded_file_url_names_and_kwargs(),
+                        self.user_non_owner, expected_code_override=403)
+
+    @staticmethod
+    def _no_uploaded_file_url_names_and_kwargs():
+        patient_import = PatientImport.objects.create(name="no uploaded file")
+        patient_records = PatientRecords.objects.create(patient_import=patient_import)
+        return [
+            ('view_patient_import', {"patient_records_id": patient_records.pk}, 200),
+        ]
 
     def testAutocompletePermission(self):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_owner, True)

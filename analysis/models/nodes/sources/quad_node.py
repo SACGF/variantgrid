@@ -36,10 +36,10 @@ class AbstractQuadInheritance(ABC):
         """quad_zyg_data = (mum_zyg, dad_zyg, proband_zyg, sibling_zyg)"""
         quad = self.node.quad
         return _build_family_zyg_q(cgc, [
-            (quad.mother.sample,  quad_zyg_data[0], self.node.require_zygosity),
-            (quad.father.sample,  quad_zyg_data[1], self.node.require_zygosity),
+            (quad.mother.sample,  quad_zyg_data[0], self.node.require_parent_zygosity),
+            (quad.father.sample,  quad_zyg_data[1], self.node.require_parent_zygosity),
             (quad.proband.sample, quad_zyg_data[2], True),  # 947 - Always require zygosity for Proband
-            (quad.sibling.sample, quad_zyg_data[3], self.node.require_zygosity),
+            (quad.sibling.sample, quad_zyg_data[3], self.node.require_sibling_zygosity),
         ])
 
     @abstractmethod
@@ -183,17 +183,19 @@ class QuadCompHet(AbstractQuadInheritance):
 
         annotation_kwargs = self.node.get_annotation_kwargs()
 
+        # Gene overlaps (not transcript annotation) - a long SV is skipped by VEP so its only
+        # record of the genes it crosses is VariantGeneOverlap @see issue #940
         def get_parent_genes(q):
             qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
-            return qs.values_list("varianttranscriptannotation__gene", flat=True).distinct()
+            return qs.values_list("variantgeneoverlap__gene", flat=True).distinct()
 
         common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
         vav = self.node.analysis.annotation_version.variant_annotation_version
         q_in_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(vav, common_genes)
         parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
-        parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
+        parent_genes_qs = parent_genes_qs.values_list("variantgeneoverlap__gene")
         two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
-        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True).distinct())
+        two_hit_genes = set(two_hits.values_list("variantgeneoverlap__gene", flat=True).distinct())
         return comp_het_q, two_hit_genes
 
     def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
@@ -268,7 +270,8 @@ class QuadNode(AbstractCohortBasedNode):
     quad = models.ForeignKey(Quad, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=QuadInheritance.choices,
                                    default=QuadInheritance.RECESSIVE)
-    require_zygosity = models.BooleanField(default=True)
+    require_parent_zygosity = models.BooleanField(default=True)
+    require_sibling_zygosity = models.BooleanField(default=True)
 
     @property
     def min_inputs(self):
@@ -332,7 +335,7 @@ class QuadNode(AbstractCohortBasedNode):
 
     def get_node_name(self):
         label = QuadInheritance(self.inheritance).label
-        if not self.require_zygosity:
+        if not (self.require_parent_zygosity and self.require_sibling_zygosity):
             label += "?"
         name_parts = [label]
         if desc := self.get_filter_description():

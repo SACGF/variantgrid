@@ -494,6 +494,11 @@ class Lab(models.Model, PreviewModelMixin):
     contact_phone = models.TextField(blank=True)
     contact_email = models.TextField(blank=True)
 
+    # Opt-in to participate in MatchMaker Exchange (patient matchmaking). Distinct from
+    # a record's share_level=PUBLIC (which only means "publicly shareable"); enabling MME
+    # is a deliberate lab decision and requires a resolvable MME contact (see clean()).
+    mme_enabled = models.BooleanField(default=False, blank=True)
+
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=SET_NULL)
 
     group_name = models.TextField(blank=True, null=True, unique=True)
@@ -535,6 +540,15 @@ class Lab(models.Model, PreviewModelMixin):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-flask"
+
+    def clean(self):
+        super().clean()
+        # An MME match is an invitation to a person-to-person clinical conversation, so a
+        # lab can't opt in without an address a matching lab can reply to.
+        if self.mme_enabled and not (self.contact_email or "").strip():
+            raise ValidationError({
+                "mme_enabled": "Set an MME contact email before enabling MatchMaker Exchange."
+            })
 
     @property
     def contact_details(self) -> ContactDetails:
@@ -641,6 +655,11 @@ class Lab(models.Model, PreviewModelMixin):
 
         group_names = list(user.groups.values_list('name', flat=True))
         return Lab.objects.select_related('organization').filter(group_name__in=group_names).order_by('name')
+
+    @staticmethod
+    def has_active_lab(user: User, admin_check=False) -> bool:
+        """ Whether the user has access to any lab belonging to an active organization """
+        return Lab.valid_labs_qs(user=user, admin_check=admin_check).filter(organization__active=True).exists()
 
     """
     # these methods have been superseeded by having full classification activity by lab

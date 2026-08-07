@@ -5,7 +5,7 @@ from django.conf import settings
 from django.dispatch import receiver
 
 from library.keycloak import Keycloak
-from library.uptime_check import uptime_check_signal, UptimeCheckResponse, UptimeCheckStatus
+from library.uptime_check import UptimeCheckResponse, UptimeCheckStatus, uptime_check_signal
 
 
 @receiver(signal=uptime_check_signal)

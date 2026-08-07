@@ -1,10 +1,11 @@
 import logging
 from collections import defaultdict
 from operator import itemgetter
+from typing import Optional
 
 from library.utils.file_utils import get_extension_without_gzip
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import UploadedFileTypes
+from upload.models import UploadData, UploadedFileTypes
 from upload.tasks.vcf.genotype_vcf_tasks import reload_vcf_task
 from upload.upload_processing import process_upload_pipeline
 
@@ -45,42 +46,39 @@ def get_import_task_factory_from_extension(user, filename, file_extension):
     return None
 
 
-def get_uploaded_file_type(uploaded_file, original_filename):
-    """ When Django UploadedFile saves, it may add extra chars to make it unique, eg:
+def get_uploaded_file_type(file_upload, original_filename):
+    """ When Django's UploadedFile saves, it may add extra chars to make it unique, eg:
         combined.vcf.gz => combined.vcf_HvzMe7j.gz
         So need to pass in original file name, which we'll use to get extension
     """
-    filename = uploaded_file.get_filename()
+    filename = file_upload.get_filename()
     file_extension = get_extension_without_gzip(original_filename)
-    import_task_factory = get_import_task_factory_from_extension(uploaded_file.user, filename, file_extension)
+    import_task_factory = get_import_task_factory_from_extension(file_upload.user, filename, file_extension)
     if import_task_factory:
         return import_task_factory.get_uploaded_file_type()
     return None
 
 
-def get_url_and_data_for_uploaded_file_data(uploaded_file):
+def get_url_and_data_for_uploaded_file_data(file_upload):
     url = None
-    upload_data = get_upload_data_for_uploaded_file(uploaded_file)
+    upload_data = get_upload_data_for_uploaded_file(file_upload)
     if upload_data:
-        try:
-            data = upload_data.get_data()
-            url = data.get_absolute_url()
-        except Exception:
-            pass
+        url = upload_data.get_data_url()
     return url, upload_data
 
 
-def get_upload_data_for_uploaded_file(uploaded_file):
-    uploaded_file_classes = {}
+def get_upload_data_for_uploaded_file(file_upload) -> Optional[UploadData]:
+    """ The UploadData created by processing file_upload - factories list their classes most specific first """
+    data_classes_by_file_type = {}
     for itf in get_import_task_factories():
         file_type = itf.get_uploaded_file_type()
-        uploaded_file_classes[file_type] = itf.get_data_classes()
+        data_classes_by_file_type[file_type] = itf.get_data_classes()
 
-    classes = uploaded_file_classes.get(uploaded_file.file_type)
+    classes = data_classes_by_file_type.get(file_upload.file_type)
     if classes:
         for klazz in classes:
             try:
-                return klazz.objects.get(uploaded_file=uploaded_file)
+                return klazz.objects.get(file_upload=file_upload)
             except Exception:
                 pass
 
@@ -91,9 +89,9 @@ def retry_upload_pipeline(upload_pipeline):
     upload_pipeline.remove_processing_files()
 
     logging.debug("retrying upload of %s", upload_pipeline)
-    uploaded_file = upload_pipeline.uploaded_file
+    file_upload = upload_pipeline.file_upload
 
-    upload_data = get_upload_data_for_uploaded_file(uploaded_file)
+    upload_data = get_upload_data_for_uploaded_file(file_upload)
     if upload_pipeline.file_type == UploadedFileTypes.VCF:
         if upload_data.vcf:
             vcf_id = upload_data.vcf.pk
@@ -103,7 +101,7 @@ def retry_upload_pipeline(upload_pipeline):
         task.apply_async()
     else:
         if upload_data:
-            logging.debug("Type: %s, deleting file records: %s", uploaded_file.file_type, upload_data)
+            logging.debug("Type: %s, deleting file records: %s", file_upload.file_type, upload_data)
             upload_data.delete()
 
         # Re-use old UFPP so that it doesn't delete uploaded VCF

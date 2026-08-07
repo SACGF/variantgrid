@@ -33,7 +33,7 @@ from genes.models import (
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import JsonDataType, update_dict_of_dict_values
+from library.utils import update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import ImportStatus, Q, Tag, UserSettings, VariantGridColumn
@@ -132,6 +132,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         self.gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
         user_settings = UserSettings.get_for_user(user)
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.genome_build = genome_build
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
@@ -345,7 +346,7 @@ class QCGeneCoverageGrid(JqGridUserRowConfig):
             gene_list_ids = gene_list_id_list.split("/")
             if gene_list_ids:
                 for gene_list_id in gene_list_ids:
-                    gene_list = get_object_or_404(GeneList, pk=gene_list_id)
+                    gene_list = GeneList.get_for_user(user, gene_list_id, success_only=False)
                     gene_symbols.update(gene_list.get_gene_names())
 
         q = self.get_coverage_q(gene_coverage_collection, gene_symbols)
@@ -381,19 +382,13 @@ class GeneSymbolWikiColumns(DatatableConfig[GeneSymbolWiki]):
         self.download_csv_button_enabled = True
 
         self.rich_columns = [
-            RichColumn('gene_symbol', orderable=True,
-                       renderer=self.render_gene_symbol, client_renderer="renderGeneSymbol"),
+            RichColumn('gene_symbol', orderable=True, client_renderer="renderGeneSymbol"),
             RichColumn('markdown'),
             RichColumn('last_edited_by__username', name='user', orderable=True),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn('modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
         ]
-
-    @staticmethod
-    def render_gene_symbol(row: dict[str, Any]) -> JsonDataType:
-        gene_symbol = row["gene_symbol"]
-        return {"id": gene_symbol}
 
     def get_initial_queryset(self) -> QuerySet[GeneSymbolWiki]:
         return GeneSymbolWiki.objects.all()

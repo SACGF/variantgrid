@@ -22,7 +22,7 @@ function initWiki() {
     const editor = new toastui.Editor({
         el: document.querySelector('.editSection', wikiId),
         previewStyle: 'vertical',
-        initialValue: `{{ wiki.markdown|jsstring }}`, // ES6 template string as could be multi-line
+        initialValue: `{{ wiki.markdown|jsonify }}`, // ES6 template string as could be multi-line
         initialEditType: 'wysiwyg',
         height: '300px',
         events: events,

@@ -7,32 +7,8 @@ from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.pandas_utils import nan_to_none
-from seqauto.models import (
-    EnrichmentKit,
-    GoldCoverageSummary,
-    GoldReference,
-    SeqAutoRun,
-    SequencingSample,
-)
+from seqauto.models import EnrichmentKit, GoldCoverageSummary, GoldReference, SequencingSample
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df, group_enrichment_kits_df
-
-
-class SeqAutoRunsGrid(JqGridUserRowConfig):
-    model = SeqAutoRun
-    caption = 'SeqAutoRuns'
-
-    fields = ['id', 'status', 'task_id',
-              'created', 'scan_start', 'create_models_start', 'scripts_and_jobs_start', 'finish_date', 'job_launch_script_filename', 'error_exception']
-    colmodel_overrides = {'id': {'width': 120, 'formatter': 'viewSeqAutoRunsLink'}}
-
-    def __init__(self, user):
-        super().__init__(user)
-        queryset = self.model.objects.all()
-        self.queryset = queryset.values(*self.get_field_names())
-
-        self.extra_config.update({'sortname': "id",
-                                  'sortorder': "desc",
-                                  'shrinkToFit': False})
 
 
 class SequencingSamplesGrid(JqGridUserRowConfig):
@@ -109,7 +85,7 @@ class GoldCoverageSummaryGrid(JqGridUserRowConfig):
 
 
 class EnrichmentKitGeneCoverageGrid(JqGridUserRowConfig):
-    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample"
+    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
     SEQUENCING_RUN_PATH = SEQUENCING_SAMPLE_PATH + "__sample_sheet__sequencing_run"
     GOLD_PATH = SEQUENCING_RUN_PATH + "__gold_standard"
     SAMPLE_NAME_PATH = SEQUENCING_SAMPLE_PATH + "__sample_name"

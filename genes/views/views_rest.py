@@ -10,7 +10,7 @@ from django.views.decorators.cache import cache_page
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import permissions
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
@@ -18,9 +18,10 @@ from rest_framework.views import APIView
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import (
     ActiveSampleGeneList,
+    Gene,
     GeneAnnotationRelease,
-    GeneInfo,
     GeneList,
+    GeneSymbol,
     PanelAppServer,
     ReleaseGeneSymbolGene,
     SampleGeneList,
@@ -32,14 +33,16 @@ from genes.panel_app import (
 )
 from genes.serializers import (
     GeneAnnotationReleaseSerializer,
-    GeneInfoSerializer,
+    GeneDetailSerializer,
     GeneListGeneSymbolSerializer,
     GeneListSerializer,
+    GeneSymbolDetailSerializer,
     SampleGeneListSerializer,
 )
 from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils.django_rest_utils import MultipleFieldLookupMixin
 from library.guardian_utils import DjangoPermission
+from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import ImportStatus
 
 log = logging.getLogger(__name__)
@@ -223,42 +226,6 @@ class GeneAnnotationReleaseView(RetrieveAPIView):
         return GeneAnnotationRelease.objects.all()
 
 
-@extend_schema(
-    parameters=[OpenApiParameter("gene_symbol", OpenApiTypes.STR, OpenApiParameter.PATH,
-                                 description="Gene symbol to retrieve GeneInfo for")],
-)
-class GeneInfoView(ListAPIView):
-    """ List GeneInfo records (e.g. tags/icons) for a gene symbol """
-    serializer_class = GeneInfoSerializer
-
-    def get_queryset(self):
-        gene_symbol = self.kwargs['gene_symbol']
-        return GeneInfo.get_for_gene_symbol(gene_symbol)
-
-
-class BatchGeneInfoView(APIView):
-    """ Needs to be a post as we can send a large number of genes
-        returns {gene_symbol : [gene_info_dict1, gene_info_dict2]} """
-
-    @extend_schema(
-        summary="Retrieve GeneInfo records for a batch of gene symbols",
-        request=OpenApiTypes.OBJECT,
-        responses=OpenApiTypes.OBJECT,
-    )
-    def post(self, request):
-        gene_symbols_json = request.data["gene_symbols_json"]
-        gene_symbols = json.loads(gene_symbols_json)
-        gene_symbol_path = "gene_list__genelistgenesymbol__gene_symbol"
-
-        qs = GeneInfo.objects.filter(**{gene_symbol_path + "__in": gene_symbols}).distinct()
-        gene_info = defaultdict(list)
-        for gi in qs.values('name', 'description', 'icon_css_class', gene_symbol_path).distinct():
-            gene_symbol = gi[gene_symbol_path]
-            gene_info[gene_symbol].append(gi)
-
-        return Response(dict(gene_info))
-
-
 class BatchGeneIdentifierForReleaseView(APIView):
     """ Needs to be a post as we can send a large number of genes """
 
@@ -313,3 +280,43 @@ class SampleGeneListView(APIView):
 
         data = SampleGeneListSerializer(sample_gene_list, context={'request': request}).data
         return Response(data)
+
+
+class _GenomeBuildContextMixin:
+    """ Optional ?genome_build= restricts the gene versions returned to that build """
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if genome_build_name := self.request.query_params.get("genome_build"):
+            context["genome_build"] = GenomeBuild.get_name_or_alias(genome_build_name)
+        return context
+
+
+class GeneDetailView(_GenomeBuildContextMixin, RetrieveAPIView):
+    """ A Gene, its per genome build versions, and the transcripts that place it on the genome """
+    serializer_class = GeneDetailSerializer
+    queryset = Gene.objects.all()
+    lookup_url_kwarg = "gene_id"
+
+    @extend_schema(
+        summary="Retrieve a gene, its versions and transcripts",
+        parameters=[OpenApiParameter(name="genome_build", type=OpenApiTypes.STR, location=OpenApiParameter.QUERY,
+                                     description="Restrict versions to this genome build, eg 'GRCh38'")],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+
+class GeneSymbolDetailView(_GenomeBuildContextMixin, RetrieveAPIView):
+    """ A gene symbol, its aliases, and the genes (RefSeq + Ensembl) assigned to it """
+    serializer_class = GeneSymbolDetailSerializer
+    queryset = GeneSymbol.objects.all()
+    lookup_url_kwarg = "gene_symbol"
+
+    @extend_schema(
+        summary="Retrieve a gene symbol, its aliases, genes and transcripts",
+        parameters=[OpenApiParameter(name="genome_build", type=OpenApiTypes.STR, location=OpenApiParameter.QUERY,
+                                     description="Restrict versions to this genome build, eg 'GRCh38'")],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)

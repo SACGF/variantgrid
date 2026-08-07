@@ -1,14 +1,25 @@
 import logging
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Union, Type
+from typing import Union
 
 import django.dispatch
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models import TextField, ForeignKey, JSONField, IntegerField, CASCADE, TextChoices, \
-    PROTECT, DateField, ManyToManyField, QuerySet, BooleanField
+from django.db.models import (
+    CASCADE,
+    PROTECT,
+    BooleanField,
+    DateField,
+    ForeignKey,
+    IntegerField,
+    JSONField,
+    ManyToManyField,
+    QuerySet,
+    TextChoices,
+    TextField,
+)
 from django.urls import reverse
 from model_utils.models import TimeStampedModel
 
@@ -69,7 +80,7 @@ class ValueOther:
         return self.label
 
     @staticmethod
-    def from_str(value: str, text_choices_class: Type) -> 'ValueOther':
+    def from_str(value: str, text_choices_class: type) -> 'ValueOther':
         try:
             choice = text_choices_class(value)
             return ValueOther(key=value, label=choice.label)
@@ -125,19 +136,22 @@ class ReviewedObject(TimeStampedModel):
     @cached_property
     def source_object(self) -> 'ReviewableModelMixin':
         """
-        The object that the FlagCollection is attached to, will be responsible for determining the user's permissions
-        in relation to the FlagCollection
+        The object that the Review is attached to, will be responsible for determining the user's permissions
+        in relation to the Review
         """
 
         # ._source_object could be set either via getting FlagInfo (via a hook)
         # or by us directly going through the
-        foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('reviews')]
+        foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('reviews') and not m.startswith("_")]
         for foreign_set in foreign_sets:
-            source_object = getattr(self, foreign_set).first()
-            if source_object:
-                return source_object
+            try:
+                source_object = getattr(self, foreign_set).first()
+                if source_object:
+                    return source_object
+            except:
+                pass
 
-        logging.warning('Could not find source object for FlagCollection %s', self.id)
+        logging.warning('Could not find source object for Review %s', self.id)
 
         raise ValueError(f"Review {self.pk} does not appear to be attached to an object")
 
@@ -208,12 +222,12 @@ class Review(TimeStampedModel):
             if isinstance(method, str):
                 return [ValueOther.from_str(method, ReviewMedium)]
             else:
-                return list(sorted(ValueOther.from_str(m, ReviewMedium) for m in method))
+                return sorted(ValueOther.from_str(m, ReviewMedium) for m in method)
 
     @property
     def participants(self) -> list[ValueOther]:
         if participants := self.meeting_meta.get("participants", {}).get("review_participants"):
-            return list(sorted(ValueOther.from_str(p, ReviewParticipants) for p in participants))
+            return sorted(ValueOther.from_str(p, ReviewParticipants) for p in participants)
         return []
 
     @property

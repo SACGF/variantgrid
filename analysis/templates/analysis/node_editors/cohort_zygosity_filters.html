@@ -96,6 +96,16 @@ $(document).ready(function() {
 });
 </script>
 
+{% if cohort.is_sub_cohort %}
+<ul class="messages" id="sub-cohort-note">
+    <li class="info">
+        Sub cohort of <b>{{ cohort.parent_cohort.name }}</b> - variants need a zygosity call
+        (Ref/Het/Hom) in at least 1 of the {{ cohort.sample_count }} samples, whatever the filters below.
+        A Sample node with "No zygosity call in sample" ticked can return more variants.
+    </li>
+</ul>
+{% endif %}
+
 <table class='zygosity-filter-table'>
 <tr class="top-header">
 	<td></td>

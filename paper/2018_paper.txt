@@ -1,0 +1,97 @@
+Variantgrid: an open source variant database and web analysis platform
+
+David M. Lawrence[1],[4], James Andrews[1][4], Jinghua Feng[1],[4], Sarah King-Smith[3][4][5], Karin S. Kassahn [3],[4] , Anna Brown[1][2], Hamish S. Scott [1],[2],[4] , Joel Geoghegan [1],[4] , Andreas W. Schreiber [1],[4]
+[1] ACRF Cancer Genomics Facility, Centre for Cancer Biology, SA Pathology, Adelaide, South Australia
+[2] Genetics and Molecular Pathology and Centre for Cancer Biology, SA Pathology, Adelaide, South Australia, Australia
+[3] Genetic and Molecular Pathology, SA Pathology, Women's and Children's Hospital, North Adelaide, South Australia, Australia
+[4] School of Biological Sciences, University of Adelaide, South Australia
+[5] AGHA?
+
+Abstract (64 words - max 3 sentences 70 words. Whole thing 1-1.5k)
+
+VariantGrid is a free for research variant database and web application for efficiently storing and analysing genetic variants from thousands of patients.
+
+Novel contributions include database scalability techniques, live drag and drop editing of variant filters, and storing multiple snapshots of annotation versions, allowing automated re-analysis and re-classification over time.
+
+VariantGrid can be run as a private server, or accessed at http://variantgrid.com
+
+--------
+
+High throughput sequencing is in regular clinical use, with cheaper sequencing shifting costs onto analysis. Falling sequencing costs have also increased analysis complexity, with labs sequencing more patients, more genes per patient, and more difficult cases. Current exome solve rates range from 40-60%, though this varies for disease and ancestry [1].
+
+Diagnostic classification methods, such as the ACMG guidelines[2] require minimum levels of evidence, so a disease-causing variant may have be identified, but not classified as pathogenic due to a lack of evidence at the time. New evidence (such as population databases and literature) is improving at a rapid rate, for instance x% of ClinVar [3] pathogenic variants in June 2018 was unclassified 2 years ago. This stream of new information makes it possible that the unsolved cases of today could be solved with tomorrow's evidence, though review and re-analysis is typically under-resourced in most labs.
+
+Improvements to storage, analysis and re-analysis of human genetic data is thus an important problem. We present VariantGrid, a web server to manage, annotate, analyse and classify variants, and the ability to automatically re-anaylse and re-classify variants.
+
+VariantGrid has a scalable database and architecture (Supp Fig 1), designed to have new VCFs regularly uploaded which it automatically annotates. Variants from different VCFs are normalised with VT[4], processed with CyVCF2 [5] then linked to a single database record, tracking a lab's internal population frequency, and allowing visibility of which samples contain a particular variant.
+
+It is the first system to use live editing of graphical variant filters, an improvement that allows a more iterative, exploratory analysis. It is the first published or open source variant database to use database partitions, allowing high scalability. Partitions allow multiple annotation versions without performance penalty, and examining differences between annotation versions allows automatic re-analyse and re-classification of variants.
+
+There are a number of commercial and open source variant database and analysis tools available, and supplementary table 1 shows a feature comparison between VariantGrid and X other existing tools.
+
+VariantGrid is written in Python, one of the most popular languages in bioinformatics[6] using Django (https://www.djangoproject.com), a high-productivity framework for creating database driven web applications. SQL and relational databases [7] have extremely wide support and high quality free tools, though certain operations can have poor performance. This has been a factor leading to the recent popularity of NoSQL databases such as Mongodb(https://www.mongodb.com), used for variant analysis by VCF-Miner [8]. VariantGrid makes a time/space tradeoff here by using the Postgres SQL database (https://www.postgresql.org) and duplicating a small subset in Redis (http://redis.io), speeding up particular queries.
+
+Another potential SQL performance problem is making queries across large numbers of samples. Gemini [9] solves this by combining data from multiple samples into a single row, removing the need for a large number of SQL joins.  A downside of their SQLlite implementation is the packed data must be extracted in Python, reducing the ability of the database optimiser to rearrange the query execution order.
+
+VariantGrid extends Gemini's multi-sample packing technique to use Postgres column array extensions allowing the filtering to be done purely in SQL. Performing filtering in SQL makes it easy to combine filters using logical operations, and this is how VariantGrid builds its analysis filter pipelines. We provide a node-based graphical user interface to allow users to construct a directed acyclic graph of variant filtering operations (Figure 1).
+
+Managing dependent tasks with a directed acyclic graph has been common practice since at least the Unix tool Make in 1976, and visual node based interfaces to construct these type of pipelines have become standard in digital compositing (applying visual filters and effects to images and videos) since NUKE (https://www.foundry.com/products/nuke) in 1993 which won an Academy Award for technical achievement in 2002.
+
+Cartogenia Bench, now Agilent Alissa (https://www.agilent.com/en/products/software-informatics/clinical-informatics-(alissa-platform)/alissa-interpret) was the first software to apply a graphical node-based interface to building variant filters. Filtering pipelines in Alisssa are run in a batch processing model, where the user construct pipelines, then executes them non-interactively in a separate step. Running an unchanging set of steps is often what people want in a clinical environment, along with other data access controls to prevent incidental findings, and VariantGrid offers this model of restricted analysis.
+
+In addition VariantGrid is the first software to offer live modification and execution of variant filters via a node graph interface. This interactive analysis is more suited to research investigations without scope constraints, and where the best filtering strategy is unclear. The interface allows rapid iterative exploration by trying out different filtering strategies based on immediate feedback.
+
+Clicking a node displays a grid of variants and annotation, and an editor to adjust a node's filtering details. Node appearance changes based on configuration, so the graph acts as a visual reminder for the current state of analysis. Variant counts are shown to the bottom right of each node, including counts for the number classified as pathogenic in ClinVar, or internally tagged or classified. Clicking on a count shows a grid of just those variants.
+
+The columns on the analysis grid are user-configurable, with over 100 columns available from VariantGrid's internal annotation. This annotation is provided by IVAT (Integrated Variant Annotation Tools) (https://bitbucket.org/sacgf/IVAT), a pipeline developed in-house in our lab. It combines computational prediction tools, population frequencies and other databases.
+
+There are two main approaches for managing variant annotation, either allow the user to upload VCFs with their own annotation, or have the system manage annotations. The first approach, as used by VCF-Miner, has the advantage of allowing custom annotations. Having the system manage annotation provides annotation for those without their own pipelines, reduces storage requirements and allows re-annotation over time.
+
+Having a fixed annotation for a gene or variant means they can be shared, saving time and space as only novel variants from a VCF need to be run through the annotation pipeline. Typically the number of novel variants per VCF shrinks rapidly after collecting samples from the same target capture regions and similar human populations. For instance after 668 germline exomes, a server had over 50 times more genotypes (2.4B) than variants (46M)
+
+Storing multiple annotations per variant could typically slow down analysis queries as the number of versions increased. VariantGrid stores each annotation version in its own database partition, so when comparing against a single version (as per a typical analysis), performance remains constant regardless of the number of annotation versions stored.
+
+Annotation versions are stored separately for components such as ClinVar, gene annotations, IVAT (variant annotation), Human Phenotype Ontology[10] and others. This allows components to be upgraded independently, the process of which is controlled by the VariantGrid systems administrator.
+
+The exact version of annotation used in an analysis or classification is stored, allowing consistent results to be retrieved years later, even after the annotation has been upgraded multiple times since.
+
+As multiple annotations are stored against a particular gene or variant, it becomes possible to compare them and look for differences. For users, we show visual diffs, highlighting which columns have been added, changed or removed. We can compare annotation versions computationally, performing automated re-analysis and re-classification of variants.
+
+Compared to other medical tests, genetic results have a very long lifetime, and the ratio of current to future knowledge is very low. As a comparison, consider taking a temperature to monitor a fever. The result quickly becomes out of date, and little new information arrives to inform treatment from re-analysis before the usefulness of the measurement expires.
+
+Compare this with a genetic test: the germline is fixed at conception, so remains useful for life, or even multiple generations. And while we have come a long way, current understanding is small compared to the total amount of information present and expected future knowledge. Thus while it would be a waste of computer time to constantly re-analyse most medical tests results over and over, the idea is not so absurd for genetics.
+
+Variant reclassification can have serious clinical and legal consequences, with groups likely already bound by existing professional, institutional or legal policies. There may also be cultural resistance to the idea of re-analysing past results. For this reason, reclassification in VariantGrid is disabled by default, and the detection, notification and resolution processes are highly configurable.
+
+VariantGrid contains many features for managing the sequencing and diagnostic process, including QC, graphing, patients, phenotypes, cohorts and trios. There are APIs and hooks to integrate with Laboratory Information Systems and write site-specific code. It has been in development and use for over 5 years, using the feedback of dozens of medical scientists and researchers.
+
+It is currently installed on 4 servers: a private patient diagnostic server for the South Australian health department, an data sharing site (db.runx1.com), the Australian National Variant Classification server (share classifications for Australian diagnostic labs via an API) and variantgrid.com, a site for public research samples, which currently holds over 600 exomes from the Centre for Cancer Biology.
+
+VariantGrid is open source and free for research, for more information please see http://variantgrid.com 
+
+--------------
+
+Thanks to Dan Andrews and Aaron Chuah in paper for use of VG server
+
+[1] Comprehensive Rare Variant Analysis via Whole-Genome Sequencing to Determine the Molecular Pathology of Inherited Retinal Disease - https://www.cell.com/ajhg/fulltext/S0002-9297(16)30527-4
+
+[2] Richards, Sue, et al. "Standards and guidelines for the interpretation of sequence variants: a joint consensus recommendation of the American College of Medical Genetics and Genomics and the Association for Molecular Pathology." Genetics in medicine 17.5 (2015): 405. 
+
+[3] Landrum, Melissa J., et al. "ClinVar: public archive of interpretations of clinically relevant variants." Nucleic acids research 44.D1 (2015): D862-D868.
+
+[4] Tan, Adrian, Gonçalo R. Abecasis, and Hyun Min Kang. “Unified Representation of Genetic Variants.” Bioinformatics 31.13 (2015): 2202–2204
+
+[5] Pedersen, Brent S., and Aaron R. Quinlan. "cyvcf2: fast, flexible variant analysis with Python." Bioinformatics 33.12 (2017): 1867-1869.
+
+[6] Pamela H Russell, Rachel L Johnson, Shreyas Ananthan, Benjamin Harnke, Nichole E Carlson. “A large-scale analysis of bioinformatics code on GitHub”, bioRxiv 321919; doi: https://doi.org/10.1101/321919
+
+[7] E. F. Codd. 1970. A relational model of data for large shared data banks. Commun. ACM 13, 6 (June 1970), 377-387. DOI=http://dx.doi.org/10.1145/362384.362685 
+
+[8]  Hart, Steven N., et al. "VCF-Miner: GUI-based application for mining variants and annotations stored in VCF files." Briefings in bioinformatics 17.2 (2015): 346-351.
+
+[9] Paila, Umadevi, et al. "GEMINI: integrative exploration of genetic variation and genome annotations." PLoS computational biology 9.7 (2013): e1003153.
+
+[10] Köhler, Sebastian, et al. "The Human Phenotype Ontology project: linking molecular biology and disease through phenotype data." Nucleic acids research 42.D1 (2013): D966-D974.
+
+
+

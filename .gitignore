@@ -43,3 +43,6 @@ cover/
 /.idea/dataSources.local.xml
 /.idea/dataSources.xml
 /.idea/dataSources
+node_modules/
+eslint.txt
+/.idea/pyLspTools.xml

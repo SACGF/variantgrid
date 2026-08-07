@@ -169,9 +169,6 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
 
     agg_kwargs = {
         "total": Count("id", distinct=True),
-        "REF": Sum("global_variant_zygosity__ref_count"),
-        "HET": Sum("global_variant_zygosity__het_count"),
-        "HOM_ALT": Sum("global_variant_zygosity__hom_count"),
         "tags": StringAgg("variantallele__allele__varianttag__tag", delimiter='|'),
     }
 
@@ -194,7 +191,13 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
                     q_clinical_significance &= classification_q
                 agg_kwargs[f"{classification}_{cs}"] = Count(count_path, filter=q_clinical_significance, distinct=True)
 
-    return qs.aggregate(**agg_kwargs)
+    counts = qs.aggregate(**agg_kwargs)
+    # Zygosity counts are 1 row per variant, so they have to be summed away from the tag/allele/classification
+    # joins above - those multiply the rows a variant contributes (eg a variant in 2 builds, or with 2 tags)
+    counts.update(qs.aggregate(REF=Sum("global_variant_zygosity__ref_count"),
+                               HET=Sum("global_variant_zygosity__het_count"),
+                               HOM_ALT=Sum("global_variant_zygosity__hom_count")))
+    return counts
 
 
 def filter_variant_range(qs, variant: Variant, distance):

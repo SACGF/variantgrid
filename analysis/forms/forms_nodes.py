@@ -5,7 +5,6 @@ from django import forms
 from django.forms.models import fields_for_model
 from django.forms.widgets import HiddenInput, TextInput
 from django.utils.text import slugify
-from django_starfield import Stars
 
 from analysis import models
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
@@ -38,7 +37,7 @@ from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import HGVSException, get_hgvs_variant, get_hgvs_variant_coordinate
 from genes.models import CustomTextGeneList, GeneList, GeneListCategory, PanelAppPanel
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
-from library.forms import NumberInput
+from library.forms import NumberInput, StarsWidget
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
@@ -226,7 +225,7 @@ class BuiltInFilterNodeForm(BaseNodeForm):
     class Meta:
         model = models.BuiltInFilterNode
         fields = ("built_in_filter", "clinvar_stars_min", "cosmic_count_min")
-        widgets = {"clinvar_stars_min": Stars(stars=4),
+        widgets = {"clinvar_stars_min": StarsWidget(stars=4),
                    "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1})}
 
 
@@ -477,12 +476,16 @@ class GeneListNodeForm(BaseNodeForm):
 
 
 class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
-    genome_build_fields = ["genomic_intervals_collection"]
+    genome_build_fields = ["genomic_intervals_collection", "contigs"]
     CUSTOM_INTERVAL_FIELDS = {'chrom', 'start', 'end'}
     # also be able to save GenomicInterval
     chrom = forms.CharField(required=False, empty_value=None, widget=TextInput(attrs={'placeholder': 'chrom'}))
     start = forms.IntegerField(required=False, widget=NumberInput(attrs={'placeholder': 'start'}))
     end = forms.IntegerField(required=False, widget=NumberInput(attrs={'placeholder': 'end'}))
+    contigs = forms.ModelMultipleChoiceField(required=False,
+                                             queryset=Contig.objects.all(),
+                                             widget=ModelSelect2Multiple(url='contig_autocomplete',
+                                                                         attrs={'data-placeholder': 'Chromosome...'}))
 
     class Meta:
         model = IntersectionNode
@@ -547,6 +550,11 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
         if "hgvs_string" in self.changed_data:
             hgvs_string = self.cleaned_data.get("hgvs_string")
             node.hgvs_variant = get_hgvs_variant(hgvs_string, self.instance.analysis.genome_build)
+
+        contigs_set = self.instance.intersectionnodecontig_set
+        contigs_set.all().delete()
+        for contig in self.cleaned_data["contigs"]:
+            contigs_set.create(contig=contig)
 
         if commit:
             node.save()

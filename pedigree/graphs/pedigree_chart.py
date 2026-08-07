@@ -52,7 +52,7 @@ class PedigreeChart:
         if madeline2 is None:
             raise ValueError("settings.PEDIGREE_MADELINE2_COMMAND not set!")
         ped_file = PedFile.objects.get(pk=self.ped_file_id)
-        ped_filename = ped_file.uploadedpedfile.uploaded_file.get_filename()
+        ped_filename = ped_file.uploadedpedfile.file_upload.get_filename()
         temp_file = NamedTemporaryFile(delete=False)
         madeline_filename = temp_file.name
 

@@ -45,6 +45,9 @@ class CellData:
     def __getitem__(self, item):
         return self.all_data[item]
 
+    def __contains__(self, item) -> bool:
+        return item in self.all_data
+
     def get_nested_json(self, key, sub_key):
         if data := self.all_data.get(key):
             return data.get(sub_key)
@@ -367,10 +370,13 @@ class DatatableConfig(Generic[DC]):
     def view_primary_key(self, row: CellData) -> JsonDataType:
         """ Relies on being 'id' and object defining get_absolute_url  """
         primary_key_name = self._model._meta.pk.name
-        pk = row.get(primary_key_name)
-        if not pk:
+        if primary_key_name not in row:
             raise ValueError(f"Need to include primary key ('{primary_key_name}') in columns")
+        pk = row[primary_key_name]
         text = row.value
+        if pk is None or pk == "":
+            # Legacy data can have blank text primary keys (eg Experiment) - no URL to link to
+            return {"text": text}
         obj = self._model(pk=pk)
         return {
             "text": text,

@@ -20,6 +20,7 @@ from annotation.models.models import (
     VariantAnnotationVersion,
     VariantTranscriptAnnotation,
 )
+from annotation.models.models_enums import NMDEscapeStatus
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import (
@@ -29,6 +30,7 @@ from annotation.vep_annotation import (
     vep_dict_to_variant_annotation_version_kwargs,
     vep_parse_version_line,
 )
+from annotation.vep_field_formatters import EMPTY_VALUES, get_clean_and_pick_single_value_func
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
@@ -383,6 +385,64 @@ class TestAnnotationVCF4(TestAnnotationVCF):
         self.assertEqual(va.gnomad_filtered, True)
 
 
+@override_settings(**get_fake_annotation_settings_dict(columns_version=5))
+class TestAnnotationVCF5(TestAnnotationVCF4):
+    """ columns_version 5 = VEP 116 + ProtVar (all builds) + OpenTargets / EVE / popEVE / PromoterAI (GRCh38).
+        The v4 annotation data (dbNSFP 5.3.1a, masked SpliceAI, gnomAD 4.1, denovo-db) carries over. """
+    TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
+    TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version5_grch37.vep_annotated.vcf")
+    TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_columns_version5_grch38.vep_annotated.vcf")
+
+    def _test_extra_grch37(self):
+        super()._test_extra_grch37()
+
+        # ProtVar is the only cv5 plugin on GRCh37 - picked transcript NM_005845.5 (ABCC4)
+        va = VariantAnnotation.objects.get(variant_id=13629762)
+        self.assertAlmostEqual(va.protvar_stability, 2.06209)
+        self.assertTrue(va.protvar_pocket.startswith("P29&"))
+        self.assertEqual(va.protvar_pocket_parsed["id"], "P29")
+        self.assertIsNone(va.protvar_int)
+
+    def _test_extra_grch38(self):
+        super()._test_extra_grch38()
+
+        # ---- ProtVar + popEVE (ABCC4, picked transcript NM_005845.5) ----
+        va = VariantAnnotation.objects.get(variant_id=24601)
+        self.assertAlmostEqual(va.protvar_stability, 2.06209)
+        self.assertEqual(va.protvar_pocket_parsed["id"], "P29")
+        self.assertAlmostEqual(va.popeve_score, -2.936)
+        self.assertIsNone(va.eve_score)  # no EVE data for this variant
+
+        # ---- EVE / popEVE / ProtVar (RPE65 G197E, picked transcript NM_000329.3) ----
+        va = VariantAnnotation.objects.get(variant_id=131167)
+        self.assertAlmostEqual(va.eve_score, 0.5005820693662203)
+        self.assertEqual(va.eve_class, "Uncertain")
+        self.assertAlmostEqual(va.popeve_score, -3.442)
+        self.assertAlmostEqual(va.protvar_stability, 2.57789)
+        self.assertEqual(va.protvar_pocket_parsed["id"], "P7")
+
+        # ---- popEVE on a variant with no ProtVar/EVE data (OR4F5) ----
+        va = VariantAnnotation.objects.get(variant_id=131165)
+        self.assertAlmostEqual(va.popeve_score, -3.958)
+        self.assertIsNone(va.protvar_stability)
+
+        # ---- PTC / PTC-aware NMD (#579). No frameshifts in the fixture, so every row should
+        # record that the calculation ran and doesn't apply, rather than staying null. ----
+        vta_qs = VariantTranscriptAnnotation.objects.filter(version=self.variant_annotation_versions_by_build["GRCh38"])
+        self.assertFalse(vta_qs.filter(nmd_escape_status__isnull=True).exists())
+        self.assertFalse(vta_qs.exclude(nmd_escape_status=NMDEscapeStatus.NOT_APPLICABLE).exists())
+        self.assertFalse(vta_qs.filter(ptc_distance_codons__isnull=False).exists())
+
+        # ---- OpenTargets / PromoterAI columns are in CSQ but no overlapping data for these
+        # test variants. Verify they parse to NULL rather than crashing. ----
+        va = VariantAnnotation.objects.get(variant_id=24601)
+        self.assertIsNone(va.open_targets_gwas_l2g_score)
+        self.assertIsNone(va.open_targets_gwas_gene_id)
+        self.assertIsNone(va.open_targets_study_id)
+        self.assertIsNone(va.promoter_ai_score)
+        self.assertIsNone(va.promoter_ai_tss_pos)
+
+
 class TestDBNSFPPerTranscriptPick(TestCase):
     """ Exercise BulkVEPVCFAnnotationInserter._pick_dbnsfp_per_transcript_values
         with a stub resolver — DBNSFPGeneAnnotation isn't populated in test DBs,
@@ -470,6 +530,18 @@ class TestVEP(TestCase):
                 vep_parse_version_line(line)
             except Exception:
                 self.fail(f"vep_parse_version_line died on line: {line}")
+
+    def test_open_targets_l2g_score_na(self):
+        """ OpenTargets emits "NA" for missing and &-joins multiple GWAS entries (e.g. "NA&NA").
+            The l2g score FloatField formatter must null those out and pick the highest real value. """
+        format_l2g = get_clean_and_pick_single_value_func(max, float, empty_values=EMPTY_VALUES | {"NA"})
+        self.assertIsNone(format_l2g("NA&NA"))
+        self.assertIsNone(format_l2g("."))
+        self.assertIsNone(format_l2g(""))
+        self.assertEqual(format_l2g("0.85"), 0.85)
+        self.assertEqual(format_l2g("0.85&NA"), 0.85)
+        self.assertEqual(format_l2g("NA&0.42"), 0.42)
+        self.assertEqual(format_l2g("0.1&0.9&NA"), 0.9)
 
     def test_aloft_pick_single(self):
         aloft_data = {

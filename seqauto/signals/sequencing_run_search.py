@@ -1,14 +1,11 @@
-import re
-
+from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_SEARCH_REGEX
 from seqauto.models import SequencingRun
 from snpdb.search import SearchExample, SearchInputInstance, search_receiver
-
-SEQUENCING_RUN_REGEX = re.compile(r"\d{6}[_-](NS|NB|M|D|SN|K|ST|A)(.{3,7})_\d{4}_(0{9}-.{5}|.{10})")
 
 
 @search_receiver(
     search_type=SequencingRun,
-    pattern=SEQUENCING_RUN_REGEX,
+    pattern=SEQUENCING_RUN_SEARCH_REGEX,
     example=SearchExample(
         "Part of the name of a sequencing run"
     )

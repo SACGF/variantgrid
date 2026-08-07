@@ -7,7 +7,7 @@ from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from snpdb.models import VCF, ImportSource, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import UploadedFile, UploadedFileTypes, UploadedVCF, UploadPipeline
+from upload.models import FileUpload, UploadedFileTypes, UploadedVCF, UploadPipeline
 
 
 class Test(URLTestCase):
@@ -20,23 +20,23 @@ class Test(URLTestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(cls.grch37)
 
-        uploaded_file = UploadedFile.objects.create(user=cls.user_owner,
-                                                    name="fake uploaded file",
-                                                    path="/tmp/foo.vcf",
-                                                    file_type=UploadedFileTypes.VCF,
-                                                    import_source=ImportSource.COMMAND_LINE)
+        file_upload = FileUpload.objects.create(user=cls.user_owner,
+                                                name="fake uploaded file",
+                                                path="/tmp/foo.vcf",
+                                                file_type=UploadedFileTypes.VCF,
+                                                import_source=ImportSource.COMMAND_LINE)
         upload_pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING,
-                                                        uploaded_file=uploaded_file)
+                                                        file_upload=file_upload)
         _upload_step = upload_pipeline.uploadstep_set.create(name="fake step", sort_order=0)
         vcf = VCF.objects.create(name="fake_vcf.vcf", date=localdate(), user=cls.user_owner,
                                  genotype_samples=0, genome_build=cls.grch37)
-        UploadedVCF.objects.create(uploaded_file=uploaded_file,
+        UploadedVCF.objects.create(file_upload=file_upload,
                                    vcf=vcf,
                                    upload_pipeline=upload_pipeline)
 
         upload_pipeline_kwargs = {"upload_pipeline_id": upload_pipeline.pk}
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
-            ('view_uploaded_file', {"uploaded_file_id": uploaded_file.pk}, 200),
+            ('view_uploaded_file', {"file_upload_id": file_upload.pk}, 200),
             ('view_upload_pipeline', upload_pipeline_kwargs, 200),
             ('view_upload_pipeline_warnings_and_errors', upload_pipeline_kwargs, 200),
         ]

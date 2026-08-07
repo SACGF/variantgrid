@@ -7,7 +7,6 @@ from django.db.models import Q
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
-from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from patients.models_enums import Zygosity
 from snpdb.archive import DataArchivedError
 from snpdb.models import Cohort, CohortGenotypeCollection, Sample, VCFFilter
@@ -48,9 +47,11 @@ class CohortMixin:
         if cohort:
             try:
                 cdc = cohort.cohort_genotype_collection
-            except DataArchivedError:
+            except (DataArchivedError, CohortGenotypeCollection.DoesNotExist):
                 # Surface via _get_configuration_errors → ERROR_CONFIGURATION;
                 # keep node-internal "no source" code paths working.
+                # A missing CGC (mid-reload / version mismatch) is treated the same
+                # as archived data so the node shows a config error instead of 500ing.
                 cdc = None
         else:
             cdc = None
@@ -186,10 +187,15 @@ class CohortMixin:
 
         filters = []
         cgc = self.cohort_genotype_collection
+        packed_index_by_sample_id = cgc.get_packed_index_by_sample_id
 
         for sample in self.get_samples():
+            # get_samples() includes ancestor samples (eg a compound het Trio/Quad's parent node)
+            # that may not be in this cohort's genotype array - skip those.
+            if sample.pk not in packed_index_by_sample_id:
+                continue
             # Indexes are handled by cohortgenotype (sub cohorts etc)
-            array_index = cgc.get_array_index_for_sample_id(sample.pk)
+            array_index = packed_index_by_sample_id[sample.pk]
             # https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#index-transforms
             allele_frequency_column = f"{cgc.cohortgenotype_alias}__samples_allele_frequency__{array_index}"
             q = naff.get_q(allele_frequency_column, sample.vcf.allele_frequency_percent)
@@ -292,11 +298,9 @@ class CohortMixin:
                 uv: UploadedVCF = vcf.uploadedvcf
                 if uv.max_variant_id:  # Very old VCFs may not have this set
                     variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
-                    if lowest_unannotated_variant := get_lowest_unannotated_variant_id(variant_annotation_version):
-                        if uv.max_variant_id > lowest_unannotated_variant:
-                            errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
-                                          f" (in variant annotation version={variant_annotation_version})"
-                                          f" {uv.max_variant_id=} > {lowest_unannotated_variant=}")
+                    if not uv.is_fully_annotated(variant_annotation_version):
+                        errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
+                                      f" (in variant annotation version={variant_annotation_version})")
             except UploadedVCF.DoesNotExist:
                 pass
         return errors

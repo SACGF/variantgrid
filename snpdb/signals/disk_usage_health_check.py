@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.dispatch import receiver
 
 from library.health_check import (
@@ -16,7 +17,7 @@ def disk_usage_health_check(sender, health_request: HealthCheckRequest, **kwargs
             name=f"Mount Point '{disk_usage.mount_point}",
             used=disk_usage.percent_nice,
             available=disk_usage.available_nice,
-            warning=not disk_usage.has_safe_capacity
+            warning=not disk_usage.has_capacity(settings.SERVER_MIN_DISK_WARNING_GIGS)
         ))
     if not checks:
         checks.append(HealthCheckCapacity(

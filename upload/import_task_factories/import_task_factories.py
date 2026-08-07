@@ -11,11 +11,15 @@ from upload.import_task_factories.abstract_vcf_import_task_factory import (
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
 from upload.models import (
     UploadedBed,
+    UploadedClassificationImport,
     UploadedFileTypes,
     UploadedGeneCoverage,
     UploadedGeneList,
+    UploadedLiftover,
+    UploadedManualVariantEntryCollection,
     UploadedPatientRecords,
     UploadedPedFile,
+    UploadedVariantTags,
     UploadedVCF,
     UploadedWikiCollection,
     UploadStep,
@@ -187,7 +191,7 @@ class VCFInsertVariantsOnlyImportFactory(AbstractVCFImportTaskFactory):
         return UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedManualVariantEntryCollection, UploadedClassificationImport, UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
         # Variants Only should only ever be explicitly chosen as a file type
@@ -210,7 +214,7 @@ class ManualVariantEntryImportFactory(AbstractVCFImportTaskFactory):
         return UploadedFileTypes.MANUAL_VARIANT_ENTRY
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedManualVariantEntryCollection, UploadedClassificationImport, UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
         # Variants Only should only ever be explicitly chosen as a file type
@@ -235,7 +239,7 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
         return UploadedFileTypes.LIFTOVER
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedLiftover, UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
         # Variants Only should only ever be explicitly chosen as a file type
@@ -244,10 +248,10 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
 
     def get_pre_vcf_task(self, upload_pipeline):
         # If source_vcf/source_genome_build are set, need to convert to produce allele VCF for genome_build
-        liftover = upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_pipeline.file_upload.uploadedliftover.liftover
         pre_vcf_task = None
         if liftover.source_genome_build:
-            output_filename = upload_pipeline.uploaded_file.get_filename()
+            output_filename = upload_pipeline.file_upload.get_filename()
             unknown_variants_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                               name="Liftover Source VCF",
                                                               sort_order=self.get_sort_order(),
@@ -287,7 +291,7 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
         return ['csv']
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedVariantTags, UploadedVCF]
 
     @staticmethod
     def _has_all_columns(columns, required_columns):
@@ -311,7 +315,7 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
     def get_pre_vcf_task(self, upload_pipeline):
         """ Need to write a VCF for variants used in tags """
 
-        variant_tags_filename = upload_pipeline.uploaded_file.get_filename()
+        variant_tags_filename = upload_pipeline.file_upload.get_filename()
         vcf_filename = self._get_vcf_filename(upload_pipeline)
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                 name="Create VariantTags Variant VCF",
@@ -368,7 +372,7 @@ class VariantWikiImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
         return ['csv']
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedWikiCollection, UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
         df = pd.read_csv(filename, nrows=1)  # Just need header
@@ -384,7 +388,7 @@ class VariantWikiImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
     def get_pre_vcf_task(self, upload_pipeline):
         """ Need to write a VCF for variants used in tags """
 
-        variant_wiki_filename = upload_pipeline.uploaded_file.get_filename()
+        variant_wiki_filename = upload_pipeline.file_upload.get_filename()
         vcf_filename = self._get_vcf_filename(upload_pipeline)
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                 name="Create VariantWiki Variant VCF",

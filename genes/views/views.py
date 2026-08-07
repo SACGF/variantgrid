@@ -50,7 +50,6 @@ from genes.models import (
     GeneCoverage,
     GeneCoverageCanonicalTranscript,
     GeneCoverageCollection,
-    GeneInfo,
     GeneList,
     GeneListCategory,
     GeneSymbol,
@@ -336,10 +335,6 @@ class GeneSymbolViewInfo:
         return gene_in_gene_lists
 
     @cached_property
-    def gene_infos(self):
-        return GeneInfo.get_for_gene_symbol(self.gene_symbol)
-
-    @cached_property
     def classifications(self) -> QuerySet[ClassificationModification]:
         # Note this is loaded in Ajax
         classifications_qs = ClassificationModification.objects.none()
@@ -421,7 +416,6 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "gene_external_urls",
             "gene_constraint",
             "gene_in_gene_lists",
-            "gene_infos",
             "gene_summary",
             "genome_build",
             "has_classified_variants",
@@ -493,12 +487,11 @@ def view_transcript(request, transcript_id):
     genome_build_genes = [GenomeBuildGenes(genome_build, sorted(gene_by_build.get(genome_build))) for genome_build in genome_builds]
     transcript_version_details: list[TranscriptVersionDetails] = []
 
-    build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
     for version in sorted(versions):
         transcript_accession = f"{transcript}.{version}"
         for genome_build in genome_builds:
             tv = transcripts_versions_by_build.get(genome_build, {}).get(version)
-            matcher = build_matcher[genome_build]
+            matcher = HGVSMatcher.instance(genome_build)
             hgvs_method = matcher.filter_best_transcripts_and_converter_type_by_accession(transcript_accession)
 
             transcript_version_details.append(
@@ -652,6 +645,7 @@ def view_gene_list(request, gene_list_id):
     gene_list = GeneList.get_for_user(request.user, gene_list_id, success_only=False)
     gl_form = GeneListForm(request.POST or None, instance=gene_list)
     if request.method == "POST":
+        gene_list.check_can_write(request.user)
         valid = gl_form.is_valid()
         if valid:
             gene_list = gl_form.save()
@@ -687,7 +681,7 @@ def view_canonical_transcript_collection(request, pk):
     summary = None
     qs = canonical_transcript_collection.genecoveragecanonicaltranscript_set.all()
     if qs.exists():
-        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit__name")
+        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit__name")
 
     is_system_default = pk == str(settings.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID)
     context = {"canonical_transcript_collection": canonical_transcript_collection,
@@ -739,7 +733,7 @@ def gene_coverage_graphs(request, genome_build, gene_symbols: Iterable[str]):
         has_coverage = has_coverage or base_gene_coverage_qs.exists()
 
         for enrichment_kit in enrichment_kits:
-            filter_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit=enrichment_kit)
+            filter_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit=enrichment_kit)
             enrichment_kit_data = get_coverage_stats(base_gene_coverage_qs, filter_q, fields)
             enrichment_kit_name = str(enrichment_kit)
             for field_name in fields:

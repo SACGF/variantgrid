@@ -246,7 +246,7 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
         chain, so the parent's join only spans the UNCOMMON partition - the COMMON variant never
         enters the query.
 
-        With substitution (gate on): get_parent_pks materialises the parent standalone with
+        With substitution (gate on): get_cached_node_pks materialises the parent standalone with
         common_variants=True (BOTH partitions), so the COMMON variant IS in the literal pk__in list -
         but the downstream rare gnomAD filter then removes it via VariantAnnotation (common-partition
         variants are common in gnomAD, so their AF is above the rare cutoff). The final PK set matches.

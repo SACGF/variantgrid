@@ -7,13 +7,13 @@ from upload.grids import (
 )
 from upload.views import views
 from upload.views.views import view_upload_step_detail
-from upload.views.views_rest import APIFileUploadView
+from upload.views.views_rest import APIAnnotatedDownloadView, APIFileUploadView, APIUploadStatusView
 from variantgrid.perm_path import path
 
 urlpatterns = [
     path('', views.upload, name='upload'),
     path('upload_poll', views.upload_poll, name='upload_poll'),
-    path('view_uploaded_file/<int:uploaded_file_id>', views.view_uploaded_file, name='view_uploaded_file'),
+    path('view_uploaded_file/<int:file_upload_id>', views.view_uploaded_file, name='view_uploaded_file'),
     path('view_upload_pipeline/<int:upload_pipeline_id>', views.view_upload_pipeline, name='view_upload_pipeline'),
     path('view_upload_pipeline/warnings_and_errors/<int:upload_pipeline_id>', views.view_upload_pipeline_warnings_and_errors, name='view_upload_pipeline_warnings_and_errors'),
     path('upload_retry_import/<int:upload_pipeline_id>', views.upload_retry_import, name='upload_retry_import'),
@@ -34,5 +34,9 @@ urlpatterns = [
 
     # APIs - Django REST framework
     path('api/v1/file_upload', APIFileUploadView.as_view(), name='api_file_upload'),
+    path('api/v1/upload_status/<int:file_upload_id>', APIUploadStatusView.as_view(), name='api_upload_status'),
+    path('api/v1/upload_status/sha256/<str:sha256_hash>', APIUploadStatusView.as_view(), name='api_upload_status_sha256'),
+    path('api/v1/download/<int:file_upload_id>/<str:export_type>', APIAnnotatedDownloadView.as_view(), name='api_annotated_download'),
+    path('api/v1/download/sha256/<str:sha256_hash>/<str:export_type>', APIAnnotatedDownloadView.as_view(), name='api_annotated_download_sha256'),
 
 ]

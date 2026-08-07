@@ -1,11 +1,13 @@
 import itertools
 from collections.abc import Iterable
+from functools import lru_cache
 from typing import Optional
 
 from django.conf import settings
 from django.contrib.sites.models import Site
 
 from analysis.models import VariantTag
+from annotation import vep_columns
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import Citation
 from annotation.models.damage_enums import (
@@ -18,7 +20,7 @@ from annotation.models.damage_enums import (
     SIFTPrediction,
 )
 from annotation.models.models import AnnotationVersion, GenePubMedCount, VariantAnnotation
-from annotation.models.models_enums import ClinVarReviewStatus
+from annotation.models.models_enums import ClinVarReviewStatus, VEPCustom
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
 from classification.enums import SpecialEKeys, SubmissionSource
@@ -211,7 +213,7 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
     """ annotation_version is optional (defaults to latest for genome build) """
 
     data = AutopopulateData("basic variant")
-    hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+    hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
     clingen_allele = None
     if variant:
         clingen_allele, evidence_value, message = get_clingen_allele_and_evidence_value_for_variant(genome_build, variant)
@@ -243,6 +245,7 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
                     continue
 
             evidence[evidence_key.key] = {'col': variantgrid_column.variant_column,
+                                          'grid_column': variantgrid_column.pk,
                                           'immutable': evidence_key.immutable,
                                           'note': variantgrid_column.ekey_note}
 
@@ -487,6 +490,54 @@ def _get_aloft_summary(variant_values: dict) -> Optional[str]:
     return aloft_summary
 
 
+@lru_cache(maxsize=1)
+def _gnomad_sv_sourced_columns() -> frozenset[str]:
+    """ VariantGrid columns whose gnomAD values come from an overlapping gnomAD-SV record """
+    sv_columns = {vgc for c in vep_columns.filter_for(vep_custom=VEPCustom.GNOMAD_SV)
+                  for vgc in c.variant_grid_columns}
+    return frozenset(sv_columns - set(VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS))
+
+
+def _format_gnomad_sv_overlap(sv_overlap: dict) -> str:
+    summary = sv_overlap["gnomad_sv_overlap_name"]
+    if coords := sv_overlap.get("gnomad_sv_overlap_coords"):
+        summary += f" {coords} ({sv_overlap['gnomad_sv_overlap_length']}bp)"
+    summary += f", {sv_overlap['gnomad_sv_overlap_percent']}% overlap"
+    summary += f", AF: {sv_overlap['gnomad_sv_overlap_af']}"
+    return summary
+
+
+def _get_gnomad_sv_overlap_note(variant_values: dict, annotation_version: AnnotationVersion) -> Optional[str]:
+    """ Structural variants have no exact gnomAD match - the values come from an overlapping gnomAD-SV record,
+        so describe which one was used (and what else overlapped) """
+    sv_data = {f: variant_values.get(f"variantannotation__{f}")
+               for f in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS}
+    if not sv_data.get("gnomad_sv_overlap_name"):
+        return None
+
+    gnomad_sv_version = annotation_version.variant_annotation_version.gnomad_sv
+    sv_overlaps = VariantAnnotation.get_gnomad_sv_overlap(sv_data, gnomad_sv_version)
+
+    # The record chosen by SVOverlapProcessor is the one whose AF was copied onto the gnomAD columns
+    gnomad_af = variant_values.get("variantannotation__gnomad_af")
+    used = None
+    for sv_overlap in sv_overlaps:
+        if sv_overlap["gnomad_sv_overlap_af"] == gnomad_af:
+            used = sv_overlap
+            break
+
+    note_lines = ["gnomAD values are from an overlapping gnomAD-SV record (structural variants have no exact match)"]
+    if used:
+        note_lines.append(f"Used: {_format_gnomad_sv_overlap(used)}")
+        note_lines.append(used["gnomad_sv_overlap_url"])
+
+    if others := [sv_overlap for sv_overlap in sv_overlaps if sv_overlap is not used]:
+        label = "Other overlapping records" if used else "Overlapping records"
+        others_summary = "; ".join(_format_gnomad_sv_overlap(sv_overlap) for sv_overlap in others)
+        note_lines.append(f"{label} ({len(others)}): {others_summary}")
+    return "\n".join(note_lines)
+
+
 def get_evidence_fields_from_variant_query(
         variant: Variant,
         evidence_variant_columns,
@@ -509,12 +560,20 @@ def get_evidence_fields_from_variant_query(
     # Also retrieve gnomad2_liftover_af, so we can use it if normal gnomAD isn't available
     gnomad2_liftover_af = "variantannotation__gnomad2_liftover_af"
     columns.add(gnomad2_liftover_af)
+    # Retrieve the gnomAD SV overlaps (and AF, to work out which one was used) to explain SV gnomAD values
+    columns.update(f"variantannotation__{f}" for f in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS)
+    columns.add("variantannotation__gnomad_af")
     values = qs.values(*columns).get()
+
+    gnomad_sv_note = _get_gnomad_sv_overlap_note(values, annotation_version)
+    gnomad_sv_columns = _gnomad_sv_sourced_columns()
 
     for evidence_key, variant_data in evidence_variant_columns.items():
         variant_column = variant_data['col']
         immutable = variant_data['immutable']
         note = variant_data['note']
+        if gnomad_sv_note and variant_data['grid_column'] in gnomad_sv_columns:
+            note = gnomad_sv_note
         value = values.get(variant_column)
         set_evidence(data, evidence_key, value, immutable, ekey_formatters, note=note)
 

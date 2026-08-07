@@ -88,7 +88,7 @@ class QCExecSummaryGraph(CacheableGraph):
         patches = [Line2D([0], [0], color='none', marker='o', markerfacecolor=color),
                    Rectangle((0, 0), 1, 1, fc=self.bp_color)]
 
-        sample_name = self.qc_exec_summary.qc.bam_file.unaligned_reads.sequencing_sample.sample_name
+        sample_name = self.qc_exec_summary.qc.sequencing_sample.sample_name
         run_label = f"{sample_name} from {self.sequencing_run}"
         labels = [run_label, comparison_description]
         figure.legend(patches, labels, loc='upper center', bbox_to_anchor=(0.5, 1), numpoints=1)
@@ -111,7 +111,7 @@ class QCExecSummaryGraph(CacheableGraph):
             "percent_duplication": "percent\nduplication",
         }
 
-        bplot = ax.boxplot([column_values], vert=False, patch_artist=True, flierprops={"markersize": 1})
+        bplot = ax.boxplot([column_values], orientation="horizontal", patch_artist=True, flierprops={"markersize": 1})
         for patch in bplot['boxes']:
             patch.set_facecolor(self.bp_color)
             patch.set_edgecolor(QCExecSummaryGraph.EDGE_COLOR)

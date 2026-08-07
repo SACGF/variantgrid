@@ -114,6 +114,9 @@ Two systems coexist:
 ### Celery task queues
 Four worker queues: `analysis_workers`, `annotation_workers`, `db_workers` (default), `web_workers`, plus `scheduling_single_worker`. Assign tasks to appropriate queues via `@app.task(queue='...')`.
 
+### Manual migrations (management commands on deploy)
+If a new management command needs to be run on existing deployments as part of an upgrade, add a migration containing a `ManualOperation` (from `manual/operations/manual_operations.py`) — the upgrade script surfaces these as required tasks. Use `ManualOperation.task_id_manage(["command_name"])` (or the `operation_manage`/`operation_other` helpers) and pass an optional `test=` callable (receives `apps`) so the task is only registered when the deployment actually has data needing it. Example: `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`.
+
 ### Preview system
 Models implement `PreviewModelMixin` to support hover-card previews. Apps connect to `preview_request_signal` and `preview_extra_signal` (in `library/preview_request.py`) to register their handlers. The `PreviewKeyValue` dataclass carries key/value pairs for the preview.
 
@@ -139,6 +142,10 @@ When asked to draft a prompt for an agent to implement a plan in another convers
 - The plan reflects the final decision; the agent reading it won't see the alternatives. Mentioning rejected options only confuses or implies the plan is incomplete.
 - Keep prompts short: read-list, "follow plan §X-§Y", any positive overrides, report-back format. No "pre-resolved decisions" section.
 
+## Code comments
+
+Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't write comments about failed paths or reverted decisions, just let the existing code stand. If you are tempted to write a lot of comments, perhaps you could make the code clearer by extracting logic into better named variables
+
 ## GitHub Comments
 
 When writing any comment on a GitHub issue or pull request, always preface it with 🤖 Written by Claude.
@@ -154,6 +161,8 @@ Tests extend `django.test.TestCase`. URL tests use `URLTestCase` from `library/d
 Fake/fixture data helpers are in `annotation/tests/test_data_fake_genes.py`, `snpdb/tests/utils/`, etc.
 
 `UNIT_TEST = sys.argv[1:2] == ['test']` is set in default_settings and used to conditionally skip expensive setup.
+
+It's great to write tests while you are writing code to ensure correctness. At the end, you should audit the tests and decide whether they are worth their costs (code to run and maintain, and possibly hampering refactoring)
 
 ## Database
 

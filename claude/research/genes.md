@@ -221,7 +221,6 @@ Organizes gene lists by purpose. Known categories:
 - `QCCoverageCustomText`
 - `PathologyTest`
 - `PanelAppCache`
-- `GeneInfo`
 
 ---
 
@@ -372,17 +371,6 @@ Maps LRG (Locus Reference Genomic) identifiers to RefSeq transcript accessions. 
 
 ## Documentation and Metadata
 
-### GeneInfo
-
-Special tags attached to specific genes with:
-- `icon_css_class`: CSS class for display icon
-- `description`: Free-text description
-- Linked `GeneList`: Genes associated with this info tag
-
-Used for highlighting genes of special clinical interest.
-
----
-
 ### GeneSymbolWiki / GeneListWiki
 
 Wiki-style documentation that can be attached to GeneSymbol or GeneList records. Supports versioned, user-editable content.
@@ -394,7 +382,8 @@ Wiki-style documentation that can be attached to GeneSymbol or GeneList records.
 | Command | Purpose |
 |---|---|
 | `import_cdot_latest` | Imports latest cdot transcript data |
-| `import_gene_annotation` | Imports GTF/GFF3 gene annotation files |
+| `import_gene_annotation` | Inserts gene/transcript versions from a cdot JSON.gz file |
+| `import_cdot_gene_annotation_release` | Installs the `GeneAnnotationRelease` matching the VEP a build was annotated with — resolves and downloads the cdot per-GFF file, links it to the `VariantAnnotationVersion`, then creates the gene annotation |
 | `import_canonical_transcript` | Imports canonical transcript designations |
 | `import_hgnc` | Imports HGNC gene nomenclature data |
 | `rematch_unmatched_gene_list_symbols` | Retries matching gene list symbols that previously failed |
@@ -435,7 +424,7 @@ Wiki-style documentation that can be attached to GeneSymbol or GeneList records.
 
 ## Data Flow Summary
 
-1. **Import:** GTF/GFF3 files imported via `import_gene_annotation` → creates `GeneAnnotationImport`, `GeneAnnotationRelease`, `Gene`, `GeneVersion`, `Transcript`, `TranscriptVersion` records
+1. **Import:** cdot JSON.gz imported via `import_gene_annotation` → creates `GeneAnnotationImport`, `Gene`, `GeneVersion`, `Transcript`, `TranscriptVersion` records. `GeneAnnotationRelease` (and its `ReleaseGeneVersion`/`ReleaseTranscriptVersion` links) comes from `import_cdot_gene_annotation_release`
 2. **cdot:** `TranscriptVersion.data` stores coordinate and exon data in cdot JSON format for HGVS calculation
 3. **Symbol resolution:** `GeneSymbol.cast()` and `GeneSymbolAlias` handle alias resolution across consortia
 4. **Gene lists:** Users create lists via text input → `CustomTextGeneList` → `GeneListGeneSymbol` with symbol matching

@@ -14,6 +14,7 @@ from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import (
     Allele,
     AlleleOrigin,
+    AllVariantsFilter,
     ClinGenAllele,
     Tag,
     Variant,
@@ -66,6 +67,11 @@ class Test(URLTestCase):
         vzcc = VariantZygosityCountCollection.objects.get_or_create(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)[0]
         VariantZygosityCount.objects.get_or_create(variant=cls.variant, collection=vzcc, het_count=1)
 
+        # The All Variants grid requires a selective filter - pin it to the test variant's contig
+        AllVariantsFilter.objects.update_or_create(
+            user=cls.user, genome_build=cls.grch37,
+            defaults={"filters": {"contig_ids": [cls.variant.locus.contig_id]}})
+
         # not sure how to test this properly
         cls.variant_wiki_obj = VariantWiki.objects.get_or_create(variant=cls.variant)
 
@@ -88,6 +94,9 @@ class Test(URLTestCase):
             ('gene_coverage', {"gene_symbol_id": self.gene_symbol.symbol}, 200),
             ("variant_sample_information", {"variant_id": self.variant.pk,
                                             "genome_build_name": self.grch37.name}, 200),
+            ("variant_sample_genotypes", {"variant_id": self.variant.pk}, 200),
+            ("variant_sample_genotypes", {"variant_id": self.variant.pk, "GET_PARAMS": {"limit": 0}}, 200),
+            ("variant_sample_genotypes", {"variant_id": self.variant.pk, "GET_PARAMS": {"limit": "all"}}, 400),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
 

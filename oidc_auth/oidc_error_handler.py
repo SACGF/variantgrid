@@ -1,6 +1,9 @@
+import logging
+
 from django.shortcuts import redirect
 from django.utils.deprecation import MiddlewareMixin
 
+logger = logging.getLogger(__name__)
 
 class HandleOIDC400Middleware(MiddlewareMixin):
     """
@@ -11,6 +14,7 @@ class HandleOIDC400Middleware(MiddlewareMixin):
     def process_exception(self, request, exception):
         # if (isinstance(exception, HTTPError) and exception.response.status_code == 400)
         # or isinstance(exception, SuspiciousActivity):
+        logger.exception(exception)
         if request.path.startswith('/oidc/'):
             return redirect('/')
         return None

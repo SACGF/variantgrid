@@ -111,6 +111,7 @@ from snpdb.models import (
     CohortSample,
     GenomeBuild,
     ImportStatus,
+    JobsControl,
     Quad,
     Sample,
     Trio,
@@ -218,6 +219,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
         "analysis_variables": analysis_variables,
         "has_write_permission": analysis.can_write(request.user),
         "warnings": analysis.get_toolbar_warnings(request.user),
+        "loading_animations": user_settings.grid_loading_animations,
     }
     return render(request, 'analysis/analysis.html', context)
 
@@ -454,6 +456,8 @@ def analysis_template_settings(request, pk):
             valid = formset.is_valid()
             if valid:
                 formset.save()
+                # Rebuild unbound, so saved rows are re-displayed along with a new blank one to add another
+                formset = AutoLaunchFormSet(prefix='auto-launch', instance=analysis_template)
             add_save_message(request, valid, "Auto Launch Config")
 
         if atv_form and atv_form.is_bound:
@@ -584,13 +588,39 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         }
         return HttpResponseRedirect(reverse("node_load", kwargs=kwargs))
 
+    # Use the count for the view being shown - if an extra filter (eg clinvar) is selected, that filtered
+    # count (not the whole node's count) decides auto-load/sorting. Mirrors VariantGrid._grid_row_count().
+    try:
+        grid_row_count = NodeCount.load_for_node(node, extra_filters).count
+    except NodeCount.DoesNotExist:
+        grid_row_count = node.count
+
+    max_variants = (UserSettings.get_for_user(request.user).node_grid_auto_load_max_variants
+                    or settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS)
+    grid_auto_load = (max_variants is None) or (grid_row_count is not None and grid_row_count < max_variants)
+
+    max_variants_display = None
+    if max_variants is not None:
+        # eg 50000 -> "50k", 50500 -> "50.5k"
+        max_variants_display = f"{max_variants / 1000:g}k" if max_variants >= 1000 else str(max_variants)
+
+    # Sorting is disabled on large grids (see issue #1651) - warn the user so they filter first
+    grid_sort_max_variants = settings.ANALYSIS_GRID_SORT_MAX_ROWS
+    grid_sorting_disabled = grid_row_count is None or grid_row_count >= grid_sort_max_variants
+
     context = {
         "analysis_id": analysis_id,
         "analysis_version": analysis_version,
         "node_id": node_id,
         "node_version": node_version,
         "extra_filters": extra_filters,
-        "bams_dict": node.get_bams_dict()
+        "bams_dict": node.get_bams_dict(),
+        "node": node,
+        "grid_row_count": grid_row_count,
+        "grid_auto_load": grid_auto_load,
+        "grid_auto_load_max_variants_display": max_variants_display,
+        "grid_sorting_disabled": grid_sorting_disabled,
+        "grid_sort_max_variants": grid_sort_max_variants,
     }
     return render(request, 'analysis/node_data/node_data_grid.html', context)
 
@@ -828,7 +858,8 @@ def cohort_zygosity_filters(request, analysis_id, node_id, cohort_id):
                                         extra=0)
 
     formset = CNZFFormSet(request.POST or None, instance=cnzfc)
-    context = {'formset': formset}
+    context = {'formset': formset,
+               'cohort': cohort}
 
     template = 'analysis/node_editors/cohort_zygosity_filters.html'
     return render(request, template, context)
@@ -1108,6 +1139,17 @@ def node_method_description(request, analysis_id, node_id, node_version):
 
 @user_passes_test(is_superuser)
 def view_analysis_issues(request):
+    if request.method == "POST":
+        if "unpause-jobs" in request.POST:
+            JobsControl.resume(by=str(request.user))
+            messages.add_message(request, messages.INFO,
+                                 "Resumed analysis + annotation job dispatch")
+        if "pause-jobs" in request.POST:
+            JobsControl.pause(reason=f"Paused from analysis issues page by {request.user}",
+                              by=str(request.user))
+            messages.add_message(request, messages.WARNING,
+                                 "Paused analysis + annotation job dispatch")
+
     all_nodes = AnalysisNode.objects.all()
     field_counts = get_field_counts(all_nodes, "status")
     summary_data = Counter()
@@ -1116,8 +1158,12 @@ def view_analysis_issues(request):
         summary_data[summary] += count
 
     field_counts = {NodeStatus(k).label: v for k, v in field_counts.items()}
+    # Don't force-create the singleton just by viewing the page
+    jobs_control = JobsControl.objects.filter(pk=JobsControl.SINGLETON_PK).first()
     context = {"nodes_status_summary": summary_data,
-               "field_counts": field_counts}
+               "field_counts": field_counts,
+               "jobs_control": jobs_control,
+               "jobs_paused": bool(jobs_control and jobs_control.paused)}
     return render(request, 'analysis/view_analysis_issues.html', context)
 
 

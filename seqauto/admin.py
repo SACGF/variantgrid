@@ -27,11 +27,6 @@ class SequencerModelAdmin(ModelAdminBasics):
     pass
 
 
-@admin.register(models.SeqAutoRun)
-class SeqAutoRunAdmin(ModelAdminBasics):
-    pass
-
-
 @admin.register(models.SequencingRun)
 class SequencingRunAdmin(ModelAdminBasics):
     pass

@@ -1,0 +1,150 @@
+{% load ui_help %}
+{% load js_tags %}
+{# Rendered standalone by mme_classification_panel.html, and AJAX-loaded into the #}
+{# classification page's MatchMaker Exchange card. One markup source, two paths.  #}
+
+{% if not mme_enabled %}
+    <div class="alert alert-warning">MatchMaker Exchange is not enabled on this deployment.</div>
+{% endif %}
+
+{% page_help_embedded title="MatchMaker Exchange" %}
+    <p>
+        MatchMaker Exchange is a federated rare-disease network. Labs query each other for
+        patients who share a <strong>candidate gene</strong> and phenotype, so an unsolved case
+        can find a second one like it.
+    </p>
+    <p>
+        <strong>What is shared:</strong> the candidate gene and variant coordinates, the curated
+        condition, HPO phenotype terms, and your lab's contact details. No patient identifiers,
+        no names, no dates of birth — a record is identified only by an opaque id.
+    </p>
+    <p>
+        <strong>VUS and above only.</strong> The MME protocol has no field for clinical
+        significance, so every submission reads as "we hold a case where this gene is a candidate".
+        A Benign call sent through it would arrive as corroboration of someone else's lead. Publish
+        negatives to <strong>ClinVar</strong>, which carries clinical significance as a first-class
+        field and already receives these same records.
+    </p>
+    <p>
+        <strong>Three layers of opt-in</strong>, all of which must hold: this deployment
+        participates, your <em>lab</em> has enabled MatchMaker Exchange, and <em>this record</em> is
+        shared at "3rd Party Databases" level, not withdrawn, and VUS or above.
+    </p>
+    <p>
+        A match is an introduction, not an answer: it results in a person-to-person email between
+        curators. Both your lab's contact address and you are notified.
+    </p>
+{% end_page_help_embedded %}
+
+{% if mme_state == "eligible" %}
+    <div class="alert alert-success mb-2">
+        This classification is a <strong>candidate gene</strong> shared with MatchMaker Exchange.
+    </div>
+{% elif mme_state == "not_candidate" %}
+    <div class="alert alert-info mb-2">
+        MatchMaker Exchange shares <strong>candidate genes</strong> — VUS and above.
+        This classification is <em>{{ clinical_significance|default:"not classified" }}</em>;
+        publish negatives to ClinVar instead.
+    </div>
+{% elif mme_state == "not_shared" %}
+    <div class="alert alert-info mb-2">
+        Share this classification at <em>3rd Party Databases</em> level to enable MatchMaker Exchange.
+    </div>
+{% elif mme_state == "lab_not_enabled" %}
+    <div class="alert alert-info mb-2">
+        Your lab has not enabled MatchMaker Exchange — contact your lab admin.
+    </div>
+{% endif %}
+
+<h5>Genomic features</h5>
+{% if genomic_features %}
+    <ul>
+        {% for gf in genomic_features %}
+            <li>
+                {% if gf.gene %}<strong>{{ gf.gene.id }}</strong>{% endif %}
+                {% if gf.variant %}
+                    — {{ gf.variant.assembly }} {{ gf.variant.referenceName }}:{{ gf.variant.start }}
+                    {{ gf.variant.referenceBases }}&gt;{{ gf.variant.alternateBases }}
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="text-muted">None</p>
+{% endif %}
+
+<h5>Disorders</h5>
+{% if disorders %}
+    <ul>{% for d in disorders %}<li>{{ d.id }}</li>{% endfor %}</ul>
+{% else %}
+    <p class="text-muted">None</p>
+{% endif %}
+
+<h5>Phenotype features (HPO)</h5>
+{% if features %}
+    <ul>
+        {% for f in features %}
+            <li>
+                {{ f.label }} <span class="text-monospace text-muted">({{ f.id }})</span>
+                {% if f|get_item:"_derivedFrom" %}
+                    <span class="badge badge-warning" title="Derived via ontology cross-reference, not directly observed">derived</span>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="text-muted">None</p>
+{% endif %}
+
+{% if eligible and mme_enabled %}
+    <h5>Submit</h5>
+    {% if nodes %}
+        {% for node_id in nodes %}
+            <form method="post" action="{% url 'mme_classification_panel' classification.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="node_id" value="{{ node_id }}">
+                <button type="submit" class="btn btn-primary mb-2">
+                    Share with MatchMaker Exchange (VUS and above) — {{ node_id }}
+                </button>
+            </form>
+        {% endfor %}
+    {% else %}
+        <p class="text-muted">No MME nodes are configured (settings.MME_NODES).</p>
+    {% endif %}
+{% endif %}
+
+{% if submissions %}
+    <h5>Our submissions</h5>
+    <table class="table table-sm">
+        <thead><tr><th>Node</th><th>Status</th><th>Created</th><th></th></tr></thead>
+        <tbody>
+            {% for submission in submissions %}
+                <tr>
+                    <td>{{ submission.node_id }}</td>
+                    <td>{{ submission.get_status_display }}</td>
+                    <td>{{ submission.created }}</td>
+                    <td><a href="{% url 'mme_view_submission' submission.pk %}">View</a></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
+{# Also in the notification email, but that can be missed and the curator may have left #}
+{% if inbound_matches %}
+    <h5>External labs that matched this record</h5>
+    <table class="table table-sm">
+        <thead><tr><th>Peer</th><th>Their patient</th><th>Score</th><th>When</th><th></th></tr></thead>
+        <tbody>
+            {% for match in inbound_matches %}
+                <tr>
+                    <td>{{ match.inbound_query.peer_node_id|default:"unknown peer" }}</td>
+                    <td class="text-monospace">{{ match.remote_patient_id|default:"—" }}</td>
+                    <td>{{ match.score|floatformat:3 }}</td>
+                    <td>{{ match.created }}</td>
+                    <td><a href="{% url 'mme_view_inbound_match' match.pk %}">View</a></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}

@@ -5,6 +5,7 @@ from typing import Optional
 
 from auditlog.registry import auditlog
 from django.db.models import Q
+from django.db.models.expressions import RawSQL
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 
@@ -78,12 +79,18 @@ class MergeNode(AnalysisNode):
                 # disable_cache=True bypasses parent NodeCache substitution: a parent with a stale
                 # VariantCollection-backed cache from a prior version would collapse to Q(pk__in=vc_join)
                 # and the merge would OR stale parent results with live siblings (see #240, ad35a7fb1).
-                qs = parent.get_queryset(disable_cache=True)
-                # Materialise to an explicit PK list (issue #546): merge parents are small, and a
-                # lazy TransformerQuerySet embedded in the Q makes arg_q_dict unpicklable (the q-cache
-                # cache.set in get_arg_q_dict then fails) as well as forcing a pk IN (subquery).
-                variant_ids = list(qs.values_list("pk", flat=True))
-                or_list.append(Q(pk__in=variant_ids))
+                # Embed the parent as a pk IN (subquery), NOT list(qs.values_list("pk")). Every parent
+                # reaching this branch is large by construction - small parents are substituted to a
+                # literal PK list upstream by get_small_parent_arg_q_dict and take the `else` branch - so
+                # list() here could pull an unbounded number of PKs into Python (e.g. a 7.4M-row cohort).
+                # We render the parent to RawSQL, capturing the compiled SQL + params (incl. the partition
+                # table rewrite the TransformerQuerySet applies in as_sql), so the parent runs as a single
+                # DB-side semi-join. RawSQL also keeps arg_q_dict picklable for the q-cache cache.set: a
+                # live TransformerQuerySet embedded in the Q is unpicklable (closure-local compiler classes)
+                # which previously forced the materialise-to-list workaround (issue #546, #240, ad35a7fb1).
+                pk_qs = parent.get_queryset(disable_cache=True).values_list("pk", flat=True)
+                sql, params = pk_qs.query.sql_with_params()
+                or_list.append(Q(pk__in=RawSQL(sql, params)))
             else:
                 if remaining_q_dict := arg_q_dict.get(None):
                     merged_q = reduce(operator.and_, remaining_q_dict.values())

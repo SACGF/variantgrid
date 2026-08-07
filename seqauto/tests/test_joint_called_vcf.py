@@ -23,8 +23,8 @@ from seqauto.models import (
 )
 from seqauto.models.models_enums import DataGeneration, PairedEnd
 from seqauto.serializers.sequencing_serializers import JointCalledVCFSerializer
-from snpdb.models import VCF, DataState, Sample
-from upload.models import BackendVCF, UploadedFile, UploadedVCF
+from snpdb.models import VCF, Sample
+from upload.models import BackendVCF, FileUpload, UploadedVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
 
 
@@ -41,7 +41,6 @@ def _make_sample_sheet(sequencing_run, sample_names, sheet_hash="SHA1"):
         sequencing_run=sequencing_run,
         path=f"/data/{sequencing_run.name}/SampleSheet.csv",
         hash=sheet_hash,
-        data_state=DataState.COMPLETE,
     )
     SequencingRunCurrentSampleSheet.objects.create(sequencing_run=sequencing_run,
                                                    sample_sheet=sample_sheet)
@@ -63,16 +62,16 @@ def _make_user():
 
 
 def _make_vcf(user, name, sample_names, source_path):
-    """Create VCF + Samples + UploadedFile + UploadedVCF wired together (no real file IO)."""
+    """Create VCF + Samples + FileUpload + UploadedVCF wired together (no real file IO)."""
     vcf = VCF.objects.create(name=name, date=timezone.now(), user=user,
                              genotype_samples=len(sample_names))
     samples = []
     for sname in sample_names:
         sample = Sample.objects.create(vcf=vcf, name=sname, vcf_sample_name=sname)
         samples.append(sample)
-    uploaded_file = UploadedFile.objects.create(
+    file_upload = FileUpload.objects.create(
         path=source_path, name=name, user=user, import_source="S")  # ImportSource.SEQAUTO
-    uploaded_vcf = UploadedVCF.objects.create(uploaded_file=uploaded_file, vcf=vcf)
+    uploaded_vcf = UploadedVCF.objects.create(file_upload=file_upload, vcf=vcf)
     return vcf, samples, uploaded_vcf
 
 
@@ -161,7 +160,6 @@ class LinkSamplesJointCallPreservedTests(TestCase):
             sample_sheet=self.sample_sheet,
             variant_caller=self.caller,
             path=path,
-            data_state=DataState.COMPLETE,
         )
         backend = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                             joint_called_vcf=joint_called_vcf,
@@ -176,7 +174,6 @@ class LinkSamplesJointCallPreservedTests(TestCase):
                                      sequencing_sample=seq_sample,
                                      name=f"{sample_name}.fastq.gz",
                                      read=PairedEnd.R1,
-                                     data_state=DataState.COMPLETE,
                                      sequencing_run=self.sequencing_run)
         unaligned = UnalignedReads.objects.create(sequencing_sample=seq_sample,
                                                   fastq_r1=fastq)
@@ -184,14 +181,13 @@ class LinkSamplesJointCallPreservedTests(TestCase):
         bam_file = BamFile.objects.create(path=f"/d/{sample_name}.bam",
                                           name=f"{sample_name}.bam",
                                           sequencing_run=self.sequencing_run,
+                                          sequencing_sample=seq_sample,
                                           unaligned_reads=unaligned,
-                                          aligner=aligner,
-                                          data_state=DataState.COMPLETE)
+                                          aligner=aligner)
         single_sample_vcf = SingleSampleVCF.objects.create(path=path,
                                                            sequencing_run=self.sequencing_run,
                                                            bam_file=bam_file,
-                                                           variant_caller=self.caller,
-                                                           data_state=DataState.COMPLETE)
+                                                           variant_caller=self.caller)
         backend = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                             joint_called_vcf=None,
                                             single_sample_vcf=single_sample_vcf)

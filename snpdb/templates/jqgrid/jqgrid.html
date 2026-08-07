@@ -63,6 +63,7 @@ If we want to use jqgrid cdn, works for half
             maxRowNum: Number.MAX_SAFE_INTEGER, // default=10k limit
             sortname: origParams.sortname,
             sortorder: origParams.sortorder,
+            postData: origParams.postData, // So the export applies the same filters as the grid
         };
 
         const fakeGrid = $("<table />");

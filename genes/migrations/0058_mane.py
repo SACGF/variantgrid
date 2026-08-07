@@ -21,7 +21,31 @@ class Migration(migrations.Migration):
                 ('hgnc', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='genes.hgnc')),
                 ('ncbi_gene_version', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='mane_ncbi', to='genes.geneversion')),
                 ('refseq_transcript_version', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='mane_refseq', to='genes.transcriptversion')),
-                ('symbol', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genes.genesymbol')),
+            ],
+        ),
+        # symbol pulled out of the CreateModel above: Django 6 emits CITextField as `text`, but
+        # genes_genesymbol.symbol is still `citext` here (genes.0078 converts the graph to text
+        # later), so a `text` FK cannot reference the citext PK. Create the column as citext; the
+        # table is otherwise Django-created and empty, so NOT NULL is safe.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql='''
+                        ALTER TABLE "genes_mane" ADD COLUMN "symbol_id" citext NOT NULL;
+                        ALTER TABLE "genes_mane"
+                            ADD FOREIGN KEY ("symbol_id")
+                            REFERENCES "genes_genesymbol" ("symbol") DEFERRABLE INITIALLY DEFERRED;
+                        CREATE INDEX ON "genes_mane" ("symbol_id");
+                    ''',
+                    reverse_sql='ALTER TABLE "genes_mane" DROP COLUMN "symbol_id";',
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='mane',
+                    name='symbol',
+                    field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genes.genesymbol'),
+                ),
             ],
         ),
     ]

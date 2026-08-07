@@ -37,19 +37,37 @@ class VCFConstant:
 
 
 class VariantClass(models.TextChoices):
-    """ https://asia.ensembl.org/info/genome/variation/prediction/classification.html#classes """
+    """ Ensembl variant classes (VEP `VARIANT_CLASS` / VariationFeature class_SO_term).
+
+        Human-readable reference (note: does NOT list every value VEP can emit - e.g.
+        chromosome_breakpoint and tandem_repeat are missing from it):
+          https://asia.ensembl.org/info/genome/variation/prediction/classification.html#classes
+
+        Authoritative source for the values VEP actually outputs:
+          - SVs:        Bio/EnsEMBL/Variation/Utils/Config.pm  %SO_TERMS  (moved here in rel 114;
+                        previously defined inline in Parser.pm::get_SO_term)
+          - SVTYPE map: Bio/EnsEMBL/VEP/Parser.pm  get_SO_term()  (e.g. BND -> chromosome_breakpoint)
+          - small vars: Bio/EnsEMBL/Variation/Utils/Sequence.pm  SO_variation_class()
+
+        Keep every existing member even if a current VEP release no longer emits it - older
+        annotation data may already contain it.
+    """
 
     SNV = 'SN', "SNV"
     GENETIC_MARKER = 'GM', "genetic_marker"
     SUBSTITUTION = 'SU', "substitution"
     TANDEM_REPEAT = 'TR', "tandem_repeat"
     ALU_INSERTION = 'AI', "Alu_insertion"
+    HERV_INSERTION = 'HI', "HERV_insertion"
+    LINE1_INSERTION = 'LI', "LINE1_insertion"
+    SVA_INSERTION = 'VI', "SVA_insertion"
     COMPLEX_STRUCTURAL_ALTERATION = 'CA', "complex_structural_alteration"
     COMPLEX_SUBSTITUTION = 'CS', "complex_substitution"
     COPY_NUMBER_GAIN = 'CG', "copy_number_gain"
     COPY_NUMBER_LOSS = 'CL', "copy_number_loss"
     COPY_NUMBER_VARIATION = 'CN', "copy_number_variation"
     DUPLICATION = 'DU', "duplication"
+    CHROMOSOME_BREAKPOINT = 'CH', "chromosome_breakpoint"
     INTERCHROMOSOMAL_BREAKPOINT = 'IB', "interchromosomal_breakpoint"
     INTERCHROMOSOMAL_TRANSLOCATION = 'IT', "interchromosomal_translocation"
     INTRACHROMOSOMAL_BREAKPOINT = 'CB', "intrachromosomal_breakpoint"
@@ -57,6 +75,10 @@ class VariantClass(models.TextChoices):
     INVERSION = 'IN', "inversion"
     LOSS_OF_HETEROZYGOSITY = 'LO', "loss_of_heterozygosity"
     MOBILE_ELEMENT_DELETION = 'MD', "mobile_element_deletion"
+    ALU_DELETION = 'AD', "Alu_deletion"
+    HERV_DELETION = 'HD', "HERV_deletion"
+    LINE1_DELETION = 'LD', "LINE1_deletion"
+    SVA_DELETION = 'VD', "SVA_deletion"
     MOBILE_ELEMENT_INSERTION = 'MI', "mobile_element_insertion"
     NOVEL_SEQUENCE_INSERTION = 'NI', "novel_sequence_insertion"
     SHORT_TANDEM_REPEAT_VARIATION = 'ST', "short_tandem_repeat_variation"

@@ -1,4 +1,4 @@
-
+import re
 
 # Here is a list of some instrument IDs from Illumina:
 # https://knowledge.illumina.com/instrumentation/general/instrumentation-general-reference_material-list/000006351
@@ -11,7 +11,17 @@
 #     HiSeq 4000: 150210_K00111_0013_AH2372BBXX
 #     HiSeq X: 141121_ST-E00107_0356_AH00C3CCXX
 #     NovaSeq 6000: 220923_A01934_0008_BHLL3GDRX2
+# This one is strict as it's used to pull the original run name back out of a directory that's had
+# something appended to it (see SequencingRun.get_original_illumina_sequencing_run)
 SEQUENCING_RUN_REGEX = r"\d{6}[_-](NS|NB|M|D|SN|K|ST|A|LH)(.{3,7})_\d{4}_(0{9}-.{5}|.{10})"
+
+# Illumina run folders are all <date>_<instrument>_<run number>_<flowcell>, eg the iSeq 100 produces
+# names like 210714_FS10000855_36_BPA73216-1615 (2 digit run number, and a flowcell that's neither of
+# the shapes above). Labs can also rename instruments now, so an instrument prefix list will always go
+# stale - match on that structure instead, and let everything after the instrument be optional.
+# This is only used to decide whether to run a name search against the (small) SequencingRun table, so
+# false positives just cost us one query that returns nothing.
+SEQUENCING_RUN_SEARCH_REGEX = re.compile(r"\d{6,8}[_-][A-Za-z0-9-]{2,}")
 
 
 def get_sequencer_model_from_name(name):

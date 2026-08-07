@@ -24,6 +24,9 @@ class Command(BaseCommand):
                             help="Number of steps to take in between AnnotationRangeLock regions (which are ~100k)")
         parser.add_argument('--replace', action='store_true')
         parser.add_argument('--min-variant', type=int, required=False)
+        parser.add_argument('--symbolic-only', action='store_true',
+                            help="Recalculate end for all variants with an SVLEN in one pass, skipping the "
+                                 "range locks and progress file (which a re-run would otherwise resume from)")
 
     @staticmethod
     def update_variants_in_range_fix_end(variant_qs):
@@ -38,7 +41,24 @@ class Command(BaseCommand):
         symbolic_variant_subquery = Variant.objects.filter(pk=OuterRef("pk")).annotate(calc_end=calc_end).values("calc_end")[:1]
         symbolic_variant_qs.update(end=Subquery(symbolic_variant_subquery))
 
+    @staticmethod
+    def recalc_symbolic_ends() -> int:
+        """ Symbolic variants are a small subset, so no need for range lock batching """
+        symbolic_qs = Variant.objects.filter(svlen__isnull=False)
+        calc_end = F("locus__position") + Abs("svlen")
+        print(f"Symbolic variants: {symbolic_qs.count()}")
+        print(f"...with a wrong end: {symbolic_qs.exclude(end=calc_end).count()}")
+
+        symbolic_subquery = Variant.objects.filter(pk=OuterRef("pk")).annotate(calc_end=calc_end).values("calc_end")[:1]
+        updated = symbolic_qs.update(end=Subquery(symbolic_subquery))
+        print(f"Updated end on {updated} symbolic variants")
+        return updated
+
     def handle(self, *args, **options):
+        if options["symbolic_only"]:
+            self.recalc_symbolic_ends()
+            return
+
         # We want to do this in small batches - so use the variant annotation range locks which are all approx the same
         # size (even if a big gap between IDs)
         # Variants from different builds are mixed up together - we just want the biggest one

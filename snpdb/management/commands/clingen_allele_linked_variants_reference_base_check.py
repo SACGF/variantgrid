@@ -2,6 +2,7 @@ import logging
 
 from django.core.management import BaseCommand
 
+from genes.hgvs import HGVSMatcher
 from snpdb.models import Allele, AlleleLiftover, ClinGenAllele, Contig, Variant
 
 
@@ -32,7 +33,9 @@ class Command(BaseCommand):
             for va in allele.variantallele_set.all():
                 existing_vc = va.variant.coordinate
                 try:
-                    clingen_vc = allele.clingen_allele.get_variant_coordinate(va.genome_build)
+                    hgvs_matcher = HGVSMatcher.instance(va.genome_build)
+                    clingen_vc = allele.clingen_allele.get_variant_coordinate(va.genome_build,
+                                                                              hgvs_matcher=hgvs_matcher)
                     if existing_vc != clingen_vc:
                         logging.info(f"{allele} has variant {existing_vc!r} not matching expected for build {va.genome_build}: {clingen_vc!r}")
                         if not dry_run:

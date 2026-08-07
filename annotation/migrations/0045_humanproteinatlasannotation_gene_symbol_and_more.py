@@ -12,10 +12,34 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='humanproteinatlasannotation',
-            name='gene_symbol',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='genes.genesymbol'),
+        # Django 6 emits CITextField as plain `text`, but genes_genesymbol.symbol is still
+        # `citext` at this point in history (genes.0078 converts the whole GeneSymbol FK graph
+        # to text + case_insensitive collation later). A `text` FK column cannot reference a
+        # `citext` PK, so Django's AddField fails with "foreign key constraint cannot be
+        # implemented". Create the column as citext to match; 0078's dynamic pg_constraint sweep
+        # picks it up with the rest.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql='''
+                        ALTER TABLE "annotation_humanproteinatlasannotation"
+                            ADD COLUMN "gene_symbol_id" citext NULL;
+                        ALTER TABLE "annotation_humanproteinatlasannotation"
+                            ADD FOREIGN KEY ("gene_symbol_id")
+                            REFERENCES "genes_genesymbol" ("symbol") DEFERRABLE INITIALLY DEFERRED;
+                        CREATE INDEX ON "annotation_humanproteinatlasannotation" ("gene_symbol_id");
+                    ''',
+                    reverse_sql='ALTER TABLE "annotation_humanproteinatlasannotation" '
+                                'DROP COLUMN "gene_symbol_id";',
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='humanproteinatlasannotation',
+                    name='gene_symbol',
+                    field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='genes.genesymbol'),
+                ),
+            ],
         ),
         migrations.AddField(
             model_name='humanproteinatlasannotation',

@@ -87,7 +87,7 @@ from genes.models import Gene, NoTranscript
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
-from library.log_utils import report_event, report_exc_info
+from library.log_utils import report_exc_info
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import (
     cautious_attempt_html_to_text,
@@ -99,7 +99,6 @@ from library.utils import (
     utc_from_timestamp,
 )
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
-from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Sample, Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -172,18 +171,6 @@ class ClassificationImportAlleleSource(AlleleSource):
         variants_qs = self.classification_import.get_variants_qs()
         return Allele.objects.filter(variantallele__variant__in=variants_qs)
 
-    def liftover_complete(self, genome_build: GenomeBuild):
-        allele_qs = self.get_allele_qs()
-        # Populate ClinGen for newly created variants as well as it's possible that old one failed but new could work
-        build_variants = Variant.objects.filter(variantallele__genome_build=genome_build,
-                                                variantallele__allele__in=allele_qs)
-        populate_clingen_alleles_for_variants(genome_build, build_variants)
-
-        ImportedAlleleInfo.relink_variants(self.classification_import)
-
-        report_event('Completed import liftover',
-                     extra_data={'liftover_id': self.pk, 'allele_count': allele_qs.count()})
-
 
 class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
     """ Used to reload all Classifications (for upgrades etc.) """
@@ -200,9 +187,6 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
         # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
         return Variant.objects.filter(contigs_q, importedalleleinfo__isnull=False)
-
-    def liftover_complete(self, genome_build: GenomeBuild):
-        ImportedAlleleInfo.relink_variants()
 
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
@@ -2216,7 +2200,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def _generate_c_hgvs(self, genome_build: GenomeBuild) -> str:
         variant = self.get_variant_for_build(genome_build)
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
 
         c_hgvs: str = None
         if variant:

@@ -15,7 +15,7 @@ from library.utils import full_class_name
 from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
 from upload.models import (
-    UploadedFile,
+    FileUpload,
     UploadedManualVariantEntryCollection,
     UploadPipeline,
     UploadStep,
@@ -80,15 +80,15 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
     working_dir = get_import_processing_dir(mvec.pk, "manual_variants")
     vcf_filename = os.path.join(working_dir, "manual_variant_entry.vcf")
     write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates, vcf_ids=vcf_ids)
-    uploaded_file = UploadedFile.objects.create(path=vcf_filename,
-                                                import_source=ImportSource.WEB,
-                                                name='Manual Variant Entry',
-                                                user=user,
-                                                file_type=UploadedFileTypes.MANUAL_VARIANT_ENTRY)
+    file_upload = FileUpload.objects.create(path=vcf_filename,
+                                            import_source=ImportSource.WEB,
+                                            name='Manual Variant Entry',
+                                            user=user,
+                                            file_type=UploadedFileTypes.MANUAL_VARIANT_ENTRY)
 
-    UploadedManualVariantEntryCollection.objects.create(uploaded_file=uploaded_file,
+    UploadedManualVariantEntryCollection.objects.create(file_upload=file_upload,
                                                         collection=mvec)
-    upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+    upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
     add_manual_variant_upload_steps(upload_pipeline)
     process_upload_pipeline(upload_pipeline)
     return mvec

@@ -25,7 +25,7 @@ from patients.models import (
 )
 from patients.models_enums import Sex
 from snpdb.models import ImportSource
-from upload.models import UploadedFile, UploadedFileTypes, UploadedPatientRecords
+from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
 
 _TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "test_data")
 _FAKE_CSV = os.path.join(_TEST_DATA_DIR, "fake_patient_records.csv")
@@ -43,14 +43,14 @@ def _make_patient_records(user):
     """Build the full PatientRecords FK chain required by process_record."""
     pi = PatientImport.objects.create(name=f"test_import_{user.pk}")
     pr = PatientRecords.objects.create(patient_import=pi)
-    uf = UploadedFile.objects.create(
+    uf = FileUpload.objects.create(
         user=user,
         name="test_import_file",
         path=_FAKE_CSV,
         file_type=UploadedFileTypes.PATIENT_RECORDS,
         import_source=ImportSource.COMMAND_LINE,
     )
-    UploadedPatientRecords.objects.create(uploaded_file=uf, patient_records=pr)
+    UploadedPatientRecords.objects.create(file_upload=uf, patient_records=pr)
     return pr
 
 

@@ -4,17 +4,14 @@ import os
 from collections import defaultdict
 
 from django.conf import settings
-from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.http.response import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
-from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import UpdateView
-from htmlmin.decorators import not_minified_response
 
 from eventlog.models import create_event
 from genes.models import CanonicalTranscriptCollection
@@ -45,17 +42,15 @@ from seqauto.models import (
     QCExecSummary,
     QCGeneCoverage,
     QCType,
-    SeqAutoRun,
     Sequencer,
     SequencingRun,
     SequencingSample,
     SingleSampleVCF,
-    SoftwarePipelineNode,
     UnalignedReads,
     VariantCaller,
     VariantCallingPipeline,
 )
-from seqauto.models.models_enums import QCCompareType, SequencingFileType
+from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.sequencing_run_utils import (
     SEQUENCING_RUN_QC_COLUMNS,
     get_qc_exec_summary_data,
@@ -63,44 +58,15 @@ from seqauto.qc.sequencing_run_utils import (
     get_sequencing_run_data,
 )
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
-from seqauto.sequencing_files.create_resource_models import (
+from seqauto.sequencing_files.sample_sheet import (
     assign_old_sample_sheet_data_to_current_sample_sheet,
 )
-from seqauto.tasks.scan_run_jobs import process_seq_auto_run
 from snpdb.graphs import graphcache
-from snpdb.models import DataState, Sample, UserSettings
+from snpdb.models import Sample, UserSettings
 
 
 def sequencing_data(request):
-    context = {"last_success_datetime": SeqAutoRun.get_last_success_datetime()}
-    return render(request, 'seqauto/sequencing_data.html', context)
-
-
-def seqauto_runs(request):
-    # Only allow button if settings allow, and previous run has finished
-    enable_button = request.user.has_perm(settings.SEQAUTO_SCAN_PERMISSION)
-
-    if request.method == "POST":
-        if not enable_button:
-            msg = "Not allowed to manually kick off sequencing run"
-            raise PermissionDenied(msg)
-
-        only_process_file_types = []  # All
-        only_launch_file_types = [SequencingFileType.ILLUMINA_FLOWCELL_QC]
-
-        seqauto_run = SeqAutoRun.objects.create()
-        task = process_seq_auto_run.si(seq_auto_run_id=seqauto_run.pk,  # @UndefinedVariable
-                                       only_process_file_types=only_process_file_types,
-                                       only_launch_file_types=only_launch_file_types)
-        task.apply_async()
-
-        msg = 'Scanning disk for sequencing data...'
-        messages.add_message(request, messages.INFO, msg, extra_tags='import-message')
-        enable_button = False
-
-    context = {"last_success_datetime": SeqAutoRun.get_last_success_datetime(),
-               "enable_button": enable_button}
-    return render(request, 'seqauto/seqauto_runs.html', context)
+    return render(request, 'seqauto/sequencing_data.html')
 
 
 def experiments(request):
@@ -137,37 +103,10 @@ def view_experiment(request, experiment_id):
     return render(request, 'seqauto/view_experiment.html', context)
 
 
-def software_pipeline(request):
-    """ Extract sofware pipelines into Directed Acyclic Graphs """
-
-    qs = SoftwarePipelineNode.objects.filter()  # @UndefinedVariable
-    return render(request, 'seqauto/software_pipeline.html', {'dag_list': qs})
-
-
-@not_minified_response  # so stack traces are formatted
-def view_seqauto_run(request, seqauto_run_id):
-
-    seqauto_run = get_object_or_404(SeqAutoRun, pk=seqauto_run_id)
-    qs = seqauto_run.jobscript_set.all()
-    file_type_counts = qs.values("file_type").annotate(file_type_count=Count("file_type"))
-    pbs_script_counts = []
-
-    for file_type, file_type_count in file_type_counts.values_list("file_type", "file_type_count"):
-        pbs_script_counts.append((SequencingFileType(file_type).label, file_type_count))
-
-    if seqauto_run.error_exception:
-        status = messages.ERROR
-        messages.add_message(request, status, mark_safe(seqauto_run.error_exception), extra_tags='stack-trace import-message')
-
-    context = {"seqauto_run": seqauto_run,
-               "pbs_script_counts": pbs_script_counts}
-    return render(request, 'seqauto/view_seqauto_run.html', context)
-
-
 def get_illumina_qc_and_show_stats_for_sample_sheet(sample_sheet):
     try:
         illumina_qc = sample_sheet.illuminaflowcellqc
-        show_stats = illumina_qc.data_state == 'C'
+        show_stats = True
     except Exception:
         illumina_qc = None
         show_stats = False
@@ -193,14 +132,6 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
                 #                                         message=message)
 
             sequencing_run = sequencing_run_form.save()
-
-    if not sequencing_run.is_valid:  # Had errors
-        sequencing_run.save()  # Try again now
-        if sequencing_run.is_valid:
-            message = "SequencingRun had errors but they appear to have been resolved. Setting is_valid=True"
-            messages.add_message(request, messages.WARNING, message)
-
-    sequencing_run.add_messages(request)
 
     vcf_types = {
         "Joint Called VCF": Q(vcf__uploadedvcf__backendvcf__joint_called_vcf__isnull=False),
@@ -549,17 +480,14 @@ def qc_column_graph(request, qc_column_id, use_percent):
     logging.info("Using %s", qc_column)
     use_percent = json.loads(use_percent)  # Boolean
 
-    data_state = qc_column.qc_type.qc_object_path + "__data_state"
-
-    SEQUENCING_SAMPLE_PATH = 'bam_file__unaligned_reads__sequencing_sample'
+    SEQUENCING_SAMPLE_PATH = 'bam_file__sequencing_sample'
     ENRICHMENT_KIT_PATH = SEQUENCING_SAMPLE_PATH + '__enrichment_kit'
 
     def get_field(f):
         return qc_column.qc_type.qc_object_path + "__" + f
 
     path = get_field(qc_column.field)
-    qs = QC.objects.filter(**{data_state: DataState.COMPLETE})
-    qs = qs.filter(**{path + "__isnull": False})
+    qs = QC.objects.filter(**{path + "__isnull": False})
     qs = qs.order_by(ENRICHMENT_KIT_PATH)  # want dict eventually sorted by kit
 
     total_field = None
@@ -630,7 +558,7 @@ def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):
     # Create a new label based on sequencing_run + sample
     current_label = get_label(qc_exec_summary.sequencing_run.name, qc_exec_summary.sample_name)
     sequencing_run_names = qc_exec_summary_data[sequencing_run_column]
-    sample_names = qc_exec_summary_data["qc__bam_file__unaligned_reads__sequencing_sample__sample_name"]
+    sample_names = qc_exec_summary_data["qc__bam_file__sequencing_sample__sample_name"]
     labels = [get_label(sr, ss) for sr, ss in zip(sequencing_run_names, sample_names)]
     qc_exec_summary_data["label"] = labels
 

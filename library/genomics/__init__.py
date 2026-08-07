@@ -44,7 +44,7 @@ def overlap_fraction(range1: Range, range2: Range) -> float:
         return overlap / length_range1
 
 
-def parse_gnomad_coord(coord: str) -> Tuple[str, int, int]:
+def parse_gnomad_coord(coord: str) -> tuple[str, int, int]:
     coord_regex = r"(.+):(\d+)-(\d+)"
     m = re.match(coord_regex, coord)  # looks like: chr17:42853981-43253980
     if not m:

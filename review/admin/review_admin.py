@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.admin import TabularInline
 from django.contrib.admin.widgets import AdminTextInputWidget
 
-from review.models import ReviewQuestion, ReviewTopic, Review
+from review.models import Review, ReviewQuestion, ReviewTopic
 from snpdb.admin_utils import ModelAdminBasics
 
 
@@ -17,7 +17,7 @@ class ReviewQuestionInline(TabularInline):
         if db_field.name in ('key', 'heading'):
             attrs = formfield.widget.attrs
             attrs['class'] = 'admin-short-field'
-            attrs['style'] = 'width: 200px';
+            attrs['style'] = 'width: 200px'
             formfield.widget = AdminTextInputWidget(attrs=attrs)
         return formfield
 

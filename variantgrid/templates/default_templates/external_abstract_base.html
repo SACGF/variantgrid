@@ -1,7 +1,6 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 {% load static %}
-{% load settings_tags %}
 {% load i18n %}
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
@@ -28,10 +27,6 @@
         {% block jsdocumentready %}
             $("button").button();
         {% endblock %}
-            let usernamePlaceholder = "{% settings_value 'LOGIN_USERNAME_PLACEHOLDER' %}";
-		    if (usernamePlaceholder && usernamePlaceholder != "None") {
-		        $("input#username", "#login-table").attr("placeholder", usernamePlaceholder);
-            }
 		});
 	</script>
     <style>

@@ -16,10 +16,17 @@ def _one_off_gene_annotation_assign_ontology_version(apps, _schema_editor):
                                                      hp_phenotype_to_genes_import_id__lte=last_ontology_import_id)
         if ov := older_ov_qs.order_by("pk").last():
             print(f"Assigning GeneAnnotationVersion {gav.pk} OntologyVersion {ov.pk} ")
-        else:
-            print("Warning: Could not find OntologyVersion for GeneAnnotationVersion pk={gav.pk}" \
+        elif legacy is not None:
+            print(f"Warning: Could not find OntologyVersion for GeneAnnotationVersion pk={gav.pk}"
                   f" with ontology versions <= {last_ontology_import_id=}. Using legacy OntologyVersion ({legacy.pk})")
             ov = legacy
+        else:
+            # No OntologyVersion records exist at all (e.g. ontology not yet imported on this
+            # deployment - this DB has zero). ontology_version is null=True, so leave it unset
+            # rather than dereference the missing legacy fallback.
+            print(f"Warning: No OntologyVersion exists; leaving GeneAnnotationVersion {gav.pk} "
+                  f"ontology_version null")
+            ov = None
         if ov:
             gav.ontology_version = ov
             gav.save()

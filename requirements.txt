@@ -20,7 +20,7 @@ attrs==26.1.0
     #   hgvs
     #   jsonschema
     #   referencing
-beautifulsoup4==4.14.3
+beautifulsoup4==4.15.0
     # via
     #   -r requirements.in
     #   django-htmlmin
@@ -37,19 +37,19 @@ bioutils==0.6.1
     #   biocommons-seqrepo
     #   cdot
     #   hgvs
-bleach==6.3.0
+bleach==6.4.0
     # via martor
-boto3==1.43.16
+boto3==1.43.31
     # via
     #   -r requirements.in
     #   django-amazon-ses
-botocore==1.43.16
+botocore==1.43.31
     # via
     #   boto3
     #   s3transfer
 cachebox==5.2.3
     # via deepdiff
-cdot==0.2.26
+cdot==0.2.30
     # via -r requirements.in
 celery==5.6.3
     # via -r requirements.in
@@ -90,7 +90,7 @@ contourpy==1.3.3
     # via matplotlib
 crispy-bootstrap4==2026.2
     # via -r requirements.in
-cryptography==48.0.0
+cryptography==49.0.0
     # via mozilla-django-oidc
 cycler==0.12.1
     # via matplotlib
@@ -104,7 +104,7 @@ deprecation==2.1.0
     # via -r requirements.in
 dill==0.4.1
     # via pylint
-django==6.0.5
+django==6.0.6
     # via
     #   -r requirements.in
     #   crispy-bootstrap4
@@ -118,15 +118,11 @@ django==6.0.5
     #   django-debug-toolbar
     #   django-downloadview
     #   django-extensions
-    #   django-geojson
     #   django-guardian
     #   django-js-reverse
-    #   django-leaflet
-    #   django-messages
     #   django-model-utils
     #   django-postgres-extra
     #   django-recaptcha
-    #   django-starfield
     #   django-storages
     #   django-stubs
     #   django-stubs-ext
@@ -145,7 +141,7 @@ django-appconf==1.2.0
     #   django-compressor
 django-auditlog==3.4.1
     # via -r requirements.in
-django-autocomplete-light==4.0.1
+django-autocomplete-light==4.0.3
     # via -r requirements.in
 django-avatar==9.0.0
     # via -r requirements.in
@@ -167,21 +163,15 @@ django-downloadview==2.5.0
     # via -r requirements.in
 django-extensions==4.1
     # via -r requirements.in
-django-geojson==4.2.0
-    # via -r requirements.in
 django-glrm==1.1.3
     # via -r requirements.in
-django-guardian==3.3.1
+django-guardian==3.3.2
     # via -r requirements.in
 django-htmlmin==0.11.0
     # via -r requirements.in
 django-js-reverse==1.0.0
     # via -r requirements.in
 django-json-widget==2.1.1
-    # via -r requirements.in
-django-leaflet==0.33.0
-    # via -r requirements.in
-django-messages @ git+https://github.com/davmlaw/django-messages/@36920f188536d60b263320325577aa0ef87de4f4#egg=django-messages
     # via -r requirements.in
 django-model-utils==5.0.0
     # via -r requirements.in
@@ -190,8 +180,6 @@ django-postgres-extra==2.0.4
 django-recaptcha==4.1.0
     # via -r requirements.in
 django-registration-redux==2.13
-    # via -r requirements.in
-django-starfield @ git+https://github.com/davmlaw/django-starfield@a7bb433bb645a989cc0f01b4543bde5e5ce210a7#egg=django_starfield
     # via -r requirements.in
 django-storages==1.14.6
     # via -r requirements.in
@@ -231,9 +219,10 @@ frozendict==2.4.7
     # via -r requirements.in
 gunicorn==26.0.0
     # via -r requirements.in
-hgvs @ git+https://github.com/biocommons/hgvs@fa02ca5ec0c9e28a1a6377b551e41ae77b450ce9#egg=hgvs
+hgvs @ git+https://github.com/biocommons/hgvs@dac6a2f75a2435804769fa836c527e4108c91297#egg=hgvs
     # via
     #   -r requirements.in
+    #   cdot
     #   hgvs-shim
 hgvs-shim==0.2.0
     # via -r requirements.in
@@ -243,7 +232,7 @@ htseq==2.1.2
     # via -r requirements.in
 humanfriendly==10.0
     # via coloredlogs
-idna==3.16
+idna==3.18
     # via requests
 ijson==3.5.0
     # via -r requirements.in
@@ -300,7 +289,7 @@ markdown-it-py==4.2.0
     # via rich
 martor==1.8.1
     # via -r requirements.in
-matplotlib==3.10.9
+matplotlib==3.11.0
     # via -r requirements.in
 matplotlib-inline==0.2.2
     # via ipython
@@ -309,14 +298,18 @@ mccabe==0.7.0
 mdurl==0.1.2
     # via markdown-it-py
 more-itertools==11.1.0
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   cdot
 mozilla-django-oidc==5.0.2
     # via -r requirements.in
+msgspec==0.21.1
+    # via cdot
 mypy==2.1.0
     # via -r requirements.in
 mypy-extensions==1.1.0
     # via mypy
-nameparser==1.1.3
+nameparser==1.2.0
     # via -r requirements.in
 networkx==3.6.1
     # via
@@ -359,13 +352,14 @@ ped-parser==1.6.6
     # via -r requirements.in
 pexpect==4.9.0
     # via ipython
-pillow==12.2.0
+pillow==12.3.0
     # via
+    #   -r requirements.in
     #   django-avatar
     #   easy-thumbnails
     #   matplotlib
     #   reportlab
-pip==26.1.1
+pip==26.1.2
     # via pyhgvs
 platformdirs==4.10.0
     # via pylint
@@ -385,6 +379,8 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.3
     # via stack-data
+pybigwig==0.3.25
+    # via -r requirements.in
 pycparser==3.0
     # via cffi
 pycryptodome==3.23.0
@@ -413,14 +409,14 @@ pylint-plugin-utils==0.9.0
     # via pylint-django
 pyparsing==3.3.2
     # via matplotlib
-pypdf==6.12.2
+pypdf==6.13.3
     # via -r requirements.in
 pysam==0.24.0
     # via
     #   -r requirements.in
     #   biocommons-seqrepo
     #   htseq
-pytest==9.0.3
+pytest==9.1.0
     # via ped-parser
 python-dateutil==2.9.0.post0
     # via
@@ -442,7 +438,7 @@ rapidfuzz==3.14.5
     # via levenshtein
 rcssmin==1.2.2
     # via django-compressor
-redis==7.4.0
+redis==8.0.0
     # via -r requirements.in
 referencing==0.37.0
     # via
@@ -477,11 +473,11 @@ rpds-py==2026.5.1
     #   referencing
 ruff==0.15.16
     # via -r requirements.in
-s3transfer==0.17.1
+s3transfer==0.19.0
     # via boto3
 scipy==1.17.1
     # via -r requirements.in
-setuptools==82.0.1
+setuptools==83.0.0
     # via pyvcf3
 simplejson==4.1.1
     # via -r requirements.in
@@ -509,11 +505,11 @@ tomlkit==0.15.0
     # via pylint
 toposort==1.10
     # via -r requirements.in
-tqdm==4.67.3
+tqdm==4.68.2
     # via
     #   biocommons-seqrepo
     #   nltk
-traitlets==5.15.0
+traitlets==5.15.1
     # via
     #   ipython
     #   matplotlib-inline
@@ -540,7 +536,7 @@ tzdata==2026.2
     # via
     #   kombu
     #   martor
-tzlocal==5.3.1
+tzlocal==5.4
     # via celery
 unidecode==1.4.0
     # via -r requirements.in
@@ -556,7 +552,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-wcwidth==0.7.0
+wcwidth==0.8.1
     # via prompt-toolkit
 webencodings==0.5.1
     # via

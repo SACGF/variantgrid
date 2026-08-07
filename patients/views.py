@@ -112,8 +112,8 @@ def patient_file_upload(request, patient_id):
     try:
         patient = Patient.get_for_user(request.user, patient_id)
         patient.check_can_write(request.user)
-        uploaded_file = filepond_upload_receive(request)
-        patient_attachment = PatientAttachment.objects.create(patient=patient, file=uploaded_file)
+        django_uploaded_file = filepond_upload_receive(request)
+        patient_attachment = PatientAttachment.objects.create(patient=patient, file=django_uploaded_file)
     except Exception:
         log_traceback()
         return HttpResponse("Upload failed", status=500)
@@ -173,7 +173,7 @@ def patient_imports(request):
 
 def view_patient_import(request, patient_records_id):
     patient_records = get_object_or_404(PatientRecords, pk=patient_records_id)
-    patient_records.uploaded_file.check_can_view(request.user)
+    patient_records.check_can_view(request.user)
     context = {"patient_records": patient_records}
     return render(request, 'patients/view_patient_import.html', context)
 
@@ -186,7 +186,7 @@ def import_patient_records_details(request):
 
 def view_patient_record(request, pk):
     patient_record = get_object_or_404(PatientRecord, pk=pk)
-    patient_record.patient_records.uploaded_file.check_can_view(request.user)
+    patient_record.patient_records.check_can_view(request.user)
     context = {"patient_record": patient_record}
     return render(request, 'patients/view_patient_record.html', context)
 

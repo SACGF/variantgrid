@@ -43,7 +43,7 @@
         <div class="card mt-4">
             <div class="card-header">Upload Processing</div>
             <div class="card-body">
-                {% with up=liftover_run.uploadedliftover.uploaded_file.uploadpipeline %}
+                {% with up=liftover_run.uploadedliftover.file_upload.uploadpipeline %}
                     {% if up %}
                         <a href="{% url 'view_upload_pipeline' upload_pipeline_id=up.pk %}">View upload processing</a>
                         {% labelled label="Status" %}{{ up.get_status_display }}{% endlabelled %}

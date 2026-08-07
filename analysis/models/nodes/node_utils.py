@@ -70,7 +70,9 @@ def update_analysis(analysis_id):
     task.apply_async()
 
 
-def reload_analysis_nodes(analysis_id):
+def reload_analysis_nodes(analysis_id, only_errors=False):
+    """ only_errors: only reload nodes with error statuses (children of error nodes
+        have ERROR_WITH_PARENT status, so the error set is closed under descendants) """
     with disable_auditlog():
         start = time.time()
         analysis = Analysis.objects.get(pk=analysis_id)
@@ -81,16 +83,18 @@ def reload_analysis_nodes(analysis_id):
             parents[child].append(nodes_by_id[parent])
 
         analysis_errors = analysis.get_errors()
-        num_nodes = len(nodes_by_id)
         valid_nodes = []
         invalid_nodes = []
         for node_id, node in nodes_by_id.items():
             node._cached_analysis_errors = analysis_errors
             node._cached_parents = parents.get(node_id, [])
+            if only_errors and not NodeStatus.is_error(node.status):
+                continue
             if node.get_errors():
                 invalid_nodes.append(node_id)
             else:
                 valid_nodes.append(node_id)
+        num_nodes = len(valid_nodes) + len(invalid_nodes)
 
         update_kwargs = {
             "status": NodeStatus.DIRTY,
@@ -106,7 +110,8 @@ def reload_analysis_nodes(analysis_id):
             nodes_qs.filter(pk__in=invalid_nodes).update(valid=False, shadow_color=NodeColors.ERROR, **update_kwargs)
 
         node_versions = []
-        for node_id, version in nodes_qs.values_list("pk", "version"):
+        reloaded_qs = nodes_qs.filter(pk__in=valid_nodes + invalid_nodes)
+        for node_id, version in reloaded_qs.values_list("pk", "version"):
             node_versions.append(NodeVersion(node_id=node_id, version=version))
         if node_versions:
             NodeVersion.objects.bulk_create(node_versions, ignore_conflicts=True)

@@ -779,6 +779,14 @@
                     <td class="collapse filter-required">{{ form.nmd_escaping_variant_required }}</td>
                     <td class="collapse filter-required"> <!-- nmd_escaping_variant is non-nullable --> </td>
                 </tr>
+                {% if node.columns_version >= 5 %}
+                    <tr>
+                        <th title="Frameshift whose predicted premature termination codon escapes Nonsense Mediated Decay">PTC escapes NMD</th>
+                        <td>{{ form.ptc_nmd_escaping.errors }} {{ form.ptc_nmd_escaping }}</td>
+                        <td class="collapse filter-required">{{ form.ptc_nmd_escaping_required }}</td>
+                        <td class="collapse filter-required"> <!-- ptc_nmd_escaping is non-nullable --> </td>
+                    </tr>
+                {% endif %}
             {% endif %}
 
             <tr>

@@ -19,7 +19,6 @@ from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import (
     ClassificationLabSummary,
-    ClassificationSummaryCacheDictPathogenicity,
     ConditionResolved,
     ConditionTextMatch,
     EvidenceMixin,
@@ -40,6 +39,7 @@ from classification.models.discordance_models_utils import (
 )
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
+from classification.models.evidence_mixin_summary_cache import clinical_significance_pills
 from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
@@ -223,38 +223,7 @@ def classification_changes(changes):
 @register.inclusion_tag("classification/tags/clinical_significance_values.html")
 def clinical_significance_values(vcm: ClassificationModification):
     classification = vcm.classification
-    always_show_somatic = vcm.classification.allele_origin_bucket != "G"
-
-    pathogenicity = classification.summary_typed.get("pathogenicity")
-    somatic_dict: ClassificationSummaryCacheDictPathogenicity = classification.summary_typed.get("somatic")
-
-    germline_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-    pending_from = None
-    value = pathogenicity.get("classification")
-    if pending_classification_value := pathogenicity.get("pending"):
-        pending_from = germline_key.pretty_value(value, value) or "No Data"
-        value = pending_classification_value
-    value_list = [{
-        "title": germline_key.pretty_label,
-        "pending_from": pending_from,
-        "label": germline_key.pretty_value(value, value) or "No Data",
-        "css_class": "cs cs-" + (value.lower() if value else "none")
-    }]
-
-    if always_show_somatic or (somatic_dict and somatic_dict.get("classification")):
-        somatic_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-        value = somatic_dict.get("clinical_significance")
-        label = somatic_key.pretty_value(value, value) or "No Data"
-        if amp_level := somatic_dict.get("amp_level"):
-            label += amp_level
-
-        somatic = {
-            "title": somatic_key.pretty_label,
-            "label": label,
-            "css_class": f"scs scs-{value.lower() if value else 'none'}"
-        }
-        value_list.append(somatic)
-
+    value_list = clinical_significance_pills(classification.summary_typed, classification.allele_origin_bucket)
     return {"values_list": value_list}
 
 

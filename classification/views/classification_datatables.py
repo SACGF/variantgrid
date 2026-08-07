@@ -13,6 +13,7 @@ from classification.enums import (
     AlleleOriginBucket,
     ClinicalSignificance,
     EvidenceCategory,
+    LabExternalFilter,
     ShareLevel,
     SpecialEKeys,
 )
@@ -463,6 +464,11 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         if cs_filters:
             if q := self.get_clinical_significance_q(cs_filters):
                 filters.append(q)
+
+        if settings.CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER:
+            if lab_external := self.get_query_param("lab_external"):
+                if q := LabExternalFilter(lab_external).filter_q("classification__lab"):
+                    filters.append(q)
 
         if self.get_query_param("internal_requires_sample"):
             filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))

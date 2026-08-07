@@ -1,6 +1,11 @@
 from django.db.models import Count
 
-from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion, AnnotationVersion
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    VariantAnnotationVersion,
+)
 from annotation.models.models_enums import AnnotationStatus
 from snpdb.models import GenomeBuild
 

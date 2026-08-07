@@ -52,11 +52,9 @@ def _get_gene_and_terms(hgvs_matcher, vta, c_hgvs=True, extra_terms: Optional[li
 def _get_search_terms(variant_transcripts_list: list, formatter: str = None, **kwargs):
     from genes.hgvs import HGVSMatcher
 
-    hgvs_matcher = None
     gene_terms = defaultdict(set)
     for vta in variant_transcripts_list:
-        if hgvs_matcher is None:
-            hgvs_matcher = HGVSMatcher(vta.version.genome_build)
+        hgvs_matcher = HGVSMatcher.instance(vta.version.genome_build)
         gene_symbol, terms = _get_gene_and_terms(hgvs_matcher, vta, **kwargs)
         if gene_symbol:
             gene_terms[gene_symbol].update(terms)

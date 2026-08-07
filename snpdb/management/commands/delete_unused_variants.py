@@ -21,7 +21,7 @@ from snpdb.models import (
     VariantWiki,
     VariantZygosityCount,
 )
-from upload.models import ModifiedImportedVariant, UploadedVCF
+from upload.models import ModifiedImportedVariant, UploadedVCFPipelineMaxVariant
 
 # Every model with a FK to Variant whose presence means the variant is still referenced and must be
 # kept, as (model, fk_column). A variant is "unused" only if no row in any of these (or in
@@ -52,7 +52,7 @@ PRELOAD_VARIANT_RELATIONS = [
     (AnnotationRangeLock, "max_variant_id"),
     (AllVariantsNode, "max_variant_id"),
     (IntersectionNode, "hgvs_variant_id"),
-    (UploadedVCF, "max_variant_id"),
+    (UploadedVCFPipelineMaxVariant, "max_variant_id"),
 ]
 
 

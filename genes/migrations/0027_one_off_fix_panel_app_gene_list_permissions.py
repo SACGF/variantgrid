@@ -2,13 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
-
-def _test_has_panel_app_gene_lists(apps):
-    PanelAppPanelLocalCacheGeneList = apps.get_model("genes", "PanelAppPanelLocalCacheGeneList")
-    return PanelAppPanelLocalCacheGeneList.objects.exists()
-
 
 class Migration(migrations.Migration):
 
@@ -16,7 +9,8 @@ class Migration(migrations.Migration):
         ('genes', '0026_auto_20210406_1718'),
     ]
 
-    operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_panel_app_gene_list_permissions"]),
-                        test=_test_has_panel_app_gene_lists),
-    ]
+    # Neutralised: this used to register a manual 'fix_panel_app_gene_list_permissions' task, but that
+    # command was deleted in #690 when the "public-read on PanelApp gene lists" feature was removed
+    # (genes/panel_app.py no longer grants it). The manual step is obsolete, so it no longer registers.
+    # Any orphaned task rows in existing DBs are cleared by manual/0004_complete_obsolete_manual_tasks.
+    operations = []

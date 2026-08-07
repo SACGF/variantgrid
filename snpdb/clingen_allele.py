@@ -15,23 +15,20 @@ So to get out Variant coords it's easier to just use HGVS as we'd have to look u
 reference base anyway to construct it
 
 """
-import hashlib
-import itertools
-import json
 import logging
-import time
-import uuid
-from functools import lru_cache
 from typing import Optional
 
-import requests
 from django.conf import settings
 
-from library.constants import MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
-from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_enums import VCFSymbolicAllele
-from library.utils import get_single_element, iter_fixed_chunks
+from library.utils import get_single_element
+from snpdb.clingen_allele_api import (
+    ClinGenAlleleAPIException,
+    ClinGenAlleleRegistryAPI,
+    ClinGenAlleleServerException,
+    ClinGenAlleleTooLargeException,
+)
 from snpdb.models import (
     Allele,
     ClinGenAllele,
@@ -49,144 +46,6 @@ from snpdb.models.models_enums import (
 )
 
 
-class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException):
-    """ Could not contact server, or response != 200 """
-    def __init__(self, url, method, status_code, response_json):
-        json_str = ", ".join([f"{k}: {v}" for k, v in response_json.items()])
-        msg = f"Error contacting ClinGen Allele Registry. {url=}, {method=}, {status_code=}. JSON: {json_str}"
-        super().__init__(msg)
-        self.status_code = status_code
-        self.response_json = response_json
-        self.description = json_str
-
-    @property
-    def is_unknown_reference(self):
-        """ e.g. error is they don't have that particular transcript - could retry """
-        if self.status_code == 500:
-            if message := self.response_json.get("message"):
-                return "Unknown reference" in message
-        return False
-
-    def get_fake_api_response(self):
-        msg = self.args[0]
-        api_response = {
-            'message': msg,
-            'errorType': ClinGenAllele.CLINGEN_ALLELE_SERVER_ERROR_TYPE,
-            'description': self.description
-        }
-        return api_response
-
-
-class ClinGenAlleleAPIException(ClinGenAllele.ClinGenAlleleRegistryException):
-    """ API returned 200 OK, but was an error """
-
-
-class ClinGenAlleleTooLargeException(ClinGenAllele.ClinGenAlleleRegistryException):
-    """ Too big for ClinGen Allele Registry  """
-
-
-class ClinGenAlleleRegistryAPI:
-    """ Manages API connections to ClinGen Allele Registry
-        This has been overridden by mock_clingen_api for unit testing """
-    def __init__(self, api_failure_output_filename=None):
-        self.login = settings.CLINGEN_ALLELE_REGISTRY_LOGIN
-        self.password = settings.CLINGEN_ALLELE_REGISTRY_PASSWORD
-        if api_failure_output_filename is None:
-            api_failure_output_filename = get_import_processing_filename(uuid.uuid4(),
-                                                                         "api_failure_output_filename.json",
-                                                                         prefix="clingen_allele_registry")
-        self.api_failure_output_filename = api_failure_output_filename
-
-    @staticmethod
-    def check_api_response(api_response):
-        """ Throws ClinGenAlleleAPIException if 'errorType' set """
-        if error_type := api_response.get('errorType'):
-            description = api_response['description']
-            input_line = api_response['inputLine']
-            message = f"ClinGeneAllele API Error: {error_type} ({description}) for input '{input_line}'"
-            raise ClinGenAlleleAPIException(message)
-
-    @staticmethod
-    def _check_response(response: requests.Response):
-        """ Throws Exception if response status code is not 200 OK """
-        if response.status_code != 200:
-            raise ClinGenAlleleServerException(response.url, response.request.method,
-                                               response.status_code, response.json())
-
-    def _put(self, url, data, chunk_size=None):
-        if chunk_size > settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS:
-            raise ValueError(f"ClinGen accepts a max of {settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS} records")
-        logging.debug("Calling ClinGen API")
-        # copy/pasted from page 5 of https://reg.clinicalgenome.org/doc/AlleleRegistry_1.01.xx_api_v1.pdf
-        identity = hashlib.sha1((self.login + self.password).encode('utf-8')).hexdigest()
-        gb_time = str(int(time.time()))
-        token = hashlib.sha1((url + identity + gb_time).encode('utf-8')).hexdigest()
-        request = url + '&gbLogin=' + self.login + '&gbTime=' + gb_time + '&gbToken=' + token
-        default_timeout = 2 * MINUTE_SECS
-        if chunk_size:
-            timeout = 2 * MINUTE_SECS * chunk_size / 1000
-            timeout = max(default_timeout, timeout)
-        else:
-            timeout = default_timeout
-
-        try:
-            response = requests.put(request, data=data, timeout=timeout)
-            self._check_response(response)
-            return response.json()
-        except Exception as e:
-            if self.api_failure_output_filename:
-                api_failure = {
-                    "request": request,
-                    "timeout": timeout,
-                    "data": data,
-                }
-                with open(self.api_failure_output_filename, "w") as f:
-                    json.dump(api_failure, f)
-
-                msg = f"API call failed, debug info written to '{self.api_failure_output_filename}'"
-                raise ClinGenAllele.ClinGenAlleleRegistryException(msg) from e
-            else:
-                raise e
-
-    @classmethod
-    def get_code(cls, code):
-        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + f"/allele/{code}"
-        return cls.get(url)
-
-    @classmethod
-    def get_external_code(cls, er_type: ClinGenAlleleExternalRecordType, external_code):
-        suffix = f"/alleles?{er_type.value}={external_code}"
-        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
-        return cls.get(url)
-
-    @classmethod
-    @lru_cache(maxsize=1000)
-    def get_hgvs(cls, hgvs_string: str):
-        suffix = f"/allele?hgvs={hgvs_string}"
-        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
-        return cls.get(url)
-
-    @classmethod
-    def get(cls, url):
-        response = requests.get(url, timeout=MINUTE_SECS)
-        cls._check_response(response)
-        return response.json()
-
-    def _clingen_hgvs_put_iter(self, hgvs_iter, file_type="hgvs"):
-        """ Calls ClinGen in batches
-            file_type = {hgvs, id, MyVariantInfo_hg19.id, MyVariantInfo_hg38.id, ExAC.id, gnomAD.id}
-         """
-        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + f"/alleles?file={file_type}"
-        chunk_size = settings.CLINGEN_ALLELE_REGISTRY_BATCH_SIZE
-
-        for hgvs_chunk in iter_fixed_chunks(hgvs_iter, chunk_size):
-            data = "\n".join(hgvs_chunk)
-            yield self._put(url, data, chunk_size=chunk_size)
-
-    def hgvs_put(self, hgvs_iter, file_type="hgvs"):
-        return itertools.chain.from_iterable(self._clingen_hgvs_put_iter(hgvs_iter, file_type=file_type))
-
-
 def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                                           clingen_api: ClinGenAlleleRegistryAPI = None):
     """ Ensures that we have ClinGenAllele for variants
@@ -196,7 +55,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
     from upload.models import ModifiedImportedVariant
 
     if clingen_api is None:
-        clingen_api = ClinGenAlleleRegistryAPI()
+        clingen_api = ClinGenAlleleRegistryAPI.instance()
 
     va_qs = VariantAllele.objects.filter(genome_build=genome_build, variant__in=variants)
     variant_ids_with_allele = set(va_qs.values_list("variant_id", flat=True))
@@ -212,7 +71,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
     variant_ids_without_alleles = []
     variant_hgvs = []
 
-    hgvs_matcher = HGVSMatcher(genome_build)
+    hgvs_matcher = HGVSMatcher.instance(genome_build)
     num_existing_records = 0
     miv_qs = ModifiedImportedVariant.objects.filter(variant__in=variants)
     normalized_variants = set(miv_qs.values_list("variant_id", flat=True))
@@ -381,12 +240,12 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
     from genes.hgvs import HGVSMatcher
 
     if clingen_api is None:
-        clingen_api = ClinGenAlleleRegistryAPI()
+        clingen_api = ClinGenAlleleRegistryAPI.instance()
 
     variant_coordinate = variant.coordinate
     _clingen_check_variant_coordinate_length(str(variant), genome_build, variant_coordinate)
 
-    g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
+    g_hgvs = HGVSMatcher.instance(genome_build).variant_to_g_hgvs(variant)
     try:
         api_response = get_single_element(list(clingen_api.hgvs_put([g_hgvs])))
     except ClinGenAlleleServerException as cgse:
@@ -467,7 +326,7 @@ def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
                                    clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
     """ Retrieves from DB or calls API then caches in DB   """
     if clingen_api is None:
-        clingen_api = ClinGenAlleleRegistryAPI()
+        clingen_api = ClinGenAlleleRegistryAPI.instance()
 
     if skip_reason := variant.clingen_allele_skip_reason():
         raise ClinGenAlleleAPIException(f"No ClinGenAllele possible for variant {variant}: {skip_reason}")
@@ -490,7 +349,7 @@ def get_clingen_allele(code: str, clingen_api: ClinGenAlleleRegistryAPI = None) 
     except ClinGenAllele.DoesNotExist:
         """ Retrieves from DB or calls API then caches in DB   """
         if clingen_api is None:
-            clingen_api = ClinGenAlleleRegistryAPI()
+            clingen_api = ClinGenAlleleRegistryAPI.instance()
         api_response = clingen_api.get_code(code)
         clingen_api.check_api_response(api_response)
         clingen_allele, _ = thread_safe_unique_together_get_or_create(ClinGenAllele, pk=clingen_allele_id,
@@ -519,7 +378,7 @@ def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordT
                                            clingen_api: ClinGenAlleleRegistryAPI = None) -> list[ClinGenAllele]:
     # TODO: We could cache this? At the moment we have to make a new API call every build
     if clingen_api is None:
-        clingen_api = ClinGenAlleleRegistryAPI()
+        clingen_api = ClinGenAlleleRegistryAPI.instance()
 
     api_response_list = clingen_api.get_external_code(er_type, external_code)
     return _store_clingen_api_response(api_response_list)
@@ -528,7 +387,7 @@ def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordT
 def get_clingen_allele_from_hgvs(hgvs_string, require_allele_id=True,
                                  clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
     if clingen_api is None:
-        clingen_api = ClinGenAlleleRegistryAPI()
+        clingen_api = ClinGenAlleleRegistryAPI.instance()
 
     api_response = clingen_api.get_hgvs(hgvs_string)
     try:

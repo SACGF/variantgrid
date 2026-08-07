@@ -39,8 +39,35 @@ ANNOTATION_VCF_DUMP_DIR = os.path.join(_BIG_DISK_BASE_DIR, 'annotation_scratch')
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 DEFAULT_FROM_EMAIL = 'noreply@variantgrid.com'
 SEND_EMAILS = True
-ADMIN_EMAIL_NOTIFICATION = "admin@variantgrid.com"
+ADMIN_EMAIL_NOTIFICATION = "david.lawrence@sa.gov.au"
 CONTACT_US_ENABLED = True
+
+# variantgrid.com static overrides (e.g. vc_settings.js enables the 'public' / "3rd Party
+# Databases" share level - the gate for sharing outward to ClinVar / MatchMaker Exchange).
+VGAWS_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "vgaws_static")
+STATICFILES_DIRS = (VGAWS_STATIC_FILES_DIR,) + STATICFILES_DIRS
+
+# MatchMaker Exchange - our own contact, sent as the `contact` block on every outbound patient.
+MME_CONTACT = {
+    "name": "Centre for Cancer Biology",
+    "href": "mailto:david.lawrence@adelaide.edu.au",
+    "institution": "Adelaide University",
+    "email": "david.lawrence@adelaide.edu.au",
+}
+
+# Beacon v2 genomic data-sharing endpoint (#1661) - enabled on variantgrid.com.
+BEACON_ENABLED = True
+BEACON_CONFIG = {
+    **BEACON_CONFIG,                              # inherit defaults, override identity
+    "beacon_id": "com.variantgrid.beacon",
+    "environment": "prod",
+    "organization": {
+        "id": "variantgrid",
+        "name": "VariantGrid",
+        "welcome_url": "https://variantgrid.com/",
+        "contact_url": "mailto:david.lawrence@sa.gov.au",
+    },
+}
 
 
 # Needed in production (when debug=False)
@@ -61,7 +88,9 @@ RECAPTCHA_PRIVATE_KEY = get_secret('RECAPTCHA.private_key')
 REGISTRATION_OPEN = True
 
 SOMALIER["enabled"] = True
-SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
+# Somalier reference/1k data + binary moved off slow EFS to local disk - the ancestry step
+# reads ~2500 small 1kg-somalier/*.somalier files per run, which stalls badly on EFS.
+SOMALIER["annotation_base_dir"] = "/opt/annotation/somalier"
 
 UPLOAD_ENABLED = True
 

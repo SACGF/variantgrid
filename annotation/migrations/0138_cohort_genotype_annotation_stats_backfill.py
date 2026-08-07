@@ -4,6 +4,7 @@
     from the legacy Sample*AnnotationStats(+PassingFilter) tables. Per-sample
     rows only; aggregate rows (sample IS NULL) are populated lazily.
 """
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import migrations
 
 
@@ -37,11 +38,14 @@ def _backfill(apps, schema_editor):
     CohortGenotypeCollection = apps.get_model("snpdb", "CohortGenotypeCollection")
 
     def _cgc_for_sample(ss):
-        cohort = ss.sample.vcf.cohort
+        # Cohort.vcf is a reverse OneToOne, so vcf.cohort raises RelatedObjectDoesNotExist for
+        # VCFs with no cohort (partial imports, or a cohort deleted later). Treat that the same
+        # as a missing CGC: skip, and let the lazy recompute recreate stats if needed.
         try:
+            cohort = ss.sample.vcf.cohort
             return CohortGenotypeCollection.objects.get(
                 cohort=cohort, cohort_version=cohort.version, collection_type="U")
-        except CohortGenotypeCollection.DoesNotExist:
+        except ObjectDoesNotExist:
             return None
 
     def _copy(old_qs, NewModel, version_field, version_attr, fields, passing_filter):

@@ -59,14 +59,18 @@
         }
     </script>
 
-    <h3>Analyses</h3>
-    
+    {% if show_create_analyses or analysis_details %}
+        <h3>Analyses</h3>
+    {% endif %}
+
+    {% if show_create_analyses %}
     <div id='create-analyses'>
     <h4>Create Analysis from template</h4>
     {% block create_analyses %}
     {% endblock create_analyses %}
     </div>
-    
+    {% endif %}
+
     {% if analysis_details %}
         <table class="table">
             <thead>

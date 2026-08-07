@@ -64,12 +64,15 @@
 	    var cohortSaveButton = $("button#cohort-save").button();
 	    cohortSaveButton.button('disable');
 		var container = $("#per-sample-zygosity-container");
+		var notes = $("#cohort-node-notes").empty();
 		if (cohortId) {
 			let url = Urls.cohort_zygosity_filters({{ node.analysis_id }}, {{ node.pk }}, cohortId);
 			$.ajax(url, {
                 suppressErrors: true,
                 success: function(html) {
                     container.html(html);
+                    // Sub cohort note applies to every zygosity panel, so move it above the accordion
+                    notes.append($("#sub-cohort-note", container));
                 },
                 error: function(response, status, xhr) {
                     container.html("Error loading zygosity for cohort (perhaps re-save node?)");
@@ -167,6 +170,8 @@
             </div>
 		</div>
 
+        <div id="cohort-node-notes"></div>
+
 		<div id="accordion-container">
 			<ul class="accordion">
                 <li>
@@ -219,6 +224,9 @@
 		        <div>
                     <div>
                     <b>Genotype:</b> {{ form.zygosity }} for {{ form.zygosity_op }} samples.
+                    </div>
+                    <div class='text-muted'>
+                        "Any zygosity call" means Ref, Het or Hom Alt - samples with no zygosity call ("?") don't count.
                     </div>
 		        </div>
 		        </li>

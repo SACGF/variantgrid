@@ -15,9 +15,15 @@ from collections import defaultdict
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.git import Git
+
 # if certain user settings are not relevant for the environment, list the columns in this
 from variantgrid.settings.components.secret_settings import get_secret, get_secrets
-from variantgrid.settings.components.settings_paths import BASE_DIR, PRIVATE_DATA_ROOT, SETTINGS_DIR, ANNOTATION_BASE_DIR
+from variantgrid.settings.components.settings_paths import (
+    ANNOTATION_BASE_DIR,
+    BASE_DIR,
+    PRIVATE_DATA_ROOT,
+    SETTINGS_DIR,
+)
 
 CSRF_FAILURE_VIEW = 'variantgrid.views.csrf_error'
 
@@ -98,6 +104,13 @@ DATABASES = {
     }
 }
 
+TEST_RUNNER = "variantgrid.test_runner.VariantGridTestRunner"
+
+if UNIT_TEST:
+    # InheritanceManager.select_subclasses() (analysis nodes) emits ~30 way joins, whose estimated cost
+    # trips jit_above_cost. Against empty test tables that's ~2.6s of LLVM codegen to return no rows.
+    DATABASES['default']['OPTIONS'] = {'options': '-c jit=off'}
+
 # DB load / DOS protection - see variantgrid_private #1502
 # Global statement_timeout applied to every connection (see variantgrid/wsgi.py)
 DATABASE_STATEMENT_TIMEOUT_SECONDS = 10 * 60
@@ -111,23 +124,36 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 42  # increment to flush caches (eg if invalid due to upgrade)
-CACHES = {
-    'default': {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
-        'TIMEOUT': TIMEOUT,
-        'VERSION': CACHE_VERSION,
-    },
-    'debug-panel': {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
-        'TIMEOUT': TIMEOUT,
-        'OPTIONS': {
-            'MAX_ENTRIES': 200
-        }
-    },
-}
+CACHE_VERSION = 44  # increment to flush caches (eg if invalid due to upgrade)
+if UNIT_TEST:
+    # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
+    CACHES = {
+        'default': {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "default",
+        },
+        'debug-panel': {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "debug-panel",
+        },
+    }
+else:
+    CACHES = {
+        'default': {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
+            'TIMEOUT': TIMEOUT,
+            'VERSION': CACHE_VERSION,
+        },
+        'debug-panel': {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
+            'TIMEOUT': TIMEOUT,
+            'OPTIONS': {
+                'MAX_ENTRIES': 200
+            }
+        },
+    }
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -196,6 +222,10 @@ MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
 # Use highest TranscriptVersion canonical, set False to use representative transcript (ie VEP pick = variant annotation)
 VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
+# When a variant has more than this many annotated transcripts, only show the top ones (by importance) on
+# the variant details transcript selection table, collapsing the rest behind a toggle. Set None to show all.
+# Important transcripts (selected/representative/canonical/tagged) are always shown regardless of this limit.
+VARIANT_TRANSCRIPT_SELECT_MAX_SHOWN = 8
 
 VARIANT_ZYGOSITY_GLOBAL_COLLECTION = "global"
 # Skip samples from variant zygosity counts when their vcf_sample_name matches this regex (e.g. "^VALIDATION_")
@@ -214,6 +244,144 @@ CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS = 10_000  # On nodes and VCFs
 CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE = True
 CLINGEN_ALLELE_REGISTRY_REATTEMPT_WITH_ACTUAL_REF = True
 CLINGEN_ALLELE_REGISTRY_MAX_CACHE_DAYS = 180  # Set to None to last forever. 180 = ~6 months
+
+# --- MatchMaker Exchange -------------------------------------------------
+# Patient-centric, phenotype-aware rare-disease matching federation (GA4GH mme-apis v1.1).
+# Disabled by default; enable per-deployment - needs incoming connections (ie on internet)
+MME_ENABLED = False
+
+# Are we a test instance? Sets `"test": true` on outbound patient profiles and reports
+# `production: false` on /heartbeat, so a peer sees the same answer either way. Set False
+# only after certifying against a target node's test instance.
+MME_TEST = True
+
+# Our own contact details, sent as the `contact` block on every outbound patient.
+# Public info, not secret. Blank by default - each deployment that enables MME fills these
+# in via its per-host env settings file (see vgaws.py). Required to submit.
+MME_CONTACT = {
+    "name": "",
+    "href": "",         # e.g. "mailto:mme@example.org"
+    "institution": "",
+    "email": "",        # preferred over a mailto: href since v1.1
+}
+
+# Remote nodes we can submit to: public base_url + api_version as plain config; the
+# token THEY issued to us is the only secret, pulled via get_secret(). Peers issue these
+# after approval, so this stays empty here and is filled in per-deployment.
+# disclaimer/terms are the node's published baseline, transcribed from
+# https://github.com/ga4gh/mme-apis/tree/master/disclaimers - a live /match response wins.
+MME_NODES = {
+    # api_version is what THAT node speaks - see https://github.com/ga4gh/mme-apis/wiki/Endpoints
+    # (most of the federation is v1.0 only; GeneMatcher also offers v1.1). Defaults to 1.0.
+    # "decipher": {"base_url": "https://www.deciphergenomics.org/mmapi/v1", "api_version": "1.0",
+    #              "token": get_secret("MME.decipher_token", mandatory=False),
+    #              "disclaimer": "", "terms": ""},
+    # "genematcher": {"base_url": "https://genematcher.org/mmapi", "api_version": "1.1",
+    #                 "token": get_secret("MME.genematcher_token", mandatory=False),
+    #                 "disclaimer": "", "terms": ""},
+}
+
+# Tokens WE issue to peer nodes to call OUR inbound endpoints, keyed by the peer's node id
+# (same keys as MME_NODES). One per peer so inbound queries can be attributed and a single
+# peer revoked. mandatory=False so deployments without the MME secret block still load.
+MME_INBOUND_TOKENS = {
+    # "genematcher": get_secret("MME.inbound_token_genematcher", mandatory=False),
+    # "decipher": get_secret("MME.inbound_token_decipher", mandatory=False),
+}
+
+# Which identifier form goes in the outbound `genomicFeatures[].gene.id`. Ensembl id,
+# Entrez id and HGNC symbol have all been legal since v1.0, but v1.1 puts Ensembl first and
+# 2.0 makes it mandatory - so default there, carrying the symbol and Entrez id alongside as
+# `_geneName`/`_entrezGeneID` for peers that key on those. "symbol" publishes the bare
+# symbol as we did before v1.1, for a deployment with no Ensembl gene annotation loaded.
+# Inbound matching resolves every form either way, so this is an outbound choice only.
+MME_GENE_ID_PREFERENCE = "ensembl"
+
+# Follow EXACT OntologyTermRelations to alias each condition term into the ontology
+# form MME expects (e.g. a MONDO diagnosis -> its EXACT-equivalent OMIM for `disorders`).
+# These are lossless, same-concept aliases. On by default; labs that curate in MONDO
+# need this to produce any `disorders`. Off = send only terms already in MME's ontology.
+MME_ONTOLOGY_SNAKE_EXACT = True
+
+# Expand a curated disease term to its *typical* HPO phenotypes (disease -> phenotype is
+# NOT an equivalence, so this is approximate and not "observed" in the patient). Off by
+# default; turn on to widen the phenotype match surface, accepting looser matches.
+MME_ONTOLOGY_PHENOTYPE_EXPANSION = False
+
+# Standing disclaimer sent as the request-level `disclaimer`, so receiving curators
+# know some phenotype terms may be ontology-derived and matches may be approximate.
+MME_DISCLAIMER = (
+    "Some phenotype (HPO) terms may be derived from the curated diagnosis via ontology "
+    "cross-references and were not necessarily directly observed; terms carry a "
+    "`_derivedFrom` field where so derived. Please contact us to confirm before acting "
+    "on a match."
+)
+
+# Our own terms of use, sent alongside MME_DISCLAIMER on outbound requests and returned
+# on our inbound /match and /metrics responses.
+MME_TERMS = ""
+
+# From-address for match notifications. Required (with SEND_EMAILS) when MME_ENABLED -
+# email sending is silently a no-op without it, so mme/apps.py refuses to start.
+MME_FROM_EMAIL = None
+
+# --- Beacon v2 ------------------------------------------------------------
+# GA4GH Beacon v2 genomic data-sharing endpoint (#1661). Variant-centric discovery:
+# "does this database contain an allele at chrom:pos ref>alt on assembly?", tiered
+# (boolean -> count -> record) by requester permission. See claude/beacon_v2_plan.md.
+# Off everywhere by default; only vgaws.py (prod) and vgtest2.py (test) turn it on.
+BEACON_ENABLED = False
+BEACON_CONFIG = {
+    # Static metadata served by the framework endpoints (/info, /service-info, /map).
+    # Placeholders - a deployment that enables Beacon overrides these in its env file.
+    "beacon_id": "org.variantgrid.beacon",       # reverse-DNS id; override per deployment
+    "name": "VariantGrid Beacon",
+    "api_version": "v2.0.0",
+    "environment": "prod",                        # prod | test | dev | staging
+    "organization": {
+        "id": "",
+        "name": "",
+        "welcome_url": "",
+        "contact_url": "",                        # e.g. "mailto:..."
+    },
+    "default_granularity": "boolean",             # tier for anonymous requests
+    "max_granularity": "record",                  # ceiling; per-request clamped by auth
+}
+
+# Small-count anonymity floor for the observations dataset: exact counts below this are
+# suppressed (the resultSet drops to boolean presence) to limit membership-inference
+# risk. Behind a setting so a later security pass can tune it. The classification
+# dataset is exempt (each record is already a deliberate public share).
+BEACON_MIN_REPORTABLE_COUNT = 5
+
+# Outbound: query external Beacons from the variant page. On by default - each node is gated
+# (see beacon/query_targets.py) so a variant only fans out to the servers whose domain it
+# matches, and a slow or dead node degrades to an error row rather than blocking the page.
+# A deployment can set this False to drop the panel entirely.
+BEACON_OUTBOUND_ENABLED = True
+BEACON_QUERY_TIMEOUT = 5          # per-node seconds; keep small - remote Beacons vary wildly
+BEACON_QUERY_CACHE_DAYS = 7       # cache each (variant, node) result; live-refresh on expiry
+# Remote nodes we can query. Each entry: public base_url + api_version, a `type` selecting the
+# query target/gate (see beacon/query_targets.py - "cnv" for copy-number Beacons, "snv" for
+# sequence Beacons), an optional `assemblies` allow-list, and an optional `token` (the only
+# secret, via get_secret(mandatory=False)) for nodes whose count/record tier requires one.
+# Only openly-queryable v2 servers that answer an exact coordinate query belong here: most
+# public Beacons are unreachable or auth-gated, and a node that cannot answer is worse than
+# no node at all - it renders as a negative.
+BEACON_QUERY_NODES = {
+    # Germline sequence variants: gnomAD v4.1 (GRCh38), gnomAD v2.1.1 exomes + GCAT (GRCh37).
+    # The "-demo" host is the real service: its /info reports environment "prod" - don't "fix"
+    # this URL. The two cleaner-looking alternatives are both dead ends: af-beacon.ega-archive.org
+    # is only the browser UI (not an API), and beacon.ega-archive.org (advertised as this node's
+    # own /info "alternativeUrl") completes TLS but never answers - it hangs until timeout.
+    "ega_af": {"base_url": "https://af-ega-beacon-demo.ega-archive.org/api", "api_version": "v2.2.0",
+               "type": "snv", "assemblies": ["GRCh37", "GRCh38"]},
+    # Somatic copy-number (bycon/progenetix family) - symbolic <DEL>/<DUP>, GRCh38 only.
+    "progenetix": {"base_url": "https://progenetix.org/beacon", "api_version": "v2.0.0",
+                   "type": "cnv", "assemblies": ["GRCh38"]},
+    "cancercelllines": {"base_url": "https://cancercelllines.org/beacon", "api_version": "v2.0.0",
+                        "type": "cnv", "assemblies": ["GRCh38"]},
+}
 
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_
 
@@ -235,8 +403,11 @@ VCF_IMPORT_COMMON_FILTERS = {
         "clinical_significance_max": "3",
     },
     "GRCh38": {
-        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.0_GRCh38_af_greater_than_5.stripped.vcf.gz",
-        "gnomad_version": "4.0",
+        # Intersection of gnomAD 4.0 and 4.1 AF>5 so the common partition is valid (skippable) under either
+        # version - @see issue #1582. "additional_gnomad_versions" lists the extra versions beyond "gnomad_version".
+        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.0_and_4.1_GRCh38_af_greater_than_5.intersection.stripped.vcf.gz",
+        "gnomad_version": "4.1",
+        "additional_gnomad_versions": ["4.0"],
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
     },
@@ -267,7 +438,7 @@ PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 # Set to None / empty to disable.
 PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
-IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
+IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = True
 
 # Where partition dump files are written when an archivable model (VAV, ClinVarVersion, CohortGenotypeCollection, ...)
 # is archived via the pre-drop archival pipeline (#1537).
@@ -356,6 +527,15 @@ ANALYSIS_NODE_CACHE_Q = True
 # single-parent nodes and MergeNode inputs. 0 disables the substitution.
 ANALYSIS_NODE_STORE_ID_SIZE_MAX = 1000
 ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
+# Fallback when no Global/Org/Lab/User override is set. None = always auto-load.
+# Analysis nodes with at least this many variants don't auto-load their grid - the user clicks
+# "Load variants" to run the row query.
+ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000
+# Analysis node grids sort in-DB via ORDER BY. Sorting by joined/unindexed columns (e.g. OMIM) on a
+# large result set forces a full sort that blows the statement_timeout. At/above this row count we
+# disable sorting entirely and fall back to ORDER BY -pk (indexed). Users filter down to re-enable.
+ANALYSIS_GRID_SORT_MAX_ROWS = 10_000
+
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_SHOW_CANONICAL_HGVS = True
@@ -383,6 +563,7 @@ CLASSIFICATION_STATS_USE_SHARED = False  # False=Use visible to user. True = Sha
 CLASSIFICATION_GRID_SHOW_PHGVS = True
 CLASSIFICATION_GRID_SHOW_SAMPLE = True
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
+CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER = True  # Toggle to show only internal/external (e.g. synced from Shariant) labs
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
 CLASSIFICATION_NEW_GROUPING = False
 CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where Lab.research=True
@@ -629,6 +810,20 @@ SPECTACULAR_SETTINGS = {
     'SWAGGER_UI_DIST': 'SIDECAR',
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
     'REDOC_DIST': 'SIDECAR',
+    # Tag groups. The Beacon v2 endpoints implement the GA4GH spec - link out to the
+    # authoritative spec rather than restating it in per-operation descriptions.
+    'TAGS': [
+        {
+            'name': 'Beacon v2',
+            'description': 'GA4GH Beacon v2 genomic data-sharing endpoints. These implement the '
+                           'external [GA4GH Beacon v2 specification](https://docs.genomebeacons.org/); '
+                           'request/response shapes and the meta envelope are defined there.',
+            'externalDocs': {
+                'description': 'GA4GH Beacon v2 documentation & specification',
+                'url': 'https://docs.genomebeacons.org/',
+            },
+        },
+    ],
     # Several predictors share the same Tolerated/Damaging choice set - use one canonical enum name
     'ENUM_NAME_OVERRIDES': {
         'ToleratedDamagingPredictionEnum': 'annotation.models.damage_enums.ToleratedDamagingPrediction.CHOICES',
@@ -650,6 +845,10 @@ LOGIN_USERNAME_PLACEHOLDER = None
 LOGOUT_REDIRECT_URL = '/'
 
 ACCOUNT_ACTIVATION_DAYS = 7  # One-week activation window
+
+# Optional apps have to be switched on before INSTALLED_APPS is built, which is before the env settings files get a
+# chance to run - so they're configured in settings_config.json rather than Python. See #1410
+USE_MAPS = get_secret("INSTALLED_APPS.maps", mandatory=False) or False
 
 INSTALLED_APPS = [
     'compressor',
@@ -673,16 +872,13 @@ INSTALLED_APPS = [
     'auditlog',
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
-    'django_messages',
+    'user_messages',
     'django_dag',
     'django_js_reverse',
-    'django_starfield',
     'django_extensions',
-    'djgeojson',
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
-    'leaflet',
     'martor',
     "psqlextra",
     'rest_framework',
@@ -712,10 +908,15 @@ INSTALLED_APPS = [
     'upload.apps.UploadConfig',
     'classification.apps.ClassificationConfig',
     'variantopedia',
-    'review'
+    'review',
+    'mme.apps.MMEConfig',
+    'beacon.apps.BeaconConfig',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
 ]
+
+if USE_MAPS:
+    INSTALLED_APPS.append('leaflet')
 
 # https://django-crispy-forms.readthedocs.io/en/latest/install.html
 # CRISPY_ALLOWED_TEMPLATE_PACKS = ('bootstrap4_neat', 'bootstrap4') # need to do this if you make an alternative template pack
@@ -743,11 +944,13 @@ LEAFLET_CONFIG = {
 # See http://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.
 
+LOG_LEVEL = 'WARNING' if UNIT_TEST else 'INFO'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
     'root': {
-        'level': 'INFO',
+        'level': LOG_LEVEL,
         'handlers': ['console'],
     },
     'formatters': {
@@ -788,7 +991,7 @@ LOGGING = {
         'django': {
             'handlers': ['console', 'db'],
             'propagate': False,
-            'level': 'INFO',
+            'level': LOG_LEVEL,
         },
         'hgvs': {
             'level': 'WARNING',
@@ -821,6 +1024,9 @@ PUBLIC_PATHS = [
     r'^/classification/api/.*',  # REST framework used by command line tools
     r'^/seqauto/api/.*',
     r'^/upload/api/.*',
+    r'^/mme/api/.*',  # Inbound MME /match + /metrics - authenticated by per-peer X-Auth-Token (see mme/auth.py)
+    r'^/mme/(metrics|disclaimers)$',  # MME requires these be published publicly
+    r'^/beacon/.*',  # Beacon v2 answers anonymous requests (public tier); views still enforce per-tier permission
 ]
 
 # Both need to be set to enable - and use get_secret in server settings files to keep out of source control
@@ -886,7 +1092,8 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "condition_matchings": False,
     "condition_match_test": False,
     "discordance_reports": False,
-    "vus": False
+    "vus": False,
+    "maps": USE_MAPS,
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 
@@ -909,6 +1116,8 @@ URLS_NAME_REGISTER.update({"classification_dashboard": False,
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
 VARIANT_DETAILS_SHOW_GENE_COVERAGE = False
 VARIANT_DETAILS_SHOW_SAMPLES = True
+# Rows the samples grid loads before it stops and offers "load all rows" - 0 for no cap
+VARIANT_DETAILS_SAMPLES_MAX_ROWS = 1000
 VARIANT_DETAILS_NEARBY_RANGE = 50
 VARIANT_DETAILS_NEARBY_SHOW_GENE = False
 

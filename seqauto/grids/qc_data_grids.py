@@ -16,7 +16,7 @@ class IlluminaFlowcellQCGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.objects.filter(data_state='C')
+        queryset = self.model.objects.all()
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("illumina_flowcell_qc_grid", kwargs={"op": JQGridViewOp.DOWNLOAD})
         self.extra_config.update({'sortname': 'sample_sheet__sequencing_run__name',
@@ -32,7 +32,7 @@ class FastQCGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.objects.filter(data_state='C')
+        queryset = self.model.objects.all()
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("fastqc_grid", kwargs={"op": JQGridViewOp.DOWNLOAD})
         self.extra_config.update({'sortname': 'fastq__sequencing_sample__sample_sheet__sequencing_run__name',
@@ -43,16 +43,16 @@ class FastQCGrid(JqGridUserRowConfig):
 class FlagstatsGrid(JqGridUserRowConfig):
     model = Flagstats
     caption = 'Flagstats'
-    fields = ["bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name",
+    fields = ["bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
               "bam_file__name", "total", "read1", "read2", "mapped", "properly_paired"]
-    colmodel_overrides = {'bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'SequencingRun'}}
+    colmodel_overrides = {'bam_file__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'SequencingRun'}}
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.objects.filter(data_state='C')
+        queryset = self.model.objects.all()
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("flagstats_grid", kwargs={"op": JQGridViewOp.DOWNLOAD})
-        self.extra_config.update({'sortname': 'bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name',
+        self.extra_config.update({'sortname': 'bam_file__sequencing_sample__sample_sheet__sequencing_run__name',
                                   'sortorder': 'desc',
                                   'grid_export_url': grid_export_url})
 
@@ -60,19 +60,19 @@ class FlagstatsGrid(JqGridUserRowConfig):
 class QCExecSummaryGrid(JqGridUserRowConfig):
     model = QCExecSummary
     caption = 'QCExecSummary'
-    fields = ["qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name",
-              "qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_name",
+    fields = ["qc__bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
+              "qc__bam_file__sequencing_sample__sample_name",
               "percent_500x_goi", "percent_250x_goi", "percent_20x_goi", "percent_10x_goi", "mean_coverage_across_genes", "mean_coverage_across_kit",
               "uniformity_of_coverage", "percent_read_enrichment", "median_insert", "ts_to_tv_ratio",
               "number_snps", "snp_dbsnp_percent", "number_indels", "indels_dbsnp_percent"]
-    colmodel_overrides = {'qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'SequencingRun'},
-                          "qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_name": {'label': 'SampleName'}}
+    colmodel_overrides = {'qc__bam_file__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'SequencingRun'},
+                          "qc__bam_file__sequencing_sample__sample_name": {'label': 'SampleName'}}
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.objects.filter(data_state='C')
+        queryset = self.model.objects.all()
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("qc_exec_summary_grid", kwargs={"op": JQGridViewOp.DOWNLOAD})
-        self.extra_config.update({'sortname': 'qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name',
+        self.extra_config.update({'sortname': 'qc__bam_file__sequencing_sample__sample_sheet__sequencing_run__name',
                                   'sortorder': 'desc',
                                   'grid_export_url': grid_export_url})

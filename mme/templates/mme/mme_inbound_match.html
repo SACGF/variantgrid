@@ -1,0 +1,45 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load js_tags %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% block title %}MME inbound match {{ match.pk }}{% endblock title %}
+{% block content %}
+    <div class="container">
+        <h3>MatchMaker Exchange — external match</h3>
+        <p class="text-muted">
+            <strong>{{ peer_node_id|default:"An MME peer" }}</strong> queried MatchMaker Exchange
+            and we returned classification
+            <a href="{% url 'view_classification' match.classification_id %}">#{{ match.classification_id }}</a>
+            as a possible match (score {{ match.score|floatformat:3 }}) on {{ match.created }}.
+        </p>
+
+        <div class="alert alert-info">
+            A match is an introduction, not an answer. Contact the querying curator below to
+            compare cases before acting on it.
+        </div>
+
+        <h4>Their contact</h4>
+        {% with contact=match.query_patient_json.contact %}
+            {% if contact %}
+                <ul>
+                    {% if contact.name %}<li><strong>{{ contact.name }}</strong></li>{% endif %}
+                    {% if contact.institution %}<li>{{ contact.institution }}</li>{% endif %}
+                    {% if contact.href %}<li><a href="{{ contact.href }}">{{ contact.href }}</a></li>{% endif %}
+                </ul>
+            {% else %}
+                <p class="text-muted">The querying node supplied no contact block.</p>
+            {% endif %}
+        {% endwith %}
+
+        {% if peer_disclaimer.disclaimer or peer_disclaimer.terms %}
+            <div class="alert alert-secondary">
+                <strong>{{ peer_node_id }} disclaimer</strong>
+                {% if peer_disclaimer.disclaimer %}<p class="mb-1">{{ peer_disclaimer.disclaimer }}</p>{% endif %}
+                {% if peer_disclaimer.terms %}<p class="mb-0"><strong>Terms:</strong> {{ peer_disclaimer.terms }}</p>{% endif %}
+            </div>
+        {% endif %}
+
+        <h4>Their patient</h4>
+        <pre class="border p-2">{{ match.query_patient_json|jsonify_pretty }}</pre>
+    </div>
+{% endblock content %}

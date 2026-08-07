@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from snpdb.models.models_enums import ImportSource
-from upload.models import UploadedFile, UploadedFileTypes
+from upload.models import FileUpload, UploadedFileTypes
 
 
 class TestUploadedFilePermissions(TestCase):
@@ -13,7 +13,7 @@ class TestUploadedFilePermissions(TestCase):
         cls.other_user = User.objects.create_user(username="file_other", password="x")
         cls.superuser = User.objects.create_superuser(username="file_super", password="x")
 
-        cls.uploaded_file = UploadedFile.objects.create(
+        cls.file_upload = FileUpload.objects.create(
             user=cls.owner,
             name="test_file.vcf",
             path="/tmp/test_file.vcf",
@@ -22,11 +22,11 @@ class TestUploadedFilePermissions(TestCase):
         )
 
     def test_owner_can_view(self):
-        self.assertTrue(self.uploaded_file.can_view(self.owner))
+        self.assertTrue(self.file_upload.can_view(self.owner))
 
     def test_non_owner_cannot_view(self):
-        self.assertFalse(self.uploaded_file.can_view(self.other_user))
+        self.assertFalse(self.file_upload.can_view(self.other_user))
 
     def test_superuser_can_view_any_file(self):
-        self.assertTrue(self.uploaded_file.can_view(self.superuser))
+        self.assertTrue(self.file_upload.can_view(self.superuser))
 

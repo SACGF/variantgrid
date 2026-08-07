@@ -17,8 +17,8 @@ from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 
 
-def _process_imported_wiki(uploaded_file) -> tuple[ImportedWikiCollection, list[ImportedWiki]]:
-    df = pd.read_csv(uploaded_file.get_filename())
+def _process_imported_wiki(file_upload) -> tuple[ImportedWikiCollection, list[ImportedWiki]]:
+    df = pd.read_csv(file_upload.get_filename())
     df = df_nan_to_none(df)
 
     match_column_name = df.columns[0]
@@ -29,7 +29,7 @@ def _process_imported_wiki(uploaded_file) -> tuple[ImportedWikiCollection, list[
         genome_build = None
     wiki_collection = ImportedWikiCollection.objects.create(match_column_name=match_column_name,
                                                             genome_build=genome_build)
-    UploadedWikiCollection.objects.create(uploaded_file=uploaded_file,
+    UploadedWikiCollection.objects.create(file_upload=file_upload,
                                           wiki_collection=wiki_collection)
 
     records = []
@@ -70,12 +70,12 @@ def _create_or_modify_wiki(user_matcher, iw, wiki, created):
 
 
 class ImportGeneWikiCollection(ImportTask):
-    def process_items(self, uploaded_file):
-        wiki_collection, records = _process_imported_wiki(uploaded_file)
+    def process_items(self, file_upload):
+        wiki_collection, records = _process_imported_wiki(file_upload)
 
         matched_records = []
         gs_matcher = GeneSymbolMatcher()
-        user_matcher = UserMatcher(uploaded_file.user)
+        user_matcher = UserMatcher(file_upload.user)
         for iw in records:
             if gene_symbol_id := gs_matcher.get_gene_symbol_id(iw.match_column_value):
                 gs_wiki, created = GeneSymbolWiki.objects.get_or_create(gene_symbol_id=gene_symbol_id)
@@ -94,9 +94,9 @@ class VariantWikiCreateVCFTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         upload_pipeline = upload_step.upload_pipeline
-        uploaded_file = upload_pipeline.uploaded_file
+        file_upload = upload_pipeline.file_upload
 
-        wiki_collection, records = _process_imported_wiki(uploaded_file)
+        wiki_collection, records = _process_imported_wiki(file_upload)
         matcher = HGVSMatcher(wiki_collection.genome_build)
         variant_coordinates = []
         for iw in records:
@@ -115,11 +115,11 @@ class VariantWikiInsertTask(ImportVCFStepTask):
         Variants will be in database at this stage """
 
     def process_items(self, upload_step: UploadStep):
-        uploaded_file = upload_step.upload_pipeline.uploaded_file
-        wiki_collection = uploaded_file.uploadedwikicollection.wiki_collection
+        file_upload = upload_step.upload_pipeline.file_upload
+        wiki_collection = file_upload.uploadedwikicollection.wiki_collection
 
         hgvs_matcher = HGVSMatcher(wiki_collection.genome_build)
-        user_matcher = UserMatcher(uploaded_file.user)
+        user_matcher = UserMatcher(file_upload.user)
         matched_records = []
         for iw in wiki_collection.importedwiki_set.all():
             if variant_coordinate := hgvs_matcher.get_variant_coordinate(iw.match_column_value):

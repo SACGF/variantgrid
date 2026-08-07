@@ -1,4 +1,5 @@
 from .models import *
+from .models_jobs_control import *
 from .models_cohort import *
 from .models_columns import *
 from .models_dbsnp import *

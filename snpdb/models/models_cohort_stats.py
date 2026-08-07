@@ -22,8 +22,8 @@ from snpdb.models.models_vcf import SampleStatsCodeVersion
 
 
 class CohortGenotypeStats(TimeStampedModel):
-    """ Replaces SampleStats(+PassingFilter). Counts derived from packed
-        CohortGenotype data — zygosity, variant class, x_het/x_hom. """
+    """ Genotype-level counts derived from packed CohortGenotype data —
+        zygosity, variant class, x_het/x_hom. """
     cohort_genotype_collection = models.ForeignKey(
         "snpdb.CohortGenotypeCollection", on_delete=CASCADE, related_name="genotype_stats")
     sample = models.ForeignKey("snpdb.Sample", null=True, on_delete=CASCADE)

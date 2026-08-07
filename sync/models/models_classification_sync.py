@@ -1,12 +1,12 @@
-import os
 from typing import Optional
+from urllib.parse import urljoin
 
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query import QuerySet
 from django_extensions.db.models import TimeStampedModel
 
-from classification.models.classification import ClassificationModification
+from classification.models.classification import Classification, ClassificationModification
 from sync.models.models import SyncDestination, SyncRun
 
 
@@ -29,9 +29,10 @@ class ClassificationModificationSyncRecord(TimeStampedModel):
 
     @property
     def remote_url(self) -> Optional[str]:
-        if not self.success:
-            raise ValueError(f"{self.classification_modification} not successfully synced")
-        url = self.run.destination.sync_details["host"]
-        remote_pk = self.meta["meta"]["id"]
-        path = self.classification_modification.classification.get_url_for_pk(remote_pk)
-        return os.path.join(url, path)
+        """ URL of the record on the destination server, None if we don't know where it landed """
+        if self.success:
+            # the v2 API response nests the remote record's pk under "meta"
+            if remote_pk := ((self.meta or {}).get("meta") or {}).get("id"):
+                host = self.run.destination.sync_details["host"]
+                return urljoin(host, Classification.get_url_for_pk(remote_pk))
+        return None

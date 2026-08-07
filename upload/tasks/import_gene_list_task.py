@@ -26,10 +26,10 @@ def create_gene_list(user, category, name, gene_names_set, modification_info=Non
 class ImportGeneListTask(ImportTask):
     MIN_GENES_TO_USE_CACHING_GENE_MATCHER = 10
 
-    def process_items(self, uploaded_file):
+    def process_items(self, file_upload):
 
-        uploaded_gene_list, _ = UploadedGeneList.objects.get_or_create(uploaded_file=uploaded_file)
-        with open(uploaded_file.get_filename()) as f:
+        uploaded_gene_list, _ = UploadedGeneList.objects.get_or_create(file_upload=file_upload)
+        with open(file_upload.get_filename()) as f:
             gene_list_data = f.read()
         tokens = tokenize_gene_symbols(gene_list_data)
 
@@ -38,8 +38,8 @@ class ImportGeneListTask(ImportTask):
         else:
             gene_matcher = None
 
-        modification_info = "From uploaded gene_list: %s" % uploaded_file.get_filename()
-        gene_list = create_gene_list(uploaded_file.user, None, uploaded_file.name, tokens.valid, modification_info,
+        modification_info = "From uploaded gene_list: %s" % file_upload.get_filename()
+        gene_list = create_gene_list(file_upload.user, None, file_upload.name, tokens.valid, modification_info,
                                      gene_matcher=gene_matcher, oversized_skipped=tokens.oversized)
         uploaded_gene_list.gene_list = gene_list
         uploaded_gene_list.save()

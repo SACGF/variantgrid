@@ -69,3 +69,41 @@ class GetVepCommandTests(TestCase):
         self.assertNotIn("--distance", cmd)
         self.assertNotIn("--gencode_primary", cmd)
         self.assertNotIn("--gencode_basic", cmd)
+
+
+def _v5_settings(vep_version: str) -> dict:
+    """ columns_version 5 (the helper pins the #1638 plugin data files) at a given VEP version. """
+    d = get_fake_annotation_settings_dict(columns_version=5)
+    d["ANNOTATION_VEP_VERSION"] = vep_version
+    return d
+
+
+class GetVepCommandColumnsVersion5Tests(TestCase):
+    """ #1638 - ProtVar / OpenTargets / EVE / PromoterAI plugin wiring at columns_version 5. """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+
+    def _plugins(self):
+        cmd = get_vep_command(
+            "in.vcf", "out.vcf", self.grch38, AnnotationConsortium.ENSEMBL,
+            VariantAnnotationPipelineType.STANDARD,
+        )
+        return [cmd[i + 1] for i, x in enumerate(cmd) if x == "--plugin"]
+
+    def test_vep116_includes_all_four_plugins(self):
+        with override_settings(**_v5_settings(vep_version="116")):
+            plugins = self._plugins()
+        self.assertTrue(any(p.startswith("ProtVar,db=") for p in plugins))
+        self.assertTrue(any(p.startswith("OpenTargets,file=") and "cols=all" in p for p in plugins))
+        self.assertTrue(any(p.startswith("EVE,file=") and "popeve_file=" in p for p in plugins))
+        self.assertTrue(any(p.startswith("PromoterAI,file=") for p in plugins))
+
+    def test_vep115_omits_eve_and_promoterai(self):
+        with override_settings(**_v5_settings(vep_version="115")):
+            plugins = self._plugins()
+        self.assertTrue(any(p.startswith("ProtVar,db=") for p in plugins))
+        self.assertTrue(any(p.startswith("OpenTargets,file=") for p in plugins))
+        self.assertFalse(any(p.startswith("EVE,file=") for p in plugins))
+        self.assertFalse(any(p.startswith("PromoterAI,file=") for p in plugins))

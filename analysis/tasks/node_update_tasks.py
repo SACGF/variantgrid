@@ -14,6 +14,7 @@ from analysis.exceptions import (
     CeleryTasksObsoleteException,
     NodeConfigurationException,
     NodeOutOfDateException,
+    NodeOutOfMemoryException,
     NodeParentErrorsException,
 )
 from analysis.models.nodes.analysis_node import (
@@ -28,7 +29,7 @@ from eventlog.models import create_event
 from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
-from snpdb.models import ProcessingStatus
+from snpdb.models import JobsControl, ProcessingStatus
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"
 
@@ -93,6 +94,7 @@ def update_node_task(node_id, version):
         leases ready nodes), writes the node's own outcome, clears its lease, then re-triggers
         the dispatcher so newly-unblocked children get leased. """
     analysis_id = None
+    out_of_memory = False
     with disable_auditlog():
         try:
             node = AnalysisNode.objects.get_subclass(pk=node_id, version=version)
@@ -127,6 +129,15 @@ def update_node_task(node_id, version):
                     status = NodeStatus.ERROR_CONFIGURATION
                 except NodeParentErrorsException:
                     status = NodeStatus.ERROR_WITH_PARENT
+                except MemoryError:
+                    # The load exceeded the worker memory cap (RLIMIT_AS). Caught here rather than
+                    # letting the OS OOM-killer lock the box. The failed allocation is already
+                    # freed, so the small writes below have headroom. Perma-fail (ERROR is
+                    # terminal - never auto-retried) and flag so we raise after rescheduling
+                    # children, surfacing it in Rollbar with analysis/node context.
+                    errors = get_traceback()
+                    status = NodeStatus.ERROR
+                    out_of_memory = True
                 except Exception:
                     errors = get_traceback()
                     status = NodeStatus.ERROR
@@ -148,6 +159,11 @@ def update_node_task(node_id, version):
 
     if analysis_id is not None:
         _trigger_rescheduling(analysis_id)
+
+    if out_of_memory:
+        # Node is already perma-failed (ERROR) and children have been kicked; raise so the task
+        # dies and the celery task_failure handler reports the OOM to Rollbar.
+        raise NodeOutOfMemoryException(analysis_id, node_id, version)
 
 
 @celery.shared_task(bind=True)
@@ -236,6 +252,8 @@ def reschedule_stalled_analyses():
         reclaim / re-lease / terminal-fail decisions are all enforced authoritatively in
         lease_ready_nodes. This query is deliberately over-inclusive - a kick with nothing ready
         fast-exits in the single worker - so it never misses stalled work. """
+    if JobsControl.is_paused():
+        return  # operational brake (e.g. crash safety auto-pause) - don't kick the dispatcher
     now = timezone.now()
     stalled_lease = Q(nodeversion__nodetask__lease_expires__lt=now)  # abandoned by a dead worker
     dirty = Q(status=NodeStatus.DIRTY)  # waiting to be dispatched (run_after honoured at lease time)
@@ -263,9 +281,10 @@ def delete_analysis_old_node_versions(analysis_id):
 def wait_for_node(self, node_id):
     """ Used to build a dependency on a node that's already loading.
 
-        No longer added to scheduling chains (issue #346 removed the worker-starvation pattern);
-        kept because analysis_grid_export_tasks._wait_for_output_node() still calls it
-        synchronously as a blocking export gate.
+        No longer added to scheduling chains (issue #346 removed the worker-starvation pattern).
+        Also no longer used by analysis_grid_export_tasks - calling this synchronously leaked its
+        self.retry() Retry up into the caller and wedged the export task in a stale RETRY state, so
+        the exports now do their own node-readiness retry. Kept as a standalone building block.
 
         Uses Celery retry (not sleep) to free the worker between checks, preventing deadlocks
         when all workers are occupied waiting for parent nodes.

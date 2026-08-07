@@ -25,10 +25,9 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
-from library.log_utils import log_traceback, report_event
+from library.log_utils import log_traceback
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from patients.models import FakeData, Patient, Specimen
-from patients.models_enums import Sex
 from snpdb.models.models import LabProject, Tag
 from snpdb.models.models_enums import (
     ImportStatus,
@@ -299,18 +298,23 @@ class VCFFilter(models.Model):
         unique_together = (('vcf', 'filter_code'), ('vcf', 'filter_id'))
 
     @staticmethod
+    def get_code_lookup(vcf: VCF) -> dict[str, str]:
+        """ Filter codes are assigned per-VCF, so this can only decode that VCF's records """
+        return {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
+
+    @staticmethod
+    def format_filter_codes(lookup: dict[str, str], filter_string: Optional[str]) -> str:
+        """ Empty/null means the record passed all of the VCF's filters """
+        if filter_string:
+            return ','.join(lookup.get(f, f) for f in filter_string)
+        return "PASS"
+
+    @staticmethod
     def get_formatter(vcf: VCF):
-        lookup = {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
+        lookup = VCFFilter.get_code_lookup(vcf)
 
         def filter_string_formatter(row, field):
-            if filter_string := row[field]:
-                formatted_filters = []
-                for f in filter_string:
-                    formatted_filters.append(lookup[f])
-                formatted_filters = ','.join(formatted_filters)
-            else:
-                formatted_filters = "PASS"
-            return formatted_filters
+            return VCFFilter.format_filter_codes(lookup, row[field])
 
         return filter_string_formatter
 
@@ -634,10 +638,6 @@ class VCFAlleleSource(AlleleSource):
             qs = Variant.objects.none()
         return qs
 
-    def liftover_complete(self, genome_build: GenomeBuild):
-        report_event('Completed VCF liftover',
-                     extra_data={'vcf_id': self.vcf.pk, 'allele_count': self.get_allele_qs().count()})
-
 
 class SampleStatsCodeVersion(TimeStampedModel):
     """ Track the version and code used to calculate sample stats, in case there are bugs/changes needed """
@@ -650,104 +650,6 @@ class SampleStatsCodeVersion(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} v{self.version}, git: {self.code_git_hash}, {self.created}"
-
-
-class AbstractVariantStats(TimeStampedModel):
-    """ Base class used for Cohort/Sample stats (note don't have Cohort stats yet)
-        @see also annotation.models.models_sample_stats """
-
-    code_version = models.ForeignKey(SampleStatsCodeVersion, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-    variant_count = models.IntegerField(default=0)
-    snp_count = models.IntegerField(default=0)
-    insertions_count = models.IntegerField(default=0)
-    deletions_count = models.IntegerField(default=0)
-    ref_count = models.IntegerField(default=0)
-    het_count = models.IntegerField(default=0)
-    hom_count = models.IntegerField(default=0)
-    unk_count = models.IntegerField(default=0)
-    x_hom_count = models.IntegerField(default=0)
-    x_het_count = models.IntegerField(default=0)
-    x_unk_count = models.IntegerField(default=0)
-
-    class Meta:
-        abstract = True
-
-    @staticmethod
-    def percent(a, b):
-        percent = float('NaN')
-        if b:
-            percent = 100.0 * a / b
-        return percent
-
-    @property
-    def total_count(self):
-        return self.variant_count
-
-    @property
-    def variant_percent(self):
-        return AbstractVariantStats.percent(self.variant_count, self.total_count)
-
-    @property
-    def snp_percent(self):
-        return AbstractVariantStats.percent(self.snp_count, self.total_count)
-
-    @property
-    def insertions_percent(self):
-        return AbstractVariantStats.percent(self.insertions_count, self.total_count)
-
-    @property
-    def deletions_percent(self):
-        return AbstractVariantStats.percent(self.deletions_count, self.total_count)
-
-    def count_for_zygosity(self, zygosity_ref, zygosity_het, zygosity_hom, zygosity_unk, label=None):
-        count = 0
-
-        if zygosity_ref:
-            count += self.ref_count
-        if zygosity_het:
-            count += self.het_count
-        if zygosity_hom:
-            count += self.hom_count
-        if zygosity_unk:
-            count += self.unk_count
-
-        return count
-
-
-class AbstractSampleStats(AbstractVariantStats):
-    """ @see also annotation.models.models_sample_stats """
-    sample = models.OneToOneField(Sample, on_delete=CASCADE)
-
-    class Meta:
-        abstract = True
-
-    @classmethod
-    def load_version(cls, sample, annotation_version):
-        # Ignores annotation_version as not used, but want consistent interface
-        return cls.objects.get(sample=sample)
-
-    @property
-    def chrx_sex_guess(self):
-        """ returns sex by using hom/het ratio <0.2 = female, >0.8=male """
-
-        sex = Sex.UNKNOWN
-        if self.x_het_count and self.x_hom_count:
-            hom_het_ratio = self.x_hom_count / self.x_het_count
-            if hom_het_ratio < 0.2:
-                sex = Sex.FEMALE
-            elif hom_het_ratio > 0.8:
-                sex = Sex.MALE
-
-        return Sex(sex).label
-
-
-class SampleStats(AbstractSampleStats):
-    pass
-
-
-class SampleStatsPassingFilter(AbstractSampleStats):
-    pass
 
 
 class VCFLengthStatsCollection(TimeStampedModel):
