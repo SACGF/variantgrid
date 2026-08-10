@@ -262,6 +262,11 @@
                         remote (with a link to it), or why it was excluded</li>
                     <li>#1030 - gnomAD structural variant frequencies autopopulate classifications</li>
                     <li>#579 - New evidence key "Early stop codon", autopopulated from the new frameshift columns</li>
+                    <li>#1063 - Classifications submitted as g.HGVS only (eg intergenic variants) are validated as
+                        genomic submissions - they only need to resolve to a variant in each build, so they're no longer
+                        held back from exports by missing transcript / c.HGVS errors, and the imported g.HGVS is shown
+                        on the classification. ClinVar export says when a transcript-based HGVS is required.
+                        Existing records are re-validated</li>
                 </ul>
                 <h4>Data / Upload</h4>
                 <ul>
