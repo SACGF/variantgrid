@@ -32,7 +32,11 @@ from annotation.sv_conservation import (
     write_conservation_sidecar,
 )
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
-from annotation.vep_annotation import get_vep_command, vep_check_command_line_version_match
+from annotation.vep_annotation import (
+    get_vep_command,
+    get_vep_skipped_variants_filename,
+    vep_check_command_line_version_match,
+)
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback, report_message
@@ -430,6 +434,7 @@ def get_run_output_paths(annotation_run, vcf_dump_filename) -> list[str]:
         vcf_dump_filename,
         annotated_filename,
         conservation_sidecar_filename(annotated_filename),
+        get_vep_skipped_variants_filename(annotated_filename),
         get_annotsv_tsv_filename(vcf_dump_filename, get_annotsv_dir(annotation_run)),
     ]
 
@@ -513,6 +518,12 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True, lease_hea
             raise RuntimeError(f"VEP returned {return_code}")
 
         annotation_run.vcf_annotated_filename = vcf_annotated_filename
+        # #1701: VEP writes this in Runner::finish(), after the output handle is closed - so it is present
+        # and complete even for the truncated-output failure this check exists to catch. Recorded only when
+        # written, so the import lane falls back to the warnings text for anything that didn't produce one.
+        skipped_variants_filename = get_vep_skipped_variants_filename(vcf_annotated_filename)
+        if os.path.exists(skipped_variants_filename):
+            annotation_run.vep_skipped_variants_filename = skipped_variants_filename
         annotation_run.annotation_end = timezone.now()
 
         if (settings.ANNOTATION_ANNOTSV_ENABLED

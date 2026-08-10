@@ -32,6 +32,7 @@ from annotation.tasks.annotate_variants import (
     conservation_sidecar_filename,
     get_annotsv_dir,
     get_run_output_paths,
+    get_vep_skipped_variants_filename,
 )
 
 
@@ -48,7 +49,10 @@ def get_all_run_output_paths(annotation_run) -> list[str]:
     if dump_filename := annotation_run.vcf_dump_filename:
         paths += get_run_output_paths(annotation_run, dump_filename)
     if annotated_filename := annotation_run.vcf_annotated_filename:
-        paths += [annotated_filename, conservation_sidecar_filename(annotated_filename)]
+        paths += [annotated_filename, conservation_sidecar_filename(annotated_filename),
+                  get_vep_skipped_variants_filename(annotated_filename)]
+    if skipped_variants_filename := annotation_run.vep_skipped_variants_filename:
+        paths.append(skipped_variants_filename)
     if annotsv_tsv_filename := annotation_run.annotsv_tsv_filename:
         paths.append(annotsv_tsv_filename)
     return paths

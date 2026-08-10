@@ -1113,6 +1113,9 @@ class AnnotationRun(TimeStampedModel):
     vep_warnings = models.TextField(null=True)
     vcf_dump_filename = models.TextField(null=True)
     vcf_annotated_filename = models.TextField(null=True)
+    # #1701: VEP's --skipped_variants_file for this attempt - one row per record VEP deliberately dropped,
+    # which the import lane counts against dump_count to catch a silently truncated annotated VCF
+    vep_skipped_variants_filename = models.TextField(null=True)
     # #1646: variants to process, pre-counted off-thread by count_annotation_run (null until counted;
     # 0 finishes an empty run without a dump). Reset to null when a merge grows the range lock.
     count = models.IntegerField(null=True)

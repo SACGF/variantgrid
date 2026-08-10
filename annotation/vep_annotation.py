@@ -112,6 +112,13 @@ def _get_vep_fasta(vep_config: VEPConfig, genome_build: GenomeBuild) -> str:
         return genome_build.reference_fasta
 
 
+def get_vep_skipped_variants_filename(vcf_annotated_filename: str) -> str:
+    """ Path VEP writes its --skipped_variants_file to, alongside the annotated VCF (mirroring the VEP
+        `_warnings.txt` pattern). Derived from the annotated name, which #1658 makes per-attempt, so two
+        attempts on one run never share it. """
+    return vcf_annotated_filename + "_skipped_variants.tsv"
+
+
 def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
                     pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True,
                     variant_annotation_version=None):
@@ -134,6 +141,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--force_overwrite", "--flag_pick", "--exclude_predicted", "--no_stats",
         "--check_existing",  # COSMIC ids
         "--no_escape",  # Don't URI escape HGVS strings
+        # #1701: a structured list of everything VEP deliberately dropped, so the import lane can check
+        # records in == records out + records skipped rather than trusting the exit code
+        "--skipped_variants_file", get_vep_skipped_variants_filename(output_filename),
 
         # flags for fields
         "--hgvs",
@@ -317,6 +327,9 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
         raise ValueError(f"VEP returned {returncode}")
     vep_version = get_vep_version_from_vcf(output_filename)
     os.remove(output_filename)
+    skipped_variants_filename = get_vep_skipped_variants_filename(output_filename)
+    if os.path.exists(skipped_variants_filename):
+        os.remove(skipped_variants_filename)
     return vep_version
 
 

@@ -4,7 +4,7 @@ from django.test.utils import override_settings
 from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
-from annotation.vep_annotation import get_vep_command
+from annotation.vep_annotation import get_vep_command, get_vep_skipped_variants_filename
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
@@ -22,6 +22,13 @@ class GetVepCommandTests(TestCase):
             VariantAnnotationPipelineType.STANDARD,
             variant_annotation_version=vav,
         )
+
+    def test_skipped_variants_file_named_off_output(self):
+        """ #1701: VEP's own list of what it dropped, per-attempt via the output name """
+        cmd = self._cmd(AnnotationConsortium.ENSEMBL)
+        self.assertIn("--skipped_variants_file", cmd)
+        self.assertEqual(cmd[cmd.index("--skipped_variants_file") + 1],
+                         get_vep_skipped_variants_filename("out.vcf"))
 
     def test_gencode_primary_ensembl_sets_flag(self):
         vav = VariantAnnotationVersion(

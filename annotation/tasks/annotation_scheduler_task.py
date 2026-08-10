@@ -26,6 +26,7 @@ from annotation.signals.manual_signals import annotation_run_discarded_signal
 from annotation.tasks.annotate_variants import (
     annotate_variants,
     get_annotated_filename,
+    get_vep_skipped_variants_filename,
     import_annotation_run,
 )
 from library.constants import HOUR_SECS, MINUTE_SECS
@@ -543,6 +544,11 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
         # The row may not name the annotated VCF yet (reclaimed mid-AnnotSV) - record the derived path so
         # the upload-only relaunch, and any later reclaim, can find the VEP output we are keeping.
         annotation_run.vcf_annotated_filename = annotated_filename
+        # #1701: same reasoning for VEP's skipped-variants list - record it so the upload-only relaunch
+        # checks records-in vs records-out against VEP's own list rather than the warnings-text fallback.
+        skipped_variants_filename = get_vep_skipped_variants_filename(annotated_filename)
+        if os.path.exists(skipped_variants_filename):
+            annotation_run.vep_skipped_variants_filename = skipped_variants_filename
         # annotation_end is persisted at that same final save, and get_status() keys ANNOTATION_COMPLETED
         # off it - so without this the resumed run sits at ANNOTATION_STARTED, which is neither
         # dispatchable nor upload-resumable, and it would never be picked up again. The annotated VCF on
@@ -568,6 +574,7 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
         annotation_run.upload_end = None
         annotation_run.vcf_dump_filename = None
         annotation_run.vcf_annotated_filename = None
+        annotation_run.vep_skipped_variants_filename = None
     annotation_run.task_id = None
     annotation_run.leased_by = None
     annotation_run.lease_expires = None
