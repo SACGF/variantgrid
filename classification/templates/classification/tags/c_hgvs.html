@@ -1,6 +1,6 @@
 {% comment %}All styles are embedded because this is also used in emails{% endcomment %}
 {% spaceless %}
-{% if not c_hgvs.full_c_hgvs %}<span class="no-value">-</span>{% else %}
+{% if not c_hgvs.full_hgvs %}<span class="no-value">-</span>{% else %}
     {% if c_hgvs.is_desired_build == False or c_hgvs.is_normalised == False %}
 {% comment %}Specfically check for False rather than not as these properties default to None and are rarely populated{% endcomment %}
         <div class="text-info">
@@ -19,7 +19,7 @@
             <span class="colon">:</span>
         {% else %}<span class="colon-no-gene-symbol">:</span>{% endif %}
 
-        <span class="c-hgvs-nomen">{{ c_hgvs.raw_c }}</span>
+        <span class="c-hgvs-nomen">{{ c_hgvs.nomen }}</span>
     </span>
 {% endif %}
 {% endspaceless %}

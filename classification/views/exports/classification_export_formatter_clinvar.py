@@ -84,8 +84,8 @@ class ClinVarCompareRowAbstract(ExportRow):
     def c_hgvs(self) -> str:
         for cm in self.allele_group.cms_regardless_of_issues:
             if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
-                if full_c_hgvs := c_hgvs.full_c_hgvs:
-                    return full_c_hgvs
+                if full_hgvs := c_hgvs.full_hgvs:
+                    return full_hgvs
 
     @cached_property
     def clinvar_url(self) -> str:

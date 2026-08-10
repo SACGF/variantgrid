@@ -79,7 +79,7 @@ class Command(BaseCommand):
                     if import_run := c.last_import_run:
                         last_imported = import_run.created
                     c_hgvs = HGVSDisplay(c.imported_c_hgvs)
-                    return f"{c.lab_record_id}\t{c_hgvs.full_c_hgvs}\t{c_hgvs.transcript_parts.version}\t{c_hgvs.gene_symbol}\t{c.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)}\t{last_imported:%Y-%m-%d}"
+                    return f"{c.lab_record_id}\t{c_hgvs.full_hgvs}\t{c_hgvs.transcript_parts.version}\t{c_hgvs.gene_symbol}\t{c.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)}\t{last_imported:%Y-%m-%d}"
 
                 records = sorted(records, key=lambda c: (HGVSDisplay(c.imported_c_hgvs).transcript_parts.version, c.last_import_run.created), reverse=True)
 

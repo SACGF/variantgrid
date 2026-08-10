@@ -391,7 +391,7 @@ def get_evidence_fields_from_preferred_transcript(
     try:
         c_hgvs = hgvs_matcher.variant_to_c_hgvs_parts(variant, transcript_version.accession)
         if c_hgvs:
-            data[SpecialEKeys.C_HGVS] = c_hgvs.full_c_hgvs
+            data[SpecialEKeys.C_HGVS] = c_hgvs.full_hgvs
     except Exception as e:
         value_obj = {}
         data.message = f'Could not parse HGVS value {e!s}'

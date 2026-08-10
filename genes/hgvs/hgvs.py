@@ -8,7 +8,7 @@ from genes.transcripts_utils import clean_transcript_accession
 from snpdb.models.models_genome import GenomeBuild
 
 
-class CHGVSDiff(enum.Flag):
+class HGVSDiff(enum.Flag):
     SAME = 0
     # the transcript identifier has changed
     DIFF_TRANSCRIPT_ID = enum.auto()
@@ -18,32 +18,32 @@ class CHGVSDiff(enum.Flag):
     # the gene symbol has changed
     DIFF_GENE = enum.auto()
     # what might be a significant change has occurred after the c.
-    DIFF_RAW_CGVS = enum.auto()
+    DIFF_NOMEN = enum.auto()
     # what looks like to just be the diff between being explicit about nucleotides in the c.
     # e.g. NM_001006657.1(WDR35):c.2891del
     #   to NM_001006657.1(WDR35):c.2891delC
-    DIFF_RAW_CGVS_EXPANDED = enum.auto()
+    DIFF_NOMEN_EXPANDED = enum.auto()
 
 
-def chgvs_diff_description(chgvsdiff: CHGVSDiff, include_minor=False) -> list[str]:
+def hgvs_diff_description(hgvs_diff: HGVSDiff, include_minor=False) -> list[str]:
     diff_list = []
-    if chgvsdiff & CHGVSDiff.DIFF_TRANSCRIPT_ID:
+    if hgvs_diff & HGVSDiff.DIFF_TRANSCRIPT_ID:
         diff_list.append('Different transcript identifier')
-    if chgvsdiff & CHGVSDiff.DIFF_TRANSCRIPT_VER:
+    if hgvs_diff & HGVSDiff.DIFF_TRANSCRIPT_VER:
         diff_list.append('Different transcript version')
-    if chgvsdiff & CHGVSDiff.DIFF_GENE:
+    if hgvs_diff & HGVSDiff.DIFF_GENE:
         diff_list.append('Different gene symbol')
-    if chgvsdiff & CHGVSDiff.DIFF_RAW_CGVS:
+    if hgvs_diff & HGVSDiff.DIFF_NOMEN:
         diff_list.append('Significant change to the c.hgvs')
-    if (chgvsdiff & CHGVSDiff.DIFF_RAW_CGVS_EXPANDED) and include_minor:
+    if (hgvs_diff & HGVSDiff.DIFF_NOMEN_EXPANDED) and include_minor:
         diff_list.append('The del|ins|dup is explicit')
     return diff_list
 
 
-_C_DOT_PARTS = re.compile(r'^(?P<pos>.*?)(?P<op>del|dup|ins)(?P<nuc>.*?)(ins(?P<ins>.*?))?$')
+_NOMEN_PARTS = re.compile(r'^(?P<pos>.*?)(?P<op>del|dup|ins)(?P<nuc>.*?)(ins(?P<ins>.*?))?$')
 
 
-def c_dot_equivalent(c_dot_1: str, c_dot_2: str) -> bool:
+def hgvs_nomen_equivalent(nomen_1: str, nomen_2: str) -> bool:
     """ Whether two nomens only differ by how explicit they are about nucleotides,
         e.g. c.2891del vs c.2891delC """
 
@@ -59,21 +59,21 @@ def c_dot_equivalent(c_dot_1: str, c_dot_2: str) -> bool:
             return True
         return False
 
-    if c_dot_1 == c_dot_2:
+    if nomen_1 == nomen_2:
         return True
-    if c_dot_1 is None or c_dot_2 is None:
+    if nomen_1 is None or nomen_2 is None:
         return False
-    if (c1_m := _C_DOT_PARTS.match(c_dot_1)) and (c2_m := _C_DOT_PARTS.match(c_dot_2)):
-        if c1_m.group('pos') != c2_m.group('pos'):
+    if (n1_m := _NOMEN_PARTS.match(nomen_1)) and (n2_m := _NOMEN_PARTS.match(nomen_2)):
+        if n1_m.group('pos') != n2_m.group('pos'):
             return False
-        if c1_m.group('op') != c2_m.group('op'):
+        if n1_m.group('op') != n2_m.group('op'):
             return False
-        if bool(c1_m.group('ins')) != bool(c2_m.group('ins')):
+        if bool(n1_m.group('ins')) != bool(n2_m.group('ins')):
             # one is a delins, the other is not
             return False
-        if not is_nucleotides_equiv(c1_m.group('nuc'), c2_m.group('nuc')):
+        if not is_nucleotides_equiv(n1_m.group('nuc'), n2_m.group('nuc')):
             return False
-        if not is_nucleotides_equiv(c1_m.group('ins'), c2_m.group('ins')):
+        if not is_nucleotides_equiv(n1_m.group('ins'), n2_m.group('ins')):
             return False
         return True
     # can't compare, and wasn't exactly the same
@@ -89,17 +89,17 @@ class HGVSDisplay:
     HGVS_REGEX = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
     NUM_PART = re.compile('^[a-z][.]([0-9]+)(.*?)$')
 
-    def __init__(self, full_c_hgvs: str, transcript: str = None):
+    def __init__(self, full_hgvs: str, transcript: str = None):
         if transcript:
             transcript = clean_transcript_accession(transcript)
 
-        if full_c_hgvs is None:
-            full_c_hgvs = ""
+        if full_hgvs is None:
+            full_hgvs = ""
 
-        self.full_c_hgvs = full_c_hgvs
-        self.raw_c = None
+        self.full_hgvs = full_hgvs
+        self.nomen = None
         self.transcript = transcript
-        self.gene = None
+        self.gene_symbol = None
         self.overrode_transcript = True
 
         # properties to help replace BestHGVS
@@ -107,92 +107,73 @@ class HGVSDisplay:
         self.is_desired_build: Optional[bool] = None
         self.genome_build: Optional[GenomeBuild] = None
 
-        if match := HGVSDisplay.HGVS_REGEX.match(full_c_hgvs):
-            self.gene = match[2]
-            self.raw_c = match[3]
+        if match := HGVSDisplay.HGVS_REGEX.match(full_hgvs):
+            self.gene_symbol = match[2]
+            self.nomen = match[3]
 
             if transcript and '.' in transcript:
                 pass
             else:
-                # only use the transcript from c_hgvs if the
+                # only use the transcript from the HGVS if the
                 # one passed in doesn't have a version
                 self.transcript = clean_transcript_accession(match[1])
                 self.overrode_transcript = False
         else:
-            self.raw_c = full_c_hgvs
+            self.nomen = full_hgvs
 
     def to_json(self):
         return {
             "transcript": self.transcript,
-            "gene_symbol": self.gene,
-            "c_nomen": self.raw_c,
-            "full": self.full_c_hgvs,
+            "gene_symbol": self.gene_symbol,
+            "c_nomen": self.nomen,
+            "full": self.full_hgvs,
             "genome_build": self.genome_build.pk if self.genome_build else None,
             "desired": self.is_desired_build,
             "normalized": self.is_normalised
         }
 
     @property
-    def gene_symbol(self) -> Optional[str]:
-        # just as "gene" wasn't accurate, migrate to gene_symbol
-        return self.gene
-
-    @gene_symbol.setter
-    def gene_symbol(self, gene_symbol):
-        self.gene = str(gene_symbol)
-
-    @property
-    def variant(self) -> Optional[str]:
-        # variant was an alternative name to raw_c, but c_dot is the best name
-        return self.raw_c
-
-    @property
-    def c_dot(self) -> Optional[str]:
-        return self.raw_c
-
-    @property
     def without_gene_symbol_str(self) -> str:
-        return f'{self.transcript}:{self.raw_c}'
+        return f'{self.transcript}:{self.nomen}'
 
     def with_gene_symbol(self, gene_symbol: str) -> 'HGVSDisplay':
         if self.transcript:
-            new_full_chgvs = f'{self.transcript}({gene_symbol}):{self.raw_c}'
-            return HGVSDisplay(new_full_chgvs)
+            return HGVSDisplay(f'{self.transcript}({gene_symbol}):{self.nomen}')
         # if there's no transcript we're invalid, not much we can do
         return self
 
     def with_transcript_version(self, version: int) -> 'HGVSDisplay':
         if self.transcript_parts:
             transcript = self.transcript_parts.identifier
-            if transcript and self.raw_c:
-                full_c_hgvs: str
-                if gene := self.gene:
-                    full_c_hgvs = f'{transcript}.{version}({gene}):{self.raw_c}'
+            if transcript and self.nomen:
+                full_hgvs: str
+                if gene_symbol := self.gene_symbol:
+                    full_hgvs = f'{transcript}.{version}({gene_symbol}):{self.nomen}'
                 else:
-                    full_c_hgvs = f'{transcript}.{version}:{self.raw_c}'
-                return HGVSDisplay(full_c_hgvs)
+                    full_hgvs = f'{transcript}.{version}:{self.nomen}'
+                return HGVSDisplay(full_hgvs)
         return self
 
     @cached_property
     def without_transcript_version(self) -> 'HGVSDisplay':
         if self.transcript_parts:
             transcript = self.transcript_parts.identifier
-            if transcript and self.raw_c:
-                full_c_hgvs: str
-                if gene := self.gene:
-                    full_c_hgvs = f'{transcript}({gene}):{self.raw_c}'
+            if transcript and self.nomen:
+                full_hgvs: str
+                if gene_symbol := self.gene_symbol:
+                    full_hgvs = f'{transcript}({gene_symbol}):{self.nomen}'
                 else:
-                    full_c_hgvs = f'{transcript}:{self.raw_c}'
-                return HGVSDisplay(full_c_hgvs)
+                    full_hgvs = f'{transcript}:{self.nomen}'
+                return HGVSDisplay(full_hgvs)
         return self
 
     def __eq__(self, other):
         if type(other) is type(self):
-            return self.full_c_hgvs == other.full_c_hgvs and self.is_normalised == other.is_normalised and self.genome_build == other.genome_build
+            return self.full_hgvs == other.full_hgvs and self.is_normalised == other.is_normalised and self.genome_build == other.genome_build
         return NotImplemented
 
     def __hash__(self):
-        return hash(self.full_c_hgvs)
+        return hash(self.full_hgvs)
 
     def __lt__(self, other):
         """
@@ -201,13 +182,13 @@ class HGVSDisplay:
         return self.sort_str < other.sort_str
 
     def __str__(self):
-        return self.full_c_hgvs
+        return self.full_hgvs
 
     @cached_property
     def sort_str(self) -> str:
         """
-        Returns a string that can be used for sorting, works on numerical part of c., followed by the extra, followed by the transcript
-        Each part being padded so equivalent comparing
+        Returns a string that can be used for sorting, works on numerical part of the nomen, followed by the extra,
+        followed by the transcript. Each part being padded so equivalent comparing
         """
         sort_str = ""
 
@@ -216,17 +197,17 @@ class HGVSDisplay:
         else:
             sort_str += "Z"
 
-        if c_part := self.raw_c:
-            if parts := HGVSDisplay.NUM_PART.match(c_part):
+        if nomen := self.nomen:
+            if parts := HGVSDisplay.NUM_PART.match(nomen):
                 num_part = parts.group(1).rjust(10, '0')
                 extra = parts.group(2)
                 return sort_str + num_part + extra + self.transcript
 
-        # if c.hgvs identical, sort by genome build
+        # if HGVS identical, sort by genome build
         if self.genome_build:
             sort_str += self.genome_build.pk
 
-        return sort_str + self.full_c_hgvs or ""
+        return sort_str + self.full_hgvs or ""
 
     @cached_property
     def transcript_parts(self) -> TranscriptParts:
@@ -234,24 +215,24 @@ class HGVSDisplay:
             return get_transcript_id_and_version(self.transcript)
         return TranscriptParts(identifier=None, version=None)
 
-    def diff(self, other: 'HGVSDisplay') -> CHGVSDiff:
-        cdiff = CHGVSDiff.SAME
+    def diff(self, other: 'HGVSDisplay') -> HGVSDiff:
+        hgvs_diff = HGVSDiff.SAME
         my_tran = self.transcript_parts
         o_tran = other.transcript_parts
         if my_tran.identifier != o_tran.identifier:
-            cdiff = cdiff | CHGVSDiff.DIFF_TRANSCRIPT_ID
+            hgvs_diff = hgvs_diff | HGVSDiff.DIFF_TRANSCRIPT_ID
         elif my_tran.version and o_tran.version and my_tran.version != o_tran.version:
             # no version compared to a version should not raise a diff as some labs don't provide any versions
-            cdiff = cdiff | CHGVSDiff.DIFF_TRANSCRIPT_VER
+            hgvs_diff = hgvs_diff | HGVSDiff.DIFF_TRANSCRIPT_VER
 
-        if self.gene and other.gene:
-            if self.gene.lower() != other.gene.lower():
-                cdiff = cdiff | CHGVSDiff.DIFF_GENE
+        if self.gene_symbol and other.gene_symbol:
+            if self.gene_symbol.lower() != other.gene_symbol.lower():
+                hgvs_diff = hgvs_diff | HGVSDiff.DIFF_GENE
 
-        if self.raw_c != other.raw_c:
-            if c_dot_equivalent(self.raw_c, other.raw_c):
-                cdiff = cdiff | CHGVSDiff.DIFF_RAW_CGVS_EXPANDED
+        if self.nomen != other.nomen:
+            if hgvs_nomen_equivalent(self.nomen, other.nomen):
+                hgvs_diff = hgvs_diff | HGVSDiff.DIFF_NOMEN_EXPANDED
             else:
-                cdiff = cdiff | CHGVSDiff.DIFF_RAW_CGVS
+                hgvs_diff = hgvs_diff | HGVSDiff.DIFF_NOMEN
 
-        return cdiff
+        return hgvs_diff

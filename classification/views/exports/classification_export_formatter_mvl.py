@@ -204,11 +204,11 @@ class MVLEntry(ExportRow):
 
     @export_column("c_nomen", categories={"format": "tsv"})
     def c_nomen_tsv(self):
-        return self.data.chgvs.raw_c
+        return self.data.chgvs.nomen
 
     @export_column("cNomen", categories={"format": "json"})
     def c_nomen_json(self):
-        return self.data.chgvs.raw_c
+        return self.data.chgvs.nomen
 
     @export_column(categories={"format": "json"})
     def gene(self):

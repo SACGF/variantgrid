@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 # new ID should exclude transcript version and gene symbol
                 # only include genome_build if it's not GRCh38
 
-                c_dot_normal = c_hgvs.c_dot
+                c_dot_normal = c_hgvs.nomen
                 if m := re_nucleotides.match(c_dot_normal):
                     c_dot_normal = m.group(1)
                 c_dot_normal = c_dot_normal.replace("c.-", "c_minus")

@@ -78,7 +78,7 @@ class ClassificationConditionResolutionRow(ExportRow):
 
     @export_column('c.HGVS')
     def c_hgvs(self):
-        return self.vc.c_parts.full_c_hgvs
+        return self.vc.c_parts.full_hgvs
 
     @export_column("Classification")
     def classification_value(self):

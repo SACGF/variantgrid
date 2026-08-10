@@ -12,9 +12,9 @@ from django.test import TestCase
 from genes.gene_matching import tokenize_gene_symbols
 from genes.hgvs.hgvs import (
     HGVSDisplay,
-    CHGVSDiff,
-    c_dot_equivalent,
-    chgvs_diff_description,
+    HGVSDiff,
+    hgvs_nomen_equivalent,
+    hgvs_diff_description,
 )
 from genes.hgvs.phgvs import PHGVS
 from genes.models import TranscriptVersion
@@ -123,27 +123,27 @@ class TestHGVSDisplayInit(TestCase):
     def test_basic_parse_with_gene(self):
         c = HGVSDisplay("NM_001145661.2(GATA2):c.1121G>A")
         self.assertEqual(c.transcript, "NM_001145661.2")
-        self.assertEqual(c.gene, "GATA2")
-        self.assertEqual(c.raw_c, "c.1121G>A")
+        self.assertEqual(c.gene_symbol, "GATA2")
+        self.assertEqual(c.nomen, "c.1121G>A")
 
     def test_basic_parse_no_gene(self):
         c = HGVSDisplay("NM_001145661.2:c.1121G>A")
         self.assertEqual(c.transcript, "NM_001145661.2")
-        self.assertIsNone(c.gene)
-        self.assertEqual(c.raw_c, "c.1121G>A")
+        self.assertIsNone(c.gene_symbol)
+        self.assertEqual(c.nomen, "c.1121G>A")
 
     def test_uppercase_kind_not_matched(self):
         # HGVS_REGEX requires lowercase kind letter (c. not C.)
         # Uppercase kind silently falls through: no gene/transcript extracted.
         c = HGVSDisplay("NM_001:C.123A>G")
-        # raw_c should be the full string (no match)
+        # nomen should be the full string (no match)
         self.assertIsNone(c.transcript)
 
     def test_versioned_transcript_param_overrides(self):
         """Versioned transcript param takes precedence over HGVS string transcript."""
         c = HGVSDisplay("NM_001.5(BRCA1):c.123A>G", transcript="NM_009.3")
         self.assertEqual(c.transcript, "NM_009.3")
-        self.assertEqual(c.gene, "BRCA1")
+        self.assertEqual(c.gene_symbol, "BRCA1")
 
     def test_unversioned_transcript_param_replaced_by_hgvs_string(self):
         """An unversioned transcript param is overwritten by the HGVS string's transcript."""
@@ -212,52 +212,52 @@ class TestHGVSDisplayDiff(TestCase):
     def test_identical_same(self):
         a = HGVSDisplay("NM_001.2(BRCA1):c.123A>G")
         b = HGVSDisplay("NM_001.2(BRCA1):c.123A>G")
-        self.assertEqual(a.diff(b), CHGVSDiff.SAME)
+        self.assertEqual(a.diff(b), HGVSDiff.SAME)
 
     def test_diff_transcript_id(self):
         a = HGVSDisplay("NM_001.2:c.123A>G")
         b = HGVSDisplay("NM_002.2:c.123A>G")
-        self.assertIn(CHGVSDiff.DIFF_TRANSCRIPT_ID, a.diff(b))
-        self.assertNotIn(CHGVSDiff.DIFF_TRANSCRIPT_VER, a.diff(b))
+        self.assertIn(HGVSDiff.DIFF_TRANSCRIPT_ID, a.diff(b))
+        self.assertNotIn(HGVSDiff.DIFF_TRANSCRIPT_VER, a.diff(b))
 
     def test_diff_transcript_ver_both_have_versions(self):
         a = HGVSDisplay("NM_001.2:c.123A>G")
         b = HGVSDisplay("NM_001.5:c.123A>G")
         diff = a.diff(b)
-        self.assertIn(CHGVSDiff.DIFF_TRANSCRIPT_VER, diff)
-        self.assertNotIn(CHGVSDiff.DIFF_TRANSCRIPT_ID, diff)
+        self.assertIn(HGVSDiff.DIFF_TRANSCRIPT_VER, diff)
+        self.assertNotIn(HGVSDiff.DIFF_TRANSCRIPT_ID, diff)
 
     def test_diff_gene_case_insensitive_not_flagged(self):
         a = HGVSDisplay("NM_001.2(BRCA1):c.123A>G")
         b = HGVSDisplay("NM_001.2(brca1):c.123A>G")
         diff = a.diff(b)
-        self.assertNotIn(CHGVSDiff.DIFF_GENE, diff)
+        self.assertNotIn(HGVSDiff.DIFF_GENE, diff)
 
     def test_diff_gene_actually_different(self):
         a = HGVSDisplay("NM_001.2(BRCA1):c.123A>G")
         b = HGVSDisplay("NM_001.2(BRCA2):c.123A>G")
-        self.assertIn(CHGVSDiff.DIFF_GENE, a.diff(b))
+        self.assertIn(HGVSDiff.DIFF_GENE, a.diff(b))
 
     def test_diff_gene_missing_on_one_side_not_flagged(self):
-        # One side has no gene → guard `if self.gene and other.gene` prevents DIFF_GENE
+        # One side has no gene symbol → guard in diff() prevents DIFF_GENE
         a = HGVSDisplay("NM_001.2(BRCA1):c.123A>G")
         b = HGVSDisplay("NM_001.2:c.123A>G")
-        self.assertNotIn(CHGVSDiff.DIFF_GENE, a.diff(b))
+        self.assertNotIn(HGVSDiff.DIFF_GENE, a.diff(b))
 
-    def test_diff_raw_cgvs_significant(self):
+    def test_diff_nomen_significant(self):
         a = HGVSDisplay("NM_001.2:c.123A>G")
         b = HGVSDisplay("NM_001.2:c.456A>G")
         diff = a.diff(b)
-        self.assertIn(CHGVSDiff.DIFF_RAW_CGVS, diff)
-        self.assertNotIn(CHGVSDiff.DIFF_RAW_CGVS_EXPANDED, diff)
+        self.assertIn(HGVSDiff.DIFF_NOMEN, diff)
+        self.assertNotIn(HGVSDiff.DIFF_NOMEN_EXPANDED, diff)
 
-    def test_diff_raw_cgvs_expanded_explicit_implicit(self):
+    def test_diff_nomen_expanded_explicit_implicit(self):
         # "c.123del" vs "c.123delA" → only expanded diff, not significant
         a = HGVSDisplay("NM_001.2:c.123del")
         b = HGVSDisplay("NM_001.2:c.123delA")
         diff = a.diff(b)
-        self.assertIn(CHGVSDiff.DIFF_RAW_CGVS_EXPANDED, diff)
-        self.assertNotIn(CHGVSDiff.DIFF_RAW_CGVS, diff)
+        self.assertIn(HGVSDiff.DIFF_NOMEN_EXPANDED, diff)
+        self.assertNotIn(HGVSDiff.DIFF_NOMEN, diff)
 
     def test_diff_symmetric(self):
         a = HGVSDisplay("NM_001.2:c.123A>G")
@@ -268,61 +268,61 @@ class TestHGVSDisplayDiff(TestCase):
         a = HGVSDisplay("NM_001.2(BRCA1):c.123A>G")
         b = HGVSDisplay("NM_001.5(BRCA2):c.456T>C")
         diff = a.diff(b)
-        self.assertIn(CHGVSDiff.DIFF_TRANSCRIPT_VER, diff)
-        self.assertIn(CHGVSDiff.DIFF_GENE, diff)
-        self.assertIn(CHGVSDiff.DIFF_RAW_CGVS, diff)
+        self.assertIn(HGVSDiff.DIFF_TRANSCRIPT_VER, diff)
+        self.assertIn(HGVSDiff.DIFF_GENE, diff)
+        self.assertIn(HGVSDiff.DIFF_NOMEN, diff)
 
 
 # ---------------------------------------------------------------------------
-# c_dot_equivalent()
+# hgvs_nomen_equivalent()
 # ---------------------------------------------------------------------------
 
 class TestHGVSDisplayCDotEquivalent(TestCase):
 
     def test_identical_strings(self):
-        self.assertTrue(c_dot_equivalent("c.123del", "c.123del"))
+        self.assertTrue(hgvs_nomen_equivalent("c.123del", "c.123del"))
 
     def test_del_explicit_vs_implicit_equivalent(self):
-        self.assertTrue(c_dot_equivalent("c.123del", "c.123delA"))
+        self.assertTrue(hgvs_nomen_equivalent("c.123del", "c.123delA"))
 
     def test_del_count_vs_explicit_match(self):
-        self.assertTrue(c_dot_equivalent("c.123del3", "c.123delACG"))
+        self.assertTrue(hgvs_nomen_equivalent("c.123del3", "c.123delACG"))
 
     def test_del_count_vs_explicit_mismatch(self):
-        self.assertFalse(c_dot_equivalent("c.123del3", "c.123delAC"))
+        self.assertFalse(hgvs_nomen_equivalent("c.123del3", "c.123delAC"))
 
     def test_del_count_vs_count_different(self):
-        self.assertFalse(c_dot_equivalent("c.123del3", "c.123del4"))
+        self.assertFalse(hgvs_nomen_equivalent("c.123del3", "c.123del4"))
 
     def test_del_different_positions(self):
-        self.assertFalse(c_dot_equivalent("c.123del", "c.456del"))
+        self.assertFalse(hgvs_nomen_equivalent("c.123del", "c.456del"))
 
     def test_del_vs_dup_not_equivalent(self):
-        self.assertFalse(c_dot_equivalent("c.123del", "c.123dup"))
+        self.assertFalse(hgvs_nomen_equivalent("c.123del", "c.123dup"))
 
     def test_dup_explicit_vs_implicit(self):
-        self.assertTrue(c_dot_equivalent("c.123dup", "c.123dupA"))
+        self.assertTrue(hgvs_nomen_equivalent("c.123dup", "c.123dupA"))
 
     def test_ins_explicit_vs_implicit(self):
         # "c.123_124ins" vs "c.123_124insATG" — one has no sequence (implicit)
-        self.assertTrue(c_dot_equivalent("c.123_124ins", "c.123_124insATG"))
+        self.assertTrue(hgvs_nomen_equivalent("c.123_124ins", "c.123_124insATG"))
 
     def test_ins_count_vs_explicit(self):
-        self.assertTrue(c_dot_equivalent("c.123_124ins3", "c.123_124insATG"))
+        self.assertTrue(hgvs_nomen_equivalent("c.123_124ins3", "c.123_124insATG"))
 
     def test_ins_count_vs_explicit_mismatch(self):
-        self.assertFalse(c_dot_equivalent("c.123_124ins4", "c.123_124insATG"))
+        self.assertFalse(hgvs_nomen_equivalent("c.123_124ins4", "c.123_124insATG"))
 
     def test_delins_vs_del_not_equivalent(self):
         # One is delins (has ins portion), other is plain del → not equivalent
-        self.assertFalse(c_dot_equivalent("c.123del", "c.123delinsATG"))
+        self.assertFalse(hgvs_nomen_equivalent("c.123del", "c.123delinsATG"))
 
     def test_snp_different(self):
-        self.assertFalse(c_dot_equivalent("c.123A>G", "c.123A>T"))
+        self.assertFalse(hgvs_nomen_equivalent("c.123A>G", "c.123A>T"))
 
     def test_one_none_input(self):
         # One None → regex won't match → falls to final return False
-        self.assertFalse(c_dot_equivalent("c.123del", None))
+        self.assertFalse(hgvs_nomen_equivalent("c.123del", None))
 
 
 # ---------------------------------------------------------------------------
@@ -594,24 +594,24 @@ class TestTranscriptVersionTags(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# chgvs_diff_description()
+# hgvs_diff_description()
 # ---------------------------------------------------------------------------
 
 class TestChgvsDiffDescription(TestCase):
 
     def test_same_returns_empty(self):
-        self.assertEqual(chgvs_diff_description(CHGVSDiff.SAME), [])
+        self.assertEqual(hgvs_diff_description(HGVSDiff.SAME), [])
 
     def test_expanded_excluded_without_include_minor(self):
-        desc = chgvs_diff_description(CHGVSDiff.DIFF_RAW_CGVS_EXPANDED, include_minor=False)
+        desc = hgvs_diff_description(HGVSDiff.DIFF_NOMEN_EXPANDED, include_minor=False)
         self.assertEqual(desc, [])
 
     def test_expanded_included_with_include_minor(self):
-        desc = chgvs_diff_description(CHGVSDiff.DIFF_RAW_CGVS_EXPANDED, include_minor=True)
+        desc = hgvs_diff_description(HGVSDiff.DIFF_NOMEN_EXPANDED, include_minor=True)
         self.assertTrue(len(desc) > 0)
 
     def test_combined_flags_produces_multiple_descriptions(self):
-        combined = CHGVSDiff.DIFF_TRANSCRIPT_VER | CHGVSDiff.DIFF_GENE
-        desc = chgvs_diff_description(combined)
+        combined = HGVSDiff.DIFF_TRANSCRIPT_VER | HGVSDiff.DIFF_GENE
+        desc = hgvs_diff_description(combined)
         self.assertEqual(len(desc), 2)
 

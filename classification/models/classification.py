@@ -1601,14 +1601,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 c_parts_cell = patch[SpecialEKeys.C_HGVS]
                 c_hgvs = c_parts_cell.value
                 if c_hgvs:
-                    c_parts = HGVSDisplay(full_c_hgvs=c_hgvs)
+                    c_parts = HGVSDisplay(full_hgvs=c_hgvs)
                     transcript = c_parts.transcript
-                    gene_symbol = c_parts.gene
+                    gene_symbol = c_parts.gene_symbol
 
                     # upper case gene symbol if it's not already
                     if gene_symbol and gene_symbol != gene_symbol.upper():
                         gene_symbol = gene_symbol.upper()
-                        c_parts_cell.value = c_parts.with_gene_symbol(gene_symbol).full_c_hgvs
+                        c_parts_cell.value = c_parts.with_gene_symbol(gene_symbol).full_hgvs
 
                     if transcript:
                         transcript_key = SpecialEKeys.REFSEQ_TRANSCRIPT_ID
@@ -1628,7 +1628,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     elif not gene_symbol and gene_symbol_cell.value:
                         # if gene symbol provided (but not in c.hgvs) inject it into it
                         c_parts = c_parts.with_gene_symbol(gene_symbol_cell.value)
-                        c_parts_cell.value = c_parts.full_c_hgvs
+                        c_parts_cell.value = c_parts.full_hgvs
 
         # if submitting via API treat null as {value:None, explain:None, notes:None} for known keys,
         # so we clear out any previous values but still retain immutability
@@ -2167,7 +2167,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         all_chgvs: list[HGVSDisplay] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_c_hgvs(genome_build):
-                chgvs = HGVSDisplay(full_c_hgvs=text)
+                chgvs = HGVSDisplay(full_hgvs=text)
                 chgvs.genome_build = genome_build
                 chgvs.is_normalised = True
                 all_chgvs.append(chgvs)

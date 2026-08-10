@@ -172,13 +172,13 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
             data: dict[str, Any]
             c_hgvs = HGVSDisplay(c_hgvs_str)
-            if c_hgvs.raw_c != c_hgvs.full_c_hgvs:
+            if c_hgvs.nomen != c_hgvs.full_hgvs:
                 data = {
                     "allele_origin_bucket": row["allele_origin_bucket"],
                     "genome_build": genome_build,
                     "transcript": c_hgvs.transcript,
                     "gene_symbol": c_hgvs.gene_symbol,
-                    "variant": c_hgvs.raw_c,
+                    "variant": c_hgvs.nomen,
                     "always_show_genome_build": True
                     # below row makes this link to the variant, but probably not desired action
                     # "variantId": row["classification_based_on__classification__variant"]

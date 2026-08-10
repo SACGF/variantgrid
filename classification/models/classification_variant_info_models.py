@@ -23,7 +23,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from genes.hgvs import HGVSDisplay, CHGVSDiff, HGVSConverterType, HGVSMatcher, chgvs_diff_description
+from genes.hgvs import HGVSDisplay, HGVSDiff, HGVSConverterType, HGVSMatcher, hgvs_diff_description
 from genes.models import GeneSymbol, NoTranscript, Transcript, TranscriptVersion
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
@@ -412,10 +412,10 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
 
 
 _DIFF_TO_VALIDATION_KEY = {
-    CHGVSDiff.DIFF_TRANSCRIPT_ID: 'transcript_id_change',
-    CHGVSDiff.DIFF_TRANSCRIPT_VER: 'transcript_version_change',
-    CHGVSDiff.DIFF_GENE: 'gene_symbol_change',
-    CHGVSDiff.DIFF_RAW_CGVS: 'c_nomen_change'
+    HGVSDiff.DIFF_TRANSCRIPT_ID: 'transcript_id_change',
+    HGVSDiff.DIFF_TRANSCRIPT_VER: 'transcript_version_change',
+    HGVSDiff.DIFF_GENE: 'gene_symbol_change',
+    HGVSDiff.DIFF_NOMEN: 'c_nomen_change'
 }
 
 
@@ -573,7 +573,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         if lifted := self.variant_info_for_lifted_over_genome_build:
             lifted_c_hgvs = lifted.c_hgvs_obj
 
-        def calculate_diff_dict(c_hgvs_diff: CHGVSDiff, severity: Optional[ALLELE_INFO_VALIDATION_SEVERITY] = None) -> ImportedAlleleValidationTagsDiff:
+        def calculate_diff_dict(c_hgvs_diff: HGVSDiff, severity: Optional[ALLELE_INFO_VALIDATION_SEVERITY] = None) -> ImportedAlleleValidationTagsDiff:
             diff_dict: ImportedAlleleValidationTagsDiff = {}
             for diff_flag, field_name in _DIFF_TO_VALIDATION_KEY.items():
                 if c_hgvs_diff & diff_flag:
@@ -865,7 +865,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             new_chgvs_obj = HGVSDisplay(new_chgvs)
             if original_chgvs_obj.transcript and new_chgvs_obj.transcript:
                 c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
-                return chgvs_diff_description(c_hgvs_diffs, include_minor=True)
+                return hgvs_diff_description(c_hgvs_diffs, include_minor=True)
 
         def is_c_hgvs_same_as_imported(genome_build: GenomeBuild, new_chgvs: str) -> bool:
             nonlocal self
@@ -874,7 +874,7 @@ class ImportedAlleleInfo(TimeStampedModel):
                 new_chgvs_obj = HGVSDisplay(new_chgvs)
                 if original_chgvs_obj and original_chgvs_obj.transcript and new_chgvs_obj.transcript:
                     c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
-                    if not bool(chgvs_diff_description(c_hgvs_diffs, include_minor=False)):
+                    if not bool(hgvs_diff_description(c_hgvs_diffs, include_minor=False)):
                         return True
             return False
 

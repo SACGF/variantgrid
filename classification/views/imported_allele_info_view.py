@@ -15,7 +15,7 @@ from classification.models import (
     ImportedAlleleInfoStatus,
 )
 from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
-from genes.hgvs import HGVSDisplay, CHGVSDiff, chgvs_diff_description
+from genes.hgvs import HGVSDisplay, HGVSDiff, hgvs_diff_description
 from library.django_utils import get_url_from_view_path, require_superuser
 from library.utils import ExportRow, MultiDiff, MultiDiffInput, export_column
 from library.utils.django_utils import render_ajax_view
@@ -269,8 +269,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     if not allele_info.imported_c_hgvs:
         diff_output = [None] + diff_output
 
-    normalized_diff: Optional[CHGVSDiff] = None
-    liftover_diff: Optional[CHGVSDiff] = None
+    normalized_diff: Optional[HGVSDiff] = None
+    liftover_diff: Optional[HGVSDiff] = None
     if imported_c_hgvs := allele_info.imported_c_hgvs_obj:
         if normalized := allele_info.variant_info_for_imported_genome_build:
             if c_hgvs := normalized.c_hgvs_obj:
@@ -286,8 +286,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "g_hgvs_label": f"Imported g.HGVS ({allele_info.imported_genome_build_patch_version})",
         "c_hgvses": diff_output,
         "c_hgvs_resolved_variant_info": c_hgvs_resolved_variant_info,
-        "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
-        "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
+        "normalized_diff": hgvs_diff_description(normalized_diff) if normalized_diff else None,
+        "liftover_diff": hgvs_diff_description(liftover_diff) if liftover_diff else None,
         "variant_coordinate_label": f"Variant Coordinate (from HGVS resolution) ({allele_info.imported_genome_build_patch_version})",
         "variant_coordinate_normalized_label": f"Variant Coordinate Normalized ({allele_info.imported_genome_build_patch_version})",
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
