@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db.models import CASCADE, QuerySet, SET_NULL, JSONField
 from django.db import models
 from django.db.models.enums import IntegerChoices
+from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
@@ -22,7 +23,7 @@ from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import first, AuditUtils, AuditSingleChange
 from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
-from review.models import ReviewableModelMixin, Review
+from review.models import ReviewableModelMixin, Review, review_detail_signal
 from snpdb.models import Allele, Lab, GenomeBuild, LabLike, CLINVAR_EXPERT_PANEL_LAB
 
 
@@ -333,6 +334,10 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     @cached_property
     def contributions_list(self) -> list[OverlapContribution]:
         return list(sorted(self.contributions.all()))
+
+    @property
+    def has_outstanding_triages(self) -> bool:
+        return self.contributions.filter(classification_grouping__isnull=False).exclude(triage_state__status=TriageStatus.PENDING).exists()
 
     class Meta:
         indexes = [models.Index(fields=['overlap_type']), models.Index(fields=['value_type']), models.Index(fields=['allele'])]

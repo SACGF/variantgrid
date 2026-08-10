@@ -36,6 +36,7 @@ from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
 from ontology.models import OntologyTerm
+from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, LabLike
 from snpdb.models.models_genome import GenomeBuild
@@ -666,6 +667,11 @@ def condition(condition_obj: Union[OntologyTerm, ConditionResolved, dict],
 @register.inclusion_tag("classification/tags/discordance_report.html")
 def discordance_report(discordance_report: DiscordanceReport):
     return {"discordance_report": discordance_report}
+
+
+@register.inclusion_tag("classification/tags/review.html")
+def review(review: Review, edit: bool=False):
+    return {"review": review, edit:edit}
 
 
 @register.inclusion_tag("classification/tags/discordance_report_row.html")

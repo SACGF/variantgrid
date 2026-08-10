@@ -120,6 +120,9 @@ class ReviewForm(Form):
 
 def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelMixin] = None):
 
+    if reviewing is None:
+        reviewing = review.reviewing.source_object
+
     discussion_form: Optional[ReviewForm]
     if request.method == "POST":
         discussion_form = ReviewForm(review=review, data=request.POST)
@@ -135,9 +138,8 @@ def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelM
         discussion_form = ReviewForm(review=review, initial=initial)
 
     return render(request, 'review/review.html', {
-        'reviewing': reviewing if reviewing else review.reviewing,
+        'reviewing': reviewing,
         'review': review,
-        'mode': 'edit',
         'form': discussion_form
     })
 
@@ -155,6 +157,9 @@ def edit_review(request, review_id: int):
     review = Review.objects.get(pk=review_id)
     review.check_can_view(request.user)
 
+    if review.is_complete or review.reviewing.source_object.is_review_locked:
+        return view_discussion_detail(request, review_id)
+
     return _handle_review(request=request, review=review)
 
 
@@ -163,9 +168,7 @@ def view_discussion_detail(request, review_id: int):
     review.check_can_view(request.user)
     return render_ajax_view(request, 'review/review_detail.html', {
         "review": review,
-        # DISCORDANCE-DEPRECATION
         "edit": request.GET.get("edit") == "true" and not review.reviewing.source_object.is_review_locked,
-        "edit": False,
         "show_source_object": request.GET.get("show_source_object") != "false",
         "show_outcome": request.GET.get("show_outcome") != "false"
     })

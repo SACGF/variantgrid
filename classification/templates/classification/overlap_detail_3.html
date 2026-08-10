@@ -49,28 +49,35 @@
         {% endfor %}
         {% comment %}Add a warning if ClinVar is in the list of labs, they wont be diffed{% endcomment %}
     {% endlabelled %}
-    {% labelled label="Reviews" %}
-        {% for review in overlap_grouping.overlap.reviews_all %}
-            <div>
-                <a href="{% url 'edit_review' review.pk %}">Reviewed - {% timestamp review.review_date %} ({% if review.is_complete %}Complete{% else %}Ongoing{% endif %})</a>
-            </div>
-        {% endfor %}
-        <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i> Start Discordance Discussion</a>
-    {% endlabelled %}
     {% if overlap_grouping.discordance_reports %}
         {% labelled label="Legacy Discordance Reports" %}
             {% for discordance_report in overlap_grouping.discordance_reports %}
-                <div>{% discordance_report discordance_report %}</div>
+                <div class="my-1">{% discordance_report discordance_report %}</div>
             {% endfor %}
         {% endlabelled %}
     {% endif %}
     {% if overlap_grouping.legacy_reviews %}
-        {% labelled label="Legacy Reviews" %}
+        {% labelled label="Legacy Multi-Lab Discussions" %}
             {% for review in overlap_grouping.legacy_reviews %}
-                <div><a href="{{ review.get_absolute_url }}" class="hover-link">Review on {{ review.review_date }}</a></div>
+                <div class="my-1">{% review review %}</div>
             {% endfor %}
         {% endlabelled %}
     {% endif %}
+    {% labelled label="Multi-Lab Discussions" %}
+        {% for review in overlap_grouping.overlap.reviews_all %}
+            <div class="my-1">
+                {% review review edit=True %}
+            </div>
+        {% endfor %}
+        <div {% if overlap_grouping.overlap.has_reviews %}class="mt-2"{% endif %}>
+        {% if overlap_grouping.overlap.has_outstanding_triages %}
+            Still waiting on all labs to triage. <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}">Click here</a> to discuss anyway.
+        {% else %}
+            <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i> Start Multi-Lab Discussion Discussion</a>
+        {% endif %}
+        </div>
+    {% endlabelled %}
+
     {% if user.is_superuser %}
         {% labelled label="Overlap Admin" %}{% admin_link overlap_grouping.overlap %}{% endlabelled %}
     {% endif %}

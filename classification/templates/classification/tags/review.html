@@ -1,0 +1,5 @@
+{% load js_tags %}
+<div style="{% if review.is_complete %}opacity:0.5{% endif %}">
+    <i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i>
+    <a href="{% url 'edit_review' review.pk %}{% if edit %}?edit=true{% endif %}">Reviewed - {% timestamp review.review_date text_only=True %} ({% if review.is_complete %}Complete{% else %}Ongoing{% endif %})</a>
+</div>

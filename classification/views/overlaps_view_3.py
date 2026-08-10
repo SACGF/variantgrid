@@ -210,12 +210,13 @@ def overlap_report_review(request: HttpRequest, overlap_id: int) -> HttpResponse
 
     overlap = Overlap.objects.get(pk=overlap_id)
 
-    if existing := overlap.reviews_all().first():
-        return redirect(reverse('edit_review', kwargs={"review_id": existing.pk}))
-    else:
-        reviewed_object = overlap.reviews_safe
-        return redirect(reverse('start_review',
-                                kwargs={"reviewed_object_id": reviewed_object.pk, "topic_id": "discordance_report"}))
+    # TODO, we have just provided a link to previous reviews, wouldn't resume them
+    # if existing := overlap.reviews_all().first():
+    #     return redirect(reverse('edit_review', kwargs={"review_id": existing.pk}))
+    # else:
+    reviewed_object = overlap.reviews_safe
+    return redirect(reverse('start_review',
+                            kwargs={"reviewed_object_id": reviewed_object.pk, "topic_id": "discordance_report"}))
 
 
 def discordance_calculator(request: HttpRequest) -> HttpResponseBase:
@@ -248,7 +249,7 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
                 user=request.user
             )
         elif action == "change":
-            changes_dict = {}
+            changes_dict = []
             for contribution in overlap.contributions_list:
                 if contribution.triage_state_obj.status == TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
                     continue
@@ -263,8 +264,11 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
                             contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_SATISFACTORY)
                         else:
                             contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_WILL_FIX, updated_value)
-
-                        changes_dict[f"{contribution.lab}"] = f"{old_effective_value} -> {updated_value}"
+                        changes_dict.append({
+                            "lab": contribution.lab.group_name,
+                            "from": old_effective_value,
+                            "to": updated_value
+                        })
 
                         contribution.comment_obj = contribution.comment_obj.next_comment("Marked as update after review - see attached review for more details")
                     # save the reviewed value if nothing else
@@ -274,9 +278,9 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
             OverlapServices.update_skews(overlap)
             OverlapServices.recalc_overlap(overlap)
 
-            resolution = overlap.overlap_status.label
+            updated_resolution = overlap.overlap_status
             review.complete_with_data_and_save({
-                "outcome": resolution,
+                "outcome": "discordant" if updated_resolution.is_discordant else "resolved",
                 "changes": changes_dict
             })
             log_admin_change(
@@ -284,10 +288,6 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
                 message=review.as_json(),
                 user=review.user
             )
-
-            if overlap.overlap_status.is_discordant:
-                # FIXME have to setup the overlap as some kind of ongoing
-                pass
 
         else:
             raise ValueError(f"Unsupported action \"{action}\"")

@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Union, Type
-
+import json
 import django.dispatch
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied
@@ -243,6 +243,7 @@ class Review(TimeStampedModel):
     def post_review_data_formatted(self) -> str:
         for caller, result in review_detail_signal.send(sender=self.reviewing.source_object.__class__, instance=self):
             return result
+        return json.dumps(self.post_review_data)
 
     def complete_with_data_and_save(self, data: dict):
         self.post_review_data = data
@@ -281,6 +282,12 @@ class ReviewableModelMixin(models.Model):
             return reviews.review_set.order_by('-review_date').all()
         else:
             return Review.objects.none()
+
+    @cached_property
+    def has_reviews(self) -> bool:
+        if reviews := self.reviews:
+            return reviews.review_set.exists()
+        return False
 
     @property
     def is_review_locked(self) -> bool:
