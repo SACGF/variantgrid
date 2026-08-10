@@ -8,11 +8,11 @@ T2T-CHM13v2.0 support (issue #1131).
 
 The script reads the header of a dbNSFP variant file to look up column indices
 by name (so it survives dbNSFP version changes that reorder/add columns), then
-emits a shell pipeline that uses ``cut`` / ``awk`` / ``sort`` / ``bgzip`` /
-``tabix`` to do the actual work (much faster than streaming through Python).
-
-The ``awk`` stage collapses the transcript-parallel fields in
-``COLLAPSE_COLUMNS`` to their distinct values — see that constant for why.
+emits a shell pipeline that uses ``cut`` / ``sort`` / ``bgzip`` / ``tabix`` for
+the bulk work, with one row-by-row stage handled by re-invoking this script as
+``--filter``. That stage drops rows unmapped in the target build and collapses
+the transcript-parallel fields in ``COLLAPSE_COLUMNS`` to their distinct values
+— see that constant for why.
 
 Modes:
 * ``--sorted``: pass a single, already-sorted concatenated file (e.g. the
@@ -114,60 +114,47 @@ COLLAPSE_COLUMNS = {
     "MutPred2_top5_mechanisms": False,  # "|" separates the ranked top 5, so keep entries intact
 }
 
-DEDUP_AWK = """BEGIN {
-    FS = OFS = "\\t"
-    n = split(PIPE_COLS, cols, ",")
-    for (i = 1; i <= n; i++) pipe_col[cols[i] + 0] = 1
-    n = split(ENTRY_COLS, cols, ",")
-    for (i = 1; i <= n; i++) entry_col[cols[i] + 0] = 1
-}
+MISSING = "."
 
-$1 ~ /^#/ { print; next }
 
-{
-    for (c in pipe_col) $c = collapse($c, 1)
-    for (c in entry_col) $c = collapse($c, 0)
-    print
-}
+def collapse(value: str, split_pipe: bool) -> str:
+    """ Distinct values of a ";"-separated array, first-seen order, dropping the "." dbNSFP uses
+        for missing. split_pipe also splits each entry on "|" and rejoins on it. """
+    if value in (MISSING, ""):
+        return MISSING
+    if ";" not in value and not (split_pipe and "|" in value):
+        return value
 
-function trim(s) {
-    gsub(/^[ \\t]+/, "", s)
-    gsub(/[ \\t]+$/, "", s)
-    return s
-}
+    entries = value.split(";")
+    if split_pipe:
+        entries = [token for entry in entries for token in entry.split("|")]
+    distinct = dict.fromkeys(t for t in (e.strip() for e in entries) if t and t != MISSING)
+    if not distinct:
+        return MISSING
+    return ("|" if split_pipe else ";").join(distinct)
 
-# Distinct values of a ";"-separated array, first-seen order, dropping the "." dbNSFP uses for
-# missing. split_pipe also splits each entry on "|" and rejoins on it.
-function collapse(v, split_pipe,    n, m, i, j, a, b, tok, out, cnt, sep) {
-    if (v == "." || v == "") return "."
-    if (index(v, ";") == 0 && !(split_pipe && index(v, "|"))) return v
 
-    delete seen
-    out = ""
-    cnt = 0
-    sep = split_pipe ? "|" : ";"
-    n = split(v, a, ";")
-    for (i = 1; i <= n; i++) {
-        if (split_pipe) {
-            m = split(a[i], b, "|")
-            for (j = 1; j <= m; j++) {
-                tok = trim(b[j])
-                if (tok != "" && tok != "." && !(tok in seen)) {
-                    seen[tok] = 1
-                    out = cnt++ ? out sep tok : tok
-                }
-            }
-        } else {
-            tok = trim(a[i])
-            if (tok != "" && tok != "." && !(tok in seen)) {
-                seen[tok] = 1
-                out = cnt++ ? out sep tok : tok
-            }
-        }
-    }
-    return cnt ? out : "."
-}
-"""
+def run_filter(pipe_cols: list[int], entry_cols: list[int], drop_missing_col: int | None):
+    """ Row-by-row stage of the generated pipeline: reads stdin, writes stdout. Column numbers are
+        1-based positions in the already-cut stream. """
+    collapse_cols = [(c - 1, True) for c in pipe_cols] + [(c - 1, False) for c in entry_cols]
+    drop_idx = drop_missing_col - 1 if drop_missing_col else None
+
+    write = sys.stdout.write
+    for line in sys.stdin:
+        if line.startswith("#"):
+            write(line)
+            continue
+        fields = line.rstrip("\n").split("\t")
+        if drop_idx is not None and fields[drop_idx] == MISSING:
+            continue
+        changed = False
+        for i, split_pipe in collapse_cols:
+            collapsed = collapse(fields[i], split_pipe)
+            if collapsed != fields[i]:
+                fields[i] = collapsed
+                changed = True
+        write("\t".join(fields) + "\n" if changed else line)
 
 
 def read_header(path: str) -> list[str]:
@@ -214,7 +201,7 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
     seq_col = post_cut_header.index(spec.chr_col) + 1
     pos_col = post_cut_header.index(spec.pos_col) + 1
 
-    # Post-cut positions of the columns the dedup awk rewrites
+    # Post-cut positions of the columns the filter stage collapses
     pipe_cols = []
     entry_cols = []
     for name, split_pipe in COLLAPSE_COLUMNS.items():
@@ -224,7 +211,9 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
     out_file = f"dbNSFP{version}_{spec.short}.stripped"
     out_gz = f"{out_file}.gz"
     header_file = f"dbnsfp_header_{spec.short}.txt"  # per-build, parallel-safe
-    dedup_awk_file = f"dbnsfp_dedup_{spec.short}.awk"
+
+    # Leading "#" makes tabix treat it as a comment; the dbNSFP plugin strips it back off
+    header_line = "#" + "\\t".join(post_cut_header)
 
     lines: list[str] = [
         "#!/bin/bash",
@@ -240,19 +229,7 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
         + "'",
         "",
         f"echo '[{build}] writing stripped header -> {header_file}'",
-        # Read just the first line via process substitution so when we close the
-        # pipe early, zcat's SIGPIPE doesn't trip `set -o pipefail` (it would if
-        # we used `zcat | head -n1 | ...`).
-        f"read -r _hdr < <(zcat {shlex.quote(files[0])})",
-        "printf '%s\\n' \"$_hdr\" \\",
-        f"    | cut -f {cut_arg} \\",
-        f"    | awk 'BEGIN{{OFS=\"\\t\"}}{{ $1=\"#\"$1; print }}' > {header_file}",
-        "",
-        f"echo '[{build}] writing dedup awk -> {dedup_awk_file} "
-        f"(collapsing {', '.join(COLLAPSE_COLUMNS)})'",
-        f"cat > {dedup_awk_file} <<'DEDUP_AWK_EOF'",
-        DEDUP_AWK.rstrip("\n"),
-        "DEDUP_AWK_EOF",
+        f"printf '%b\\n' {shlex.quote(header_line)} > {header_file}",
         "",
     ]
 
@@ -262,19 +239,20 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
     cut_cmd = f"cut -f {cut_arg}"
 
     # Runs before the sort so there is ~30% less data to sort
-    dedup_cmd = (f"awk -v PIPE_COLS={','.join(pipe_cols)} -v ENTRY_COLS={','.join(entry_cols)}"
-                 f" -f {dedup_awk_file}")
+    this_script = shlex.quote(os.path.abspath(__file__))
+    filter_cmd = (f"{shlex.quote(sys.executable)} {this_script} --filter"
+                  f" --pipe-cols {','.join(pipe_cols)} --entry-cols {','.join(entry_cols)}")
 
     if sorted_input:
         stage_desc = f"echo '[{build}] cutting columns + collapsing + bgzipping -> {out_gz}'"
-        pipeline += [cut_cmd, dedup_cmd]
+        pipeline += [cut_cmd, filter_cmd]
     else:
-        src_chr_idx = column_index(header, spec.chr_col)
-        awk_cmd = f"awk -F'\\t' '${src_chr_idx} != \".\"'"
+        # Rows with no mapping in this build carry "." in the chr column - drop them in the same pass
+        filter_cmd += f" --drop-missing-col {seq_col}"
         sort_cmd = f"sort -T \"$TMP_DIR\" -k{seq_col},{seq_col} -k{pos_col},{pos_col}n"
         stage_desc = (f"echo '[{build}] concat + collapse + sort + bgzip "
                       f"({len(files)} input files) -> {out_gz}'")
-        pipeline += [awk_cmd, cut_cmd, dedup_cmd, sort_cmd]
+        pipeline += [cut_cmd, filter_cmd, sort_cmd]
         lines += [
             f"TMP_DIR={shlex.quote(tmp_dir)}",
             'mkdir -p "$TMP_DIR"',
@@ -296,7 +274,31 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
     return "\n".join(lines) + "\n"
 
 
+def filter_main(argv: list[str]):
+    ap = argparse.ArgumentParser(
+        prog="dbnsfp_strip.py --filter",
+        description="Row-by-row stage of the generated pipeline (stdin -> stdout). Column numbers "
+                    "are 1-based positions in the already-cut stream."
+    )
+    ap.add_argument("--pipe-cols", default="", type=_column_list,
+                    help="Columns to collapse, also splitting/rejoining entries on '|'")
+    ap.add_argument("--entry-cols", default="", type=_column_list,
+                    help="Columns to collapse, keeping entries intact")
+    ap.add_argument("--drop-missing-col", type=int, default=None,
+                    help="Drop rows where this column is '.' (unmapped in this build)")
+    args = ap.parse_args(argv)
+    run_filter(args.pipe_cols, args.entry_cols, args.drop_missing_col)
+
+
+def _column_list(value: str) -> list[int]:
+    return [int(c) for c in value.split(",") if c]
+
+
 def main():
+    if sys.argv[1:2] == ["--filter"]:
+        filter_main(sys.argv[2:])
+        return
+
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--build", required=True, choices=GENOME_BUILDS,
