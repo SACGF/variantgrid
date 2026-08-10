@@ -15,14 +15,12 @@ Which we unfortunately see sometimes.
 import re
 import sys
 from collections import Counter
-from io import StringIO
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from vcf import Reader
 
 from library.genomics.vcf_enums import VCFColumns
-from library.genomics.vcf_utils import UnsortedVCFError, VCFSortChecker
+from library.genomics.vcf_utils import UnsortedVCFError, VCFSortChecker, vcf_header_filter_ids
 from snpdb.models import GenomeBuild, GenomeFasta
 
 
@@ -169,11 +167,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def _get_defined_vcf_filters(vcf_header_lines) -> set:
-        defined_filters = {"PASS"}
-        stream = StringIO("".join(vcf_header_lines))
-        reader = Reader(stream)
-        defined_filters.update(reader.filters.keys())
-        return defined_filters
+        return {"PASS"} | vcf_header_filter_ids(vcf_header_lines)
 
     @staticmethod
     def _write_unsorted_marker(filename, reason: str):
