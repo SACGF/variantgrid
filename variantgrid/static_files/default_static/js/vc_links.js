@@ -115,7 +115,8 @@ const VCLinks = (function() {
                 }
             }
 
-            links.push(this.generateBeacon());
+            // beacon-network.org no longer accepts connections, so don't offer the link
+            //links.push(this.generateBeacon());
             links.push(this.makeLink('cBioPortal (Gene)', 'https://www.cbioportal.org', '/ln?q=@@:MUT', SpecialEKeys.GENE_SYMBOL));
             links.push(this.makeLink('CIViC (Gene)', 'https://civicdb.org', '/links/entrez_name/@@', SpecialEKeys.GENE_SYMBOL));
             // not sure why, but this straight up doesn't work
