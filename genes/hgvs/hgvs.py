@@ -186,8 +186,14 @@ class HGVSComponents:
     def __hash__(self):
         return hash(self.full_hgvs)
 
+    @property
+    def sort_key(self) -> tuple[str, str]:
+        """ sort_str leaves out the gene symbol, so fall back to the whole string to keep
+            ordering total - callers take [0] of a sorted list to label things """
+        return self.sort_str, self.full_hgvs
+
     def __lt__(self, other):
-        return self.sort_str < other.sort_str
+        return self.sort_key < other.sort_key
 
     def __bool__(self):
         return bool(self.full_hgvs)
@@ -252,10 +258,10 @@ class HGVSDisplay:
         return normalised_prefix + self.components.sort_str
 
     @property
-    def sort_key(self) -> tuple[str, str]:
+    def sort_key(self) -> tuple[str, str, str]:
         """ The build breaks ties only between otherwise identical HGVS - appending it to sort_str
             instead would let a longer key win wherever a shorter one is a prefix of it """
-        return self.sort_str, self.genome_build.pk if self.genome_build else ""
+        return self.sort_str, self.genome_build.pk if self.genome_build else "", self.full_hgvs
 
     def __lt__(self, other):
         return self.sort_key < other.sort_key
