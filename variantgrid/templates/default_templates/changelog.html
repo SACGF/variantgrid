@@ -38,6 +38,8 @@
                     <li>Analysis grid - sample column labels can show patient name. Much faster CSV export when using canonical transcripts</li>
                     <li>More performance work - the node editor no longer waits for the grid, large nodes (over 50k variants by default)
                         don't auto-load their grid, and large grids no longer auto-sort</li>
+                    <li>Node CSV/VCF exports are generated in the background, with progress shown on the analysis toolbar so
+                        they survive clicking through to other nodes</li>
                 </ul>
 
                 <h4>Annotation</h4>
@@ -188,6 +190,8 @@
                 <ul>
                     <li>Grids throughout the site have been converted from jqGrid to DataTables (analysis, snpdb, annotation, pedigrees, seqauto)</li>
                     <li>Grid download filenames include a date suffix, and analysis exports record the node version</li>
+                    <li>Lab heads can add and remove members on their lab page</li>
+                    <li>Faster page loads - related data, ontology versions and contigs no longer run a query per row</li>
                 </ul>
 
                 <h4>Variant Details</h4>
@@ -220,6 +224,7 @@
                     <li>g.VCF files are handled properly, and "ref=N" is converted to the real reference sequence</li>
                     <li>Progress is shown while an uploaded VCF is being annotated</li>
                     <li>Manual variant entry import handles partial failures gracefully</li>
+                    <li>Unsorted VCFs are sorted during import (with a warning) rather than failing</li>
                 </ul>
             </div>
         </div>
@@ -228,23 +233,52 @@
 
     {% else %}
        <div class="card mt-4">
-            <div class="card-header">Unreleased</div>
+            <div class="card-header">10 August 2026</div>
             <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#940 - Trio / Quad node - compound het uses gene overlaps, so long structural variants can be a hit</li>
+                    <li>#579 - Damage node - filter frameshifts by premature termination codon / NMD escape</li>
+                    <li>#1257 - Node CSV / VCF exports are generated in the background - the analysis toolbar shows their
+                        progress (so they survive clicking through to other nodes), and a file that's already been
+                        generated is downloaded again without regenerating it</li>
+                    <li>#1700 - Grids that already know how many rows they have (node counts, all variants estimate)
+                        skip the extra count query</li>
+                    <li>#265 - Dragging a multiple selection of nodes works again</li>
+                    <li>Tag node - "all tags" mode warns that it's a snapshot, and when it was taken</li>
+                </ul>
                 <h4>Annotation</h4>
                 <ul>
                     <li>#579 - New columns for frameshifts - "Stop codon distance", "PTC to last junction", and "NMD escape"
                         (predicted from the new stop codon, not the variant). Existing annotation is backfilled</li>
-                </ul>
-                <h4>Analysis</h4>
-                <ul>
-                    <li>#940 - Trio / Quad node - compound het uses gene overlaps, so long structural variants can be a hit</li>
-                    <li>Tag node - "all tags" mode warns that it's a snapshot, and when it was taken</li>
+                    <li>#1701 - Detect annotation runs where VEP's output was truncated, so records VEP lost are no longer
+                        imported as annotated. Existing runs are checked, and affected ones can be re-annotated</li>
+                    <li>#1701 - Lower VEP memory use (smaller buffers, and repeated per-transcript dbNSFP values are
+                        collapsed) which also makes the annotated VCF about 20% smaller</li>
                 </ul>
                 <h4>Classification</h4>
                 <ul>
                     <li>#1347 - Classification page shows sync status - whether the last published version reached each
                         remote (with a link to it), or why it was excluded</li>
                     <li>#1030 - gnomAD structural variant frequencies autopopulate classifications</li>
+                    <li>#579 - New evidence key "Early stop codon", autopopulated from the new frameshift columns</li>
+                </ul>
+                <h4>Data / Upload</h4>
+                <ul>
+                    <li>#127 - Unsorted VCFs are sorted during import rather than failing, with a warning on the import.
+                        VCFs we can't handle give a clearer error</li>
+                    <li>A failed import can be retried - pipeline steps re-run, keeping records the pipeline can't
+                        recreate (manual variant entry, classification imports, liftover)</li>
+                </ul>
+                <h4>Labs</h4>
+                <ul>
+                    <li>#1698 - Lab heads can add and remove members on their lab page (anyone in their organisation who
+                        has logged in)</li>
+                </ul>
+                <h4>Liftover</h4>
+                <ul>
+                    <li>#1420 - An allele whose liftover has run and failed is marked as complete, rather than sitting in
+                        "liftover in progress" until an admin marks it</li>
                 </ul>
             </div>
        </div>
