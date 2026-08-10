@@ -313,20 +313,18 @@ class ClassificationGroup:
 
     @staticmethod
     def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
-        c_parts: HGVSDisplay
         if c_str := cm.classification.get_c_hgvs(genome_build):
-            c_parts = HGVSDisplay(c_str)
-            c_parts.is_normalised = True
-            c_parts.genome_build = genome_build
-        else:
-            c_parts = cm.classification.c_parts
-            c_parts.is_normalised = False
-            try:
-                c_parts.genome_build = cm.classification.get_genome_build()
-                c_parts.is_desired_build = genome_build.name == c_parts.genome_build.name
-            except ValueError:
-                pass
-        return c_parts
+            return HGVSDisplay.parse(c_str, genome_build=genome_build, is_normalised=True)
+
+        imported_genome_build = None
+        is_desired_build = None
+        try:
+            imported_genome_build = cm.classification.get_genome_build()
+            is_desired_build = genome_build.name == imported_genome_build.name
+        except ValueError:
+            pass
+        return HGVSDisplay(cm.classification.c_parts, genome_build=imported_genome_build,
+                           is_normalised=False, is_desired_build=is_desired_build)
 
     @cached_property
     def c_hgvses(self) -> list[HGVSDisplay]:

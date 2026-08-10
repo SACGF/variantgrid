@@ -23,7 +23,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from genes.hgvs import HGVSDisplay, HGVSDiff, HGVSConverterType, HGVSMatcher, hgvs_diff_description
+from genes.hgvs import HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher, hgvs_diff_description
 from genes.models import GeneSymbol, NoTranscript, Transcript, TranscriptVersion
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
@@ -122,11 +122,14 @@ class ResolvedVariantInfo(TimeStampedModel):
     """ c.HGVS as you'd normally represent it """
 
     @property
-    def c_hgvs_obj(self) -> Optional[HGVSDisplay]:
+    def c_hgvs_obj(self) -> Optional[HGVSComponents]:
         if self.c_hgvs:
-            c_hgvs = HGVSDisplay(self.c_hgvs)
-            c_hgvs.genome_build = self.genome_build
-            return c_hgvs
+            return HGVSComponents(self.c_hgvs)
+
+    @property
+    def c_hgvs_display(self) -> Optional[HGVSDisplay]:
+        if components := self.c_hgvs_obj:
+            return HGVSDisplay(components, genome_build=self.genome_build)
 
     c_hgvs_compat = TextField(null=True, blank=True)
     """ c.HGVS with all bases explicit in the case of dels & dups """
@@ -212,7 +215,7 @@ class ResolvedVariantInfo(TimeStampedModel):
 
         result = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
         c_hgvs = result.hgvs_variant.format()
-        c_hgvs_obj = HGVSDisplay(c_hgvs)
+        c_hgvs_obj = HGVSComponents(c_hgvs)
 
         hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         version = hgvs_matcher.hgvs_converter.get_version()
@@ -566,10 +569,10 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         validation_dict: ImportedAlleleInfoValidationTags = {}
         imported_c_hgvs = self.imported_c_hgvs_obj
-        normalized_c_hgvs: Optional[HGVSDisplay] = None
+        normalized_c_hgvs: Optional[HGVSComponents] = None
         if normalised := self.variant_info_for_imported_genome_build:
             normalized_c_hgvs = normalised.c_hgvs_obj
-        lifted_c_hgvs: Optional[HGVSDisplay] = None
+        lifted_c_hgvs: Optional[HGVSComponents] = None
         if lifted := self.variant_info_for_lifted_over_genome_build:
             lifted_c_hgvs = lifted.c_hgvs_obj
 
@@ -661,16 +664,16 @@ class ImportedAlleleInfo(TimeStampedModel):
         return self.imported_c_hgvs or self.imported_g_hgvs
 
     @property
-    def imported_c_hgvs_obj(self) -> Optional[HGVSDisplay]:
+    def imported_c_hgvs_obj(self) -> Optional[HGVSComponents]:
         if self.imported_c_hgvs:
-            return HGVSDisplay(self.imported_c_hgvs)
+            return HGVSComponents(self.imported_c_hgvs)
 
     @property
-    def imported_g_hgvs_obj(self) -> Optional[HGVSDisplay]:
+    def imported_g_hgvs_obj(self) -> Optional[HGVSComponents]:
         if self.imported_g_hgvs:
-            return HGVSDisplay(self.imported_g_hgvs)
+            return HGVSComponents(self.imported_g_hgvs)
 
-    def imported_hgvs_obj(self) -> Optional[HGVSDisplay]:
+    def imported_hgvs_obj(self) -> Optional[HGVSComponents]:
         if c_hgvs := self.imported_c_hgvs_obj:
             return c_hgvs
         if g_hgvs := self.imported_g_hgvs_obj:
@@ -682,7 +685,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         all_chgvs = set()
         for iai in allele.importedalleleinfo_set.all():
             for rb in iai.resolved_builds:
-                if c_hgvs := rb.c_hgvs_obj:
+                if c_hgvs := rb.c_hgvs_display:
                     all_chgvs.add(c_hgvs)
         return sorted(all_chgvs, key=lambda x: (x.genome_build, x.sort_str))
 
@@ -691,7 +694,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         if self.imported_transcript:
             return self.imported_transcript
         elif self.imported_c_hgvs:
-            return HGVSDisplay(self.imported_c_hgvs).transcript
+            return HGVSComponents(self.imported_c_hgvs).transcript
 
     @property
     def imported_as_c_hgvs(self) -> bool:
@@ -861,8 +864,8 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         def c_hgvs_diff_if_applicable(original_chgvs: str, new_chgvs: str):
 
-            original_chgvs_obj = HGVSDisplay(original_chgvs)
-            new_chgvs_obj = HGVSDisplay(new_chgvs)
+            original_chgvs_obj = HGVSComponents(original_chgvs)
+            new_chgvs_obj = HGVSComponents(new_chgvs)
             if original_chgvs_obj.transcript and new_chgvs_obj.transcript:
                 c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
                 return hgvs_diff_description(c_hgvs_diffs, include_minor=True)
@@ -871,7 +874,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             nonlocal self
             if self.imported_genome_build == genome_build:
                 original_chgvs_obj = self.imported_c_hgvs_obj
-                new_chgvs_obj = HGVSDisplay(new_chgvs)
+                new_chgvs_obj = HGVSComponents(new_chgvs)
                 if original_chgvs_obj and original_chgvs_obj.transcript and new_chgvs_obj.transcript:
                     c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
                     if not bool(hgvs_diff_description(c_hgvs_diffs, include_minor=False)):
@@ -898,7 +901,7 @@ class ImportedAlleleInfo(TimeStampedModel):
                             message_parts += diffs
                 except Exception as ex:
                     # Make sure that we still fail
-                    if rvi.c_hgvs and HGVSDisplay.HGVS_REGEX.match(rvi.c_hgvs):
+                    if rvi.c_hgvs and HGVSComponents.HGVS_REGEX.match(rvi.c_hgvs):
                         message_parts.append(f"Error resolving {rvi.genome_build} c.HGVS: {ex}")
             if message_parts:
                 new_dirty_message = "\n".join(message_parts)

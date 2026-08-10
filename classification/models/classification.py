@@ -82,7 +82,7 @@ from flags.models.models import (
     FlagTypeContext,
     flag_collection_extra_info_signal,
 )
-from genes.hgvs import HGVSDisplay, HGVSMatcher
+from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
 from genes.models import Gene, NoTranscript
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
@@ -1601,7 +1601,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 c_parts_cell = patch[SpecialEKeys.C_HGVS]
                 c_hgvs = c_parts_cell.value
                 if c_hgvs:
-                    c_parts = HGVSDisplay(full_hgvs=c_hgvs)
+                    c_parts = HGVSComponents(c_hgvs)
                     transcript = c_parts.transcript
                     gene_symbol = c_parts.gene_symbol
 
@@ -2041,10 +2041,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
             if (genome_build := self.get_genome_build_opt()) and \
                     (preferred_build := allele_info[genome_build]) and \
-                    (c_hgvs := preferred_build.c_hgvs_obj):
+                    (c_hgvs := preferred_build.c_hgvs_display):
                 resolved_dict.update(c_hgvs.to_json())
             elif c_hgvs_raw := self.get(SpecialEKeys.C_HGVS):
-                resolved_dict.update(HGVSDisplay(c_hgvs_raw).to_json())
+                resolved_dict.update(HGVSDisplay.parse(c_hgvs_raw).to_json())
 
             include = False
             if latest_validation := allele_info.latest_validation:
@@ -2167,37 +2167,28 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         all_chgvs: list[HGVSDisplay] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_c_hgvs(genome_build):
-                chgvs = HGVSDisplay(full_hgvs=text)
-                chgvs.genome_build = genome_build
-                chgvs.is_normalised = True
-                all_chgvs.append(chgvs)
+                all_chgvs.append(HGVSDisplay.parse(text, genome_build=genome_build, is_normalised=True))
         return all_chgvs
 
     def c_hgvs_best(self, preferred_genome_build: GenomeBuild) -> HGVSDisplay:
         if c_hgvs_str := self.get_c_hgvs(preferred_genome_build):
-            c_hgvs = HGVSDisplay(c_hgvs_str)
-            c_hgvs.genome_build = preferred_genome_build
-            c_hgvs.is_normalised = True
-            c_hgvs.is_desired_build = True
-            return c_hgvs
+            return HGVSDisplay.parse(c_hgvs_str, genome_build=preferred_genome_build,
+                                     is_normalised=True, is_desired_build=True)
         for alt_genome_build in GenomeBuild.builds_with_annotation_cached():
             if preferred_genome_build == alt_genome_build:
                 continue
             if c_hgvs_str := self.get_c_hgvs(alt_genome_build):
-                c_hgvs = HGVSDisplay(c_hgvs_str)
-                c_hgvs.genome_build = alt_genome_build
-                c_hgvs.is_normalised = True
-                c_hgvs.is_desired_build = False
-                return c_hgvs
+                return HGVSDisplay.parse(c_hgvs_str, genome_build=alt_genome_build,
+                                         is_normalised=True, is_desired_build=False)
         # nothing resolved, fall back to whichever HGVS the submitter gave us
-        imported_hgvs = HGVSDisplay(self.get(SpecialEKeys.C_HGVS) or self.get(SpecialEKeys.G_HGVS) or "")
+        imported_genome_build = None
         try:
-            imported_hgvs.genome_build = self.get_genome_build()
+            imported_genome_build = self.get_genome_build()
         except ValueError:
             pass
-        imported_hgvs.is_normalised = False
-        imported_hgvs.is_desired_build = preferred_genome_build == imported_hgvs.genome_build
-        return imported_hgvs
+        return HGVSDisplay.parse(self.get(SpecialEKeys.C_HGVS) or self.get(SpecialEKeys.G_HGVS) or "",
+                                 genome_build=imported_genome_build, is_normalised=False,
+                                 is_desired_build=preferred_genome_build == imported_genome_build)
 
     def _generate_c_hgvs(self, genome_build: GenomeBuild) -> str:
         variant = self.get_variant_for_build(genome_build)
@@ -2287,12 +2278,12 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         if c_hgvs := self.get(SpecialEKeys.C_HGVS):
             # remove any white space inside the c.HGVS
             c_hgvs = re.sub(r'\s+', '', c_hgvs)
-            c_hgvs_obj = HGVSDisplay(c_hgvs)
+            genome_build = None
             try:
-                c_hgvs_obj.genome_build = self.get_genome_build()
+                genome_build = self.get_genome_build()
             except ValueError:
                 pass
-            return c_hgvs_obj
+            return HGVSDisplay.parse(c_hgvs, genome_build=genome_build)
 
     @property
     def allele_origin_bucket_obj(self) -> AlleleOriginBucket:

@@ -6,7 +6,7 @@ from typing import Optional
 
 from classification.models import Classification, ImportedAlleleInfo
 from flags.models import FlagComment, FlagStatus, FlagType
-from genes.hgvs import HGVSDisplay
+from genes.hgvs import HGVSComponents
 from library.guardian_utils import admin_bot
 from snpdb.models import Allele, GenomeBuild
 
@@ -26,7 +26,7 @@ class CHGVSIdentifier:
     def effective_transcript(self) -> str:
         if self.transcript:
             return self.transcript
-        return HGVSDisplay(self.imported_c_hgvs).transcript
+        return HGVSComponents(self.imported_c_hgvs).transcript
 
     def fuzzy_matches(self, other: 'CHGVSIdentifier') -> bool:
         if other.genome_build and self.genome_build and other.genome_build != self.genome_build:

@@ -11,7 +11,7 @@ from classification.models import (
     ClassificationGrouping,
     OverlapStatus,
 )
-from genes.hgvs import HGVSDisplay
+from genes.hgvs import HGVSComponents, HGVSDisplay
 from library.cache import timed_cache
 from library.utils import JsonDataType
 from snpdb.lab_picker import LabPickerData
@@ -75,13 +75,11 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
         for gb in self.genome_build_prefs:
             if ri := allele_info[gb]:
                 if c_hgvs := ri.c_hgvs_obj:
-                    c_hgvs.is_desired_build = is_preferred_genome_build
-                    return c_hgvs
+                    return HGVSDisplay(c_hgvs, genome_build=ri.genome_build,
+                                       is_desired_build=is_preferred_genome_build)
             is_preferred_genome_build = False
 
-        c_hgvs = allele_info.imported_c_hgvs_obj
-        c_hgvs.is_normalised = False
-        return c_hgvs
+        return HGVSDisplay(allele_info.imported_c_hgvs_obj or HGVSComponents(""), is_normalised=False)
 
     def render_allele(self, row: CellData) -> JsonDataType:
         allele_group = _allele_group(row.get("allele"))

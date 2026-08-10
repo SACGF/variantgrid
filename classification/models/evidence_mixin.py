@@ -10,7 +10,7 @@ from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.enums import AlleleOriginBucket, SpecialEKeys
-from genes.hgvs import HGVSDisplay, PHGVS
+from genes.hgvs import HGVSComponents, PHGVS
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
@@ -242,8 +242,8 @@ class EvidenceMixin:
         return None
 
     @cached_property
-    def c_parts(self) -> HGVSDisplay:
-        return HGVSDisplay(self.get(SpecialEKeys.C_HGVS) or "")
+    def c_parts(self) -> HGVSComponents:
+        return HGVSComponents(self.get(SpecialEKeys.C_HGVS) or "")
 
     @cached_property
     def p_parts(self) -> PHGVS:
@@ -256,7 +256,7 @@ class EvidenceMixin:
         :return:
         """
         if c_hgvs := self.get(SpecialEKeys.C_HGVS):
-            parts = HGVSDisplay(c_hgvs)
+            parts = HGVSComponents(c_hgvs)
             if parts.transcript:
                 return parts.transcript
 

@@ -130,18 +130,17 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
-                    c_hgvs = HGVSDisplay(c_hgvs_string)
-                    c_hgvs.genome_build = genome_build
-                    c_hgvs.is_desired_build = index == 0
+                    c_hgvs = HGVSDisplay.parse(c_hgvs_string, genome_build=genome_build,
+                                               is_desired_build=index == 0)
                     return c_hgvs.to_json()
 
             # May still have linked to an allele without having the c_hgvs on either build
             # TODO check imported g_hgvs or other importable columns
             # could be dirty and not have a latest_allele_info
             if raw_genome_build := row["latest_allele_info__imported_genome_build_patch_version__genome_build"]:
-                c_hgvs = HGVSDisplay(row["latest_allele_info__imported_c_hgvs"])
-                c_hgvs.genome_build = GenomeBuild.get_name_or_alias(raw_genome_build)
-                c_hgvs.is_normalised = False
+                c_hgvs = HGVSDisplay.parse(row["latest_allele_info__imported_c_hgvs"],
+                                           genome_build=GenomeBuild.get_name_or_alias(raw_genome_build),
+                                           is_normalised=False)
                 return c_hgvs.to_json()
             else:
                 return {}

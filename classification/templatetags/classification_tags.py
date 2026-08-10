@@ -41,7 +41,7 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
 from classification.models.evidence_mixin_summary_cache import clinical_significance_pills
 from eventlog.models import ViewEvent
-from genes.hgvs import HGVSDisplay
+from genes.hgvs import HGVSComponents, HGVSDisplay
 from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
 from ontology.models import OntologyTerm
@@ -418,20 +418,23 @@ def classification_table(
 
 def _to_c_hgvs(c_hgvs: Any) -> HGVSDisplay:
     if isinstance(c_hgvs, ClassificationModification):
-        if c_hgvs := c_hgvs.classification.get_c_hgvs(GenomeBuildManager.get_current_genome_build()):
-            c_hgvs = HGVSDisplay(c_hgvs)
-            c_hgvs.genome_build = GenomeBuildManager.get_current_genome_build()
-    elif isinstance(c_hgvs, str):
-        c_hgvs = HGVSDisplay(c_hgvs)
-
-    if c_hgvs is None:  # might have got a none c.hgvs from the ClassificationModification
-        c_hgvs = HGVSDisplay("")
+        genome_build = GenomeBuildManager.get_current_genome_build()
+        if c_hgvs_str := c_hgvs.classification.get_c_hgvs(genome_build):
+            return HGVSDisplay.parse(c_hgvs_str, genome_build=genome_build)
+        # might have got a none c.hgvs from the ClassificationModification
+        return HGVSDisplay.parse("")
+    if isinstance(c_hgvs, str):
+        return HGVSDisplay.parse(c_hgvs)
+    if isinstance(c_hgvs, HGVSComponents):
+        return HGVSDisplay(c_hgvs)
+    if c_hgvs is None:
+        return HGVSDisplay.parse("")
 
     return c_hgvs
 
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[HGVSDisplay, ClassificationModification, str], show_genome_build: Optional[bool] = None):
+def c_hgvs(c_hgvs: Union[HGVSDisplay, HGVSComponents, ClassificationModification, str], show_genome_build: Optional[bool] = None):
     c_hgvs = _to_c_hgvs(c_hgvs)
 
     if show_genome_build is None:

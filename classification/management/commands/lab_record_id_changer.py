@@ -5,7 +5,7 @@ from django.core.management import BaseCommand
 
 from classification.enums import SpecialEKeys
 from classification.models import Classification
-from genes.hgvs import HGVSDisplay
+from genes.hgvs import HGVSComponents
 from snpdb.models import GenomeBuild, Lab
 
 
@@ -27,7 +27,7 @@ class Command(BaseCommand):
         should_commit = options["commit"]
         for cr in Classification.objects.filter(lab=lab).iterator():
             c_hgvs_str = cr.get(SpecialEKeys.C_HGVS)
-            c_hgvs = HGVSDisplay(c_hgvs_str)
+            c_hgvs = HGVSComponents(c_hgvs_str)
             genome_build_str = cr.get(SpecialEKeys.GENOME_BUILD)
 
             if c_hgvs.transcript and genome_build_str:

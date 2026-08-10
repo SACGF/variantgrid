@@ -5,7 +5,7 @@ from django.core.management import BaseCommand, CommandError
 
 from classification.classification_import import reattempt_variant_matching
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
-from genes.hgvs import HGVSDisplay
+from genes.hgvs import HGVSComponents
 from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from genes.models_enums import AnnotationConsortium
 from library.guardian_utils import admin_bot
@@ -82,7 +82,7 @@ class Command(BaseCommand):
             "pk", "imported_c_hgvs", "imported_transcript", "imported_genome_build_patch_version__genome_build_id")
         for pk, imported_c_hgvs, imported_transcript, genome_build_name in allele_info_values.iterator(chunk_size=10000):
             if genome_build := genome_builds_by_name.get(genome_build_name):
-                transcript_accession = HGVSDisplay(imported_c_hgvs).transcript if imported_c_hgvs else imported_transcript
+                transcript_accession = HGVSComponents(imported_c_hgvs).transcript if imported_c_hgvs else imported_transcript
                 if transcript_accession:
                     allele_info_ids_by_transcript[(genome_build, transcript_accession)].append(pk)
         print(f"{len(allele_info_ids_by_transcript)} transcripts used by ImportedAlleleInfo to check")

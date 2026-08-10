@@ -20,7 +20,7 @@ from classification.models import (
     MultiCondition,
     classification_flag_types,
 )
-from genes.hgvs import HGVSDisplay
+from genes.hgvs import HGVSComponents
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
 from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
 from snpdb.models import ClinVarCitationsModes, ClinVarKey, GenomeBuild
@@ -488,7 +488,7 @@ class ClinVarExportConverter:
         try:
             genome_build = self.classification_based_on.get_genome_build()
             if c_hgvs := self.classification_based_on.classification.get_c_hgvs(genome_build):
-                c_hgvs_obj = HGVSDisplay(c_hgvs)
+                c_hgvs_obj = HGVSComponents(c_hgvs)
                 c_hgvs_no_gene = c_hgvs_obj.without_gene_symbol_str
 
                 hgvs_errors = JSON_MESSAGES_EMPTY

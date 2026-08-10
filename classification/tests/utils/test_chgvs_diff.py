@@ -1,10 +1,10 @@
 from django.test.testcases import TestCase
 
-from genes.hgvs import HGVSDisplay, HGVSDiff, hgvs_nomen_equivalent
+from genes.hgvs import HGVSComponents, HGVSDiff, hgvs_nomen_equivalent
 
 
 def diff(c1: str, c2: str) -> HGVSDiff:
-    return HGVSDisplay(c1).diff(HGVSDisplay(c2))
+    return HGVSComponents(c1).diff(HGVSComponents(c2))
 
 
 # noinspection SpellCheckingInspection,SpellCheckingInspection

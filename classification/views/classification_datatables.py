@@ -63,15 +63,13 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             for index, genome_build in enumerate(self.genome_build_prefs):
                 try:
                     if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):
-                        c_hgvs = HGVSDisplay(c_hgvs_string)
-                        c_hgvs.genome_build = genome_build
-                        c_hgvs.is_desired_build = index == 0
+                        c_hgvs = HGVSDisplay.parse(c_hgvs_string, genome_build=genome_build,
+                                                   is_desired_build=index == 0)
                         return c_hgvs.to_json()
                 except ValueError:
                     pass
 
-            c_hgvs = HGVSDisplay(row.get('published_evidence__c_hgvs__value'))
-            c_hgvs.is_normalised = False
+            c_hgvs = HGVSDisplay.parse(row.get('published_evidence__c_hgvs__value'), is_normalised=False)
             json_data = c_hgvs.to_json()
             # use this rather than genome build object so we can get a patch version
             json_data['genome_build'] = row.get('published_evidence__genome_build__value')

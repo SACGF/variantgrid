@@ -1,5 +1,6 @@
 import enum
 import re
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
 
@@ -80,11 +81,11 @@ def hgvs_nomen_equivalent(nomen_1: str, nomen_2: str) -> bool:
     return False
 
 
-class HGVSDisplay:
+class HGVSComponents:
     """
-    An HGVS string (c./g./n./p.) split into transcript, gene symbol and nomen, along with the genome build it
-    belongs to and whether it's the resolved/desired representation - enough to render, sort and diff it.
-    Parsing is lenient, anything that doesn't match is kept whole, so it can handle whatever is in the database.
+    An HGVS string (c./g./n./p.) split into transcript, gene symbol and nomen, keeping the original string.
+    Parsing is lenient - anything that doesn't match falls through to the nomen - so it can handle whatever is in
+    the database, including legacy junk. Identity, ordering and diffing are all on the string alone.
     """
     HGVS_REGEX = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
     NUM_PART = re.compile('^[a-z][.]([0-9]+)(.*?)$')
@@ -100,114 +101,42 @@ class HGVSDisplay:
         self.nomen = None
         self.transcript = transcript
         self.gene_symbol = None
-        self.overrode_transcript = True
 
-        # properties to help replace BestHGVS
-        self.is_normalised: Optional[bool] = None
-        self.is_desired_build: Optional[bool] = None
-        self.genome_build: Optional[GenomeBuild] = None
-
-        if match := HGVSDisplay.HGVS_REGEX.match(full_hgvs):
+        if match := HGVSComponents.HGVS_REGEX.match(full_hgvs):
             self.gene_symbol = match[2]
             self.nomen = match[3]
 
-            if transcript and '.' in transcript:
-                pass
-            else:
-                # only use the transcript from the HGVS if the
-                # one passed in doesn't have a version
+            if not (transcript and '.' in transcript):
+                # only use the transcript from the HGVS if the one passed in doesn't have a version
                 self.transcript = clean_transcript_accession(match[1])
-                self.overrode_transcript = False
         else:
             self.nomen = full_hgvs
-
-    def to_json(self):
-        return {
-            "transcript": self.transcript,
-            "gene_symbol": self.gene_symbol,
-            "c_nomen": self.nomen,
-            "full": self.full_hgvs,
-            "genome_build": self.genome_build.pk if self.genome_build else None,
-            "desired": self.is_desired_build,
-            "normalized": self.is_normalised
-        }
 
     @property
     def without_gene_symbol_str(self) -> str:
         return f'{self.transcript}:{self.nomen}'
 
-    def with_gene_symbol(self, gene_symbol: str) -> 'HGVSDisplay':
+    def with_gene_symbol(self, gene_symbol: str) -> 'HGVSComponents':
         if self.transcript:
-            return HGVSDisplay(f'{self.transcript}({gene_symbol}):{self.nomen}')
+            return HGVSComponents(f'{self.transcript}({gene_symbol}):{self.nomen}')
         # if there's no transcript we're invalid, not much we can do
         return self
 
-    def with_transcript_version(self, version: int) -> 'HGVSDisplay':
-        if self.transcript_parts:
-            transcript = self.transcript_parts.identifier
-            if transcript and self.nomen:
-                full_hgvs: str
-                if gene_symbol := self.gene_symbol:
-                    full_hgvs = f'{transcript}.{version}({gene_symbol}):{self.nomen}'
-                else:
-                    full_hgvs = f'{transcript}.{version}:{self.nomen}'
-                return HGVSDisplay(full_hgvs)
+    def with_transcript_version(self, version: int) -> 'HGVSComponents':
+        if identifier := self.transcript_parts.identifier:
+            return self._with_transcript(f'{identifier}.{version}')
         return self
 
     @cached_property
-    def without_transcript_version(self) -> 'HGVSDisplay':
-        if self.transcript_parts:
-            transcript = self.transcript_parts.identifier
-            if transcript and self.nomen:
-                full_hgvs: str
-                if gene_symbol := self.gene_symbol:
-                    full_hgvs = f'{transcript}({gene_symbol}):{self.nomen}'
-                else:
-                    full_hgvs = f'{transcript}:{self.nomen}'
-                return HGVSDisplay(full_hgvs)
+    def without_transcript_version(self) -> 'HGVSComponents':
+        return self._with_transcript(self.transcript_parts.identifier)
+
+    def _with_transcript(self, transcript: Optional[str]) -> 'HGVSComponents':
+        if transcript and self.nomen:
+            if gene_symbol := self.gene_symbol:
+                return HGVSComponents(f'{transcript}({gene_symbol}):{self.nomen}')
+            return HGVSComponents(f'{transcript}:{self.nomen}')
         return self
-
-    def __eq__(self, other):
-        if type(other) is type(self):
-            return self.full_hgvs == other.full_hgvs and self.is_normalised == other.is_normalised and self.genome_build == other.genome_build
-        return NotImplemented
-
-    def __hash__(self):
-        return hash(self.full_hgvs)
-
-    def __lt__(self, other):
-        """
-        Warning, just does alphabetic sorting for consistent ordering, does not attempt to order by genomic coordinate
-        """
-        return self.sort_str < other.sort_str
-
-    def __str__(self):
-        return self.full_hgvs
-
-    @cached_property
-    def sort_str(self) -> str:
-        """
-        Returns a string that can be used for sorting, works on numerical part of the nomen, followed by the extra,
-        followed by the transcript. Each part being padded so equivalent comparing
-        """
-        sort_str = ""
-
-        if self.is_normalised:
-            sort_str += "A"
-        else:
-            sort_str += "Z"
-
-        if nomen := self.nomen:
-            if parts := HGVSDisplay.NUM_PART.match(nomen):
-                num_part = parts.group(1).rjust(10, '0')
-                extra = parts.group(2)
-                return sort_str + num_part + extra + self.transcript
-
-        # if HGVS identical, sort by genome build
-        if self.genome_build:
-            sort_str += self.genome_build.pk
-
-        return sort_str + self.full_hgvs or ""
 
     @cached_property
     def transcript_parts(self) -> TranscriptParts:
@@ -215,7 +144,19 @@ class HGVSDisplay:
             return get_transcript_id_and_version(self.transcript)
         return TranscriptParts(identifier=None, version=None)
 
-    def diff(self, other: 'HGVSDisplay') -> HGVSDiff:
+    @cached_property
+    def sort_str(self) -> str:
+        """
+        A string that sorts on the numerical part of the nomen, followed by the extra, followed by the transcript.
+        Each part being padded so equivalent comparing.
+        Warning, alphabetic sorting for consistent ordering, does not attempt to order by genomic coordinate
+        """
+        if self.nomen:
+            if parts := HGVSComponents.NUM_PART.match(self.nomen):
+                return parts.group(1).rjust(10, '0') + parts.group(2) + (self.transcript or "")
+        return self.full_hgvs
+
+    def diff(self, other: 'HGVSComponents') -> HGVSDiff:
         hgvs_diff = HGVSDiff.SAME
         my_tran = self.transcript_parts
         o_tran = other.transcript_parts
@@ -236,3 +177,82 @@ class HGVSDisplay:
                 hgvs_diff = hgvs_diff | HGVSDiff.DIFF_NOMEN
 
         return hgvs_diff
+
+    def __eq__(self, other):
+        if isinstance(other, HGVSComponents):
+            return self.full_hgvs == other.full_hgvs
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(self.full_hgvs)
+
+    def __lt__(self, other):
+        return self.sort_str < other.sort_str
+
+    def __bool__(self):
+        return bool(self.full_hgvs)
+
+    def __str__(self):
+        return self.full_hgvs
+
+    def __repr__(self):
+        return f"HGVSComponents({self.full_hgvs!r})"
+
+
+@dataclass(frozen=True)
+class HGVSDisplay:
+    """
+    HGVSComponents plus the view state needed to render it - which build it came from, whether it's the build the
+    user asked for, and whether it's our normalised representation or exactly what the lab submitted.
+    """
+    components: HGVSComponents
+    genome_build: Optional[GenomeBuild] = None
+    is_normalised: Optional[bool] = None
+    is_desired_build: Optional[bool] = None
+
+    @staticmethod
+    def parse(full_hgvs: str, transcript: str = None, genome_build: Optional[GenomeBuild] = None,
+              is_normalised: Optional[bool] = None, is_desired_build: Optional[bool] = None) -> 'HGVSDisplay':
+        return HGVSDisplay(HGVSComponents(full_hgvs, transcript), genome_build=genome_build,
+                           is_normalised=is_normalised, is_desired_build=is_desired_build)
+
+    @property
+    def full_hgvs(self) -> str:
+        return self.components.full_hgvs
+
+    @property
+    def transcript(self) -> Optional[str]:
+        return self.components.transcript
+
+    @property
+    def gene_symbol(self) -> Optional[str]:
+        return self.components.gene_symbol
+
+    @property
+    def nomen(self) -> Optional[str]:
+        return self.components.nomen
+
+    def to_json(self):
+        """ The shape VCTable.format_hgvs in vc_form.js consumes """
+        return {
+            "transcript": self.transcript,
+            "gene_symbol": self.gene_symbol,
+            "c_nomen": self.nomen,
+            "full": self.full_hgvs,
+            "genome_build": self.genome_build.pk if self.genome_build else None,
+            "desired": self.is_desired_build,
+            "normalized": self.is_normalised
+        }
+
+    @cached_property
+    def sort_str(self) -> str:
+        """ Normalised records sort ahead of imported ones, then by the HGVS itself, then by build """
+        normalised_prefix = "A" if self.is_normalised else "Z"
+        build = self.genome_build.pk if self.genome_build else ""
+        return normalised_prefix + self.components.sort_str + build
+
+    def __lt__(self, other):
+        return self.sort_str < other.sort_str
+
+    def __str__(self):
+        return self.full_hgvs

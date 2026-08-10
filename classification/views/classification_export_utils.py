@@ -11,7 +11,7 @@ from django.db.models.query import QuerySet
 from classification.enums import CriteriaEvaluation
 from classification.models.classification import ClassificationModification
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
-from genes.hgvs import HGVSDisplay
+from genes.hgvs import HGVSComponents
 from library.cache import clear_cached_property
 
 
@@ -236,7 +236,7 @@ class VCFEncoding:
 
 class VariantWithChgvs:
 
-    def __init__(self, vcm: ClassificationModification, chgvs: HGVSDisplay):
+    def __init__(self, vcm: ClassificationModification, chgvs: HGVSComponents):
         self.vcm = vcm
         self.chgvs = chgvs
 
@@ -248,7 +248,7 @@ class VariantWithChgvs:
             return 0
 
     @property
-    def c_hgvs_without_transcript_version(self) -> HGVSDisplay:
+    def c_hgvs_without_transcript_version(self) -> HGVSComponents:
         return self.chgvs.without_transcript_version
 
 
@@ -256,7 +256,7 @@ class TranscriptGroup:
 
     def __init__(self):
         self.highest_transcript_version: Optional[int] = None
-        self.highest_transcript_chgvs: Optional[HGVSDisplay] = None
+        self.highest_transcript_chgvs: Optional[HGVSComponents] = None
         self.vcmcs: list[VariantWithChgvs] = []
 
     def add(self, vcmc: VariantWithChgvs):

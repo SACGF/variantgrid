@@ -45,7 +45,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             c_hgvs_str = data.get(data.key)
 
         if c_hgvs_str:
-            if c_hgvs := HGVSDisplay(c_hgvs_str):
+            if c_hgvs := HGVSDisplay.parse(c_hgvs_str):
                 json_data = c_hgvs.to_json()
                 # json_data['variant_id'] = variant_id
                 return json_data

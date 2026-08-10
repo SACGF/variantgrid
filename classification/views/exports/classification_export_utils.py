@@ -12,7 +12,7 @@ from classification.views.exports.classification_export_filter import (
     AlleleData,
     ClassificationFilter,
 )
-from genes.hgvs import HGVSDisplay
+from genes.hgvs import HGVSComponents
 from library.log_utils import report_message
 
 
@@ -58,7 +58,7 @@ class CHGVSData:
     def source(self) -> ClassificationFilter:
         return self.allele.source
 
-    chgvs: HGVSDisplay
+    chgvs: HGVSComponents
     different_chgvs: bool = False
     cms: list[ClassificationModification] = field(default_factory=list)
 
@@ -81,7 +81,7 @@ class CHGVSData:
 
         genome_build = allele_data.source.genome_build
         for vcm in allele_data.cms:
-            c_parts = HGVSDisplay(vcm.classification.get_c_hgvs(genome_build=genome_build, use_compat=use_compat))
+            c_parts = HGVSComponents(vcm.classification.get_c_hgvs(genome_build=genome_build, use_compat=use_compat))
             if c_parts:
                 transcript_parts = c_parts.transcript_parts
                 if transcript_parts:
