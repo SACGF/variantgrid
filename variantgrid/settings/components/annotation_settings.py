@@ -24,8 +24,19 @@ _VARIANT_ANNOTATION_PIPELINE_STRUCTURAL_VARIANT = "C"
 
 ANNOTATION_VEP_BUFFER_SIZE = {
     # Default VEP is 5k but this has crashed out a 16G machine...
-    _VARIANT_ANNOTATION_PIPELINE_STANDARD: 2000,
-    _VARIANT_ANNOTATION_PIPELINE_STRUCTURAL_VARIANT: 1000,
+    # VEP holds the transcript cache for every 1Mb region the current buffer spans (it drops the rest
+    # in AnnotationSource::clean_cache), so peak RSS tracks regions-per-buffer, not variant count.
+    # Runtime was flat across every size measured; output byte-identical. Matters most when
+    # annotation_workers runs several VEPs concurrently.
+    #
+    # 12.5k small variants: 4000 -> 1295MB, 2000 -> 1260MB, 1000 -> 1049MB, 500 -> 871MB, 250 -> 858MB.
+    # Flattens at 500 - below that fixed startup dominates.
+    _VARIANT_ANNOTATION_PIPELINE_STANDARD: 500,
+    # SVs span whole regions each, so they load far more cache per variant and keep scaling down:
+    # 1000 DELs (median 49kb) -> 1774MB @1000, 1212MB @500, 752MB @250, 505MB @100, matching the
+    # worst-case regions in one buffer (247 / 126 / 67 / 29). 250 keeps enough per buffer to avoid
+    # re-loading shared regions between consecutive buffers.
+    _VARIANT_ANNOTATION_PIPELINE_STRUCTURAL_VARIANT: 250,
 }
 # get_unannotated_count_min_max does quick queries to try and get VEP batch sizes within a range
 # If it gets below min, it does a slower query to get range lock.

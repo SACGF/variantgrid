@@ -8,8 +8,11 @@ T2T-CHM13v2.0 support (issue #1131).
 
 The script reads the header of a dbNSFP variant file to look up column indices
 by name (so it survives dbNSFP version changes that reorder/add columns), then
-emits a shell pipeline that uses ``cut`` / ``sort`` / ``bgzip`` / ``tabix`` to
-do the actual work (much faster than streaming through Python).
+emits a shell pipeline that uses ``cut`` / ``awk`` / ``sort`` / ``bgzip`` /
+``tabix`` to do the actual work (much faster than streaming through Python).
+
+The ``awk`` stage collapses the transcript-parallel fields in
+``COLLAPSE_COLUMNS`` to their distinct values — see that constant for why.
 
 Modes:
 * ``--sorted``: pass a single, already-sorted concatenated file (e.g. the
@@ -98,6 +101,75 @@ DBNSFP_COLUMNS = [
 ]
 
 
+# dbNSFP stores these as ";"-separated arrays parallel to Ensembl_transcriptid. We run VEP with
+# --refseq, so the dbNSFP plugin can never match a NM_ stable_id against Ensembl_transcriptid and
+# transcript_match is unusable (it would delete every transcript-specific field) - leaving the plugin
+# to emit the whole array into every consequence. Collapsing to distinct values here costs us nothing:
+# BulkVEPVCFAnnotationInserter already reduces these to a set via remove_empty_multiples/join_uniq.
+#
+# The value is True where entries additionally repeat internally on "|" - Interpro_domain lists a
+# domain once per Interpro predicting database, so GNAS goes from 8464 chars to 61.
+COLLAPSE_COLUMNS = {
+    "Interpro_domain": True,
+    "MutPred2_top5_mechanisms": False,  # "|" separates the ranked top 5, so keep entries intact
+}
+
+DEDUP_AWK = """BEGIN {
+    FS = OFS = "\\t"
+    n = split(PIPE_COLS, cols, ",")
+    for (i = 1; i <= n; i++) pipe_col[cols[i] + 0] = 1
+    n = split(ENTRY_COLS, cols, ",")
+    for (i = 1; i <= n; i++) entry_col[cols[i] + 0] = 1
+}
+
+$1 ~ /^#/ { print; next }
+
+{
+    for (c in pipe_col) $c = collapse($c, 1)
+    for (c in entry_col) $c = collapse($c, 0)
+    print
+}
+
+function trim(s) {
+    gsub(/^[ \\t]+/, "", s)
+    gsub(/[ \\t]+$/, "", s)
+    return s
+}
+
+# Distinct values of a ";"-separated array, first-seen order, dropping the "." dbNSFP uses for
+# missing. split_pipe also splits each entry on "|" and rejoins on it.
+function collapse(v, split_pipe,    n, m, i, j, a, b, tok, out, cnt, sep) {
+    if (v == "." || v == "") return "."
+    if (index(v, ";") == 0 && !(split_pipe && index(v, "|"))) return v
+
+    delete seen
+    out = ""
+    cnt = 0
+    sep = split_pipe ? "|" : ";"
+    n = split(v, a, ";")
+    for (i = 1; i <= n; i++) {
+        if (split_pipe) {
+            m = split(a[i], b, "|")
+            for (j = 1; j <= m; j++) {
+                tok = trim(b[j])
+                if (tok != "" && tok != "." && !(tok in seen)) {
+                    seen[tok] = 1
+                    out = cnt++ ? out sep tok : tok
+                }
+            }
+        } else {
+            tok = trim(a[i])
+            if (tok != "" && tok != "." && !(tok in seen)) {
+                seen[tok] = 1
+                out = cnt++ ? out sep tok : tok
+            }
+        }
+    }
+    return cnt ? out : "."
+}
+"""
+
+
 def read_header(path: str) -> list[str]:
     opener = gzip.open if path.endswith(".gz") else open
     with opener(path, "rt") as f:
@@ -142,9 +214,17 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
     seq_col = post_cut_header.index(spec.chr_col) + 1
     pos_col = post_cut_header.index(spec.pos_col) + 1
 
+    # Post-cut positions of the columns the dedup awk rewrites
+    pipe_cols = []
+    entry_cols = []
+    for name, split_pipe in COLLAPSE_COLUMNS.items():
+        col = post_cut_header.index(name) + 1
+        (pipe_cols if split_pipe else entry_cols).append(str(col))
+
     out_file = f"dbNSFP{version}_{spec.short}.stripped"
     out_gz = f"{out_file}.gz"
     header_file = f"dbnsfp_header_{spec.short}.txt"  # per-build, parallel-safe
+    dedup_awk_file = f"dbnsfp_dedup_{spec.short}.awk"
 
     lines: list[str] = [
         "#!/bin/bash",
@@ -168,6 +248,12 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
         f"    | cut -f {cut_arg} \\",
         f"    | awk 'BEGIN{{OFS=\"\\t\"}}{{ $1=\"#\"$1; print }}' > {header_file}",
         "",
+        f"echo '[{build}] writing dedup awk -> {dedup_awk_file} "
+        f"(collapsing {', '.join(COLLAPSE_COLUMNS)})'",
+        f"cat > {dedup_awk_file} <<'DEDUP_AWK_EOF'",
+        DEDUP_AWK.rstrip("\n"),
+        "DEDUP_AWK_EOF",
+        "",
     ]
 
     file_list = " ".join(shlex.quote(f) for f in files)
@@ -175,16 +261,20 @@ def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,
     pipeline = [f"zgrep -h -v '^#chr' {file_list}"]
     cut_cmd = f"cut -f {cut_arg}"
 
+    # Runs before the sort so there is ~30% less data to sort
+    dedup_cmd = (f"awk -v PIPE_COLS={','.join(pipe_cols)} -v ENTRY_COLS={','.join(entry_cols)}"
+                 f" -f {dedup_awk_file}")
+
     if sorted_input:
-        stage_desc = f"echo '[{build}] cutting columns + bgzipping -> {out_gz}'"
-        pipeline += [cut_cmd]
+        stage_desc = f"echo '[{build}] cutting columns + collapsing + bgzipping -> {out_gz}'"
+        pipeline += [cut_cmd, dedup_cmd]
     else:
         src_chr_idx = column_index(header, spec.chr_col)
         awk_cmd = f"awk -F'\\t' '${src_chr_idx} != \".\"'"
         sort_cmd = f"sort -T \"$TMP_DIR\" -k{seq_col},{seq_col} -k{pos_col},{pos_col}n"
-        stage_desc = (f"echo '[{build}] concat + sort + bgzip "
+        stage_desc = (f"echo '[{build}] concat + collapse + sort + bgzip "
                       f"({len(files)} input files) -> {out_gz}'")
-        pipeline += [awk_cmd, cut_cmd, sort_cmd]
+        pipeline += [awk_cmd, cut_cmd, dedup_cmd, sort_cmd]
         lines += [
             f"TMP_DIR={shlex.quote(tmp_dir)}",
             'mkdir -p "$TMP_DIR"',
