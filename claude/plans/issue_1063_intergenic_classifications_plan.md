@@ -1,255 +1,198 @@
-# Plan: Fix Intergenic Classifications (#1063)
+# Plan: Let g.HGVS-only classifications through (#1063)
 
-**Issue**: Intergenic variants (e.g. `NC_000009.12:g.99087902A>C`) have no transcript and no c.HGVS by design. The validation system incorrectly treats them as having resolution errors, causing false "Resolution Differences" that mark them as un-exportable, generate bad UI links, and flood the classification record with spurious errors.
+**Issue**: A classification imported as g.HGVS (e.g. `NC_000009.12:g.99087902A>C`) has no transcript and no c.HGVS. `ImportedAlleleInfo._calculate_validation()` validates it as though a c.HGVS were expected, producing errors that set `include=False` and block export, plus bad UI links.
 
 **Reported symptoms**:
 - `General Transcript Type Not Supported` ERROR
 - `Liftover c.nomen Change` ERROR
 - `Liftover Transcript Version Change` ERROR
 - `Builds Missing 37` / `Builds Missing 38` WARNINGs
-- HGVS resolution tool link shows `?hgvs=None` (causes error when visited)
-- No link to allele on classification page (despite allele existing)
-- Variant excluded from exports (`include=False`)
+- HGVS resolution tool link renders `?hgvs=None` (errors when visited)
+- No allele link on the classification page (despite the allele existing)
+- Record excluded from exports (`include=False`)
 
 ---
 
-## Root Cause Analysis
+## Design decision
 
-### What identifies a truly intergenic variant?
-An `ImportedAlleleInfo` is intergenic **by design** when:
-- `imported_g_hgvs` is set (e.g. `NC_000009.12:g.99087902A>C`)
-- `imported_c_hgvs` is None and `imported_transcript` is None
-- **AND** the HGVSMatcher found no overlapping transcript when resolving the variant (i.e. `ResolvedVariantInfo.transcript_version` is null for all resolved builds)
+A g.HGVS-only submission is accepted on its own terms. The submitter may have a record of the genomic coordinate and not the gene or transcript; or there may have been no transcript at that position when they classified it, even though there is one now. Either way the record goes through.
 
-If the resolver DID find a transcript (i.e. `transcript_version` is set on a `ResolvedVariantInfo`), the missing c.HGVS is **accidental** — it's a resolution failure, not expected behaviour, and should still be flagged as an error.
+Validation therefore keys off **what was supplied on import**, not off what the resolver later managed to find:
 
-### Why each error fires
+- **c.HGVS or transcript supplied on import** → validate exactly as today. A missing or unsupported c.HGVS is a genuine resolution failure and stays an error.
+- **g.HGVS only** → the record is accepted. Where resolution does yield a transcript-based c.HGVS, surface the difference as a **warning** so it is visible without blocking.
 
-**1. `transcript_type_not_supported` ERROR**
-`classification_variant_info_models.py:587`
+This keeps the resolver's outcome as information for the curator, and keeps the accept/reject decision tied to the submission.
+
+---
+
+## Why each error fires today
+
+**1. `transcript_type_not_supported` ERROR** — `classification_variant_info_models.py:601`
 ```python
 if not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
-    general["transcript_type_not_supported"] = "E"
+    general["transcript_type_not_supported"] = ...
 ```
-`get_transcript` returns `None` for intergenic (no `imported_transcript`, no `imported_c_hgvs` to extract from).
-`is_supported_transcript(None)` returns `False` at line 712 (`if not transcript_or_hgvs: return False`).
-**This check is meant for unsupported transcript prefixes (e.g. `NX_`), not "no transcript at all".**
+`get_transcript` (`:675`) returns `imported_transcript`, else the transcript parsed out of `imported_c_hgvs` — so `None` for a g.HGVS-only import. `is_supported_transcript(None)` returns `False`. The check exists to reject unsupported transcript prefixes (e.g. `NX_`); it fires on "no transcript at all" as a side effect.
 
-**2. `Liftover c.nomen Change` + `Liftover Transcript Version Change` ERRORs / WARNINGs**
-`classification_variant_info_models.py:573-575`
-`ResolvedVariantInfo.recalc_c_hgvs()` (lines 192–217) calls:
-```python
-result = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript=None)
-```
-When `imported_transcript` is None for intergenic variants, the matcher falls back to the genomic (g.) HGVS representation (e.g. `NC_000009.12:g.99087902A>C`). This **g.HGVS gets stored in the `c_hgvs` field** of `ResolvedVariantInfo`.
+**2. `Liftover c.nomen Change` + `Liftover Transcript Version Change`** — `:587-589`
+`ResolvedVariantInfo.recalc_c_hgvs()` (`:207-232`) calls the matcher with `imported_transcript=None`, which falls back to the genomic representation, and that g.HGVS is stored in the `c_hgvs` field. `_calculate_validation()` then diffs the GRCh37 and GRCh38 values. The contig accessions differ by build (`NC_000009.11` vs `NC_000009.12`), so the diff always reports `transcript_version_change` (W) and `c_nomen_change` (E). The `c_nomen_change` error is what sets `include=False`.
 
-Then `_calculate_validation()` computes `c_hgvs_obj` from `ResolvedVariantInfo.c_hgvs` for both builds, and diffs them:
-```python
-if normalized_c_hgvs and lifted_c_hgvs:
-    if lifted_diff_dict := calculate_diff_dict(normalized_c_hgvs.diff(lifted_c_hgvs)):
-        validation_dict["liftover"] = lifted_diff_dict
-```
-Since GRCh37 and GRCh38 have **different contig versions** (`NC_000009.11` vs `NC_000009.12`), the diff always flags changes. These are spurious for intergenic variants.
+**3. `Builds Missing 37` / `Builds Missing 38`** — `:591-595`
+The check requires `c_hgvs_obj` on each `ResolvedVariantInfo`. For the partially-overlapping deletion in the issue comments (`NC_000009.12:g.99044538_99087902del`), liftover succeeds and both `ResolvedVariantInfo` rows exist, but `recalc_c_hgvs()` errors because the variant runs off the transcript, leaving `c_hgvs` empty. Both severities are `W` (`:278-279`), so these are cosmetic rather than export-blocking.
 
-**3. `Builds Missing 37` / `Builds Missing 38` WARNINGs**
-`classification_variant_info_models.py:578-581`
-```python
-if not self.grch37 or not self.grch37.c_hgvs_obj:
-    builds["missing_37"] = "W"
-if not self.grch38 or not self.grch38.c_hgvs_obj:
-    builds["missing_38"] = "W"
-```
-For the partially-overlapping deletion case, even though liftover succeeds and a `ResolvedVariantInfo` exists for both builds, `c_hgvs_obj` may be `None` because no transcript representation could be generated. The "builds" check is `c_hgvs_obj`-specific, so it triggers even when the variant IS resolved in both builds.
-
-**4. HGVS resolution tool link shows `?hgvs=None`**
-`imported_allele_info_detail.html:60`
-```html
-<a href="{% url 'hgvs_resolution_tool' %}?genome_build={{ allele_info.imported_genome_build|urlencode }}&hgvs={{ allele_info.imported_c_hgvs|urlencode }}">
-```
-`imported_c_hgvs` is `None` for intergenic, so Django's template engine renders the literal string `"None"`.
-Same bug exists in `management/commands/imported_allele_info_check.py:116`.
-
-**5. No allele link on classification page**
-This is a downstream effect: because validation errors mark `include=False`, and possibly because the classification view omits the allele link when the variant isn't resolved to a "supported" state. Needs verification in `classification_view.py` — the allele link context variable may be gated on `latest_validation.include`.
+**4. `?hgvs=None` link** — `imported_allele_info_detail.html:60` and `imported_allele_info_check.py:113`
+Both build the resolution-tool URL from `imported_c_hgvs`; Django's template engine renders `None` as the literal string `"None"`, and `urlencode()` stringifies it the same way.
 
 ---
 
-## Proposed Changes
+## Step 1: Add `imported_as_c_hgvs` to `ImportedAlleleInfo`
 
-### Step 1: Add `has_c_hgvs` property to `ImportedAlleleInfo`
-
-**File**: `classification/models/classification_variant_info_models.py`
-Add after the `get_transcript` property (~line 665):
+**File**: `classification/models/classification_variant_info_models.py`, near `get_transcript` (`:675`)
 
 ```python
 @property
-def has_c_hgvs(self) -> bool:
-    """True when a c.HGVS (transcript-based) representation is expected for this record.
-
-    If c.HGVS or a transcript was explicitly provided on import, c.HGVS is always expected.
-
-    If only g.HGVS was imported, we ask whether the resolver found a transcript when
-    resolving the variant. If it did (transcript_version is set on any ResolvedVariantInfo),
-    the variant overlaps a known transcript and c.HGVS should have been produced — its
-    absence is a resolution failure (missing by accident), not expected behaviour.
-    Only if no transcript was found in any build is the variant confirmed as truly intergenic
-    (missing by design)."""
-    if self.imported_c_hgvs or self.imported_transcript:
-        return True
-    # g.HGVS-only import: check whether resolution found a transcript in any build
-    for build_info in [self.grch37, self.grch38]:
-        if build_info and build_info.transcript_version_id:
-            return True
-    return False
+def imported_as_c_hgvs(self) -> bool:
+    """True when the submission supplied a transcript-based HGVS, so a resolved c.HGVS is expected."""
+    return bool(self.imported_c_hgvs or self.imported_transcript)
 ```
+
+Read the fields directly rather than going via `get_transcript`, so a malformed `imported_c_hgvs` that parses to no transcript still counts as a c.HGVS submission and keeps its errors.
 
 ---
 
-### Step 2: Fix `_calculate_validation()` for intergenic variants
+## Step 2: Key validation off the submission
 
-**File**: `classification/models/classification_variant_info_models.py`, `_calculate_validation()` (~lines 551-595)
+**File**: `classification/models/classification_variant_info_models.py`, `_calculate_validation()` (`:565-609`)
 
-#### 2a. Skip `transcript_type_not_supported` for variants without c.HGVS
-Change:
+### 2a. Gate `transcript_type_not_supported`
 ```python
-if not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
-    general["transcript_type_not_supported"] = _VALIDATION_TO_SEVERITY.get("transcript_type_not_supported", "E")
-```
-To:
-```python
-if self.has_c_hgvs and not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
+if self.imported_as_c_hgvs and not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
     general["transcript_type_not_supported"] = _VALIDATION_TO_SEVERITY.get("transcript_type_not_supported", "E")
 ```
 
-#### 2b. Skip liftover/normalize diffs when no c.HGVS is expected
-The diff comparisons at lines 569-575 use `c_hgvs_obj` from `ResolvedVariantInfo`. For intergenic variants this field may hold a g.HGVS (different contig versions across builds). Wrap the entire diff section:
+### 2b. Run the normalize diff for c.HGVS submissions
+The `normalize` diff compares `imported_c_hgvs` against the resolved value, so it applies where a c.HGVS was imported. The existing `if imported_c_hgvs and normalized_c_hgvs:` guard already covers this — leave it as is.
+
+### 2c. Report the liftover diff as a warning for g.HGVS-only submissions
+Give `calculate_diff_dict` an optional severity override:
 ```python
-if self.has_c_hgvs:
-    if imported_c_hgvs and normalized_c_hgvs:
-        if normal_diff_dict := calculate_diff_dict(imported_c_hgvs.diff(normalized_c_hgvs)):
-            validation_dict["normalize"] = normal_diff_dict
-    if normalized_c_hgvs and lifted_c_hgvs:
-        if lifted_diff_dict := calculate_diff_dict(normalized_c_hgvs.diff(lifted_c_hgvs)):
-            validation_dict["liftover"] = lifted_diff_dict
+def calculate_diff_dict(c_hgvs_diff: CHGVSDiff, severity: Optional[ALLELE_INFO_VALIDATION_SEVERITY] = None) -> ImportedAlleleValidationTagsDiff:
+    diff_dict: ImportedAlleleValidationTagsDiff = {}
+    for diff_flag, field_name in _DIFF_TO_VALIDATION_KEY.items():
+        if c_hgvs_diff & diff_flag:
+            diff_dict[field_name] = severity or _VALIDATION_TO_SEVERITY.get(field_name, "E")
+    return diff_dict
 ```
 
-#### 2c. Fix `builds` check when no c.HGVS is expected
-For intergenic variants the absence of `c_hgvs_obj` is expected; check for variant existence instead:
+Run the liftover diff when both builds resolved to a genuine transcript, and downgrade to `"W"` when the submission was g.HGVS-only:
+```python
+both_builds_have_transcript = all(
+    build_info and build_info.transcript_version_id
+    for build_info in (self.variant_info_for_imported_genome_build,
+                       self.variant_info_for_lifted_over_genome_build)
+)
+if normalized_c_hgvs and lifted_c_hgvs and (self.imported_as_c_hgvs or both_builds_have_transcript):
+    diff_severity = None if self.imported_as_c_hgvs else "W"
+    if lifted_diff_dict := calculate_diff_dict(normalized_c_hgvs.diff(lifted_c_hgvs), diff_severity):
+        validation_dict["liftover"] = lifted_diff_dict
+```
+
+`transcript_version_id` distinguishes a real c.HGVS from the g.HGVS fallback: `recalc_c_hgvs()` sets `transcript_version` from `c_hgvs_obj.transcript_version_model()` (`:219`), which resolves for `NM_`/`ENST` accessions and stays null for the `NC_` genomic form. So a g.HGVS-only record that resolves to a transcript in both builds gets its liftover difference reported as a warning, and one that resolves to genomic form in both builds gets nothing.
+
+### 2d. Check build coverage against the variant for g.HGVS-only submissions
 ```python
 builds: ImportedAlleleValidationTagsBuilds = {}
-if self.has_c_hgvs:
-    if not self.grch37 or not self.grch37.c_hgvs_obj:
-        builds["missing_37"] = _VALIDATION_TO_SEVERITY.get("missing_37", "E")
-    if not self.grch38 or not self.grch38.c_hgvs_obj:
-        builds["missing_38"] = _VALIDATION_TO_SEVERITY.get("missing_38", "E")
-else:
-    # For intergenic, check the variant itself exists in each build (no c.HGVS expected)
-    if not self.grch37 or not self.grch37.variant_id:
-        builds["missing_37"] = _VALIDATION_TO_SEVERITY.get("missing_37", "E")
-    if not self.grch38 or not self.grch38.variant_id:
-        builds["missing_38"] = _VALIDATION_TO_SEVERITY.get("missing_38", "E")
+for build_str, build_info in (("37", self.grch37), ("38", self.grch38)):
+    if self.imported_as_c_hgvs:
+        resolved = build_info and build_info.c_hgvs_obj
+    else:
+        resolved = build_info and build_info.variant_id
+    if not resolved:
+        builds[f"missing_{build_str}"] = _VALIDATION_TO_SEVERITY.get(f"missing_{build_str}", "E")
 ```
+For a g.HGVS-only submission the variant coordinate is the thing that has to exist in each build; the c.HGVS is a bonus.
 
 ---
 
-### Step 3: Fix HGVS resolution tool link in template
+## Step 3: Fall back to g.HGVS in the resolution-tool links
 
-**File**: `classification/templates/classification/imported_allele_info_detail.html`, line 60
-
-Change:
-```html
-<a class="hover-link" href="{% url 'hgvs_resolution_tool' %}?genome_build={{ allele_info.imported_genome_build|urlencode }}&hgvs={{ allele_info.imported_c_hgvs|urlencode }}">Click here to test</a>
-```
-To (use `imported_c_hgvs` if set, else `imported_g_hgvs`):
+**File**: `classification/templates/classification/imported_allele_info_detail.html:60`
 ```html
 <a class="hover-link" href="{% url 'hgvs_resolution_tool' %}?genome_build={{ allele_info.imported_genome_build|urlencode }}&hgvs={{ allele_info.imported_c_hgvs|default:allele_info.imported_g_hgvs|urlencode }}">Click here to test</a>
 ```
 
-Also fix the same bug in the management command:
-**File**: `classification/management/commands/imported_allele_info_check.py`, line 116
-Change:
-```python
-"hgvs": self.imported_allele_info.imported_c_hgvs
-```
-To:
+**File**: `classification/management/commands/imported_allele_info_check.py:113` (`_compare_url`)
 ```python
 "hgvs": self.imported_allele_info.imported_c_hgvs or self.imported_allele_info.imported_g_hgvs
 ```
 
 ---
 
-### Step 4: Investigate and fix "no allele link" on classification page
+## Step 4: Allele link on the classification page
 
-**File to investigate**: `classification/views/classification_view.py`
-Check whether the context variable that drives the allele link is gated on `latest_validation.include`. If so, it should be gated on `allele_info.allele` being non-null instead (the allele exists even if exports are excluded).
+**Files**: `classification/templates/classification/classification.html:222`, `classification/views/classification_view.py`
 
-Look for pattern like:
-```python
-context['allele'] = classification.allele if classification.variant_info.latest_validation.include else None
-```
-If found, change to always pass the allele when it exists:
-```python
-context['allele'] = classification.allele  # allele link is independent of export eligibility
-```
+The template renders the link under `{% if record == 'view_allele' and value.id %}`. A search of `classification_view.py` found no gating on `latest_validation.include`, so this symptom is likely downstream of `include=False` and should clear once Steps 1–2 land. Confirm against a live g.HGVS-only record after the fix; if the link is still absent, trace where the `view_allele` record value is populated and make it depend on the allele existing.
 
 ---
 
-### Step 5: ClinVar export — improve error message for intergenic
+## Step 5: ClinVar export message
 
-**File**: `classification/models/clinvar_export_convertor.py`, ~line 476
-The current code already excludes intergenic variants from ClinVar (no c.HGVS → error). This is correct behaviour since ClinVar requires c.HGVS. However, the error message should be clearer:
+**File**: `classification/models/clinvar_export_convertor.py:518`
 
-Change:
+ClinVar requires a transcript-based HGVS, so excluding these submissions there is correct. Make the message say why:
 ```python
+if allele_info and not allele_info.imported_as_c_hgvs:
+    return ValidatedJson(None, JsonMessages.error(
+        f"No c.HGVS available for this variant in {genome_build} — ClinVar requires a transcript-based HGVS."))
 return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
 ```
-To:
-```python
-if allele_info and not allele_info.has_c_hgvs:
-    return ValidatedJson(None, JsonMessages.error("Intergenic variant — no c.HGVS available. ClinVar requires a transcript-based HGVS."))
-else:
-    return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
-```
 
 ---
 
-### Step 6: Re-validate existing intergenic ImportedAlleleInfo records
+## Step 6: Re-validate existing records
 
-After deploying the above code changes, existing records that were incorrectly validated need to be re-processed. This requires a **data migration** or a **management command run**:
+Existing g.HGVS-only records carry the old validation tags and stay excluded until re-validated. Add a management command, and register it for deployments via a `ManualOperation` migration with a `test=` callable that checks for affected rows:
 
 ```python
-# One-off migration or manage.py command:
-from classification.models import ImportedAlleleInfo
-for iai in ImportedAlleleInfo.objects.filter(imported_g_hgvs__isnull=False, imported_c_hgvs__isnull=True):
-    iai.apply_validation(force_update=True)
-    iai.save()
+for allele_info in ImportedAlleleInfo.objects.filter(imported_c_hgvs__isnull=True, imported_transcript__isnull=True):
+    allele_info.apply_validation(force_update=True)
+    allele_info.save()
 ```
 
-This will clear the false error tags and set `include=True` for intergenic variants that successfully resolved to a variant coordinate in both builds.
+`apply_validation` preserves `include` on records a curator has confirmed (`:638`), so manual decisions survive the sweep.
 
 ---
 
-## Files to Change (Summary)
+## Files to change
 
 | File | Change |
 |------|--------|
-| `classification/models/classification_variant_info_models.py` | Add `has_c_hgvs` property; fix `_calculate_validation()` (3 sub-changes) |
-| `classification/templates/classification/imported_allele_info_detail.html` | Fix resolution tool link to use `imported_g_hgvs` as fallback |
-| `classification/management/commands/imported_allele_info_check.py` | Fix `hgvs` param in resolution tool URL |
-| `classification/models/clinvar_export_convertor.py` | Better error message for intergenic variants |
-| `classification/views/classification_view.py` | Investigate and fix allele link visibility (Step 4) |
-| New migration or management command | Re-validate existing intergenic records |
+| `classification/models/classification_variant_info_models.py` | Add `imported_as_c_hgvs`; Steps 2a, 2c, 2d in `_calculate_validation()` |
+| `classification/templates/classification/imported_allele_info_detail.html` | g.HGVS fallback in resolution-tool link |
+| `classification/management/commands/imported_allele_info_check.py` | g.HGVS fallback in `_compare_url` |
+| `classification/models/clinvar_export_convertor.py` | Clearer exclusion message |
+| `classification/views/classification_view.py` | Confirm allele link appears (Step 4) |
+| New management command + `ManualOperation` migration | Re-validate existing g.HGVS-only records |
 
 ---
 
-## Test Cases to Add
+## Display check
 
-In `classification/tests/models/test_classification_utils.py` or a new test file:
+`Classification.c_hgvs_best()` (`classification/models/classification.py:2175-2200`) falls through to `is_normalised = False` when `chgvs_grch37`/`chgvs_grch38` are empty, which is what renders *"not resolved, showing imported GRCh38.p14"* in the c.HGVS column (`vc_form.js:2392`). After the fix, check both cases from the issue:
 
-1. **`has_c_hgvs` property**:
-   - `True` when `imported_c_hgvs` or `imported_transcript` is set (always expects c.HGVS)
-   - `True` when g.HGVS-only import AND resolver found a transcript (`transcript_version_id` set on a `ResolvedVariantInfo`) — missing c.HGVS is an error
-   - `False` when g.HGVS-only import AND resolver found no transcript in any build — truly intergenic, no c.HGVS expected
-2. **Validation tags for intergenic**: Create an `ImportedAlleleInfo` with `imported_g_hgvs` set, assert `_calculate_validation()` does NOT produce `transcript_type_not_supported`, liftover diffs, or normalize diffs.
-3. **Builds missing check**: Verify `missing_37`/`missing_38` only fires when the variant itself is absent in that build for intergenic records.
-4. **`include=True` for resolved intergenic**: Verify a fully-resolved intergenic record (variant in both builds) gets `include=True`.
+- `NC_000009.12:g.99087902A>C` — resolves to the genomic form, so `chgvs_grch38` holds the g.HGVS and the column should show it.
+- `NC_000009.12:g.99044538_99087902del` — runs off the transcript, so `recalc_c_hgvs()` errors and both cached columns stay empty. Confirm what the column shows and whether falling back to `imported_g_hgvs` reads better than the imported-c.HGVS path.
+
+---
+
+## Tests
+
+In `classification/tests/`:
+
+1. **`imported_as_c_hgvs`** — `True` for `imported_c_hgvs` set, `True` for `imported_transcript` set, `False` for g.HGVS only.
+2. **g.HGVS-only, resolves to genomic form in both builds** — `_calculate_validation()` returns no `transcript_type_not_supported`, no `liftover` diff, and `include=True`.
+3. **g.HGVS-only, resolves to a transcript in both builds with differing c.HGVS** — `liftover` diff present with every severity `"W"`, and `include=True`.
+4. **c.HGVS import with an unsupported transcript prefix** — `transcript_type_not_supported` still fires as `"E"` and `include=False`.
+5. **Build coverage** — for a g.HGVS-only record, `missing_37`/`missing_38` track variant presence per build.
