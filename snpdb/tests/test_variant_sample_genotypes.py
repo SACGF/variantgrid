@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from annotation.fake_annotation import get_fake_annotation_version
 from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
@@ -30,6 +31,9 @@ class VariantSampleGenotypesTest(TestCase):
         cls.user = User.objects.get_or_create(username='vsg_test_user')[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+        # The payload generates g.HGVS for reference variants, which needs HGVSMatcher
+        get_fake_annotation_version(cls.grch37)
+        get_fake_annotation_version(cls.grch38)
 
         # create_fake_cohort packs samples as [proband, mother, father]
         cls.cohort_37 = create_fake_cohort(cls.user, cls.grch37)
@@ -137,7 +141,7 @@ class VariantSampleGenotypesTest(TestCase):
         cgc = CohortGenotypeCollection.objects.get(cohort=self.cohort_37)
         CohortGenotype.objects.create(collection=cgc, variant=variant,
                                       samples_zygosity=Zygosity.HET + Zygosity.HET + Zygosity.MISSING,
-                                      samples_allele_frequency=[0.25, CohortGenotype.MISSING_NUMBER_VALUE, -1],
+                                      samples_allele_frequency=[0.25, float(CohortGenotype.MISSING_NUMBER_VALUE), -1.0],
                                       samples_allele_depth=[20] * 3, samples_read_depth=[30] * 3,
                                       samples_genotype_quality=[30] * 3, samples_phred_likelihood=[0] * 3)
 
@@ -227,6 +231,7 @@ class VariantSampleGenotypesClassificationsTest(TestCase):
         ClassificationTestUtils.setUp()
         cls.lab, cls.lab_user = ClassificationTestUtils.lab_and_user()
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
 
         cls.user = User.objects.get_or_create(username='vsg_classification_user')[0]
         cls.user.groups.add(all_users_group())  # Every logged in user is in this
