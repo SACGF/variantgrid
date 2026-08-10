@@ -2189,14 +2189,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 c_hgvs.is_normalised = True
                 c_hgvs.is_desired_build = False
                 return c_hgvs
-        c_hgvs = HGVSDisplay(self.get(SpecialEKeys.C_HGVS) or "")
+        # nothing resolved, fall back to whichever HGVS the submitter gave us
+        imported_hgvs = HGVSDisplay(self.get(SpecialEKeys.C_HGVS) or self.get(SpecialEKeys.G_HGVS) or "")
         try:
-            c_hgvs.genome_build = self.get_genome_build()
+            imported_hgvs.genome_build = self.get_genome_build()
         except ValueError:
             pass
-        c_hgvs.is_normalised = False
-        c_hgvs.is_desired_build = preferred_genome_build == c_hgvs.genome_build
-        return c_hgvs
+        imported_hgvs.is_normalised = False
+        imported_hgvs.is_desired_build = preferred_genome_build == imported_hgvs.genome_build
+        return imported_hgvs
 
     def _generate_c_hgvs(self, genome_build: GenomeBuild) -> str:
         variant = self.get_variant_for_build(genome_build)

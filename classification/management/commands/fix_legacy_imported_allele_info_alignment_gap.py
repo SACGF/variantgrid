@@ -114,7 +114,7 @@ class Command(BaseCommand):
         allele_info_ids_to_rematch = []
         for allele_info in ImportedAlleleInfo.objects.filter(pk__in=gapped_allele_info_ids).iterator(chunk_size=100):
             if difference := self._matching_out_of_date(allele_info):
-                print(f"REMATCHING {allele_info.pk} ({allele_info.imported_c_hgvs or allele_info.imported_g_hgvs}): "
+                print(f"REMATCHING {allele_info.pk} ({allele_info.imported_hgvs}): "
                       f"{difference}")
                 allele_info_ids_to_rematch.append(allele_info.pk)
 

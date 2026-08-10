@@ -113,7 +113,7 @@ class ChgvsDiff(ExportRow):
         return get_url_from_view_path(reverse('hgvs_resolution_tool')) + "?" + urlencode(
             {
                 "genome_build": self.imported_allele_info.imported_genome_build.pk,
-                "hgvs": self.imported_allele_info.imported_c_hgvs
+                "hgvs": self.imported_allele_info.imported_hgvs
             }
         )
 

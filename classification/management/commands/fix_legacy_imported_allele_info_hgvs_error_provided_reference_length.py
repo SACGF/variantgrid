@@ -38,7 +38,7 @@ class Command(BaseCommand):
         iai_ids_with_hgvs_errors = set()
         for iai in iai_qs.filter(q).iterator():
             matcher = HGVSMatcher.instance(iai.imported_genome_build)
-            hgvs_name = iai.imported_c_hgvs or iai.imported_g_hgvs
+            hgvs_name = iai.imported_hgvs
             try:
                 matcher.get_variant_coordinate(hgvs_name)
             except (HGVSInvalidVariantError, InvalidHGVSName) as e:

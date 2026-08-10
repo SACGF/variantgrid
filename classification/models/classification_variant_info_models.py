@@ -526,7 +526,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return reverse('view_imported_allele_info_detail', kwargs={'allele_info_id': self.pk})
 
     def __str__(self):
-        return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
+        return f"{self.imported_genome_build_patch_version} {self.imported_hgvs}"
 
     @classmethod
     def supported_genome_builds(cls) -> set:
@@ -558,7 +558,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.imported_md5_hash:
-            self.imported_md5_hash = md5sum_str(self.imported_c_hgvs or self.imported_g_hgvs)
+            self.imported_md5_hash = md5sum_str(self.imported_hgvs)
 
         super().save(*args, **kwargs)
 
@@ -573,32 +573,42 @@ class ImportedAlleleInfo(TimeStampedModel):
         if lifted := self.variant_info_for_lifted_over_genome_build:
             lifted_c_hgvs = lifted.c_hgvs_obj
 
-        def calculate_diff_dict(c_hgvs_diff: CHGVSDiff) -> ImportedAlleleValidationTagsDiff:
+        def calculate_diff_dict(c_hgvs_diff: CHGVSDiff, severity: Optional[ALLELE_INFO_VALIDATION_SEVERITY] = None) -> ImportedAlleleValidationTagsDiff:
             diff_dict: ImportedAlleleValidationTagsDiff = {}
             for diff_flag, field_name in _DIFF_TO_VALIDATION_KEY.items():
                 if c_hgvs_diff & diff_flag:
-                    diff_dict[field_name] = _VALIDATION_TO_SEVERITY.get(field_name, "E")
+                    diff_dict[field_name] = severity or _VALIDATION_TO_SEVERITY.get(field_name, "E")
             return diff_dict
 
         if imported_c_hgvs and normalized_c_hgvs:
             if normal_diff_dict := calculate_diff_dict(imported_c_hgvs.diff(normalized_c_hgvs)):
                 validation_dict["normalize"] = normal_diff_dict
 
-        if normalized_c_hgvs and lifted_c_hgvs:
-            if lifted_diff_dict := calculate_diff_dict(normalized_c_hgvs.diff(lifted_c_hgvs)):
+        # a g.HGVS only submission resolves to the genomic form when there's no transcript, and the contig accession
+        # differs by build - only diff the builds when both sides resolved to a real transcript
+        both_builds_have_transcript = all(
+            build_info and build_info.transcript_version_id for build_info in (normalised, lifted)
+        )
+        if normalized_c_hgvs and lifted_c_hgvs and (self.imported_as_c_hgvs or both_builds_have_transcript):
+            diff_severity = None if self.imported_as_c_hgvs else "W"
+            if lifted_diff_dict := calculate_diff_dict(normalized_c_hgvs.diff(lifted_c_hgvs), diff_severity):
                 validation_dict["liftover"] = lifted_diff_dict
 
         builds: ImportedAlleleValidationTagsBuilds = {}
-        if not self.grch37 or not self.grch37.c_hgvs_obj:
-            builds["missing_37"] = _VALIDATION_TO_SEVERITY.get("missing_37", "E")
-        if not self.grch38 or not self.grch38.c_hgvs_obj:
-            builds["missing_38"] = _VALIDATION_TO_SEVERITY.get("missing_38", "E")
+        for build_str, build_info in (("37", self.grch37), ("38", self.grch38)):
+            if self.imported_as_c_hgvs:
+                resolved = build_info and build_info.c_hgvs_obj
+            else:
+                # a g.HGVS submission only needs the variant coordinate in each build, the c.HGVS is a bonus
+                resolved = build_info and build_info.variant_id
+            if not resolved:
+                builds[f"missing_{build_str}"] = _VALIDATION_TO_SEVERITY.get(f"missing_{build_str}", "E")
 
         if builds:
             validation_dict["builds"] = builds
 
         general: ImportedAlleleValidationTagsGeneral = {}
-        if not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
+        if self.imported_as_c_hgvs and not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
             general["transcript_type_not_supported"] = _VALIDATION_TO_SEVERITY.get("transcript_type_not_supported", "E")
         if not self.variant_coordinate:
             # we couldn't derive a variant coordinate, should be the end of it
@@ -642,8 +652,13 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def __lt__(self, other: 'ImportedAlleleInfo'):
         def sort_key(obj: ImportedAlleleInfo):
-            return obj.imported_genome_build_patch_version, obj.imported_c_hgvs or obj.imported_g_hgvs or ""
+            return obj.imported_genome_build_patch_version, obj.imported_hgvs or ""
         return sort_key(self) < sort_key(other)
+
+    @property
+    def imported_hgvs(self) -> Optional[str]:
+        """ The HGVS exactly as it was imported - only one of c/g is ever provided """
+        return self.imported_c_hgvs or self.imported_g_hgvs
 
     @property
     def imported_c_hgvs_obj(self) -> Optional[HGVSDisplay]:
@@ -677,6 +692,12 @@ class ImportedAlleleInfo(TimeStampedModel):
             return self.imported_transcript
         elif self.imported_c_hgvs:
             return HGVSDisplay(self.imported_c_hgvs).transcript
+
+    @property
+    def imported_as_c_hgvs(self) -> bool:
+        """ True when the submission supplied a transcript-based HGVS, so a resolved c.HGVS is expected.
+            Reads the fields directly so a malformed imported_c_hgvs that parses to no transcript still counts """
+        return bool(self.imported_c_hgvs or self.imported_transcript)
 
     @property
     def gene_symbols(self) -> list[GeneSymbol]:
@@ -773,7 +794,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         vc: Optional[VariantCoordinate] = None
         message = None
         genome_build = self.imported_genome_build_patch_version.genome_build
-        use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
+        use_hgvs = self.imported_hgvs
         hgvs_matcher = HGVSMatcher.instance(genome_build)
         hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         version = hgvs_matcher.hgvs_converter.get_version()

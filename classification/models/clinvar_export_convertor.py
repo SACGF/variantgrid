@@ -515,6 +515,10 @@ class ClinVarExportConverter:
 
                 return ValidatedJson(json_data)
             else:
+                allele_info = self.classification_based_on.classification.allele_info
+                if allele_info and not allele_info.imported_as_c_hgvs:
+                    return ValidatedJson(None, JsonMessages.error(
+                        f"No c.HGVS available for this variant in {genome_build} — ClinVar requires a transcript-based HGVS."))
                 return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
         except BaseException:
             return ValidatedJson(None, JsonMessages.error("Could not determine genome build of submission"))

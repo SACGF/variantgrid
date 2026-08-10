@@ -1258,7 +1258,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
 
     @admin_list_column("Imported HGVS", "imported_c_hgvs")
     def imported_hgvs(self, obj: ImportedAlleleInfo):
-        return obj.imported_c_hgvs or obj.imported_g_hgvs
+        return obj.imported_hgvs
 
     @admin_list_column("Include in Exports", "latest_validation__include", is_boolean=True)
     def validation_include(self, obj: ImportedAlleleInfo):
