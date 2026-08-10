@@ -140,8 +140,10 @@ class ImportCreateUploadedVCFTask(ImportVCFStepTask):
     def process_items(self, upload_step):
         upload_pipeline = upload_step.upload_pipeline
         file_upload = upload_pipeline.file_upload
-        UploadedVCF.objects.create(file_upload=file_upload,
-                                   upload_pipeline=upload_pipeline)
+        # UploadedVCF can already exist from an earlier run of this pipeline (ie retry import) - re-use it
+        UploadedVCF.objects.update_or_create(file_upload=file_upload,
+                                             defaults={"upload_pipeline": upload_pipeline,
+                                                       "vcf_importer": None})
         return 0
 
 

@@ -136,6 +136,10 @@ class FileUpload(TimeStampedModel):
 class UploadData(models.Model):
     """ Data created by processing a FileUpload - one per FileUpload/file_type """
 
+    # Retry-import deletes UploadData so the pipeline re-creates it from the file. Set False where the record
+    # links to data created before the pipeline started, as the pipeline can't make it again
+    created_by_pipeline = True
+
     class Meta:
         abstract = True
 

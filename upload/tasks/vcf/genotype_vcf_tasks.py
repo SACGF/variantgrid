@@ -104,6 +104,8 @@ class VCFCheckAnnotationTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         uploaded_vcf = upload_step.get_uploaded_vcf()
+        # A retry re-runs this step against the UploadedVCF from the earlier run - start pending annotation again
+        UploadedVCFPendingAnnotation.objects.filter(uploaded_vcf=uploaded_vcf).delete()
         pending_annotation = UploadedVCFPendingAnnotation.objects.create(uploaded_vcf=uploaded_vcf)
         annotation_version = AnnotationVersion.latest(upload_step.genome_build)
         variant_annotation_version = annotation_version.variant_annotation_version

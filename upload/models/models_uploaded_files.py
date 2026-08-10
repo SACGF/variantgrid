@@ -104,6 +104,8 @@ class UploadedGeneCoverage(UploadData):
 
 
 class UploadedManualVariantEntryCollection(UploadData):
+    created_by_pipeline = False  # @see annotation.manual_variant_entry.create_manual_variants
+
     file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     collection = models.OneToOneField(ManualVariantEntryCollection, null=True, on_delete=CASCADE)
 
@@ -118,6 +120,8 @@ class UploadedManualVariantEntryCollection(UploadData):
 
 
 class UploadedClassificationImport(UploadData):
+    created_by_pipeline = False  # @see classification.classification_import.process_classification_import
+
     file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     classification_import = models.OneToOneField(ClassificationImport, null=True, on_delete=CASCADE)
 
@@ -132,6 +136,8 @@ class UploadedClassificationImport(UploadData):
 
 
 class UploadedLiftover(UploadData):
+    created_by_pipeline = False  # @see snpdb.liftover.create_liftover_pipelines
+
     file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     liftover = models.OneToOneField(LiftoverRun, null=True, on_delete=CASCADE)
 

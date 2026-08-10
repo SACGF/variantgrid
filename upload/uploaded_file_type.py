@@ -100,7 +100,7 @@ def retry_upload_pipeline(upload_pipeline):
         task = reload_vcf_task.si(upload_pipeline.pk, vcf_id)  # @UndefinedVariable
         task.apply_async()
     else:
-        if upload_data:
+        if upload_data and upload_data.created_by_pipeline:
             logging.debug("Type: %s, deleting file records: %s", file_upload.file_type, upload_data)
             upload_data.delete()
 
