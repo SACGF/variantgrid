@@ -12,10 +12,11 @@ from django.test import TestCase
 from genes.gene_matching import tokenize_gene_symbols
 from genes.hgvs.hgvs import (
     HGVSDisplay,
-    PHGVS,
     CHGVSDiff,
+    c_dot_equivalent,
     chgvs_diff_description,
 )
+from genes.hgvs.phgvs import PHGVS
 from genes.models import TranscriptVersion
 from genes.transcripts_utils import (
     get_refseq_type,
@@ -273,55 +274,55 @@ class TestHGVSDisplayDiff(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# HGVSDisplay.c_dot_equivalent()
+# c_dot_equivalent()
 # ---------------------------------------------------------------------------
 
 class TestHGVSDisplayCDotEquivalent(TestCase):
 
     def test_identical_strings(self):
-        self.assertTrue(HGVSDisplay.c_dot_equivalent("c.123del", "c.123del"))
+        self.assertTrue(c_dot_equivalent("c.123del", "c.123del"))
 
     def test_del_explicit_vs_implicit_equivalent(self):
-        self.assertTrue(HGVSDisplay.c_dot_equivalent("c.123del", "c.123delA"))
+        self.assertTrue(c_dot_equivalent("c.123del", "c.123delA"))
 
     def test_del_count_vs_explicit_match(self):
-        self.assertTrue(HGVSDisplay.c_dot_equivalent("c.123del3", "c.123delACG"))
+        self.assertTrue(c_dot_equivalent("c.123del3", "c.123delACG"))
 
     def test_del_count_vs_explicit_mismatch(self):
-        self.assertFalse(HGVSDisplay.c_dot_equivalent("c.123del3", "c.123delAC"))
+        self.assertFalse(c_dot_equivalent("c.123del3", "c.123delAC"))
 
     def test_del_count_vs_count_different(self):
-        self.assertFalse(HGVSDisplay.c_dot_equivalent("c.123del3", "c.123del4"))
+        self.assertFalse(c_dot_equivalent("c.123del3", "c.123del4"))
 
     def test_del_different_positions(self):
-        self.assertFalse(HGVSDisplay.c_dot_equivalent("c.123del", "c.456del"))
+        self.assertFalse(c_dot_equivalent("c.123del", "c.456del"))
 
     def test_del_vs_dup_not_equivalent(self):
-        self.assertFalse(HGVSDisplay.c_dot_equivalent("c.123del", "c.123dup"))
+        self.assertFalse(c_dot_equivalent("c.123del", "c.123dup"))
 
     def test_dup_explicit_vs_implicit(self):
-        self.assertTrue(HGVSDisplay.c_dot_equivalent("c.123dup", "c.123dupA"))
+        self.assertTrue(c_dot_equivalent("c.123dup", "c.123dupA"))
 
     def test_ins_explicit_vs_implicit(self):
         # "c.123_124ins" vs "c.123_124insATG" — one has no sequence (implicit)
-        self.assertTrue(HGVSDisplay.c_dot_equivalent("c.123_124ins", "c.123_124insATG"))
+        self.assertTrue(c_dot_equivalent("c.123_124ins", "c.123_124insATG"))
 
     def test_ins_count_vs_explicit(self):
-        self.assertTrue(HGVSDisplay.c_dot_equivalent("c.123_124ins3", "c.123_124insATG"))
+        self.assertTrue(c_dot_equivalent("c.123_124ins3", "c.123_124insATG"))
 
     def test_ins_count_vs_explicit_mismatch(self):
-        self.assertFalse(HGVSDisplay.c_dot_equivalent("c.123_124ins4", "c.123_124insATG"))
+        self.assertFalse(c_dot_equivalent("c.123_124ins4", "c.123_124insATG"))
 
     def test_delins_vs_del_not_equivalent(self):
         # One is delins (has ins portion), other is plain del → not equivalent
-        self.assertFalse(HGVSDisplay.c_dot_equivalent("c.123del", "c.123delinsATG"))
+        self.assertFalse(c_dot_equivalent("c.123del", "c.123delinsATG"))
 
     def test_snp_different(self):
-        self.assertFalse(HGVSDisplay.c_dot_equivalent("c.123A>G", "c.123A>T"))
+        self.assertFalse(c_dot_equivalent("c.123A>G", "c.123A>T"))
 
     def test_one_none_input(self):
         # One None → regex won't match → falls to final return False
-        self.assertFalse(HGVSDisplay.c_dot_equivalent("c.123del", None))
+        self.assertFalse(c_dot_equivalent("c.123del", None))
 
 
 # ---------------------------------------------------------------------------

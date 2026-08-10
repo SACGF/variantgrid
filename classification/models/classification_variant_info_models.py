@@ -216,7 +216,7 @@ class ResolvedVariantInfo(TimeStampedModel):
 
         hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         version = hgvs_matcher.hgvs_converter.get_version()
-        transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
+        transcript_version = TranscriptVersion.get_for_parts(genome_build, c_hgvs_obj.transcript_parts)
         # Prefer data version from the transcript directly used; fall back to the c_hgvs_obj lookup
         data_version = (result.converter_info.hgvs_converter_data_version
                         or (transcript_version.data.get('cdot', '') if transcript_version else ''))

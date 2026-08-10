@@ -1,5 +1,7 @@
 # Copied from pyhgvs.models.hgvs_name.get_refseq_type
 # @see https://github.com/counsyl/hgvs/blob/master/pyhgvs/__init__.py
+import re
+from typing import Optional
 
 REFSEQ_PREFIXES = [
     ('AC_', 'genomic',
@@ -39,6 +41,27 @@ def get_refseq_type(name):
 
 def transcript_is_lrg(transcript_accession: str):
     return transcript_accession.startswith("LRG_")
+
+
+def get_lrg_and_t(lrg_identifier: str) -> tuple[Optional[str], Optional[str]]:
+    if m := re.match(r"(LRG_\d+)(t\d+)?", lrg_identifier, flags=re.IGNORECASE):
+        lrg, t = m.groups()
+        lrg = lrg.upper()
+        if t:
+            t = t.lower()
+    else:
+        lrg = t = None
+    return lrg, t
+
+
+def clean_transcript_accession(transcript_accession: str) -> str:
+    """ Upper cases the accession, other than the 't' of an LRG which is conventionally lower case """
+    t_upper = transcript_accession.upper()
+    if transcript_is_lrg(t_upper):
+        lrg, t = get_lrg_and_t(transcript_accession)
+        if lrg:
+            return lrg + t if t else lrg
+    return t_upper
 
 
 def looks_like_transcript(prefix: str) -> bool:

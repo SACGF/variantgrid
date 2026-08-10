@@ -20,8 +20,9 @@ class TranscriptParts(FormerTuple):
 
 
 def get_transcript_id_and_version(transcript_accession: str) -> TranscriptParts:
+    """ Lenient - anything that isn't "<identifier>.<int>" is kept whole as the identifier """
     parts = transcript_accession.split(".")
-    if len(parts) == 2:
+    if len(parts) == 2 and parts[1].isdigit():
         identifier = str(parts[0])
         version = int(parts[1])
     else:

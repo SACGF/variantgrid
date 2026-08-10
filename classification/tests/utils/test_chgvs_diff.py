@@ -1,6 +1,6 @@
 from django.test.testcases import TestCase
 
-from genes.hgvs import HGVSDisplay, CHGVSDiff
+from genes.hgvs import HGVSDisplay, CHGVSDiff, c_dot_equivalent
 
 
 def diff(c1: str, c2: str) -> CHGVSDiff:
@@ -11,14 +11,14 @@ def diff(c1: str, c2: str) -> CHGVSDiff:
 class CHGVSDiffTests(TestCase):
 
     def test_c_dot_same(self):
-        self.assertTrue(HGVSDisplay.c_dot_equivalent('c.22G>A', 'c.22G>A'))
-        self.assertTrue(HGVSDisplay.c_dot_equivalent('c.4205_4208del', 'c.4205_4208delTGCC'))
-        self.assertTrue(HGVSDisplay.c_dot_equivalent('c.4205_4208del4', 'c.4205_4208delTGCC'))
-        self.assertFalse(HGVSDisplay.c_dot_equivalent('c.4205_4208del1', 'c.4205_4208del2'))
-        self.assertFalse(HGVSDisplay.c_dot_equivalent('c.4205_4208delAT', 'c.4205_4208delT'))
+        self.assertTrue(c_dot_equivalent('c.22G>A', 'c.22G>A'))
+        self.assertTrue(c_dot_equivalent('c.4205_4208del', 'c.4205_4208delTGCC'))
+        self.assertTrue(c_dot_equivalent('c.4205_4208del4', 'c.4205_4208delTGCC'))
+        self.assertFalse(c_dot_equivalent('c.4205_4208del1', 'c.4205_4208del2'))
+        self.assertFalse(c_dot_equivalent('c.4205_4208delAT', 'c.4205_4208delT'))
         # snuck a different nucleotide in the 2nd one below
-        self.assertFalse(HGVSDisplay.c_dot_equivalent('c.2719_2730delAAGAAGGACAGGinsT', 'c.2719_2730delAAGATGGACAGGinsT'))
-        self.assertTrue(HGVSDisplay.c_dot_equivalent('c.2719_2730delAAGAAGGACAGGinsT', 'c.2719_2730delinsT'))
+        self.assertFalse(c_dot_equivalent('c.2719_2730delAAGAAGGACAGGinsT', 'c.2719_2730delAAGATGGACAGGinsT'))
+        self.assertTrue(c_dot_equivalent('c.2719_2730delAAGAAGGACAGGinsT', 'c.2719_2730delinsT'))
 
     def test_insert_gene(self):
         cd = diff('NM_000022.3:c.22G>A', 'NM_000022.3(ADA):c.22G>A')

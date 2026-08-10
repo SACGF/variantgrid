@@ -2,3 +2,4 @@ from hgvs_shim import HGVSException, HGVSNomenclatureException, HGVSImplementati
 from hgvs_shim import HGVSVariant
 from .hgvs import *
 from .hgvs_matcher import *
+from .phgvs import *

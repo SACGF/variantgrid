@@ -41,6 +41,7 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNC
 from genes.transcript_errors import BadTranscript, MissingTranscript, NoTranscript
 from genes.transcript_parts import TranscriptParts, get_transcript_id_and_version
 from genes.transcript_sequence_retrieval import FetchedTranscriptSequence, TranscriptSequenceFetcher
+from genes.transcripts_utils import get_lrg_and_t
 from library.cache import timed_cache
 from library.constants import DAY_SECS, HOUR_SECS, WEEK_SECS
 from library.django_utils import SortByPKMixin
@@ -920,6 +921,15 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return {f"{transcript_id}.{version}": pk for (pk, transcript_id, version) in tv_values}
 
     @staticmethod
+    def get_for_parts(genome_build: GenomeBuild, transcript_parts: TranscriptParts) -> Optional['TranscriptVersion']:
+        """ Exact lookup for an already split accession - None if the version wasn't given, or we don't have it """
+        if transcript_parts.identifier and transcript_parts.version:
+            return TranscriptVersion.objects.filter(genome_build=genome_build,
+                                                    transcript_id=transcript_parts.identifier,
+                                                    version=transcript_parts.version).first()
+        return None
+
+    @staticmethod
     def filter_by_accession(accession, genome_build=None):
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(accession)
         kwargs = {"transcript_id": transcript_id}
@@ -1420,15 +1430,8 @@ class LRGRefSeqGene(models.Model):
         unique_together = ("lrg", "t")
 
     @staticmethod
-    def get_lrg_and_t(lrg_identifier: str) -> tuple[str, Optional[str]]:
-        if m := re.match(r"(LRG_\d+)(t\d+)?", lrg_identifier, flags=re.IGNORECASE):
-            lrg, t = m.groups()
-            lrg = lrg.upper()
-            if t:
-                t = t.lower()
-        else:
-            lrg = t = None
-        return lrg, t
+    def get_lrg_and_t(lrg_identifier: str) -> tuple[Optional[str], Optional[str]]:
+        return get_lrg_and_t(lrg_identifier)
 
     @staticmethod
     def get_transcript_version(genome_build: GenomeBuild, lrg_identifier: str) -> Optional[TranscriptVersion]:
