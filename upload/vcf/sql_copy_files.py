@@ -35,7 +35,8 @@ def sql_copy_csv(input_filename, table_name, columns, delimiter=',', quote=None)
 
 
 def sql_copy_csv_file(f, table_name, columns, delimiter=',', quote=None):
-    columns_str = ','.join(columns)
+    # Quote identifiers as psycopg2's copy_from() did - some columns (eg Variant.end) are reserved words
+    columns_str = ','.join(f'"{c}"' for c in columns)
     if quote:
         if delimiter != ',':
             msg = f"Don't know how to do this (sql_copy_csv_file sep='{delimiter}', quote='{quote}'"

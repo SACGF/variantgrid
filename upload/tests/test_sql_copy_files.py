@@ -15,7 +15,7 @@ class SqlCopyFilesTest(TestCase):
 
     def setUp(self):
         with connection.cursor() as cursor:
-            cursor.execute(f"CREATE TEMP TABLE {TEMP_TABLE} (a int, b text) ON COMMIT DROP")
+            cursor.execute(f'CREATE TEMP TABLE {TEMP_TABLE} (a int, b text, "end" int) ON COMMIT DROP')
 
     def _get_rows(self):
         with connection.cursor() as cursor:
@@ -42,6 +42,15 @@ class SqlCopyFilesTest(TestCase):
         filename = self._write_csv('1,"one,two"\n')
         self.assertEqual(sql_copy_csv(filename, TEMP_TABLE, COLUMNS, quote='"'), 1)
         self.assertEqual(self._get_rows(), [(1, "one,two")])
+
+    def test_sql_copy_csv_reserved_word_column(self):
+        """ VARIANTS_HEADER has 'end' in it, which needs quoting """
+
+        filename = self._write_csv("1,one,42\n")
+        self.assertEqual(sql_copy_csv(filename, TEMP_TABLE, COLUMNS + ["end"]), 1)
+        with connection.cursor() as cursor:
+            cursor.execute(f'SELECT "end" FROM {TEMP_TABLE}')
+            self.assertEqual(cursor.fetchall(), [(42,)])
 
     def test_sql_copy_csv_file_iterator(self):
         """ BulkVCFCountInserter streams rows in via IteratorFile rather than a file on disk """
