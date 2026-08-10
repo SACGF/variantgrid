@@ -50,6 +50,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
+from library.django_utils.django_postgres import get_backend_pid
 from library.log_utils import log_traceback
 from library.utils import add_exception_note, format_percent
 from library.utils.database_utils import queryset_to_sql
@@ -1087,8 +1088,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         Analysis.objects.filter(pk=self.analysis.pk).update(modified=timezone.now())
 
     def set_node_task_and_status(self, celery_task, status):
-        cursor = connection.cursor()
-        db_pid = cursor.db.connection.get_backend_pid()
+        with connection.cursor() as cursor:
+            db_pid = get_backend_pid(cursor)
         self.update(status=status)
 
         NodeTask.objects.filter(node_version__node=self, node_version__version=self.version) \

@@ -2,11 +2,37 @@
 from django.db import models
 from django.db.models import Model, sql
 
+# IteratorFile.read() concatenates until it has this much, so big reads go quadratic
+COPY_READ_SIZE = 8192
+
 
 class PostgresRealField(models.Field):
     """ 32 bit float """
     def db_type(self, connection):
         return 'real'
+
+
+# psycopg2 and psycopg3 differ on the driver APIs below, and deployments can be on either, so go
+# through these wrappers rather than the raw connection/cursor. Both drivers are tested in
+# library.django_utils.tests.test_django_postgres
+
+
+def get_backend_pid(cursor) -> int:
+    """ PID of the Postgres backend serving this cursor's connection.
+        psycopg3 dropped get_backend_pid() - connection.info works on both drivers """
+    return cursor.db.connection.info.backend_pid
+
+
+def copy_from_file(cursor, copy_sql: str, f):
+    """ Runs a 'COPY <table> FROM STDIN' statement, streaming from a file-like object.
+        psycopg3 replaced copy_expert()/copy_from() with the cursor.copy() context manager """
+    if hasattr(cursor, "copy_expert"):  # psycopg2
+        cursor.copy_expert(copy_sql, f)
+    else:
+        with cursor.copy(copy_sql) as copy:
+            while data := f.read(COPY_READ_SIZE):
+                copy.write(data)
+    return cursor.rowcount
 
 
 def pg_sql_array(values):

@@ -4,6 +4,7 @@ import os
 
 from django.db import connection
 
+from library.django_utils.django_postgres import copy_from_file
 from library.utils import single_quote
 
 LOCI_HEADER = ['contig_id', 'position', 'ref_id']
@@ -34,34 +35,25 @@ def sql_copy_csv(input_filename, table_name, columns, delimiter=',', quote=None)
 
 
 def sql_copy_csv_file(f, table_name, columns, delimiter=',', quote=None):
-    cursor = connection.cursor()
+    columns_str = ','.join(columns)
+    if quote:
+        if delimiter != ',':
+            msg = f"Don't know how to do this (sql_copy_csv_file sep='{delimiter}', quote='{quote}'"
+            raise ValueError(msg)
+        sql = f"COPY {table_name} ({columns_str}) FROM STDIN WITH (FORMAT csv, QUOTE {single_quote(quote)})"
+    else:
+        sql = f"COPY {table_name} ({columns_str}) FROM STDIN " \
+              f"WITH (FORMAT text, DELIMITER {single_quote(delimiter)}, NULL '')"
+
     try:
-        if quote:
-            if delimiter != ',':
-                msg = f"Don't know how to do this (sql_copy_csv_file sep='{delimiter}', quote='{quote}'"
-                raise ValueError(msg)
-
-            columns = ','.join(columns)
-            quote = single_quote(quote)
-            sql = f"COPY {table_name} ({columns}) FROM STDIN CSV QUOTE {quote};"
-            value = cursor.copy_expert(sql, f)
-        else:
-            value = cursor.copy_from(f,
-                                     table_name,
-                                     delimiter,
-                                     null='',
-                                     columns=columns)
-
-        logging.debug("copy returned %s - affected %d rows", value, cursor.rowcount)
-
-        affected = cursor.rowcount
-        return affected
+        with connection.cursor() as cursor:
+            affected = copy_from_file(cursor, sql, f)
+            logging.debug("copy affected %d rows", affected)
+            return affected
     except Exception as e:
         logging.error(e)
-        logging.info("columns = '%s'", columns)
+        logging.info("columns = '%s'", columns_str)
         raise e
-    finally:
-        cursor.close()
 
 
 def loci_sql_copy_csv(input_filename):
