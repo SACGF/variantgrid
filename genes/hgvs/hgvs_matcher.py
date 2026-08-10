@@ -17,7 +17,7 @@ from django.core.cache import cache
 from django.db.models import Max, Min
 from django.utils.timezone import now
 
-from genes.hgvs import CHGVS, HGVSImplementationException, HGVSNomenclatureException, HGVSVariant
+from genes.hgvs import HGVSDisplay, HGVSImplementationException, HGVSNomenclatureException, HGVSVariant
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import (
@@ -670,11 +670,11 @@ class HGVSMatcher:
             hgvs_str = str(hgvs_variant)
         return hgvs_str
 
-    def variant_to_c_hgvs_parts(self, variant: Variant, transcript: Optional[str], throw_on_issue: bool = False) -> Optional[CHGVS]:
+    def variant_to_c_hgvs_parts(self, variant: Variant, transcript: Optional[str], throw_on_issue: bool = False) -> Optional[HGVSDisplay]:
         try:
             hgvs_variant = self.variant_to_hgvs_variant(variant, transcript)
             if hgvs_variant:
-                return CHGVS(hgvs_variant.format(), transcript)
+                return HGVSDisplay(hgvs_variant.format(), transcript)
         except Exception:
             if throw_on_issue:
                 raise

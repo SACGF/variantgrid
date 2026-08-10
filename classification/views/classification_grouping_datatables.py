@@ -26,7 +26,7 @@ from classification.models import (
     EvidenceKeyMap,
     ImportedAlleleInfo,
 )
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
@@ -130,7 +130,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
-                    c_hgvs = CHGVS(c_hgvs_string)
+                    c_hgvs = HGVSDisplay(c_hgvs_string)
                     c_hgvs.genome_build = genome_build
                     c_hgvs.is_desired_build = index == 0
                     return c_hgvs.to_json()
@@ -139,7 +139,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             # TODO check imported g_hgvs or other importable columns
             # could be dirty and not have a latest_allele_info
             if raw_genome_build := row["latest_allele_info__imported_genome_build_patch_version__genome_build"]:
-                c_hgvs = CHGVS(row["latest_allele_info__imported_c_hgvs"])
+                c_hgvs = HGVSDisplay(row["latest_allele_info__imported_c_hgvs"])
                 c_hgvs.genome_build = GenomeBuild.get_name_or_alias(raw_genome_build)
                 c_hgvs.is_normalised = False
                 return c_hgvs.to_json()

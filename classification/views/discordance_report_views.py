@@ -41,7 +41,7 @@ from classification.views.discordance_report_triage_view import DiscordanceRepor
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from library.log_utils import log_admin_change
 from library.preview_request import PreviewKeyValue, preview_extra_signal
 from review.models import Review
@@ -251,7 +251,7 @@ class DiscordanceReportTemplateData:
         return self._effectives_and_not_considered[1]
 
     @property
-    def c_hgvses(self) -> list[CHGVS]:
+    def c_hgvses(self) -> list[HGVSDisplay]:
         return sorted({cm.c_hgvs_best(self.genome_build) for cm in self.report.all_classification_modifications})
 
     def resolve_label(self):

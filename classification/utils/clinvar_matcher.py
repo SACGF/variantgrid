@@ -28,7 +28,7 @@ from classification.models import (
     ConditionResolved,
     EvidenceKeyMap,
 )
-from genes.hgvs import CHGVS, HGVSException
+from genes.hgvs import HGVSDisplay, HGVSException
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
@@ -176,9 +176,9 @@ class ClinVarLegacyRow:
         return self.get_column(ClinVarLegacyColumn.Your_variant_description_HGVS)
 
     @property
-    def variant_description(self) -> Optional[CHGVS]:
+    def variant_description(self) -> Optional[HGVSDisplay]:
         if cd := self.variant_description_str:
-            c_hgvs = CHGVS(cd)
+            c_hgvs = HGVSDisplay(cd)
             c_hgvs.gene_symbol = self.submitted_gene
             return c_hgvs
 
@@ -229,9 +229,9 @@ class ClinVarLegacyRow:
             return self.variant_preferred
 
     @property
-    def c_hgvs_with_gene_symbol(self) -> Optional[CHGVS]:
+    def c_hgvs_with_gene_symbol(self) -> Optional[HGVSDisplay]:
         if c_hgvs_str := self.c_hgvs_preferred_str:
-            c_hgvs = CHGVS(c_hgvs_str)
+            c_hgvs = HGVSDisplay(c_hgvs_str)
             c_hgvs.gene_symbol = self.submitted_gene
             return c_hgvs
         return None
@@ -309,7 +309,7 @@ class ClinVarLegacyRow:
         if c_hgvs := self.c_hgvs_with_gene_symbol:
             # allow for some transcript version increases
             if c_hgvs.transcript_parts.version:
-                test_c_hgvs: CHGVS
+                test_c_hgvs: HGVSDisplay
                 c_hgvs_strs: list[str] = []
                 for attempt_increase in range(-3, 3):
                     if c_hgvs.transcript_parts.version + attempt_increase >= 1:
@@ -336,7 +336,7 @@ class ClinVarLegacyRow:
                             clinical_significance = classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
                             if clinical_significance == self.clinical_significance_code:
                                 export_match_types.add(ClinVarLegacyExportMatchType.CLINICAL_SIGNIFICANCE_MATCHES)
-                            # if CHGVS(classification_based_on.get(SpecialEKeys.C_HGVS)) == self.c_hgvs_with_gene_symbol:
+                            # if HGVSDisplay(classification_based_on.get(SpecialEKeys.C_HGVS)) == self.c_hgvs_with_gene_symbol:
                             #    export_match_types.add(ClinVarLegacyExportMatchType.C_HGVS_MATCHES)
 
                         umbrella = clinvar_export.condition_resolved.terms

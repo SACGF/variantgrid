@@ -22,7 +22,7 @@ from classification.models import (
 )
 from classification.models.clinical_context_models import DiscordanceLevel, DiscordanceStatus
 from flags.models import Flag, FlagStatus
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from library.utils import first, group_by_key, segment
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
@@ -261,7 +261,7 @@ class AlleleOverlap(OverlapState):
         self._calculator_state = calculator_state
         self.allele = allele
         self.context_map: dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = {}
-        self._c_hgvses: set[CHGVS] = set()
+        self._c_hgvses: set[HGVSDisplay] = set()
 
         # need to keep track of the below for sorting
         self.shared_labs = set()
@@ -299,7 +299,7 @@ class AlleleOverlap(OverlapState):
         return sorted(self.context_map.values())
 
     @property
-    def c_hgvses(self) -> list[CHGVS]:
+    def c_hgvses(self) -> list[HGVSDisplay]:
         return sorted(self._c_hgvses)
 
     @property

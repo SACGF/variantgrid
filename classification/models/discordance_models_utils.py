@@ -18,7 +18,7 @@ from classification.models import (
     DiscordanceReportTriage,
     DiscordanceReportTriageStatus,
 )
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportDataType, ExportRow, export_column, pretty_label
 from snpdb.lab_picker import LabPickerData
@@ -195,11 +195,11 @@ class DiscordanceReportRowData(ExportRow):
         return date_str
 
     @property
-    def c_hgvs(self) -> CHGVS:
+    def c_hgvs(self) -> HGVSDisplay:
         return self._cm_candidate.c_hgvs_best(genome_build=self.perspective.genome_build)
 
     @property
-    def c_hgvses(self) -> list[CHGVS]:
+    def c_hgvses(self) -> list[HGVSDisplay]:
         return sorted({candidate.c_hgvs_best(genome_build=self.perspective.genome_build) for candidate in self._cm_candidates})
 
     @property

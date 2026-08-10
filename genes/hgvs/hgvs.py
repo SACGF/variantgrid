@@ -150,10 +150,11 @@ class PHGVS:
         )
 
 
-class CHGVS:
+class HGVSDisplay:
     """
-    Technically this is HGVS now as it will accept c. p. g. n. etc
-    This is one of the first helper classes I created on this project and it's a bit of a mess
+    An HGVS string (c./g./n./p.) split into transcript, gene symbol and nomen, along with the genome build it
+    belongs to and whether it's the resolved/desired representation - enough to render, sort and diff it.
+    Parsing is lenient, anything that doesn't match is kept whole, so it can handle whatever is in the database.
     """
     HGVS_REGEX = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
     NUM_PART = re.compile('^[a-z][.]([0-9]+)(.*?)$')
@@ -178,7 +179,7 @@ class CHGVS:
             return True
         if c_dot_1 is None or c_dot_2 is None:
             return False
-        if (c1_m := CHGVS.C_DOT_PARTS.match(c_dot_1)) and (c2_m := CHGVS.C_DOT_PARTS.match(c_dot_2)):
+        if (c1_m := HGVSDisplay.C_DOT_PARTS.match(c_dot_1)) and (c2_m := HGVSDisplay.C_DOT_PARTS.match(c_dot_2)):
             if c1_m.group('pos') != c2_m.group('pos'):
                 return False
             if c1_m.group('op') != c2_m.group('op'):
@@ -212,7 +213,7 @@ class CHGVS:
         self.is_desired_build: Optional[bool] = None
         self.genome_build: Optional[GenomeBuild] = None
 
-        if match := CHGVS.HGVS_REGEX.match(full_c_hgvs):
+        if match := HGVSDisplay.HGVS_REGEX.match(full_c_hgvs):
             self.gene = match[2]
             self.raw_c = match[3]
 
@@ -267,14 +268,14 @@ class CHGVS:
     def without_gene_symbol_str(self) -> str:
         return f'{self.transcript}:{self.raw_c}'
 
-    def with_gene_symbol(self, gene_symbol: str) -> 'CHGVS':
+    def with_gene_symbol(self, gene_symbol: str) -> 'HGVSDisplay':
         if self.transcript:
             new_full_chgvs = f'{self.transcript}({gene_symbol}):{self.raw_c}'
-            return CHGVS(new_full_chgvs)
+            return HGVSDisplay(new_full_chgvs)
         # if there's no transcript we're invalid, not much we can do
         return self
 
-    def with_transcript_version(self, version: int) -> 'CHGVS':
+    def with_transcript_version(self, version: int) -> 'HGVSDisplay':
         if self.transcript_parts:
             transcript = self.transcript_parts.identifier
             if transcript and self.raw_c:
@@ -283,11 +284,11 @@ class CHGVS:
                     full_c_hgvs = f'{transcript}.{version}({gene}):{self.raw_c}'
                 else:
                     full_c_hgvs = f'{transcript}.{version}:{self.raw_c}'
-                return CHGVS(full_c_hgvs)
+                return HGVSDisplay(full_c_hgvs)
         return self
 
     @cached_property
-    def without_transcript_version(self) -> 'CHGVS':
+    def without_transcript_version(self) -> 'HGVSDisplay':
         if self.transcript_parts:
             transcript = self.transcript_parts.identifier
             if transcript and self.raw_c:
@@ -296,7 +297,7 @@ class CHGVS:
                     full_c_hgvs = f'{transcript}({gene}):{self.raw_c}'
                 else:
                     full_c_hgvs = f'{transcript}:{self.raw_c}'
-                return CHGVS(full_c_hgvs)
+                return HGVSDisplay(full_c_hgvs)
         return self
 
     def __eq__(self, other):
@@ -330,7 +331,7 @@ class CHGVS:
             sort_str += "Z"
 
         if c_part := self.raw_c:
-            if parts := CHGVS.NUM_PART.match(c_part):
+            if parts := HGVSDisplay.NUM_PART.match(c_part):
                 num_part = parts.group(1).rjust(10, '0')
                 extra = parts.group(2)
                 return sort_str + num_part + extra + self.transcript
@@ -354,7 +355,7 @@ class CHGVS:
 
     def transcript_version_model(self, genome_build: Optional[GenomeBuild] = None) -> Optional[TranscriptVersion]:
         """
-        :param genome_build: Must be provided if genome_build isn't already part of the CHGVS object
+        :param genome_build: Must be provided if genome_build isn't already part of the HGVSDisplay object
         :return: The extract TranscriptVersion if it's in our database, otherwise None
         """
         parts = self.transcript_parts
@@ -367,7 +368,7 @@ class CHGVS:
             if transcript := Transcript.objects.filter(identifier=parts.identifier).first():
                 return TranscriptVersion.objects.filter(genome_build=genome_build, transcript=transcript, version=parts.version).first()
 
-    def diff(self, other: 'CHGVS') -> CHGVSDiff:
+    def diff(self, other: 'HGVSDisplay') -> CHGVSDiff:
         cdiff = CHGVSDiff.SAME
         my_tran = self.transcript_parts
         o_tran = other.transcript_parts
@@ -382,7 +383,7 @@ class CHGVS:
                 cdiff = cdiff | CHGVSDiff.DIFF_GENE
 
         if self.raw_c != other.raw_c:
-            if CHGVS.c_dot_equivalent(self.raw_c, other.raw_c):
+            if HGVSDisplay.c_dot_equivalent(self.raw_c, other.raw_c):
                 cdiff = cdiff | CHGVSDiff.DIFF_RAW_CGVS_EXPANDED
             else:
                 cdiff = cdiff | CHGVSDiff.DIFF_RAW_CGVS

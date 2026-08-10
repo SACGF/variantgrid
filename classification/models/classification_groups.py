@@ -20,7 +20,7 @@ from classification.models import (
 )
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
-from genes.hgvs import CHGVS, PHGVS
+from genes.hgvs import HGVSDisplay, PHGVS
 from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab
@@ -312,10 +312,10 @@ class ClassificationGroup:
                 return cc.is_discordant
 
     @staticmethod
-    def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> CHGVS:
-        c_parts: CHGVS
+    def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
+        c_parts: HGVSDisplay
         if c_str := cm.classification.get_c_hgvs(genome_build):
-            c_parts = CHGVS(c_str)
+            c_parts = HGVSDisplay(c_str)
             c_parts.is_normalised = True
             c_parts.genome_build = genome_build
         else:
@@ -329,7 +329,7 @@ class ClassificationGroup:
         return c_parts
 
     @cached_property
-    def c_hgvses(self) -> list[CHGVS]:
+    def c_hgvses(self) -> list[HGVSDisplay]:
         unique_c = set()
         for ge in self.group_entries:
             unique_c.add(ge.c_hgvs)
@@ -347,7 +347,7 @@ class ClassificationGroup:
         return prefix + self.c_hgvs.sort_str
 
     @property
-    def c_hgvs(self) -> CHGVS:
+    def c_hgvs(self) -> HGVSDisplay:
         return self.c_hgvses[0]
 
     @property

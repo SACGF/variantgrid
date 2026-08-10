@@ -82,7 +82,7 @@ from flags.models.models import (
     FlagTypeContext,
     flag_collection_extra_info_signal,
 )
-from genes.hgvs import CHGVS, HGVSMatcher
+from genes.hgvs import HGVSDisplay, HGVSMatcher
 from genes.models import Gene, NoTranscript
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
@@ -105,7 +105,7 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
 from snpdb.user_settings_manager import UserSettingsManager
 
-ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
+ChgvsKey = namedtuple('HGVSDisplay', ['short', 'column', 'build'])
 
 classification_validation_signal = django.dispatch.Signal()  # args: "classification", "patch_meta", "key_map"
 classification_current_state_signal = django.dispatch.Signal()  # args: "user"
@@ -1601,7 +1601,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 c_parts_cell = patch[SpecialEKeys.C_HGVS]
                 c_hgvs = c_parts_cell.value
                 if c_hgvs:
-                    c_parts = CHGVS(full_c_hgvs=c_hgvs)
+                    c_parts = HGVSDisplay(full_c_hgvs=c_hgvs)
                     transcript = c_parts.transcript
                     gene_symbol = c_parts.gene
 
@@ -2044,7 +2044,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     (c_hgvs := preferred_build.c_hgvs_obj):
                 resolved_dict.update(c_hgvs.to_json())
             elif c_hgvs_raw := self.get(SpecialEKeys.C_HGVS):
-                resolved_dict.update(CHGVS(c_hgvs_raw).to_json())
+                resolved_dict.update(HGVSDisplay(c_hgvs_raw).to_json())
 
             include = False
             if latest_validation := allele_info.latest_validation:
@@ -2163,19 +2163,19 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if variant := self.get_variant_for_build(variant_annotation_version.genome_build):
             return variant.variantannotation_set.filter(version=variant_annotation_version).first()
 
-    def c_hgvs_all(self) -> list[CHGVS]:
-        all_chgvs: list[CHGVS] = []
+    def c_hgvs_all(self) -> list[HGVSDisplay]:
+        all_chgvs: list[HGVSDisplay] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_c_hgvs(genome_build):
-                chgvs = CHGVS(full_c_hgvs=text)
+                chgvs = HGVSDisplay(full_c_hgvs=text)
                 chgvs.genome_build = genome_build
                 chgvs.is_normalised = True
                 all_chgvs.append(chgvs)
         return all_chgvs
 
-    def c_hgvs_best(self, preferred_genome_build: GenomeBuild) -> CHGVS:
+    def c_hgvs_best(self, preferred_genome_build: GenomeBuild) -> HGVSDisplay:
         if c_hgvs_str := self.get_c_hgvs(preferred_genome_build):
-            c_hgvs = CHGVS(c_hgvs_str)
+            c_hgvs = HGVSDisplay(c_hgvs_str)
             c_hgvs.genome_build = preferred_genome_build
             c_hgvs.is_normalised = True
             c_hgvs.is_desired_build = True
@@ -2184,12 +2184,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             if preferred_genome_build == alt_genome_build:
                 continue
             if c_hgvs_str := self.get_c_hgvs(alt_genome_build):
-                c_hgvs = CHGVS(c_hgvs_str)
+                c_hgvs = HGVSDisplay(c_hgvs_str)
                 c_hgvs.genome_build = alt_genome_build
                 c_hgvs.is_normalised = True
                 c_hgvs.is_desired_build = False
                 return c_hgvs
-        c_hgvs = CHGVS(self.get(SpecialEKeys.C_HGVS) or "")
+        c_hgvs = HGVSDisplay(self.get(SpecialEKeys.C_HGVS) or "")
         try:
             c_hgvs.genome_build = self.get_genome_build()
         except ValueError:
@@ -2282,11 +2282,11 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=True, blank=True)
 
     @property
-    def imported_c_hgvs_obj(self) -> CHGVS:
+    def imported_c_hgvs_obj(self) -> HGVSDisplay:
         if c_hgvs := self.get(SpecialEKeys.C_HGVS):
             # remove any white space inside the c.HGVS
             c_hgvs = re.sub(r'\s+', '', c_hgvs)
-            c_hgvs_obj = CHGVS(c_hgvs)
+            c_hgvs_obj = HGVSDisplay(c_hgvs)
             try:
                 c_hgvs_obj.genome_build = self.get_genome_build()
             except ValueError:
@@ -2588,7 +2588,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         lowest_share_level = self.classification.lowest_share_level(user)
         return self.classification.get_visible_evidence(self.evidence, lowest_share_level)
 
-    def c_hgvs_best(self, genome_build: GenomeBuild) -> CHGVS:
+    def c_hgvs_best(self, genome_build: GenomeBuild) -> HGVSDisplay:
         return self.classification.c_hgvs_best(preferred_genome_build=genome_build)
 
     def is_significantly_equal(self, other: 'ClassificationModification', care_about_explains: bool = False) -> bool:

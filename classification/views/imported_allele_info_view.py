@@ -15,7 +15,7 @@ from classification.models import (
     ImportedAlleleInfoStatus,
 )
 from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
-from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
+from genes.hgvs import HGVSDisplay, CHGVSDiff, chgvs_diff_description
 from library.django_utils import get_url_from_view_path, require_superuser
 from library.utils import ExportRow, MultiDiff, MultiDiffInput, export_column
 from library.utils.django_utils import render_ajax_view
@@ -29,7 +29,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
     @staticmethod
     def render_c_hgvs(data: CellData):
         c_hgvs_str: Optional[str]
-        c_hgvs: Optional[CHGVS]
+        c_hgvs: Optional[HGVSDisplay]
         variant_id: Optional[int] = None
         error: Optional[str] = None
 
@@ -45,7 +45,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             c_hgvs_str = data.get(data.key)
 
         if c_hgvs_str:
-            if c_hgvs := CHGVS(c_hgvs_str):
+            if c_hgvs := HGVSDisplay(c_hgvs_str):
                 json_data = c_hgvs.to_json()
                 # json_data['variant_id'] = variant_id
                 return json_data

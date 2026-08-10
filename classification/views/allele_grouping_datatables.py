@@ -11,7 +11,7 @@ from classification.models import (
     ClassificationGrouping,
     OverlapStatus,
 )
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from library.cache import timed_cache
 from library.utils import JsonDataType
 from snpdb.lab_picker import LabPickerData
@@ -69,7 +69,7 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
         labs_list = sorted(labs)
         return "".join("<div>" + str(lab) +"</div>" for lab in labs_list)
 
-    def c_hgvs_for(self, cg: ClassificationGrouping) -> CHGVS:
+    def c_hgvs_for(self, cg: ClassificationGrouping) -> HGVSDisplay:
         is_preferred_genome_build = True
         allele_info = cg.latest_classification_modification.classification.allele_info
         for gb in self.genome_build_prefs:

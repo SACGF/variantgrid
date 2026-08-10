@@ -33,7 +33,7 @@ from classification.utils.clinvar_matcher import (
     ClinVarLegacyRow,
 )
 from classification.views.classification_dashboard_view import ClassificationDashboard
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from library.cache import timed_cache
 from library.django_utils import (
     RequireSuperUserView,
@@ -171,7 +171,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                 c_hgvs_str = row["classification_based_on__classification__allele_info__grch38__c_hgvs"]
 
             data: dict[str, Any]
-            c_hgvs = CHGVS(c_hgvs_str)
+            c_hgvs = HGVSDisplay(c_hgvs_str)
             if c_hgvs.raw_c != c_hgvs.full_c_hgvs:
                 data = {
                     "allele_origin_bucket": row["allele_origin_bucket"],

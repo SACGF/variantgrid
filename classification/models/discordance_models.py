@@ -26,7 +26,7 @@ from classification.models.clinical_context_models import (
     ClinicalContextRecalcTrigger,
 )
 from classification.models.flag_types import classification_flag_types
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from library.guardian_utils import admin_bot
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import invalidate_cached_property
@@ -427,7 +427,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                         return True
         return False
 
-    def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> list[CHGVS]:
+    def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> list[HGVSDisplay]:
         if not genome_build:
             genome_build = GenomeBuildManager.get_current_genome_build()
         c_hgvs = set()

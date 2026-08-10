@@ -14,7 +14,7 @@ from classification.models.classification_json_definitions import (
     ClassificationJsonAlleleDict,
     ClassificationJsonAlleleRevolvedDict,
 )
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from library.django_utils import get_url_from_view_path
 
 
@@ -35,7 +35,7 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
                 (c_hgvs := preferred_build.c_hgvs_obj):
             resolved_dict.update(c_hgvs.to_json())
         elif c_hgvs_raw := classification.get(SpecialEKeys.C_HGVS):
-            resolved_dict.update(CHGVS(c_hgvs_raw).to_json())
+            resolved_dict.update(HGVSDisplay(c_hgvs_raw).to_json())
 
         include = False
         if latest_validation := allele_info.latest_validation:

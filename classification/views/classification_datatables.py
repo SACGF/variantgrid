@@ -25,7 +25,7 @@ from classification.models import (
 )
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from genes.models import TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm
@@ -63,14 +63,14 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             for index, genome_build in enumerate(self.genome_build_prefs):
                 try:
                     if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):
-                        c_hgvs = CHGVS(c_hgvs_string)
+                        c_hgvs = HGVSDisplay(c_hgvs_string)
                         c_hgvs.genome_build = genome_build
                         c_hgvs.is_desired_build = index == 0
                         return c_hgvs.to_json()
                 except ValueError:
                     pass
 
-            c_hgvs = CHGVS(row.get('published_evidence__c_hgvs__value'))
+            c_hgvs = HGVSDisplay(row.get('published_evidence__c_hgvs__value'))
             c_hgvs.is_normalised = False
             json_data = c_hgvs.to_json()
             # use this rather than genome build object so we can get a patch version
