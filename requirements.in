@@ -7,9 +7,10 @@ cdot>=0.2.30
 celery
 ConfigArgParse
 crispy-bootstrap4
+cryptography>=50.0.0
 cyvcf2>=0.30.14
 deprecation
-Django
+Django>=6.0.7
 django-amazon-ses
 django-auditlog>=3.0.0
 django_autocomplete_light<5
@@ -34,7 +35,7 @@ django-postgres-extra
 django_recaptcha>=4.0.0
 django-registration-redux
 django_termsandconditions
-djangorestframework
+djangorestframework>=3.18.0
 drf-spectacular
 drf-spectacular-sidecar
 easy_thumbnails
@@ -58,7 +59,7 @@ more_itertools
 mozilla_django_oidc
 nameparser
 networkx
-nltk
+nltk>=3.10.0
 numpy
 oauthlib
 pandas
@@ -67,7 +68,7 @@ pillow>=12.3.0
 pronto>=2.4.7
 psycopg2
 pyBigWig>=0.3.22
-pypdf>=6.13.3
+pypdf>=6.15.0
 pysam
 python_dateutil
 pyyaml

@@ -7,7 +7,9 @@ annotated-types==0.7.0
 ansimarkup==2.0.0
     # via django-postgres-extra
 asgiref==3.11.1
-    # via django
+    # via
+    #   django
+    #   django-axes
 ast-serialize==0.5.0
     # via mypy
 astroid==4.0.4
@@ -90,8 +92,10 @@ contourpy==1.3.3
     # via matplotlib
 crispy-bootstrap4==2026.2
     # via -r requirements.in
-cryptography==49.0.0
-    # via mozilla-django-oidc
+cryptography==50.0.0
+    # via
+    #   -r requirements.in
+    #   mozilla-django-oidc
 cycler==0.12.1
     # via matplotlib
 cyvcf2==0.33.0
@@ -100,11 +104,13 @@ decorator==5.3.1
     # via ipython
 deepdiff==9.1.0
     # via -r requirements.in
+defusedxml==0.7.1
+    # via nltk
 deprecation==2.1.0
     # via -r requirements.in
 dill==0.4.1
     # via pylint
-django==6.0.6
+django==6.1
     # via
     #   -r requirements.in
     #   crispy-bootstrap4
@@ -112,6 +118,7 @@ django==6.0.6
     #   django-appconf
     #   django-auditlog
     #   django-autocomplete-light
+    #   django-axes
     #   django-compressor
     #   django-crispy-forms
     #   django-datetime-utc
@@ -173,7 +180,7 @@ django-htmlmin==0.11.0
     # via -r requirements.in
 django-ipware==7.0.1
     # via django-axes
-django-js-reverse==1.0.0
+django-js-reverse==0.10.2
     # via -r requirements.in
 django-json-widget==2.1.1
     # via -r requirements.in
@@ -197,7 +204,7 @@ django-termsandconditions==2.1.1
     # via -r requirements.in
 django-threadlocals==0.10
     # via -r requirements.in
-djangorestframework==3.17.1
+djangorestframework==3.18.0
     # via
     #   -r requirements.in
     #   drf-spectacular
@@ -223,7 +230,7 @@ frozendict==2.4.7
     # via -r requirements.in
 gunicorn==26.0.0
     # via -r requirements.in
-hgvs @ git+https://github.com/biocommons/hgvs@dac6a2f75a2435804769fa836c527e4108c91297#egg=hgvs
+hgvs @ git+https://github.com/biocommons/hgvs@3ac3d43fd3f8bef1854af11c95219cea8dd9f8fe#egg=hgvs
     # via
     #   -r requirements.in
     #   cdot
@@ -319,7 +326,7 @@ networkx==3.6.1
     # via
     #   -r requirements.in
     #   pronto
-nltk==3.9.4
+nltk==3.10.2
     # via -r requirements.in
 numpy==2.4.6
     # via
@@ -340,6 +347,7 @@ orderly-set==5.5.0
 packaging==26.2
     # via
     #   deprecation
+    #   django-js-reverse
     #   gunicorn
     #   kombu
     #   matplotlib
@@ -375,10 +383,14 @@ prompt-toolkit==3.0.52
     #   ipython
 pronto==2.7.3
     # via -r requirements.in
+psycopg==3.3.4
+    # via hgvs
+psycopg-binary==3.3.4
+    # via psycopg
+psycopg-pool==3.3.1
+    # via hgvs
 psycopg2==2.9.12
-    # via
-    #   -r requirements.in
-    #   hgvs
+    # via -r requirements.in
 ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.3
@@ -412,8 +424,10 @@ pylint-django==2.7.0
 pylint-plugin-utils==0.9.0
     # via pylint-django
 pyparsing==3.3.2
-    # via matplotlib
-pypdf==6.13.3
+    # via
+    #   hgvs
+    #   matplotlib
+pypdf==6.15.0
     # via -r requirements.in
 pysam==0.24.0
     # via
@@ -532,6 +546,8 @@ typing-extensions==4.15.0
     #   django-stubs-ext
     #   djangorestframework-stubs
     #   mypy
+    #   psycopg
+    #   psycopg-pool
     #   pydantic
     #   pydantic-core
     #   referencing
