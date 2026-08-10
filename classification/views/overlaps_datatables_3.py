@@ -228,7 +228,10 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         if not self.lab_picker.is_admin_mode:
             skew_qs = skew_qs.filter(contribution__classification_grouping__lab__in=self.lab_picker.lab_ids)
 
-        max_triage_status = TriageNextStep(skew_qs.aggregate(max_status=Max('next_step'))["max_status"])
+        if cell.obj.is_active_discordance:
+            max_triage_status = TriageNextStep(skew_qs.aggregate(max_status=Max('next_step'))["max_status"])
+        else:
+            max_triage_status = None
 
         for contribution in cell.obj.contributions:
             value = values[contribution.effective_value]

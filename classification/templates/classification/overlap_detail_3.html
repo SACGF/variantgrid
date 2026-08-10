@@ -15,14 +15,16 @@
             </div>
 
             {% labelled label="Overlap Status" %}
-                <span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>
+                <div class="mb-1 {% if overlap.overlap_status.is_attention %}text-danger{% endif %}">
                     {% if overlap.overlap_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status.label }}{% endif %}
-                </span>
+                </div>
                 {% if overlap.overlap_override_status %}
-                    <br/>Reviewed as : <b>{{ overlap.get_overlap_override_status_display }}</b>
+                    <div class="my-1">Reviewed as : <b>{{ overlap.get_overlap_override_status_display }}</b></div>
                 {% endif %}
-                </span>
-                {% if overlap.has_pending_values %}<div style="color:#888">Includes Pending Updates</div>{% endif %}
+                {% if overlap.overlap_max_ever_status != overlap.overlap_status %}
+                    <div class="my-1" style="color:#888">Was : {{ overlap.overlap_max_ever_status.label }}</div>
+                {% endif %}
+                {% if overlap.has_pending_values %}<div class="my-1" style="color:#888">Includes Pending Updates</div>{% endif %}
                 <div id="overlap-{{ overlap.pk }}-updated"></div>
             {% endlabelled %}
             {% if overlap.overlap_status_change_timestamp %}
@@ -63,20 +65,23 @@
             {% endfor %}
         {% endlabelled %}
     {% endif %}
-    {% labelled label="Multi-Lab Discussions" %}
-        {% for review in overlap_grouping.overlap.reviews_all %}
-            <div class="my-1">
-                {% review review edit=True %}
+
+    {% if overlap_grouping.overlap.has_reviews or overlap_grouping.overlap_status.is_discordant %}
+        {% labelled label="Multi-Lab Discussions" %}
+            {% for review in overlap_grouping.overlap.reviews_all %}
+                <div class="my-1">
+                    {% review review edit=True %}
+                </div>
+            {% endfor %}
+            <div {% if overlap_grouping.overlap.has_reviews %}class="mt-2"{% endif %}>
+            {% if overlap_grouping.overlap.has_outstanding_triages %}
+                Still waiting on all labs to triage. <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}">Click here</a> to discuss anyway.
+            {% else %}
+                <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i> Start Multi-Lab Discussion Discussion</a>
+            {% endif %}
             </div>
-        {% endfor %}
-        <div {% if overlap_grouping.overlap.has_reviews %}class="mt-2"{% endif %}>
-        {% if overlap_grouping.overlap.has_outstanding_triages %}
-            Still waiting on all labs to triage. <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}">Click here</a> to discuss anyway.
-        {% else %}
-            <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i> Start Multi-Lab Discussion Discussion</a>
-        {% endif %}
-        </div>
-    {% endlabelled %}
+        {% endlabelled %}
+    {% endif %}
 
     {% if user.is_superuser %}
         {% labelled label="Overlap Admin" %}{% admin_link overlap_grouping.overlap %}{% endlabelled %}

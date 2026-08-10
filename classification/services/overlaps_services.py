@@ -100,8 +100,8 @@ class OverlapServices:
                 # now update status of any created overlaps or existing linked overlaps
                 for overlap in overlap_contribution.overlaps:
                     # FIXME, should mark the overlap as dirty instead so overlap can be batch
-                    OverlapServices.recalc_overlap(overlap)
                     OverlapServices.update_skews(overlap)
+                    OverlapServices.recalc_overlap(overlap)
 
     @staticmethod
     def update_clinvar_overlap_contribution(clinvar_record_collection: ClinVarRecordCollection, migrate: bool = False, recalc_overlap=True):

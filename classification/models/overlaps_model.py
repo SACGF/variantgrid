@@ -231,6 +231,10 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
 
+    @property
+    def is_active_discordance(self):
+        return self.overlap_status.is_discordant and not self.overlap_override_status
+
     def get_absolute_url(self):
         return reverse('overlap_3', kwargs={"overlap_id": self.pk})
 
@@ -337,7 +341,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     @property
     def has_outstanding_triages(self) -> bool:
-        return self.contributions.filter(classification_grouping__isnull=False).exclude(triage_state__status=TriageStatus.PENDING).exists()
+        return self.contributions.filter(triage_state__status=TriageStatus.PENDING).exists()
 
     class Meta:
         indexes = [models.Index(fields=['overlap_type']), models.Index(fields=['value_type']), models.Index(fields=['allele'])]
@@ -489,7 +493,6 @@ class TriageNextStep(IntegerChoices):
 class OverlapContributionSkew(TimeStampedModel):
     overlap = models.ForeignKey(Overlap, on_delete=CASCADE)
     contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
-    # skew_perspective = models.TextField(max_length=1, choices=TriageNextStep.choices, default=TriageNextStep.PENDING_CALCULATION)
     next_step = IntegerFieldChoices(choices_type=TriageNextStep, default=TriageNextStep.PENDING_CALCULATION)
 
     def __str__(self):
