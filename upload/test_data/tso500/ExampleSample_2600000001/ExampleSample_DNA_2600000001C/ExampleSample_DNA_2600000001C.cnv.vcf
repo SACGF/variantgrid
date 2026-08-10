@@ -1,0 +1,71 @@
+##fileformat=VCFv4.2
+##DRAGENVersion=<ID=dragen,Version="SW: 07.021.624.3.11.2, HW: 07.021.624">
+##DRAGENCommandLine=<ID=dragen,Date="Thu Jan 01 12:23:04 UTC 2026",CommandLineOptions="--ref-dir hashtable --output-directory DnaDragenCaller --output-file-prefix ExampleSample_DNA_2600000001C --events-log-file events.csv --tso500-solid-umi true --umi-metrics-interval-file resource_bundle/small_variants/TSO_HRD_manifest_randomized.bed --tso500-solid-snv true --vc-sq-call-threshold=-1 --vc-target-bed resource_bundle/small_variants/TST500C_manifest.bed --vc-target-bed-padding 8 --vc-systematic-noise resource_bundle/small_variants/mean_gvcf_bq30_lowSQ_v1.0_systematic_noise_v2_novaseqx.bed.gz --vc-depth-annotation-threshold 100 --vc-homref-depth-filter-threshold 100 --tumor-fastq-list ExampleSample_DNA_2600000001C.fastq_list.csv --tumor-fastq-list-sample-id ExampleSample_DNA_2600000001C --vc-somatic-hotspots resource_bundle/small_variants/pepe2_prior.vcf --vc-hotspot-log10-prior-boost 3.0 --vc-blacklist-bed resource_bundle/small_variants/pepe_blacklist_sorted.bed --qc-coverage-ignore-overlaps true --gc-metrics-enable true --qc-coverage-region-1 resource_bundle/small_variants/TST500C_CodingRegions_hg19.bed --qc-coverage-reports-1 callability --qc-coverage-tag-1 tmb --qc-coverage-region-2 resource_bundle/small_variants/TST500C_manifest.exon.bed --qc-coverage-tag-2 exon --qc-coverage-reports-2 cov_report --tso500-contam-vcf resource_bundle/contamination/Contamination.vcf --qc-contam-min-basequal 30 --qc-contam-min-mapq 30 --tso500-solid-cnv true --cnv-combined-counts resource_bundle/cnv/TSO500_DRAGEN_BASELINE_SOLID_matched_targets_v2_novaseqx.combined.counts.txt.gz --cnv-segmentation-bed resource_bundle/cnv/dragen_tso500_manifest_cnv_genes_predefined_cutoff_FFPE.bed --cnv-target-bed resource_bundle/cnv/TSO500_DRAGEN_TARGET_SOLID_matched_targets.bed --tso500-solid-msi true --msi-microsatellites-file resource_bundle/msi/references/microsatellites-TSO500-SOLID-concordant.list --msi-ref-normal-dir resource_bundle/msi/data/TSO500-Solid --tso500-use-combined-license true --tso500-cnv-enable-low-validation-filter false --logging-to-output-dir true --force">
+##reference=file://hashtable
+##contig=<ID=chr1,length=249250621>
+##contig=<ID=chr2,length=243199373>
+##contig=<ID=chr3,length=198022430>
+##contig=<ID=chr4,length=191154276>
+##contig=<ID=chr5,length=180915260>
+##contig=<ID=chr6,length=171115067>
+##contig=<ID=chr7,length=159138663>
+##contig=<ID=chr8,length=146364022>
+##contig=<ID=chr9,length=141213431>
+##contig=<ID=chr10,length=135534747>
+##contig=<ID=chr11,length=135006516>
+##contig=<ID=chr12,length=133851895>
+##contig=<ID=chr13,length=115169878>
+##contig=<ID=chr14,length=107349540>
+##contig=<ID=chr15,length=102531392>
+##contig=<ID=chr16,length=90354753>
+##contig=<ID=chr17,length=81195210>
+##contig=<ID=chr18,length=78077248>
+##contig=<ID=chr19,length=59128983>
+##contig=<ID=chr20,length=63025520>
+##contig=<ID=chr21,length=48129895>
+##contig=<ID=chr22,length=51304566>
+##contig=<ID=chrX,length=155270560>
+##ALT=<ID=CNV,Description="Copy number variant region">
+##ALT=<ID=DEL,Description="Deletion relative to the reference">
+##ALT=<ID=DUP,Description="Region of elevated copy number relative to the reference">
+##INFO=<ID=REFLEN,Number=1,Type=Integer,Description="Number of REF positions included in this record">
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS">
+##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END">
+##INFO=<ID=SEGID,Number=1,Type=String,Description="Segment ID">
+##FILTER=<ID=cnvQual,Description="CNV with quality below 0">
+##FILTER=<ID=cnvBinSupportRatio,Description="CNV with low supporting number of bins with respect to event length">
+##FILTER=<ID=cnvCopyRatio,Description="CNV with copy ratio within +/- 0 of 1.0">
+##FILTER=<ID=LoDFail,Description="CNV is closer to neutral PON counts than the specified limit of detection threshold (PON * (1 +/- 0.2))">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=SM,Number=1,Type=Float,Description="Linear copy ratio of the segment mean">
+##FORMAT=<ID=BC,Number=1,Type=Integer,Description="Number of bins in the region">
+##FORMAT=<ID=PE,Number=2,Type=Integer,Description="Number of improperly paired end reads at start and stop breakpoints">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	ExampleSample_DNA_2600000001C
+chr1	2489163	DRAGEN:REF:chr1:2489163-2494714	N	.	3	PASS	END=2494714;REFLEN=5552;SEGID=TNFRSF14	GT:SM:BC:PE	./.:1.39098:7:1,7
+chr1	8073268	DRAGEN:REF:chr1:8073268-8085120	N	.	3	PASS	END=8085120;REFLEN=11853;SEGID=ERRFI1	GT:SM:BC:PE	./.:1.46136:5:97,15
+chr1	9770511	DRAGEN:GAIN:chr1:9770512-9787106	N	<DUP>	9	PASS	SVLEN=16595;SVTYPE=CNV;END=9787106;REFLEN=16595;SEGID=PIK3CD	GT:SM:BC:PE	./1:1.49428:22:15,10
+chr1	11167539	DRAGEN:GAIN:chr1:11167540-11319468	N	<DUP>	24	PASS	SVLEN=151929;SVTYPE=CNV;END=11319468;REFLEN=151929;SEGID=MTOR	GT:SM:BC:PE	./1:1.41839:56:0,4
+chr1	16174561	DRAGEN:REF:chr1:16174561-16265924	N	.	3	PASS	END=16265924;REFLEN=91364;SEGID=SPEN	GT:SM:BC:PE	./.:1.04875:16:4,27
+chr1	17345374	DRAGEN:REF:chr1:17345374-17380516	N	.	3	PASS	END=17380516;REFLEN=35143;SEGID=SDHB	GT:SM:BC:PE	./.:1.01246:8:0,1
+chr1	18957498	DRAGEN:REF:chr1:18957498-19075362	N	.	3	PASS	END=19075362;REFLEN=117865;SEGID=PAX7	GT:SM:BC:PE	./.:0.920584:9:43,188
+chr1	23881001	DRAGEN:REF:chr1:23881001-23889120	N	.	3	PASS	END=23889120;REFLEN=8120;SEGID=ID3	GT:SM:BC:PE	./.:1.01219:5:3,8
+chr1	27022893	DRAGEN:REF:chr1:27022893-27107249	N	.	3	PASS	END=27107249;REFLEN=84357;SEGID=ARID1A	GT:SM:BC:PE	./.:0.969898:20:22,104
+chr1	36807354	DRAGEN:REF:chr1:36807354-36826935	N	.	3	PASS	END=36826935;REFLEN=19582;SEGID=STK40	GT:SM:BC:PE	./.:0.990944:10:7,6
+chr1	40356095	DRAGEN:REF:chr1:40356095-40372764	N	.	3	PASS	END=40372764;REFLEN=16670;SEGID=MYCL1	GT:SM:BC:PE	./.:1.04232:30:28,17
+chr3	10070339	DRAGEN:LOSS:chr3:10070340-10142948	N	<DEL>	43	PASS	SVLEN=-72609;SVTYPE=CNV;END=10142948;REFLEN=72609;SEGID=FANCD2	GT:SM:BC:PE	0/1:0.614134:43:1,1
+chr3	10183529	DRAGEN:LOSS:chr3:10183530-10191651	N	<DEL>	4	PASS	SVLEN=-8122;SVTYPE=CNV;END=10191651;REFLEN=8122;SEGID=VHL	GT:SM:BC:PE	0/1:0.578665:3:5,1
+chr3	12329346	DRAGEN:LOSS:chr3:12329347-12475857	N	<DEL>	21	PASS	SVLEN=-146511;SVTYPE=CNV;END=12475857;REFLEN=146511;SEGID=PPARG	GT:SM:BC:PE	0/1:0.573793:10:0,10
+chr3	12626010	DRAGEN:LOSS:chr3:12626011-12704516	N	<DEL>	30	PASS	SVLEN=-78506;SVTYPE=CNV;END=12704516;REFLEN=78506;SEGID=RAF1	GT:SM:BC:PE	0/1:0.573206:33:10,3
+chr3	30648373	DRAGEN:LOSS:chr3:30648374-30733093	N	<DEL>	11	PASS	SVLEN=-84720;SVTYPE=CNV;END=30733093;REFLEN=84720;SEGID=TGFBR2	GT:SM:BC:PE	0/1:0.541725:8:0,0
+chr3	38180150	DRAGEN:LOSS:chr3:38180151-38182779	N	<DEL>	5	PASS	SVLEN=-2629;SVTYPE=CNV;END=38182779;REFLEN=2629;SEGID=MYD88	GT:SM:BC:PE	0/1:0.567324:5:12,7
+chr3	41265557	DRAGEN:LOSS:chr3:41265558-41280835	N	<DEL>	13	PASS	SVLEN=-15278;SVTYPE=CNV;END=41280835;REFLEN=15278;SEGID=CTNNB1	GT:SM:BC:PE	0/1:0.609687:13:4,9
+chr3	47058580	DRAGEN:LOSS:chr3:47058581-47205416	N	<DEL>	38	PASS	SVLEN=-146836;SVTYPE=CNV;END=47205416;REFLEN=146836;SEGID=SETD2	GT:SM:BC:PE	0/1:0.571483:21:17,1
+chr3	119545632	DRAGEN:GAIN:chr3:119545633-119812283	N	<DUP>	9	PASS	SVLEN=266651;SVTYPE=CNV;END=119812283;REFLEN=266651;SEGID=GSK3B	GT:SM:BC:PE	./1:1.9086:12:14,11
+chr3	128199859	DRAGEN:GAIN:chr3:128199860-128205876	N	<DUP>	8	PASS	SVLEN=6017;SVTYPE=CNV;END=128205876;REFLEN=6017;SEGID=GATA2	GT:SM:BC:PE	./1:1.83201:5:31,10
+chr3	134514471	DRAGEN:GAIN:chr3:134514472-134977964	N	<DUP>	15	PASS	SVLEN=463493;SVTYPE=CNV;END=134977964;REFLEN=463493;SEGID=EPHB1	GT:SM:BC:PE	./1:2.02813:16:2,7
+chr3	136057077	DRAGEN:GAIN:chr3:136057078-136349762	N	<DUP>	19	PASS	SVLEN=292685;SVTYPE=CNV;END=136349762;REFLEN=292685;SEGID=STAG1	GT:SM:BC:PE	./1:1.74434:32:13,8
+chr3	138374228	DRAGEN:GAIN:chr3:138374229-138478187	N	<DUP>	19	PASS	SVLEN=103959;SVTYPE=CNV;END=138478187;REFLEN=103959;SEGID=PIK3CB	GT:SM:BC:PE	./1:1.84178:34:15,7
+chr3	142168268	DRAGEN:GAIN:chr3:142168269-142297548	N	<DUP>	32	PASS	SVLEN=129280;SVTYPE=CNV;END=142297548;REFLEN=129280;SEGID=ATR	GT:SM:BC:PE	./1:1.86266:47:20,3

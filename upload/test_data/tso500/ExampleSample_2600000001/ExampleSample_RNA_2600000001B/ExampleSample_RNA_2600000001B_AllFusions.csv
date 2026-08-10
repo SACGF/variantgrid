@@ -1,0 +1,65 @@
+# Source = FusionProcessor 1.0.0.614
+# FileDate = 20260101
+# Caller = The algorithm used to identify the fusion.
+# Gene A = The gene associated with the A side of the fusion. A semicolon delimited list will be used for multiple genes.
+# Gene B = The gene associated with the B side of the fusion. A semicolon delimited list will be used for multiple genes.
+# Gene A Breakpoint = The chromosome and offset of the Gene A side of the fusion.
+# Gene B Breakpoint = The chromosome and offset of the Gene B side of the fusion.
+# Score = The quality of fusion as determined by the respective caller. Results from different callers are not equivalent.
+# Filter = The filter associated with the fusion as determined by the respective caller. Results from different callers are not equivalent.
+# Precise/Imprecise = Whether the algorithm could identify the precise fusion coordinates. Coordinates listed for imprecise fusions are based on strongest statistical evidence. (RFF Only)
+# Intragenic Call = List any genes associated with a splice overlapping the fusion. A semicolon delimited list will be used for multiple genes. (SG Only)
+# Ref A Split = Gene A uniquely mapping reads spanning the junction; does not support fusion. Duplicate reads included.
+# Ref A Pair = Gene A uniquely mapping reads paired across junction; does not support fusion. Duplicate reads included.
+# Ref B Split = Gene B uniquely mapping reads spanning the junction; does not support fusion. Duplicate reads included.
+# Ref B Pair = Gene B uniquely mapping reads paired across junction; does not support fusion. Duplicate reads included.
+# Alt Split = Uniquely mapping reads split by the junction; supports fusion. Duplicate reads included.
+# Alt Pair = Uniquely mapping reads paired across junction; supports fusion. Duplicate reads included.
+# Contig = Sequence of fusion. Can be used to determine fusion directionality (RFF Only)
+# ContigAlign1 = Length of Gene A in contig (RFF Only)
+# ContigAlign2 = Length of Gene B in contig (RFF Only)
+# CandidateAlt = The number of reads and pairs that potentially supports this candidate before refinement and scoring. (RFF Imprecise Reads Only)
+# KeepFusion = The determination whether the fusion should be kept or dropped from the list of fusions.
+# Ref A Dedup = Gene A uniquely mapping reads paired across or split by the junction; does not support fusion. Duplicate reads are not included.
+# Ref B Dedup = Gene B uniquely mapping reads paired across or split by the junction; does not support fusion. Duplicate reads are not included.
+# Alt Split Dedup = Uniquely mapping reads split by the junction; supports fusion. Duplicate reads are not included.
+# Alt Pair Dedup = Uniquely mapping reads paired across junction; supports fusion. Duplicate reads are not included.
+# Fusion Directionality Known = Whether Fusion Directionality is known and indicated by gene order.
+# Gene A Sense = Indicates whether left/right breakpoint order suggests fusion transcript is in the same sense of Gene A. If multiple genes in Gene A, then semi - colon separated list of bools
+# Gene A Location = Location of the breakpoint within Gene A: IntactExon: Matches exon boundary, BrokenExon: Inside an exon, Intronic: Within an intron, Intergenic: No gene overlap. If multiple genes in Gene A, then semi - colon separated list of values.
+# Gene B Sense = Indicates whether left/right breakpoint order suggests fusion transcript is in the same sense of Gene B. If multiple genes in Gene B, then semi - colon separated list of bools
+# Gene B Location = Location of the breakpoint within Gene B: IntactExon: Matches exon boundary, BrokenExon: Inside an exon, Intronic: Within an intron, Intergenic: No gene overlap If multiple genes in Gene B, then semi - colon separated list of values.
+Caller,Gene A,Gene B,Gene A Breakpoint,Gene B Breakpoint,Score,Filter,Precise/Imprecise,Intragenic Call,Ref A Split,Ref A Pair,Ref B Split,Ref B Pair,Alt Split,Alt Pair,CandidateAlt,Contig,ContigAlign1,ContigAlign2,KeepFusion,Ref A Dedup,Ref B Dedup,Alt Split Dedup,Alt Pair Dedup,Fusion Directionality Known,Gene A Location,Gene B Location,Gene A Sense,Gene B Sense
+DRAGEN,PVT1,MYC,chr8:128806980,chr8:128750494,0.5,PASS;LOW_ALT_TO_REF,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,2,4416,6,1,True,IntactExon,IntactExon,True,True
+SpliceGirl,FIP1L1;PDGFRA,FIP1L1;PDGFRA,chr4:55133909,chr4:55138560,0,N/A,N/A,FIP1L1;PDGFRA,127,N/A,N/A,N/A,40,N/A,N/A,N/A,N/A,N/A,False,5,N/A,1,N/A,True,Intronic;IntactExon,Intronic;IntactExon,True,True
+SpliceGirl,KMT2A,TMEM25,chr11:118392053,chr11:118406110,0,N/A,N/A,N/A,1338,N/A,N/A,N/A,2,N/A,N/A,N/A,N/A,N/A,False,29,N/A,1,N/A,True,BrokenExon,BrokenExon,True,True
+DRAGEN,RP11-458D21.5;NOTCH2NL,SUSD4,chr1:145209436,chr1:223442017,0.0157,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;UNENRICHED_GENES;LOW_ALT_TO_REF;LOW_GENE_COVERAGE,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,275,0,1,0,True,IntactExon;IntactExon,IntactExon,True;True,True
+DRAGEN,RP11-458D21.5;NOTCH2NL,ZNF219,chr1:145209436,chr14:21561833,0.0393,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;UNENRICHED_GENES;LOW_ALT_TO_REF,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,275,6,1,0,True,IntactExon;IntactExon,IntactExon,True;True,True
+DRAGEN,NOTCH2NL;RP11-458D21.5,AMPD2,chr1:145281704,chr1:110162762,0.0133,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;UNENRICHED_GENES;LOW_ALT_TO_REF,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,243,0,1,0,True,IntactExon;IntactExon,IntactExon,True;True,True
+DRAGEN,NOTCH2NL;NBPF10,NBPF20,chr1:145290511,chr1:148347051,0.0069,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;UNENRICHED_GENES;LOW_GENE_COVERAGE,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,43,0,1,0,True,IntactExon;IntactExon,IntactExon,True;True,True
+DRAGEN,RNU1-1,RNVU1-15,chr1:16840617,chr1:148605072,0.0002,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;UNENRICHED_GENES,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,1,0,1,0,True,IntactExon,IntactExon,True,True
+DRAGEN,AHDC1,MYC,chr1:27929908,chr8:128750494,0.0358,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_ALT_TO_REF,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,2,4416,1,0,True,IntactExon,IntactExon,True,True
+DRAGEN,AHDC1,TMPRSS2,chr1:27929908,chr21:42870116,0.0597,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,2,88,1,0,True,IntactExon,IntactExon,True,True
+DRAGEN,NOTCH2,AMPD2,chr1:120539620,chr1:110162762,0.0116,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;LOW_ALT_TO_REF,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,163,0,1,0,True,IntactExon,IntactExon,True,True
+DRAGEN,CASP10,MYC,chr2:202048031,chr8:128750494,0.0697,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;LOW_ALT_TO_REF;LOW_GENE_COVERAGE,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,0,4416,2,0,True,IntactExon,IntactExon,True,True
+DRAGEN,TRIP12,EWSR1,chr2:230701564,chr22:29686402,0.1739,FAIL;LOW_SCORE;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_ALT_TO_REF;LOW_GENE_COVERAGE,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,0,459,2,0,True,IntactExon,IntactExon,True,True
+DRAGEN,ENTPD3,RPL14,chr3:40442308,chr3:40503522,0.0273,FAIL;LOW_SCORE;DOUBLE_BROKEN_EXON;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;READ_THROUGH;UNENRICHED_GENES;LOW_ALT_TO_REF,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,1,3108,4,0,True,Intron,BrokenExon,True,True
+DRAGEN,ENTPD3,RPL14,chr3:40446552,chr3:40503522,0.1725,FAIL;LOW_SCORE;ANCHOR_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;READ_THROUGH;UNENRICHED_GENES;LOW_ALT_TO_REF,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,1,3108,12,0,True,Intron,BrokenExon,True,True
+DRAGEN,ENTPD3,RPL14,chr3:40447887,chr3:40503522,0.1222,FAIL;LOW_SCORE;DOUBLE_BROKEN_EXON;ANCHOR_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;READ_THROUGH;UNENRICHED_GENES;LOW_ALT_TO_REF,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,1,3108,10,0,True,Intron,BrokenExon,True,True
+DRAGEN,RPL14,ENTPD3,chr3:40503552,chr3:40446544,0.0335,FAIL;LOW_SCORE;DOUBLE_BROKEN_EXON;MIN_SUPPORT;LOW_UNIQUE_ALIGNMENTS;LOW_MAPQ;UNENRICHED_GENES;LOW_ALT_TO_REF,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,False,3368,1,4,0,True,BrokenExon,Intron,True,True
+DRAGEN,TPM3,NTRK1,chr1:154142876,chr1:156844361,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,0,2,159,0,True,IntactExon,IntactExon,True,True
+DRAGEN,LMNA,NTRK1,chr1:156100562,chr1:156844696,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,0,517,247,0,True,IntactExon,IntactExon,True,True
+DRAGEN,SLC45A3,BRAF,chr1:205649521,chr7:140494266,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,0,1070,518,0,True,IntactExon,IntactExon,True,True
+DRAGEN,EML4,ALK,chr2:42522654,chr2:29446394,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,749,9,75,0,True,IntactExon,IntactExon,True,True
+DRAGEN,PPARG/AC016683.6,PAX8,chr3:12421199,chr2:113992971,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,11,0,182,0,True,IntactExon,IntactExon,True,True
+DRAGEN,TFG,NTRK1,chr3:100451513,chr1:156844360,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,0,2,124,0,True,IntactExon,IntactExon,True,True
+DRAGEN,FGFR3,TACC3,chr4:1808661,chr4:1741429,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,9,0,98,0,True,IntactExon,IntactExon,True,True
+DRAGEN,FGFR3,BAIAP2L1,chr4:1808661,chr7:97991744,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,10,0,231,0,True,IntactExon,IntactExon,True,True
+DRAGEN,SLC34A2,ROS1;GOPC,chr4:25665950,chr6:117645578,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,0,0,59,0,True,IntactExon,IntactExon,True,True
+DRAGEN,CD74,ROS1;GOPC,chr5:149784243,chr6:117645578,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,2,0,96,0,True,IntactExon,IntactExon,True,True
+DRAGEN,EGFR,SEPT14,chr7:55268103,chr7:55863785,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,7,0,75,0,True,IntactExon,IntactExon,True,True
+DRAGEN,KIF5B,RET,chr10:32306071,chr10:43609927,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,2452,3,339,0,True,IntactExon,IntactExon,True,True
+DRAGEN,NCOA4,RET,chr10:51582937,chr10:43612030,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,0,81,61,0,True,IntactExon,IntactExon,True,True
+DRAGEN,CCDC6,RET,chr10:61665879,chr10:43612032,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,0,81,83,0,True,IntactExon,IntactExon,True,True
+DRAGEN,ETV6,NTRK3,chr12:12022900,chr15:88483984,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,0,0,142,0,True,IntactExon,IntactExon,True,True
+DRAGEN,TMPRSS2,ERG,chr21:42880006,chr21:39956867,N/A,PASS,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,True,1,1,620,0,True,IntactExon,IntactExon,True,True

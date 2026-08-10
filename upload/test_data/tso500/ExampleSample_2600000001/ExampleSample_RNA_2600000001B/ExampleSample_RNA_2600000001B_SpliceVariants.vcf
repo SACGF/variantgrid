@@ -1,0 +1,59 @@
+##fileformat=VCFv4.1
+##20260807=fileDate=20260101=20260807
+##source=SpliceGirl 1.0.0.614
+##reference=file:resource_bundle/hg19_decoy
+##contig=<ID=chr1,length=249250621>
+##contig=<ID=chr2,length=243199373>
+##contig=<ID=chr3,length=198022430>
+##contig=<ID=chr4,length=191154276>
+##contig=<ID=chr5,length=180915260>
+##contig=<ID=chr6,length=171115067>
+##contig=<ID=chr7,length=159138663>
+##contig=<ID=chr8,length=146364022>
+##contig=<ID=chr9,length=141213431>
+##contig=<ID=chr10,length=135534747>
+##contig=<ID=chr11,length=135006516>
+##contig=<ID=chr12,length=133851895>
+##contig=<ID=chr13,length=115169878>
+##contig=<ID=chr14,length=107349540>
+##contig=<ID=chr15,length=102531392>
+##contig=<ID=chr16,length=90354753>
+##contig=<ID=chr17,length=81195210>
+##contig=<ID=chr18,length=78077248>
+##contig=<ID=chr19,length=59128983>
+##contig=<ID=chr20,length=63025520>
+##contig=<ID=chr21,length=48129895>
+##contig=<ID=chr22,length=51304566>
+##contig=<ID=chrX,length=155270560>
+##contig=<ID=chrY,length=59373566>
+##contig=<ID=chrM,length=16569>
+##ALT=<ID=DEL,Description="Deletion">
+##QUAL=<Description="QUAL score correlates support for the read count of splice junctions, not Phred-scaled">
+##FILTER=<ID=LowQ,Description="Indicates the variant has a quality score below the passing threshold.">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=ALTDEDUP,Number=1,Type=Integer,Description="Reads split across deletion. Uniquely mapping, no duplicate reads">
+##INFO=<ID=ALTDUP,Number=1,Type=Integer,Description="Reads split across deletion. Uniquely mapping including duplicate reads">
+##INFO=<ID=REFDEDUP,Number=1,Type=Integer,Description="Reads across deletion region which do not support deletion.Uniquely mapping, no duplicate reads.">
+##INFO=<ID=REFDUP,Number=1,Type=Integer,Description="Reads across deletion region which do not support deletion. Uniquely mapping including duplicate reads.">
+##INFO=<ID=INTERGENIC,Number=1,Type=Flag,Description="Indicates that this splice variant may be an intergenic fusion.">
+##FORMAT=<ID=AD,Number=1,Type=Integer,Description="SpliceSupportingReads: Reads across splice varaint region which do not support deletion.Uniquely mapping, no duplicate reads.">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="ReferenceReads: reads split across splice variant. Uniquely mapping, no duplicate reads.">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
+chr1	120464432	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=120465258;ALTDEDUP=1;ALTDUP=2;REFDEDUP=80;REFDUP=3554;INTERGENIC=False	AD:DP	1:80
+chr1	120464931	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=120466259;ALTDEDUP=0;ALTDUP=0;REFDEDUP=1;REFDUP=27;INTERGENIC=False	AD:DP	0:1
+chr1	120469234	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=120471624;ALTDEDUP=1;ALTDUP=56;REFDEDUP=80;REFDUP=3627;INTERGENIC=False	AD:DP	1:80
+chr1	120473555	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=120478094;ALTDEDUP=1;ALTDUP=20;REFDEDUP=98;REFDUP=3825;INTERGENIC=False	AD:DP	1:98
+chr1	120501703	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=120502014;ALTDEDUP=1;ALTDUP=26;REFDEDUP=51;REFDUP=1835;INTERGENIC=False	AD:DP	1:51
+chr1	120506336	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=120510830;ALTDEDUP=1;ALTDUP=32;REFDEDUP=0;REFDUP=0;INTERGENIC=False	AD:DP	1:0
+chr1	120506430	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=120510055;ALTDEDUP=1;ALTDUP=19;REFDEDUP=129;REFDUP=5620;INTERGENIC=False	AD:DP	1:129
+chr1	120508143	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=120508998;ALTDEDUP=0;ALTDUP=0;REFDEDUP=46;REFDUP=2442;INTERGENIC=False	AD:DP	0:46
+chr1	120548211	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=120556330;ALTDEDUP=0;ALTDUP=0;REFDEDUP=49;REFDUP=1701;INTERGENIC=False	AD:DP	0:49
+chr1	243652421	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=243661168;ALTDEDUP=1;ALTDUP=18;REFDEDUP=127;REFDUP=3452;INTERGENIC=False	AD:DP	1:127
+chr1	243663195	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=243663244;ALTDEDUP=1;ALTDUP=47;REFDEDUP=0;REFDUP=0;INTERGENIC=False	AD:DP	1:0
+chr2	42485683	.	C	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=42488260;ALTDEDUP=1;ALTDUP=19;REFDEDUP=115;REFDUP=3550;INTERGENIC=False	AD:DP	1:115
+chr2	42511843	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=42513240;ALTDEDUP=1;ALTDUP=23;REFDEDUP=73;REFDUP=2016;INTERGENIC=False	AD:DP	1:73
+chr2	47637511	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=47639583;ALTDEDUP=1;ALTDUP=65;REFDEDUP=90;REFDUP=3021;INTERGENIC=False	AD:DP	1:90
+chr2	47637511	.	T	<DEL>	0	LowQ;LowUniqueAlignments	SVTYPE=DEL;END=47643556;ALTDEDUP=1;ALTDUP=34;REFDEDUP=90;REFDUP=3051;INTERGENIC=False	AD:DP	1:90
+chr7	55087058	.	G	<DEL>	100	PASS	SVTYPE=DEL;END=55223522;ALTDEDUP=64;ALTDUP=64;REFDEDUP=1;REFDUP=1;INTERGENIC=False	AD:DP	64:1
+chr7	116411708	.	G	<DEL>	100	PASS	SVTYPE=DEL;END=116414934;ALTDEDUP=91;ALTDUP=91;REFDEDUP=1;REFDUP=1;INTERGENIC=False	AD:DP	91:1
