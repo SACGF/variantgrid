@@ -5,6 +5,7 @@ failures indicate real bugs in the production code.
 
 No DB needed for most tests (pure Python / mock-based).
 """
+import collections
 import types
 
 from django.test import TestCase
@@ -214,6 +215,23 @@ class TestHGVSComponentsInit(TestCase):
     def test_sort_str_no_transcript(self):
         # A bare nomen has no transcript to append
         self.assertEqual(HGVSComponents("c.123A>G").sort_str, "0000000123A>G")
+
+    def test_genome_build_only_breaks_ties(self):
+        """ The build must not be concatenated onto sort_str - a shorter key is a prefix of a longer
+            one whenever a transcript is unversioned, and the suffix would flip that comparison """
+        build = collections.namedtuple("FakeBuild", "pk")("GRCh38")
+        unversioned = HGVSDisplay.parse("NM_033213:c.3+46C>G", genome_build=build)
+        versioned = HGVSDisplay.parse("NM_033213.5:c.3+46C>G", genome_build=build)
+        self.assertLess(unversioned, versioned)
+
+    def test_genome_build_breaks_an_actual_tie(self):
+        grch37 = collections.namedtuple("FakeBuild", "pk")("GRCh37")
+        grch38 = collections.namedtuple("FakeBuild", "pk")("GRCh38")
+        # same transcript and nomen, so sort_str ties and only the build separates them
+        a = HGVSDisplay.parse("NM_001.2(BRCA1):c.123A>G", genome_build=grch37)
+        b = HGVSDisplay.parse("NM_001.2:c.123A>G", genome_build=grch38)
+        self.assertEqual(a.sort_str, b.sort_str)
+        self.assertLess(a, b)
 
     def test_display_eq_includes_view_state(self):
         components = HGVSComponents("NM_001.2:c.123A>G")

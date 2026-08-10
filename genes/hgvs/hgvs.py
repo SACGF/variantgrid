@@ -246,13 +246,19 @@ class HGVSDisplay:
 
     @cached_property
     def sort_str(self) -> str:
-        """ Normalised records sort ahead of imported ones, then by the HGVS itself, then by build """
+        """ Normalised records sort ahead of imported ones, then by the HGVS itself.
+            Callers that put this in a data-order attribute get exactly this string """
         normalised_prefix = "A" if self.is_normalised else "Z"
-        build = self.genome_build.pk if self.genome_build else ""
-        return normalised_prefix + self.components.sort_str + build
+        return normalised_prefix + self.components.sort_str
+
+    @property
+    def sort_key(self) -> tuple[str, str]:
+        """ The build breaks ties only between otherwise identical HGVS - appending it to sort_str
+            instead would let a longer key win wherever a shorter one is a prefix of it """
+        return self.sort_str, self.genome_build.pk if self.genome_build else ""
 
     def __lt__(self, other):
-        return self.sort_str < other.sort_str
+        return self.sort_key < other.sort_key
 
     def __str__(self):
         return self.full_hgvs
