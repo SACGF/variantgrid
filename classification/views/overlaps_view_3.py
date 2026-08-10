@@ -281,6 +281,7 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
             updated_resolution = overlap.overlap_status
             review.complete_with_data_and_save({
                 "outcome": "discordant" if updated_resolution.is_discordant else "resolved",
+                "overlap_status": updated_resolution,
                 "changes": changes_dict
             })
             log_admin_change(

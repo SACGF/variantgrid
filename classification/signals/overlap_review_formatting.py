@@ -1,4 +1,5 @@
 import json
+from typing import Optional
 
 from django.dispatch.dispatcher import receiver
 from django.template import loader
@@ -23,25 +24,16 @@ def overlap_changes_summary(sender, instance: Review, **kwargs):
         if outcome == "postpone":
             return "Outcome awaiting further discussion"
 
-        rows = []
+        change_list = []
         if changes := data.get("changes"):
+            change_list = list(sorted(PendingChange.from_dict(change) for change in changes))
 
-            t = loader.get_template("classification/snippets/pending_change.html")
-            changes_d = list(sorted(PendingChange.from_dict(change) for change in changes))
-            for change in changes_d:
-                row = t.render(context={"change": change})
-                rows.append(row)
-        if overlap_status := data.get("overlap_status"):
+        overlap_status: Optional[OverlapStatus]
+        if overlap_status_raw := data.get("overlap_status"):
             try:
-                os = OverlapStatus(overlap_status)
-                rows.append(f"<div>{os.label}</div>")
-                if os.is_discordant:
-                    rows.append("<div>Continued discordance</div>")
-                else:
-                    rows.append("<div>Resolved</div>")
+                overlap_status = OverlapStatus(overlap_status_raw)
             except:
                 pass
 
-        return SafeString("".join(rows))
-    else:
-        return "Outcome was not decided"
+        t = loader.get_template("classification/snippets/pending_change.html")
+        return SafeString(t.render(context={"changes": change_list, "overlap_status": overlap_status}))

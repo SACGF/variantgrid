@@ -43,13 +43,9 @@ def discordance_report_changes_summary(sender, instance: Review, **kwargs):
 
     if data := instance.post_review_data:
         if changes := data.get("changes"):
-            rows = []
             t = loader.get_template("classification/snippets/pending_change.html")
             changes_d = list(sorted(PendingChange.from_dict(change) for change in changes))
-            for change in changes_d:
-                row = t.render(context={"change": change})
-                rows.append(row)
-            return SafeString("".join(rows))
+            return SafeString(t.render(context={"changes": changes_d}))
         elif outcome := data.get("outcome"):
             if outcome == "postpone":
                 return "Outcome awaiting further discussion"

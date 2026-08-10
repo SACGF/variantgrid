@@ -19,14 +19,12 @@
                 return this.value;
             }).get();
 
-            let uniqueValues = [...new Set(selectedValues + nonInteractiveValues)];
+            let uniqueValues = [...new Set(selectedValues.concat(nonInteractiveValues))];
             let valueStr = uniqueValues.join(',');
             let valueType = '{{ overlap.value_type.value }}';
-            // <div data-toggle="ajax" href="{% url 'overlap_calc' %}?value_type=O&values=VUS,P"></div>
             let baseUrl = "{% url 'overlap_calc' %}?value_type={{ overlap.value_type.value }}";
             let ajaxDiv = $('<div>', {'data-toggle': 'ajax', 'href': `${baseUrl}&values=${valueStr}`});
             let parentDiv = $('#resulting-status');
-            console.log(parentDiv);
             parentDiv.html(ajaxDiv);
         }
 
@@ -52,7 +50,6 @@
 
         function showFormCheck() {
             let value = $("input[name='outcome']:checked").val();
-            console.log(value);
             let allValues = {
                 "#pending-changes": value == "agree",
                 "#postponed-changes": value == "postpone"
