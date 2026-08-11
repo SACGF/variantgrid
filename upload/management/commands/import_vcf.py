@@ -15,7 +15,9 @@ class Command(BaseCommand):
         parser.add_argument('--name', required=True)
         parser.add_argument('--user', required=True)
         # Upload metadata - facts the VCF header may not carry. @see upload.upload_metadata
-        parser.add_argument('--genome-build', help='Declared genome build, used where the header has no contigs')
+        parser.add_argument('--genome-build', help="Declared genome build, used where the header has no "
+                                                   "contigs. Use the build's own name (GRCh37) rather than "
+                                                   "an alias (hg19)")
         parser.add_argument('--source', help='Declared variant caller, matched against VCFSourceSettings')
         parser.add_argument('vcf')
 

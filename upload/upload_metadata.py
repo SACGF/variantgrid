@@ -25,16 +25,18 @@ class UploadMetadataError(ValueError):
 
 
 def _validate_genome_build(value) -> str:
-    """ Stored as the build name - GenomeBuild's primary key is its name, so this is nearly an FK """
+    """ Clients should send a build's own name ('GRCh37') rather than an alias ('hg19'): an alias can
+        collide with another build's name, and only the build itself says which patch you meant.
+        Aliases still resolve - we store the canonical name, which is GenomeBuild's primary key. """
     try:
         return GenomeBuild.get_name_or_alias(str(value)).name
     except GenomeBuild.DoesNotExist as e:
         available = GenomeBuild.available_names_or_aliases()
         raise UploadMetadataError(f"Unknown '{GENOME_BUILD}': '{value}' - must be one of: {available}") from e
     except GenomeBuild.MultipleObjectsReturned as e:
-        # e.g. 'hg19' is both a build name and GRCh37's alias - the submitter has to say which
-        raise UploadMetadataError(f"Ambiguous '{GENOME_BUILD}': '{value}' matches more than one build - "
-                                  f"use the build's own name") from e
+        # Only where a deployment has both builds enabled, eg 'hg19' is a build name and GRCh37's alias
+        raise UploadMetadataError(f"Ambiguous '{GENOME_BUILD}': '{value}' matches more than one enabled "
+                                  f"build - use the build's own name") from e
 
 
 def _validate_source(value) -> str:

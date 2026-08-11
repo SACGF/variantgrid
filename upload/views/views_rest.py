@@ -60,7 +60,8 @@ class APIFileUploadView(APIView):
         description="Optional query params: 'path' (SeqAuto backend-link hint only - omit for general "
                     "uploads) and 'force' (skip sha256 de-duplication). Any other query param is treated "
                     "as upload metadata for the detected file type - a VCF accepts 'genome_build' and "
-                    "'source'; an unknown key is a 400. Returns file_upload_id and sha256_hash. "
+                    "'source'; an unknown key is a 400. Send a build's own name ('GRCh37') rather than "
+                    "an alias ('hg19'). Returns file_upload_id and sha256_hash. "
                     "'uploaded_file_id' is a retained alias for 'file_upload_id'.",
         request=OpenApiTypes.BINARY,
         responses=OpenApiTypes.OBJECT,
