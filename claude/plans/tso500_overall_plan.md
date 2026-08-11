@@ -6,9 +6,9 @@ each issue carries its own design.
 
 The file-level ingestion analysis is in [`tso500_ingestion_plan.md`](tso500_ingestion_plan.md); the
 test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md).
-Three phases have their own design docs: [`tso500_phase2_plan.md`](tso500_phase2_plan.md) for the loader
+Four phases have their own design docs: [`tso500_phase2_plan.md`](tso500_phase2_plan.md) for the loader
 refinements, [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) for gene
-fusions, and
+fusions, [`tso500_phase_7_plan.md`](tso500_phase_7_plan.md) for the grouping node, and
 [`somatic_curation_reuse_issue_1419_plan.md`](somatic_curation_reuse_issue_1419_plan.md) for Phase 8's
 reporting.
 
@@ -422,17 +422,27 @@ Build the **extraction level first** — same nucleic acid, different callers. T
 case from sapath#301 and the DRAGEN snv+cnv split, and it has no genome-build complication. Layer
 specimen on top after.
 
-Likely less new machinery than it looks: `Cohort.vcf` is already nullable and spans VCFs
-(`snpdb/models/models_cohort.py:53`), `CohortNode` consumes it today, and the per-caller-cutoff case is
-already expressible as N× `SampleNode` with their own `min_ad`/`min_dp` into a `MergeNode`. So this is
-largely an entry-point problem — auto-selecting the right samples and wiring the template — and
-`analysis_templates_tag` (`analysis/templatetags/related_analyses_tags.py:134`) takes exactly one of
-sample/cohort/trio/quad/pedigree today, with extraction and specimen the natural extension. Preserve
-caller/VCF identity rather than unioning: sapath#301 requires different cutoffs per caller, and a node
-that merges everything solves neither that nor the FFPE-vs-germline case.
+Designed in [`tso500_phase_7_plan.md`](tso500_phase_7_plan.md), which is the spec. In short: the node
+resolves its samples **at query time** and ORs a per-sample subquery on `pk`, the way `MergeNode`
+already does (`analysis/models/nodes/filters/merge_node.py:91-94`), rather than pre-building a
+cross-VCF `Cohort`. `Cohort.vcf` being nullable made the cohort look like the obvious vehicle, but
+`cohort_genotype_task` hardcodes `format` and `info` to empty and never writes `filters`
+(`snpdb/tasks/cohort_genotype_tasks.py:167-173`), so the copy would drop `INFO/CN`, `SEGID`,
+`FORMAT/SM` and the FILTER values Phase 2 exists to preserve and Phase 6 exists to display — and its
+insert scans all of `snpdb_variant` per extraction. Query-time resolution also has no version to go
+stale as Phase 4's out-of-order arrivals set `Sample.extraction`.
 
-`Cohort` has a `genome_build` FK, so a cross-VCF cohort is single-build by construction — fine at
-extraction and specimen level, and only a problem if this ever goes up to Patient.
+It is one node rather than four: `SampleNode` gains a `source_level` and extraction/specimen/patient
+FKs, because the only thing that differs between levels is object → sample set, and a separate node
+class would force a duplicate of every analysis template. Preserve caller/VCF identity rather than
+unioning: sapath#301 requires different cutoffs per caller, and a node that merges everything solves
+neither that nor the FFPE-vs-germline case. `analysis_templates_tag`
+(`analysis/templatetags/related_analyses_tags.py:134`) takes exactly one of
+sample/cohort/trio/quad/pedigree today, with extraction and specimen the natural extension.
+
+Dropping the cohort drops its `genome_build` FK with it, so the single-build constraint that ruled
+Patient out is gone — the node restricts to the analysis build, and Patient becomes one more level a
+deployment can leave switched off.
 
 ## Phase 8 — reporting (sapath#246, #1419, then #444)
 
