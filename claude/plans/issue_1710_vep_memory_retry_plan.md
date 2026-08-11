@@ -21,6 +21,170 @@ is not the fix here; #1701 supplies the truncation detection this plan retries o
 
 ---
 
+## RESOLVED (2026-08-11): the MaveDB plugin on long alleles at DMS loci
+
+Everything below this section diagnosed the wrong mechanism. Measured against two failing prod dumps
+(runs 34869 and 34870, 781 and 782 variants), the cause is **one plugin and one variant**, and buffer
+size has nothing to do with it.
+
+### The reproduction
+
+`chr12:124,911,738 GACC…GAGC > G` — a 228 bp in-frame deletion (variant_id 307197276) in **UBC**
+(`NM_021009.7:c.1806_2033del`, `NP_066289.3:p.Leu603_Val678del`). UBC is a tandem array of the 76-codon
+ubiquitin monomer and this removes exactly one repeat unit.
+
+Binary chop of run 34870 under the production VEP command, killing the tree above a cap:
+
+| input | peak RSS | outcome |
+|---|---|---|
+| all 782 variants | 4.42 GB | killed t+216s, 400/782 records written |
+| variants 451-520 | 3.00 GB | killed |
+| variants 451-452 | 0.24 GB | ok |
+| **variant 453 alone** | **5.92 GB** | **killed t+16s, still climbing** |
+
+The RSS curve for the full file is flat at ~414 MB for 200 s, then 1.0 GB at t+207 and 3.4 GB at t+213.
+A single buffer does it.
+
+### The mechanism
+
+`MaveDB::run()` (`plugins/MaveDB.pm:263`) is called per transcript-allele and fetches the variant's own span:
+
+```perl
+my @data = @{$self->get_data($vf->{chr}, $vf->{start} - 2, $vf->{end} + 1)};
+```
+
+There is no 1 Mb expansion here — MaveDB sets `expand_left(0)`/`expand_right(0)` in `new()`, so unlike
+dbNSFP the window really is the allele. Every record in it is parsed by `parse_data` into a Perl hash
+keyed by **all 241 data columns** (`_get_colnames` splices off only the 5 identifying columns), regardless
+of how few are emitted. UBC is one of the most-studied deep-mutational-scanning targets in existence, so
+MaveDB carries ~1,975 records per base there — 471,066 records in `chr12:124,900,000-124,920,000`.
+
+Cost is therefore records-in-span x hash width, and records-in-span is proportional to allele length.
+Measured at the identical locus with MaveDB as the only plugin:
+
+| variant | get_data window | MaveDB records | peak RSS |
+|---|---|---|---|
+| SNV | 4 bp | 6,900 | 0.22 GB |
+| 30 bp deletion | 33 bp | 42,306 | 0.90 GB |
+| 229 bp deletion | 232 bp | 456,360 | 5.92 GB |
+
+i.e. ~0.2 GB + records x ~13 KB. A SNV at this locus is harmless; **length is the multiplier**.
+
+It also produces nothing. Every MaveDB record at UBC has `ref` set to a `ga4gh:VA.<hash>` identifier
+rather than a sequence (468,066 of the rows near UBC), so `get_matched_variant_alleles` can never match.
+The 5.92 GB buys zero annotations.
+
+### Bisection evidence
+
+Feature bisection on the single variant (3 GB cap): full 2.94 GB killed / no-bigwig 2.96 killed /
+no-custom 2.94 killed / **no-plugins 0.19 ok** / bare 0.07 ok. Then each plugin alone:
+
+| plugin | peak | plugin | peak |
+|---|---|---|---|
+| Grantham | 0.06 | dbscSNV | 0.07 |
+| SpliceRegion | 0.05 | SpliceAI | 0.10 |
+| NMD | 0.07 | **MaveDB** | **2.96 (killed)** |
+| Mastermind | 0.07 | ProtVar | 0.07 |
+| MaxEntScan | 0.07 | OpenTargets | 0.07 |
+| dbNSFP | 0.07 | EVE / PromoterAI | 0.07 |
+
+### Buffer size is not involved
+
+Run 34869 has the same size profile as 34870 (median REF 180 bp, p90 ~620, max 1000) and the same 74
+distinct 1 Mb bins, and completes cleanly. Sweeping buffer size on it:
+
+| buffer | peak RSS | wall |
+|---|---|---|
+| 100 (current) | 0.41 GB | 281 s |
+| 500 (old default) | 0.59 GB | 269 s |
+| 5000 | 0.73 GB | 268 s |
+
+At 5000 the whole file is one buffer, holding all 74 bins at once — so **0.73 GB is a hard ceiling for
+this data at any buffer size**. The bins model below is quantitatively right (it predicts 782 MB there;
+730 MB measured) but was applied to a failure it does not govern. `6c5f2c4` neither helped nor hurt, and
+these ranges are dense (p25 gap between consecutive variants is 0 — they overlap), not sparse.
+
+A single variant is a single buffer at any setting, so no `--buffer_size` value could have prevented this.
+
+### The fix, validated
+
+Strip the MaveDB data file to the columns VariantGrid consumes **and** pass `cols=` explicitly. Both are
+required: `cols=` alone does nothing because `parse_data` keys the hash off the file header, not off
+`cols`. `vep_columns.py:964,974` read only `MaveDB_score` and `MaveDB_urn`; the plugin's default
+`cols` is `urn:score:nt:pro:doi` (`MaveDB.pm:153`), so a stripped file without an explicit `cols=` fails
+to instantiate.
+
+Stripping `MaveDB_variants_2026-04-30.tsv.gz` from 246 columns to `chr,start,end,ref,alt,urn,score`
+takes it from 591 MB to 84 MB over the same 7,264,799 records. On the pathological variant:
+
+| config | peak RSS | exit |
+|---|---|---|
+| full file, default cols | 3.93 GB | killed |
+| full file, `cols=urn:score` | 3.96 GB | killed |
+| **stripped file + `cols=urn:score`** | **0.58 GB** | **ok** |
+
+End-to-end on the full production command, only MaveDB swapped:
+
+| run | before | after |
+|---|---|---|
+| 34870 | 4.42 GB, killed, 400/782 records | **0.82 GB, exit 0, 782/782, 0 skipped** |
+| 34869 | 0.41 GB, exit 0 | 0.38 GB, exit 0 |
+
+Value-neutral: over 400 variants sampled from MaveDB itself, the production file and the stripped file
+produce **1331 vs 1331** annotated transcript-alleles with **0 mismatches**, holding `transcript_match`
+equal on both sides.
+
+Two deployment notes:
+
+- `vep_annotation.py:473` parses the data version from the filename regex
+  `^MaveDB_variants_(\d{4}-\d{2}-\d{2})\.tsv\.gz$` and raises otherwise, so a `.stripped.` name needs the
+  regex widened (dbNSFP avoids this only because it is a different config key).
+- 0.58 GB is still above the 0.07 GB no-plugin baseline: 456k two-key hashes remain. This reduces the
+  exposure rather than removing it, so a length gate is still worth having as a second lever — the SV
+  pipeline command carries no plugins at all, so routing long indels there bypasses MaveDB entirely
+  (#1708). That is a semantic change for 50-1000 bp variants, so it is the second move, not the first.
+
+### Separate bug found on the way: `transcript_match=0` is truthy
+
+`vep_annotation.py:234` builds the plugin parameter with a **trailing space**:
+
+```python
+VEPPlugin.MAVEDB: lambda: f"MaveDB,file={vc['mave']},single_aminoacid_changes=0,transcript_match=0 ",
+```
+
+Perl treats `"0 "` as true (only `"0"` is false), so `_transcripts_match` filters results in production
+despite the code intending to disable it. Measured on the same 400 variants against the same data file,
+the only difference being that space: **846 annotated transcript-alleles with it, 1331 without** — about
+36% of MaveDB annotations are being silently discarded today.
+
+### Separate bug found on the way: reclaim treats file existence as proof VEP finished
+
+`_reset_run_for_redispatch` (`annotation/tasks/annotation_scheduler_task.py:540`) resumes a run
+upload-only on `os.path.exists(annotated_filename)`, commenting that "the annotated VCF on disk is the
+proof VEP finished". VEP creates that file at startup and writes progressively: during the baseline run
+here it sat at 24,576 bytes of an eventual 3,088,691. A run reclaimed mid-VEP is therefore stamped
+`annotation_end`, marked ANNOTATION_COMPLETED and sent to the import lane off a partial file, where
+#1701 raises `TruncatedVEPOutputError`. This is the "one bad run cost five" amplification in the ticket,
+and it is what turns a single 6 GB variant into five failed runs. It needs a completeness check
+(records-out vs `dump_count`, or VEP's own skipped-variants file which is written in `Runner::finish()`)
+rather than an existence check.
+
+### What this leaves of the plan below
+
+Phase 1 (`MemoryMax=` containment) still stands on its own merits and is now the second priority after
+the MaveDB fix — it is what bounds the blast radius of any future single-variant blowup. Phases 2-4
+(per-range buffer override, truncation retry, predictive buffer sizing) are all built on the
+bins-per-buffer model and address a failure mode that did not occur here; nothing in them would have
+caught this variant.
+
+---
+
+## Superseded: the buffer-size diagnosis
+
+The remainder of this document predates the measurements above and is kept for the derivation of the
+bins-per-buffer model (which is sound, and correctly predicts the 0.41-0.73 GB range measured on 34869)
+and for the record of what was designed and deliberately not built.
+
 ## First, the one-line version — done
 
 The variants in run 34818 were ~1 kb, which (see "What actually costs the memory") rules out the
