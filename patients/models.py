@@ -365,11 +365,19 @@ class Extraction(ExternallyManagedModel):
         One extraction can be sequenced more than once (repeats, top-ups) so SequencingSample
         points here rather than the other way around """
     specimen = models.ForeignKey(Specimen, on_delete=CASCADE)
+    # Local reference beside external_pk - not every deployment has a system to be managed by,
+    # the same reason Patient carries patient_code and Specimen carries its own reference_id
+    reference_id = models.TextField(null=True, blank=True)
     nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.choices, default=NucleicAcid.DNA, null=True, blank=True)
     extraction_date = models.DateTimeField(null=True, blank=True)
 
+    class Meta:
+        # Unnamed extractions are all distinct under Postgres, which is what the re-extraction
+        # case wants - extraction_date tells those apart
+        unique_together = ("specimen", "reference_id")
+
     def __str__(self):
-        s = str(self.specimen)
+        s = self.reference_id or str(self.specimen)
         if self.nucleic_acid_source:
             s += f" ({self.get_nucleic_acid_source_display()})"
         if self.extraction_date:

@@ -12,6 +12,8 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.import_records import process_record
 from patients.models import (
     Extraction,
+    ExternalModelManager,
+    ExternalPK,
     Patient,
     PatientColumns,
     PatientImport,
@@ -46,8 +48,10 @@ class TestSpecimenExtraction(TestCase):
         assign_permission_to_user_and_groups(cls.user, cls.patient)
         cls.specimen = Specimen.objects.create(reference_id="2600000001", patient=cls.patient,
                                                mutation_type=Mutation.SOMATIC)
-        cls.dna = Extraction.objects.create(specimen=cls.specimen, nucleic_acid_source=NucleicAcid.DNA)
-        cls.rna = Extraction.objects.create(specimen=cls.specimen, nucleic_acid_source=NucleicAcid.RNA)
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+        cls.rna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001B",
+                                            nucleic_acid_source=NucleicAcid.RNA)
 
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         vcf = VCF.objects.create(name="extraction_test.vcf", genotype_samples=2, genome_build=genome_build,
@@ -89,6 +93,27 @@ class TestSpecimenExtraction(TestCase):
         self.assertNotEqual(str(redo), str(self.dna))
         dna_qs = self.specimen.extraction_set.filter(nucleic_acid_source=NucleicAcid.DNA)
         self.assertEqual(list(dna_qs.order_by("-extraction_date")), [redo, self.dna])
+
+    def test_local_reference_and_external_pk_coexist(self):
+        """ external_pk is nullable because not every deployment has a system managing it, so each
+            level carries a local reference too """
+        external_manager = ExternalModelManager.objects.create(name="test_lims")
+        external_pk = ExternalPK.objects.create(code="LIMS-EXT-1", external_type="extraction",
+                                                external_manager=external_manager)
+        self.dna.external_pk = external_pk
+        self.dna.save()
+
+        self.dna.refresh_from_db()
+        self.assertEqual(self.dna.reference_id, "2600000001C")
+        self.assertEqual(self.dna.external_pk.code, "LIMS-EXT-1")
+        self.assertIsNone(self.rna.external_pk, "A local reference works without an external one")
+
+    def test_unnamed_extractions_are_distinct(self):
+        """ unique_together is on (specimen, reference_id), and Postgres treats NULLs as distinct,
+            so a specimen can hold several unnamed extractions """
+        Extraction.objects.create(specimen=self.specimen)
+        Extraction.objects.create(specimen=self.specimen)
+        self.assertEqual(self.specimen.extraction_set.filter(reference_id__isnull=True).count(), 2)
 
     def test_timestamps_recorded(self):
         """ Everything in patients is a TimeStampedModel """
@@ -201,10 +226,13 @@ class TestAutocompleteForwarding(TestCase):
         cls.other_patient_specimen = Specimen.objects.create(reference_id="2600000003",
                                                              patient=cls.other_patient)
 
-        cls.dna = Extraction.objects.create(specimen=cls.specimen, nucleic_acid_source=NucleicAcid.DNA)
-        cls.rna = Extraction.objects.create(specimen=cls.specimen, nucleic_acid_source=NucleicAcid.RNA)
-        cls.other_extraction = Extraction.objects.create(specimen=cls.other_specimen)
-        Extraction.objects.create(specimen=cls.other_patient_specimen)
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+        cls.rna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001B",
+                                            nucleic_acid_source=NucleicAcid.RNA)
+        cls.other_extraction = Extraction.objects.create(specimen=cls.other_specimen,
+                                                         reference_id="2600000002C")
+        Extraction.objects.create(specimen=cls.other_patient_specimen, reference_id="2600000003C")
 
     def _queryset(self, view_class, **forwarded):
         view = view_class()
@@ -227,6 +255,10 @@ class TestAutocompleteForwarding(TestCase):
     def test_specimen_forwards_patient(self):
         specimens = self._queryset(SpecimenAutocompleteView, patient=self.patient.pk)
         self.assertEqual(set(specimens), {self.specimen, self.other_specimen})
+
+    def test_extraction_searchable_by_its_own_reference(self):
+        """ The TSO 500 container suffix lives on the extraction, not the specimen """
+        self.assertIn('reference_id', ExtractionAutocompleteView.fields)
 
     def test_nothing_forwarded_returns_all_visible(self):
         self.assertEqual(self._queryset(SpecimenAutocompleteView).count(), 3)
