@@ -21,6 +21,21 @@ from library.utils import open_file_or_filename, open_handle_gzip
 from snpdb.models import GenomeFasta, Sequence, SequenceRole, Variant, VariantCoordinate
 
 
+VCF_HEADER_FILTER_ID_PATTERN = re.compile(r'^##FILTER=<ID=([^,>]+)')
+
+
+def vcf_header_filter_ids(vcf_header_lines: Iterable[str]) -> set[str]:
+    """ Declared FILTER IDs, read straight out of the raw header lines.
+
+        Callers write keys beyond ID/Description here (eg Illumina's LrCalculator adds Number/Type) which
+        strict parsers reject outright, so we only pull out the ID rather than parsing the whole line """
+    filter_ids = set()
+    for line in vcf_header_lines:
+        if m := VCF_HEADER_FILTER_ID_PATTERN.match(line):
+            filter_ids.add(m.group(1))
+    return filter_ids
+
+
 def cyvcf2_header_types(cyvcf2_reader) -> defaultdict:
     header_types = defaultdict(dict)
     for h in cyvcf2_reader.header_iter():

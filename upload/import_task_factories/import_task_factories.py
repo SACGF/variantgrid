@@ -125,7 +125,10 @@ class PatientRecordsImportTaskFactory(ImportTaskFactory):
         return [UploadedPatientRecords]
 
     def get_processing_ability(self, user, filename, file_extension):
-        df = pd.read_csv(filename, encoding='unicode_escape')
+        try:
+            df = pd.read_csv(filename, encoding='unicode_escape')
+        except Exception:  # Every CSV factory is asked, so a shape we can't read is someone else's file
+            return 0
         if PatientColumns.PATIENT_LAST_NAME in df.columns:
             return 1000
         return 0
