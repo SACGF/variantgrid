@@ -24,11 +24,11 @@ from library.enums.titles import Title
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import calculate_age
 from patients.models_enums import (
-    Mutation,
     NucleicAcid,
     PatientRecordMatchType,
     PopulationGroup,
     Sex,
+    TissueStatus,
 )
 
 TEST_PATIENT_KWARGS = {"first_name": "PATIENT", "last_name": "TESTPATIENT"}
@@ -308,7 +308,7 @@ class Tissue(TimeStampedModel):
         return self.name
 
 
-class Specimen(ExternallyManagedModel):
+class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMixin):
     """ Biological material collected from a patient - one tissue at one timepoint (block, blood draw).
         The nucleic acid taken off it lives on Extraction below """
     reference_id = models.TextField()
@@ -318,12 +318,51 @@ class Specimen(ExternallyManagedModel):
     tissue = models.ForeignKey(Tissue, null=True, blank=True, on_delete=SET_NULL)
     collection_date = models.DateTimeField(null=True, blank=True)
     received_date = models.DateTimeField(null=True, blank=True)
-    mutation_type = models.CharField(max_length=1, choices=Mutation.choices, default=Mutation.GERMLINE, null=True, blank=True)
+    # Per-specimen rather than per-tissue - the same tissue plays different roles in different tests
+    tissue_status = models.CharField(max_length=1, choices=TissueStatus.choices, default=TissueStatus.UNKNOWN)
     # See note on patient / sample ages and dates above Patient model
     _age_at_collection_date = models.IntegerField(null=True, blank=True)
 
     class Meta:
         unique_together = ("patient", "reference_id")
+
+    @classmethod
+    def get_permission_class(cls):
+        return Patient
+
+    def get_permission_object(self):
+        # A specimen's confidentiality is its patient's
+        return self.patient
+
+    @classmethod
+    def _filter_from_permission_object_qs(cls, queryset):
+        return cls.objects.filter(patient__in=queryset)
+
+    def can_write(self, user) -> bool:
+        return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-vial"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'patients'
+
+    @property
+    def preview(self) -> PreviewData:
+        parts = [PreviewKeyValue(key="Tissue status", value=self.get_tissue_status_display())]
+        if self.collection_date:
+            parts.append(PreviewKeyValue(key="Collected", value=self.collection_date))
+
+        return self.preview_with(
+            identifier=self.reference_id or self.external_pk or f"({self.pk})",
+            title=str(self.patient),
+            summary_extra=parts
+        )
+
+    def get_absolute_url(self):
+        return reverse('view_specimen', kwargs={"specimen_id": self.pk})
 
     @property
     def age_at_collection_date(self):
@@ -360,7 +399,7 @@ class Specimen(ExternallyManagedModel):
         return s
 
 
-class Extraction(ExternallyManagedModel):
+class Extraction(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMixin):
     """ Nucleic acid taken off a Specimen - eg the DNA arm and the RNA arm of one tumour block.
         One extraction can be sequenced more than once (repeats, top-ups) so SequencingSample
         points here rather than the other way around """
@@ -375,6 +414,45 @@ class Extraction(ExternallyManagedModel):
         # Unnamed extractions are all distinct under Postgres, which is what the re-extraction
         # case wants - extraction_date tells those apart
         unique_together = ("specimen", "reference_id")
+
+    @classmethod
+    def get_permission_class(cls):
+        return Patient
+
+    def get_permission_object(self):
+        return self.specimen.patient
+
+    @classmethod
+    def _filter_from_permission_object_qs(cls, queryset):
+        return cls.objects.filter(specimen__patient__in=queryset)
+
+    def can_write(self, user) -> bool:
+        return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-flask"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'patients'
+
+    @property
+    def preview(self) -> PreviewData:
+        parts = []
+        if self.nucleic_acid_source:
+            parts.append(PreviewKeyValue(key="Nucleic acid", value=self.get_nucleic_acid_source_display()))
+        if self.extraction_date:
+            parts.append(PreviewKeyValue(key="Extracted", value=self.extraction_date))
+
+        return self.preview_with(
+            identifier=self.reference_id or self.external_pk or f"({self.pk})",
+            title=str(self.specimen.patient),
+            summary_extra=parts
+        )
+
+    def get_absolute_url(self):
+        return reverse('view_extraction', kwargs={"extraction_id": self.pk})
 
     def __str__(self):
         s = self.reference_id or str(self.specimen)
@@ -481,7 +559,7 @@ class PatientColumns:
     SPECIMEN_COLLECTED_BY = 'Specimen Collected by'
     SPECIMEN_COLLECTION_DATE = 'Specimen Collection date'
     SPECIMEN_RECEIVED_DATE = 'Specimen Received date'
-    SPECIMEN_MUTATION_TYPE = 'Specimen Mutation type (Germline/Somatic)'
+    SPECIMEN_TISSUE_STATUS = 'Specimen Tissue status (Reference/Affected/Unknown)'
     SPECIMEN_NUCLEIC_ACID_SOURCE = 'Specimen Nucleic acid source (DNA/RNA)'
     SPECIMEN_AGE_AT_COLLECTION_DATE = 'Age at collection date (mutually exclusive to date of birth)'
 
@@ -504,7 +582,7 @@ class PatientColumns:
         (SPECIMEN_COLLECTED_BY, "String", ""),
         (SPECIMEN_COLLECTION_DATE, "Date", ""),
         (SPECIMEN_RECEIVED_DATE, "Date", ""),
-        (SPECIMEN_MUTATION_TYPE, "Mutation Type", ""),
+        (SPECIMEN_TISSUE_STATUS, "Tissue Status", "Role the material plays in the test"),
         (SPECIMEN_NUCLEIC_ACID_SOURCE, "Nucleic Acid Source", ""),
         (SPECIMEN_AGE_AT_COLLECTION_DATE, "Int", "Only use this column if date of birth is unavailable"),
     ]
@@ -530,7 +608,7 @@ class PatientColumns:
         SPECIMEN_COLLECTED_BY: "extraction__specimen__collected_by",
         SPECIMEN_COLLECTION_DATE: "extraction__specimen__collection_date",
         SPECIMEN_RECEIVED_DATE: "extraction__specimen__received_date",
-        SPECIMEN_MUTATION_TYPE: "extraction__specimen__mutation_type",
+        SPECIMEN_TISSUE_STATUS: "extraction__specimen__tissue_status",
         SPECIMEN_NUCLEIC_ACID_SOURCE: "extraction__nucleic_acid_source",
         SPECIMEN_AGE_AT_COLLECTION_DATE: "extraction__specimen___age_at_collection_date",
     }
@@ -659,7 +737,7 @@ class PatientRecord(TimeStampedModel):
     specimen_collected_by = models.TextField(null=True)
     specimen_collection_date = models.TextField(null=True)
     specimen_received_date = models.TextField(null=True)
-    specimen_mutation_type = models.CharField(max_length=1, choices=Mutation.choices, null=True)
+    specimen_tissue_status = models.CharField(max_length=1, choices=TissueStatus.choices, null=True)
     specimen_nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.choices, null=True)
     specimen_age_at_collection_date = models.IntegerField(null=True, blank=True)
 

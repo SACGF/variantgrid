@@ -24,6 +24,8 @@ urlpatterns = [
     path('view_patient/contact/<int:patient_id>', views.view_patient_contact_tab, name='view_patient_contact_tab'),
     path('view_patient/patient_specimens/<int:patient_id>', views.view_patient_specimens, name='view_patient_specimens'),
     path('view_patient/patient_extractions/<int:patient_id>', views.view_patient_extractions, name='view_patient_extractions'),
+    path('view_specimen/<int:specimen_id>', views.view_specimen, name='view_specimen'),
+    path('view_extraction/<int:extraction_id>', views.view_extraction, name='view_extraction'),
     path('view_patient/genes/<int:patient_id>', views.view_patient_genes, name='view_patient_genes'),
     path('view_patient/modifications/<int:patient_id>', views.view_patient_modifications, name='view_patient_modifications'),
 

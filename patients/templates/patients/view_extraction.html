@@ -1,0 +1,78 @@
+{% extends menu_patients_base %}
+{% load ui_utils %}
+{% load crispy_forms_tags %}
+{% block title %}Extraction {{ extraction }}{% endblock title %}
+{% block head %}
+<script>
+    $(document).ready(() => {
+        $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
+    });
+</script>
+{% endblock head %}
+
+{% block submenu_page_content %}
+    <div class="container">
+        <h3>Extraction: {{ extraction }} {% admin_link extraction %}</h3>
+
+        {% labelled label="Specimen" %}
+            <a href="{% url 'view_specimen' extraction.specimen_id %}">{{ extraction.specimen }}</a>
+        {% endlabelled %}
+        {% labelled label="Patient" %}
+            <a href="{% url 'view_patient' extraction.specimen.patient_id %}">{{ extraction.specimen.patient }}</a>
+        {% endlabelled %}
+        {% labelled label="External ID" %}{{ extraction.external_pk|default:"-" }}{% endlabelled %}
+        {% if extraction.external_manager %}
+            {% labelled label="Externally managed" %}{{ extraction.external_manager.explaination }}{% endlabelled %}
+        {% endif %}
+
+        <form method="post" id="extraction-form">
+            {% csrf_token %}
+            {% crispy form form_helper.horizontal %}
+            {% if has_write_permission %}
+                <button id="save-extraction" class="btn btn-primary">Save</button>
+                <button type="reset" class="btn btn-secondary">Reset</button>
+            {% else %}
+                You can view but not modify this extraction.
+            {% endif %}
+        </form>
+
+        <hr/>
+        <h4>Samples</h4>
+        {% if samples %}
+            <table class="table">
+                <thead>
+                    <tr><th>Sample<th>VCF<th>Variants type</tr>
+                </thead>
+                <tbody>
+                {% for sample in samples %}
+                    <tr>
+                        <td><a href="{% url 'view_sample' sample.pk %}">{{ sample.name }}</a>
+                        <td>{{ sample.vcf }}
+                        <td>{{ sample.get_variants_type_display }}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>This extraction has no samples.</p>
+        {% endif %}
+
+        {% if sequencing_samples %}
+            <h4>Sequencing Samples</h4>
+            <table class="table">
+                <thead>
+                    <tr><th>Sequencing sample<th>Sample sheet<th>Enrichment kit</tr>
+                </thead>
+                <tbody>
+                {% for sequencing_sample in sequencing_samples %}
+                    <tr>
+                        <td>{{ sequencing_sample.sample_name }}
+                        <td>{{ sequencing_sample.sample_sheet }}
+                        <td>{{ sequencing_sample.enrichment_kit|default:"-" }}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+{% endblock submenu_page_content %}

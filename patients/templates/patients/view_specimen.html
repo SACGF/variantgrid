@@ -1,0 +1,64 @@
+{% extends menu_patients_base %}
+{% load ui_utils %}
+{% load crispy_forms_tags %}
+{% block title %}Specimen {{ specimen.reference_id }}{% endblock title %}
+{% block head %}
+<script>
+    $(document).ready(() => {
+        $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
+    });
+</script>
+{% endblock head %}
+
+{% block submenu_page_content %}
+    <div class="container">
+        <h3>Specimen: {{ specimen.reference_id }} {% admin_link specimen %}</h3>
+
+        {% labelled label="Patient" %}
+            <a href="{% url 'view_patient' specimen.patient_id %}">{{ specimen.patient }}</a>
+        {% endlabelled %}
+        {% labelled label="External ID" %}{{ specimen.external_pk|default:"-" }}{% endlabelled %}
+        {% if specimen.external_manager %}
+            {% labelled label="Externally managed" %}{{ specimen.external_manager.explaination }}{% endlabelled %}
+        {% endif %}
+        {% labelled label="Age at collection" %}{{ specimen.age_at_collection_date|default_if_none:"-" }}{% endlabelled %}
+
+        <form method="post" id="specimen-form">
+            {% csrf_token %}
+            {% crispy form form_helper.horizontal %}
+            {% if has_write_permission %}
+                <button id="save-specimen" class="btn btn-primary">Save</button>
+                <button type="reset" class="btn btn-secondary">Reset</button>
+            {% else %}
+                You can view but not modify this specimen.
+            {% endif %}
+        </form>
+
+        <hr/>
+        <h4>Extractions</h4>
+        {% if extractions %}
+            <table class="table">
+                <thead>
+                    <tr><th>Extraction<th>Nucleic acid source<th>Extraction date<th>Samples</tr>
+                </thead>
+                <tbody>
+                {% for extraction in extractions %}
+                    <tr>
+                        <td><a href="{% url 'view_extraction' extraction.pk %}">{{ extraction.reference_id|default:extraction.pk }}</a>
+                        <td>{{ extraction.get_nucleic_acid_source_display|default:"-" }}
+                        <td>{{ extraction.extraction_date|default_if_none:"-" }}
+                        <td>
+                            {% for sample in extraction.sample_set.all %}
+                                <a href="{% url 'view_sample' sample.pk %}">{{ sample.name }}</a>{% if not forloop.last %}, {% endif %}
+                            {% empty %}
+                                -
+                            {% endfor %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>This specimen has no extractions.</p>
+        {% endif %}
+    </div>
+{% endblock submenu_page_content %}

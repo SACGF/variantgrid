@@ -22,6 +22,14 @@
         });
     </script>
     <div class="container">
+        {% if specimen_formset.queryset %}
+            <div class="mb-2">
+                Specimen pages:
+                {% for specimen in specimen_formset.queryset %}
+                    <a href="{% url 'view_specimen' specimen.pk %}">{{ specimen.reference_id }}</a>{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+        {% endif %}
         <form id="patient-specimens-form" method="post" action="{% url 'view_patient_specimens' patient.pk %}">
             {% csrf_token %}
             {% crispy specimen_formset form_helper.horizontal %}

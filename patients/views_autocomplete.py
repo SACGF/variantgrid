@@ -28,7 +28,7 @@ class SpecimenAutocompleteView(AutocompleteView):
     fields = ['reference_id']
 
     def get_user_queryset(self, user):
-        qs = Specimen.objects.filter(patient__in=Patient.filter_for_user(user))
+        qs = Specimen.filter_for_user(user)
         if patient := self.forwarded.get('patient'):
             qs = qs.filter(patient=patient)
         if extraction := self.forwarded.get('extraction'):
@@ -43,7 +43,7 @@ class ExtractionAutocompleteView(AutocompleteView):
     fields = ['reference_id', 'specimen__reference_id']
 
     def get_user_queryset(self, user):
-        qs = Extraction.objects.filter(specimen__patient__in=Patient.filter_for_user(user))
+        qs = Extraction.filter_for_user(user)
         if patient := self.forwarded.get('patient'):
             qs = qs.filter(specimen__patient=patient)
         if specimen := self.forwarded.get('specimen'):

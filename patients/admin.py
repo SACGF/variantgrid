@@ -17,7 +17,7 @@ class TissueAdmin(ModelAdminBasics):
 
 @admin.register(models.Specimen)
 class SpecimenAdmin(ModelAdminBasics):
-    list_display = ("id", "reference_id", "patient", "tissue", "mutation_type", "collection_date")
+    list_display = ("id", "reference_id", "patient", "tissue", "tissue_status", "collection_date")
     search_fields = ("reference_id",)
 
 

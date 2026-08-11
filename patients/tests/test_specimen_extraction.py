@@ -1,5 +1,5 @@
 """
-Specimen -> Extraction -> Sample (#1704)
+Specimen -> Extraction -> Sample (#1704), and Specimen.tissue_status (variantgrid_private#2447)
 """
 import os
 from datetime import datetime
@@ -8,6 +8,10 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
+from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import (
+    get_evidence_fields_for_sample_and_patient,
+)
+from classification.enums import SpecialEKeys
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.import_records import process_record
 from patients.models import (
@@ -17,12 +21,14 @@ from patients.models import (
     Patient,
     PatientColumns,
     PatientImport,
+    PatientRecord,
     PatientRecords,
     Specimen,
 )
-from patients.models_enums import Mutation, NucleicAcid
+from patients.models_enums import NucleicAcid, TissueStatus
 from patients.views_autocomplete import ExtractionAutocompleteView, SpecimenAutocompleteView
 from snpdb.models import VCF, GenomeBuild, ImportSource, ImportStatus, Sample
+from snpdb.models.models_enums import VariantsType
 from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
 
 _FAKE_CSV = os.path.join(os.path.dirname(__file__), "test_data", "fake_patient_records.csv")
@@ -47,7 +53,7 @@ class TestSpecimenExtraction(TestCase):
         cls.patient = Patient.objects.create(first_name="DNARNA", last_name="PATIENT")
         assign_permission_to_user_and_groups(cls.user, cls.patient)
         cls.specimen = Specimen.objects.create(reference_id="2600000001", patient=cls.patient,
-                                               mutation_type=Mutation.SOMATIC)
+                                               tissue_status=TissueStatus.AFFECTED)
         cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001C",
                                             nucleic_acid_source=NucleicAcid.DNA)
         cls.rna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001B",
@@ -120,6 +126,97 @@ class TestSpecimenExtraction(TestCase):
         for obj in (self.patient, self.specimen, self.dna):
             self.assertIsNotNone(obj.created, f"{type(obj).__name__} has no created")
             self.assertIsNotNone(obj.modified, f"{type(obj).__name__} has no modified")
+
+
+class TestSpecimenTissueStatus(TestCase):
+    """ variantgrid_private#2447 - a specimen nobody has described says so, rather than defaulting to
+        a Germline claim that autopopulate then stamps on every classification """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("tissue_status_user", password="x")
+        cls.patient = Patient.objects.create(first_name="TISSUE", last_name="PATIENT")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+
+        genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.vcf = VCF.objects.create(name="tissue_status.vcf", genotype_samples=1, genome_build=genome_build,
+                                     import_status=ImportStatus.SUCCESS, user=cls.user, date=timezone.now())
+
+    def test_unset_tissue_status_is_unknown(self):
+        specimen = Specimen.objects.create(reference_id="UNDESCRIBED", patient=self.patient)
+        self.assertEqual(specimen.tissue_status, TissueStatus.UNKNOWN)
+
+    def _allele_origin(self, tissue_status, variants_type):
+        specimen = Specimen.objects.create(reference_id=f"{tissue_status}{variants_type}",
+                                           patient=self.patient, tissue_status=tissue_status)
+        extraction = Extraction.objects.create(specimen=specimen, nucleic_acid_source=NucleicAcid.DNA)
+        sample = Sample.objects.create(name=f"sample_{tissue_status}{variants_type}", vcf=self.vcf,
+                                       patient=self.patient, extraction=extraction,
+                                       variants_type=variants_type)
+        data = get_evidence_fields_for_sample_and_patient(None, sample)
+        return data[SpecialEKeys.ALLELE_ORIGIN]
+
+    def test_reference_specimen_germline_call_set_is_germline(self):
+        self.assertEqual(self._allele_origin(TissueStatus.REFERENCE, VariantsType.GERMLINE), "germline")
+
+    def test_somatic_only_call_set_is_somatic_whatever_the_tissue(self):
+        for tissue_status in TissueStatus:
+            self.assertEqual(self._allele_origin(tissue_status, VariantsType.SOMATIC_ONLY), "somatic",
+                             f"{tissue_status} + somatic only")
+
+    def test_affected_specimen_mixed_call_set_is_unset(self):
+        """ A tumour sample carrying both origins is per-variant, so the curator decides """
+        self.assertIsNone(self._allele_origin(TissueStatus.AFFECTED, VariantsType.MIXED))
+
+    def test_unknown_tissue_germline_call_set_is_unset(self):
+        self.assertIsNone(self._allele_origin(TissueStatus.UNKNOWN, VariantsType.GERMLINE))
+
+    def test_affected_specimen_germline_call_set_is_unset(self):
+        self.assertIsNone(self._allele_origin(TissueStatus.AFFECTED, VariantsType.GERMLINE))
+
+    def test_sample_without_extraction_is_unset(self):
+        sample = Sample.objects.create(name="no_extraction", vcf=self.vcf, patient=self.patient,
+                                       variants_type=VariantsType.GERMLINE)
+        data = get_evidence_fields_for_sample_and_patient(None, sample)
+        self.assertIsNone(data[SpecialEKeys.ALLELE_ORIGIN])
+
+
+class TestSpecimenExtractionPermissions(TestCase):
+    """ #1706 - both delegate to their patient, which is where a specimen's confidentiality lives """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.owner = User.objects.create_user("specimen_owner", password="x")
+        cls.other_user = User.objects.create_user("specimen_other", password="x")
+        cls.patient = Patient.objects.create(first_name="PERM", last_name="PATIENT")
+        assign_permission_to_user_and_groups(cls.owner, cls.patient)
+
+        cls.specimen = Specimen.objects.create(reference_id="PERMSPEC", patient=cls.patient)
+        cls.extraction = Extraction.objects.create(specimen=cls.specimen, reference_id="PERMSPECC")
+
+    def test_owner_sees_them(self):
+        self.assertEqual(list(Specimen.filter_for_user(self.owner)), [self.specimen])
+        self.assertEqual(list(Extraction.filter_for_user(self.owner)), [self.extraction])
+        self.assertTrue(self.specimen.can_view(self.owner))
+        self.assertTrue(self.extraction.can_view(self.owner))
+
+    def test_other_user_sees_nothing(self):
+        self.assertEqual(list(Specimen.filter_for_user(self.other_user)), [])
+        self.assertEqual(list(Extraction.filter_for_user(self.other_user)), [])
+        self.assertFalse(self.specimen.can_view(self.other_user))
+        self.assertFalse(self.extraction.can_view(self.other_user))
+
+    def test_external_manager_blocks_writes(self):
+        """ ExternallyManagedModel.can_write is ANDed with the patient's guardian permission """
+        self.assertTrue(self.specimen.can_write(self.owner))
+
+        external_manager = ExternalModelManager.objects.create(name="read_only_lims", can_modify=False)
+        self.specimen.external_pk = ExternalPK.objects.create(code="LIMS-SPEC-1", external_type="specimen",
+                                                              external_manager=external_manager)
+        self.specimen.save()
+        self.assertFalse(self.specimen.can_write(self.owner))
 
 
 class TestPatientCSVExtractionRoundTrip(TestCase):
@@ -196,6 +293,21 @@ class TestPatientCSVExtractionRoundTrip(TestCase):
         self.assertEqual(self.sample.extraction.specimen.reference_id, "CSVSPEC001")
         self.assertIsNone(self.sample.extraction.nucleic_acid_source)
 
+    def test_tissue_status_column_parses_display_value(self):
+        """ parse_choice takes the key or the display value in any case """
+        self._import_row(**{PatientColumns.SPECIMEN_TISSUE_STATUS: "affected / lesional"})
+
+        specimen = Specimen.objects.get(reference_id="CSVSPEC001")
+        self.assertEqual(specimen.tissue_status, TissueStatus.AFFECTED)
+        record = PatientRecord.objects.get(specimen=specimen)
+        self.assertEqual(record.specimen_tissue_status, TissueStatus.AFFECTED)
+
+    def test_blank_tissue_status_column_is_unknown(self):
+        self._import_row()
+
+        specimen = Specimen.objects.get(reference_id="CSVSPEC001")
+        self.assertEqual(specimen.tissue_status, TissueStatus.UNKNOWN)
+
     def test_export_columns_round_trip(self):
         """ The CSV written back out reads the same values through the new relations """
         self._import_row()
@@ -207,6 +319,8 @@ class TestPatientCSVExtractionRoundTrip(TestCase):
                          "left femur")
         self.assertEqual(values[PatientColumns.SAMPLE_QUERYSET_PATH[PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE]],
                          NucleicAcid.DNA)
+        self.assertEqual(values[PatientColumns.SAMPLE_QUERYSET_PATH[PatientColumns.SPECIMEN_TISSUE_STATUS]],
+                         TissueStatus.UNKNOWN)
 
 
 class TestAutocompleteForwarding(TestCase):
