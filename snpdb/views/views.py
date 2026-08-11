@@ -399,7 +399,7 @@ def view_vcf(request, vcf_id):
     sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, passing_filter=True)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
-                                             fields=["vcf_sample_name", "name", "patient", "specimen"],
+                                             fields=["vcf_sample_name", "name", "patient", "extraction"],
                                              widgets=SampleForm.Meta.widgets)
 
     post = request.POST or None

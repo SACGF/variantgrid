@@ -25,6 +25,8 @@
         <form id="patient-specimens-form" method="post" action="{% url 'view_patient_specimens' patient.pk %}">
             {% csrf_token %}
             {% crispy specimen_formset form_helper.horizontal %}
+            <h4>Extractions</h4>
+            {% crispy extraction_formset form_helper.horizontal %}
             <table>
             {% if has_write_permission %}
             <td><button id='save-button' class="btn btn-primary">Save</button></td>

@@ -20,7 +20,7 @@ from library.cache import timed_cache
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
-from patients.models import Patient, Specimen
+from patients.models import Extraction, Patient, Specimen
 from snpdb import models
 from snpdb.models import (
     DEFAULT_GRID_LOADING_ANIMATIONS,
@@ -363,9 +363,9 @@ class SampleForm(forms.ModelForm, ROFormMixin):
                    'name': TextInput(),
                    'patient': ModelSelect2(url='patient_autocomplete',
                                            attrs={'data-placeholder': 'Patient...'}),
-                   'specimen': ModelSelect2(url='specimen_autocomplete',
-                                            forward=['patient'],
-                                            attrs={'data-placeholder': 'Specimen...'})}
+                   'extraction': ModelSelect2(url='extraction_autocomplete',
+                                              forward=['patient'],
+                                              attrs={'data-placeholder': 'Extraction...'})}
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
@@ -384,14 +384,14 @@ class SampleForm(forms.ModelForm, ROFormMixin):
 
     def clean(self):
         cleaned_data = super().clean()
-        specimen = cleaned_data.get('specimen')
-        if specimen:
+        extraction = cleaned_data.get('extraction')
+        if extraction:
             patient = cleaned_data.get('patient')
             if patient is None:
-                self.add_error('patient', "Patient must be supplied if specimen supplied")
-            elif specimen.patient != patient:
-                msg = "Specimen must be from supplied patient"
-                self.add_error('specimen', msg)
+                self.add_error('patient', "Patient must be supplied if extraction supplied")
+            elif extraction.specimen.patient != patient:
+                msg = "Extraction must be from supplied patient"
+                self.add_error('extraction', msg)
                 self.add_error('patient', msg)
         return cleaned_data
 
@@ -560,10 +560,11 @@ class SettingsOverrideForm(BaseModelForm):
     @staticmethod
     def _validate_sample_formatter_func(sample_label_template):
         """ Throws error if invalid """
-        specimen = Specimen(reference_id='refId', description='description')
+        specimen = Specimen(pk=3, reference_id='refId', description='description')
+        extraction = Extraction(pk=4, specimen=specimen)
         patient = Patient(pk=2, first_name='first_name', last_name='last_name',
                           patient_code='patient_code')
-        sample = Sample(pk=1, name="sample", patient=patient, specimen=specimen)
+        sample = Sample(pk=1, name="sample", patient=patient, extraction=extraction)
         params = sample._get_sample_formatter_params()
         errors = []
         for i, t in enumerate(sample_label_template.split("||")):

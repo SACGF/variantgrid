@@ -416,7 +416,7 @@ $(document).ready(function() {
                     <th>VCF Sample Name
                     <th>Name
                     <th>Patient
-                    <th>Specimen
+                    <th>Extraction
                 </tr>
             </thead>
             {% for form in samples_form %}
@@ -455,7 +455,7 @@ $(document).ready(function() {
                             </div>
                         </div>
                     </td>
-                    <td>{{ form.specimen }}{{ form.specimen.errors }}</td>
+                    <td>{{ form.extraction }}{{ form.extraction.errors }}</td>
                 </tr>
                 
             {% endfor %}

@@ -70,8 +70,8 @@ $(document).ready(function() {
     const sampleForm = $("#sample-form");
     const patientSelect = $("#id_patient", sampleForm);
     patientSelect.change(function() {
-        let specimenSelect = $("#id_specimen", sampleForm);
-        clearAutocompleteChoice(specimenSelect);
+        let extractionSelect = $("#id_extraction", sampleForm);
+        clearAutocompleteChoice(extractionSelect);
     });
     const dialog = setupCreatePatientDialog();
     const sampleName = $("#id_name").val();

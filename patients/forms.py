@@ -1,11 +1,12 @@
 from dal import forward
 from django import forms
-from django.forms.models import ALL_FIELDS, inlineformset_factory
+from django.forms.models import inlineformset_factory, modelformset_factory
 from django.forms.widgets import TextInput
 
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import (
+    Extraction,
     ExternalPK,
     Patient,
     PatientModification,
@@ -120,7 +121,7 @@ class PatientSearchForm(forms.Form):
 PatientSpecimenFormSet = inlineformset_factory(Patient,
                                                Specimen,
                                                can_delete=True,
-                                               fields=ALL_FIELDS,
+                                               exclude=['external_pk'],
                                                widgets={'name': TextInput(),
                                                         'description': TextInput(),
                                                         'reference_id': TextInput(),
@@ -128,6 +129,13 @@ PatientSpecimenFormSet = inlineformset_factory(Patient,
                                                         'collection_date': TextInput(attrs={'class': 'date-picker'}),
                                                         'received_date': TextInput(attrs={'class': 'date-picker'})},
                                                extra=1)
+
+# Not an inline formset as Extraction hangs off Specimen - the view restricts it to one patient
+PatientExtractionFormSet = modelformset_factory(Extraction,
+                                                can_delete=True,
+                                                fields=['specimen', 'reference_id', 'nucleic_acid_source'],
+                                                widgets={'reference_id': TextInput()},
+                                                extra=1)
 
 
 def external_pk_autocomplete_form_factory(external_type):
