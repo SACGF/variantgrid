@@ -4,7 +4,8 @@ from typing import Optional
 from classification.autopopulate_evidence_keys.evidence_from_variant import AutopopulateData
 from classification.enums import SpecialEKeys
 from patients.models_enums import Sex, Zygosity
-from snpdb.models import Sample, SampleGenotype, Specimen
+from patients.models import Extraction
+from snpdb.models import Sample, SampleGenotype
 from snpdb.models.models_variant import Variant
 
 
@@ -40,8 +41,8 @@ def get_evidence_fields_for_sample_and_patient(variant: Variant, sample: Sample)
         if patient.family_code:
             data[SpecialEKeys.FAMILY_ID] = patient.family_code
 
-    if sample.specimen:
-        data.update(get_evidence_fields_for_specimen(sample.specimen))
+    if sample.extraction:
+        data.update(get_evidence_fields_for_extraction(sample.extraction))
 
     if variant and sample:
         if sample_genotype := sample.get_genotype(variant):
@@ -83,13 +84,14 @@ def get_evidence_fields_for_sample_and_patient(variant: Variant, sample: Sample)
     return data
 
 
-def get_evidence_fields_for_specimen(specimen: Specimen) -> AutopopulateData:
+def get_evidence_fields_for_extraction(extraction: Extraction) -> AutopopulateData:
     data = AutopopulateData("specimen")
+    specimen = extraction.specimen
     data[SpecialEKeys.SPECIMEN_ID] = specimen.reference_id
     data[SpecialEKeys.ALLELE_ORIGIN] = specimen.get_mutation_type_display()
     data[SpecialEKeys.SAMPLE_TYPE] = str(specimen.tissue)
     data[SpecialEKeys.AGE] = specimen.age_at_collection_date
-    data[SpecialEKeys.NUCLEIC_ACID_SOURCE] = specimen.get_nucleic_acid_source_display()
+    data[SpecialEKeys.NUCLEIC_ACID_SOURCE] = extraction.get_nucleic_acid_source_display()
 
     return data
 

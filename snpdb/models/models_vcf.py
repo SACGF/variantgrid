@@ -27,7 +27,7 @@ from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
-from patients.models import FakeData, Patient, Specimen
+from patients.models import Extraction, FakeData, Patient, Specimen
 from snpdb.models.models import LabProject, Tag
 from snpdb.models.models_enums import (
     ImportStatus,
@@ -337,8 +337,8 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.
     no_dna_control = models.BooleanField(default=False)
     research_consent = models.BooleanField(null=True, blank=True)
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
-    # TODO: A sample may have >1 specimens (eg tumor/normal subtraction)
-    specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)
+    # TODO: A sample may have >1 extractions (eg tumor/normal subtraction)
+    extraction = models.ForeignKey(Extraction, null=True, blank=True, on_delete=SET_NULL)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
 
@@ -357,6 +357,12 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.
             genome_builds={self.vcf.genome_build},
             summary_extra=[PreviewKeyValue("VCF", str(self.vcf))]
         )
+
+    @property
+    def specimen(self) -> Optional[Specimen]:
+        if self.extraction:
+            return self.extraction.specimen
+        return None
 
     @property
     def genome_build(self):

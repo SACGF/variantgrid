@@ -57,22 +57,22 @@ def assign_patient_to_sample(patient_import, user, sample, patient, origin):
                                        patient_import=patient_import)
 
 
-def assign_specimen_to_sample(patient_import, user, sample, specimen, origin):
+def assign_extraction_to_sample(patient_import, user, sample, extraction, origin):
     """ Creates patient modification record """
 
-    if sample.specimen == specimen:
+    if sample.extraction == extraction:
         return
 
-    old_specimen = sample.specimen
+    old_extraction = sample.extraction
 
-    sample.specimen = specimen
+    sample.extraction = extraction
     sample.save()
 
-    description = f"Assigned specimen to {sample=}"
-    if old_specimen:
-        description += f" (previously specimen was: {old_specimen})"
+    description = f"Assigned extraction to {sample=}"
+    if old_extraction:
+        description += f" (previously extraction was: {old_extraction})"
 
-    PatientModification.objects.create(patient=specimen.patient,
+    PatientModification.objects.create(patient=extraction.specimen.patient,
                                        user=user,
                                        description=description,
                                        origin=origin,
@@ -337,17 +337,17 @@ def process_record(patient_records, record_id, row):
         patient.save(check_patient_text_phenotype=False)  # Will do bulk at the end
 
     specimen = None
-    # print("specimen_reference_id=%s" %(specimen_reference_id))
+    extraction = None
     if specimen_reference_id:
-        # print("process specimen id=%s" %(specimen_reference_id))
-        try:
-            specimen = Specimen.objects.get(reference_id=specimen_reference_id)
-            if specimen.patient != patient:
-
-                msg = f"{specimen} had patient {patient}, tried to assign to patient {specimen.patient}"
-                raise ValueError(msg)
+        specimen = Specimen.objects.filter(patient=patient, reference_id=specimen_reference_id).first()
+        if specimen:
             specimen_match_type = PatientRecordMatchType.EXACT
-        except Specimen.DoesNotExist:
+        else:
+            other_patients_specimen = Specimen.objects.filter(reference_id=specimen_reference_id).first()
+            if other_patients_specimen:
+                msg = f"{other_patients_specimen} has patient {other_patients_specimen.patient}, " \
+                      f"tried to assign to patient {patient}"
+                raise ValueError(msg)
             specimen = Specimen.objects.create(reference_id=specimen_reference_id,
                                                patient=patient)
             specimen_match_type = PatientRecordMatchType.CREATED
@@ -361,22 +361,22 @@ def process_record(patient_records, record_id, row):
             "collection_date": specimen_collection_date,
             "received_date": specimen_received_date,
             "mutation_type": specimen_mutation_type,
-            "nucleic_acid_source": specimen_nucleic_acid_source,
             "_age_at_collection_date": specimen_age_at_collection
         }
         changed = set_fields_if_blank(specimen, field_values)
         if changed:
-            # print("save specimen id=%s" %(specimen_reference_id))
             specimen.description = specimen_description
             specimen.collected_by = specimen_collected_by
             specimen.patient = patient
             specimen.collection_date = specimen_collection_date
             specimen.received_date = specimen_received_date
             specimen.mutation_type = specimen_mutation_type
-            specimen.nucleic_acid_source = specimen_nucleic_acid_source
             specimen._age_at_collection_date = specimen_age_at_collection
 
             specimen.save()
+
+        # The CSV has one nucleic acid source column, so it describes a single extraction per specimen
+        extraction = specimen.get_or_create_extraction(specimen_nucleic_acid_source)
     else:
         specimen_match_type = None
 
@@ -384,8 +384,8 @@ def process_record(patient_records, record_id, row):
         origin = PatientRecordOriginType.UPLOADED_CSV
         assign_patient_to_sample(patient_records.patient_import, user, sample, patient, origin)
 
-        if specimen:
-            assign_specimen_to_sample(patient_records.patient_import, user, sample, specimen, origin)
+        if extraction:
+            assign_extraction_to_sample(patient_records.patient_import, user, sample, extraction, origin)
 
     validation_message = '\n'.join(validation_messages)
     valid = not validation_messages

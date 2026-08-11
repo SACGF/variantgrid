@@ -9,6 +9,7 @@ from library.enums.titles import Title
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import (
     Clinician,
+    Extraction,
     ExternalModelManager,
     ExternalPK,
     Patient,
@@ -35,6 +36,7 @@ class Test(URLTestCase):
         assign_permission_to_user_and_groups(cls.user_owner, cls.patient)
 
         cls.specimen = Specimen.objects.create(reference_id="funny bone biopsy", patient=cls.patient)
+        cls.extraction = Extraction.objects.create(specimen=cls.specimen, reference_id="funny bone DNA")
 
         cls.clinician = Clinician.objects.get_or_create(title=Title.DR, first_name='Nick', last_name='Riviera')[0]
         emm = ExternalModelManager.objects.get_or_create(name="fake_model_manager", details="blah")[0]
@@ -56,6 +58,7 @@ class Test(URLTestCase):
             ('view_patient', patient_kwargs, 200),
             # ('view_patient_contact_tab', patient_kwargs, 200),
             ('view_patient_specimens', patient_kwargs, 200),
+            ('view_patient_extractions', patient_kwargs, 200),
             ('view_patient_genes', patient_kwargs, 200),
             ('view_patient_modifications', patient_kwargs, 200),
             ('view_patient_import', {"patient_records_id": patient_records.pk}, 200),
@@ -64,6 +67,7 @@ class Test(URLTestCase):
         cls.PRIVATE_AUTOCOMPLETE_URLS = [
             ('patient_autocomplete', cls.patient, {"q": cls.patient.last_name}),
             ('specimen_autocomplete', cls.specimen, {"q": cls.specimen.reference_id}),
+            ('extraction_autocomplete', cls.extraction, {"q": cls.extraction.reference_id}),
         ]
 
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)

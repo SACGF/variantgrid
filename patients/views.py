@@ -17,6 +17,7 @@ from ontology.forms import HGNCForm, HPOForm, MONDOForm, OMIMForm
 from patients import forms
 from patients.forms import PatientContactForm, PatientSearchForm
 from patients.models import (
+    Extraction,
     Patient,
     PatientAttachment,
     PatientColumns,
@@ -92,6 +93,32 @@ def view_patient_specimens(request, patient_id):
                "specimen_formset": specimen_formset,
                "has_write_permission": patient.can_write(request.user)}
     return render(request, 'patients/view_patient_specimens.html', context)
+
+
+def _patient_extraction_formset(patient, data=None):
+    """ Restricted to the patient's own specimens - Extraction has no direct FK to Patient """
+    specimen_qs = patient.specimen_set.all()
+    formset_class = forms.patient_extraction_formset_factory(patient)
+    formset = formset_class(data, queryset=Extraction.objects.filter(specimen__in=specimen_qs))
+    for form in formset.forms:
+        form.fields["specimen"].queryset = specimen_qs
+    return formset
+
+
+def view_patient_extractions(request, patient_id):
+    patient = Patient.get_for_user(request.user, patient_id)
+    if request.method == "POST":
+        extraction_formset = _patient_extraction_formset(patient, data=request.POST)
+        valid = extraction_formset.is_valid()
+        if valid:
+            extraction_formset.save()
+        add_save_message(request, valid, "Patient Extraction")
+
+    context = {"patient": patient,
+               "num_extractions": patient.num_extractions,
+               "extraction_formset": _patient_extraction_formset(patient),
+               "has_write_permission": patient.can_write(request.user)}
+    return render(request, 'patients/view_patient_extractions.html', context)
 
 
 def view_patient_genes(request, patient_id):

@@ -17,7 +17,14 @@ class TissueAdmin(ModelAdminBasics):
 
 @admin.register(models.Specimen)
 class SpecimenAdmin(ModelAdminBasics):
-    pass
+    list_display = ("id", "reference_id", "patient", "tissue", "mutation_type", "collection_date")
+    search_fields = ("reference_id",)
+
+
+@admin.register(models.Extraction)
+class ExtractionAdmin(ModelAdminBasics):
+    list_display = ("id", "specimen", "reference_id", "nucleic_acid_source", "extraction_date")
+    search_fields = ("reference_id", "specimen__reference_id")
 
 
 @admin.register(models.PatientImport)

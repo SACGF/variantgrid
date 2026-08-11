@@ -36,7 +36,7 @@ from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
 from library.preview_request import PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename
-from patients.models import FakeData, Patient
+from patients.models import Extraction, FakeData, Patient
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models.models_enums import DataGeneration, PairedEnd, SequencerRead
 from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequencer
@@ -282,6 +282,8 @@ class SequencingSample(models.Model):
         As it's not a file, not a SeqAutoRecord
      """
     sample_sheet = models.ForeignKey(SampleSheet, on_delete=CASCADE)
+    # Optional enrichment - seqauto isn't run everywhere, so Sample.extraction is the join key
+    extraction = models.ForeignKey(Extraction, null=True, blank=True, on_delete=SET_NULL)
     sample_id = models.TextField()
     # sample_name is used to name files. In MiSeq/NextSeq samplesheet you can add names.
     # For Hiseq and if left empty on MiSeq this will be sample_id

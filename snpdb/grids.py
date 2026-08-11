@@ -124,7 +124,8 @@ class SamplesListGrid(JqGridUserRowConfig):
               "somaliersampleextract__somalierancestry__predicted_ancestry",
               "patient__patient_code", "patient__first_name", "patient__last_name", "patient__sex",
               "patient__date_of_birth", "patient__date_of_death",
-              "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date", "vcf__id"]
+              "extraction__specimen__reference_id", "extraction__specimen__tissue__name",
+              "extraction__specimen__collection_date", "vcf__id"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {"width": 400,
@@ -158,7 +159,7 @@ class SamplesListGrid(JqGridUserRowConfig):
         'patient__date_of_death': {'hidden': True},
         'het_hom_count': {'name': 'het_hom_count', "model_field": False, 'sorttype': 'int',
                           'label': 'Het/Hom Count'},
-        "specimen__reference_id": {'label': 'Specimen'},
+        "extraction__specimen__reference_id": {'label': 'Specimen'},
         # These urls are only there for CSV export
         "sample_url": {'name': 'sample_url', 'label': 'Sample URL', "model_field": False, 'hidden': True},
         "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},

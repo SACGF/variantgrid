@@ -23,6 +23,7 @@ urlpatterns = [
     path('view_patient/<int:patient_id>', views.view_patient, name='view_patient'),
     path('view_patient/contact/<int:patient_id>', views.view_patient_contact_tab, name='view_patient_contact_tab'),
     path('view_patient/patient_specimens/<int:patient_id>', views.view_patient_specimens, name='view_patient_specimens'),
+    path('view_patient/patient_extractions/<int:patient_id>', views.view_patient_extractions, name='view_patient_extractions'),
     path('view_patient/genes/<int:patient_id>', views.view_patient_genes, name='view_patient_genes'),
     path('view_patient/modifications/<int:patient_id>', views.view_patient_modifications, name='view_patient_modifications'),
 
@@ -52,6 +53,7 @@ urlpatterns = [
     # Autocomplete
     path('autocomplete/Patient/', views_autocomplete.PatientAutocompleteView.as_view(), name='patient_autocomplete'),
     path('autocomplete/Specimen/', views_autocomplete.SpecimenAutocompleteView.as_view(), name='specimen_autocomplete'),
+    path('autocomplete/Extraction/', views_autocomplete.ExtractionAutocompleteView.as_view(), name='extraction_autocomplete'),
     path('autocomplete/Clinician/', views_autocomplete.ClinicianAutocompleteView.as_view(), name='clinician_autocomplete'),
     path('autocomplete/ExternalPKAutocompleteView', views_autocomplete.ExternalPKAutocompleteView.as_view(), name='external_pk_autocomplete'),
 ]
