@@ -20,8 +20,15 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from library.genomics.vcf_enums import VCFColumns
-from library.genomics.vcf_utils import UnsortedVCFError, VCFSortChecker, vcf_header_filter_ids
+from library.genomics.vcf_utils import (
+    UnsortedVCFError,
+    VCFSortChecker,
+    parse_vcf_info_column,
+    vcf_header_filter_ids,
+)
 from snpdb.models import GenomeBuild, GenomeFasta
+
+REFERENCE_SPAN_SKIP_REASON = "reference call over a span (ALT='.' with END)"
 
 
 class Command(BaseCommand):
@@ -119,6 +126,10 @@ class Command(BaseCommand):
                         skipped_records[skip_reason] += 1
                         continue
 
+                if self._is_reference_span(columns):
+                    skipped_records[REFERENCE_SPAN_SKIP_REASON] += 1
+                    continue
+
                 # Check ref bases are ok
                 # Alts are checked in 'vcf_remove_non_standard_alts', which happens after split multi-allelic
                 ref = columns[VCFColumns.REF]
@@ -164,6 +175,20 @@ class Command(BaseCommand):
         self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)
         self._write_skip_counts(skipped_records, skipped_records_stats_file)
         self._write_skip_counts(skipped_filters, skipped_filters_stats_file)
+
+    @staticmethod
+    def _is_reference_span(columns: list[str]) -> bool:
+        """ A reference call over a span is a no-call region, not a variant - the same statement we already
+            make about gVCF reference blocks. This is 406 of 500 records in a real TSO 500 cnv.vcf.
+
+            SVTYPE present means the caller is describing an event rather than a segmentation interval
+            (e.g. an 'Undetermined' per-gene CNV call), so those are kept. A reference record at a single
+            position - no END - is a normal reference variant and also kept. """
+
+        if columns[VCFColumns.ALT] != ".":
+            return False
+        info = parse_vcf_info_column(columns[VCFColumns.INFO])
+        return "END" in info and "SVTYPE" not in info
 
     @staticmethod
     def _get_defined_vcf_filters(vcf_header_lines) -> set:

@@ -53,3 +53,4 @@ class UploadStepOrigin(models.TextChoices):
 class ModifiedImportedVariantOperation(models.TextChoices):
     NORMALIZATION = 'N', "Normalisation"
     RMDUP = 'R', "Removed Duplicate"
+    SHARED_LOCUS = 'L', "Shared Locus - allele depths summed"

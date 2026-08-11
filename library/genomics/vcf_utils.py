@@ -1,3 +1,4 @@
+import itertools
 import logging
 import operator
 import os
@@ -10,7 +11,7 @@ import cyvcf2
 import vcf
 from django.conf import settings
 
-from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.genomics.vcf_enums import VCFColumns, VCFSymbolicAllele
 from library.genomics.vcf_writer import (
     VCFInfoHeader,
     VCFWriter,
@@ -18,7 +19,7 @@ from library.genomics.vcf_writer import (
     symbolic_alt_info,
 )
 from library.utils import open_file_or_filename, open_handle_gzip
-from snpdb.models import GenomeFasta, Sequence, SequenceRole, Variant, VariantCoordinate
+from snpdb.models import GenomeFasta, Sequence, SequenceRole, Variant, VariantCoordinate, VCFFilter
 
 
 VCF_HEADER_FILTER_ID_PATTERN = re.compile(r'^##FILTER=<ID=([^,>]+)')
@@ -268,16 +269,57 @@ def get_contigs_header_lines(genome_build, standard_only=True, use_accession=Tru
     return reference_lines + contig_lines
 
 
+def scan_undeclared_filter_ids(record_lines: Iterable[str], declared_filter_ids: set[str]) -> list[str]:
+    """ FILTER values records use but the header never declares, in the order they're first seen.
+
+        These can't just be passed through: bcftools norm dies on an undeclared FILTER ("Invalid BCF, the
+        FILTER tag id=N ... not present in the header") rather than warning, and vcf_clean_and_filter
+        strips them. Declaring them is what lets the value reach the grid.
+
+        Capped at the codes VCFFilter has left to assign, so a pathological file can't emit thousands of
+        header lines. """
+
+    max_undeclared = (VCFFilter.ASCII_MAX - VCFFilter.ASCII_MIN) - len(declared_filter_ids)
+    undeclared_filter_ids = []
+    known_filter_ids = set(declared_filter_ids) | {"PASS", "."}
+    if max_undeclared <= 0:
+        return undeclared_filter_ids
+
+    for line in record_lines:
+        columns = line.split("\t")
+        if len(columns) <= VCFColumns.FILTER:
+            continue
+        filter_column = columns[VCFColumns.FILTER]
+        if filter_column in known_filter_ids:
+            continue
+        for filter_id in filter_column.split(";"):
+            if filter_id not in known_filter_ids:
+                known_filter_ids.add(filter_id)
+                undeclared_filter_ids.append(filter_id)
+                if len(undeclared_filter_ids) >= max_undeclared:
+                    logging.warning("Reached the %d undeclared FILTER limit - later ones will be stripped",
+                                    max_undeclared)
+                    return undeclared_filter_ids
+    return undeclared_filter_ids
+
+
 def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_filename: str,
                              new_info_lines: list[str] = None, standard_contigs_only=True):
     contig_regex = re.compile(r"^##contig=<ID=(.+),length=(\d+)")
 
     header_lines = []
+    undeclared_filter_ids = []
     with open_handle_gzip(source_vcf_filename, "rt") as in_f:
+        first_record_line = None
         for line in in_f:
             if not line.startswith("#"):
+                first_record_line = line
                 break  # End of header
             header_lines.append(line.strip())
+
+        if first_record_line is not None:
+            record_lines = itertools.chain([first_record_line], in_f)
+            undeclared_filter_ids = scan_undeclared_filter_ids(record_lines, vcf_header_filter_ids(header_lines))
 
     # These are used to validate contigs in header
     genome_fasta = GenomeFasta.get_for_genome_build(genome_build)
@@ -293,6 +335,8 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
                 if new_info_lines:
                     for new_info_line in new_info_lines:
                         f.write(new_info_line + "\n")
+                for filter_id in undeclared_filter_ids:
+                    f.write(f'##FILTER=<ID={filter_id},Description="Undeclared in source header">\n')
                 for contig_line in get_contigs_header_lines(genome_build, standard_only=standard_contigs_only):
                     f.write(contig_line + "\n")
 
