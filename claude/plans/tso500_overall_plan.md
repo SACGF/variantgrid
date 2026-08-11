@@ -9,156 +9,92 @@ test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upl
 
 ---
 
+## Done
+
+- **Phase 0 — pipeline fixes** (`21a973d15`, branch `issue_1506_tso500_pipeline_fixes`, unmerged).
+  `vcf_header_filter_ids()` in `library/genomics/vcf_utils.py` reads declared FILTER IDs off the raw
+  header lines, so `_DragenExonCNV.vcf` no longer dies at the first pipe stage on PyVCF's FILTER regex.
+  A regex rather than cyvcf2, which needs a real file descriptor and so does not suit a stdin filter.
+  Also stopped `PatientRecordsImportTaskFactory.get_processing_ability` raising out of file-type
+  detection on a CSV pandas cannot read, which was breaking detection for every other CSV type.
+
+- **Phase 1 — `Specimen → Extraction → Sample` (#1704)** (PR #1705, branch
+  `issue_1704_specimen_extraction_sample`). The join key everything below groups on:
+
+  ```
+  Patient └── Specimen └── Extraction └── [SequencingSample] └── Sample
+  ```
+
+  `nucleic_acid_source` moved off `Specimen` onto the new `Extraction`, so the DNA and RNA arms of one
+  block share a specimen instead of becoming two. `Specimen` swapped its `TextField` primary key for a
+  surrogate one with `reference_id` unique per patient. Both levels extend `ExternallyManagedModel` and
+  carry a local `reference_id` beside the nullable `external_pk`, since not every deployment has a system
+  managing its records. `Sample.extraction` replaced `Sample.specimen`; `SequencingSample.extraction`
+  added as optional enrichment. R7's consumers updated, the patient CSV still round-trips through one
+  extraction per specimen, and the patient page gained an Extractions tab. Everything in `patients` is now
+  a `TimeStampedModel`, and `Extraction.extraction_date` tells re-extractions apart.
+
 ## Where things stand
 
-Test data landed in `ed5e15a33` — one de-identified run, one specimen, DNA and RNA arms, five files.
-Running each through the real pipe stages gave:
+The five test files from `ed5e15a33` — one de-identified run, one specimen, DNA and RNA arms:
 
-| File | Today | Blocked on |
-|---|---|---|
-| `hard-filtered.vcf` | loads, 93 records | — |
-| `cnv.vcf` | loads, 25 records | copy-neutral rows and `SM` are refinements |
-| `SpliceVariants.vcf` | loads, 17 records | `AD`/`DP` mean something else; filter dropped |
-| `_DragenExonCNV.vcf` | dies at first pipe stage | PyVCF FILTER parse; no `##contig` lines |
-| `AllFusions.csv` | errors during file-type detection | no parser, and nowhere to put the rows |
-
-So three of five files already load, and the two that don't are blocked by different things — one by a
-small pipeline bug, one by a missing model. That split is what sets the order below.
-
-## The single most useful thing to fix first
-
-Everything downstream keys on the same thing: **the identifier pair that says these two arms are one
-specimen**. In the test run that is accession `2600000001` with container suffixes `C` (DNA) and `B`
-(RNA). Four separate pieces of work need that join to exist:
-
-- the DNA and RNA arms have to be recognisable as one specimen at all (#431's "C- ID / Pair ID")
-- specimen-level measures arrive by API keyed on it, not on a vendor pair-ID string
-  ([#1559](https://github.com/SACGF/variantgrid/issues/1559))
-- the analysis node selects on it
-  ([variantgrid_private#223](https://github.com/SACGF/variantgrid_private/issues/223) — settled on
-  Extraction/Specimen as the grouping level, since Patient is too coarse and SequencingSample too fine)
-- multi-variant reporting groups by it ([#444](https://github.com/SACGF/variantgrid/issues/444))
-
-That join key is [#1704](https://github.com/SACGF/variantgrid/issues/1704). It is the right next step,
-and the reason is not just that other issues block on it — it is that `Sample.specimen` is barely
-wired in today (five consumers, listed in the issue's R7) and every month of somatic work makes that
-surface larger. It is the one change here that gets more expensive by waiting.
+| File | State |
+|---|---|
+| `hard-filtered.vcf` | loads, 93 records |
+| `cnv.vcf` | loads, 25 records — copy-neutral rows and `SM` are Phase 2 refinements |
+| `SpliceVariants.vcf` | loads, 17 records — `AD`/`DP` mapping and the dropped filter are Phase 2 |
+| `_DragenExonCNV.vcf` | reaches the importer after Phase 0; still needs an explicit genome build (Phase 2) |
+| `AllFusions.csv` | no longer breaks file-type detection; needs a parser and somewhere to put the rows (Phase 5) |
 
 ## Dependency map
 
 ```
-  Phase 0  pipeline fixes ─────────────────┐
+  Phase 0  pipeline fixes ✔ ───────────────┐
            chase TAU files ────────────┐   │
                                        │   │
-  Phase 1  #1704 Specimen→Extraction   │   │
+  Phase 1  #1704 Specimen→Extraction ✔ │   │
              │                         │   │
       ┌──────┼───────────────┐         │   │
       │      │               │         │   │
   P2  │  TSO500 linking ◄────┼─────────┼───┘
-      │      + loader refinements       │
-      │                                 │
-  P3  │  #1559 specimen measures (API)  │
-      │                                 │
-  P4  #1506 GeneFusion ──► AllFusions parser ◄──┘   (independent of #1704 — can run in parallel)
+      │      + loader refinements      │
+      │                                │
+  P3  │  private#2447 tissue status    │
+      │  #1706 specimen/extraction pages, search
+      │      │                         │
+  P4  │  #1707 patient API ──► #1559 specimen measures
+      │                                │
+  P5  #1506 GeneFusion ──► AllFusions parser ◄──┘   (independent of #1704 — can run in parallel)
       │
-  P5  #1558 grid display
+  P6  #1558 grid display  (+ #1706's grid half, private#2837)
       │
-  P6  private#223 analysis grouping node
+  P7  private#223 analysis grouping node
       │
-  P7  sapath#246 ──► #444 multi-variant reporting
+  P8  sapath#246 ──► #444 multi-variant reporting
 ```
 
-Only two things are genuinely on a critical path: #1704 before anything that groups samples, and
-#1506 before the fusion parser has a destination. Everything else is ordered by value, not by
-necessity.
+#1506 is the only remaining critical-path item — the fusion parser has nowhere to put rows without it.
+Everything else is ordered by value, not by necessity.
 
 ---
 
-## Phase 0 — unblock the remaining test data, and start the long-lead requests
+## Still open from Phase 0 — chase TAU for the missing files
 
-Two small pipeline fixes, both worth doing regardless of TSO 500, both prerequisites for exercising
-the test data end to end.
-
-1. **Read declared FILTER IDs off the raw header lines** in `upload/management/commands/vcf_clean_and_filter.py`.
-   Illumina's LrCalculator writes `##FILTER` lines with keys beyond `ID`/`Description`, which PyVCF
-   rejects outright, killing the whole import at the first pipe stage. This is the last PyVCF use in the pipe.
-2. **`get_processing_ability` returns 0 for unreadable input** —
-   `upload/import_task_factories/import_task_factories.py:127` calls `pd.read_csv` bare, so one CSV
-   shape it cannot parse breaks file-type detection for every other CSV type.
-
-**Done** — `vcf_header_filter_ids()` in `library/genomics/vcf_utils.py`, tests in
-`library/tests/test_vcf_header_filter_ids.py`. Note this went to a regex over the header lines rather
-than cyvcf2 as originally sketched: cyvcf2 needs a real file descriptor (`StringIO`/`BytesIO` both raise
-`UnsupportedOperation: fileno`), and this command is a streaming stdin filter, so spilling the header to
-a temp file just to read it back would be worse than the hand-rolled parse the rest of the command
-already uses — which exists precisely because strict parsers choke on real-world headers.
-
-In parallel, and starting now because they have lead time, **request the missing files from TAU**:
+Long lead time, so worth pushing now:
 
 - `Logs_Intermediates/Gis/<sample>/<sample>.abcn_annotated.vcf` + `<sample>.abcn_genes.tsv` — per-gene
   absolute and minor copy number, the latter being where gene-level LOH comes from. The only genuinely
   CVO-only data, and a VCF, so it is in ingestion scope. Illumina names the path but publishes no
   INFO/FORMAT spec, so it cannot be mocked up.
-- `MetricsOutput.tsv` / the run-level TMB summary — feeds Phase 3.
+- `MetricsOutput.tsv` / the run-level TMB summary — feeds Phase 4.
 - A run with a real BRCA1/2 large rearrangement. Both `_DragenExonCNV.vcf` records in the test data are
   constructed, and no published TSO 500 output has a populated one either. Until one arrives the field
   spelling in that file stays provisional.
 
-**Done when** all five test files at least reach the importer without erroring, and the requests are out.
+## Still open from Phase 1
 
-## Phase 1 — `Specimen → Extraction → Sample` (#1704)
-
-The foundational model change. Read the issue for R1-R8; the shape is:
-
-```
-Patient └── Specimen └── Extraction └── [SequencingSample] └── Sample
-```
-
-Points worth holding onto while implementing:
-
-- **`Extraction` goes in `patients`, not `seqauto`** (R1). VCFs arrive by hand, and some deployments
-  never run seqauto, so grouping has to work without it.
-- **`nucleic_acid_source` moves to `Extraction`** (R3). It sitting on `Specimen` is the direct cause of
-  the DNA and RNA arms becoming two unrelated specimens. `mutation_type` stays on `Specimen` — it
-  describes the material. `Sample.variants_type` is a third, genuinely different thing and stays put.
-- **`Specimen` needs a surrogate PK** (R4). `reference_id` is a `TextField` primary key today, so
-  specimen references are globally unique across all patients and any FK drags text keys around.
-- **Both levels extend `ExternallyManagedModel`** (`patients/models.py:85`) (R5) — this is what lets VG
-  and the LIMS agree on a specimen without string surgery on sample names, and it is what Phase 3 keys on.
-
-Consumer surface, all of it: `patients/import_records.py`, `snpdb/forms.py:366`, `snpdb/grids.py:161`,
-`patients/views_autocomplete.py`, and `get_evidence_fields_for_specimen()` in
-`classification/autopopulate_evidence_keys/evidence_from_sample_and_patient.py:86`. Patient CSV import
-has to keep round-tripping `PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE` (R6) — decide whether the
-existing column implies an extraction or the CSV format grows one.
-
-**Settled** (2026-08-10), closing the open questions on the issue:
-
-- **Name it `Extraction`.** The LIMS-side collision noted on #1704 is real but lives in documentation,
-  not in the model.
-- **No QC fields on `Extraction`** (yield, concentration, 260/280). R5's `external_pk` keeps QC
-  reconcilable in the tracking system, and VG never generates those numbers — a second copy would only
-  drift. Nullable columns stay cheap to add if a consumer appears.
-- **No parent above `Specimen`.** A block (tumour FFPE) *is* a specimen, so several blocks from one
-  clinical case are several `Specimen` rows on one `Patient`, already told apart by `tissue` and
-  `collection_date`. A case level would only earn its place if one case needed its blocks analysed
-  together, which TSO 500 does not.
-- **The existing patient CSV column implies a single extraction** — `SPECIMEN_NUCLEIC_ACID_SOURCE`
-  creates/updates one `Extraction` under the `Specimen`, so existing CSVs keep working untouched (R6).
-  Those files describe one extraction per specimen anyway.
-
-Existing `Specimen` rows need a data migration creating one `Extraction` each, carrying the specimen's
-current `nucleic_acid_source`, and repointing their samples onto it.
-
-**Done when** a `Sample` reaches its specimen via `sample.extraction.specimen`, one specimen holds a DNA
-and an RNA extraction, and the existing patient CSV import still round-trips.
-
-**Built** on branch `issue_1704_specimen_extraction_sample` — models, the four migrations, R7's consumers,
-and an `Extraction` formset on the patient specimens tab so DNA/RNA stays settable now that it has left
-the specimen form. Two surfaces stayed specimen-shaped and are worth revisiting as consumers appear: the
-patient CSV columns are all `SPECIMEN_*`, so a CSV can name one extraction per specimen but not the DNA
-and RNA arms of one block; and `specimen_autocomplete` no longer has a caller, the sample form having
-moved to `extraction_autocomplete` (kept, since the sapath and private repos may use it).
+The patient CSV columns are all `SPECIMEN_*`, so a CSV can name one extraction per specimen but not the
+DNA and RNA arms of one block. Worth revisiting when a consumer needs it.
 
 ## Phase 2 — TSO 500 linking, and the per-file loader refinements
 
@@ -208,18 +144,90 @@ VAF/depth meaningless, and fusions are not VCF at all.
   them and the accession/container-suffix parse above where it does not.
 
 Note `SEGID=MYCL1` uses an older symbol than the rest of the pipeline (`MYCL`) — resolve gene symbols
-through `GeneSymbol` rather than trusting what the caller wrote. The same argument recurs in Phase 4.
+through `GeneSymbol` rather than trusting what the caller wrote. The same argument recurs in Phase 5.
 
 **Decide before starting:** where the loader lives. Upload is strictly per-file today and has no
 directory concept; seqauto already models runs, sample sheets and file discovery. Given "upload
 separately, join later", the lightest answer is probably that the lab client posts the linkage and the
-files go through normal upload — which also matches Phase 3's direction. Worth settling explicitly
+files go through normal upload — which also matches Phase 4's direction. Worth settling explicitly
 rather than by default.
 
 **Done when** the whole test run imports with both arms attached to one specimen, splice VAF is right,
 and no copy-neutral rows are inserted.
 
-## Phase 3 — specimen-level measures (#1559)
+## Phase 3 — finish the specimen model, and give it somewhere to show (private#2447, #1706)
+
+Both are Phase 1 leftovers rather than new work, and both are markedly cheaper before Phase 4 puts
+`Specimen` behind a public API than after.
+
+### private#2447 — `Specimen.mutation_type` becomes a tissue status
+
+Phase 1 moved `nucleic_acid_source` off `Specimen` onto `Extraction` and left `mutation_type` alone. It
+is still a two-value Germline/Somatic field with `default=Mutation.GERMLINE` (`patients/models.py:321`),
+and its one substantive consumer is classification autopopulate
+(`classification/autopopulate_evidence_keys/evidence_from_sample_and_patient.py:91`), which sets
+`SpecialEKeys.ALLELE_ORIGIN` and so feeds `AlleleOriginBucket` and the cross-lab overlaps.
+
+That is a live problem for this work specifically. Every TSO 500 specimen is a tumour block, and unless
+somebody sets the field its classifications are stamped "Germline" by default and filed alongside other
+labs' real germline records — corrupting exactly the somatic classifications Phase 8 exists to produce.
+
+Two reasons it belongs here rather than "some time":
+
+- Same model, same app, same migration surface as Phase 1, while the context is hot.
+- Phase 4 exposes `Specimen` over an API a separate client codes against. Changing the field before that
+  is a migration; changing it after is a client contract change.
+
+The design is settled on the issue: a per-specimen `tissue_status` (Reference (unaffected) / Affected
+(lesional) / Unknown, defaulting to Unknown), leaving the call-set question to the existing
+`VCF.variants_type` and the per-variant question to the existing `allele_origin`, and having autopopulate
+assert an origin only where both levels agree. Matched normal stays derivable — "reference specimen, same
+patient" — rather than becoming an FK. The migration maps `S` → affected; `G` is ambiguous because it was
+the default, so check the deployment's distinct `PatientRecord.specimen_mutation_type` values
+(`patients/models.py:662`) before deciding it means anything. The patient CSV's `SPECIMEN_MUTATION_TYPE`
+column follows.
+
+### #1706 — specimen and extraction pages, search, preview
+
+`Specimen` and `Extraction` are plain `ExternallyManagedModel` today (`patients/models.py:311`, `:363`):
+no `get_absolute_url`, no `PreviewModelMixin`, no search handler, no page of their own. The patient page
+tabs (`patients/urls.py:25-26`) are the only place either surfaces.
+
+Phase 4's done-when is "the measures show on the specimen page", so a specimen page is a prerequisite
+rather than a nicety. The minimum here: detail pages for both, `PreviewModelMixin` so they hover-card the
+way `Patient` does, a search handler, and links each way along `Patient → Specimen → Extraction → Sample`.
+
+The rest of #1706 — top-level specimen/extraction grids under the patients menu, links from the sample
+grid, and private#2837's ask for specimen ID on the variant page — is grid work, so it rides with Phase 6
+where the grid changes already are. Splitting on that line keeps this phase to what Phase 4 needs.
+
+Beyond #2447's migration this half is views and templates, so it parallelises with anything.
+
+**Done when** a specimen has its own page reachable from search and from the patient, and `tissue_status`
+has replaced `mutation_type` everywhere including the CSV.
+
+## Phase 4 — the lab-client API surface (#1707, then #1559)
+
+One boundary, one client, two steps. #1559's settled direction — measures arrive by API rather than by VG
+parsing pipeline output — only works if the client can first create the things it keys on, which is
+#1707. Raise the client-side issue in `SACGF/variantgrid_api` once both have landed.
+
+### #1707 — patient / specimen / extraction API
+
+`patients` has no serializers at all today; every route into a `Specimen` is a human one (the sample form,
+the patient CSV, the admin). The API creates `Patient`, `Specimen` and `Extraction` keyed on the tracking
+system's external identifiers, so the client can accession before or alongside posting a run.
+
+This is also the other half of Phase 2's seqauto decision. There, `SequencingSample` stores whatever
+specimen/extraction text it is sent and leaves the FK null, deliberately creating nothing — the seqauto
+payload names no patient and `Specimen.patient` is non-null. #1707 is where creation happens, from a
+client that does know the patient. Together they make the deferred matching pass tractable: real objects
+to match against, arriving from the same source as the text. It also demotes Phase 2's
+accession/container-suffix name parse to a fallback for deployments with no tracking system.
+
+Do this after Phase 3's `tissue_status` change, so the API ships the field it is keeping.
+
+### #1559 — specimen-level measures
 
 Small, and it proves Phase 1's identifiers work across the LIMS boundary. Direction is already settled:
 **these arrive by API from the lab client, not by VG parsing pipeline output.** The measures are
@@ -248,11 +256,12 @@ Per-gene absolute and minor copy number are *not* in scope here — they are per
 per-specimen and arrive as a VCF, so they are ingestion. They land whenever Phase 0's request produces
 `abcn_annotated.vcf`.
 
-**Done when** the client can post TMB/MSI/GIS for a specimen and it shows on the specimen page.
+**Done when** the client can create a patient, specimen and extraction over the API, then post TMB/MSI/GIS
+against that specimen and see it on the specimen page.
 
-## Phase 4 — `GeneFusion` and the `AllFusions.csv` parser (#1506, phase 1 only)
+## Phase 5 — `GeneFusion` and the `AllFusions.csv` parser (#1506, phase 1 only)
 
-Independent of Phases 1-3, so this can run in parallel with a second person from Phase 0 onward.
+Independent of Phases 1-4, so this can run in parallel with a second person from Phase 0 onward.
 
 **Scope it to ingestion, storage and identity. Leave fusion classification equivalence alone.** The
 design on #1506 already does this deliberately: a `GeneFusion` model keyed on a canonical gene pair with
@@ -291,19 +300,25 @@ gene list. Real-file properties it has to survive, all present in the test data:
 **Done when** all 33 rows of the test file import, `EGFR-SEPTIN14` resolves despite the file saying
 `SEPT14`, and the same fusion from both callers resolves to one `GeneFusion`.
 
-## Phase 5 — showing non-variants on the grids (#1558)
+## Phase 6 — showing non-variants on the grids (#1558, and #1706's grid half)
 
 Less outstanding than the issue title suggests. Per its own comment table, SV already works in the grid
 and CNV works as SV — what is missing is surfacing `CohortGenotype.info["CN"]` (and TSO 500's `FORMAT/SM`
 linear copy ratio, which importer v21+ already keeps in the format JSON blob but which is not queryable).
 That part is independent and could be pulled forward any time.
 
-Fusions are the genuinely new case, and only exist to display after Phase 4. The single-grid vs
+Fusions are the genuinely new case, and only exist to display after Phase 5. The single-grid vs
 multiple-grids question is worth deciding on real fusion rows rather than in the abstract — with a
 `GeneFusion`-keyed `Allele` in hand, "sort by gene brings the fusions together" is testable instead of
 hypothetical.
 
-## Phase 6 — analysis grouping node (variantgrid_private#223)
+#1706's grid half joins here because it is the same kind of change and wants the same pass over the
+column definitions: top-level specimen and extraction grids under the patients menu, an extraction link
+on the sample grid, and private#2837's specimen and patient IDs in the variant page's sample table —
+"which of these rows are the same patient" being the question that one is actually asking. All of it
+depends on Phase 3 having given both models a URL to link to.
+
+## Phase 7 — analysis grouping node (variantgrid_private#223)
 
 Consumes Phase 1 directly. The grouping level is settled: **Extraction, then Specimen** — Patient is too
 coarse (same patient sequenced at multiple timepoints, wanted independently) and SequencingSample too
@@ -325,7 +340,7 @@ that merges everything solves neither that nor the FFPE-vs-germline case.
 `Cohort` has a `genome_build` FK, so a cross-VCF cohort is single-build by construction — fine at
 extraction and specimen level, and only a problem if this ever goes up to Patient.
 
-## Phase 7 — reporting (sapath#246, then #444)
+## Phase 8 — reporting (sapath#246, then #444)
 
 Last, because it consumes everything above. #431 notes #246 is old and may be worth rolling into #444.
 
@@ -333,16 +348,20 @@ Last, because it consumes everything above. #431 notes #246 is old and may be wo
   from the grid's tags button rather than exporting CSV. Small and independent of the rest; could be
   pulled forward if it is blocking the diagnostic team.
 - **#444** — multi-variant classification and reporting. Grouped by gene, launched from the sample or
-  specimen page, pulling in Phase 3's TMB/MSI measures. `ClassificationReportTemplate` exists; the vue
+  specimen page, pulling in Phase 4's TMB/MSI measures. `ClassificationReportTemplate` exists; the vue
   template needs to take an array.
 
 ---
 
 ## Parallelism
 
-With two people: one takes Phase 1 → 2 → 3 (the model spine), the other takes Phase 0 → 4 (fusions), and
-they meet at Phase 5. Phase 4 touches `classification` and `upload`; Phases 1-3 touch `patients` and
-`snpdb`, so the conflict surface is small.
+With two people: one takes Phase 2 → 3 → 4 (the model spine, now that Phase 1 has landed), the other
+takes Phase 5 (fusions), and they meet at Phase 6. Phase 5 touches `classification` and `upload`;
+Phases 2-4 touch `patients`, `snpdb` and `seqauto`, so the conflict surface is small.
+
+Phase 3's #1706 half is views and templates only, so it also splits off cleanly for a third person or for
+whoever wants a break from migrations — the one ordering constraint is that #2447's field change lands
+before #1707 serializes it.
 
 With one person, the order above is the order.
 
@@ -350,17 +369,19 @@ With one person, the order above is the order.
 
 | Decision | Phase | Why it is cheaper now |
 |---|---|---|
-| ~~Extraction QC, Specimen parent, patient CSV, naming~~ | 1 | Settled — see Phase 1 |
-| Where does the run loader live — upload, seqauto, or lab-client API? | 2 | Settle explicitly; the API answer lines up with Phase 3 |
-| ~~May the seqauto API create specimens/extractions, or only match them?~~ | 2 | Settled — text beside the FKs, link what exists, match the rest later. See Phase 2 |
-| Multi-gene partner with one HGNC and one clone identifier — reject or resolve? | 4 | Determines whether `GeneFusion` identity can be non-null on both sides |
-| Single grid or multiple grids for non-variants? | 5 | Best answered against real fusion rows, so genuinely wait for Phase 4 |
+| Where does the run loader live — upload, seqauto, or lab-client API? | 2 | Settle explicitly; the API answer lines up with Phase 4 |
+| Does `G` in `PatientRecord.specimen_mutation_type` mean anything on each deployment? | 3 | Decides whether the migration can map `G` → Unknown and lose nothing |
+| Multi-gene partner with one HGNC and one clone identifier — reject or resolve? | 5 | Determines whether `GeneFusion` identity can be non-null on both sides |
+| Single grid or multiple grids for non-variants? | 6 | Best answered against real fusion rows, so genuinely wait for Phase 5 |
 
 ## Deferred, deliberately
 
 - **Matching stored seqauto text to specimens and extractions** — Phase 2 keeps the client's references
   as text whenever the objects are absent, so the reconciliation pass can land whenever the tracking
-  system integration is ready, against real unmatched rows rather than hypothetical ones.
+  system integration is ready, against real unmatched rows rather than hypothetical ones. Phase 4's
+  #1707 is what supplies those objects, so the pass is best written once both ends exist.
+- **Per-gene LOH as a specimen measure** — #1559 lists it, but it is per-gene rather than per-specimen and
+  the vendor emits it in a VCF, so it belongs with `abcn_annotated.vcf` below rather than in Phase 4.
 - **Fusion equivalence and discordance** — the research-level part of #1506. Somatic classifications get
   `MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED` today, so nothing regresses by waiting.
 - **Breakend coordinates and BND VCF export** — #1506 phases 2 and 3.
