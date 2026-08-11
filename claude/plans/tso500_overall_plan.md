@@ -49,32 +49,31 @@ The five test files from `ed5e15a33` — one de-identified run, one specimen, DN
 ## Dependency map
 
 ```
-  Phase 0  pipeline fixes ✔ ───────────────┐
-           chase TAU files ────────────┐   │
-                                       │   │
-  Phase 1  #1704 Specimen→Extraction ✔ │   │
-             │                         │   │
-      ┌──────┼───────────────┐         │   │
-      │      │               │         │   │
-  P2  │  TSO500 linking ◄────┼─────────┼───┘
-      │      + loader refinements      │
-      │                                │
-  P3  │  private#2447 tissue status    │
-      │  #1706 specimen/extraction pages, search
-      │      │                         │
-  P4  │  #1707 patient API ──► #1559 specimen measures
-      │                                │
-  P5  #1506 GeneFusion ──► AllFusions parser ◄──┘   (independent of #1704 — can run in parallel)
+  Phase 0  pipeline fixes ✔ ──► P2  loader refinements   (no model deps — anyone, any time)
+           chase TAU files ─────────────────────────────────────────┐
+                                                                    │
+  Phase 1  #1704 Specimen→Extraction ✔                              │
+             │                                                      │
+      ┌──────┴───────────────────────────┐                          │
+      │                                  │                          │
+  P3  private#2447 tissue status         │                          │
+      #1706 pages, search, preview       │                          │
+      │              │                   │                          │
+  P4  seqauto text ──┤                   │                          │
+      #1707 patient API ──► matching ──► #1559 measures ◄───────────┘
+      │              │                   │
+      │              │              P7  private#223 grouping node
+      │              │
+      │         P8  sapath#246 ──► #444 multi-variant reporting
       │
-  P6  #1558 grid display  (+ #1706's grid half, private#2837)
+  P5  #1506 GeneFusion ──► AllFusions parser   (independent of #1704 — can run in parallel)
       │
-  P7  private#223 analysis grouping node
-      │
-  P8  sapath#246 ──► #444 multi-variant reporting
+  P6  #1558 grid display  (+ #1706's grid half, private#2837 — needs P3's URLs)
 ```
 
-#1506 is the only remaining critical-path item — the fusion parser has nowhere to put rows without it.
-Everything else is ordered by value, not by necessity.
+Phases are listed in the order to do them, but only the arrows are real constraints. #1506 is the one
+remaining critical-path item — the fusion parser has nowhere to put rows without it. Everything else is
+ordered by value.
 
 ---
 
@@ -96,64 +95,38 @@ Long lead time, so worth pushing now:
 The patient CSV columns are all `SPECIMEN_*`, so a CSV can name one extraction per specimen but not the
 DNA and RNA arms of one block. Worth revisiting when a consumer needs it.
 
-## Phase 2 — TSO 500 linking, and the per-file loader refinements
+## Phase 2 — per-file loader refinements
 
-With the model in place, make the run's files land against the right extractions. #431's decision is
-**upload the files separately and join later** — not concatenate before import — so this is mostly
-assignment, not a new bulk-import path. That is the cheap version and it is the right one: concatenating
-destroys per-caller cutoffs (which sapath#301 requires), the FORMAT fields across the DRAGEN outputs are
-disjoint so any merge is lossy, DNA and RNA are different libraries so a shared sample column makes
-VAF/depth meaningless, and fusions are not VCF at all.
+Make each file import with the right values in it. Nothing here depends on Phase 1, or on anything else
+in this plan — no model changes, five independent items, each testable against one test file. It could
+have gone in Phase 0 and it can be picked up by anyone at any point, which is why it is separated from
+the linkage work that used to share this phase (now Phase 4).
 
-- **Parse accession + container suffix into `Specimen` + `Extraction`.** `2600000001` is the specimen,
-  the trailing `C`/`B` name the two extractions. Match on external identifiers where the tracking system
-  supplies them rather than trusting the name parse.
 - **Supply the genome build explicitly.** `_DragenExonCNV.vcf` has no `##contig` lines and only
   `##reference=file:resource_bundle/hg19_decoy/`, so `vcf_detect_genome_build_from_header` finds nothing
-  and `upload/tasks/vcf/genotype_vcf_tasks.py:63` sets `REQUIRES_USER_INPUT` and stops. The loader knows
-  the build; pass it alongside the file.
+  and `upload/tasks/vcf/genotype_vcf_tasks.py:63` sets `REQUIRES_USER_INPUT` and stops. Whatever submits
+  the file knows the build, so let it say so explicitly instead of relying on header detection.
 - **`VCFSourceSettings` mapping for SpliceGirl.** The `##source` line (`SpliceGirl 1.0.0.614`) is already
   the hook. In this file `AD` is `Number=1` splice-supporting reads and `DP` is *reference* reads, so
   binding them by name silently gives empty allele depth, missing VAF, and a read-depth column showing
   reference counts. Derive VAF from `ALTDEDUP`/`REFDEDUP`.
 - **Preserve `LowUniqueAlignments`.** The splice header declares `LowQ` only, so `vcf_clean_and_filter`
   strips the undeclared code from 15 of 17 records — and that is the filter separating the two `PASS`
-  oncology calls from the background. The genotype processor already copes via `_add_undeclared_filter_code`;
-  either let undeclared values through the header stage or have the loader add the `##FILTER` line.
+  oncology calls from the background. The genotype processor already copes via `_add_undeclared_filter_code`,
+  so the fix is letting undeclared values through the header stage.
 - **Skip copy-neutral `cnv.vcf` rows.** `ALT=.` is 406 of 500 in a real run; they carry no call and
   currently import as reference variants with the segment span discarded.
-- **Carry `Specimen`/`Extraction` through the seqauto API as text beside the FKs.** Phase 1 added
-  `SequencingSample.extraction`, but `SequencingSampleSerializer`
-  (`seqauto/serializers/sequencing_serializers.py:232`) does not list the field, so the FK is
-  unreachable from the lab client that posts sample sheets — the only ways to set an extraction today
-  are the sample form, the patient CSV and the admin.
+- **Resolve gene symbols through `GeneSymbol`.** `SEGID=MYCL1` in `cnv.vcf` uses an older symbol than the
+  rest of the pipeline (`MYCL`), so trusting what the caller wrote drops the row's gene. The same
+  argument recurs in Phase 5 with `SEPT14`.
 
-  **Settled**: `SequencingSample` grows plain-text specimen and extraction reference columns alongside
-  the model FKs. The client sends the text, and the API stores whatever it was sent — the payload is
-  always accepted. Where a `Specimen`/`Extraction` already exists the serializer links it; where one
-  does not, the text is kept and the FK stays null for a later matching pass. The lab client owns the
-  identifiers, VG owns the objects, and a run posts successfully whether or not the tracking system got
-  there first. This is the shape `PatientRecord` already uses (`patients/models.py:635`) — raw columns
-  from the file beside the matched FK — so the matching pass has a precedent to follow.
+None of these have their own issue — they came out of running the test data through the real pipe stages,
+and sapath#431 is the only thing above them. Worth raising individually if they are going to be picked up
+by different people.
 
-  Because nothing is created, the API needs no `Patient`, which is what would otherwise have blocked
-  this: `Specimen.patient` is non-null and nothing in the seqauto payload names a patient.
-
-  **Deferred to later work**: the matching pass itself — reconciling stored text against specimens and
-  extractions that arrive afterwards, on the R5 external identifiers where the tracking system supplies
-  them and the accession/container-suffix parse above where it does not.
-
-Note `SEGID=MYCL1` uses an older symbol than the rest of the pipeline (`MYCL`) — resolve gene symbols
-through `GeneSymbol` rather than trusting what the caller wrote. The same argument recurs in Phase 5.
-
-**Decide before starting:** where the loader lives. Upload is strictly per-file today and has no
-directory concept; seqauto already models runs, sample sheets and file discovery. Given "upload
-separately, join later", the lightest answer is probably that the lab client posts the linkage and the
-files go through normal upload — which also matches Phase 4's direction. Worth settling explicitly
-rather than by default.
-
-**Done when** the whole test run imports with both arms attached to one specimen, splice VAF is right,
-and no copy-neutral rows are inserted.
+**Done when** all five test files import with the right values: splice VAF derived from
+`ALTDEDUP`/`REFDEDUP`, `LowUniqueAlignments` surviving to the grid, no copy-neutral rows inserted, and
+`_DragenExonCNV.vcf` landing against an explicit build.
 
 ## Phase 3 — finish the specimen model, and give it somewhere to show (private#2447, #1706)
 
@@ -206,26 +179,62 @@ Beyond #2447's migration this half is views and templates, so it parallelises wi
 **Done when** a specimen has its own page reachable from search and from the patient, and `tissue_status`
 has replaced `mutation_type` everywhere including the CSV.
 
-## Phase 4 — the lab-client API surface (#1707, then #1559)
+## Phase 4 — how identifiers cross the lab boundary (seqauto linkage, #1707, #1559)
 
-One boundary, one client, two steps. #1559's settled direction — measures arrive by API rather than by VG
-parsing pipeline output — only works if the client can first create the things it keys on, which is
-#1707. Raise the client-side issue in `SACGF/variantgrid_api` once both have landed.
+One subject in four steps: getting the lab's specimen and extraction identifiers into VG, turning them
+into objects, reconciling the two, and then hanging measures off the result. The sample-sheet half used to
+sit in Phase 2, but it is the same boundary and the same client as #1707, and it reads as one design only
+when the two are together.
+
+#431's decision governs the whole phase: **upload the files separately and join later**, not concatenate
+before import. So this is assignment, not a new bulk-import path. Concatenating destroys per-caller
+cutoffs (which sapath#301 requires), the FORMAT fields across the DRAGEN outputs are disjoint so any merge
+is lossy, DNA and RNA are different libraries so a shared sample column makes VAF/depth meaningless, and
+fusions are not VCF at all.
+
+Raise the client-side issue in `SACGF/variantgrid_api` once the phase lands.
+
+### The sample sheet — carry `Specimen`/`Extraction` as text beside the FKs
+
+Phase 1 added `SequencingSample.extraction`, but `SequencingSampleSerializer`
+(`seqauto/serializers/sequencing_serializers.py:232`) does not list the field, so the FK is unreachable
+from the lab client that posts sample sheets — the only ways to set an extraction today are the sample
+form, the patient CSV and the admin.
+
+**Settled**: `SequencingSample` grows plain-text specimen and extraction reference columns alongside the
+model FKs. The client sends the text, and the API stores whatever it was sent — the payload is always
+accepted. Where a `Specimen`/`Extraction` already exists the serializer links it; where one does not, the
+text is kept and the FK stays null. The lab client owns the identifiers, VG owns the objects, and a run
+posts successfully whether or not the tracking system got there first. This is the shape `PatientRecord`
+already uses (`patients/models.py:635`) — raw columns from the file beside the matched FK.
+
+Because nothing is created, this step needs no `Patient`, which is what would otherwise have blocked it:
+`Specimen.patient` is non-null and nothing in the seqauto payload names a patient. That gap is the next
+step's job.
 
 ### #1707 — patient / specimen / extraction API
 
 `patients` has no serializers at all today; every route into a `Specimen` is a human one (the sample form,
 the patient CSV, the admin). The API creates `Patient`, `Specimen` and `Extraction` keyed on the tracking
-system's external identifiers, so the client can accession before or alongside posting a run.
-
-This is also the other half of Phase 2's seqauto decision. There, `SequencingSample` stores whatever
-specimen/extraction text it is sent and leaves the FK null, deliberately creating nothing — the seqauto
-payload names no patient and `Specimen.patient` is non-null. #1707 is where creation happens, from a
-client that does know the patient. Together they make the deferred matching pass tractable: real objects
-to match against, arriving from the same source as the text. It also demotes Phase 2's
-accession/container-suffix name parse to a fallback for deployments with no tracking system.
+system's external identifiers, so the client can accession before or alongside posting a run — from a
+client that, unlike seqauto, does know the patient.
 
 Do this after Phase 3's `tissue_status` change, so the API ships the field it is keeping.
+
+### Reconciling the two — the matching pass
+
+With both halves in, the pass has real objects to match against rather than hypothetical ones: stored
+sample-sheet text against specimens and extractions that arrived afterwards, on the R5 external
+identifiers where the tracking system supplies them.
+
+Where it does not, fall back to parsing the sample name — `2600000001` is the specimen and the trailing
+`C`/`B` name the DNA and RNA extractions. A fallback, not the mechanism: it is the only option for
+deployments with no tracking system, and it is guesswork everywhere else.
+
+**Decide before starting:** whether anything beyond this is needed to get a run's files loaded. Upload is
+strictly per-file today and has no directory concept; seqauto already models runs, sample sheets and file
+discovery. If the client posts the linkage and the files go through normal upload, there is no run loader
+to site — which is the answer this phase is built around, so it is worth confirming rather than assuming.
 
 ### #1559 — specimen-level measures
 
@@ -256,8 +265,9 @@ Per-gene absolute and minor copy number are *not* in scope here — they are per
 per-specimen and arrive as a VCF, so they are ingestion. They land whenever Phase 0's request produces
 `abcn_annotated.vcf`.
 
-**Done when** the client can create a patient, specimen and extraction over the API, then post TMB/MSI/GIS
-against that specimen and see it on the specimen page.
+**Done when** the whole test run lands against one specimen with both arms attached — sample sheet posted,
+patient/specimen/extraction created over the API, FKs resolved — and TMB/MSI/GIS posted against that
+specimen shows on its page.
 
 ## Phase 5 — `GeneFusion` and the `AllFusions.csv` parser (#1506, phase 1 only)
 
@@ -355,12 +365,13 @@ Last, because it consumes everything above. #431 notes #246 is old and may be wo
 
 ## Parallelism
 
-With two people: one takes Phase 2 → 3 → 4 (the model spine, now that Phase 1 has landed), the other
-takes Phase 5 (fusions), and they meet at Phase 6. Phase 5 touches `classification` and `upload`;
-Phases 2-4 touch `patients`, `snpdb` and `seqauto`, so the conflict surface is small.
+With two people: one takes Phase 3 → 4 (the model spine, now that Phase 1 has landed), the other takes
+Phase 5 (fusions), and they meet at Phase 6. Phase 5 touches `classification` and `upload`; Phases 3-4
+touch `patients`, `snpdb` and `seqauto`, so the conflict surface is small.
 
-Phase 3's #1706 half is views and templates only, so it also splits off cleanly for a third person or for
-whoever wants a break from migrations — the one ordering constraint is that #2447's field change lands
+Two things split off cleanly on top of that. Phase 2 is five independent file-correctness fixes with no
+model changes, so it can go to whoever, whenever — including before Phase 3. Phase 3's #1706 half is
+views and templates only. The one ordering constraint across the lot is that #2447's field change lands
 before #1707 serializes it.
 
 With one person, the order above is the order.
@@ -369,17 +380,13 @@ With one person, the order above is the order.
 
 | Decision | Phase | Why it is cheaper now |
 |---|---|---|
-| Where does the run loader live — upload, seqauto, or lab-client API? | 2 | Settle explicitly; the API answer lines up with Phase 4 |
+| Is a run loader needed at all, or does client-posted linkage plus normal upload cover it? | 4 | The whole phase is built around the second answer; confirm rather than assume |
 | Does `G` in `PatientRecord.specimen_mutation_type` mean anything on each deployment? | 3 | Decides whether the migration can map `G` → Unknown and lose nothing |
 | Multi-gene partner with one HGNC and one clone identifier — reject or resolve? | 5 | Determines whether `GeneFusion` identity can be non-null on both sides |
 | Single grid or multiple grids for non-variants? | 6 | Best answered against real fusion rows, so genuinely wait for Phase 5 |
 
 ## Deferred, deliberately
 
-- **Matching stored seqauto text to specimens and extractions** — Phase 2 keeps the client's references
-  as text whenever the objects are absent, so the reconciliation pass can land whenever the tracking
-  system integration is ready, against real unmatched rows rather than hypothetical ones. Phase 4's
-  #1707 is what supplies those objects, so the pass is best written once both ends exist.
 - **Per-gene LOH as a specimen measure** — #1559 lists it, but it is per-gene rather than per-specimen and
   the vendor emits it in a VCF, so it belongs with `abcn_annotated.vcf` below rather than in Phase 4.
 - **Fusion equivalence and discordance** — the research-level part of #1506. Somatic classifications get
