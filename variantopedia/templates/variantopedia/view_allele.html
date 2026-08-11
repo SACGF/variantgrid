@@ -334,8 +334,11 @@
                     <td>{{ overlap.value_type_label }}</td>
                     <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}{{ value }}{% endfor %}</td>
                     <td class="font-weight-bold">
+                        {% overlap_state overlap show_link_if_discordant=True %}
+                    {% comment %}
                     {% if overlap.overlap_status.is_attention %}<a class="hover-link text-danger" href="{{ overlap.get_absolute_url }}">{{ overlap.overlap_status_label }}{% if overlap.overlap_status_obj.value == 90 %} <i class="fa-solid fa-kit-medical"></i>{% endif %}</a>
                     {% else %}<span class="text-success">{{ overlap.overlap_status_label }}{% endif %}
+                    {% endcomment %}
                     </td>
                 </tr>
             {% endfor %}

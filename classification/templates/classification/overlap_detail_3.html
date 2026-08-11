@@ -15,12 +15,7 @@
             </div>
 
             {% labelled label="Overlap Status" %}
-                <div class="mb-1 {% if overlap.overlap_status.is_attention %}text-danger{% endif %}">
-                    {% if overlap.overlap_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status.label }}{% endif %}
-                </div>
-                {% if overlap.overlap_override_status %}
-                    <div class="my-1">Reviewed as : <b>{{ overlap.get_overlap_override_status_display }}</b></div>
-                {% endif %}
+                {% overlap_state overlap %}
                 {% if overlap.overlap_max_ever_status != overlap.overlap_status %}
                     <div class="my-1" style="color:#888">Was : {{ overlap.overlap_max_ever_status.label }}</div>
                 {% endif %}

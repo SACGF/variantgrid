@@ -365,6 +365,10 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         return value_type.label
 
     @property
+    def is_single_context(self):
+        return self.overlap_type == OverlapType.SINGLE_CONTEXT
+
+    @property
     def overlap_status_label(self):
         if self.overlap_type == OverlapType.CROSS_CONTEXT:
             match self.overlap_status:

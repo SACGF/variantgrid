@@ -864,6 +864,16 @@ def triage(context,
     }
 
 
+@register.inclusion_tag("classification/tags/overlap_state.html")
+def overlap_state(overlap: Overlap, show_link=False, show_link_if_discordant=False):
+    if not show_link and show_link_if_discordant:
+        show_link = overlap.overlap_status.is_discordant and overlap.is_single_context
+    return {
+        "overlap": overlap,
+        "show_link": show_link
+    }
+
+
 # Overlap Email
 @register.inclusion_tag("classification/tags/overlap_row_email.html")
 def overlap_row_email(overlap: Overlap, lab: Lab, genome_build: GenomeBuild):

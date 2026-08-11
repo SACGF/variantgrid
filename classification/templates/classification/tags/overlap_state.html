@@ -1,0 +1,10 @@
+{% if show_link %}<a class="hover-link" href="{{ overlap.get_absolute_url }}">{% endif %}
+{% if overlap.overlap_status.is_attention %}
+    <span class="{% if not show_link %}text-danger{% endif %}">
+    {% if overlap.overlap_status == 90 and overlap.is_single_context %} <i class="fa-solid fa-kit-medical" title="Medically Significant"></i> Discordance{% else %}{{ overlap.overlap_status_label }}{% endif %}
+    </span>
+{% else %}<span class="text-success">{{ overlap.overlap_status_label }}</span>{% endif %}
+{% if show_link %}</a>{% endif %}
+{% if overlap.overlap_override_status %}
+    <div class="my-1">Reviewed as : <b>{{ overlap.get_overlap_override_status_display }}</b></div>
+{% endif %}
