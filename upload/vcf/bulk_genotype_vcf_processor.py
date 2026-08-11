@@ -1,6 +1,7 @@
 import csv
 import logging
 import os
+import re
 from time import sleep
 from typing import Optional
 
@@ -13,7 +14,11 @@ from django.db.models import Max
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.genomics.vcf_enums import VCFConstant
+from library.genomics.vcf_enums import (
+    UNDECLARED_FILTERS_INFO,
+    UNDECLARED_FILTERS_SEPARATOR,
+    VCFConstant,
+)
 from library.git import Git
 from library.utils import AsciiValue, double_quote, json_default_converter
 from library.utils.database_utils import postgres_arrays
@@ -22,6 +27,7 @@ from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import (
+    ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
     PipelineFailedJobTerminateEarlyException,
     UploadPipeline,
@@ -33,6 +39,10 @@ from upload.models import (
 from upload.tasks.vcf.import_sql_copy_task import ImportCohortGenotypeSQLCopyTask
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
 from upload.vcf.sql_copy_files import COHORT_GENOTYPE_HEADER, write_sql_copy_csv
+
+# BCFTOOLS_OLD_VARIANT ends in the 1-based alt index where the row was a multi-allelic, eg
+# 'NC_000001.10|145016034|A|AA,AC|2' - strip it to get back to the row all the alts came from
+MULTIALLELIC_ALT_INDEX_PATTERN = re.compile(r"\|\d+$")
 
 
 class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
@@ -112,6 +122,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.locus_cohort_genotypes = []
         self.locus_gnomad_af = []
         self.locus_allele_depths = []
+        self.locus_ref_allele_depths = []
+        self.locus_source_rows = []
         self.locus_modified_imported_variant_hashes = []
         self.locus_modified_imported_variants = []
 
@@ -151,6 +163,20 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         # Make sure child processes have finished
         for p in self.child_processes:
             p.join()
+
+    @staticmethod
+    def _restore_undeclared_filters(variant: cyvcf2.Variant) -> Optional[str]:
+        """ vcf_clean_and_filter moved FILTER values the source header never declared into INFO, so that
+            bcftools norm - which dies on an undeclared FILTER - would carry them this far. Put them back;
+            convert_filters creates the VCFFilter rows for them. """
+
+        vcf_filter = variant.FILTER
+        if undeclared := variant.INFO.get(UNDECLARED_FILTERS_INFO):
+            restored = undeclared.split(UNDECLARED_FILTERS_SEPARATOR)
+            if vcf_filter and vcf_filter != ".":
+                restored = vcf_filter.split(";") + restored
+            vcf_filter = ";".join(restored)
+        return vcf_filter
 
     def convert_filters(self, vcf_filter) -> Optional[str]:
         filters = None
@@ -196,6 +222,14 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 sleep(1)
 
         raise ValueError(f"Could not create undeclared filter {filter_id=}/{filter_code=} after {max_attempts=}")
+
+    @staticmethod
+    def _get_source_row_key(variant: cyvcf2.Variant) -> Optional[str]:
+        """ Identifies the VCF row a record came from, so records bcftools split out of one multi-allelic
+            row can be told from records that were separate rows all along. None means it was its own row """
+        if old_variant := variant.INFO.get(ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG):
+            return MULTIALLELIC_ALT_INDEX_PATTERN.sub("", old_variant)
+        return None
 
     @staticmethod
     def get_ref_alt_allele_depth_default(variant):
@@ -307,7 +341,10 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
     @staticmethod
     def _get_info_json(variant: cyvcf2.Variant) -> dict:
-        return dict(variant.INFO)
+        info = dict(variant.INFO)
+        # Our own pipe-stage plumbing, not the caller's data - the value is stored as a filter instead
+        info.pop(UNDECLARED_FILTERS_INFO, None)
+        return info
 
     def finished_locus(self):
         """ sum(AD) for this locus and add data to arrays """
@@ -333,14 +370,43 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 cgt[self.cohort_gt_vaf_index] = postgres_arrays(vaf)
                 self.cohort_genotypes.append(cgt)
 
+            self._add_shared_locus_modified_imported_variants()
+
         self.locus_variant_hashes = []
         self.locus_filters = []
         self.locus_gnomad_af = []
         self.locus_cohort_genotypes = []
         self.locus_allele_depths = []
+        self.locus_ref_allele_depths = []
+        self.locus_source_rows = []
         self.locus_modified_imported_variant_hashes = []
         self.locus_modified_imported_variants = []
         self.locus_ad_sum.fill(0)
+
+    def _add_shared_locus_modified_imported_variants(self):
+        """ Separate VCF rows can land on one locus - process_entry keys it on (CHROM, POS, ref), so
+            e.g. two symbolic deletions with the same start and different END join up and their depths
+            are summed into one VAF denominator.
+
+            Decomposed multi-allelics are the case this summing is *for*, and they already get a
+            NORMALIZATION row saying so, so only genuinely separate source rows are recorded here. """
+
+        if not (self.preprocess_vcf_import_info and self.get_ref_alt_allele_depth):
+            return
+        num_source_rows = len({key for key in self.locus_source_rows if key}) \
+            + sum(1 for key in self.locus_source_rows if not key)
+        if num_source_rows < 2:
+            return
+
+        ad_sum = self.locus_ad_sum.tolist()
+        for variant_hash, ref_depth, alt_depth in zip(self.locus_variant_hashes, self.locus_ref_allele_depths,
+                                                      self.locus_allele_depths):
+            detail = f"Allele frequency summed across {num_source_rows} VCF records sharing this locus. " \
+                     f"Denominator (ref+alt over all records)={ad_sum}, " \
+                     f"this record ref={ref_depth.tolist()}, alt={alt_depth.tolist()}"
+            self.modified_imported_variant_hashes.append(variant_hash)
+            self.modified_imported_variants.append((ModifiedImportedVariantOperation.SHARED_LOCUS,
+                                                    None, None, None, detail))
 
     def process_entry(self, variant: cyvcf2.Variant) -> tuple[VariantCoordinate, str]:
         """ :return variant coordinate, variant_hash """
@@ -362,11 +428,14 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             read_depth_str = self.get_format_array_str(variant, self.vcf.read_depth_field, as_type=int)
             alt_allele_depth_str = postgres_arrays(alt_allele_depth)
             self.locus_allele_depths.append(empty_as_zero_alt_allele_depth)
+            self.locus_ref_allele_depths.append(empty_as_zero_ref_allele_depth)
             self.locus_ad_sum += empty_as_zero_ref_allele_depth + empty_as_zero_alt_allele_depth
         else:
             read_depth_str = ""
             alt_allele_depth_str = ""
             self.locus_allele_depths.append(np.nan)
+            self.locus_ref_allele_depths.append(np.nan)
+        self.locus_source_rows.append(self._get_source_row_key(variant))
 
         if self.vcf.allele_frequency_field:
             allele_frequency_str = self.get_format_array_str(variant, self.vcf.allele_frequency_field, as_type=float)
@@ -421,7 +490,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         ]
 
         self.locus_variant_hashes.append(variant_hash)
-        self.locus_filters.append(self.convert_filters(variant.FILTER))
+        self.locus_filters.append(self.convert_filters(self._restore_undeclared_filters(variant)))
         self.locus_cohort_genotypes.append(cohort_gt)
         gnomad_af = variant.INFO.get(settings.VCF_IMPORT_COMMON_FILTER_INFO)
         self.locus_gnomad_af.append(gnomad_af)
@@ -489,7 +558,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             # dupes may not be on subsequent lines due to normalization/multi-allelic so need check all in hash
             if variant_id in seen_variant_ids:
                 self.modified_imported_variant_hashes.append(variant_hash)
-                self.modified_imported_variants.append((ModifiedImportedVariantOperation.RMDUP, None, None, None))
+                self.modified_imported_variants.append((ModifiedImportedVariantOperation.RMDUP,
+                                                        None, None, None, None))
                 continue
 
             seen_variant_ids.add(variant_id)

@@ -59,6 +59,28 @@ intervals — identical for every sample — and splice and fusion calls are som
 vendor `resource_bundle/…` paths and caller arguments are real — a loader may want the pipeline
 version out of them.
 
+## Upload metadata for these files
+
+Two facts these files don't reliably carry are supplied at upload instead, as `genome_build` and
+`source` (`upload/upload_metadata.py`; API query params, or `import_vcf --genome-build/--source`).
+
+| File | `genome_build` | `source` |
+|---|---|---|
+| `hard-filtered.vcf` | from header contigs | `DRAGEN TSO500 SmallVariant` |
+| `cnv.vcf` | from header contigs | `DRAGEN TSO500 CNV` |
+| `_DragenExonCNV.vcf` | **`GRCh37` — required**, the header has no contigs and an unresolvable `##reference` | from header (`LrCalculator 1.0.0.11`) |
+| `SpliceVariants.vcf` | from header contigs | from header (`SpliceGirl 1.0.0.614`) |
+
+Send a build's **own name** (`GRCh37`), not an alias (`hg19`). These files are GRCh37 with a `chr`
+prefix and `chrM` at 16569, and their `##reference` says `hg19_decoy` — which is exactly the confusion
+the declared build exists to settle. Aliases do resolve, but `hg19` is both GRCh37's alias and a build
+in its own right, so it only reads unambiguously while that build stays disabled.
+
+A client-supplied `source` becomes part of VG's configuration contract, since `VCFSourceSettings.
+source_regex` has to match something the client invented — so these strings want to stay stable. The
+two DRAGEN ones are reserved rather than used: nothing is keyed on them yet, because the SpliceGirl
+field mapping comes off the header and the copy-neutral skip is a general rule.
+
 ## Cases this data covers
 
 - `hard-filtered.vcf` — one MNV represented three ways at overlapping positions: an SNV and a 7bp

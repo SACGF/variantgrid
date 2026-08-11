@@ -57,6 +57,7 @@ from upload.tasks.vcf.import_vcf_tasks import (
     ProcessVCFLinkManualVariantEntrySetMaxVariantTask,
     ProcessVCFSetMaxVariantTask,
 )
+from upload.upload_metadata import VCF_METADATA_KEYS
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -160,6 +161,10 @@ class GenotypeVCFImportFactory(AbstractVCFImportTaskFactory):
 
     def get_data_classes(self):
         return [UploadedVCF]
+
+    def get_metadata_keys(self):
+        # Consumed in vcf_import.create_vcf_from_vcf / configure_vcf_from_header
+        return VCF_METADATA_KEYS
 
     def get_create_data_from_vcf_header_task_class(self):
         return ImportCreateVCFModelForGenotypeVCFTask

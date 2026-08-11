@@ -77,7 +77,7 @@ class UploadPipelineModifiedVariantsGrid(JqGridUserRowConfig):
     model = ModifiedImportedVariant
     caption = 'Modified Imported Variant'
     fields = ["operation", "variant__variantannotation__transcript_version__gene_version__gene__identifier", "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
-              'old_multiallelic', 'old_variant']
+              'old_multiallelic', 'old_variant', 'operation_detail']
 
     colmodel_overrides = {"variant__variantannotation__transcript_version__gene_version__gene__identifier": {"hidden": True},
                           "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol": {'label': 'Gene', 'formatter': 'geneLinkFormatter'}}

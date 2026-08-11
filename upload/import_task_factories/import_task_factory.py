@@ -28,6 +28,11 @@ class ImportTaskFactory(ABC):
         """ e.g. return ['csv', 'xls'] """
         pass
 
+    def get_metadata_keys(self) -> frozenset[str]:
+        """ Upload metadata keys this file type accepts - anything else is rejected at upload time.
+            @see upload.upload_metadata """
+        return frozenset()
+
     def get_processing_ability(self, user: User, filename: str, file_extension: str) -> int:
         """ If you can't process EVERY file of type in extensions, overwrite this and check.
             > 0 means you can process it - the processor with the highest value will do it

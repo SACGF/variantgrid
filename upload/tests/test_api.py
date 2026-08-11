@@ -144,6 +144,52 @@ class UploadFileAPITest(UploadAPITestBase):
         self.assertEqual(response.json()["file_upload_id"], existing.pk)
 
 
+class UploadMetadataAPITest(UploadAPITestBase):
+    """ Upload metadata is validated while the client is still connected, so a mistyped key is a 400
+        rather than a silent fallback to header detection @see upload.upload_metadata """
+
+    def _upload(self, marker: str, query_string: str = ""):
+        self.client.force_authenticate(user=self.owner)
+        with patch("upload.views.views.upload_processing.process_uploaded_file"):
+            return self.client.post(
+                reverse("api_file_upload") + query_string,
+                {"file": SimpleUploadedFile(f"{marker}.vcf", _vcf_bytes(marker))},
+                format="multipart",
+            )
+
+    def test_valid_metadata_stored(self):
+        response = self._upload("meta_ok", "?genome_build=GRCh37&source=DRAGEN%20TSO500%20CNV")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata,
+                         {"genome_build": "GRCh37", "source": "DRAGEN TSO500 CNV"})
+
+    def test_unknown_key_rejected(self):
+        response = self._upload("meta_typo", "?genomeBuild=GRCh37")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("genomeBuild", response.json()["error"])
+
+    def test_unresolvable_genome_build_rejected(self):
+        response = self._upload("meta_badbuild", "?genome_build=GRCh99")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("GRCh99", response.json()["error"])
+
+    def test_rejected_upload_leaves_no_file_upload(self):
+        """ We create the FileUpload to detect the file type, so a rejected one has to be cleaned up """
+        before = set(FileUpload.objects.values_list("pk", flat=True))
+        self._upload("meta_rollback", "?genome_build=GRCh99")
+        self.assertEqual(set(FileUpload.objects.values_list("pk", flat=True)), before)
+
+    def test_path_and_force_are_not_metadata(self):
+        response = self._upload("meta_reserved", "?path=/client/x.vcf&force=1")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata, {})
+        self.assertEqual(file_upload.path, "/client/x.vcf")
+
+
 class UploadStatusAPITest(UploadAPITestBase):
     def test_status_by_id_processing(self):
         file_upload = self._create_vcf_upload("status_proc", pipeline_status=ProcessingStatus.PROCESSING)

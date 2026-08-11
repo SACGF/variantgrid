@@ -50,6 +50,11 @@ from upload.uploaded_file_type import (
     get_url_and_data_for_uploaded_file_data,
     retry_upload_pipeline,
 )
+from upload.upload_metadata import (
+    UploadMetadataError,
+    get_metadata_keys_for_file_type,
+    validate_upload_metadata,
+)
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
                          UploadedFileTypes.GENE_LIST: "uploaded_gene_list"}
@@ -141,7 +146,7 @@ def get_remaining_annotation_runs(uploaded_vcf, genome_build) -> int:
     return ar_qs.filter(annotation_range_lock__max_variant_id__lte=max_variant_id).count()
 
 
-def handle_file_upload(user, django_uploaded_file, path=None) -> FileUpload:
+def handle_file_upload(user, django_uploaded_file, path=None, metadata=None) -> FileUpload:
     original_filename = django_uploaded_file._name
     kwargs = {
         "name": original_filename,
@@ -153,6 +158,15 @@ def handle_file_upload(user, django_uploaded_file, path=None) -> FileUpload:
     file_upload = FileUpload.objects.create(**kwargs)
     # Save 1st to actually create file (need to open handling unicode)
     file_upload.file_type = get_uploaded_file_type(file_upload, original_filename)
+
+    # Validate while the client is still connected - the file type is known by here, so a bad key or
+    # an unresolvable build is theirs to fix now rather than a failed import several stages later
+    try:
+        file_upload.metadata = validate_upload_metadata(metadata,
+                                                        get_metadata_keys_for_file_type(file_upload.file_type))
+    except UploadMetadataError:
+        file_upload.delete()
+        raise
     file_upload.save()
 
     # File is on disk now - store hash so uploads can be de-duped / polled by content (API + web)
