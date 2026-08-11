@@ -11,7 +11,7 @@ test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upl
 
 ## Done
 
-- **Phase 0 — pipeline fixes** (`21a973d15`, branch `issue_1506_tso500_pipeline_fixes`, unmerged).
+- **Phase 0 — pipeline fixes** (PR #1709, branch `issue_1506_tso500_pipeline_fixes`).
   `vcf_header_filter_ids()` in `library/genomics/vcf_utils.py` reads declared FILTER IDs off the raw
   header lines, so `_DragenExonCNV.vcf` no longer dies at the first pipe stage on PyVCF's FILTER regex.
   A regex rather than cyvcf2, which needs a real file descriptor and so does not suit a stdin filter.
@@ -98,14 +98,18 @@ DNA and RNA arms of one block. Worth revisiting when a consumer needs it.
 ## Phase 2 — per-file loader refinements
 
 Make each file import with the right values in it. Nothing here depends on Phase 1, or on anything else
-in this plan — no model changes, five independent items, each testable against one test file. It could
-have gone in Phase 0 and it can be picked up by anyone at any point, which is why it is separated from
-the linkage work that used to share this phase (now Phase 4).
+in this plan — four independent items, each testable against one test file. It could have gone in
+Phase 0 and it can be picked up by anyone at any point, which is why it is separated from the linkage
+work that used to share this phase (now Phase 4).
 
-- **Supply the genome build explicitly.** `_DragenExonCNV.vcf` has no `##contig` lines and only
+Designed in detail in [`tso500_phase2_plan.md`](tso500_phase2_plan.md), which is the spec.
+
+- **Upload metadata — genome build and source.** `_DragenExonCNV.vcf` has no `##contig` lines and only
   `##reference=file:resource_bundle/hg19_decoy/`, so `vcf_detect_genome_build_from_header` finds nothing
-  and `upload/tasks/vcf/genotype_vcf_tasks.py:63` sets `REQUIRES_USER_INPUT` and stops. Whatever submits
-  the file knows the build, so let it say so explicitly instead of relying on header detection.
+  and `upload/tasks/vcf/genotype_vcf_tasks.py:63` sets `REQUIRES_USER_INPUT` and stops; `cnv.vcf` and
+  `hard-filtered.vcf` declare no `##source`, so nothing keyed on the caller can reach them. Whatever
+  submits the file knows both, so let it say so explicitly instead of relying on header detection.
+  A `FileUpload.metadata` JSON blob, validated at upload time.
 - **`VCFSourceSettings` mapping for SpliceGirl.** The `##source` line (`SpliceGirl 1.0.0.614`) is already
   the hook. In this file `AD` is `Number=1` splice-supporting reads and `DP` is *reference* reads, so
   binding them by name silently gives empty allele depth, missing VAF, and a read-depth column showing
@@ -116,9 +120,9 @@ the linkage work that used to share this phase (now Phase 4).
   so the fix is letting undeclared values through the header stage.
 - **Skip copy-neutral `cnv.vcf` rows.** `ALT=.` is 406 of 500 in a real run; they carry no call and
   currently import as reference variants with the segment span discarded.
-- **Resolve gene symbols through `GeneSymbol`.** `SEGID=MYCL1` in `cnv.vcf` uses an older symbol than the
-  rest of the pipeline (`MYCL`), so trusting what the caller wrote drops the row's gene. The same
-  argument recurs in Phase 5 with `SEPT14`.
+Resolving `cnv.vcf`'s `SEGID` gene symbols through `GeneSymbol` was a fifth item here, and has moved to
+Phase 6: `CohortGenotype.info` is a `JSONField`, so nothing is lost at import, and whether to resolve
+aliases at read time or into a queryable column is the same question `SM` and `CN` pose there.
 
 None of these have their own issue — they came out of running the test data through the real pipe stages,
 and sapath#431 is the only thing above them. Worth raising individually if they are going to be picked up
@@ -126,7 +130,7 @@ by different people.
 
 **Done when** all five test files import with the right values: splice VAF derived from
 `ALTDEDUP`/`REFDEDUP`, `LowUniqueAlignments` surviving to the grid, no copy-neutral rows inserted, and
-`_DragenExonCNV.vcf` landing against an explicit build.
+`_DragenExonCNV.vcf` landing against a declared build.
 
 ## Phase 3 — finish the specimen model, and give it somewhere to show (private#2447, #1706)
 
@@ -317,6 +321,13 @@ and CNV works as SV — what is missing is surfacing `CohortGenotype.info["CN"]`
 linear copy ratio, which importer v21+ already keeps in the format JSON blob but which is not queryable).
 That part is independent and could be pulled forward any time.
 
+`cnv.vcf`'s `SEGID` gene symbol joins it, down from Phase 2. The value is stored and the JSON is
+queryable, but it is whatever the caller wrote — `MYCL1` where the rest of the pipeline says `MYCL` —
+and JSON cannot be joined to `GeneSymbol`/`GeneSymbolAlias`. So it is the same read-time-versus-column
+decision as `SM` and `CN`, and wants deciding once for all three.
+`GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` (`genes/gene_matching.py:45`) is the resolver
+either way.
+
 Fusions are the genuinely new case, and only exist to display after Phase 5. The single-grid vs
 multiple-grids question is worth deciding on real fusion rows rather than in the abstract — with a
 `GeneFusion`-keyed `Allele` in hand, "sort by gene brings the fusions together" is testable instead of
@@ -369,8 +380,8 @@ With two people: one takes Phase 3 → 4 (the model spine, now that Phase 1 has 
 Phase 5 (fusions), and they meet at Phase 6. Phase 5 touches `classification` and `upload`; Phases 3-4
 touch `patients`, `snpdb` and `seqauto`, so the conflict surface is small.
 
-Two things split off cleanly on top of that. Phase 2 is five independent file-correctness fixes with no
-model changes, so it can go to whoever, whenever — including before Phase 3. Phase 3's #1706 half is
+Two things split off cleanly on top of that. Phase 2 is four independent file-correctness fixes, so it
+can go to whoever, whenever — including before Phase 3. Phase 3's #1706 half is
 views and templates only. The one ordering constraint across the lot is that #2447's field change lands
 before #1707 serializes it.
 
