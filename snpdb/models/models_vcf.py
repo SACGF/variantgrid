@@ -27,7 +27,7 @@ from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
-from patients.models import Extraction, FakeData, Patient, Specimen
+from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
 from snpdb.models.models import LabProject, Tag
 from snpdb.models.models_enums import (
     ImportStatus,
@@ -328,7 +328,7 @@ class VCFTag(models.Model):
         return f"{self.tag}:{self.vcf}"
 
 
-class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.Model):
+class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, ExtractionMatchMixin, models.Model):
     """ A VCF sample storing genotype information
         Sample data is stored as packed fields in CohortGenotype (via vcf.cohort.cohortgenotypecollection) """
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
@@ -337,8 +337,6 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.
     no_dna_control = models.BooleanField(default=False)
     research_consent = models.BooleanField(null=True, blank=True)
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
-    # TODO: A sample may have >1 extractions (eg tumor/normal subtraction)
-    extraction = models.ForeignKey(Extraction, null=True, blank=True, on_delete=SET_NULL)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
 

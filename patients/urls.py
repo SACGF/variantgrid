@@ -1,3 +1,6 @@
+from django.urls import include
+from rest_framework import routers
+
 from library.django_utils.jqgrid_view import JQGridView
 from patients import views, views_autocomplete
 from patients.grids import (
@@ -5,6 +8,13 @@ from patients.grids import (
     PatientOntologyGenesGrid,
     PatientRecordColumns,
     PatientRecordsColumns,
+)
+from patients.views_rest import (
+    ExtractionViewSet,
+    PatientViewSet,
+    SpecimenMeasureBulkCreateView,
+    SpecimenMeasureViewSet,
+    SpecimenViewSet,
 )
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
@@ -58,4 +68,17 @@ urlpatterns = [
     path('autocomplete/Extraction/', views_autocomplete.ExtractionAutocompleteView.as_view(), name='extraction_autocomplete'),
     path('autocomplete/Clinician/', views_autocomplete.ClinicianAutocompleteView.as_view(), name='clinician_autocomplete'),
     path('autocomplete/ExternalPKAutocompleteView', views_autocomplete.ExternalPKAutocompleteView.as_view(), name='external_pk_autocomplete'),
+]
+
+router = routers.DefaultRouter()
+router.register(r'api/v1/patient', PatientViewSet, basename='api_patient')
+router.register(r'api/v1/specimen', SpecimenViewSet, basename='api_specimen')
+router.register(r'api/v1/extraction', ExtractionViewSet, basename='api_extraction')
+router.register(r'api/v1/specimen_measure', SpecimenMeasureViewSet, basename='api_specimen_measure')
+
+urlpatterns += [
+    # Ahead of the router, whose detail route would otherwise read 'bulk_create' as a primary key
+    path('api/v1/specimen_measure/bulk_create', SpecimenMeasureBulkCreateView.as_view(),
+         name='api_specimen_measure_bulk_create'),
+    path('', include(router.urls), name='patients_apis'),
 ]

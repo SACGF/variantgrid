@@ -75,6 +75,12 @@ app.conf.beat_schedule['dispatch-annotation-runs'] = {
     'schedule': MINUTE_SECS,
 }
 
+# Extraction references parked by a VCF or link call that arrived before the extraction existed
+app.conf.beat_schedule['reconcile-pending-extractions'] = {
+    'task': 'patients.tasks.extraction_matching_tasks.reconcile_pending_extractions',
+    'schedule': HOUR_SECS,
+}
+
 app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
     'task': 'analysis.tasks.analysis_grid_export_tasks.clear_old_node_export_cached_generated_files',
     'schedule': crontab(hour=3, minute=15),

@@ -17,6 +17,23 @@ class TissueStatus(models.TextChoices):
     UNKNOWN = 'U', 'Unknown'
 
 
+class MatchStatus(models.TextChoices):
+    """ An identifier's journey from posted to resolved - independent feeds arrive in any order, so a
+        reference we cannot resolve yet is parked rather than rejected """
+    MATCHED = 'M', 'Matched'
+    PENDING = 'P', 'Pending'
+    NEEDS_ATTENTION = 'N', 'Needs attention'
+
+
+class SpecimenMeasureType(models.TextChoices):
+    """ Vendor-neutral - other panels push the same shape """
+    TMB = 'T', 'Tumour mutational burden'
+    MSI = 'M', 'Microsatellite instability'
+    GIS = 'G', 'Genomic instability score'
+    TUMOUR_FRACTION = 'F', 'Tumour fraction'
+    PLOIDY = 'P', 'Ploidy'
+
+
 class SimpleZygosity(models.TextChoices):
     NON_REF_CALL = 'A', 'Het or Hom Alt'
     ANY_CALL = 'Z', 'Any zygosity call'

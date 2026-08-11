@@ -92,6 +92,17 @@ class Test(URLTestCase):
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 
+    def testApiUrls(self):
+        """ #1707 - the API list endpoints, which only ever show what the user can see """
+        URL_NAMES_AND_KWARGS = [
+            ("api_patient-list", {}, 200),
+            ("api_specimen-list", {}, 200),
+            ("api_extraction-list", {}, 200),
+            ("api_specimen_measure-list", {}, 200),
+            ("api_specimen_measure_bulk_create", {}, 405),  # POST only
+        ]
+        self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
+
     def testAutocompleteUrls(self):
         """ Autocompletes w/o permissions """
         AUTOCOMPLETE_URLS = [
