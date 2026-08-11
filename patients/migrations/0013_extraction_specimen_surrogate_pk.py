@@ -115,7 +115,6 @@ class Migration(migrations.Migration):
                                                                               verbose_name='created')),
                 ('modified', django_extensions.db.fields.ModificationDateTimeField(auto_now=True,
                                                                                    verbose_name='modified')),
-                ('reference_id', models.TextField(blank=True, null=True)),
                 ('nucleic_acid_source', models.CharField(blank=True,
                                                          choices=[('D', 'DNA'), ('R', 'RNA')],
                                                          default='D', max_length=1, null=True)),
@@ -124,9 +123,6 @@ class Migration(migrations.Migration):
                 ('specimen', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,
                                                to='patients.specimen')),
             ],
-            options={
-                'unique_together': {('specimen', 'reference_id')},
-            },
         ),
         migrations.RunPython(_create_extractions, migrations.RunPython.noop, elidable=True),
         migrations.RemoveField(

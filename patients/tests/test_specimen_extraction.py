@@ -45,10 +45,8 @@ class TestSpecimenExtraction(TestCase):
         assign_permission_to_user_and_groups(cls.user, cls.patient)
         cls.specimen = Specimen.objects.create(reference_id="2600000001", patient=cls.patient,
                                                mutation_type=Mutation.SOMATIC)
-        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001C",
-                                            nucleic_acid_source=NucleicAcid.DNA)
-        cls.rna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001B",
-                                            nucleic_acid_source=NucleicAcid.RNA)
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, nucleic_acid_source=NucleicAcid.DNA)
+        cls.rna = Extraction.objects.create(specimen=cls.specimen, nucleic_acid_source=NucleicAcid.RNA)
 
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         vcf = VCF.objects.create(name="extraction_test.vcf", genotype_samples=2, genome_build=genome_build,
@@ -185,13 +183,10 @@ class TestAutocompleteForwarding(TestCase):
         cls.other_patient_specimen = Specimen.objects.create(reference_id="2600000003",
                                                              patient=cls.other_patient)
 
-        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001C",
-                                            nucleic_acid_source=NucleicAcid.DNA)
-        cls.rna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000001B",
-                                            nucleic_acid_source=NucleicAcid.RNA)
-        cls.other_extraction = Extraction.objects.create(specimen=cls.other_specimen,
-                                                         reference_id="2600000002C")
-        Extraction.objects.create(specimen=cls.other_patient_specimen, reference_id="2600000003C")
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, nucleic_acid_source=NucleicAcid.DNA)
+        cls.rna = Extraction.objects.create(specimen=cls.specimen, nucleic_acid_source=NucleicAcid.RNA)
+        cls.other_extraction = Extraction.objects.create(specimen=cls.other_specimen)
+        Extraction.objects.create(specimen=cls.other_patient_specimen)
 
     def _queryset(self, view_class, **forwarded):
         view = view_class()
@@ -218,7 +213,3 @@ class TestAutocompleteForwarding(TestCase):
     def test_nothing_forwarded_returns_all_visible(self):
         self.assertEqual(self._queryset(SpecimenAutocompleteView).count(), 3)
         self.assertEqual(self._queryset(ExtractionAutocompleteView).count(), 4)
-
-    def test_extraction_searchable_by_its_own_reference(self):
-        """ The TSO 500 container suffix lives on the extraction, not the specimen """
-        self.assertIn('reference_id', ExtractionAutocompleteView.fields)

@@ -133,8 +133,7 @@ PatientSpecimenFormSet = inlineformset_factory(Patient,
 # Not an inline formset as Extraction hangs off Specimen - the view restricts it to one patient
 PatientExtractionFormSet = modelformset_factory(Extraction,
                                                 can_delete=True,
-                                                fields=['specimen', 'reference_id', 'nucleic_acid_source'],
-                                                widgets={'reference_id': TextInput()},
+                                                fields=['specimen', 'nucleic_acid_source'],
                                                 extra=1)
 
 

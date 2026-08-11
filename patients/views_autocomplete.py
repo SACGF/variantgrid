@@ -39,8 +39,7 @@ class SpecimenAutocompleteView(AutocompleteView):
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
 class ExtractionAutocompleteView(AutocompleteView):
     """ Narrows on whichever of Patient -> Specimen a form has already set """
-    # An extraction may be referred to by its own reference (eg a container suffix) or its specimen's
-    fields = ['reference_id', 'specimen__reference_id']
+    fields = ['specimen__reference_id']
 
     def get_user_queryset(self, user):
         qs = Extraction.objects.filter(specimen__patient__in=Patient.filter_for_user(user))
