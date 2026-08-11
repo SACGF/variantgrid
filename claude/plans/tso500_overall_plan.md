@@ -6,9 +6,11 @@ each issue carries its own design.
 
 The file-level ingestion analysis is in [`tso500_ingestion_plan.md`](tso500_ingestion_plan.md); the
 test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md).
-Two phases have their own design docs: [`tso500_phase2_plan.md`](tso500_phase2_plan.md) for the loader
-refinements, and [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) for gene
-fusions.
+Three phases have their own design docs: [`tso500_phase2_plan.md`](tso500_phase2_plan.md) for the loader
+refinements, [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) for gene
+fusions, and
+[`somatic_curation_reuse_issue_1419_plan.md`](somatic_curation_reuse_issue_1419_plan.md) for Phase 8's
+reporting.
 
 ---
 
@@ -432,16 +434,28 @@ that merges everything solves neither that nor the FFPE-vs-germline case.
 `Cohort` has a `genome_build` FK, so a cross-VCF cohort is single-build by construction — fine at
 extraction and specimen level, and only a problem if this ever goes up to Patient.
 
-## Phase 8 — reporting (sapath#246, then #444)
+## Phase 8 — reporting (sapath#246, #1419, then #444)
 
 Last, because it consumes everything above. #431 notes #246 is old and may be worth rolling into #444.
+
+Designed in [`somatic_curation_reuse_issue_1419_plan.md`](somatic_curation_reuse_issue_1419_plan.md),
+which is the spec. In short: somatic reporting sees the same variants over and over, so the phase is
+about reusing prior curation. An audit of `EvidenceKey.copy_consensus` first — 142 keys carry it, set
+for germline ACMG work and never reviewed against somatic, and several of them copy one patient's
+tumour measurements or report narrative onto another's. Then a wizard that triages a run's
+`SomaticReportable` tags against what has already been curated for each allele, and walks them one
+variant at a time. Then gene-level reuse (#1419), where the human picks the source record because AMP
+tiering is gene *and* tumour type and the phenotype data cannot make that call.
 
 - **sapath#246** — keep tagging `SomaticReportable` as now, but launch the classification as AMP/somatic
   from the grid's tags button rather than exporting CSV. Small and independent of the rest; could be
   pulled forward if it is blocking the diagnostic team.
+- **#1419** — gene-level copy consensus, deliberately as a copy rather than the first-class gene/disease
+  object the issue also proposes. The object needs the disease axis settled first; the copy reuses
+  machinery that already works and owns exactly the key set the object would.
 - **#444** — multi-variant classification and reporting. Grouped by gene, launched from the sample or
   specimen page, pulling in Phase 4's TMB/MSI measures. `ClassificationReportTemplate` exists; the vue
-  template needs to take an array.
+  template needs to take an array. Starts from the wizard's triaged list.
 
 ---
 
@@ -472,6 +486,9 @@ With one person, the order above is the order.
   the vendor emits it in a VCF, so it belongs with `abcn_annotated.vcf` below rather than in Phase 4.
 - **Fusion equivalence and discordance** — the research-level part of #1506. Somatic classifications get
   `MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED` today, so nothing regresses by waiting.
+- **Gene/disease curation as a first-class object** — #1419's schema option, and the only thing that can
+  express "reviewed on this date, due for review". Needs the disease axis settled; Phase 8 does the
+  reuse as a copy in the meantime, over exactly the key set such an object would own.
 - **Breakend representation and BND VCF export** — #1506 phases 2 and 3. The breakpoint values themselves
   arrive in `AllFusions.csv` and Phase 5 stores them, so this is a read-side change when a consumer appears.
 - **`abcn_annotated.vcf` / gene-level LOH** — cannot start until TAU supplies a file; the format is
