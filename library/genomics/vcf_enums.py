@@ -92,3 +92,10 @@ class VariantClass(models.TextChoices):
 
 
 INFO_LIFTOVER_SWAPPED_REF_ALT = "VG_LIFTOVER_SWAPPED_REF_ALT"
+
+# FILTER values the source header never declared. vcf_clean_and_filter moves them here because bcftools
+# norm dies on an undeclared FILTER, and the genotype processor puts them back at insert.
+# Separator is '|' as the VCF spec already bars whitespace and ';' from FILTER IDs, and ',' would read
+# as a multi-value INFO
+UNDECLARED_FILTERS_INFO = "VG_UNDECLARED_FILTERS"
+UNDECLARED_FILTERS_SEPARATOR = "|"

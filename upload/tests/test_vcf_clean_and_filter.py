@@ -17,7 +17,9 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
+from library.genomics.vcf_enums import UNDECLARED_FILTERS_INFO, VCFColumns
 from snpdb.models import GenomeBuild
+from upload.management.commands.vcf_clean_and_filter import REFERENCE_SPAN_SKIP_REASON
 
 _TEST_DIR = tempfile.mkdtemp(prefix="test_vcf_clean_and_filter_")
 _TEST_FASTA = os.path.join(_TEST_DIR, "placeholder.fna")
@@ -33,6 +35,14 @@ POSITION_BACKWARDS_RECORDS = [("1", 154560359), ("1", 154560345), ("2", 100000)]
 UNGROUPED_CONTIG_RECORDS = [("1", 100000), ("2", 100000), ("1", 200000)]
 
 
+def _write_placeholder_fasta(genome_build):
+    with open(_TEST_FASTA, "w") as f:
+        f.write(">placeholder\nN\n")  # Sequence is never read - only the index below
+    with open(_TEST_FASTA + ".fai", "w") as f:
+        for accession, length in genome_build.standard_contigs.values_list("refseq_accession", "length"):
+            f.write(f"{accession}\t{length}\t0\t60\t61\n")
+
+
 def _fake_annotation_settings() -> dict:
     annotation = copy.deepcopy(settings.ANNOTATION)
     annotation[settings.BUILD_GRCH37]["reference_fasta"] = _TEST_FASTA
@@ -45,11 +55,7 @@ class TestVCFCleanAndFilterSortedCheck(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
-        with open(_TEST_FASTA, "w") as f:
-            f.write(">placeholder\nN\n")  # Sequence is never read - only the index below
-        with open(_TEST_FASTA + ".fai", "w") as f:
-            for accession, length in cls.genome_build.standard_contigs.values_list("refseq_accession", "length"):
-                f.write(f"{accession}\t{length}\t0\t60\t61\n")
+        _write_placeholder_fasta(cls.genome_build)
 
     def setUp(self):
         super().setUp()
@@ -111,3 +117,131 @@ class TestVCFCleanAndFilterSortedCheck(TestCase):
         expected = [genome_fasta.convert_chrom_to_fasta_sequence(chrom)
                     for chrom, _ in UNGROUPED_CONTIG_RECORDS]
         self.assertEqual(chroms, expected)
+
+
+@override_settings(ANNOTATION=_fake_annotation_settings())
+class TestUndeclaredFiltersMovedToInfo(TestCase):
+    """ An undeclared FILTER can't stay in the FILTER column - bcftools norm dies on one rather than
+        warning - and dropping it loses real calls. So the record carries it in INFO past norm, and the
+        genotype processor puts it back at insert. """
+
+    FILTER_COLUMN = "LowQ;LowUniqueAlignments"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        _write_placeholder_fasta(cls.genome_build)
+
+    def _run(self, filter_column: str, info: str = ".") -> tuple[list[str], dict]:
+        """ Returns (written record columns, undeclared filter counts) """
+        vcf_filename = os.path.join(_TEST_DIR, f"{self.id()}.vcf")
+        with open(vcf_filename, "w") as f:
+            f.write(VCF_HEADER.replace(
+                "#CHROM", '##FILTER=<ID=LowQ,Description="Below the passing threshold.">\n#CHROM'))
+            f.write(f"1\t100000\t.\tT\tA\t0\t{filter_column}\t{info}\n")
+
+        stats_filename = os.path.join(_TEST_DIR, f"{self.id()}.skipped_filters.txt")
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            call_command("vcf_clean_and_filter", vcf=vcf_filename, genome_build=self.genome_build.name,
+                         allow_unsorted=True, skipped_filters_stats_file=stats_filename)
+
+        records = [line for line in stdout.getvalue().splitlines() if not line.startswith("#")]
+        self.assertEqual(1, len(records))
+        skipped = {}
+        if os.path.exists(stats_filename):
+            with open(stats_filename) as f:
+                for line in f:
+                    name, count = line.rstrip("\n").split("\t")
+                    skipped[name] = int(count)
+        return records[0].split("\t"), skipped
+
+    def test_undeclared_filter_moved_to_info(self):
+        columns, skipped = self._run(self.FILTER_COLUMN)
+        self.assertEqual("LowQ", columns[VCFColumns.FILTER], "Declared value stays in FILTER")
+        self.assertEqual(f"{UNDECLARED_FILTERS_INFO}=LowUniqueAlignments", columns[VCFColumns.INFO].strip())
+        self.assertEqual({"LowUniqueAlignments": 1}, skipped, "Still counted for the pipeline page")
+
+    def test_appended_to_existing_info(self):
+        columns, _ = self._run(self.FILTER_COLUMN, info="SVTYPE=DEL;END=200")
+        self.assertEqual(f"SVTYPE=DEL;END=200;{UNDECLARED_FILTERS_INFO}=LowUniqueAlignments",
+                         columns[VCFColumns.INFO].strip())
+
+    def test_filter_column_becomes_missing_when_all_undeclared(self):
+        columns, _ = self._run("LowUniqueAlignments;base_quality")
+        self.assertEqual(".", columns[VCFColumns.FILTER])
+        self.assertEqual(f"{UNDECLARED_FILTERS_INFO}=LowUniqueAlignments|base_quality",
+                         columns[VCFColumns.INFO].strip())
+
+    def test_declared_filters_untouched(self):
+        columns, skipped = self._run("LowQ")
+        self.assertEqual("LowQ", columns[VCFColumns.FILTER])
+        self.assertEqual(".", columns[VCFColumns.INFO].strip(), "No INFO added when nothing was undeclared")
+        self.assertEqual({}, skipped)
+
+    def test_pass_untouched(self):
+        columns, _ = self._run("PASS")
+        self.assertEqual("PASS", columns[VCFColumns.FILTER])
+        self.assertEqual(".", columns[VCFColumns.INFO].strip())
+
+
+@override_settings(ANNOTATION=_fake_annotation_settings())
+class TestVCFCleanAndFilterReferenceSpans(TestCase):
+    """ A reference call over a span carries no call and loses its span on import, so it's skipped -
+        the same statement the importer already makes about gVCF reference blocks. """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        _write_placeholder_fasta(cls.genome_build)
+
+    def _run(self, records) -> tuple[str, dict]:
+        """ Returns (written records with header stripped, skipped record counts) """
+        vcf_filename = os.path.join(_TEST_DIR, f"{self.id()}.vcf")
+        with open(vcf_filename, "w") as f:
+            f.write(VCF_HEADER)
+            for alt, info in records:
+                f.write(f"1\t100000\t.\tN\t{alt}\t.\tPASS\t{info}\n")
+
+        stats_filename = os.path.join(_TEST_DIR, f"{self.id()}.skipped.txt")
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            call_command("vcf_clean_and_filter", vcf=vcf_filename, genome_build=self.genome_build.name,
+                         allow_unsorted=True, skipped_records_stats_file=stats_filename)
+
+        written = "".join(line for line in stdout.getvalue().splitlines(keepends=True)
+                          if not line.startswith("#"))
+        skipped = {}
+        if os.path.exists(stats_filename):
+            with open(stats_filename) as f:
+                for line in f:
+                    name, count = line.rstrip("\n").split("\t")
+                    skipped[name] = int(count)
+        return written, skipped
+
+    def test_copy_neutral_segment_skipped(self):
+        """ cnv.vcf's copy-neutral rows - ALT='.' over a span with no SVTYPE """
+        written, skipped = self._run([(".", "END=104714;REFLEN=4715;SEGID=TNFRSF14")])
+        self.assertEqual(written, "")
+        self.assertEqual(skipped, {REFERENCE_SPAN_SKIP_REASON: 1})
+
+    def test_undetermined_cnv_call_kept(self):
+        """ _DragenExonCNV.vcf's 'Undetermined' BRCA2 row - SVTYPE means the caller is describing an
+            event rather than a segmentation interval, so 'we looked and could not tell' survives """
+        written, skipped = self._run([(".", "SVTYPE=CNV;END=104714;GENE=BRCA2")])
+        self.assertEqual(len(written.splitlines()), 1)
+        self.assertEqual(skipped, {})
+
+    def test_single_position_reference_record_kept(self):
+        """ Reference variants are first class - only a reference call over a *span* is dropped """
+        written, skipped = self._run([(".", ".")])
+        self.assertEqual(len(written.splitlines()), 1)
+        self.assertEqual(skipped, {})
+
+    def test_symbolic_alts_unaffected(self):
+        written, skipped = self._run([("<DUP>", "SVTYPE=CNV;END=104714"),
+                                      ("<DEL>", "SVTYPE=CNV;END=104714")])
+        self.assertEqual(len(written.splitlines()), 2)
+        self.assertEqual(skipped, {})

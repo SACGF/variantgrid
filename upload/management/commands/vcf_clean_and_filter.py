@@ -19,9 +19,20 @@ from collections import Counter
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from library.genomics.vcf_enums import VCFColumns
-from library.genomics.vcf_utils import UnsortedVCFError, VCFSortChecker, vcf_header_filter_ids
+from library.genomics.vcf_enums import (
+    UNDECLARED_FILTERS_INFO,
+    UNDECLARED_FILTERS_SEPARATOR,
+    VCFColumns,
+)
+from library.genomics.vcf_utils import (
+    UnsortedVCFError,
+    VCFSortChecker,
+    parse_vcf_info_column,
+    vcf_header_filter_ids,
+)
 from snpdb.models import GenomeBuild, GenomeFasta
+
+REFERENCE_SPAN_SKIP_REASON = "reference call over a span (ALT='.' with END)"
 
 
 class Command(BaseCommand):
@@ -119,6 +130,10 @@ class Command(BaseCommand):
                         skipped_records[skip_reason] += 1
                         continue
 
+                if self._is_reference_span(columns):
+                    skipped_records[REFERENCE_SPAN_SKIP_REASON] += 1
+                    continue
+
                 # Check ref bases are ok
                 # Alts are checked in 'vcf_remove_non_standard_alts', which happens after split multi-allelic
                 ref = columns[VCFColumns.REF]
@@ -130,21 +145,25 @@ class Command(BaseCommand):
                     skipped_records[skip_reason] += 1
                     continue
 
-                # Remove filters not in header
+                # Move filters not in the header into INFO. They can't stay in the FILTER column -
+                # bcftools norm dies on an undeclared FILTER rather than warning - but dropping them
+                # loses real calls, so the record carries them past norm and the genotype processor
+                # puts them back via _add_undeclared_filter_code
                 filter_column = columns[VCFColumns.FILTER]
                 if filter_column not in QUICK_ACCEPT_FILTERS:
                     cleaned_filters = []
+                    undeclared_filters = []
                     for fc in filter_column.split(";"):
                         if fc in defined_filters:
                             cleaned_filters.append(fc)
                         else:
+                            undeclared_filters.append(fc)
                             skipped_filters[fc] += 1
 
-                    if cleaned_filters:
-                        filter_column = ";".join(cleaned_filters)
-                    else:
-                        filter_column = "."
-                    columns[VCFColumns.FILTER] = filter_column
+                    columns[VCFColumns.FILTER] = ";".join(cleaned_filters) if cleaned_filters else "."
+                    if undeclared_filters:
+                        columns[VCFColumns.INFO] = self._add_undeclared_filters_info(
+                            columns[VCFColumns.INFO], undeclared_filters)
 
                 # Only the records we write need to be sorted - skipped ones can't break the downstream index
                 if sort_checker:
@@ -164,6 +183,29 @@ class Command(BaseCommand):
         self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)
         self._write_skip_counts(skipped_records, skipped_records_stats_file)
         self._write_skip_counts(skipped_filters, skipped_filters_stats_file)
+
+    @staticmethod
+    def _add_undeclared_filters_info(info_column: str, undeclared_filters: list[str]) -> str:
+        # INFO is the last column when a VCF has no samples, so it can be carrying the line's newline
+        info, newline, _ = info_column.partition("\n")
+        value = f"{UNDECLARED_FILTERS_INFO}={UNDECLARED_FILTERS_SEPARATOR.join(undeclared_filters)}"
+        if info not in (".", ""):
+            value = f"{info};{value}"
+        return value + newline
+
+    @staticmethod
+    def _is_reference_span(columns: list[str]) -> bool:
+        """ A reference call over a span is a no-call region, not a variant - the same statement we already
+            make about gVCF reference blocks. This is 406 of 500 records in a real TSO 500 cnv.vcf.
+
+            SVTYPE present means the caller is describing an event rather than a segmentation interval
+            (e.g. an 'Undetermined' per-gene CNV call), so those are kept. A reference record at a single
+            position - no END - is a normal reference variant and also kept. """
+
+        if columns[VCFColumns.ALT] != ".":
+            return False
+        info = parse_vcf_info_column(columns[VCFColumns.INFO])
+        return "END" in info and "SVTYPE" not in info
 
     @staticmethod
     def _get_defined_vcf_filters(vcf_header_lines) -> set:

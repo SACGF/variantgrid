@@ -129,7 +129,8 @@ class AbstractBulkVCFProcessor(abc.ABC):
             for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, self.genome_build):
                 # These 2 need to be in sync
                 miv_hash_list.append(variant_hash)
-                miv_list.append((ModifiedImportedVariantOperation.NORMALIZATION, old_multiallelic, old_variant, ov))
+                miv_list.append((ModifiedImportedVariantOperation.NORMALIZATION, old_multiallelic, old_variant,
+                                 ov, None))
 
     def process_modified_imported_variants(self, variant_ids_by_hash):
         modified_imported_variants = []

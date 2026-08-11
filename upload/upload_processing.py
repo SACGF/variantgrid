@@ -11,6 +11,7 @@ from upload.models import (
     UploadPipeline,
     UploadStepOrigin,
 )
+from upload.upload_metadata import get_metadata_keys_for_file_type, validate_upload_metadata
 
 
 def get_upload_processing_task(file_type, upload_pipeline):
@@ -85,13 +86,16 @@ def process_upload_pipeline(upload_pipeline: UploadPipeline,
     return upload_pipeline, result
 
 
-def process_vcf_file(vcf_filename, name, user, import_source, run_async=True, file_type=UploadedFileTypes.VCF) -> tuple[UploadPipeline, AsyncResult]:
+def process_vcf_file(vcf_filename, name, user, import_source, run_async=True, file_type=UploadedFileTypes.VCF,
+                     metadata=None) -> tuple[UploadPipeline, AsyncResult]:
     logging.info("process_vcf_file, path=%s", vcf_filename)
+    metadata = validate_upload_metadata(metadata, get_metadata_keys_for_file_type(file_type))
     file_upload = FileUpload.objects.create(path=vcf_filename,
                                             import_source=import_source,
                                             name=name,
                                             user=user,
-                                            file_type=file_type)
+                                            file_type=file_type,
+                                            metadata=metadata)
     ufpj, result = process_uploaded_file(file_upload, run_async)
 
     if not run_async:  # Should be done by now...

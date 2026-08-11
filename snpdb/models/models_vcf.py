@@ -7,7 +7,7 @@ from typing import Optional, Union
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields.array import ArrayField
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import Field, Lookup
 from django.db.models.deletion import CASCADE, SET_NULL
@@ -665,9 +665,42 @@ class SampleLabProject(models.Model):
 
 class VCFSourceSettings(models.Model):
     """ Modifies VCF based on 'source' header field - applied in upload.vcf.vcf_import.handle_vcf_source """
+
+    # VCF sample-field columns a source may override. configure_vcf_from_header binds these by name, which
+    # is wrong for callers that reuse a standard ID for something else (e.g. SpliceGirl's DP is *reference*
+    # reads, not total depth) - so a source says what its fields actually mean
+    OVERRIDABLE_SAMPLE_FIELDS = frozenset({
+        "allele_depth_field",
+        "allele_frequency_field",
+        "ref_depth_field",
+        "alt_depth_field",
+        "read_depth_field",
+        "genotype_field",
+        "genotype_quality_field",
+        "phred_likelihood_field",
+        "sample_filters_field",
+    })
+
     source_regex = models.TextField()
     sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)
+    # A key present sets that field, including to null - which is how you clear a by-name default. A JSON
+    # blob rather than nullable columns because null can't tell "no override" from "clear this field"
+    sample_field_overrides = models.JSONField(default=dict, blank=True)
+
+    def clean(self):
+        super().clean()
+        if unknown_fields := set(self.sample_field_overrides or {}) - self.OVERRIDABLE_SAMPLE_FIELDS:
+            unknown = ", ".join(sorted(unknown_fields))
+            valid = ", ".join(sorted(self.OVERRIDABLE_SAMPLE_FIELDS))
+            raise ValidationError({"sample_field_overrides": f"Unknown VCF field(s): {unknown}. Valid: {valid}"})
+
+    def apply_sample_field_overrides(self, vcf):
+        """ Applied after the by-name defaults, so overrides land on top """
+        for field, value in (self.sample_field_overrides or {}).items():
+            if field not in self.OVERRIDABLE_SAMPLE_FIELDS:
+                raise ValueError(f"{self}: '{field}' is not an overridable VCF sample field")
+            setattr(vcf, field, value)
 
     def __str__(self):
         return f"{self.source_regex} sample_variants_type={self.get_sample_variants_type_display()}, " \

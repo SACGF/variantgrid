@@ -21,6 +21,7 @@ from library.log_utils import report_exc_info
 from snpdb.models import CachedGeneratedFile, Cohort
 from snpdb.models.models_enums import ImportStatus
 from upload.models import FileUpload
+from upload.upload_metadata import UploadMetadataError
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
 from upload.views.views import get_upload_status_dict, handle_file_upload
 
@@ -46,13 +47,22 @@ class APIFileUploadView(APIView):
         upload to a pre-registered backend sequencing VCF at that server path. General upload / annotate
         / download clients should omit it and identify uploads by the returned file_upload_id and/or
         sha256_hash (content hash, which is stable across servers). 'uploaded_file_id' is a retained
-        alias for 'file_upload_id'. """
+        alias for 'file_upload_id'.
+
+        Every other query param is upload metadata - facts about the file it doesn't carry itself, whose
+        accepted keys depend on the detected file type (a VCF takes 'genome_build' and 'source'). An
+        unknown key or an unresolvable build is a 400. @see upload.upload_metadata """
+
+    RESERVED_QUERY_PARAMS = {"path", "force"}
 
     @extend_schema(
         summary="Upload a file (multipart form field 'file'), returning the uploaded file ID",
         description="Optional query params: 'path' (SeqAuto backend-link hint only - omit for general "
-                    "uploads) and 'force' (skip sha256 de-duplication). Returns file_upload_id and "
-                    "sha256_hash. 'uploaded_file_id' is a retained alias for 'file_upload_id'.",
+                    "uploads) and 'force' (skip sha256 de-duplication). Any other query param is treated "
+                    "as upload metadata for the detected file type - a VCF accepts 'genome_build' and "
+                    "'source'; an unknown key is a 400. Send a build's own name ('GRCh37') rather than "
+                    "an alias ('hg19'). Returns file_upload_id and sha256_hash. "
+                    "'uploaded_file_id' is a retained alias for 'file_upload_id'.",
         request=OpenApiTypes.BINARY,
         responses=OpenApiTypes.OBJECT,
     )
@@ -61,6 +71,8 @@ class APIFileUploadView(APIView):
             django_uploaded_file = request.FILES['file']
             path = request.query_params.get("path")
             force = request.query_params.get("force", False)
+            metadata = {k: v for k, v in request.query_params.items()
+                        if k not in self.RESERVED_QUERY_PARAMS}
 
             response_data = {}
             existing_file_upload: Optional[FileUpload] = None
@@ -74,12 +86,15 @@ class APIFileUploadView(APIView):
             else:
                 # This is still a Django UploadedFile - even though it's API we save as import_source.WEB_UPLOAD
                 # So we know to handle it as a web upload rather than 'path' (which is the path on the API client)
-                file_upload = handle_file_upload(request.user, django_uploaded_file, path=path)
+                file_upload = handle_file_upload(request.user, django_uploaded_file, path=path,
+                                                 metadata=metadata)
 
             response_data["file_upload_id"] = file_upload.pk
             response_data["uploaded_file_id"] = file_upload.pk  # deprecated alias
             response_data["sha256_hash"] = file_upload.sha256_hash
             return JsonResponse(response_data)
+        except UploadMetadataError as e:
+            return JsonResponse({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
         except Exception:
             report_exc_info(request=request)
             return JsonResponse({"error": "Upload failed"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)

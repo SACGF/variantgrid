@@ -65,6 +65,9 @@ class FileUpload(TimeStampedModel):
     import_source = models.CharField(max_length=1, choices=ImportSource.choices)
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
+    # Facts about the file the file itself doesn't carry, supplied by whatever submitted it. Keys are
+    # per file_type and validated at upload time - @see upload.upload_metadata
+    metadata = models.JSONField(default=dict, blank=True)
 
     @property
     def exists(self):
@@ -697,6 +700,9 @@ class ModifiedImportedVariants(VCFImportInfo):
         if num_rmdup := miv_qs.filter(operation=ModifiedImportedVariantOperation.RMDUP).count():
             messages.append(f"{num_rmdup} duplicates removed")
 
+        if num_shared_locus := miv_qs.filter(operation=ModifiedImportedVariantOperation.SHARED_LOCUS).count():
+            messages.append(f"{num_shared_locus} allele frequencies summed across a shared locus")
+
         return ", ".join(messages)
 
 
@@ -719,6 +725,9 @@ class ModifiedImportedVariant(models.Model):
     # Legacy rows hold vt OLD_VARIANT: @see https://genome.sph.umich.edu/wiki/Vt#Normalization
     old_variant = models.TextField(null=True)
     old_variant_formatted = models.TextField(null=True)  # consistently format for retrieval
+    # What the operation did, where the old_* fields (which are bcftools-shaped) can't say it. Used by
+    # SHARED_LOCUS to record the depths that were summed, so the per-record VAF stays reconstructable
+    operation_detail = models.TextField(null=True)
 
     @property
     def tool_name(self) -> Optional[str]:

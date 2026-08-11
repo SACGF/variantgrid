@@ -3,10 +3,11 @@ import os
 import re
 import sys
 import traceback
-from typing import Any
+from typing import Any, Optional
 
 import cyvcf2
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django.utils import timezone
@@ -46,6 +47,7 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from upload.models import (
     BackendVCF,
+    FileUpload,
     PipelineFailedJobTerminateEarlyException,
     SimpleVCFImportInfo,
     UploadedVCF,
@@ -55,6 +57,7 @@ from upload.models import (
     VCFPipelineStage,
 )
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
+from upload.upload_metadata import get_metadata_genome_build, get_metadata_source
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
 from user_messages.models import Message
@@ -206,13 +209,11 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     vcf = create_vcf_from_uploaded_vcf(uploaded_vcf, num_genotype_samples)
     # Save header ASAP if case something goes wrong
     vcf.header = vcf_reader.raw_header
-
-    try:
-        vcf.genome_build = vcf_detect_genome_build_from_header(vcf_reader)
-    except GenomeBuildDetectionException:
-        pass
+    vcf.save()
     uploaded_vcf.vcf = vcf
     uploaded_vcf.save()
+
+    vcf.genome_build = resolve_genome_build(vcf_reader, file_upload)
 
     configure_vcf_from_header(vcf, vcf_reader)
 
@@ -223,6 +224,43 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
         backend_vcf_import_start_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
 
     return vcf
+
+
+def _get_file_upload(vcf) -> Optional[FileUpload]:
+    """ The upload a VCF came from, if it came from one (absent for VCFs made by other means) """
+    try:
+        return vcf.uploadedvcf.file_upload
+    except ObjectDoesNotExist:
+        return None
+
+
+def resolve_genome_build(vcf_reader, file_upload) -> Optional[GenomeBuild]:
+    """ Header detection first, then whatever the submitter declared at upload.
+
+        Where both are present and disagree we fail rather than pick a winner - differing contigs mean
+        the coordinates aren't what the submitter thinks they are. Returns None if nothing resolves,
+        which the caller turns into REQUIRES_USER_INPUT. """
+
+    detected_genome_build = None
+    try:
+        detected_genome_build = vcf_detect_genome_build_from_header(vcf_reader)
+    except GenomeBuildDetectionException:
+        pass
+
+    declared_genome_build = get_metadata_genome_build(file_upload)
+    if declared_genome_build and detected_genome_build and declared_genome_build != detected_genome_build:
+        msg = f"Declared genome build '{declared_genome_build}' disagrees with build " \
+              f"'{detected_genome_build}' detected from the VCF header"
+        raise GenomeBuildMismatchException(msg)
+
+    if genome_build := detected_genome_build or declared_genome_build:
+        return genome_build
+
+    # Nothing to disambiguate on a single-build server - same fallback ImportBedFileTask already applies
+    genome_builds = list(GenomeBuild.builds_with_annotation())
+    if len(genome_builds) == 1:
+        return genome_builds[0]
+    return None
 
 
 def _get_vcf_sample_names(vcf, vcf_reader) -> list[str]:
@@ -242,7 +280,9 @@ def configure_vcf_from_header(vcf, vcf_reader):
     create_vcf_filters(vcf, header_types.get("FILTER", {}))
     create_vcf_format(vcf, header_types.get("FORMAT", {}))
     vcf_formats = set(header_types["FORMAT"])
-    source = cyvcf2_header_get(vcf_reader, "source", "")
+    # A client-declared source wins over '##source' - it's the only way to reach a file that declares
+    # none. The header text stays in vcf.header either way
+    source = get_metadata_source(_get_file_upload(vcf)) or cyvcf2_header_get(vcf_reader, "source", "")
     vcf.source = source
     if vcf.genotype_samples:  # Has sample format fields
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
@@ -284,6 +324,8 @@ def handle_vcf_source(vcf):
             if re.match(vss.source_regex, vcf.source):
                 vcf.sample_set.all().update(variants_type=vss.sample_variants_type)
                 vcf.variant_zygosity_count = vss.variant_zygosity_count
+                # Runs last in configure_vcf_from_header, so this lands on top of the by-name defaults
+                vss.apply_sample_field_overrides(vcf)
                 vcf.save()
 
 
@@ -510,6 +552,10 @@ def create_modified_imported_variants_job(upload_pipeline, num_modified_imported
 
 class GenomeBuildDetectionException(Exception):
     pass
+
+
+class GenomeBuildMismatchException(Exception):
+    """ Declared genome build contradicts the one detected from the header - fail rather than guess """
 
 
 class ContigMismatchException(GenomeBuildDetectionException):
