@@ -6,12 +6,12 @@ each issue carries its own design.
 
 The file-level ingestion analysis is in [`tso500_ingestion_plan.md`](tso500_ingestion_plan.md); the
 test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md).
-Five phases have their own design docs: [`tso500_phase2_plan.md`](tso500_phase2_plan.md) for the loader
-refinements, [`tso500_phase_3_plan.md`](tso500_phase_3_plan.md) for tissue status and the specimen
-pages, [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) for gene
-fusions, [`tso500_phase_7_plan.md`](tso500_phase_7_plan.md) for the grouping node, and
+Three phases still ahead have their own design docs:
+[`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) for gene fusions,
+[`tso500_phase_7_plan.md`](tso500_phase_7_plan.md) for the grouping node, and
 [`somatic_curation_reuse_issue_1419_plan.md`](somatic_curation_reuse_issue_1419_plan.md) for Phase 8's
-reporting.
+reporting. Phases 2 and 3 had docs of their own, deleted once they landed — what outlived them is in the
+Done entries below, and the PRs that reference them are #1712 and #1715.
 
 ---
 
@@ -41,8 +41,7 @@ reporting.
   a `TimeStampedModel`, and `Extraction.extraction_date` tells re-extractions apart.
 
 - **Phase 2 — per-file loader refinements** (PR #1712, branch
-  `issue_1711_tso500_phase2_loader_refinements`, issue #1711). All four items, designed in
-  [`tso500_phase2_plan.md`](tso500_phase2_plan.md):
+  `issue_1711_tso500_phase2_loader_refinements`, issue #1711). All four items:
 
   `FileUpload.metadata` is a JSON blob carrying the facts a file doesn't reliably hold itself, with each
   `ImportTaskFactory` declaring the keys it accepts and validation running at upload time — so a mistyped
@@ -59,6 +58,56 @@ reporting.
   per-gene `Undetermined` call survives. Where separate VCF rows share a locus and have their depths
   summed, a `ModifiedImportedVariant` with the new `SHARED_LOCUS` operation records the summed depths so
   the per-record VAF stays reconstructable.
+
+- **Phase 3 — tissue status, and pages for Specimen / Extraction** (PR #1715, branch
+  `issue_1706_tso500_phase3_tissue_status_and_pages`, issues #1706 and private#2447). Both Phase 1
+  leftovers, done before Phase 4 puts `Specimen` behind a public API:
+
+  `Specimen.mutation_type` became `Specimen.tissue_status` — Reference / Affected / Unknown, not null,
+  defaulting to Unknown. The old field was Germline/Somatic with `default=GERMLINE`, so every tumour
+  block nobody had touched was stamping its classifications "Germline" through autopopulate and filing
+  them alongside other labs' real germline records. It sits on `Specimen` rather than on `Tissue`
+  because the same tissue plays different roles — blood is the reference in a solid-tumour workup and
+  *is* the tumour in leukaemia.
+
+  Three levels answer three different questions, and the phase settled which field owns each — worth
+  quoting rather than rederiving, since #1707 serializes the first and #1559 and Phase 8 read all three:
+
+  | Level | Question | Where | Values |
+  |---|---|---|---|
+  | Specimen | What is this material, and what role does it play in the test? | `Specimen.tissue_status` | Reference / Affected / Unknown |
+  | Call set | What's in this VCF? | `Sample.variants_type` | Unknown / Germline / Mixed / Somatic only |
+  | Variant | What is *this* variant's origin? | `allele_origin` → `AlleleOriginBucket` | germline / somatic / other |
+
+  private#2447 says `VCF.variants_type`; it is actually on **`Sample`**
+  (`snpdb/models/models_vcf.py:343`), alongside `Sample.extraction` and `Sample.is_somatic`. That is why
+  the derivation sits in `get_evidence_fields_for_sample_and_patient` rather than the extraction helper,
+  which cannot see the call set.
+
+  Autopopulate became a derivation across two of those levels instead of one field read: an
+  `allele_origin` is asserted only where the specimen and `Sample.variants_type` agree — reference +
+  germline is `germline`, anything + somatic-only is `somatic`, everything else stays unset and falls
+  back to `settings.ALLELE_ORIGIN_NOT_PROVIDED_BUCKET`, because a mixed tumour sample's origin is
+  genuinely per-variant and cannot be known at accession. It emits the evidence key's own option string
+  rather than a display label, which is what `bucket_for_allele_origin` matches on.
+
+  `tissue_status` is per-specimen only — both arms of one block share the material, so it did not go on
+  `Extraction` the way `nucleic_acid_source` did. `Tissue` stays a lookup table with no page of its own.
+  Matched normal stays derivable — "reference specimen, same patient" — rather than becoming an FK.
+
+  `patients/0016` maps `S` → Affected and `G` → Unknown, `G` being indistinguishable from an untouched
+  record, and registers a `ManualOperation` only where a `PatientRecord` actually carries a `G`. The
+  patient CSV column is a hard rename to `'Specimen Tissue status (Reference/Affected/Unknown)'` — an
+  old spreadsheet fails the import naming the missing column, since Germline → Unknown is a loss of
+  meaning rather than a translation.
+
+  Both models now delegate permissions to their patient the way `Trio` delegates to its cohort, which
+  gave them `filter_for_user` and let the autocompletes drop their hand-rolled patient filters. Detail
+  pages at `view_specimen` / `view_extraction`, editable except `external_pk`; samples on both pages
+  filter through `Sample.filter_for_user` separately, since a sample carries its VCF's permissions
+  rather than its patient's. `PreviewModelMixin` on both, search on `HAS_3_ANY` (a TSO 500 reference is
+  all digits), `ExternalPK` search reaching both, and links each way along
+  `Patient → Specimen → Extraction → Sample`.
 
 ## Where things stand
 
@@ -82,8 +131,8 @@ The five test files from `ed5e15a33` — one de-identified run, one specimen, DN
              │                                                      │
       ┌──────┴───────────────────────────┐                          │
       │                                  │                          │
-  P3  private#2447 tissue status         │                          │
-      #1706 pages, search, preview       │                          │
+  P3  private#2447 tissue status ✔       │                          │
+      #1706 pages, search, preview ✔     │                          │
       │              │                   │                          │
   P4  seqauto link ──┤                   │                          │
       #1707 patient API ──► matching ──► #1559 measures ◄───────────┘
@@ -134,59 +183,26 @@ on them yet — the SpliceGirl mapping comes off the header and the copy-neutral
 They become part of VG's configuration contract the moment a `VCFSourceSettings.source_regex` matches
 one, so they want to stay stable from the first client.
 
-## Phase 3 — finish the specimen model, and give it somewhere to show (private#2447, #1706)
+`SEGID=MYCL1` resolving to `MYCL` is unconfirmed against a real database. NCBI carries the alias, and
+`GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` (`genes/gene_matching.py:45`) is the resolver, but
+Phase 6's gene-symbol item rests on that assumption holding — and Phase 5's fusion parser wants the same
+shape for `SEPT14` → `SEPTIN14`, so one check covers both.
 
-Designed in [`tso500_phase_3_plan.md`](tso500_phase_3_plan.md), which is the spec.
+**Clients send a build's own name (`GRCh37`), not an alias.** `GenomeBuild.get_name_or_alias("hg19")`
+raises `MultipleObjectsReturned` rather than `DoesNotExist`, so a declared build that will not resolve
+is a 400 rather than a guess. `hg19` happens to resolve here because that build is disabled, but
+`GenomeBuild.enabled` is per-deployment DB state, so the check stays. Documented in the API schema,
+`import_vcf --genome-build` and the test-data README; Phase 4's client work should follow it.
 
-Both are Phase 1 leftovers rather than new work, and both are markedly cheaper before Phase 4 puts
-`Specimen` behind a public API than after.
+## Still open from Phase 3
 
-### private#2447 — `Specimen.mutation_type` becomes a tissue status
+The grid half of #1706 — top-level specimen and extraction grids under the patients menu, an extraction
+link on the sample grid, and private#2837's IDs in the variant page's sample table — is Phase 6, where
+the column pass already is. Phase 3 gave both models the URL those links need.
 
-Phase 1 moved `nucleic_acid_source` off `Specimen` onto `Extraction` and left `mutation_type` alone. It
-is still a two-value Germline/Somatic field with `default=Mutation.GERMLINE` (`patients/models.py:321`),
-and its one substantive consumer is classification autopopulate
-(`classification/autopopulate_evidence_keys/evidence_from_sample_and_patient.py:91`), which sets
-`SpecialEKeys.ALLELE_ORIGIN` and so feeds `AlleleOriginBucket` and the cross-lab overlaps.
-
-That is a live problem for this work specifically. Every TSO 500 specimen is a tumour block, and unless
-somebody sets the field its classifications are stamped "Germline" by default and filed alongside other
-labs' real germline records — corrupting exactly the somatic classifications Phase 8 exists to produce.
-
-Two reasons it belongs here rather than "some time":
-
-- Same model, same app, same migration surface as Phase 1, while the context is hot.
-- Phase 4 exposes `Specimen` over an API a separate client codes against. Changing the field before that
-  is a migration; changing it after is a client contract change.
-
-The design is settled on the issue: a per-specimen `tissue_status` (Reference (unaffected) / Affected
-(lesional) / Unknown, defaulting to Unknown), leaving the call-set question to the existing
-`VCF.variants_type` and the per-variant question to the existing `allele_origin`, and having autopopulate
-assert an origin only where both levels agree. Matched normal stays derivable — "reference specimen, same
-patient" — rather than becoming an FK. The migration maps `S` → affected and `G` → unknown, `G` being
-ambiguous because it was the default, and registers a `ManualOperation` only on deployments whose
-`PatientRecord.specimen_mutation_type` (`patients/models.py:662`) actually carries a `G` — evidence the
-CSV column was populated rather than defaulted. The patient CSV's `SPECIMEN_MUTATION_TYPE` column
-follows, as a hard rename rather than an alias.
-
-### #1706 — specimen and extraction pages, search, preview
-
-`Specimen` and `Extraction` are plain `ExternallyManagedModel` today (`patients/models.py:311`, `:363`):
-no `get_absolute_url`, no `PreviewModelMixin`, no search handler, no page of their own. The patient page
-tabs (`patients/urls.py:25-26`) are the only place either surfaces.
-
-Phase 4's done-when is "the measures show on the specimen page", so a specimen page is a prerequisite
-rather than a nicety. The minimum here: detail pages for both, `PreviewModelMixin` so they hover-card the
-way `Patient` does, a search handler, and links each way along `Patient → Specimen → Extraction → Sample`.
-
-The rest of #1706 — top-level specimen/extraction grids under the patients menu, links from the sample
-grid, and private#2837's ask for specimen ID on the variant page — is grid work, so it rides with Phase 6
-where the grid changes already are. Splitting on that line keeps this phase to what Phase 4 needs.
-
-Beyond #2447's migration this half is views and templates, so it parallelises with anything.
-
-**Done when** a specimen has its own page reachable from search and from the patient, and `tissue_status`
-has replaced `mutation_type` everywhere including the CSV.
+A deployment whose patient CSV ever populated the old Germline/Somatic column gets a manual task out of
+`patients/0016` asking a human to decide which of those specimens really were Reference. Nothing
+registers on deployments that never used the column.
 
 ## Phase 4 — how identifiers cross the lab boundary (#1707, seqauto link, #1559)
 
@@ -215,7 +231,7 @@ the patient CSV, the admin). The API creates `Patient`, `Specimen` and `Extracti
 system's external identifiers, so the client can accession before or alongside posting a run — from a
 client that, unlike seqauto, does know the patient.
 
-Do this after Phase 3's `tissue_status` change, so the API ships the field it is keeping.
+Phase 3 landed `tissue_status`, so the API serializes the field it is keeping.
 
 ### Two ways for a VCF to name its extraction
 
@@ -413,8 +429,8 @@ run, so what remains here is the kind filter and the columns that only make sens
 #1706's grid half joins here because it is the same kind of change and wants the same pass over the
 column definitions: top-level specimen and extraction grids under the patients menu, an extraction link
 on the sample grid, and private#2837's specimen and patient IDs in the variant page's sample table —
-"which of these rows are the same patient" being the question that one is actually asking. All of it
-depends on Phase 3 having given both models a URL to link to.
+"which of these rows are the same patient" being the question that one is actually asking. Phase 3 gave
+both models the URL all of it links to.
 
 ## Phase 7 — analysis grouping node (variantgrid_private#223)
 
@@ -475,14 +491,14 @@ tiering is gene *and* tumour type and the phenotype data cannot make that call.
 
 ## Parallelism
 
-With two people: one takes Phase 3 → 4 (the model spine, now that Phase 1 has landed), the other takes
-Phase 5 (fusions), and they meet at Phase 6. Phase 5 touches `classification` and `upload`; Phases 3-4
-touch `patients`, `snpdb` and `seqauto`, so the conflict surface is small.
+With two people: one takes Phase 4 (the model spine, now that Phases 1 and 3 have landed), the other
+takes Phase 5 (fusions), and they meet at Phase 6. Phase 5 touches `classification` and `upload`; Phase 4
+touches `patients`, `snpdb` and `seqauto`, so the conflict surface is small.
 
-Phase 3's #1706 half is views and templates only, so it splits off cleanly on top of that. One ordering
-constraint remains across the lot: #2447's field change lands before #1707 serializes it. Phase 4's
-route 2 is unblocked either way — the `FileUpload.metadata` blob it hangs an `extraction` key off
-already exists, along with the per-file-type key declaration and upload-time validation it needs.
+The one ordering constraint that ran across the lot is discharged — #2447's field change landed before
+#1707 serializes it. Phase 4's route 2 is unblocked too: the `FileUpload.metadata` blob it hangs an
+`extraction` key off already exists, along with the per-file-type key declaration and upload-time
+validation it needs.
 
 With one person, the order above is the order.
 
