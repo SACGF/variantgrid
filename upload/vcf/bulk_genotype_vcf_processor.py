@@ -14,7 +14,11 @@ from django.db.models import Max
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.genomics.vcf_enums import VCFConstant
+from library.genomics.vcf_enums import (
+    UNDECLARED_FILTERS_INFO,
+    UNDECLARED_FILTERS_SEPARATOR,
+    VCFConstant,
+)
 from library.git import Git
 from library.utils import AsciiValue, double_quote, json_default_converter
 from library.utils.database_utils import postgres_arrays
@@ -159,6 +163,20 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         # Make sure child processes have finished
         for p in self.child_processes:
             p.join()
+
+    @staticmethod
+    def _restore_undeclared_filters(variant: cyvcf2.Variant) -> Optional[str]:
+        """ vcf_clean_and_filter moved FILTER values the source header never declared into INFO, so that
+            bcftools norm - which dies on an undeclared FILTER - would carry them this far. Put them back;
+            convert_filters creates the VCFFilter rows for them. """
+
+        vcf_filter = variant.FILTER
+        if undeclared := variant.INFO.get(UNDECLARED_FILTERS_INFO):
+            restored = undeclared.split(UNDECLARED_FILTERS_SEPARATOR)
+            if vcf_filter and vcf_filter != ".":
+                restored = vcf_filter.split(";") + restored
+            vcf_filter = ";".join(restored)
+        return vcf_filter
 
     def convert_filters(self, vcf_filter) -> Optional[str]:
         filters = None
@@ -323,7 +341,10 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
     @staticmethod
     def _get_info_json(variant: cyvcf2.Variant) -> dict:
-        return dict(variant.INFO)
+        info = dict(variant.INFO)
+        # Our own pipe-stage plumbing, not the caller's data - the value is stored as a filter instead
+        info.pop(UNDECLARED_FILTERS_INFO, None)
+        return info
 
     def finished_locus(self):
         """ sum(AD) for this locus and add data to arrays """
@@ -469,7 +490,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         ]
 
         self.locus_variant_hashes.append(variant_hash)
-        self.locus_filters.append(self.convert_filters(variant.FILTER))
+        self.locus_filters.append(self.convert_filters(self._restore_undeclared_filters(variant)))
         self.locus_cohort_genotypes.append(cohort_gt)
         gnomad_af = variant.INFO.get(settings.VCF_IMPORT_COMMON_FILTER_INFO)
         self.locus_gnomad_af.append(gnomad_af)

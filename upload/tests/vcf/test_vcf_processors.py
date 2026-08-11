@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from annotation.fake_annotation import get_fake_annotation_version
-from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.genomics.vcf_enums import UNDECLARED_FILTERS_INFO, VCFSymbolicAllele
 from library.utils import sha256sum_str
 from snpdb.models import ImportSource, Sequence
 from upload.models import (
@@ -229,6 +229,41 @@ class TestVCFProcessors(TestCase):
 
         operations = {miv[0] for miv in processor.modified_imported_variants}
         self.assertNotIn(ModifiedImportedVariantOperation.SHARED_LOCUS, operations)
+
+    def test_undeclared_filters_restored_from_info(self):
+        """ vcf_clean_and_filter moved them to INFO so bcftools norm wouldn't die on them - the
+            processor puts them back and creates the VCFFilter rows """
+        vcf_filename = os.path.join(self.TEST_DATA_DIR, "sample1_hg19.vcf")
+        fast_vcf_reader = cyvcf2.VCF(vcf_filename)
+        upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, fast_vcf_reader)
+        processor = BulkGenotypeVCFProcessor(upload_step, uploaded_vcf.vcf.cohort.cohort_genotype_collection,
+                                             uploaded_vcf, None)
+
+        class _FakeVariant:
+            def __init__(self, vcf_filter, info):
+                self.FILTER = vcf_filter
+                self.INFO = info
+
+        restore = processor._restore_undeclared_filters
+        self.assertEqual("LowQ;LowUniqueAlignments",
+                         restore(_FakeVariant("LowQ", {UNDECLARED_FILTERS_INFO: "LowUniqueAlignments"})))
+        self.assertEqual("LowUniqueAlignments;base_quality",
+                         restore(_FakeVariant(None,
+                                              {UNDECLARED_FILTERS_INFO: "LowUniqueAlignments|base_quality"})))
+        self.assertEqual("LowQ", restore(_FakeVariant("LowQ", {})))
+        self.assertIsNone(restore(_FakeVariant(None, {})), "cyvcf2 gives PASS as None - stays None")
+
+        # Each restored value gets a filter code, via the same path an undeclared filter already took
+        filters = processor.convert_filters(
+            restore(_FakeVariant("LowQ", {UNDECLARED_FILTERS_INFO: "LowUniqueAlignments"})))
+        self.assertEqual(2, len(filters))
+        self.assertTrue(uploaded_vcf.vcf.vcffilter_set.filter(filter_id="LowUniqueAlignments").exists())
+
+    def test_undeclared_filters_info_kept_out_of_cohort_genotype_info(self):
+        """ It's our own pipe-stage plumbing, not the caller's data """
+        variant = next(iter(cyvcf2.VCF(os.path.join(self.TEST_DATA_DIR, "sample1_hg19.vcf"))))
+        info_json = BulkGenotypeVCFProcessor._get_info_json(variant)
+        self.assertNotIn(UNDECLARED_FILTERS_INFO, info_json)
 
     def test_genotype_processor_undeclared_filter(self):
         """VCF with a FILTER value not declared in the header should not crash the processor.

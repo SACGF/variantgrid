@@ -6,6 +6,9 @@ each issue carries its own design.
 
 The file-level ingestion analysis is in [`tso500_ingestion_plan.md`](tso500_ingestion_plan.md); the
 test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md).
+Two phases have their own design docs: [`tso500_phase2_plan.md`](tso500_phase2_plan.md) for the loader
+refinements, and [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) for gene
+fusions.
 
 ---
 
@@ -44,10 +47,11 @@ test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upl
   later. A declared `genome_build` that contradicts header detection fails the import rather than picking
   a winner. `VCFSourceSettings` grew a `sample_field_overrides` JSONField (one column, so "clear this
   field" is expressible), and the `^SpliceGirl` row remaps `AD`/`DP` so VAF derives as
-  `ALTDEDUP/(ALTDEDUP+REFDEDUP)`. `write_cleaned_vcf_header` now declares FILTER values the source header
-  omits — necessary because `bcftools norm` *dies* on an undeclared FILTER rather than warning, and
-  because preprocess feeds that header back as `--replace-header`, one declaration fixes both the
-  stripping and norm. Copy-neutral records (`ALT=.` + `END` + no `SVTYPE`) are skipped and counted;
+  `ALTDEDUP/(ALTDEDUP+REFDEDUP)`. FILTER values the source header never declared are moved into
+  `INFO/VG_UNDECLARED_FILTERS` by `vcf_clean_and_filter` and restored by the genotype processor at
+  insert — they can't stay in the FILTER column, because `bcftools norm` *dies* on an undeclared FILTER
+  rather than warning, and dropping them loses real calls. Copy-neutral records
+  (`ALT=.` + `END` + no `SVTYPE`) are skipped and counted;
   `SVTYPE` marks a caller describing an event rather than a segmentation interval, so `_DragenExonCNV.vcf`'s
   per-gene `Undetermined` call survives. Where separate VCF rows share a locus and have their depths
   summed, a `ModifiedImportedVariant` with the new `SHARED_LOCUS` operation records the summed depths so
@@ -345,46 +349,40 @@ and extractions created over the API, the DNA arm's VCFs reaching `Sample.extrac
 link call and a hand-uploaded file reaching it through upload metadata alone — and TMB/MSI/GIS posted
 against that specimen shows on its page.
 
-## Phase 5 — `GeneFusion` and the `AllFusions.csv` parser (#1506, phase 1 only)
+## Phase 5 — gene fusions as variants and the `AllFusions.csv` parser (#1506, phase 1 only)
 
 Independent of Phases 1-4, so this can run in parallel with a second person from Phase 0 onward.
 
+Designed in detail in [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md), which
+is the spec. In short: gene-level events get a real `Variant`, anchored on a gene-level contig shared by
+every build, with the gene pair encoded in a symbolic alt (`<FUSION:HGNC:nnn>`) and a `GeneFusion`
+companion model. A `Variant` rather than the bare `Allele` the issue originally proposed, because
+`VariantGeneOverlap` and `CohortGenotype` are both `Variant`-keyed — without one, fusions cannot reach
+gene lists, compound-het detection or any analysis node. VEP never sees them; a third annotation pipeline
+type resolves HGNC → gene locally and writes the overlap rows.
+
 **Scope it to ingestion, storage and identity. Leave fusion classification equivalence alone.** The
-design on #1506 already does this deliberately: a `GeneFusion` model keyed on a canonical gene pair with
-a one-to-one *bare* `Allele` (no `ClinGenAllele`, no `VariantAllele` — purely a grouping key), plus an
-`ImportedAlleleInfo.gene_fusion` FK that short-circuits HGVS resolution. Because the bare Allele slots
-into the existing infrastructure, `ClinicalContext`, `DiscordanceReport`, the VCF pipeline, annotation
-and ClinGen all need no changes; range queries just exclude `genefusion__isnull=False`.
+user-group feedback on #1506 — "very difficult to implement, needs more thinking and likely more
+resourcing, likely a research level project" — is about **fusion equivalence and discordance**, not about
+ingesting and displaying them. Somatic classifications already land on
+`MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED`, so phase 1 gets that for free and the research-level part
+stays deferred.
 
-This matters for sequencing, because the user-group feedback on #1506 — "very difficult to implement,
-needs more thinking and likely more resourcing, likely a research level project" — is about **fusion
-equivalence and discordance**, not about ingesting and displaying them. Somatic classifications already
-land on `MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED`, so phase 1 gets that for free and the research-level
-part stays deferred. Breakend coordinates (#1506 phase 2) and BND VCF export (phase 3) are also deferred.
+Two things about the test file that the issue's original design assumed otherwise. Every row carries both
+breakpoints (`chr8:128806980` form), so fusions are *not* coordinate-free — what is deferred is the
+breakend representation, not the data, which is captured from day one. And the breakpoints are
+per-observation rather than per-fusion: `ENTPD3-RPL14` appears three times from one caller with three
+different 5′ breakpoints, so identity stays the gene pair and the coordinates live in
+`CohortGenotype.info` alongside the rest of the per-row data.
 
-The parser then needs a fusion import task factory claiming the file — recognisable from the
-`# Source = FusionProcessor` first line and the `Caller,Gene A,Gene B,…` header row — with a processing
-ability above `GeneListImportTaskFactory`'s 1, which would otherwise win and import the fusions as a
-gene list. Real-file properties it has to survive, all present in the test data:
-
-- **Multi-gene partners are routine**, not edge cases — `ROS1;GOPC`, `RP11-458D21.5;NOTCH2NL`. The
-  per-gene annotation columns are correspondingly semicolon-delimited. **Open question:** for a partner
-  that is one HGNC gene plus one clone-based identifier, reject the row or resolve to the HGNC member?
-- **`SEPT14`** (EGFR-SEPT14) — HGNC renamed it `SEPTIN14`, and spreadsheets date-mangle it. A direct test
-  of keying on HGNC ID rather than symbol.
-- **Mixed delimiters** — `PPARG/AC016683.6` uses a slash alongside the `;` and `-` forms.
-- **Direction is reported, not inferred** — `Fusion Directionality Known` plus `Gene A Sense`/`Gene B Sense`
-  populate `is_ordered` from data.
-- **Breakpoint context** — `Gene A Location`/`Gene B Location` carry `IntactExon`/`BrokenExon`/`Intronic`/
-  `Intergenic`. Keep in `source_data`; a later breakend representation wants exactly this and it costs
-  nothing now.
-- **Two callers in one file** (`DRAGEN`, `SpliceGirl`) whose scores and filters the header warns are not
-  comparable — carry caller per row.
-- **Ingest unfiltered.** 1 of 149 rows passed the caller's own filter. Same posture as the CNV and
-  small-variant VCFs: take everything, apply our own thresholds.
+Consequences for the rest of this plan: the fusion file cannot go through the bcftools stages, so the
+loader inserts variants directly; and since a `Sample` belongs to exactly one `VCF`, the file creates its
+own VCF and Sample rather than joining the RNA arm's `SpliceVariants` sample — Phase 4 ties that sample to
+the extraction, Phase 7's grouping node shows both arms together.
 
 **Done when** all 33 rows of the test file import, `EGFR-SEPTIN14` resolves despite the file saying
-`SEPT14`, and the same fusion from both callers resolves to one `GeneFusion`.
+`SEPT14`, the same gene pair from both callers resolves to one `GeneFusion`, and a gene list containing
+`ROS1` finds `CD74-ROS1`.
 
 ## Phase 6 — showing non-variants on the grids (#1558, and #1706's grid half)
 
@@ -401,9 +399,10 @@ decision as `SM` and `CN`, and wants deciding once for all three.
 either way.
 
 Fusions are the genuinely new case, and only exist to display after Phase 5. The single-grid vs
-multiple-grids question is worth deciding on real fusion rows rather than in the abstract — with a
-`GeneFusion`-keyed `Allele` in hand, "sort by gene brings the fusions together" is testable instead of
-hypothetical.
+multiple-grids question is worth deciding on real fusion rows rather than in the abstract — with fusion
+`Variant`s in hand, "sort by gene brings the fusions together" is testable instead of hypothetical. Phase
+5 leaves them grid-ready rather than grid-complete: they carry a gene symbol from their own annotation
+run, so what remains here is the kind filter and the columns that only make sense for a fusion.
 
 #1706's grid half joins here because it is the same kind of change and wants the same pass over the
 column definitions: top-level specimen and extraction grids under the patients menu, an extraction link
@@ -464,7 +463,7 @@ With one person, the order above is the order.
 | Decision | Phase | Why it is cheaper now |
 |---|---|---|
 | Does `G` in `PatientRecord.specimen_mutation_type` mean anything on each deployment? | 3 | Decides whether the migration can map `G` → Unknown and lose nothing |
-| Multi-gene partner with one HGNC and one clone identifier — reject or resolve? | 5 | Determines whether `GeneFusion` identity can be non-null on both sides |
+| Multi-gene partner with one HGNC and one clone identifier — park the row or resolve to the HGNC member? | 5 | Determines whether `GeneFusion` identity can be non-null on both sides |
 | Single grid or multiple grids for non-variants? | 6 | Best answered against real fusion rows, so genuinely wait for Phase 5 |
 
 ## Deferred, deliberately
@@ -473,7 +472,8 @@ With one person, the order above is the order.
   the vendor emits it in a VCF, so it belongs with `abcn_annotated.vcf` below rather than in Phase 4.
 - **Fusion equivalence and discordance** — the research-level part of #1506. Somatic classifications get
   `MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED` today, so nothing regresses by waiting.
-- **Breakend coordinates and BND VCF export** — #1506 phases 2 and 3.
+- **Breakend representation and BND VCF export** — #1506 phases 2 and 3. The breakpoint values themselves
+  arrive in `AllFusions.csv` and Phase 5 stores them, so this is a read-side change when a consumer appears.
 - **`abcn_annotated.vcf` / gene-level LOH** — cannot start until TAU supplies a file; the format is
   undocumented and not usefully mockable.
 - **`_DragenExonCNV.vcf` exact field spelling** — provisional until a run with a real large rearrangement

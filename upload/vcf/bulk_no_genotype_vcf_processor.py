@@ -52,7 +52,7 @@ class BulkNoGenotypeVCFProcessor(BulkGenotypeVCFProcessor):
 
         # Don't need to worry about processing all loci - go straight onto variant lists for insert
         self.variant_hashes.append(alt_hash)
-        self.variant_filters.append(self.convert_filters(variant.FILTER))
+        self.variant_filters.append(self.convert_filters(self._restore_undeclared_filters(variant)))
         self.cohort_genotypes.append(self.EMPTY_COHORT_GT_DATA)
         gnomad_af = variant.INFO.get(settings.VCF_IMPORT_COMMON_FILTER_INFO)
         self.variant_gnomad_af.append(gnomad_af)

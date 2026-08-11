@@ -17,7 +17,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
-from library.genomics.vcf_utils import write_cleaned_vcf_header
+from library.genomics.vcf_enums import UNDECLARED_FILTERS_INFO, VCFColumns
 from snpdb.models import GenomeBuild
 from upload.management.commands.vcf_clean_and_filter import REFERENCE_SPAN_SKIP_REASON
 
@@ -120,9 +120,10 @@ class TestVCFCleanAndFilterSortedCheck(TestCase):
 
 
 @override_settings(ANNOTATION=_fake_annotation_settings())
-class TestUndeclaredFiltersSurviveCleanedHeader(TestCase):
-    """ preprocess writes the cleaned header then feeds it back as --replace-header, so declaring
-        undeclared FILTER values there is what stops vcf_clean_and_filter stripping them """
+class TestUndeclaredFiltersMovedToInfo(TestCase):
+    """ An undeclared FILTER can't stay in the FILTER column - bcftools norm dies on one rather than
+        warning - and dropping it loses real calls. So the record carries it in INFO past norm, and the
+        genotype processor puts it back at insert. """
 
     FILTER_COLUMN = "LowQ;LowUniqueAlignments"
 
@@ -132,41 +133,57 @@ class TestUndeclaredFiltersSurviveCleanedHeader(TestCase):
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         _write_placeholder_fasta(cls.genome_build)
 
-    def _write_source_vcf(self) -> str:
+    def _run(self, filter_column: str, info: str = ".") -> tuple[list[str], dict]:
+        """ Returns (written record columns, undeclared filter counts) """
         vcf_filename = os.path.join(_TEST_DIR, f"{self.id()}.vcf")
         with open(vcf_filename, "w") as f:
             f.write(VCF_HEADER.replace(
                 "#CHROM", '##FILTER=<ID=LowQ,Description="Below the passing threshold.">\n#CHROM'))
-            f.write(f"1\t100000\t.\tT\tA\t0\t{self.FILTER_COLUMN}\t.\n")
-        return vcf_filename
+            f.write(f"1\t100000\t.\tT\tA\t0\t{filter_column}\t{info}\n")
 
-    def _cleaned_header(self, vcf_filename) -> str:
-        header_filename = os.path.join(_TEST_DIR, f"{self.id()}.header.vcf")
-        write_cleaned_vcf_header(self.genome_build, vcf_filename, header_filename)
-        with open(header_filename) as f:
-            return f.read()
-
-    def test_cleaned_header_declares_undeclared_filter(self):
-        header = self._cleaned_header(self._write_source_vcf())
-        self.assertIn('##FILTER=<ID=LowUniqueAlignments,Description="Undeclared in source header">', header)
-        self.assertIn("##FILTER=<ID=LowQ,", header)
-
-    def test_records_keep_their_filters(self):
-        vcf_filename = self._write_source_vcf()
-        header_filename = os.path.join(_TEST_DIR, f"{self.id()}.header.vcf")
-        write_cleaned_vcf_header(self.genome_build, vcf_filename, header_filename)
-        skipped_filters_filename = os.path.join(_TEST_DIR, f"{self.id()}.skipped_filters.txt")
-
+        stats_filename = os.path.join(_TEST_DIR, f"{self.id()}.skipped_filters.txt")
         stdout = StringIO()
         with redirect_stdout(stdout):
             call_command("vcf_clean_and_filter", vcf=vcf_filename, genome_build=self.genome_build.name,
-                         replace_header=header_filename, allow_unsorted=True,
-                         skipped_filters_stats_file=skipped_filters_filename)
+                         allow_unsorted=True, skipped_filters_stats_file=stats_filename)
 
         records = [line for line in stdout.getvalue().splitlines() if not line.startswith("#")]
         self.assertEqual(1, len(records))
-        self.assertEqual(self.FILTER_COLUMN, records[0].split("\t")[6])
-        self.assertFalse(os.path.exists(skipped_filters_filename))
+        skipped = {}
+        if os.path.exists(stats_filename):
+            with open(stats_filename) as f:
+                for line in f:
+                    name, count = line.rstrip("\n").split("\t")
+                    skipped[name] = int(count)
+        return records[0].split("\t"), skipped
+
+    def test_undeclared_filter_moved_to_info(self):
+        columns, skipped = self._run(self.FILTER_COLUMN)
+        self.assertEqual("LowQ", columns[VCFColumns.FILTER], "Declared value stays in FILTER")
+        self.assertEqual(f"{UNDECLARED_FILTERS_INFO}=LowUniqueAlignments", columns[VCFColumns.INFO].strip())
+        self.assertEqual({"LowUniqueAlignments": 1}, skipped, "Still counted for the pipeline page")
+
+    def test_appended_to_existing_info(self):
+        columns, _ = self._run(self.FILTER_COLUMN, info="SVTYPE=DEL;END=200")
+        self.assertEqual(f"SVTYPE=DEL;END=200;{UNDECLARED_FILTERS_INFO}=LowUniqueAlignments",
+                         columns[VCFColumns.INFO].strip())
+
+    def test_filter_column_becomes_missing_when_all_undeclared(self):
+        columns, _ = self._run("LowUniqueAlignments;base_quality")
+        self.assertEqual(".", columns[VCFColumns.FILTER])
+        self.assertEqual(f"{UNDECLARED_FILTERS_INFO}=LowUniqueAlignments|base_quality",
+                         columns[VCFColumns.INFO].strip())
+
+    def test_declared_filters_untouched(self):
+        columns, skipped = self._run("LowQ")
+        self.assertEqual("LowQ", columns[VCFColumns.FILTER])
+        self.assertEqual(".", columns[VCFColumns.INFO].strip(), "No INFO added when nothing was undeclared")
+        self.assertEqual({}, skipped)
+
+    def test_pass_untouched(self):
+        columns, _ = self._run("PASS")
+        self.assertEqual("PASS", columns[VCFColumns.FILTER])
+        self.assertEqual(".", columns[VCFColumns.INFO].strip())
 
 
 @override_settings(ANNOTATION=_fake_annotation_settings())

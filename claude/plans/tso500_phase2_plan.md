@@ -214,30 +214,43 @@ of 17 records and reports `Skipped 15 'LowUniqueAlignments' FILTER`
 (`upload/management/commands/vcf_clean_and_filter.py:133`). That is the filter separating the two
 `PASS` oncology calls from the background — silently deleted, on any caller, not just this one.
 
-Given the bcftools finding above, the fix is to **declare** the values rather than pass them through.
-Two places the declaration can come from:
+Given the bcftools finding above, the value cannot stay in the FILTER column past `bcftools norm`.
+Three places it could go — the third is what was built.
 
-**(a) Scan for them when writing the cleaned header.** `write_cleaned_vcf_header`
-(`library/genomics/vcf_utils.py:256`) already opens the source file and already owns what the cleaned
-header declares. Continue past the header collecting distinct FILTER values, and emit
-`##FILTER=<ID=…,Description="Undeclared in source header">` for each one not already declared. Cap the
-count at the `VCFFilter.ASCII_MIN`–`ASCII_MAX` range the codes have to fit in anyway, so a pathological
-file cannot emit thousands of lines. Cost: preprocess reads the whole file where it currently reads
-only the header, on top of the read the pipe itself does.
+**(a) Scan for them when writing the cleaned header** and emit `##FILTER` lines. Costs a full extra
+read of the file on *every* import, whether or not it needs one — and on a `.gz` that means
+decompressing the whole thing.
 
 **(b) Source-driven declarations** on the same `VCFSourceSettings` row as item 2. Free, but only fixes
 callers someone has configured.
 
-**Recommend (a).** It is the same silent data loss for every caller, the value it currently deletes is
-the one that matters here, and an extra streaming pass is proportionate to a pipeline that already
-reads the file several times.
+**(c) Move the value into an INFO field the pipeline owns, and put it back at insert.** ✔ built.
+`vcf_clean_and_filter` already walks every line and already separates declared from undeclared filters
+(`upload/management/commands/vcf_clean_and_filter.py:144`) — so the discovery costs nothing new. Instead
+of dropping the undeclared values it appends them to `INFO/VG_UNDECLARED_FILTERS`, declared in the
+cleaned header beside the `BCFTOOLS_OLD_VARIANT` and `VG_LIFTOVER_SWAPPED_REF_ALT` lines
+`_write_cleaned_header` already injects — a fixed ID we own, so nothing has to be discovered ahead of
+time. `BulkGenotypeVCFProcessor._restore_undeclared_filters` reads it back and hands it to
+`convert_filters`, whose `_add_undeclared_filter_code` already creates the `VCFFilter` rows.
+
+Why (c) wins: no extra pass, no retry, and no cap on header lines — the ceiling is
+`_add_undeclared_filter_code`'s existing code assignment, which already handles running out. Verified
+against bcftools 1.20 that `norm` copies the INFO onto **both** records of a split multi-allelic and
+preserves it through `--check-ref=s` rewriting `REF=N`, so the many→one mapping from source row to
+inserted variants comes free rather than needing a variant-keyed sidecar.
+
+Two details it needs: INFO is the last column in a VCF with no samples, so it carries the line's
+newline and the value has to be spliced in before it; and the separator is `|`, since the VCF spec
+already bars whitespace and `;` from FILTER IDs while `,` would read as a multi-value INFO. The field
+is popped in `_get_info_json` so our own plumbing doesn't land in `CohortGenotype.info`.
 
 `create_vcf_filters` reads the *original* header at the header stage, so no `VCFFilter` row is created
-for the value there; `_add_undeclared_filter_code` still makes one at insert time with description
+for the value there; `_add_undeclared_filter_code` makes one at insert time with description
 "Undeclared filter". That path already has a test — `test_genotype_processor_undeclared_filter`.
 
-**Tests.** A new one on `write_cleaned_vcf_header`, plus the `call_command` + `redirect_stdout` harness
-in `upload/tests/test_vcf_clean_and_filter.py` for records keeping their filters.
+**Tests.** `TestUndeclaredFiltersMovedToInfo` in `upload/tests/test_vcf_clean_and_filter.py` for the
+move, and `test_undeclared_filters_restored_from_info` in `upload/tests/vcf/test_vcf_processors.py` for
+the restore.
 
 ## 4. Skip copy-neutral `cnv.vcf` rows
 
@@ -304,7 +317,7 @@ All five were settled before implementation and built as below (PR #1712).
 |---|---|---|
 | The metadata key vocabulary | 1 | Per-factory declaration — `ImportTaskFactory.get_metadata_keys()`, empty in the base, `{genome_build, source}` on `GenotypeVCFImportFactory`, the one factory reaching `create_vcf_from_vcf`. The `source` strings are documented in the test-data README but nothing is keyed on them yet, so the contract stays uncommitted until something consumes it |
 | Sample-field overrides: one JSONField, or six nullable columns plus a boolean | 2 | One `sample_field_overrides` JSONField, keys validated in `clean()` against `OVERRIDABLE_SAMPLE_FIELDS` — three of the five SpliceGirl values are clears, and "key present ⇒ set it, including to null" only works if a typo can't silently vanish |
-| Undeclared FILTER: scan when writing the cleaned header, or declare per source | 3 | (a), scan. Same silent data loss on every caller, and one extra sequential read of a file the pipe already reads several times |
+| Undeclared FILTER: scan when writing the cleaned header, or declare per source | 3 | Neither. Review found a third option that costs nothing: `vcf_clean_and_filter` already separates declared from undeclared filters on the pass it already makes, so it moves the undeclared ones into `INFO/VG_UNDECLARED_FILTERS` and the genotype processor restores them at insert. No extra file read, no retry — see item 3 |
 | Should `ALT=. + END` drop `_DragenExonCNV.vcf`'s `Undetermined` BRCA2 row | 4 | Kept — rule narrowed to `ALT=.` + `END` + **no `SVTYPE`**. Verified: all 9 `cnv.vcf` copy-neutral rows carry no `SVTYPE`, the BRCA2 row carries `SVTYPE=CNV`. `SVTYPE` present is the caller declaring a structural-variant call rather than a segmentation interval, which is the distinction the rule draws. gVCF reference blocks are unaffected — they carry `END` with no `SVTYPE`, but their ALT is `<NON_REF>` |
 | Duplicate-position splice records: accept halved VAF, or key symbolic loci on svlen | 2 | Accept the join (1/182). Both affected records are `LowQ` background calls, not the PASS oncology calls, and the locus key is shared with every other VCF's multi-allelic AD summing. Recorded rather than left silent: a `ModifiedImportedVariant` with the new `SHARED_LOCUS` operation and an `operation_detail` column carrying the summed denominator and the record's own ref/alt, so the per-record value stays reconstructable |
 
@@ -320,10 +333,12 @@ moves to Phase 6.
   it. That build is now disabled, so it resolves to GRCh37 here, but `GenomeBuild.enabled` is
   per-deployment DB state — the check stays as a 400. The real fix is clients sending a build's own name
   (`GRCh37`), now documented in the API schema, `import_vcf --genome-build` and the test-data README.
-- **Items 3's two symptoms have one fix.** `vcf_clean_and_filter` already runs with `--replace-header`
-  pointing at the cleaned header, and `_get_defined_vcf_filters` reads exactly that — so declaring in
-  `write_cleaned_vcf_header` stops the stripping *and* satisfies `bcftools norm`, with no change to the
-  command. The plan treats these as separate concerns.
+- **The undeclared FILTER doesn't need declaring at all.** The plan's two options both put a `##FILTER`
+  line in the header, which means knowing the IDs before any record is read — hence a scan. But the
+  value only has to get *past* `bcftools norm`, and `_add_undeclared_filter_code` already handles it at
+  insert. Carrying it in an INFO field the pipeline owns does that with no extra pass: `norm` copies
+  INFO onto both records of a split multi-allelic and preserves it through `--check-ref=s`, so the
+  source-row → inserted-variant mapping comes free.
 - **`old_multiallelic` could not carry the shared-locus explanation.**
   `get_other_loci_variants_by_multiallelic` excludes same-locus variants ("split into separate loci"),
   which is the opposite of this case — hence the dedicated `operation_detail` column.
