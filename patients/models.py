@@ -62,7 +62,7 @@ class ExternalModelManager(TimeStampedModel):
         return name
 
 
-class ExternalPK(models.Model, PreviewModelMixin):
+class ExternalPK(TimeStampedModel, PreviewModelMixin):
     code = models.TextField()
     external_type = models.TextField()
     external_manager = models.ForeignKey(ExternalModelManager, on_delete=CASCADE)
@@ -215,6 +215,10 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return self.specimen_set.count()
 
     @property
+    def num_extractions(self):
+        return Extraction.objects.filter(specimen__patient=self).count()
+
+    @property
     def age(self):
         """ You may actually want to use Specimen.age_at_collection_date rather than this """
         return calculate_age(self.date_of_birth, self.date_of_death)
@@ -289,14 +293,14 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return reverse('patients')
 
 
-class PatientPopulation(models.Model):
+class PatientPopulation(TimeStampedModel):
     """ Can have many-to-one - e.g. Obama would have an entry for
         both AFRICAN_AFRICAN_AMERICAN and NON_FINNISH_EUROPEAN """
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
     population = models.CharField(max_length=3, choices=PopulationGroup.choices)
 
 
-class Tissue(models.Model):
+class Tissue(TimeStampedModel):
     name = models.TextField()
     description = models.TextField()
 
@@ -362,15 +366,18 @@ class Extraction(ExternallyManagedModel):
         points here rather than the other way around """
     specimen = models.ForeignKey(Specimen, on_delete=CASCADE)
     nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.choices, default=NucleicAcid.DNA, null=True, blank=True)
+    extraction_date = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         s = str(self.specimen)
         if self.nucleic_acid_source:
             s += f" ({self.get_nucleic_acid_source_display()})"
+        if self.extraction_date:
+            s += f" {self.extraction_date.strftime(settings.DATE_FORMAT)}"
         return s
 
 
-class PatientAttachment(models.Model):
+class PatientAttachment(TimeStampedModel):
     UPLOAD_PATH = 'patient_attachments'
 
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
@@ -418,13 +425,13 @@ class PatientRecordOriginType:
     )
 
 
-class PatientImport(models.Model):
+class PatientImport(TimeStampedModel):
     """ All the modifications hang off this. We don't want this to get deleted so modifications stay there
         Even after reload patient import """
     name = models.TextField()
 
 
-class PatientModification(models.Model):
+class PatientModification(TimeStampedModel):
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     date = models.DateTimeField(auto_now_add=True)
@@ -441,7 +448,7 @@ class PatientModification(models.Model):
                 pass
         return url
 
-class PatientComment(models.Model):
+class PatientComment(TimeStampedModel):
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
     comment = models.TextField()
     patient_modification = models.ForeignKey(PatientModification, on_delete=CASCADE)
@@ -521,7 +528,7 @@ class PatientColumns:
     }
 
 
-class Clinician(models.Model):
+class Clinician(TimeStampedModel):
     email = models.TextField(null=True, blank=True)
     title = models.CharField(max_length=1, choices=Title.CHOICES, null=True, blank=True)
     first_name = models.TextField(null=True, blank=True)
@@ -581,7 +588,7 @@ class Clinician(models.Model):
 # CSV imports
 
 
-class PatientRecords(models.Model):
+class PatientRecords(TimeStampedModel):
     patient_import = models.OneToOneField(PatientImport, on_delete=CASCADE)
 
     def can_view(self, user) -> bool:
@@ -610,7 +617,7 @@ class PatientRecords(models.Model):
         return reverse('view_patient_import', kwargs={"patient_records_id": self.pk})
 
 
-class PatientRecord(models.Model):
+class PatientRecord(TimeStampedModel):
     """ Record created from Uploaded Patient Records
         will be processed into Sample/Patients/Specimens etc. """
     patient_records = models.ForeignKey(PatientRecords, on_delete=CASCADE)
@@ -668,7 +675,7 @@ def patient_attachment_post_save(sender, instance, created, **kwargs):  # pylint
         instance.save()
 
 
-class FollowLeadScientist(models.Model):
+class FollowLeadScientist(TimeStampedModel):
     follow = models.ForeignKey(User, related_name='followed', on_delete=CASCADE)
     user = models.ForeignKey(User, related_name='following', on_delete=CASCADE)
 

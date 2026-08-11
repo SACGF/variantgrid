@@ -58,6 +58,7 @@ class Test(URLTestCase):
             ('view_patient', patient_kwargs, 200),
             # ('view_patient_contact_tab', patient_kwargs, 200),
             ('view_patient_specimens', patient_kwargs, 200),
+            ('view_patient_extractions', patient_kwargs, 200),
             ('view_patient_genes', patient_kwargs, 200),
             ('view_patient_modifications', patient_kwargs, 200),
             ('view_patient_import', {"patient_records_id": patient_records.pk}, 200),

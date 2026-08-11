@@ -130,11 +130,19 @@ PatientSpecimenFormSet = inlineformset_factory(Patient,
                                                         'received_date': TextInput(attrs={'class': 'date-picker'})},
                                                extra=1)
 
-# Not an inline formset as Extraction hangs off Specimen - the view restricts it to one patient
-PatientExtractionFormSet = modelformset_factory(Extraction,
-                                                can_delete=True,
-                                                fields=['specimen', 'nucleic_acid_source'],
-                                                extra=1)
+def patient_extraction_formset_factory(patient):
+    """ Not an inline formset as Extraction hangs off Specimen rather than Patient, so the patient is
+        forwarded as a constant to narrow the specimen autocomplete. The view sets the queryset,
+        which is what actually restricts what can be saved """
+    specimen_widget = ModelSelect2(url='specimen_autocomplete',
+                                   forward=(forward.Const(patient.pk, 'patient'),),
+                                   attrs={'data-placeholder': 'Specimen...'})
+    return modelformset_factory(Extraction,
+                                can_delete=True,
+                                fields=['specimen', 'nucleic_acid_source', 'extraction_date'],
+                                widgets={'specimen': specimen_widget,
+                                         'extraction_date': TextInput(attrs={'class': 'date-picker'})},
+                                extra=1)
 
 
 def external_pk_autocomplete_form_factory(external_type):

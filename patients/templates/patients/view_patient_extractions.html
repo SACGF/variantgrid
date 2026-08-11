@@ -1,30 +1,30 @@
 {% load crispy_forms_tags %}
 {% load ui_help %}
 {% load ui_utils %}
-<div id="patient-specimens">
-    {% page_help 'patients/view_patient_help2' 'Specimens Help' %}
+<div id="patient-extractions">
+    {% page_help 'patients/view_patient_extractions_help' 'Extractions Help' %}
     <script type="text/javascript">
-        var targetParent = $("#patient-specimens").parent();
-    
+        var targetParent = $("#patient-extractions").parent();
+
         $(document).ready(function() {
             {% update_django_messages %}
             var options = {
                 target: targetParent,
             };
-            $('form#patient-specimens-form').ajaxForm(options); 
+            $('form#patient-extractions-form').ajaxForm(options);
             $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
-    
-            var title = "Specimens";
-            {% if num_specimens %}
-            title += " ({{ num_specimens }})"
+
+            var title = "Extractions";
+            {% if num_extractions %}
+            title += " ({{ num_extractions }})"
             {% endif %}
-            $("#specimens-tab-link").html(title);
+            $("#extractions-tab-link").html(title);
         });
     </script>
     <div class="container">
-        <form id="patient-specimens-form" method="post" action="{% url 'view_patient_specimens' patient.pk %}">
+        <form id="patient-extractions-form" method="post" action="{% url 'view_patient_extractions' patient.pk %}">
             {% csrf_token %}
-            {% crispy specimen_formset form_helper.horizontal %}
+            {% crispy extraction_formset form_helper.horizontal %}
             <table>
             {% if has_write_permission %}
             <td><button id='save-button' class="btn btn-primary">Save</button></td>

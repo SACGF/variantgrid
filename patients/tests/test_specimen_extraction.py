@@ -2,6 +2,7 @@
 Specimen -> Extraction -> Sample (#1704)
 """
 import os
+from datetime import datetime
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -77,6 +78,23 @@ class TestSpecimenExtraction(TestCase):
         """ A specimen with both arms must not have one of them repurposed """
         self.assertEqual(self.specimen.get_or_create_extraction(NucleicAcid.RNA), self.rna)
         self.assertEqual(self.specimen.extraction_set.count(), 2)
+
+    def test_extraction_date_distinguishes_a_re_extraction(self):
+        """ Two DNA extractions off one specimen are told apart by when they were taken """
+        redo = Extraction.objects.create(specimen=self.specimen, nucleic_acid_source=NucleicAcid.DNA,
+                                         extraction_date=timezone.make_aware(datetime(2026, 3, 14)))
+        self.dna.extraction_date = timezone.make_aware(datetime(2026, 1, 20))
+        self.dna.save()
+
+        self.assertNotEqual(str(redo), str(self.dna))
+        dna_qs = self.specimen.extraction_set.filter(nucleic_acid_source=NucleicAcid.DNA)
+        self.assertEqual(list(dna_qs.order_by("-extraction_date")), [redo, self.dna])
+
+    def test_timestamps_recorded(self):
+        """ Everything in patients is a TimeStampedModel """
+        for obj in (self.patient, self.specimen, self.dna):
+            self.assertIsNotNone(obj.created, f"{type(obj).__name__} has no created")
+            self.assertIsNotNone(obj.modified, f"{type(obj).__name__} has no modified")
 
 
 class TestPatientCSVExtractionRoundTrip(TestCase):
