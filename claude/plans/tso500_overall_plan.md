@@ -34,6 +34,25 @@ test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upl
   extraction per specimen, and the patient page gained an Extractions tab. Everything in `patients` is now
   a `TimeStampedModel`, and `Extraction.extraction_date` tells re-extractions apart.
 
+- **Phase 2 — per-file loader refinements** (PR #1712, branch
+  `issue_1711_tso500_phase2_loader_refinements`, issue #1711). All four items, designed in
+  [`tso500_phase2_plan.md`](tso500_phase2_plan.md):
+
+  `FileUpload.metadata` is a JSON blob carrying the facts a file doesn't reliably hold itself, with each
+  `ImportTaskFactory` declaring the keys it accepts and validation running at upload time — so a mistyped
+  key is a 400 while the client is still connected rather than a `REQUIRES_USER_INPUT` several stages
+  later. A declared `genome_build` that contradicts header detection fails the import rather than picking
+  a winner. `VCFSourceSettings` grew a `sample_field_overrides` JSONField (one column, so "clear this
+  field" is expressible), and the `^SpliceGirl` row remaps `AD`/`DP` so VAF derives as
+  `ALTDEDUP/(ALTDEDUP+REFDEDUP)`. `write_cleaned_vcf_header` now declares FILTER values the source header
+  omits — necessary because `bcftools norm` *dies* on an undeclared FILTER rather than warning, and
+  because preprocess feeds that header back as `--replace-header`, one declaration fixes both the
+  stripping and norm. Copy-neutral records (`ALT=.` + `END` + no `SVTYPE`) are skipped and counted;
+  `SVTYPE` marks a caller describing an event rather than a segmentation interval, so `_DragenExonCNV.vcf`'s
+  per-gene `Undetermined` call survives. Where separate VCF rows share a locus and have their depths
+  summed, a `ModifiedImportedVariant` with the new `SHARED_LOCUS` operation records the summed depths so
+  the per-record VAF stays reconstructable.
+
 ## Where things stand
 
 The five test files from `ed5e15a33` — one de-identified run, one specimen, DNA and RNA arms:
@@ -41,15 +60,15 @@ The five test files from `ed5e15a33` — one de-identified run, one specimen, DN
 | File | State |
 |---|---|
 | `hard-filtered.vcf` | loads, 93 records |
-| `cnv.vcf` | loads, 25 records — copy-neutral rows and `SM` are Phase 2 refinements |
-| `SpliceVariants.vcf` | loads, 17 records — `AD`/`DP` mapping and the dropped filter are Phase 2 |
-| `_DragenExonCNV.vcf` | reaches the importer after Phase 0; still needs an explicit genome build (Phase 2) |
+| `cnv.vcf` | loads, 16 records — 9 copy-neutral rows skipped and counted; `SM` surfacing is Phase 6 |
+| `SpliceVariants.vcf` | loads, 17 records — VAF derived from `ALTDEDUP`/`REFDEDUP`, `LowUniqueAlignments` preserved |
+| `_DragenExonCNV.vcf` | loads, 2 records, against a `genome_build` declared at upload |
 | `AllFusions.csv` | no longer breaks file-type detection; needs a parser and somewhere to put the rows (Phase 5) |
 
 ## Dependency map
 
 ```
-  Phase 0  pipeline fixes ✔ ──► P2  loader refinements   (no model deps — anyone, any time)
+  Phase 0  pipeline fixes ✔ ──► Phase 2  loader refinements ✔
            chase TAU files ─────────────────────────────────────────┐
                                                                     │
   Phase 1  #1704 Specimen→Extraction ✔                              │
@@ -95,42 +114,18 @@ Long lead time, so worth pushing now:
 The patient CSV columns are all `SPECIMEN_*`, so a CSV can name one extraction per specimen but not the
 DNA and RNA arms of one block. Worth revisiting when a consumer needs it.
 
-## Phase 2 — per-file loader refinements
+## Still open from Phase 2
 
-Make each file import with the right values in it. Nothing here depends on Phase 1, or on anything else
-in this plan — four independent items, each testable against one test file. It could have gone in
-Phase 0 and it can be picked up by anyone at any point, which is why it is separated from the linkage
-work that used to share this phase (now Phase 4).
+`AllFusions.csv` still has no parser — that is Phase 5. The manual checklist on #1711 wants running
+against a real GRCh37 deployment: PR #1712 measured the record counts and VAFs through
+`write_cleaned_vcf_header` → `vcf_clean_and_filter` → `bcftools norm`, not through a full import with
+annotation.
 
-Designed in detail in [`tso500_phase2_plan.md`](tso500_phase2_plan.md), which is the spec.
-
-- **Upload metadata — genome build and source.** `_DragenExonCNV.vcf` has no `##contig` lines and only
-  `##reference=file:resource_bundle/hg19_decoy/`, so `vcf_detect_genome_build_from_header` finds nothing
-  and `upload/tasks/vcf/genotype_vcf_tasks.py:63` sets `REQUIRES_USER_INPUT` and stops; `cnv.vcf` and
-  `hard-filtered.vcf` declare no `##source`, so nothing keyed on the caller can reach them. Whatever
-  submits the file knows both, so let it say so explicitly instead of relying on header detection.
-  A `FileUpload.metadata` JSON blob, validated at upload time.
-- **`VCFSourceSettings` mapping for SpliceGirl.** The `##source` line (`SpliceGirl 1.0.0.614`) is already
-  the hook. In this file `AD` is `Number=1` splice-supporting reads and `DP` is *reference* reads, so
-  binding them by name silently gives empty allele depth, missing VAF, and a read-depth column showing
-  reference counts. Derive VAF from `ALTDEDUP`/`REFDEDUP`.
-- **Preserve `LowUniqueAlignments`.** The splice header declares `LowQ` only, so `vcf_clean_and_filter`
-  strips the undeclared code from 15 of 17 records — and that is the filter separating the two `PASS`
-  oncology calls from the background. The genotype processor already copes via `_add_undeclared_filter_code`,
-  so the fix is letting undeclared values through the header stage.
-- **Skip copy-neutral `cnv.vcf` rows.** `ALT=.` is 406 of 500 in a real run; they carry no call and
-  currently import as reference variants with the segment span discarded.
-Resolving `cnv.vcf`'s `SEGID` gene symbols through `GeneSymbol` was a fifth item here, and has moved to
-Phase 6: `CohortGenotype.info` is a `JSONField`, so nothing is lost at import, and whether to resolve
-aliases at read time or into a queryable column is the same question `SM` and `CN` pose there.
-
-None of these have their own issue — they came out of running the test data through the real pipe stages,
-and sapath#431 is the only thing above them. Worth raising individually if they are going to be picked up
-by different people.
-
-**Done when** all five test files import with the right values: splice VAF derived from
-`ALTDEDUP`/`REFDEDUP`, `LowUniqueAlignments` surviving to the grid, no copy-neutral rows inserted, and
-`_DragenExonCNV.vcf` landing against a declared build.
+The `source` strings a client sends (`DRAGEN TSO500 SmallVariant`, `DRAGEN TSO500 CNV`) are documented
+in [`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md) but nothing is keyed
+on them yet — the SpliceGirl mapping comes off the header and the copy-neutral skip is a general rule.
+They become part of VG's configuration contract the moment a `VCFSourceSettings.source_regex` matches
+one, so they want to stay stable from the first client.
 
 ## Phase 3 — finish the specimen model, and give it somewhere to show (private#2447, #1706)
 
@@ -457,10 +452,10 @@ With two people: one takes Phase 3 → 4 (the model spine, now that Phase 1 has 
 Phase 5 (fusions), and they meet at Phase 6. Phase 5 touches `classification` and `upload`; Phases 3-4
 touch `patients`, `snpdb` and `seqauto`, so the conflict surface is small.
 
-Two things split off cleanly on top of that. Phase 2 is four independent file-correctness fixes, so it
-can go to whoever, whenever — including before Phase 3. Phase 3's #1706 half is
-views and templates only. Two ordering constraints across the lot: #2447's field change lands before
-#1707 serializes it, and Phase 4's route 2 is a key in the `FileUpload.metadata` blob Phase 2 builds.
+Phase 3's #1706 half is views and templates only, so it splits off cleanly on top of that. One ordering
+constraint remains across the lot: #2447's field change lands before #1707 serializes it. Phase 4's
+route 2 is unblocked either way — the `FileUpload.metadata` blob it hangs an `extraction` key off
+already exists, along with the per-file-type key declaration and upload-time validation it needs.
 
 With one person, the order above is the order.
 

@@ -296,20 +296,43 @@ is the assumption the item rests on.
 
 ---
 
-## Decisions to settle before starting
+## Decisions — as settled
 
-| Decision | Item | Why now |
+All five were settled before implementation and built as below (PR #1712).
+
+| Decision | Item | Settled as |
 |---|---|---|
-| The metadata key vocabulary — which keys each file type accepts, and the agreed `source` strings | 1 | The `source` values become part of VG's config contract, so they want to be stable from the first client |
-| Sample-field overrides: one JSONField, or six nullable columns plus a boolean | 2 | It is the migration; changing it later is a second one |
-| Undeclared FILTER: scan when writing the cleaned header, or declare per source | 3 | (a) costs a file read on every import; (b) leaves un-configured callers broken |
-| Should `ALT=. + END` drop `_DragenExonCNV.vcf`'s `Undetermined` BRCA2 row | 4 | Decides whether the rule needs a filter-aware exception |
-| Duplicate-position splice records: accept halved VAF, or key symbolic loci on svlen | 2 | The second touches multi-allelic behaviour shared with every other VCF |
+| The metadata key vocabulary | 1 | Per-factory declaration — `ImportTaskFactory.get_metadata_keys()`, empty in the base, `{genome_build, source}` on `GenotypeVCFImportFactory`, the one factory reaching `create_vcf_from_vcf`. The `source` strings are documented in the test-data README but nothing is keyed on them yet, so the contract stays uncommitted until something consumes it |
+| Sample-field overrides: one JSONField, or six nullable columns plus a boolean | 2 | One `sample_field_overrides` JSONField, keys validated in `clean()` against `OVERRIDABLE_SAMPLE_FIELDS` — three of the five SpliceGirl values are clears, and "key present ⇒ set it, including to null" only works if a typo can't silently vanish |
+| Undeclared FILTER: scan when writing the cleaned header, or declare per source | 3 | (a), scan. Same silent data loss on every caller, and one extra sequential read of a file the pipe already reads several times |
+| Should `ALT=. + END` drop `_DragenExonCNV.vcf`'s `Undetermined` BRCA2 row | 4 | Kept — rule narrowed to `ALT=.` + `END` + **no `SVTYPE`**. Verified: all 9 `cnv.vcf` copy-neutral rows carry no `SVTYPE`, the BRCA2 row carries `SVTYPE=CNV`. `SVTYPE` present is the caller declaring a structural-variant call rather than a segmentation interval, which is the distinction the rule draws. gVCF reference blocks are unaffected — they carry `END` with no `SVTYPE`, but their ALT is `<NON_REF>` |
+| Duplicate-position splice records: accept halved VAF, or key symbolic loci on svlen | 2 | Accept the join (1/182). Both affected records are `LowQ` background calls, not the PASS oncology calls, and the locus key is shared with every other VCF's multi-allelic AD summing. Recorded rather than left silent: a `ModifiedImportedVariant` with the new `SHARED_LOCUS` operation and an `operation_detail` column carrying the summed denominator and the record's own ref/alt, so the per-record value stays reconstructable |
 
 Settled during planning, recorded so they aren't relitigated: metadata is passed at upload rather than
 read off seqauto objects; it is a JSON blob rather than typed columns on `FileUpload`; the sample-field
 mapping lives in `VCFSourceSettings` rather than in the upload payload or a third hardcode; item 5
 moves to Phase 6.
+
+## What the build found that this plan didn't
+
+- **`hg19` is ambiguous by more than the plan says.** `GenomeBuild.get_name_or_alias("hg19")` raised
+  `MultipleObjectsReturned`, not `DoesNotExist`, so "reject a build that will not resolve" didn't cover
+  it. That build is now disabled, so it resolves to GRCh37 here, but `GenomeBuild.enabled` is
+  per-deployment DB state — the check stays as a 400. The real fix is clients sending a build's own name
+  (`GRCh37`), now documented in the API schema, `import_vcf --genome-build` and the test-data README.
+- **Items 3's two symptoms have one fix.** `vcf_clean_and_filter` already runs with `--replace-header`
+  pointing at the cleaned header, and `_get_defined_vcf_filters` reads exactly that — so declaring in
+  `write_cleaned_vcf_header` stops the stripping *and* satisfies `bcftools norm`, with no change to the
+  command. The plan treats these as separate concerns.
+- **`old_multiallelic` could not carry the shared-locus explanation.**
+  `get_other_loci_variants_by_multiallelic` excludes same-locus variants ("split into separate loci"),
+  which is the opposite of this case — hence the dedicated `operation_detail` column.
+- **`create_vcf_from_vcf` never saved the VCF** despite its "Save header ASAP if case something goes
+  wrong" comment; the first save was inside `configure_vcf_from_header`. Added, so a build-mismatch
+  failure keeps the header.
+- **#1711's checklist said `cnv.vcf` keeps 15 `<DUP>`/`<DEL>` rows — it is 16** (8 + 8), and it
+  contradicted its own "16 records" line, since 25 − 9 = 16 makes every survivor symbolic. Issue
+  corrected.
 
 ## Order of work
 
@@ -331,13 +354,18 @@ issue of their own, so raise them individually if they are going to different pe
 
 All five test files import with the right values in them:
 
-| File | Expected after Phase 2 |
-|---|---|
-| `hard-filtered.vcf` | unchanged — 93 records |
-| `cnv.vcf` | 16 records; the 9 copy-neutral rows skipped and counted on the pipeline page |
-| `SpliceVariants.vcf` | 17 records, VAF = `ALTDEDUP/(ALTDEDUP+REFDEDUP)`, `LowUniqueAlignments` on the 15 background calls and visible on the grid |
-| `_DragenExonCNV.vcf` | imports against a declared GRCh37, no `REQUIRES_USER_INPUT` |
-| `AllFusions.csv` | unchanged — Phase 5 |
+| File | Expected after Phase 2 | Measured |
+|---|---|---|
+| `hard-filtered.vcf` | unchanged — 93 records | 93 → 93 ✔ |
+| `cnv.vcf` | 16 records; the 9 copy-neutral rows skipped and counted on the pipeline page | 25 → 16, 9 skipped ✔ |
+| `SpliceVariants.vcf` | 17 records, VAF = `ALTDEDUP/(ALTDEDUP+REFDEDUP)`, `LowUniqueAlignments` on the 15 background calls and visible on the grid | 17 → 17, 15 `LowQ;LowUniqueAlignments` + 2 `PASS` ✔ |
+| `_DragenExonCNV.vcf` | imports against a declared GRCh37, no `REQUIRES_USER_INPUT` | 2 → 2 against a declared build ✔ |
+| `AllFusions.csv` | unchanged — Phase 5 | unchanged ✔ |
 
-Verify with `python3 manage.py import_vcf --name <n> --user <u> --genome-build GRCh37 <file>` against a
-GRCh37 dev database, which exercises the real pipe stages rather than a mock.
+Splice VAFs: `chr7:55087058` (EGFRvIII) 64/65 = 0.985, `chr7:116411708` (MET exon 14) 91/92 = 0.989,
+`chr1:120464432` 1/81 = 0.012, `chr2:47637511` 1/182 = 0.0055 for both records at the shared locus.
+
+Measured by driving `write_cleaned_vcf_header` → `vcf_clean_and_filter` → `bcftools norm` against a
+GRCh37 database. Still worth running
+`python3 manage.py import_vcf --name <n> --user <u> --genome-build GRCh37 <file>` end to end, which
+adds the insert and annotation stages these numbers don't cover.
