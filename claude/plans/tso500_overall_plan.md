@@ -59,7 +59,7 @@ The five test files from `ed5e15a33` — one de-identified run, one specimen, DN
   P3  private#2447 tissue status         │                          │
       #1706 pages, search, preview       │                          │
       │              │                   │                          │
-  P4  seqauto text ──┤                   │                          │
+  P4  seqauto link ──┤                   │                          │
       #1707 patient API ──► matching ──► #1559 measures ◄───────────┘
       │              │                   │
       │              │              P7  private#223 grouping node
@@ -183,12 +183,11 @@ Beyond #2447's migration this half is views and templates, so it parallelises wi
 **Done when** a specimen has its own page reachable from search and from the patient, and `tissue_status`
 has replaced `mutation_type` everywhere including the CSV.
 
-## Phase 4 — how identifiers cross the lab boundary (seqauto linkage, #1707, #1559)
+## Phase 4 — how identifiers cross the lab boundary (#1707, seqauto link, #1559)
 
-One subject in four steps: getting the lab's specimen and extraction identifiers into VG, turning them
-into objects, reconciling the two, and then hanging measures off the result. The sample-sheet half used to
-sit in Phase 2, but it is the same boundary and the same client as #1707, and it reads as one design only
-when the two are together.
+One subject in four steps: creating the lab's patients, specimens and extractions in VG, giving an upload
+a way to name the extraction it belongs to, absorbing the two arriving in either order, and then hanging
+measures off the result.
 
 #431's decision governs the whole phase: **upload the files separately and join later**, not concatenate
 before import. So this is assignment, not a new bulk-import path. Concatenating destroys per-caller
@@ -196,27 +195,15 @@ cutoffs (which sapath#301 requires), the FORMAT fields across the DRAGEN outputs
 is lossy, DNA and RNA are different libraries so a shared sample column makes VAF/depth meaningless, and
 fusions are not VCF at all.
 
+There is no run loader to build, either. Upload is strictly per-file and has no directory concept, while
+seqauto already models runs, sample sheets and backend VCFs — and the client posts those before it posts a
+file. Everything below is assignment on top of the per-file upload that exists.
+
 Raise the client-side issue in `SACGF/variantgrid_api` once the phase lands.
 
-### The sample sheet — carry `Specimen`/`Extraction` as text beside the FKs
-
-Phase 1 added `SequencingSample.extraction`, but `SequencingSampleSerializer`
-(`seqauto/serializers/sequencing_serializers.py:232`) does not list the field, so the FK is unreachable
-from the lab client that posts sample sheets — the only ways to set an extraction today are the sample
-form, the patient CSV and the admin.
-
-**Settled**: `SequencingSample` grows plain-text specimen and extraction reference columns alongside the
-model FKs. The client sends the text, and the API stores whatever it was sent — the payload is always
-accepted. Where a `Specimen`/`Extraction` already exists the serializer links it; where one does not, the
-text is kept and the FK stays null. The lab client owns the identifiers, VG owns the objects, and a run
-posts successfully whether or not the tracking system got there first. This is the shape `PatientRecord`
-already uses (`patients/models.py:635`) — raw columns from the file beside the matched FK.
-
-Because nothing is created, this step needs no `Patient`, which is what would otherwise have blocked it:
-`Specimen.patient` is non-null and nothing in the seqauto payload names a patient. That gap is the next
-step's job.
-
 ### #1707 — patient / specimen / extraction API
+
+First, because everything after it quotes the identifiers this creates.
 
 `patients` has no serializers at all today; every route into a `Specimen` is a human one (the sample form,
 the patient CSV, the admin). The API creates `Patient`, `Specimen` and `Extraction` keyed on the tracking
@@ -225,20 +212,109 @@ client that, unlike seqauto, does know the patient.
 
 Do this after Phase 3's `tissue_status` change, so the API ships the field it is keeping.
 
-### Reconciling the two — the matching pass
+### Two ways for a VCF to name its extraction
 
-With both halves in, the pass has real objects to match against rather than hypothetical ones: stored
-sample-sheet text against specimens and extractions that arrived afterwards, on the R5 external
-identifiers where the tracking system supplies them.
+By the time a file arrives the client has already made its seqauto calls (sequencing run, sample sheet,
+backend VCFs) and the patient calls above. The file carries a `path`, and on a seqauto deployment that
+path is what ties it to the sequencing side: `create_backend_vcf_links` (`upload/vcf/vcf_import.py:409`)
+resolves it to a `BackendVCF`, then `link_samples_and_vcfs_to_sequencing` (`:436`) walks that to the
+sample sheet and prefix-matches VCF sample names against `SequencingSample` rows
+(`get_samples_by_sequencing_sample`, `seqauto/models/models_seqauto.py:1008`), creating
+`SampleFromSequencingSample`. So `Sample` ↔ `SequencingSample` already links itself, and the only thing
+missing on that path is which extraction the `SequencingSample` is.
 
-Where it does not, fall back to parsing the sample name — `2600000001` is the specimen and the trailing
-`C`/`B` name the DNA and RNA extractions. A fallback, not the mechanism: it is the only option for
-deployments with no tracking system, and it is guesswork everywhere else.
+**Route 1 — link the `SequencingSample` to the `Extraction`, once per sequencing sample.** Phase 1 added
+`SequencingSample.extraction` and nothing sets it from the API. A small link endpoint does, taking the
+lookup shape `SequencingSampleLookupSerializer` already defines
+(`seqauto/serializers/sequencing_serializers.py:206` — sequencing run, sheet hash, sample name) plus the
+extraction identifier. `link_samples_and_vcfs_to_sequencing` then carries it down to `Sample.extraction`
+beside the `SampleFromSequencingSample` it already creates, so all three of one arm's VCFs inherit the
+extraction from that single call.
 
-**Decide before starting:** whether anything beyond this is needed to get a run's files loaded. Upload is
-strictly per-file today and has no directory concept; seqauto already models runs, sample sheets and file
-discovery. If the client posts the linkage and the files go through normal upload, there is no run loader
-to site — which is the answer this phase is built around, so it is worth confirming rather than assuming.
+Its own endpoint rather than fields on `SampleSheetSerializer`: most sample sheets have no specimen or
+extraction to name, and most samples that have an extraction never had a sample sheet, so the two belong
+on separate calls. A re-sent sheet builds fresh `SequencingSample` rows (`_create_sequencing_samples`,
+`seqauto/serializers/sequencing_serializers.py:250`), so carry an existing extraction across from the
+previous current sheet's row with the same `sample_id` rather than making the client re-link.
+
+**Route 2 — an `extraction` key in `FileUpload.metadata`.** Phase 2 built the blob and the per-file-type
+key vocabulary, so this is one more key, and it sets `Sample.extraction` with no seqauto records involved
+at all — which is what a deployment not running seqauto has, and what a hand-uploaded file has anywhere.
+A single-sample VCF takes a bare reference; a multi-sample VCF takes a map keyed on VCF sample name.
+
+Route 1 saves repeating the reference on every file wherever a sample sheet exists; route 2 is the general
+mechanism and the only one available off the seqauto path. Where a file has both and they disagree, fail
+the import — the same rule Phase 2 applies to a declared `genome_build` the header contradicts.
+
+Validate the key's *shape* at upload time and resolve the reference at import. Phase 2 validates
+`genome_build` while the client is still connected precisely so that a typo is a 400; existence-checking
+an extraction there would instead reject the ordering race the next section exists to absorb.
+
+### Resolving the identifier — one helper for all three models
+
+The link call, the metadata key and #1707's own payloads all quote the same kind of identifier, and
+`Patient`, `Specimen` and `Extraction` are all `ExternallyManagedModel`, so this wants writing once.
+
+An externally managed object is found by its `ExternalPK` (`patients/models.py:65`), which is unique on
+`(code, external_type, external_manager)`; one that is not falls back to the local reference Phase 1 put
+beside it — `Extraction.reference_id`, `Specimen.reference_id`, `Patient.patient_code`. The resolver
+builds its query from whichever of those the caller supplied, rather than insisting on one canonical form:
+an external manager and code, an `external_type`, a local reference, or any combination. Each narrows the
+query where present and is left out where not.
+
+Nothing needs pinning to a VG-side vocabulary. `external_pk` is a OneToOne *from* each model, so
+`Extraction.objects.filter(external_pk__code=...)` can only return extractions — the model being queried
+already scopes the lookup, and `external_type` is just one more optional narrowing. The only per-model
+knowledge the helper needs is which field holds the local reference, since `Patient` calls it
+`patient_code`.
+
+Given both, they narrow to one object and the payload is simply better identified. Given one, it resolves
+on that alone. Where the two resolve to *different* objects, that is ambiguity rather than precedence, so
+it parks as Needs attention along with everything else the pass cannot settle.
+
+`reference_id` is unique per parent, not globally (`("specimen", "reference_id")`, `("patient",
+"reference_id")`), so a bare local reference can legitimately match more than one row. That falls out the
+same way — resolve, and park anything ambiguous for a human rather than guessing or making the client send
+the whole parent chain. In practice a TSO 500 reference like `2600000001C` already carries its specimen.
+
+Payload shape: a bare string is the code, and an object `{code, external_manager}` disambiguates where a
+deployment needs it. The metadata blob is JSON either way, so a multi-sample VCF's per-sample map nests
+whichever of the two shapes it needs.
+
+**Keep it on the API rather than the sample-sheet signal.** The SA Pathology app hooks
+`sequencing_run_sample_sheet_created_signal` (`seqauto/models/models_seqauto.py:248`) to assign patients
+from HelixIDs in the sheet, and the same hook could reach extractions. Leave it where it is: it only fires
+where seqauto runs, it is per-deployment glue rather than anything an API contract can state, and route 2
+has to exist regardless.
+
+### Reconciling what arrives out of order — Mocha's pattern
+
+Mocha hit this and the answer is worth copying wholesale (SACGF/mocha#126, commits `ed1d0df`, `982022e`):
+independent feeds that legitimately arrive in any order, and callers who should never have to re-send.
+What it does:
+
+- **Nullable FK, with `match_status` (Matched / Pending / Needs attention) and a human-readable
+  `match_error` on the same row.** A row that cannot resolve yet is parked rather than rejected.
+- **Reject only what can never resolve** — no anchor record for the identifiers at all — with a 400.
+  Everything else is a 202 carrying the reason, so the caller knows it is pending rather than failed.
+- **Key idempotency on the posted identifiers, never on the nullable FK.** Postgres treats nulls as
+  distinct, so a `unique_together` spanning the FK lets a parked resend duplicate.
+- **A periodic `reconcile_pending_*` task** re-resolves parked rows, fired on schedule and again whenever
+  new upstream data lands. Its `apply_match` leaves an already-matched row alone, so a confirmed link
+  never flaps back.
+- **Promote Pending to Needs attention after a few days** — past that window it is a real mismatch rather
+  than the load race, and wants a human instead of rotting silently.
+- **Surface it**: `status` and `match_error` read-only on the serializer, and unmatched rows filterable on
+  the list page.
+
+Here the parked claim always has a row to live on, so it needs no new table: an unresolved reference sits
+beside the `extraction` FK that already exists on both `Sample` and `SequencingSample`, as
+`extraction_reference` plus the two match columns. Reconciling is then one task across both models, over
+the rows whose FK is null and whose reference is set.
+
+Where no tracking system supplies identifiers at all, parsing the sample name is the fallback —
+`2600000001` is the specimen and the trailing `C`/`B` name the DNA and RNA extractions. A fallback, not
+the mechanism: it is the only option for those deployments, and guesswork everywhere else.
 
 ### #1559 — specimen-level measures
 
@@ -269,9 +345,10 @@ Per-gene absolute and minor copy number are *not* in scope here — they are per
 per-specimen and arrive as a VCF, so they are ingestion. They land whenever Phase 0's request produces
 `abcn_annotated.vcf`.
 
-**Done when** the whole test run lands against one specimen with both arms attached — sample sheet posted,
-patient/specimen/extraction created over the API, FKs resolved — and TMB/MSI/GIS posted against that
-specimen shows on its page.
+**Done when** the whole test run lands against one specimen with both arms attached — patient, specimen
+and extractions created over the API, the DNA arm's VCFs reaching `Sample.extraction` through one seqauto
+link call and a hand-uploaded file reaching it through upload metadata alone — and TMB/MSI/GIS posted
+against that specimen shows on its page.
 
 ## Phase 5 — `GeneFusion` and the `AllFusions.csv` parser (#1506, phase 1 only)
 
@@ -382,8 +459,8 @@ touch `patients`, `snpdb` and `seqauto`, so the conflict surface is small.
 
 Two things split off cleanly on top of that. Phase 2 is four independent file-correctness fixes, so it
 can go to whoever, whenever — including before Phase 3. Phase 3's #1706 half is
-views and templates only. The one ordering constraint across the lot is that #2447's field change lands
-before #1707 serializes it.
+views and templates only. Two ordering constraints across the lot: #2447's field change lands before
+#1707 serializes it, and Phase 4's route 2 is a key in the `FileUpload.metadata` blob Phase 2 builds.
 
 With one person, the order above is the order.
 
@@ -391,7 +468,6 @@ With one person, the order above is the order.
 
 | Decision | Phase | Why it is cheaper now |
 |---|---|---|
-| Is a run loader needed at all, or does client-posted linkage plus normal upload cover it? | 4 | The whole phase is built around the second answer; confirm rather than assume |
 | Does `G` in `PatientRecord.specimen_mutation_type` mean anything on each deployment? | 3 | Decides whether the migration can map `G` → Unknown and lose nothing |
 | Multi-gene partner with one HGNC and one clone identifier — reject or resolve? | 5 | Determines whether `GeneFusion` identity can be non-null on both sides |
 | Single grid or multiple grids for non-variants? | 6 | Best answered against real fusion rows, so genuinely wait for Phase 5 |
