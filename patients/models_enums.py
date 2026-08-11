@@ -9,9 +9,12 @@ class NucleicAcid(models.TextChoices):
     RNA = 'R', 'RNA'
 
 
-class Mutation(models.TextChoices):
-    GERMLINE = 'G', 'Germline'
-    SOMATIC = 'S', 'Somatic'
+class TissueStatus(models.TextChoices):
+    """ What role the material plays in the test - the same tissue can be either, eg blood is the
+        reference in a solid tumour workup and is the tumour in leukaemia """
+    REFERENCE = 'R', 'Reference (unaffected)'
+    AFFECTED = 'A', 'Affected / lesional'
+    UNKNOWN = 'U', 'Unknown'
 
 
 class SimpleZygosity(models.TextChoices):

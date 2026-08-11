@@ -55,9 +55,21 @@ function setPatientLink() {
     patientSelector.change(mySetPatientLink);
 }
 
+function setExtractionLink() {
+    const extractionSelector = $("#id_extraction");
+    extractionSelector.parent().append("<a class='cross-link' id='extraction-link'>View Extraction</a>");
+    function mySetExtractionLink() {
+        const pk = extractionSelector.find(":selected").val();
+        setCrossLink($("#extraction-link"), Urls.view_extraction, pk);
+    }
+    mySetExtractionLink();
+    extractionSelector.change(mySetExtractionLink);
+}
+
 
 $(document).ready(function() {
     setPatientLink();
+    setExtractionLink();
 
     $("#sample-tabs").tabs();
 

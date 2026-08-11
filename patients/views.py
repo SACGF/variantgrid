@@ -2,6 +2,7 @@ import mimetypes
 
 import pandas as pd
 from django.conf import settings
+from django.db.models import Prefetch
 from django.http.response import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_http_methods, require_POST
@@ -25,6 +26,7 @@ from patients.models import (
     PatientRecord,
     PatientRecordOriginType,
     PatientRecords,
+    Specimen,
 )
 from snpdb.models import Sample
 from uicore.utils.form_helpers import form_helper_horizontal
@@ -119,6 +121,53 @@ def view_patient_extractions(request, patient_id):
                "extraction_formset": _patient_extraction_formset(patient),
                "has_write_permission": patient.can_write(request.user)}
     return render(request, 'patients/view_patient_extractions.html', context)
+
+
+def view_specimen(request, specimen_id):
+    specimen = Specimen.get_for_user(request.user, specimen_id)
+    form = forms.SpecimenForm(request.POST or None, instance=specimen)
+    form.helper = form_helper_horizontal()
+
+    has_write_permission = specimen.can_write(request.user)
+    if not has_write_permission:
+        set_form_read_only(form)
+
+    if request.method == "POST":
+        valid = form.is_valid()
+        if valid:
+            specimen = form.save()
+        add_save_message(request, valid, "Specimen")
+
+    # Samples carry their VCF's permissions, so they're filtered separately to the specimen's own
+    visible_samples = Prefetch("sample_set", queryset=Sample.filter_for_user(request.user).order_by("pk"))
+    context = {"specimen": specimen,
+               "form": form,
+               "extractions": specimen.extraction_set.order_by("pk").prefetch_related(visible_samples),
+               "has_write_permission": has_write_permission}
+    return render(request, 'patients/view_specimen.html', context)
+
+
+def view_extraction(request, extraction_id):
+    extraction = Extraction.get_for_user(request.user, extraction_id)
+    form = forms.ExtractionForm(request.POST or None, instance=extraction)
+    form.helper = form_helper_horizontal()
+
+    has_write_permission = extraction.can_write(request.user)
+    if not has_write_permission:
+        set_form_read_only(form)
+
+    if request.method == "POST":
+        valid = form.is_valid()
+        if valid:
+            extraction = form.save()
+        add_save_message(request, valid, "Extraction")
+
+    context = {"extraction": extraction,
+               "form": form,
+               "samples": Sample.filter_for_user(request.user).filter(extraction=extraction).order_by("pk"),
+               "sequencing_samples": extraction.sequencingsample_set.order_by("pk"),
+               "has_write_permission": has_write_permission}
+    return render(request, 'patients/view_extraction.html', context)
 
 
 def view_patient_genes(request, patient_id):

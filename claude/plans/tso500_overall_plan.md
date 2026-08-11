@@ -6,8 +6,9 @@ each issue carries its own design.
 
 The file-level ingestion analysis is in [`tso500_ingestion_plan.md`](tso500_ingestion_plan.md); the
 test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md).
-Four phases have their own design docs: [`tso500_phase2_plan.md`](tso500_phase2_plan.md) for the loader
-refinements, [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) for gene
+Five phases have their own design docs: [`tso500_phase2_plan.md`](tso500_phase2_plan.md) for the loader
+refinements, [`tso500_phase_3_plan.md`](tso500_phase_3_plan.md) for tissue status and the specimen
+pages, [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) for gene
 fusions, [`tso500_phase_7_plan.md`](tso500_phase_7_plan.md) for the grouping node, and
 [`somatic_curation_reuse_issue_1419_plan.md`](somatic_curation_reuse_issue_1419_plan.md) for Phase 8's
 reporting.
@@ -135,6 +136,8 @@ one, so they want to stay stable from the first client.
 
 ## Phase 3 — finish the specimen model, and give it somewhere to show (private#2447, #1706)
 
+Designed in [`tso500_phase_3_plan.md`](tso500_phase_3_plan.md), which is the spec.
+
 Both are Phase 1 leftovers rather than new work, and both are markedly cheaper before Phase 4 puts
 `Specimen` behind a public API than after.
 
@@ -160,10 +163,11 @@ The design is settled on the issue: a per-specimen `tissue_status` (Reference (u
 (lesional) / Unknown, defaulting to Unknown), leaving the call-set question to the existing
 `VCF.variants_type` and the per-variant question to the existing `allele_origin`, and having autopopulate
 assert an origin only where both levels agree. Matched normal stays derivable — "reference specimen, same
-patient" — rather than becoming an FK. The migration maps `S` → affected; `G` is ambiguous because it was
-the default, so check the deployment's distinct `PatientRecord.specimen_mutation_type` values
-(`patients/models.py:662`) before deciding it means anything. The patient CSV's `SPECIMEN_MUTATION_TYPE`
-column follows.
+patient" — rather than becoming an FK. The migration maps `S` → affected and `G` → unknown, `G` being
+ambiguous because it was the default, and registers a `ManualOperation` only on deployments whose
+`PatientRecord.specimen_mutation_type` (`patients/models.py:662`) actually carries a `G` — evidence the
+CSV column was populated rather than defaulted. The patient CSV's `SPECIMEN_MUTATION_TYPE` column
+follows, as a hard rename rather than an alias.
 
 ### #1706 — specimen and extraction pages, search, preview
 
@@ -486,7 +490,6 @@ With one person, the order above is the order.
 
 | Decision | Phase | Why it is cheaper now |
 |---|---|---|
-| Does `G` in `PatientRecord.specimen_mutation_type` mean anything on each deployment? | 3 | Decides whether the migration can map `G` → Unknown and lose nothing |
 | Multi-gene partner with one HGNC and one clone identifier — park the row or resolve to the HGNC member? | 5 | Determines whether `GeneFusion` identity can be non-null on both sides |
 | Single grid or multiple grids for non-variants? | 6 | Best answered against real fusion rows, so genuinely wait for Phase 5 |
 

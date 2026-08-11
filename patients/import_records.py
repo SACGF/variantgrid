@@ -29,7 +29,7 @@ from patients.models import (
     PatientRecordOriginType,
     Specimen,
 )
-from patients.models_enums import Mutation, NucleicAcid, PatientRecordMatchType, Sex
+from patients.models_enums import NucleicAcid, PatientRecordMatchType, Sex, TissueStatus
 from snpdb.models import Sample
 
 UNKNOWN_STRING = 'UNKNOWN'  # Upper
@@ -238,7 +238,7 @@ def process_record(patient_records, record_id, row):
     specimen_collected_by = row[PatientColumns.SPECIMEN_COLLECTED_BY]
     specimen_collection_date = parse_date(row, PatientColumns.SPECIMEN_COLLECTION_DATE, validation_messages)
     specimen_received_date = parse_date(row, PatientColumns.SPECIMEN_RECEIVED_DATE, validation_messages)
-    specimen_mutation_type = parse_choice(Mutation.choices, row, PatientColumns.SPECIMEN_MUTATION_TYPE, validation_messages)
+    specimen_tissue_status = parse_choice(TissueStatus.choices, row, PatientColumns.SPECIMEN_TISSUE_STATUS, validation_messages)
     specimen_nucleic_acid_source = parse_choice(NucleicAcid.choices, row, PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE, validation_messages)
     specimen_age_at_collection = row[PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE]
 
@@ -360,7 +360,8 @@ def process_record(patient_records, record_id, row):
             #tissue=tissue,
             "collection_date": specimen_collection_date,
             "received_date": specimen_received_date,
-            "mutation_type": specimen_mutation_type,
+            # tissue_status is never null - a blank column means Unknown rather than "no answer"
+            "tissue_status": specimen_tissue_status or TissueStatus.UNKNOWN,
             "_age_at_collection_date": specimen_age_at_collection
         }
         changed = set_fields_if_blank(specimen, field_values)
@@ -370,7 +371,7 @@ def process_record(patient_records, record_id, row):
             specimen.patient = patient
             specimen.collection_date = specimen_collection_date
             specimen.received_date = specimen_received_date
-            specimen.mutation_type = specimen_mutation_type
+            specimen.tissue_status = specimen_tissue_status or TissueStatus.UNKNOWN
             specimen._age_at_collection_date = specimen_age_at_collection
 
             specimen.save()
@@ -416,7 +417,7 @@ def process_record(patient_records, record_id, row):
                                  specimen_collected_by=specimen_collected_by,
                                  specimen_collection_date=specimen_collection_date,
                                  specimen_received_date=specimen_received_date,
-                                 specimen_mutation_type=specimen_mutation_type,
+                                 specimen_tissue_status=specimen_tissue_status,
                                  specimen_nucleic_acid_source=specimen_nucleic_acid_source,
                                  specimen_age_at_collection_date=specimen_age_at_collection)
 

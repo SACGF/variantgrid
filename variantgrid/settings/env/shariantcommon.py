@@ -191,6 +191,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "patient_imports": False,
     "patient_term_approvals": False,
     "patients": False,
+    "view_specimen": False,
+    "view_extraction": False,
 
     "gene_lists": False,
     "genes": False,

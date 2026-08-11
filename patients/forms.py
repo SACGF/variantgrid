@@ -1,6 +1,6 @@
 from dal import forward
 from django import forms
-from django.forms.models import inlineformset_factory, modelformset_factory
+from django.forms.models import inlineformset_factory, modelform_factory, modelformset_factory
 from django.forms.widgets import TextInput
 
 from library.django_utils.autocomplete_utils import ModelSelect2
@@ -129,6 +129,22 @@ PatientSpecimenFormSet = inlineformset_factory(Patient,
                                                         'collection_date': TextInput(attrs={'class': 'date-picker'}),
                                                         'received_date': TextInput(attrs={'class': 'date-picker'})},
                                                extra=1)
+
+
+# The specimen/extraction pages edit the same fields as the patient tabs' formsets - the tabs stay the
+# bulk editor, external_pk is the tracking system's identity so both show it read only beside the form
+SpecimenForm = modelform_factory(Specimen,
+                                 exclude=['external_pk', 'patient'],
+                                 widgets={'description': TextInput(),
+                                          'reference_id': TextInput(),
+                                          'collected_by': TextInput(),
+                                          'collection_date': TextInput(attrs={'class': 'date-picker'}),
+                                          'received_date': TextInput(attrs={'class': 'date-picker'})})
+
+ExtractionForm = modelform_factory(Extraction,
+                                   fields=['reference_id', 'nucleic_acid_source', 'extraction_date'],
+                                   widgets={'reference_id': TextInput(),
+                                            'extraction_date': TextInput(attrs={'class': 'date-picker'})})
 
 
 def patient_extraction_formset_factory(patient):

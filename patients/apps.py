@@ -9,5 +9,5 @@ class PatientsConfig(AppConfig):
         # pylint: disable=import-outside-toplevel,unused-import
         # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
         # silently unregistering them
-        from patients.signals import external_pk_search, patient_search  # noqa: F401
+        from patients.signals import external_pk_search, patient_search, specimen_search  # noqa: F401
         # pylint: enable=import-outside-toplevel,unused-import
