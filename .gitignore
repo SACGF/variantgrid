@@ -48,3 +48,4 @@ node_modules/
 eslint.txt
 /.idea/pyLspTools.xml
 /.claude/scheduled_tasks.lock
+/.idea/pyProjectModel.xml
