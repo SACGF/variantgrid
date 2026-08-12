@@ -29,9 +29,11 @@ size has nothing to do with it.
 
 ### The reproduction
 
-`chr12:124,911,738 GACC…GAGC > G` — a 228 bp in-frame deletion (variant_id 307197276) in **UBC**
-(`NM_021009.7:c.1806_2033del`, `NP_066289.3:p.Leu603_Val678del`). UBC is a tandem array of the 76-codon
-ubiquitin monomer and this removes exactly one repeat unit.
+A 229 bp reference span — an in-frame deletion (variant_id 307197276) in **UBC**, a tandem array of the
+76-codon ubiquitin monomer, removing exactly one repeat unit. Coordinates are left out of this doc as it
+is patient data and the repo is public; look the variant up by id. Everything below reproduces on a
+synthetic equivalent built from the reference at `chr12:124,911,743` (229 bp of reference deleted),
+which peaks at 8.84 GB against the same data file.
 
 Binary chop of run 34870 under the production VEP command, killing the tree above a cap:
 
