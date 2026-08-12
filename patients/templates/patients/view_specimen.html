@@ -60,5 +60,26 @@
         {% else %}
             <p>This specimen has no extractions.</p>
         {% endif %}
+
+        <hr/>
+        <h4>Measures</h4>
+        {% if measures %}
+            <table class="table">
+                <thead><tr><th>Measure<th>Value<th>Call<th>Method<th>Measured</tr></thead>
+                <tbody>
+                {% for measure in measures %}
+                    <tr>
+                        <td>{{ measure.get_measure_type_display }}
+                        <td>{{ measure.value|default_if_none:"-" }} {{ measure.unit|default:"" }}
+                        <td>{{ measure.call|default:"-" }}
+                        <td>{{ measure.method|default:"-" }}
+                        <td>{{ measure.measured_date|default_if_none:"-" }}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No measures recorded for this specimen.</p>
+        {% endif %}
     </div>
 {% endblock submenu_page_content %}

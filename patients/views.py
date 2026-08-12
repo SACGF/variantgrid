@@ -143,6 +143,7 @@ def view_specimen(request, specimen_id):
     context = {"specimen": specimen,
                "form": form,
                "extractions": specimen.extraction_set.order_by("pk").prefetch_related(visible_samples),
+               "measures": specimen.specimenmeasure_set.order_by("measure_type", "-measured_date"),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_specimen.html', context)
 

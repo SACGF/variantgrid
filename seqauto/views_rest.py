@@ -64,6 +64,7 @@ from seqauto.serializers.sequencing_serializers import (
     SequencerSerializer,
     SequencingFilesBulkCreateSerializer,
     SequencingRunSerializer,
+    SequencingSampleExtractionLinkSerializer,
     SingleSampleVCFSerializer,
     VariantCallerSerializer,
 )
@@ -150,6 +151,32 @@ class SequencingFilesBulkCreateView(APIView):
             serializer.save()
             return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SequencingSampleExtractionLinkView(APIView):
+    """ Name the extraction a sequencing sample was made from.
+
+        The sequencing sample is the anchor: without it there is nothing to park a claim on, so an
+        unknown one is a 400. An extraction that hasn't been created yet is a 202 - it is parked on
+        the row and re-resolved by reconcile_pending_extractions. """
+
+    @extend_schema(
+        summary="Link a sequencing sample to the extraction it was made from",
+        request=SequencingSampleExtractionLinkSerializer,
+        responses=OpenApiTypes.OBJECT,
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = SequencingSampleExtractionLinkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        sequencing_sample = serializer.save()
+        response = {
+            "sequencing_sample": str(sequencing_sample),
+            "match_status": sequencing_sample.get_extraction_match_status_display(),
+            "match_error": sequencing_sample.extraction_match_error,
+            "extraction": str(sequencing_sample.extraction) if sequencing_sample.extraction else None,
+        }
+        status_code = status.HTTP_200_OK if sequencing_sample.extraction else status.HTTP_202_ACCEPTED
+        return Response(response, status=status_code)
 
 
 class QCViewSet(ModelViewSet):

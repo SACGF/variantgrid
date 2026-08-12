@@ -437,6 +437,17 @@ PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 # Users can still see live preview matches on the patient page along with a warning.
 # Set to None / empty to disable.
 PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
+# How long a parked extraction reference stays Pending before it needs a human - past this it is a
+# real mismatch rather than feeds arriving out of order. Same window Mocha settled on
+PATIENT_EXTRACTION_MATCH_PENDING_DAYS = 3
+# Deployments with no tracking system to quote identifiers: a regex read against a VCF sample name,
+# whose 'extraction' named group is the extraction's reference_id. Only consulted where nothing was
+# posted, so it can never override a client
+PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$"
+# An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
+# tracking systems is known - so only a superuser creates one via the API. A public server taking
+# records from systems it has never seen would set this False
+PATIENTS_API_EXTERNAL_MANAGER_CREATE_ADMIN_ONLY = True
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = True
 
@@ -1064,6 +1075,7 @@ PUBLIC_PATHS = [
     r'^/oidc/.*',  # all oidc URLs
     r'^/api/.*',  # OpenAPI schema + Swagger/ReDoc docs pages (drf-spectacular)
     r'^/classification/api/.*',  # REST framework used by command line tools
+    r'^/patients/api/.*',
     r'^/seqauto/api/.*',
     r'^/upload/api/.*',
     r'^/mme/api/.*',  # Inbound MME /match + /metrics - authenticated by per-peer X-Auth-Token (see mme/auth.py)

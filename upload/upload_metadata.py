@@ -9,15 +9,19 @@ keys it accepts via get_metadata_keys().
 Validation happens at upload time, while the client is still connected, so a mistyped key is a 400
 rather than a silently ignored value and a REQUIRES_USER_INPUT several pipeline stages later.
 """
+import json
 from typing import Optional
 
+from patients.external_references import ExternalReference, ExternalReferenceError
 from snpdb.models.models_genome import GenomeBuild
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 
 GENOME_BUILD = "genome_build"
 SOURCE = "source"
+EXTRACTION = "extraction"                  # one extraction for every sample in the file
+SAMPLE_EXTRACTIONS = "sample_extractions"  # VCF sample name -> extraction, for a multi-sample VCF
 
-VCF_METADATA_KEYS = frozenset({GENOME_BUILD, SOURCE})
+VCF_METADATA_KEYS = frozenset({GENOME_BUILD, SOURCE, EXTRACTION, SAMPLE_EXTRACTIONS})
 
 
 class UploadMetadataError(ValueError):
@@ -46,9 +50,45 @@ def _validate_source(value) -> str:
     return source
 
 
+def _as_json_value(key: str, value):
+    """ Upload query params arrive as strings, so a JSON value comes through as its own text """
+    if isinstance(value, str) and value.lstrip()[:1] in "{[":
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError as e:
+            raise UploadMetadataError(f"'{key}' is not valid JSON: {e}") from e
+    return value
+
+
+def _validate_extraction(value):
+    """ Shape only - the reference resolves at import.
+
+        Phase 2 validates genome_build while the client is still connected precisely so a typo is a
+        400; existence-checking an extraction here would instead reject the ordering race that
+        patients.tasks.extraction_matching_tasks exists to absorb. """
+    try:
+        return ExternalReference.from_data(_as_json_value(EXTRACTION, value)).as_json()
+    except ExternalReferenceError as e:
+        raise UploadMetadataError(f"'{EXTRACTION}': {e}") from e
+
+
+def _validate_sample_extractions(value):
+    """ Keyed on VCF sample name, so nothing but sample names lives at this level """
+    value = _as_json_value(SAMPLE_EXTRACTIONS, value)
+    if not isinstance(value, dict) or not value:
+        raise UploadMetadataError(f"'{SAMPLE_EXTRACTIONS}' must be a non-empty object keyed on "
+                                  f"VCF sample name")
+    try:
+        return {name: ExternalReference.from_data(ref).as_json() for name, ref in value.items()}
+    except ExternalReferenceError as e:
+        raise UploadMetadataError(f"'{SAMPLE_EXTRACTIONS}': {e}") from e
+
+
 _VALIDATORS = {
     GENOME_BUILD: _validate_genome_build,
     SOURCE: _validate_source,
+    EXTRACTION: _validate_extraction,
+    SAMPLE_EXTRACTIONS: _validate_sample_extractions,
 }
 
 
@@ -75,6 +115,11 @@ def validate_upload_metadata(metadata: Optional[dict], allowed_keys) -> dict:
         accepted = ", ".join(sorted(allowed_keys)) if allowed_keys else "(none for this file type)"
         raise UploadMetadataError(f"Unknown upload metadata key(s): {unknown}. Accepted keys: {accepted}")
 
+    if EXTRACTION in metadata and SAMPLE_EXTRACTIONS in metadata:
+        # One says the whole file is an extraction and the other says it is per-sample - guessing
+        # which wins is the kind of silent decision upload-time validation exists to avoid
+        raise UploadMetadataError(f"Send '{EXTRACTION}' or '{SAMPLE_EXTRACTIONS}', not both")
+
     return {key: _VALIDATORS[key](value) for key, value in metadata.items()}
 
 
@@ -84,6 +129,20 @@ def get_metadata_genome_build(file_upload) -> Optional[GenomeBuild]:
         # Validation stored the canonical name, which is the PK - don't re-run ambiguous alias resolution
         return GenomeBuild.objects.get(pk=build_name)
     return None
+
+
+def get_metadata_extractions(file_upload, sample_names) -> dict[str, ExternalReference]:
+    """ Keyed on VCF sample name either way, so the caller has one shape to handle.
+
+        A name in sample_extractions that the VCF doesn't have is the client's mistake to see, so it
+        comes back too rather than being dropped - assign_sample_extractions reports it. """
+    metadata = (file_upload.metadata or {}) if file_upload else {}
+    if per_sample := metadata.get(SAMPLE_EXTRACTIONS):
+        return {name: ExternalReference.from_data(ref) for name, ref in per_sample.items()}
+    if declared := metadata.get(EXTRACTION):
+        reference = ExternalReference.from_data(declared)
+        return {name: reference for name in sample_names}
+    return {}
 
 
 def get_metadata_source(file_upload) -> Optional[str]:
