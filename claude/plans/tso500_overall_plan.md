@@ -254,8 +254,12 @@ registers on deployments that never used the column.
 
 ## Still open from Phase 4
 
-**Raise the client-side issue in `SACGF/variantgrid_api`** — the API contract the phase created is what
-the lab client codes against, and nothing consumes it yet.
+**The client work is raised but not done** —
+[`SACGF/variantgrid_api#20`](https://github.com/SACGF/variantgrid_api/issues/20) asks for the
+dataclasses and methods behind the patient / specimen / extraction API, the link call, an upload
+metadata kwarg (which also reaches Phase 2's `genome_build` and `source`, unreachable from the client
+today) and the measures. Deliberately deferred to the end and batched with the other client issues still
+to be raised, so it ships as one release rather than several.
 
 The §"Done when" run wants doing once against a real deployment: patient, specimen and both extractions
 (`2600000001C` DNA, `2600000001B` RNA) created over the API, the DNA arm's three VCFs reaching
@@ -263,7 +267,8 @@ The §"Done when" run wants doing once against a real deployment: patient, speci
 metadata alone, a VCF uploaded before its extraction exists parking and then attaching itself, and
 TMB/MSI/GIS showing on the specimen page. PR #1716's evidence is the unit suites, which stop short of a
 full import with annotation — so this joins Phase 2's #1711 checklist as one pass over a real GRCh37
-deployment.
+deployment. Every call is plain JSON over an API token, so the run can be driven by hand rather than
+waiting on the client release.
 
 `URLS_NAME_REGISTER` does not gate router URLs, so Shariant still serves the patient API. The names are
 in `shariantcommon.py` as intended, but only `api_specimen_measure_bulk_create` is registered through
