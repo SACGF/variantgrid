@@ -355,11 +355,21 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
     _store_vcf_stats(files.skipped_alts_stats, clean_sub_step, "ALTs")
     _store_vcf_stats(files.converted_alts_stats, clean_sub_step, "ALTs", operation='Converted')
 
+    _schedule_split_file_steps(upload_step, files.split_vcf_dir, annotate_gnomad_af=annotate_gnomad_af)
+
+    return files.swap_skipped
+
+
+def _schedule_split_file_steps(upload_step, split_vcf_dir: str, annotate_gnomad_af=False):
+    """ One SeparateUnknownVariantsTask per split VCF, plus the UploadStepMultiFileOutput rows that
+        ScheduleMultiFileOutputTasksTask fans the data-insertion tasks out over. Shared by every
+        preprocess variant - a pipeline that skips the bcftools stages still needs all of this. """
+    upload_pipeline = upload_step.upload_pipeline
     # Create this here so downstream tasks (running in parallel) can all link against the same one
     ModifiedImportedVariants.get_for_pipeline(upload_pipeline)
     vcf_import_annotate_dir = upload_pipeline.get_pipeline_processing_subdir("vcf_import_annotate")
     sort_order = upload_pipeline.get_max_step_sort_order()
-    for split_vcf_filename in glob.glob(f"{files.split_vcf_dir}/*.vcf.gz"):
+    for split_vcf_filename in glob.glob(f"{split_vcf_dir}/*.vcf.gz"):
         sort_order += 1
         separate_upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                          name="Separate Unknown Variants Task",
@@ -388,8 +398,6 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
         UploadStepMultiFileOutput.objects.create(upload_step=upload_step,
                                                  output_filename=output_filename)
 
-    return files.swap_skipped
-
 
 def _store_vcf_stats(filename, upload_step, description, operation='Skipped'):
     if os.path.exists(filename):
@@ -398,3 +406,55 @@ def _store_vcf_stats(filename, upload_step, description, operation='Skipped'):
             for name, count in df.iloc[:, 0].items():
                 message_string = f"{operation} {count} '{name}' {description}"
                 SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string=message_string)
+
+
+def preprocess_gene_level_vcf(upload_step):
+    """ Preprocess for gene-level variants - split into sub-files and nothing else.
+
+        The bcftools stages every other import runs all need a reference sequence: 'bcftools norm
+        --check-ref=s --fasta-ref' reads the base at the position, and vcf_clean_and_filter maps
+        chroms through standard_contigs_only (which excludes the gene-level contig by role) before
+        replacing the header with one built the same way. A gene-level locus has no reference base
+        and its position is a gene id, so none of that applies - @see snpdb.gene_level_variants.
+
+        Nothing is lost by skipping them: the VCF is written by us (GeneFusionCreateVCFTask) rather
+        than supplied by a lab, so it already has our contig names, no undeclared FILTERs, one alt
+        per record and is written in sorted order. Everything downstream of the split - unknown
+        variant insert, the parallel data-insertion tasks, max-variant tracking - is unchanged. """
+
+    vcf_filename = upload_step.input_filename
+    if not os.path.exists(vcf_filename):
+        raise FileNotFoundError(f"Can't access vcf: '{vcf_filename}'")
+
+    upload_pipeline = upload_step.upload_pipeline
+    split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
+    header_filename = _write_gene_level_header(upload_pipeline, vcf_filename)
+    vcf_name = name_from_filename(vcf_filename, remove_gz=True)
+
+    split_env = {**os.environ,
+                 'VG_HEADER_FILE': header_filename,
+                 'VG_SPLIT_VCF_DIR': split_vcf_dir}
+    split_file_rows = upload_step.split_file_rows or settings.VCF_IMPORT_FILE_SPLIT_ROWS
+    pipe_commands = {
+        "cat": ["cat", vcf_filename],
+        REMOVE_HEADER_SUB_STEP: [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"],
+        SPLIT_VCF_SUB_STEP: ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
+                             "--lines", str(split_file_rows),
+                             "--filter='bash -c \"set -eo pipefail; { cat $VG_HEADER_FILE; cat; } | bgzip -c > $VG_SPLIT_VCF_DIR/$FILE\"'"],
+    }
+    _run_pipe(pipe_commands, {}, split_env, upload_pipeline)
+    _schedule_split_file_steps(upload_step, split_vcf_dir)
+
+
+def _write_gene_level_header(upload_pipeline, vcf_filename) -> str:
+    """ The header prepended to each split file. Taken from the VCF as written rather than rebuilt
+        from the build's contigs, which would drop the gene-level contig on its SequenceRole. """
+    clean_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("clean_vcf_dir")
+    header_filename = os.path.join(clean_vcf_dir,
+                                   name_from_filename(vcf_filename, remove_gz=True) + ".header.vcf")
+    with open(vcf_filename) as in_f, open(header_filename, "w") as out_f:
+        for line in in_f:
+            if not line.startswith("#"):
+                break
+            out_f.write(line)
+    return header_filename

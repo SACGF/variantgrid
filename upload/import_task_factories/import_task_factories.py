@@ -26,8 +26,14 @@ from upload.models import (
     UploadStepTaskType,
     VCFPipelineStage,
 )
+from upload.gene_fusions import all_fusions_parser
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
+from upload.tasks.import_gene_fusions_task import (
+    GeneFusionCreateVCFModelTask,
+    GeneFusionCreateVCFTask,
+    GeneFusionInsertTask,
+)
 from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
 from upload.tasks.import_ped_task import ImportPedTask
@@ -47,6 +53,7 @@ from upload.tasks.vcf.genotype_vcf_tasks import (
     VCFCheckAnnotationTask,
 )
 from upload.tasks.vcf.import_vcf_tasks import (
+    GeneLevelPreprocessVCFTask,
     ImportCreateUploadedVCFTask,
     LiftoverCompleteTask,
     LiftoverCreateVCFTask,
@@ -92,6 +99,60 @@ class GeneListImportTaskFactory(ImportTaskFactory):
 
     def create_import_task(self, upload_pipeline):
         return ImportGeneListTask.si(upload_pipeline.pk)
+
+
+class GeneFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
+    """ AllFusions.csv rows become gene-level variants, written as a VCF so they go through the
+        normal insert pipeline. Only the bcftools stages are skipped - they all need a reference base
+        a gene-level locus does not have. @see upload.tasks.import_gene_fusions_task
+
+        A csv full of gene symbols, so GeneListImportTaskFactory would otherwise claim it on its
+        default ability of 1 """
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.GENE_FUSIONS
+
+    def get_possible_extensions(self):
+        return ['csv']
+
+    def get_data_classes(self):
+        return [UploadedVCF]
+
+    def get_metadata_keys(self):
+        # Creates its own VCF and Sample, so it takes the same keys a VCF does
+        return VCF_METADATA_KEYS
+
+    def get_processing_ability(self, user, filename, file_extension):
+        if all_fusions_parser.can_process_file(filename):
+            return 1000
+        return 0
+
+    def _get_vcf_filename(self, upload_pipeline) -> str:
+        return get_import_processing_filename(upload_pipeline.pk, "gene_fusion_variants.vcf")
+
+    def get_pre_vcf_task(self, upload_pipeline):
+        """ Write the fusion variants as a VCF for the pipeline to insert """
+        upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                name="Create Gene Fusion Variant VCF",
+                                                sort_order=self.get_sort_order(),
+                                                task_type=UploadStepTaskType.CELERY,
+                                                pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
+                                                script=full_class_name(GeneFusionCreateVCFTask),
+                                                input_filename=upload_pipeline.file_upload.get_filename(),
+                                                output_filename=self._get_vcf_filename(upload_pipeline))
+        return GeneFusionCreateVCFTask.si(upload_step.pk, 0)
+
+    def get_create_data_from_vcf_header_task_class(self):
+        return GeneFusionCreateVCFModelTask
+
+    def _get_preprocess_class(self) -> type:
+        return GeneLevelPreprocessVCFTask
+
+    def get_known_variants_parallel_vcf_processing_task_class(self):
+        return ProcessVCFSetMaxVariantTask
+
+    def get_post_data_insertion_classes(self):
+        return [GeneFusionInsertTask, VCFCheckAnnotationTask]
 
 
 class GeneCoverageImportTaskFactory(ImportTaskFactory):

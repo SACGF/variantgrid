@@ -23,6 +23,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
+from genes.gene_fusions import get_gene_fusion_allele, get_gene_fusion_for_string
 from genes.hgvs import HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher, hgvs_diff_description
 from genes.models import GeneSymbol, NoTranscript, Transcript, TranscriptVersion
 from library.cache import timed_cache
@@ -31,6 +32,7 @@ from library.log_utils import report_exc_info
 from library.utils import IconWithTooltip, md5sum_str, pretty_label
 from library.utils.django_utils import get_cached_project_git_hash
 from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
+from snpdb.models.models_variant import HGVS_UNCLEANED_PATTERN
 
 """
 Now we have
@@ -182,6 +184,14 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.transcript_version: Optional[TranscriptVersion] = None
         self.variant = variant
         self.genomic_sort = variant.sort_string
+
+        if variant.is_gene_level:
+            # Sits on no transcript, so there is nothing to write a c.HGVS against. The gene symbol is
+            # the fusion's anchor - what a grid sorts and groups on
+            if gene_fusion := self.allele_info.gene_fusion:
+                self.gene_symbol = GeneSymbol.objects.filter(pk=gene_fusion.anchor.gene_symbol_id).first()
+            self.save()
+            return self
 
         try:
             c_hgvs_resolution = self.recalc_c_hgvs()
@@ -501,6 +511,10 @@ class ImportedAlleleInfo(TimeStampedModel):
     matched_variant = ForeignKey(Variant, null=True, blank=True, on_delete=SET_NULL)
     """ not used for any logic other than storing the variant that was matched (so we can later find allele, and
     variants of other builds) """
+
+    gene_fusion = ForeignKey('genes.GeneFusion', null=True, blank=True, on_delete=SET_NULL)
+    """ set where the imported value named a gene pair ('BCR::ABL1') rather than an HGVS - the fusion
+    already carries its own Variant, so there is nothing to resolve """
 
     allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
     """ set this once it's matched, but record can exist prior to variant matching """
@@ -824,6 +838,27 @@ class ImportedAlleleInfo(TimeStampedModel):
                                            message=message, hgvs_converter_version=hgvs_converter_version,
                                            hgvs_converter_data_version=data_version)
 
+    def resolve_gene_fusion(self) -> bool:
+        """ A lab submitting 'BCR::ABL1' names a gene pair, not a coordinate - there is no HGVS to
+            resolve, and the fusion already owns a Variant, so matching is immediate.
+
+            Returns whether this was a fusion, so the caller can skip HGVS resolution. """
+
+        imported = self.imported_hgvs
+        if not imported or HGVS_UNCLEANED_PATTERN.search(imported):
+            return False
+
+        gene_fusion = get_gene_fusion_for_string(imported)
+        if gene_fusion is None:
+            return False
+
+        self.gene_fusion = gene_fusion
+        # The Allele arrives the ordinary way - fusions have no coordinate for ClinGen, so this is the
+        # plain 'no ClinGen' path
+        get_gene_fusion_allele(gene_fusion, self.imported_genome_build_patch_version.genome_build)
+        self.set_variant_and_save(gene_fusion.variant, message=f"Matched gene fusion {gene_fusion}")
+        return True
+
     def update_variant_coordinate(self):
         """ returns if a valid variant_coordinate could be derived """
 
@@ -939,7 +974,8 @@ class ImportedAlleleInfo(TimeStampedModel):
         try:
             allele_info, created = ImportedAlleleInfo.objects.get_or_create(**tidied)
             if created:
-                allele_info.update_variant_coordinate()
+                if not allele_info.resolve_gene_fusion():
+                    allele_info.update_variant_coordinate()
                 allele_info.apply_validation()
                 allele_info.save()
             return allele_info

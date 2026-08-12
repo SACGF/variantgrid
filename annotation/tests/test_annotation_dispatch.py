@@ -110,7 +110,8 @@ class AnnotationDispatchTestCase(TestCase):
         with mock.patch.object(annotate_variants, "apply_async") as launch:
             _handle_range_lock(lock)
         runs = AnnotationRun.objects.filter(annotation_range_lock=lock)
-        self.assertEqual(runs.count(), 2)  # one per pipeline type
+        num_pipeline_types = len(VariantAnnotationPipelineType)
+        self.assertEqual(runs.count(), num_pipeline_types)
         for run in runs:
             self.assertEqual(run.status, AnnotationStatus.CREATED)
             self.assertIsNone(run.task_id)

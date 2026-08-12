@@ -128,6 +128,9 @@ class SequenceRole(models.TextChoices):
     ALT_SCAFFOLD = 'ALT', "alt-scaffold"
     FIX_PATCH = 'FP', "fix-patch"
     NOVEL_PATCH = 'NP', "novel-patch"
+    # Not a sequence at all - the shared contig gene-level events (gene fusions) are anchored on.
+    # @see snpdb.gene_level_variants
+    GENE_LEVEL = 'GL', "gene-level"
 
 
 class AssemblyMoleculeType(models.TextChoices):

@@ -670,7 +670,14 @@ class ModifiedImportedVariants(VCFImportInfo):
 
     @staticmethod
     def get_for_pipeline(upload_pipeline) -> 'ModifiedImportedVariants':
-        upload_step = upload_pipeline.uploadstep_set.get(name=ModifiedImportedVariants.LINKED_SUB_STEP_NAME)
+        """ Modifications hang off the normalize sub-step, since bcftools norm is what makes almost
+            all of them. A pipeline that skips bcftools entirely (gene-level variants have no
+            reference base to normalise against) still records merges, so those fall back to the
+            preprocess step itself. """
+        upload_step = upload_pipeline.uploadstep_set.filter(
+            name=ModifiedImportedVariants.LINKED_SUB_STEP_NAME).first()
+        if upload_step is None:
+            upload_step = upload_pipeline.uploadstep_set.get(name=UploadStep.PREPROCESS_VCF_NAME)
         return ModifiedImportedVariants.objects.get_or_create(upload_step=upload_step)[0]
 
     @property

@@ -1143,7 +1143,9 @@ class AnnotationRun(TimeStampedModel):
 
     @staticmethod
     def get_for_variant(variant: Variant, genome_build) -> Optional['AnnotationRun']:
-        if variant.is_symbolic:
+        if variant.is_gene_level:
+            pipeline_type = VariantAnnotationPipelineType.GENE_LEVEL
+        elif variant.is_symbolic:
             pipeline_type = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
         else:
             pipeline_type = VariantAnnotationPipelineType.STANDARD
@@ -1826,7 +1828,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
         }
     }
 
-    # List of filters to describe variants that can be annotated
+    # List of filters to describe variants that can be annotated.
+    # Gene-level variants belong here - they get a VariantAnnotation row like anything else, just
+    # written by the GENE_LEVEL pipeline rather than VEP. Which pipeline claims them is
+    # pipeline_type_variant_q's business, and it subtracts them from both VEP types.
     VARIANT_ANNOTATION_Q = [
         Variant.get_no_reference_q(),
         ~Q(alt__seq__in=['.', '*']),  # Exclude non-standard variants

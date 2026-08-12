@@ -29,13 +29,13 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT, VCFSymbolicAllele
+from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT, GeneLevelSymbolicAlt, VCFSymbolicAllele
 from library.guardian_utils import admin_bot
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
+from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, SequenceRole
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 LOCUS_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
@@ -381,10 +381,17 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         return Sequence.allele_is_symbolic(self.alt)
 
     @property
+    def is_gene_level(self) -> bool:
+        """ Coordinate-level twin of Variant.is_gene_level - keyed on the alt, since a bare coordinate
+            has no contig role to read. No coordinate means nothing can be read off a reference """
+        return GeneLevelSymbolicAlt.parse(self.alt) is not None
+
+    @property
     def can_be_made_explicit(self) -> bool:
         """ <CNV> (copy-number-variable region) and <INS> have no unambiguous explicit ref/alt
             expansion (cf. Variant.can_make_g_hgvs), so as_external_explicit() will raise for them.
-            Their external VCF representation stays symbolic. """
+            Their external VCF representation stays symbolic. Gene-level alts have no reference
+            sequence at all. """
         if not self.is_symbolic:
             return True
         return self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
@@ -397,6 +404,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def as_external_explicit(self, genome_build) -> 'VariantCoordinate':
         """ explicit ref/alt """
+        if self.is_gene_level:
+            raise ValueError(f"{self} is gene-level - it has no coordinate to read a reference from")
+
         if self.is_symbolic:
             if self.svlen is None:
                 raise ValueError(f"{self} has 'svlen' = None")
@@ -577,7 +587,11 @@ class Locus(models.Model):
 class Variant(PreviewModelMixin, models.Model):
     """ Variants represent the different alleles at a locus
         Usually 2+ per line in a VCF file (ref + >= 1 alts pointing to the same locus for the row)
-        There is only 1 Variant for a given locus/alt per database (handled via insertion queues) """
+        There is only 1 Variant for a given locus/alt per database (handled via insertion queues)
+
+        Gene-level events (gene fusions) are also stored as Variants, on a contig that isn't a
+        sequence and with a gene ID in place of a coordinate. That is not what you'd expect here -
+        @see snpdb.gene_level_variants before touching anything guarded by get_gene_level_q() """
 
     REFERENCE_ALT = "="
     _BASES = "GATC"
@@ -636,6 +650,18 @@ class Variant(PreviewModelMixin, models.Model):
     @staticmethod
     def get_symbolic_q() -> Q:
         return Q(svlen__isnull=False)
+
+    @staticmethod
+    def get_gene_level_q() -> Q:
+        """ Events with no coordinate (gene fusions) - @see snpdb.gene_level_variants.
+            The single predicate for "keep this away from anything that reads a reference
+            sequence"; is_gene_level is the instance-level twin """
+        return Q(locus__contig__role=SequenceRole.GENE_LEVEL)
+
+    @cached_property
+    def is_gene_level(self) -> bool:
+        """ @see snpdb.gene_level_variants, and get_gene_level_q for the queryset form """
+        return self.locus.contig.is_gene_level
 
     @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):
@@ -782,6 +808,9 @@ class Variant(PreviewModelMixin, models.Model):
 
     def clingen_allele_skip_reason(self) -> Optional[str]:
         """Return why ClinGen should be skipped for this variant, or None if it can be used."""
+        if self.is_gene_level:
+            # ClinGen registers coordinates, and there isn't one - @see snpdb.gene_level_variants
+            return f"Gene-level variant {self.alt} has no coordinate, so cannot be registered"
         if not self.can_make_g_hgvs:
             return f"Symbolic variant {self.alt} cannot form g.HGVS (only DEL/DUP/INV supported)"
         size = self._clingen_allele_size
@@ -799,6 +828,10 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_c_hgvs(self) -> bool:
+        """ Gene-level variants are annotated (by the GENE_LEVEL pipeline) but sit on no transcript, so
+            there is nothing to write a c.HGVS against. @see snpdb.gene_level_variants """
+        if self.is_gene_level:
+            return False
         return self.can_have_annotation and (self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH)
 
     def as_tuple(self) -> tuple[str, int, str, str, int]:

@@ -14,7 +14,9 @@ ExampleSample_2600000001/
     └── ..._AllFusions.csv            fusions            33
 ```
 
-The VCFs go through the normal VCF import; `AllFusions.csv` needs its own parser.
+The VCFs go through the normal VCF import. `AllFusions.csv` has its own parser, which creates a VCF and
+Sample of its own and inserts gene-level variants directly - it cannot go through the bcftools stages, as
+a gene-level locus has no reference base to check against.
 
 Everything is GRCh37 — b37 contigs renamed with a `chr` prefix, including `hs37d5`, `NC_007605`
 and the `GL000*` decoys, with `chrM` at 16569 (rCRS, not hg19's 16571).
@@ -70,6 +72,7 @@ Two facts these files don't reliably carry are supplied at upload instead, as `g
 | `cnv.vcf` | from header contigs | `DRAGEN TSO500 CNV` |
 | `_DragenExonCNV.vcf` | **`GRCh37` — required**, the header has no contigs and an unresolvable `##reference` | from header (`LrCalculator 1.0.0.11`) |
 | `SpliceVariants.vcf` | from header contigs | from header (`SpliceGirl 1.0.0.614`) |
+| `AllFusions.csv` | **`GRCh37` — required** on a multi-build deployment, the file carries no build at all | from its own `# Source =` line (`FusionProcessor 1.0.0.614`) |
 
 Send a build's **own name** (`GRCh37`), not an alias (`hg19`). These files are GRCh37 with a `chr`
 prefix and `chrM` at 16569, and their `##reference` says `hg19_decoy` — which is exactly the confusion

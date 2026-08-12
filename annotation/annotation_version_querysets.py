@@ -32,10 +32,16 @@ def pipeline_type_variant_q(pipeline_type: VariantAnnotationPipelineType) -> Q:
         types register their predicate here - a type's predicate may overlap another's. """
 
     q_sv = Variant.get_symbolic_q()  # symbolic (eg <DEL>/<DUP>/<INS>) -> structural variant pipeline
+    # Gene-level variants carry svlen=0 (so unique_together works - Postgres treats nulls as distinct),
+    # which makes them look symbolic. VEP can't parse their alt and they have no coordinate anyway, so
+    # subtract them from both VEP pipelines. @see snpdb.gene_level_variants
+    q_gene_level = Variant.get_gene_level_q()
     if pipeline_type == VariantAnnotationPipelineType.STANDARD:
-        return ~q_sv
+        return ~q_sv & ~q_gene_level
     elif pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
-        return q_sv
+        return q_sv & ~q_gene_level
+    elif pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
+        return q_gene_level
     raise ValueError(f"Unrecognised {pipeline_type=}")
 
 

@@ -26,7 +26,7 @@ from upload.vcf.bulk_manual_variant_entry_linking_vcf_processor import (
 )
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 from upload.vcf.vcf_import import import_vcf_file
-from upload.vcf.vcf_preprocess import preprocess_vcf
+from upload.vcf.vcf_preprocess import preprocess_gene_level_vcf, preprocess_vcf
 from variantgrid.celery import app
 
 
@@ -57,6 +57,16 @@ class PreprocessAndAnnotateVCFTask(ImportVCFStepTask):
         preprocess_vcf(upload_step, annotate_gnomad_af=annotate_gnomad_af)
 
         # Reload from DB - vcf_extract_unknown_and_split_file set items_processed in a different process
+        upload_step = UploadStep.objects.get(pk=upload_step.pk)
+        return upload_step.items_processed
+
+
+class GeneLevelPreprocessVCFTask(ImportVCFStepTask):
+    """ Preprocess for gene-level variants - splits only. Every bcftools stage needs a reference
+        base a gene-level locus does not have. @see preprocess_gene_level_vcf """
+
+    def process_items(self, upload_step):
+        preprocess_gene_level_vcf(upload_step)
         upload_step = UploadStep.objects.get(pk=upload_step.pk)
         return upload_step.items_processed
 
@@ -251,6 +261,7 @@ def process_vcf_file_task(vcf_filename, name, user_id, import_source):
 PreprocessVCFTask = app.register_task(PreprocessVCFTask())
 PreprocessAndAnnotateVCFTask = app.register_task(PreprocessAndAnnotateVCFTask())
 LiftoverPreprocessVCFTask = app.register_task(LiftoverPreprocessVCFTask())
+GeneLevelPreprocessVCFTask = app.register_task(GeneLevelPreprocessVCFTask())
 CheckStartAnnotationTask = app.register_task(CheckStartAnnotationTask())
 ScheduleMultiFileOutputTasksTask = app.register_task(ScheduleMultiFileOutputTasksTask())
 UploadPipelineFinishedTask = app.register_task(UploadPipelineFinishedTask())

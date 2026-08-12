@@ -78,6 +78,8 @@ class VariantAnnotationPipelineType(models.TextChoices):
     """ We have standard long and short  """
     STANDARD = "S", "Standard Short Variant"
     STRUCTURAL_VARIANT = "C", "Structural Variant"
+    # Never reaches VEP - annotation is computed locally from the gene identity in the alt
+    GENE_LEVEL = "G", "Gene Level"
 
 
 class NMDEscapeStatus(models.TextChoices):
@@ -152,6 +154,8 @@ class VEPSkippedReason(models.TextChoices):
     INCOMPLETE = 'i', "Incomplete"
     UNKNOWN = 'u', "Unknown"
     TOO_LONG = 'l', "Too Long"
+    # Gene level - so an empty consequence isn't read as "VEP found nothing"
+    GENE_LEVEL = 'g', "Gene level (locally computed)"
 
 
 class ClinVarReviewStatus(models.TextChoices):

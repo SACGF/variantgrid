@@ -6,12 +6,13 @@ each issue carries its own design.
 
 The file-level ingestion analysis is in [`tso500_ingestion_plan.md`](tso500_ingestion_plan.md); the
 test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md).
-Three phases still ahead have their own design docs:
-[`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) for gene fusions,
-[`tso500_phase_7_plan.md`](tso500_phase_7_plan.md) for the grouping node, and
+Two phases still ahead have their own design docs:
+[`tso500_phase_7_plan.md`](tso500_phase_7_plan.md) for the grouping node and
 [`somatic_curation_reuse_issue_1419_plan.md`](somatic_curation_reuse_issue_1419_plan.md) for Phase 8's
-reporting. Phases 2, 3 and 4 had docs of their own, deleted once they landed — what outlived them is in
-the Done entries below, and the PRs that reference them are #1712, #1715 and #1716.
+reporting. [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md) has landed but is
+kept, since it is the reference for how gene-level variants are identified and annotated — Phase 6
+displays them. Phases 2, 3 and 4 had docs of their own, deleted once they landed — what outlived them is
+in the Done entries below, and the PRs that reference them are #1712, #1715 and #1716.
 
 ---
 
@@ -156,6 +157,38 @@ the Done entries below, and the PRs that reference them are #1712, #1715 and #17
   the `Sample` / `SequencingSample` admin filters, and through a health check that stays silent while
   everything matches.
 
+- **Phase 5 — gene fusions as variants and the `AllFusions.csv` parser (#1506, phase 1)**, designed in
+  [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md), which stays the spec.
+  Gene-level events get a real `Variant`, anchored on one gene-level contig shared by every build, with
+  the gene pair encoded in a symbolic alt and a `GeneFusion` companion model. A `Variant` rather than the
+  bare `Allele` the issue originally proposed, because `VariantGeneOverlap` and `CohortGenotype` are both
+  `Variant`-keyed — without one, fusions cannot reach gene lists, compound-het detection or any analysis
+  node. VEP never sees them; a third annotation pipeline type resolves gene → symbol → release genes
+  locally and writes the overlap rows for **both** partners.
+
+  Scoped to ingestion, storage and identity — fusion classification equivalence stays deferred, which is
+  what the user-group's "research level project" feedback on #1506 was actually about. Somatic
+  classifications already land on `MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED`, so nothing regresses.
+
+  Two things the issue's original design assumed otherwise. Every row carries both breakpoints
+  (`chr8:128806980` form), so fusions are *not* coordinate-free — what is deferred is the breakend
+  representation, not the data, which is captured from day one. And the breakpoints are per-observation:
+  `ENTPD3-RPL14` appears three times from one caller with three different 5′ breakpoints, so identity is
+  the gene pair and the coordinates live in `CohortGenotype.info` with the rest of the per-row data.
+
+  The one design change from the plan as written: partners are identified by a **`FusionGeneId`** row
+  whose pk is the HGNC ID where there is one, and a locally allocated id above 1,000,000 where there is
+  not. Clone-based identifiers are routine fusion partners (`RP11-458D21.5`, `AC016683.6` are both in
+  the test file), and HGNC-only identity left them unrepresentable. The alt namespaces the two apart
+  (`<FUSION:HGNC:nnn>` vs `<FUSION:GENE:nnn>`) because only the first kind means the same thing on
+  another deployment — anything leaving the system sends `GeneFusion.canonical_str`, not the number.
+
+  The fusion file cannot go through the bcftools stages, so the loader inserts variants directly; and
+  since a `Sample` belongs to exactly one `VCF`, the file creates its own VCF and Sample rather than
+  joining the RNA arm's `SpliceVariants` sample — Phase 4 ties that sample to the extraction, Phase 7's
+  grouping node shows both arms together. A multi-build deployment must declare `genome_build` at upload,
+  as `_DragenExonCNV.vcf` already does.
+
 ## Where things stand
 
 The five test files from `ed5e15a33` — one de-identified run, one specimen, DNA and RNA arms:
@@ -166,7 +199,7 @@ The five test files from `ed5e15a33` — one de-identified run, one specimen, DN
 | `cnv.vcf` | loads, 16 records — 9 copy-neutral rows skipped and counted; `SM` surfacing is Phase 6 |
 | `SpliceVariants.vcf` | loads, 17 records — VAF derived from `ALTDEDUP`/`REFDEDUP`, `LowUniqueAlignments` preserved |
 | `_DragenExonCNV.vcf` | loads, 2 records, against a `genome_build` declared at upload |
-| `AllFusions.csv` | no longer breaks file-type detection; needs a parser and somewhere to put the rows (Phase 5) |
+| `AllFusions.csv` | loads, 33 rows -> 31 fusion variants (2 gene pairs seen more than once); needs `genome_build` declared at upload |
 
 ## Dependency map
 
@@ -188,14 +221,13 @@ The five test files from `ed5e15a33` — one de-identified run, one specimen, DN
       │              │
       │         P8  sapath#246 ──► #444 multi-variant reporting
       │
-  P5  #1506 GeneFusion ──► AllFusions parser   (independent of #1704 — can run in parallel)
+  P5  #1506 GeneFusion ✔ ──► AllFusions parser ✔
       │
   P6  #1558 grid display  (+ #1706's grid half, private#2837 — needs P3's URLs)
 ```
 
-Phases are listed in the order to do them, but only the arrows are real constraints. #1506 is the one
-remaining critical-path item — the fusion parser has nowhere to put rows without it. Everything else is
-ordered by value.
+Phases are listed in the order to do them, but only the arrows are real constraints. With #1506 landed
+there is no critical path left — everything remaining is ordered by value.
 
 ---
 
@@ -220,7 +252,7 @@ DNA and RNA arms of one block. Worth revisiting when a consumer needs it.
 
 ## Still open from Phase 2
 
-`AllFusions.csv` still has no parser — that is Phase 5. The manual checklist on #1711 wants running
+The manual checklist on #1711 wants running
 against a real GRCh37 deployment: PR #1712 measured the record counts and VAFs through
 `write_cleaned_vcf_header` → `vcf_clean_and_filter` → `bcftools norm`, not through a full import with
 annotation.
@@ -233,8 +265,9 @@ one, so they want to stay stable from the first client.
 
 `SEGID=MYCL1` resolving to `MYCL` is unconfirmed against a real database. NCBI carries the alias, and
 `GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` (`genes/gene_matching.py:45`) is the resolver, but
-Phase 6's gene-symbol item rests on that assumption holding — and Phase 5's fusion parser wants the same
-shape for `SEPT14` → `SEPTIN14`, so one check covers both.
+Phase 6's gene-symbol item rests on that assumption holding. Phase 5's fusion parser goes through the
+same resolver for `SEPT14` → `SEPTIN14`, so one check against a real database covers both — and if the
+alias is missing, a fusion partner still imports, just under a local `GENE:` id rather than its HGNC one.
 
 **Clients send a build's own name (`GRCh37`), not an alias.** `GenomeBuild.get_name_or_alias("hg19")`
 raises `MultipleObjectsReturned` rather than `DoesNotExist`, so a declared build that will not resolve
@@ -280,41 +313,6 @@ than globally, so a derived reference matching rows under two specimens parks as
 500 reference embeds its specimen (`2600000001C` starts with `2600000001`), so it does not arise here — a
 deployment whose naming does not carry the specimen would need the regex to yield a parent too.
 
-## Phase 5 — gene fusions as variants and the `AllFusions.csv` parser (#1506, phase 1 only)
-
-Independent of Phases 1-4, all of which have landed, so it starts whenever someone is free.
-
-Designed in detail in [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md), which
-is the spec. In short: gene-level events get a real `Variant`, anchored on a gene-level contig shared by
-every build, with the gene pair encoded in a symbolic alt (`<FUSION:HGNC:nnn>`) and a `GeneFusion`
-companion model. A `Variant` rather than the bare `Allele` the issue originally proposed, because
-`VariantGeneOverlap` and `CohortGenotype` are both `Variant`-keyed — without one, fusions cannot reach
-gene lists, compound-het detection or any analysis node. VEP never sees them; a third annotation pipeline
-type resolves HGNC → gene locally and writes the overlap rows.
-
-**Scope it to ingestion, storage and identity. Leave fusion classification equivalence alone.** The
-user-group feedback on #1506 — "very difficult to implement, needs more thinking and likely more
-resourcing, likely a research level project" — is about **fusion equivalence and discordance**, not about
-ingesting and displaying them. Somatic classifications already land on
-`MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED`, so phase 1 gets that for free and the research-level part
-stays deferred.
-
-Two things about the test file that the issue's original design assumed otherwise. Every row carries both
-breakpoints (`chr8:128806980` form), so fusions are *not* coordinate-free — what is deferred is the
-breakend representation, not the data, which is captured from day one. And the breakpoints are
-per-observation rather than per-fusion: `ENTPD3-RPL14` appears three times from one caller with three
-different 5′ breakpoints, so identity stays the gene pair and the coordinates live in
-`CohortGenotype.info` alongside the rest of the per-row data.
-
-Consequences for the rest of this plan: the fusion file cannot go through the bcftools stages, so the
-loader inserts variants directly; and since a `Sample` belongs to exactly one `VCF`, the file creates its
-own VCF and Sample rather than joining the RNA arm's `SpliceVariants` sample — Phase 4 ties that sample to
-the extraction, Phase 7's grouping node shows both arms together.
-
-**Done when** all 33 rows of the test file import, `EGFR-SEPTIN14` resolves despite the file saying
-`SEPT14`, the same gene pair from both callers resolves to one `GeneFusion`, and a gene list containing
-`ROS1` finds `CD74-ROS1`.
-
 ## Phase 6 — showing non-variants on the grids (#1558, and #1706's grid half)
 
 Less outstanding than the issue title suggests. Per its own comment table, SV already works in the grid
@@ -329,11 +327,13 @@ decision as `SM` and `CN`, and wants deciding once for all three.
 `GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` (`genes/gene_matching.py:45`) is the resolver
 either way.
 
-Fusions are the genuinely new case, and only exist to display after Phase 5. The single-grid vs
-multiple-grids question is worth deciding on real fusion rows rather than in the abstract — with fusion
-`Variant`s in hand, "sort by gene brings the fusions together" is testable instead of hypothetical. Phase
-5 leaves them grid-ready rather than grid-complete: they carry a gene symbol from their own annotation
-run, so what remains here is the kind filter and the columns that only make sense for a fusion.
+Fusions are the genuinely new case, and Phase 5 has now put real ones in the database, so the
+single-grid vs multiple-grids question is decidable rather than hypothetical — "sort by gene brings the
+fusions together" is testable on the 31 fusion variants the test file produces. Phase 5 left them
+grid-ready rather than grid-complete: they carry a gene symbol and `overlapping_symbols` from their own
+annotation run, so what remains here is the kind filter and the columns that only make sense for a
+fusion (both breakpoints, caller, read counts — all in `CohortGenotype.info["observations"]`, one entry
+per row the caller wrote).
 
 #1706's grid half joins here because it is the same kind of change and wants the same pass over the
 column definitions: top-level specimen and extraction grids under the patients menu, an extraction link
@@ -400,10 +400,9 @@ tiering is gene *and* tumour type and the phenotype data cannot make that call.
 
 ## Parallelism
 
-With Phases 1-4 landed, the model spine is done and what remains splits cleanly: one takes Phase 5
-(fusions, `classification` and `upload`), the other Phase 7's grouping node (`analysis`, reading Phase
-4's `Sample.extraction`), and they meet at Phase 6, which wants Phase 5's rows in hand. Phase 8 consumes
-everything and comes last either way.
+With Phases 1-5 landed, the model spine is done and the fusion rows Phase 6 wants to display exist. What
+remains splits cleanly: one takes Phase 6 (grids), the other Phase 7's grouping node (`analysis`, reading
+Phase 4's `Sample.extraction`). Phase 8 consumes everything and comes last either way.
 
 With one person, the order above is the order.
 
@@ -411,8 +410,7 @@ With one person, the order above is the order.
 
 | Decision | Phase | Why it is cheaper now |
 |---|---|---|
-| Multi-gene partner with one HGNC and one clone identifier — park the row or resolve to the HGNC member? | 5 | Determines whether `GeneFusion` identity can be non-null on both sides |
-| Single grid or multiple grids for non-variants? | 6 | Best answered against real fusion rows, so genuinely wait for Phase 5 |
+| Single grid or multiple grids for non-variants? | 6 | Now answerable — Phase 5's fusion rows exist to try it on |
 
 ## Deferred, deliberately
 
