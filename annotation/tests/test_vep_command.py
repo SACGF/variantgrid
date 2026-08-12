@@ -30,6 +30,24 @@ class GetVepCommandTests(TestCase):
         self.assertEqual(cmd[cmd.index("--skipped_variants_file") + 1],
                          get_vep_skipped_variants_filename("out.vcf"))
 
+    @override_settings(ANNOTATION_VEP_MEMORY_LIMIT_GB=4)
+    def test_memory_limit_wraps_whole_command(self):
+        """ #1710: prlimit has to be outermost so everything VEP starts inherits the heap ceiling """
+        cmd = self._cmd(AnnotationConsortium.ENSEMBL)
+        self.assertEqual(cmd[:3], ["prlimit", f"--data={4 * 1024 ** 3}", "--"])
+
+    @override_settings(ANNOTATION_VEP_MEMORY_LIMIT_GB=4,
+                       ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT="/path/perlbrew_runner.sh")
+    def test_memory_limit_wraps_perlbrew_runner(self):
+        cmd = self._cmd(AnnotationConsortium.ENSEMBL)
+        self.assertEqual(cmd[:4], ["prlimit", f"--data={4 * 1024 ** 3}", "--", "/path/perlbrew_runner.sh"])
+
+    @override_settings(ANNOTATION_VEP_MEMORY_LIMIT_GB=None, ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT=None)
+    def test_no_memory_limit_leaves_command_unwrapped(self):
+        cmd = self._cmd(AnnotationConsortium.ENSEMBL)
+        self.assertNotIn("prlimit", cmd)
+        self.assertTrue(cmd[0].endswith("vep"))
+
     def test_gencode_primary_ensembl_sets_flag(self):
         vav = VariantAnnotationVersion(
             gencode_subset=VariantAnnotationVersion.GencodeSubset.PRIMARY,

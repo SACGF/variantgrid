@@ -188,6 +188,16 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT:
         cmd.insert(0, settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT)
 
+    if memory_limit_gb := settings.ANNOTATION_VEP_MEMORY_LIMIT_GB:
+        # Outermost so the limit is inherited by everything VEP starts. --data covers brk + anonymous
+        # mmap, which is where a plugin's per-record hashes live, and leaves the fasta/tabix file
+        # mappings out of it - --as would count those and force a much looser number. Perl hits it as a
+        # failed malloc and exits non-zero with "Out of memory!" on stderr, so the run fails naming its
+        # own cause; a cgroup kill would arrive as SIGKILL, which _abort_process already uses for lease
+        # aborts and so can't be told apart.
+        limit_bytes = int(memory_limit_gb * 1024 ** 3)
+        cmd[0:0] = ["prlimit", f"--data={limit_bytes}", "--"]
+
     if settings.ANNOTATION_VEP_FORK and settings.ANNOTATION_VEP_FORK > 1:
         cmd.extend(["--fork", str(settings.ANNOTATION_VEP_FORK)])
 
