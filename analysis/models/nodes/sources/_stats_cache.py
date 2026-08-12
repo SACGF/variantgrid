@@ -61,6 +61,16 @@ class NoFilterHandler(FilterKeyHandler):
         return [None]
 
 
+class SampleNodeHandler(NoFilterHandler):
+    """ A group level SampleNode spans genotype collections, so there's no single cohort's stats
+        row to read - its counts are live queries. """
+
+    def filter_key_for_node(self, node) -> FilterKey:
+        if node.is_group_level:
+            return UNCACHEABLE
+        return None
+
+
 class TrioInheritanceHandler(FilterKeyHandler):
     # 5 inheritance modes precomputed including compound het.
     CACHED_MODES = {
@@ -96,7 +106,7 @@ def get_handler_for_node(node) -> FilterKeyHandler:
     from analysis.models.nodes.sources.trio_node import TrioNode
 
     handlers = {
-        SampleNode: NoFilterHandler(),
+        SampleNode: SampleNodeHandler(),
         CohortNode: NoFilterHandler(),
         TrioNode: TrioInheritanceHandler(),
         PedigreeNode: NoFilterHandler(),

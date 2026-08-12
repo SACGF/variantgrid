@@ -117,6 +117,9 @@ class SampleAutocompleteView(GenomeBuildAutocompleteView):
     def get_user_queryset(self, user):
         sample_qs = Sample.filter_for_user(user, True).filter(import_status=ImportStatus.SUCCESS)
         sample_qs = self.exclude_archived_if_forwarded(sample_qs, "vcf__data_archived_date")
+        # Completes the Patient -> Specimen -> Extraction -> Sample chain the patients autocompletes start
+        if extraction := self.forwarded.get('extraction'):
+            sample_qs = sample_qs.filter(extraction=extraction)
         return self.filter_to_genome_build(sample_qs, "vcf__genome_build")
 
 

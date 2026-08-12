@@ -29,9 +29,18 @@ class SampleNodeView(GeneCoverageNodeView):
         else:
             base_template = "analysis/node_editors/grid_editor.html"
 
+        source_samples = []
+        if self.object.is_group_level:
+            group = self.object.get_sample_group()
+            has_genotype = any(s.has_genotype for s in group.samples)
+            for group_sample in group.samples:
+                source_samples.append({"sample": group_sample,
+                                       "thresholds": self.object.get_sample_thresholds(group_sample)})
+
         context.update({"base_template": base_template,
                         "sample": sample,
                         "has_genotype": has_genotype,
+                        "source_samples": source_samples,
                         "show_genes_tab": show_genes_tab,
                         "gene_lists": [gene_list]})
         return context
@@ -39,7 +48,10 @@ class SampleNodeView(GeneCoverageNodeView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         has_genotype = True
-        if self.object.sample:
+        if self.object.is_group_level:
+            if samples := self.object.get_source_samples():
+                has_genotype = any(s.has_genotype for s in samples)
+        elif self.object.sample:
             has_genotype = self.object.sample.has_genotype
         analysis = self.object.analysis
         kwargs["genome_build"] = analysis.genome_build

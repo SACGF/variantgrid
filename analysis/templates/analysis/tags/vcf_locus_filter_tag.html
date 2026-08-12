@@ -18,6 +18,10 @@
             loadBaseURL(Urls.sample_vcf_locus_filters, sampleId);
         }
 
+        function loadExtractionVCFLocusFilter(extractionId) {
+            loadBaseURL(Urls.extraction_vcf_locus_filters, extractionId);
+        }
+
         function loadCohortVCFLocusFilter(cohortId) {
             loadBaseURL(Urls.cohort_vcf_locus_filters, cohortId);
         }
@@ -44,6 +48,11 @@
         $(document).ready(function() {
             loadVCFLocusFilter({{ vcf.pk }});
         });        
+        {% endif %}
+        {% if extraction %}
+        $(document).ready(function() {
+            loadExtractionVCFLocusFilter({{ extraction.pk }});
+        });
         {% endif %}
         
     </script>

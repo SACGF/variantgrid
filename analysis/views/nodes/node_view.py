@@ -89,7 +89,7 @@ class NodeView(UpdateView):
         if self.object.analysis.template_type == AnalysisTemplateType.TEMPLATE and self.object.is_source:
             for field_name, field in form.fields.items():
                 if not field.widget.is_hidden:
-                    if field_name in ["pedigree", "trio", "cohort", "sample", "sample_gene_list"]:
+                    if field_name in ["pedigree", "trio", "cohort", "sample", "extraction", "sample_gene_list"]:
                         field.required = False  # Need to be able to save if analysis variable
                         self._monkey_patch_widget_render(field.widget)
 
