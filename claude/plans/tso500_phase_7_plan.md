@@ -71,8 +71,11 @@ still need N× `SampleNode` → `MergeNode`.
 arms", "called in ≥2 of these samples" — are one indexed regex over a packed row
 (`CohortGenotypeCollection.get_zygosity_q`), and only work within a single CGC. The group node also
 gives up `get_cached_label_count_for_cohort`, so its node counts are live queries. Both are acceptable
-at 3-4 samples over ~100-row partitions, and if a cross-sample zygosity requirement ever appears the
-cohort can be added *behind* this node as a materialised cache without changing its identity.
+at 3-4 samples over ~100-row partitions, and either can be added *behind* this node later without
+changing its identity: a `VariantCollection` (`snpdb/models/models_variant.py:930`) is the vehicle if
+live counts ever get slow — it is a partitioned PK set with its own `get_arg_q_dict` and archive
+handling, so it caches the result without touching genotype data the way a cohort copy would — and a
+cohort if a genuine cross-sample zygosity requirement appears.
 
 ## How the query is built
 
@@ -166,6 +169,14 @@ defaults. Four menu entries, four labels and icons, one table.
 - **`handle_sample_pre_delete`** (`analysis/signals/source_data_invalidation.py:55`) needs a second Q —
   `Q(samplenode__extraction=instance.extraction)` — because deleting a sample changes a group node's
   result without touching its FK. That work exists under either design.
+- **Per-sample thresholds are a child table**, keyed `(node, sample)`, carrying the same
+  `min_ad`/`min_dp`/`min_gq`/`max_pl` set the node already holds
+  (`analysis/models/nodes/sources/sample_node.py:24-27`). `NodeAlleleFrequencyFilter` →
+  `NodeAlleleFrequencyRange` (`analysis/models/nodes/analysis_node.py:1364`) is the precedent for a
+  per-node child table feeding `_get_node_arg_q_dict`. The node's own fields stay as the value applied
+  to any sample with no row — so a sample that `reconcile_pending_extractions` attaches after the node
+  was configured gets the node default rather than nothing, and the editor shows a row only where the
+  user has overridden one.
 - **`SampleNodeForm`** is where the complexity actually lands. It already deletes fields conditionally
   for `has_genotype` and `lock_input_sources` (`analysis/forms/forms_nodes.py:783-793`); it gains
   level-conditional widgets and the per-sample threshold rows.
@@ -198,8 +209,15 @@ Two things decide whether it helps or misleads:
 
 - **Apply exactly the filters the node will** — `Sample.filter_for_user`, the analysis genome build,
   archived VCFs. A preview that counts samples the node then drops is worse than no preview.
-- **Report exclusions rather than omitting them.** "4 samples, 3 in GRCh38" is the message. Silent
-  narrowing is the failure mode that bites here, precisely because the user didn't hand-pick the samples.
+- **Report exclusions rather than omitting them.** "4 samples, 3 in GRCh38 — 1 not included" is the
+  message. Silent narrowing is the failure mode that bites here, precisely because the user didn't
+  hand-pick the samples.
+
+An analysis has exactly one genome build, so restricting to it is a fact rather than a policy choice —
+which is what makes Patient level cheap even where timepoints span builds. The warning is the whole of
+the work, and it belongs on the node as well as in the preview, since the exclusion happens at query
+time: a build the node silently drops is the same failure as a VCF that was archived, and
+`NodeStatus`/the node's warning text is where the user will actually see it.
 
 Where stats haven't been calculated yet, return null and let the UI say so.
 
@@ -261,11 +279,15 @@ sapath#301 actually asked for, so they are not optional at extraction level.
 exon-CNV calls in a single grid, each row showing which VCF it came from and carrying that VCF's
 `INFO`/`FORMAT` values, with different `min_ad` per caller, and the node showing ×3 on the canvas.
 
-## Open questions
+## Settled, with what was decided against
 
-| Question | Notes |
+| Question | Decision |
 |---|---|
-| Per-sample threshold UI — repeated rows in the editor, or a per-VCF-source default? | sapath#301 needs per-caller cutoffs; the shape is a form problem, not a query one |
-| Patient level and multiple genome builds | Free of `Cohort.genome_build` now, but "which build" becomes a node question rather than a data one |
-| `Sample.extraction` is a single FK (`snpdb/models/models_vcf.py:340` — "TODO: A sample may have >1 extractions (eg tumor/normal subtraction)") | If that becomes real the resolver absorbs it; a materialised cohort would not have |
-| Cached label counts at group level | Live counts are fine at TSO 500 sizes; revisit if a specimen ever spans many timepoints |
+| Per-sample threshold UI | **Repeated rows in the editor**, over a per-VCF-source default. VG's usual shape is a global default you may then override per object, so the rows are needed either way — and the defaults want to key on panel as well as caller, which is its own piece of work |
+| Patient level and multiple genome builds | **Restrict to the analysis build and warn** which VCFs that excluded. An analysis is single-build by definition, so this is a message rather than a decision |
+| `Sample.extraction` is a single FK (`snpdb/models/models_vcf.py:340` — "TODO: A sample may have >1 extractions (eg tumor/normal subtraction)") | **Leave it.** If it becomes real the query-time resolver absorbs it; a materialised cohort would not have |
+| Cached label counts at group level | **Live counts, no cache.** `VariantCollection` is the next step if a specimen ever spans enough timepoints to hurt |
+
+Deployment-wide threshold defaults per VCF source — and per panel, which is the part that makes it
+bigger than a settings dict — are #1717 rather than part of this phase. The per-node values this phase
+builds stay the thing that runs either way; #1717 only changes what a new node starts from.

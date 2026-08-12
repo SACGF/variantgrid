@@ -305,7 +305,7 @@ hand-created fusion variants, so it can run in parallel with step 5.
 
 | Decision | Why it matters |
 |---|---|
-| Multi-gene partner with one HGNC and one clone-based identifier — park the row or resolve to the HGNC member? | Parking (imported, unlinked, needs-attention, per Phase 4's reconcile pattern) keeps the data; resolving invents a call the caller did not make. Determines whether `GeneFusion` identity can be non-null on both sides |
+| How a non-HGNC partner gets an identity — `RP11-458D21.5`, `AC016683.6` and the multi-gene `ROS1;GOPC` forms | Parking the row is ruled out: these partners have to be storable as fusions. So the question is which namespace joins HGNC in `Locus.position` and the alt, and whether identity moves when HGNC later names one of these genes. Determines whether `GeneFusion` identity can be non-null on both sides |
 | Does VEP parse BND at all? | Only affects whether a future breakend phase can reuse VEP; nothing in phase 1 waits on it |
 | Single grid or multiple grids for non-variants | Overall plan Phase 6, best answered against real fusion rows |
 

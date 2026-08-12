@@ -329,11 +329,12 @@ decision as `SM` and `CN`, and wants deciding once for all three.
 `GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` (`genes/gene_matching.py:45`) is the resolver
 either way.
 
-Fusions are the genuinely new case, and only exist to display after Phase 5. The single-grid vs
-multiple-grids question is worth deciding on real fusion rows rather than in the abstract — with fusion
-`Variant`s in hand, "sort by gene brings the fusions together" is testable instead of hypothetical. Phase
-5 leaves them grid-ready rather than grid-complete: they carry a gene symbol from their own annotation
-run, so what remains here is the kind filter and the columns that only make sense for a fusion.
+Fusions are the genuinely new case, and only exist to display after Phase 5. **One grid, not several** —
+a fusion is a row like any other, so compound-het detection, gene lists and every downstream node keep
+working over the same result set rather than needing a per-kind union. That is also what Phase 5's
+choice of a real `Variant` over a bare `Allele` was for. Phase 5 leaves them grid-ready rather than
+grid-complete: they carry a gene symbol from their own annotation run, so what remains here is the kind
+filter and the columns that only make sense for a fusion.
 
 #1706's grid half joins here because it is the same kind of change and wants the same pass over the
 column definitions: top-level specimen and extraction grids under the patients menu, an extraction link
@@ -411,8 +412,10 @@ With one person, the order above is the order.
 
 | Decision | Phase | Why it is cheaper now |
 |---|---|---|
-| Multi-gene partner with one HGNC and one clone identifier — park the row or resolve to the HGNC member? | 5 | Determines whether `GeneFusion` identity can be non-null on both sides |
-| Single grid or multiple grids for non-variants? | 6 | Best answered against real fusion rows, so genuinely wait for Phase 5 |
+| Multi-gene partner with one HGNC and one clone identifier — how non-HGNC genes get an identity | 5 | Determines whether `GeneFusion` identity can be non-null on both sides. Parking the row is ruled out: these partners have to be storable |
+
+Phase 6's single-vs-multiple grid question is settled — one grid, so fusions reach comp-het and every
+downstream node. Phase 7's four are settled in its own doc.
 
 ## Deferred, deliberately
 
