@@ -145,6 +145,10 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
         return qs.order_by("genomebuildcontig__order")
 
     @cached_property
+    def contig_ids(self) -> list[int]:
+        return list(self.contigs.values_list("pk", flat=True))
+
+    @cached_property
     def standard_contigs(self):
         return self.contigs.filter(role=SequenceRole.ASSEMBLED_MOLECULE)
 
