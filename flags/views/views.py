@@ -251,15 +251,6 @@ class FlagHelper:
         json_data['collections'] = flag_collections_json
 
         for flag in self.flags.values():
-            flag_type = self.flag_types[flag.flag_type_id]
-            if flag_type.only_one:
-                # find when flag was last opened
-                try:
-                    created = FlagComment.objects.filter(flag=flag, resolution__status=FlagStatus.OPEN).order_by('-created').\
-                        values_list('created', flat=True).first()
-                except Exception:
-                    pass
-
             resolution = self.flag_resolutions[flag.resolution_id]
             json_entry = {
                 'id': flag.pk,
