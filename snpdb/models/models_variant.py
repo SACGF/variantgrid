@@ -636,8 +636,12 @@ class Variant(PreviewModelMixin, models.Model):
 
     @staticmethod
     def get_contigs_q(genome_build: GenomeBuild) -> Q:
-        """ Restrict to contigs in a genome build """
-        return Q(locus__contig__genomebuildcontig__genome_build=genome_build)
+        """ Restrict to contigs in a genome build.
+
+            A build's contigs are a small fixed set, so this is an IN list rather than a join through
+            GenomeBuildContig - the join collapses the planner's row estimate to 1 and it can end up
+            re-scanning the whole variant side once per contig (#1720) """
+        return Q(locus__contig_id__in=genome_build.contig_ids)
 
     @staticmethod
     def get_reference_q() -> Q:
