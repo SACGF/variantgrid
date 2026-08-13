@@ -11,7 +11,7 @@ from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError, models
-from django.db.models import QuerySet, Value
+from django.db.models import F, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
 from django.db.models.functions.text import Concat
@@ -727,9 +727,16 @@ class Variant(PreviewModelMixin, models.Model):
     @staticmethod
     def qs_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> QuerySet['Variant']:
         variant_coordinate = variant_coordinate.as_internal_symbolic(genome_build)
-        params = ["locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "svlen"]
-        return Variant.objects.filter(locus__contig__genomebuildcontig__genome_build=genome_build,
-                                      **dict(zip(params, variant_coordinate)))
+        # Resolving the contig up front drops the join through GenomeBuildContig (@see #1720) and puts the
+        # filter on the leading edge of the snpdb_locus (contig, position, ref) unique index
+        contig = genome_build.chrom_contig_mappings.get(variant_coordinate.chrom)
+        if contig is None:
+            return Variant.objects.none()
+        return Variant.objects.filter(locus__contig=contig,
+                                      locus__position=variant_coordinate.position,
+                                      locus__ref__seq=variant_coordinate.ref,
+                                      alt__seq=variant_coordinate.alt,
+                                      svlen=variant_coordinate.svlen)
 
     @staticmethod
     def get_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> 'Variant':
@@ -901,9 +908,9 @@ class Variant(PreviewModelMixin, models.Model):
     def get_best_variant_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
         from annotation.models import VariantAnnotationVersion
         vav = VariantAnnotationVersion.latest(genome_build)
-        if can := self.varianttranscriptannotation_set.filter(version=vav, canonical=True).first():
-            return can
-        if version := self.varianttranscriptannotation_set.filter(version=vav).first():
+        # canonical is nullable, so nulls_last keeps a canonical=True row ahead of the rest
+        canonical_first = F("canonical").desc(nulls_last=True)
+        if version := self.varianttranscriptannotation_set.filter(version=vav).order_by(canonical_first).first():
             return version
         if any_at_all := self.varianttranscriptannotation_set.first():
             return any_at_all

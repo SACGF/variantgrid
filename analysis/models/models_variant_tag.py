@@ -108,8 +108,10 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         if tag_ids:
             tags_qs = tags_qs.filter(tag__in=tag_ids)
 
+        # Tagging is done manually so this will only ever be small - much faster to convert to list
+        allele_ids = [a for a in tags_qs.values_list("allele", flat=True) if a is not None]
         return Q(variantallele__genome_build=genome_build,
-                 variantallele__allele__in=tags_qs.values_list("allele"))
+                 variantallele__allele__in=allele_ids)
 
     @staticmethod
     def get_variant_tag_counts_qs(variant, genome_build=None) -> QuerySet['VariantTag']:
