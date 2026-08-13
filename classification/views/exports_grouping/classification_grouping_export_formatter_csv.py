@@ -18,7 +18,7 @@ from snpdb.models import GenomeBuild
 class CSVFormatDetails:
     full_detail: bool = False
     html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
-    html_links: bool = True
+    html_links: bool = False  # was only True for the sake of Franklin (which now has its own proper export)
 
 
 @dataclass(frozen=True)

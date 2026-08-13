@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
@@ -9,10 +10,11 @@ from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from more_itertools.more import peekable
-from classification.enums import ShareLevel
+from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, \
     OverlapContribution
 from classification.models import EvidenceKeyMap
+from genes.hgvs import CHGVS
 from library.utils import local_date_string
 from snpdb.models import Organization, Lab, GenomeBuild, Variant, Allele
 import re
@@ -25,6 +27,7 @@ class ClassificationGroupingExportFilter:
     exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
     include_sources: Optional[Set[Lab]] = None
     since: Optional[datetime] = None  # has to work on classification grouping and conflict lab
+    allele_origin: Optional[AlleleOriginBucket] = None
 
     @cached_property
     def date_str(self):
@@ -34,6 +37,7 @@ class ClassificationGroupingExportFilter:
     def from_request(cls, request: HttpRequest) -> 'ClassificationGroupingExportFilter':
         exclude_sources = None
         include_sources = None
+        allele_origin = None
         lab_mode = "all"
         if labs_str := request.GET.get("labs"):
             lab_mode = labs_str
@@ -53,20 +57,24 @@ class ClassificationGroupingExportFilter:
 
         since = None
         if since_str := request.GET.get("since"):
-            if re.match("[0-9]+", since_str):
+            if re.match("$[0-9]+^", since_str):
                 since_days = int(since_str)
                 # TODO round off to midnight
                 since = datetime.now() - timedelta(days=since_days)
             elif date_match := re.match(r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})", since_str):
-                since = datetime(year=int(date_match.group("year")), month=int(date_match.group("months")), day=int(date_match.group("days")))
+                since = datetime(year=int(date_match.group("year")), month=int(date_match.group("month")), day=int(date_match.group("day")))
                 # TODO truncate date
+
+        if allele_origin_str := request.GET.get("allele_origin"):
+            allele_origin = AlleleOriginBucket(allele_origin_str)
 
         return ClassificationGroupingExportFilter(
             user=request.user,
             lab_mode=lab_mode,
             exclude_sources=exclude_sources,
             include_sources=include_sources,
-            since=since
+            since=since,
+            allele_origin=allele_origin
         )
 
     def queryset(self, genome_build: Optional[GenomeBuild] = None) -> QuerySet[ClassificationGrouping]:
@@ -89,6 +97,9 @@ class ClassificationGroupingExportFilter:
         # order by allele ordering
         if not genome_build:
             genome_build = GenomeBuild.grch38()
+
+        if allele_origin := self.allele_origin:
+            groupings = groupings.filter(allele_origin_grouping__allele_origin_bucket=allele_origin)
 
         allele_sort_column = ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "genomic_sort")
         # could we build the ordering into AlleleOriginGrouping?
@@ -135,7 +146,53 @@ class ClassificationGroupingExportFormatProperties:
 class ClassificationGroupingByAllele:
     allele_id: int
     classification_groupings: list[ClassificationGrouping]
-    variant: Optional[Variant]
+    genome_build: Optional[GenomeBuild]
+
+    @cached_property
+    def variant(self) -> Optional[Variant]:
+        if genome_build := self.genome_build:
+            allele = Allele.objects.get(pk=self.allele_id)
+            variant = allele.variant_for_build_optional(genome_build)
+            return variant
+        return None
+
+    @cached_property
+    def c_hgvs(self) -> Optional[CHGVS]:
+        for cg in self.classification_groupings:
+            if allele_info := cg.latest_allele_info:
+                if preferred_build := allele_info[self.genome_build]:
+                    if c_hgvs_obj := preferred_build.c_hgvs_obj:
+                        return c_hgvs_obj
+        return None
+
+    def sub_by_allele_origin(self) -> list['ClassificationGroupingByAlleleAndOrigin']:
+        by_allele_origin = defaultdict(list)
+        for grouping in self.classification_groupings:
+            by_allele_origin[grouping.allele_origin_bucket].append(grouping)
+        return [ClassificationGroupingByAlleleAndOrigin(self, allele_origin, groupings) for allele_origin, groupings in by_allele_origin.items()]
+
+
+@dataclass(frozen=True)
+class ClassificationGroupingByAlleleAndOrigin:
+    grouping_by_allele: ClassificationGroupingByAllele
+    allele_origin_bucket: AlleleOriginBucket
+    classification_groupings: list[ClassificationGrouping]
+
+    @property
+    def allele_id(self):
+        return self.grouping_by_allele.allele_id
+
+    @property
+    def variant(self) -> Optional[Variant]:
+        return self.grouping_by_allele.variant
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.grouping_by_allele.genome_build
+
+    @property
+    def c_hgvs(self):
+        return self.grouping_by_allele.c_hgvs
 
 
 class ClassificationGroupingExportFormat(ABC):
@@ -160,18 +217,12 @@ class ClassificationGroupingExportFormat(ABC):
     def queryset(self, genome_build: Optional[GenomeBuild] = None) -> QuerySet[ClassificationGrouping]:
         return self.classification_grouping_filter.queryset(genome_build=genome_build)
 
-    def allele_group_iterator(self, genome_build: Optional[GenomeBuild] = None) -> Iterator[ClassificationGroupingByAllele]:
-        for allele_id, cgs in itertools.groupby(self.queryset(genome_build).iterator(), lambda cg: cg.allele_origin_grouping.allele_grouping.allele.pk):
-            variant: Optional[Variant] = None
-            if genome_build:
-                # FIXME make me efficient
-                allele = Allele.objects.get(pk=allele_id)
-                variant = allele.variant_for_build_optional(genome_build)
-
+    def allele_group_iterator(self) -> Iterator[ClassificationGroupingByAllele]:
+        for allele_id, cgs in itertools.groupby(self.queryset(self.genome_build).iterator(), lambda cg: cg.allele_origin_grouping.allele.pk):
             yield ClassificationGroupingByAllele(
                 allele_id,
                 list(cgs),
-                variant=variant
+                genome_build=self.genome_build
             )
 
     def header(self) -> list[str]:

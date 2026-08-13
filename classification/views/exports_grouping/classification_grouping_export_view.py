@@ -13,6 +13,8 @@ from classification.views.exports_grouping.classification_grouping_export_format
     ClassificationGroupingExportFormatterVCF, VCFFormatDetails
 from classification.views.exports_grouping.classification_grouping_export_process import \
     ClassificationGroupingExportProcess
+from classification.views.exports_grouping.classification_grouping_export_formatter_franklin import \
+    ClassificationGroupingExportFormatterFranklin, FranklinFormatDetails
 from library.django_utils import get_url_from_view_path
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Lab, Organization
@@ -51,6 +53,14 @@ def serve_export(request: HttpRequest) -> HttpResponseBase:
             )
         case "json":
             classification_export_format = ClassificationGroupingExportFormatterJSON(classification_grouping_filter=export_filter)
+        case "franklin":
+            franklin_format_details = FranklinFormatDetails(
+                genome_build=GenomeBuild.get_name_or_alias(request.GET.get("genome_build"))
+            )
+            classification_export_format = ClassificationGroupingExportFormatterFranklin(
+                classification_grouping_filter=export_filter,
+                franklin_formatter_details=franklin_format_details
+            )
         case _:
             raise ValueError(f"Unsupported export format: {format_str}")
 

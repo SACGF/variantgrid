@@ -458,6 +458,10 @@ class ClassificationGrouping(TimeStampedModel):
         self.save()
         # note the save signal will update the OverlapContribution
 
+    @property
+    def conditions_obj(self) -> ConditionResolved:
+        return ConditionResolved.from_dict(self.conditions)
+
     def gene_symbols(self):
         terms = set(self.classificationgroupingsearchterm_set.filter(term_type=ClassificationGroupingSearchTermType.GENE_SYMBOL).values_list("term", flat=True))
         return GeneSymbol.objects.filter(symbol__in=terms)

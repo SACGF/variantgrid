@@ -63,6 +63,9 @@ class ClassificationSummaryCacheObjDate(DataClassJsonMixin):
     date: str  # in format of yyyy-mm-dd
     type: Optional[str]
 
+    def __bool__(self):
+        return bool(self.date)
+
     def __lt__(self, other):
         return self.date < other.date
 
@@ -74,6 +77,12 @@ class ClassificationSummaryCacheObjSomatic(DataClassJsonMixin):
     clinical_significance: Optional[str]
     amp_level: Optional[str]
     sort: Optional[int]
+
+    @property
+    def somatic_clinical_significance_value(self) -> Optional['SomaticClinicalSignificanceValue']:
+        if cs := self.clinical_significance:
+            return SomaticClinicalSignificanceValue(cs, self.amp_level)
+        return None
 
 
 @dataclass(frozen=True)
@@ -130,6 +139,17 @@ class SomaticClinicalSignificanceValue:
                 return sort_value
         # default to 1, so things which shouldn't even be considered somatic can be 0
         return 1
+
+    @property
+    def pretty_value(self):
+        from classification.models import EvidenceKeyMap
+        parts = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.tier_level)
+        if amp_level := self.amp_level:
+            parts.append(amp_level)
+        return "".join(parts)
+
+    def __lt__(self, other):
+        return self.sort_value < other.sort_value
 
 
 _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {

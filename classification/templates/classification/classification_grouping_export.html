@@ -98,6 +98,10 @@
         {% endlabelled %}
         <hr/>
 
+        {% labelled label="Allele Origin" %}
+            {% allele_origin_toggle show_label=False %}
+        {% endlabelled %}
+
         {% labelled label="Rows per File" %}
             <input class="form-control" id="rows_per_file" type="number" value="" placeholder="Unlimited"/>
             <span class="text-muted">Set this to a value to download a zip of the export broken into files, where no file exceeds that many rows.</span>
@@ -122,7 +126,7 @@
                         {% if genome_build.enabled %}
                             <div class="form-check">
                                 <label class="form-check-label">
-                                    <input class="form-check-input" {% if genome_build.name == default_genome_build.name %}checked="checked"{% endif %} id="genome_build_{{ genome_build.name }}" type="radio" name="genome_build" value="{{ genome_build.name }}" />
+                                    <input class="form-check-input" {% if genome_build.name == default_genome_build.name %}checked="checked"{% endif %} id="vcf_genome_build_{{ genome_build.name }}" type="radio" name="vcf_genome_build" value="{{ genome_build.name }}" />
                                     {{ genome_build.name }}
                                 </label>
                             </div>
@@ -157,6 +161,30 @@
             {% ui_register_tab_embedded tab_set="format" label="JSON" %}
                 <span class="text-secondary">JSON export for exporting the system's internal representation of the classifications, only recommended for advanced use cases.</span>
             {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="format" label="Franklin" %}
+                <span class="text-secondary">A TSV formatted specifically for Franklin By QIAGEN</span><br/><br/>
+                <div class="mb-4">
+                    If there is a conflict of classification values, the most pathogenic will be reported.<br/>
+                    The curation date will be hardcoded to 2000-01-01 to give the data a lower priority to what's been curated in your system.<br/>
+                    The condition will be hardcoded to blank.<br/>
+                    Each record will have summary details as well as a link back to {{ site_name }} to see the up to-date data.
+                </div>
+
+                {% labelled label="Genome Build" hint="chunky" %}
+                    {% for genome_build in genome_builds %}
+                        {% if genome_build.enabled %}
+                            <div class="form-check">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" {% if genome_build.name == default_genome_build.name %}checked="checked"{% endif %} id="franklin_genome_build_{{ genome_build.name }}" type="radio" name="franklin_genome_build" value="{{ genome_build.name }}" />
+                                    {{ genome_build.name }}
+                                </label>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endlabelled %}
+            {% end_ui_register_tab_embedded %}
+
             {% ui_render_tabs tab_set="format" mode="pills" %}
 
         {% endlabelled %}
@@ -195,13 +223,19 @@
             if (since) {
                 params.since = `${since}`;
             }
+            let allele_origin = $("input[name='allele-origin-toggle']:checked").val();
+            if (allele_origin !== "A") {
+                params.allele_origin = allele_origin
+            }
 
             let formatTab = $('#format .nav-link.active').attr('id');
             formatTab = formatTab.substring(1, formatTab.length - 4);
             params.format = formatTab;
             if (formatTab === 'vcf') {
                 params.vcf_target_system = $('input[name=vcf_target_system]:checked').val();
-                params.genome_build = $('input[name=genome_build]:checked').val();
+                params.genome_build = $('input[name=vcf_genome_build]:checked').val();
+            } else if (formatTab === 'franklin') {
+                params.genome_build = $('input[name=franklin_genome_build]:checked').val();
             }
 
             let paramParts = [];

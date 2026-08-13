@@ -191,6 +191,6 @@ class ClassificationGroupingExportFormatterVCF(ClassificationGroupingExportForma
 
     def single_row_generator(self) -> Iterator[str]:
         date_str = self.classification_grouping_filter.date_str
-        for entry in self.allele_group_iterator(genome_build=self.genome_build):
+        for entry in self.allele_group_iterator():
             if row := VCFRow(entry=entry, date_str=date_str).vcf_row(export_tweak=self.export_tweaks):
                 yield row
