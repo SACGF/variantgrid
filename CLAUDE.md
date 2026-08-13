@@ -65,7 +65,7 @@ There are per-app research documents generated in claude/research
 ### Core genetic apps (dependency order)
 - **`library/`** — Shared utilities (not a Django app). No Django models; provides: permissions (`guardian_utils`), notifications (`log_utils.NotificationBuilder`), preview system, jQGrid/DataTables base classes, caching, and 20+ utility modules in `library/utils/`.
 - **`snpdb/`** — Foundation genetic models: `Variant`, `Allele`, `Locus`, `GenomeBuild`, `VCF`, `Sample`, `Cohort`, `Lab`, `Organization`. Also called "SNPDB" (the original project name). Most other apps depend on this.
-- **`genes/`** — Genes, transcripts, HGVS resolution, canonical transcript management. Contains `hgvs/` subdirectory with biocommons/pyhgvs converters.
+- **`genes/`** — Genes, transcripts, HGVS resolution, canonical transcript management. Contains `hgvs/` subdirectory with the biocommons HGVS converter.
 - **`annotation/`** — VEP annotation integration, ClinVar, variant annotation versions.
 - **`analysis/`** — Interactive DAG-based variant filtering pipeline. Nodes produce Django Q objects composed into querysets. Supports sample/trio/cohort/pedigree analysis modes.
 - **`classification/`** — The largest app. Full ACMG classification workflow: evidence keys, versioned records, discordance detection, ClinVar export, condition text matching, multi-lab sharing.

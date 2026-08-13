@@ -132,13 +132,11 @@ def hgvs_resolution_tool(request: HttpRequest):
 
         if data.get("display_clingen_separately"):
             hgvs_matchers = [
-                HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.PYHGVS, clingen_resolution=False),
                 HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS, clingen_resolution=False),
                 HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.CLINGEN_ALLELE_REGISTRY),
             ]
         else:
             hgvs_matchers = [
-                HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.PYHGVS),
                 HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS),
             ]
 

@@ -30,7 +30,6 @@ def _get_gene_and_terms(hgvs_matcher, vta, c_hgvs=True, extra_terms: Optional[li
                 terms.append(f"{cdna_coords}{ref}{change_symbol}{alt}")
 
     if vta.hgvs_p:
-        # pyHGVS doesn't handle p.HGVS very well, so can't use HGVSName.format_protein() etc
         protein_aa3 = vta.hgvs_p.split(":p.")[1]
         terms.append(protein_aa3)
         protein_aa1 = vta.amino_acid_3_to_1(protein_aa3)

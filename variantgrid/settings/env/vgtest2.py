@@ -25,7 +25,6 @@ ANNOTATION_VCF_DUMP_DIR = os.path.join(ANNOTATION_BASE_DIR, 'scratch')
 
 # GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 HEALTH_CHECK_ENABLED = False
-HGVS_DEFAULT_METHOD = "biocommons_hgvs"
 
 # Beacon v2 genomic data-sharing endpoint (#1661) - enabled on test.variantgrid.com for
 # manual testing. environment="test" is the spec's own signal that this is a non-production

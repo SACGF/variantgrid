@@ -235,7 +235,7 @@ hgvs @ git+https://github.com/biocommons/hgvs@3ac3d43fd3f8bef1854af11c95219cea8d
     #   -r requirements.in
     #   cdot
     #   hgvs-shim
-hgvs-shim==0.2.0
+hgvs-shim==0.2.1
     # via -r requirements.in
 html5lib==1.1
     # via django-htmlmin
@@ -371,8 +371,6 @@ pillow==12.3.0
     #   easy-thumbnails
     #   matplotlib
     #   reportlab
-pip==26.1.2
-    # via pyhgvs
 platformdirs==4.10.0
     # via pylint
 pluggy==1.6.0
@@ -410,8 +408,6 @@ pygments==2.20.0
     #   ipython
     #   pytest
     #   rich
-pyhgvs @ git+https://github.com/SACGF/hgvs@69ff4bdd09088be798708702779a5ba59f1c5b41#egg=pyhgvs
-    # via -r requirements.in
 pyjwt==2.13.0
     # via mozilla-django-oidc
 pylint==4.0.5

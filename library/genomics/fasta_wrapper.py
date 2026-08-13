@@ -2,8 +2,8 @@ from pysam.libcfaidx import FastaFile
 
 
 class FastaFileContigWrapper:
-    """ PyHGVS expects FastaSeqFileDB to return an object
-        representing the contig - fake this for pysam """
+    """ A single contig from a pysam FastaFile, sliceable by
+        genomic coordinate ie contig[start:end] """
 
     def __init__(self, fasta_file, contig):
         self.fasta_file = fasta_file
@@ -16,8 +16,8 @@ class FastaFileContigWrapper:
 
 
 class FastaFileWrapper:
-    """ Implements pygr.SeqFileDB interface
-        as pygr (pyghvs dependency) doesn't support Python3 """
+    """ A reference genome fasta, indexed by contig name ie fasta[chrom][start:end]
+        Contig names can be converted on lookup via convert_chrom_func """
 
     def __init__(self, fasta_filename, convert_chrom_func=None):
         self.fasta_filename = fasta_filename

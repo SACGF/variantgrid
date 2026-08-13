@@ -1,10 +1,11 @@
 """
-    PyHGVS has its own testing, this is specific to our code.
+    The biocommons hgvs library has its own testing, this is specific to our code.
 """
 from unittest import skip
 
 from django.test import TestCase, override_settings
-from pyhgvs import HGVSName  # This is used for pyhgvs specific test
+from hgvs.parser import Parser
+from hgvs_shim.hgvs_converter_biocommons import BioCommonsHGVSVariant
 
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import (
@@ -13,7 +14,6 @@ from annotation.tests.test_data_fake_genes import (
 )
 from genes.hgvs import HGVSConverterType, HGVSException, HGVSMatcher
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
-from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSVariant
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 
@@ -56,7 +56,7 @@ class TestHGVS(TestCase):
         ]
 
         hgvs_matcher = HGVSMatcher(genome_build=GenomeBuild.grch38(),
-                                   hgvs_converter_type=HGVSConverterType.PYHGVS)
+                                   hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
         for bad_hgvs in BAD_HGVS:
             # try:
             #     hgvs_matcher.create_hgvs_variant(bad_hgvs)
@@ -89,8 +89,9 @@ class TestHGVS(TestCase):
             "NM_000726.4(CACNB4):c.162_173delCTACACAAGCAG": "NM_000726.4(CACNB4):c.162_173del",
         }
 
+        parser = Parser()
         for hgvs_string, hgvs_expected_trimmed in LONG_AND_TRIMMED_HGVS.items():
-            hgvs_variant = PyHGVSVariant(HGVSName(hgvs_string))
+            hgvs_variant = BioCommonsHGVSVariant(parser.parse(hgvs_string))
             hgvs_actual_trimmed = hgvs_variant.format(max_ref_length=10)
             self.assertEqual(hgvs_actual_trimmed, hgvs_expected_trimmed)
 
@@ -160,20 +161,10 @@ class TestHGVS(TestCase):
             (6, CLINGEN), (5, CLINGEN), (4, CLINGEN), (3, CLINGEN), (2, CLINGEN), (1, CLINGEN),
         ], "Latest, prefer_local")
 
-    def test_hgvs_pyhgvs(self):
-        self._test_hgvs_conversion(HGVSConverterType.PYHGVS)
-
     def test_hgvs_biocommons(self):
-        # PyHGVS doesn't support INV but biocommons does
-        extra_hgvs = [
-            "NM_001145661.2(GATA2):c.1117_1131inv",
-        ]
-        self._test_hgvs_conversion(HGVSConverterType.BIOCOMMONS_HGVS, extra_hgvs)
+        self._test_hgvs_conversion(HGVSConverterType.BIOCOMMONS_HGVS)
 
-    def _test_hgvs_conversion(self, hgvs_converter_type: HGVSConverterType, extra_hgvs=None):
-        if extra_hgvs is None:
-            extra_hgvs = []
-
+    def _test_hgvs_conversion(self, hgvs_converter_type: HGVSConverterType):
         # GATA2 ClinVar
         HGVS_EXAMPLES = [
             "NM_001145661.2(GATA2):c.1121G>A",
@@ -211,20 +202,19 @@ class TestHGVS(TestCase):
             "NM_001145661.2(GATA2):c.1200_1216dup",
             "NM_001145661.2(GATA2):c.1126_1133dup",
             "NM_001145661.2(GATA2):c.1023_1038dup",
+            # Inv
+            "NM_001145661.2(GATA2):c.1117_1131inv",
         ]
 
         genome_build = GenomeBuild.grch37()
         create_gata2_transcript_version(genome_build)
         matcher = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type)
-        for hgvs_string in HGVS_EXAMPLES + extra_hgvs:
+        for hgvs_string in HGVS_EXAMPLES:
             transcript_accession = matcher.get_transcript_accession(hgvs_string)
             vc = matcher.get_variant_coordinate(hgvs_string)
             hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(vc, transcript_accession)
             hgvs_out = hgvs_variant.format(max_ref_length=0)
             self.assertEqual(hgvs_string, hgvs_out, f"{hgvs_converter_type} Converting to and back to VariantCoordinate")
-
-    def test_pyhgvs_reference_diff(self):
-        self._test_reference_diff(HGVSConverterType.PYHGVS)
 
     def test_biocommons_reference_diff(self):
         self._test_reference_diff(HGVSConverterType.BIOCOMMONS_HGVS)
@@ -246,9 +236,6 @@ class TestHGVS(TestCase):
             self.assertEqual(vcd.variant_coordinate, expected_vc)
             self.assertEqual(vcd.matches_reference, expected_matches_ref)
 
-    def test_pyhgvs_gene_symbol_hgvs(self):
-        self._test_gene_symbol_hgvs(HGVSConverterType.PYHGVS)
-
     def test_biocommons_gene_symbol_hgvs(self):
         self._test_gene_symbol_hgvs(HGVSConverterType.BIOCOMMONS_HGVS)
 
@@ -269,9 +256,6 @@ class TestHGVS(TestCase):
     def test_biocommons_mitochondria_hgvs(self):
         return self._test_mitochondria_hgvs(HGVSConverterType.BIOCOMMONS_HGVS)
 
-    def test_pyhgvs_mitochondria_hgvs(self):
-        return self._test_mitochondria_hgvs(HGVSConverterType.PYHGVS)
-
     def _test_mitochondria_hgvs(self, hgvs_converter_type: HGVSConverterType):
         matcher = HGVSMatcher(GenomeBuild.grch37(), hgvs_converter_type=hgvs_converter_type)
         vc = VariantCoordinate(chrom='MT', position=263, ref='A', alt='G')
@@ -284,9 +268,6 @@ class TestHGVS(TestCase):
     def test_biocommons_mitochondria_hgvs_on_nuclear_contig_rejected(self):
         return self._test_mitochondria_hgvs_on_nuclear_contig_rejected(HGVSConverterType.BIOCOMMONS_HGVS)
 
-    def test_pyhgvs_mitochondria_hgvs_on_nuclear_contig_rejected(self):
-        return self._test_mitochondria_hgvs_on_nuclear_contig_rejected(HGVSConverterType.PYHGVS)
-
     def _test_mitochondria_hgvs_on_nuclear_contig_rejected(self, hgvs_converter_type: HGVSConverterType):
         """ 'm.' on a nuclear contig must be rejected rather than silently resolved as 'g.'
             - see SACGF/variantgrid#1632 """
@@ -297,9 +278,6 @@ class TestHGVS(TestCase):
 
     def test_biocommons_invalid_trailing_int(self):
         return self._test_invalid_trailing_int(HGVSConverterType.BIOCOMMONS_HGVS)
-
-    def test_pyhgvs_invalid_trailing_int(self):
-        return self._test_invalid_trailing_int(HGVSConverterType.PYHGVS)
 
     def _test_invalid_trailing_int(self, hgvs_converter_type: HGVSConverterType):
         _bad_examples = [

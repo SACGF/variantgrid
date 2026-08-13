@@ -25,7 +25,6 @@ def check_library_versions() -> dict:
         "cdot": (0, 2, 26),
         "cyvcf2": (0, 30, 14),  # ploidy fix
         "hgvs": _test_biocommons_hgvs,
-        "pyhgvs": (0, 12, 4),
     }
 
     library_version_valid = {}

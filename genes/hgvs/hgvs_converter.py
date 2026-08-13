@@ -1,22 +1,17 @@
-import abc
-import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from genes.hgvs import HGVSNomenclatureException, HGVSVariant
-from snpdb.models import GenomeBuild, VariantCoordinate
+from genes.hgvs import HGVSVariant
 
 
 class HGVSConverterType(Enum):
-    PYHGVS = 1
     BIOCOMMONS_HGVS = 2
-    COMBO = 3
     CLINGEN_ALLELE_REGISTRY = 4  # This is not a full implementation just enough for HGVS tester tool
 
     @property
     def is_internal_type(self) -> bool:
-        return self in (HGVSConverterType.PYHGVS, HGVSConverterType.BIOCOMMONS_HGVS)
+        return self is HGVSConverterType.BIOCOMMONS_HGVS
 
 
 class HgvsMatchRefAllele:
@@ -68,81 +63,3 @@ class HgvsOriginallyNormalized(ValueError):
         if not bool(self):
             msg = f'Normalized HGVS "{self.original_hgvs}" to "{self.normalized_hgvs}"'
         return msg
-
-# We need a common Exception
-# Common HGVS Extra??
-
-
-class HGVSConverter(abc.ABC):
-    """ This is the base object for PyHGVS and BioCommons HGVS
-        implementations """
-
-    def __init__(self, genome_build: GenomeBuild, local_resolution=True, clingen_resolution=True):
-        self.genome_build = genome_build
-        self.local_resolution = local_resolution
-        self.clingen_resolution = clingen_resolution
-
-    @staticmethod
-    def _hgvs_string_validation(hgvs_string: str):
-        """ raise exceptions on any errors """
-
-        if "ins" in hgvs_string:
-            if re.search(r"ins\d+$", hgvs_string):
-                raise HGVSNomenclatureException("Insertions require inserted sequence, not an integer length")
-            if hgvs_string.endswith("ins"):
-                raise HGVSNomenclatureException("Insertions require inserted sequence")
-        if ":" not in hgvs_string:
-            raise HGVSNomenclatureException("No colon (':') provided")
-        for char in [":", "c", "g", "."]:
-            if hgvs_string.startswith(char):
-                raise HGVSNomenclatureException("Missing reference sequence")
-
-    @abc.abstractmethod
-    def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
-        pass
-
-    @abc.abstractmethod
-    def normalize(self, hgvs_variant: HGVSVariant) -> HGVSVariant:
-        pass
-
-    def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
-        hgvs_variant = self._variant_coordinate_to_g_hgvs(vc)
-        if hgvs_variant.contig_accession == self.genome_build.mitochondria_accession:
-            hgvs_variant.kind = 'm'
-        return hgvs_variant
-
-    @abc.abstractmethod
-    def _variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
-        pass
-
-    @abc.abstractmethod
-    def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
-        pass
-
-    @abc.abstractmethod
-    def hgvs_to_variant_coordinate_reference_match_and_normalized(self, hgvs_string: str, transcript_version) -> tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
-        pass
-
-    @abc.abstractmethod
-    def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
-        pass
-
-    @abc.abstractmethod
-    def get_transcript_accession(self, hgvs_string: str) -> str:
-        pass
-
-    @abc.abstractmethod
-    def get_hgvs_converter_type(self) -> HGVSConverterType:
-        pass
-
-    @abc.abstractmethod
-    def get_version(self) -> str:
-        pass
-
-    def description(self, describe_fallback=True) -> str:
-        hgvs_converter_type = self.get_hgvs_converter_type()
-        version = self.get_version()
-        desc = f"{hgvs_converter_type.name} {version}"
-        if describe_fallback and self.clingen_resolution:
-            desc += " (ClinGen fallback)"
-        return desc

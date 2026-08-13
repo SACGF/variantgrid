@@ -324,8 +324,7 @@ def server_status_settings(request):
     slack_emoji = (settings.SLACK or {}).get('emoji') or ':dna:'
     slack_username = f"{slack_emoji} {slack_bot_username()}"
 
-    hgvs_matcher_id = settings.HGVS_DEFAULT_METHOD
-    hgvs_matcher = HGVSMatcher(GenomeBuild.grch38(), hgvs_converter_type=hgvs_matcher_id)
+    hgvs_matcher = HGVSMatcher(GenomeBuild.grch38())
 
     return render(request, "variantopedia/server_status_settings_detail.html", {
         "settings": settings,

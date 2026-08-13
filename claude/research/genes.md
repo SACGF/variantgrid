@@ -124,7 +124,6 @@ The most important model for variant annotation. Stores versioned, build-specifi
   - `hgvs_ok`: Whether HGVS nomenclature can be computed
 - **Key Methods:**
   - `get_transcript_version(build, name)`: Retrieve a specific version
-  - `pyhgvs_data`: Returns data formatted for pyhgvs HGVS calculation
 
 #### CDot Integration
 

@@ -2,7 +2,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from functools import cached_property, lru_cache
+from functools import lru_cache
 from typing import Optional, Union
 
 from cdot.hgvs import (
@@ -16,18 +16,16 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
 from django.utils.timezone import now
+from hgvs_shim import HGVSConverter
 
 from genes.hgvs import HGVSComponents, HGVSImplementationException, HGVSNomenclatureException, HGVSVariant
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import (
-    HGVSConverter,
     HGVSConverterType,
     HgvsMatchRefAllele,
     HgvsOriginallyNormalized,
 )
-from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
-from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
 from genes.models import (
     BadTranscript,
     LRGRefSeqGene,
@@ -116,35 +114,21 @@ class ClinGenHGVSConverter(BioCommonsHGVSConverter):
 
 class HGVSConverterFactory:
     """
-    For choice of PyHGVS vs BioCommons @see https://github.com/SACGF/variantgrid/issues/839
+    HGVS conversion is done by BioCommons HGVS @see https://github.com/SACGF/variantgrid/issues/839
     """
 
     @staticmethod
     def factory(genome_build: GenomeBuild, hgvs_converter_type: Optional[HGVSConverterType] = None,
                 local_resolution=True, clingen_resolution=True) -> HGVSConverter:
         if hgvs_converter_type is None:
-            # if settings.DEBUG:  # TODO: Disabled
-            #     hgvs_converter_type = HGVSConverterType.COMBO
-            # else:
-            hgvs_converter_type = settings.HGVS_DEFAULT_METHOD
+            hgvs_converter_type = HGVSConverterType.BIOCOMMONS_HGVS
 
         if clingen_resolution and not ClinGenHGVSConverter.build_supported(genome_build):
             logging.warning("ClinGen does not support build %s", genome_build)
             clingen_resolution = False
 
-        if isinstance(hgvs_converter_type, str):
-            hgvs_converter_type = HGVSConverterType[hgvs_converter_type.upper()]
-
         if hgvs_converter_type == HGVSConverterType.BIOCOMMONS_HGVS:
             return BioCommonsHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
-        elif hgvs_converter_type == HGVSConverterType.PYHGVS:
-            return PyHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
-        elif hgvs_converter_type == HGVSConverterType.COMBO:
-            converters = [
-                BioCommonsHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution),
-                PyHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution),
-            ]
-            return ComboCheckerHGVSConverter(genome_build, converters, die_on_error=False)
         elif hgvs_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
             return ClinGenHGVSConverter(genome_build)
 
@@ -498,7 +482,7 @@ class HGVSMatcher:
     def _validate_genomic_kind(self, hgvs_variant: HGVSVariant):
         """ 'm.' (mitochondrial) HGVS is only valid on the mitochondrial contig.
 
-            pyhgvs/biocommons treat the 'm' kind like 'g' (coordinates resolved against
+            biocommons treats the 'm' kind like 'g' (coordinates resolved against
             whichever reference the accession names), so without this an m. on a nuclear
             contig is silently resolved as g. - see SACGF/variantgrid#1632. """
         if hgvs_variant.kind != 'm':
@@ -584,7 +568,7 @@ class HGVSMatcher:
                             if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self, require_allele_id=False):
                                 if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
-                                    # regardless of whether we use PyHGVS or ClinGen to resolve
+                                    # regardless of whether we use biocommons or ClinGen to resolve
                                     if gene_symbol := transcript_version.gene_symbol:
                                         hgvs_variant.gene = str(gene_symbol)
                                     hgvs_method = potential_converter_type
@@ -693,15 +677,10 @@ class HGVSMatcher:
         cleaned, fixes = cdot_clean_hgvs(hgvs_string)
         return cleaned, warning_messages(fixes)
 
-    @cached_property
+    @property
     def _gene_symbol_data_provider(self) -> DjangoTranscriptDataProvider:
-        """ cdot data provider used for gene-symbol -> transcript resolution.
-            Reuse the converter's provider when it has one (BioCommons/ClinGen),
-            otherwise build one for this genome build (e.g. PyHGVS converter). """
-        hdp = getattr(self.hgvs_converter, "hdp", None)
-        if isinstance(hdp, DjangoTranscriptDataProvider):
-            return hdp
-        return DjangoTranscriptDataProvider(self.genome_build)
+        """ cdot data provider used for gene-symbol -> transcript resolution. """
+        return self.hgvs_converter.hdp
 
     def rank_gene_symbol_transcripts(self, gene_symbol: str) -> tuple[list[tuple[str, list[str], Optional[str]]], list[str]]:
         """ Rank a gene symbol's transcripts best-first via cdot (MANE/canonical tags).

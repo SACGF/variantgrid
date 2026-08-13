@@ -13,7 +13,6 @@ from typing import Any, Optional, Union
 from urllib.error import URLError
 
 from cache_memoize import cache_memoize
-from cdot.pyhgvs.pyhgvs_transcript import PyHGVSTranscriptFactory
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.contrib.postgres.aggregates import StringAgg
@@ -885,7 +884,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def alignment_gap(self) -> bool:
         if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
             # Sometimes RefSeq transcripts have gaps when aligning to the genome
-            # We've modified PyHGVS to be able to handle this
             for ex in self.genome_build_data["exons"]:
                 if ex[-1] is not None:
                     return True
@@ -1042,16 +1040,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     @cached_property
     def genome_build_data(self) -> dict:
         return self.data["genome_builds"][self.genome_build.name]
-
-    @cached_property
-    def pyhgvs_data(self):
-        transcript_json = self.data.copy()
-        # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
-        # so use DB as source of truth and replace into PyHGVS at last minute
-        if self.gene_symbol:
-            transcript_json["gene_name"] = str(self.gene_symbol)
-        tf = PyHGVSTranscriptFactory(transcripts={self.accession: transcript_json})
-        return tf.get_pyhgvs_data(self.accession, self.genome_build.name, sacgf_pyhgvs_fork=True)
 
     @cached_property
     def length(self) -> Optional[int]:

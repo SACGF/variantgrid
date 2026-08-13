@@ -4,7 +4,6 @@ from functools import reduce
 from django.core.management import BaseCommand
 from django.db.models import Q
 from hgvs.exceptions import HGVSInvalidVariantError
-from pyhgvs import InvalidHGVSName
 
 from classification.classification_import import reattempt_variant_matching
 from classification.models.classification_variant_info_models import (
@@ -41,7 +40,7 @@ class Command(BaseCommand):
             hgvs_name = iai.imported_hgvs
             try:
                 matcher.get_variant_coordinate(hgvs_name)
-            except (HGVSInvalidVariantError, InvalidHGVSName) as e:
+            except HGVSInvalidVariantError as e:
                 print(f"REMATCHING {iai.pk} due to: {hgvs_name}: {e}")
                 iai_ids_with_hgvs_errors.add(iai.pk)
             except ValueError:
