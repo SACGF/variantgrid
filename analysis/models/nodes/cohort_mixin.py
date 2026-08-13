@@ -208,29 +208,38 @@ class CohortMixin:
             q_and.append(GroupOperation.reduce(filters, naff.group_operation))
         return q_and
 
-    def get_vcf_locus_filters_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+    def _get_vcf_locus_filters_arg_q_dict(self, vcf, alias: str) -> dict[Optional[str], dict[str, Q]]:
+        """ Filter ids are stored on the node - they resolve into each VCF's own codes here """
         arg_q_dict = {}
-        if self.has_filters:
-            vcf = self._get_vcf()
-            alias = self.cohort_genotype_collection.cohortgenotype_alias
+        filter_codes = NodeVCFFilter.get_filter_codes(self, vcf)
+        if filter_codes:
+            q_or = []
+            if None in filter_codes:  # Pass
+                filter_codes.remove(None)
+                q_or.append(Q(**{f"{alias}__filters__isnull": True}))
 
-            filter_codes = NodeVCFFilter.get_filter_codes(self, vcf)
             if filter_codes:
-                q_or = []
-                if None in filter_codes:  # Pass
-                    filter_codes.remove(None)
-                    q_or.append(Q(**{f"{alias}__filters__isnull": True}))
+                joined_codes = re.escape(''.join(filter_codes))
+                joined_codes = joined_codes.replace("'", "''")
+                pattern = f"[{joined_codes}]"
+                q_or.append(Q(**{f"{alias}__filters__regex": pattern}))
 
-                if filter_codes:
-                    joined_codes = re.escape(''.join(filter_codes))
-                    joined_codes = joined_codes.replace("'", "''")
-                    pattern = f"[{joined_codes}]"
-                    q_or.append(Q(**{f"{alias}__filters__regex": pattern}))
-
-                if q_or:
-                    q = reduce(operator.or_, q_or)
-                    arg_q_dict[alias] = {str(q): q}
+            if q_or:
+                q = reduce(operator.or_, q_or)
+                arg_q_dict[alias] = {str(q): q}
         return arg_q_dict
+
+    def get_vcf_locus_filter_vcfs(self) -> list:
+        """ The VCFs the node's filter id selection is offered from / resolved against """
+        if vcf := self._get_vcf():
+            return [vcf]
+        return []
+
+    def get_vcf_locus_filters_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+        if not self.has_filters:
+            return {}
+        alias = self.cohort_genotype_collection.cohortgenotype_alias
+        return self._get_vcf_locus_filters_arg_q_dict(self._get_vcf(), alias)
 
     def get_filter_code(self):
         """
@@ -259,76 +268,91 @@ class CohortMixin:
         vcf = self._get_vcf()
         return vcf and vcf.vcffilter_set.exists()
 
-    def _get_node_extra_columns(self):
-        """ show filters if we have them and they're not filtered away (no point then) """
-
-        extra_columns = []
+    def _get_filters_cohort_genotype_collections(self) -> list:
+        """ The genotype collections whose record level FILTER to show. Nodes spanning VCFs override """
         if self.has_filters:
             if cgc := self.cohort_genotype_collection:
-                extra_columns.append(f"{cgc.cohortgenotype_alias}__filters")
+                return [cgc]
+        return []
 
-        return extra_columns
+    def _get_node_extra_columns(self):
+        """ show filters if we have them and they're not filtered away (no point then) """
+        return [f"{cgc.cohortgenotype_alias}__filters" for cgc in self._get_filters_cohort_genotype_collections()]
 
     def _get_node_extra_colmodel_overrides(self):
         extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
-        if self.has_filters and (cgc := self.cohort_genotype_collection):
-            vcf = self._get_vcf()
-            server_side_formatter = VCFFilter.get_formatter(vcf)
+        cgcs = self._get_filters_cohort_genotype_collections()
+        for cgc in cgcs:
+            vcf = cgc.cohort.get_vcf()
             filters_column = f"{cgc.cohortgenotype_alias}__filters"
-            extra_colmodel_overrides[filters_column] = {
+            overrides = {
                 'name': filters_column,
                 'model_field': False,  # It's an alias
                 'queryset_field': True,
-                'server_side_formatter': server_side_formatter,
+                'server_side_formatter': VCFFilter.get_formatter(vcf),
             }
+            if len(cgcs) > 1:  # Which VCF's FILTER this is only needs saying when there are several
+                overrides['label'] = f"{vcf} Filters"
+            extra_colmodel_overrides[filters_column] = overrides
 
         return extra_colmodel_overrides
 
+    def _get_configuration_check_cohorts(self) -> list:
+        """ Cohorts to check for missing/archived genotype data. Nodes spanning VCFs override """
+        if cohort := self._get_cohort():
+            return [cohort]
+        return []
+
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
-        if cohort := self._get_cohort():
+        for cohort in self._get_configuration_check_cohorts():
             try:
                 _ = cohort.cohort_genotype_collection
             except CohortGenotypeCollection.DoesNotExist:
                 errors.append("Source data missing: underlying genotype data is no longer available")
             except DataArchivedError as e:
                 errors.append(str(e))
-        if vcf := self._get_vcf():
-            try:
-                uv: UploadedVCF = vcf.uploadedvcf
-                if uv.max_variant_id:  # Very old VCFs may not have this set
-                    variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
-                    if not uv.is_fully_annotated(variant_annotation_version):
-                        errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
-                                      f" (in variant annotation version={variant_annotation_version})")
-            except UploadedVCF.DoesNotExist:
-                pass
+
+            if vcf := cohort.get_vcf():
+                try:
+                    uv: UploadedVCF = vcf.uploadedvcf
+                    if uv.max_variant_id:  # Very old VCFs may not have this set
+                        variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
+                        if not uv.is_fully_annotated(variant_annotation_version):
+                            errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
+                                          f" (in variant annotation version={variant_annotation_version})")
+                except UploadedVCF.DoesNotExist:
+                    pass
         return errors
 
 
 class SampleMixin(CohortMixin):
     """ Adds sample to query via annotation kwargs, must have a "sample" field """
 
+    def _get_sample(self) -> Optional[Sample]:
+        """ The sample this node's genotype joins hang off - overridden by nodes that group samples """
+        return self.sample
+
     def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
         kwargs["override"] = False
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
-        if self.sample:
-            annotation_kwargs.update(self.sample.get_annotation_kwargs(**kwargs))
+        if sample := self._get_sample():
+            annotation_kwargs.update(sample.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
     def _get_cohort(self):
         cohort = None
-        if self.sample:
-            cohort = self.sample.vcf.cohort
+        if sample := self._get_sample():
+            cohort = sample.vcf.cohort
         return cohort
 
     def _get_cohorts_and_sample_visibility_for_node(self):
         cohorts = []
         visibility = {}
 
-        if self.sample:
+        if sample := self._get_sample():
             cohorts = [self._get_cohort()]
-            visibility[self.sample] = self.sample.has_genotype
+            visibility[sample] = sample.has_genotype
         return cohorts, visibility
 
 

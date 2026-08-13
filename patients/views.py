@@ -28,7 +28,8 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from snpdb.models import Sample
+from patients.sample_grouping import get_extraction_sample_group, sample_group_as_json
+from snpdb.models import GenomeBuild, Sample
 from uicore.utils.form_helpers import form_helper_horizontal
 
 
@@ -169,6 +170,22 @@ def view_extraction(request, extraction_id):
                "sequencing_samples": extraction.sequencingsample_set.order_by("pk"),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_extraction.html', context)
+
+
+def extraction_samples(request, extraction_id):
+    """ The samples an analysis grouping node reaches for this extraction, with per sample counts off
+        the stats rows. Keyed on the extraction rather than a node, as it has to answer before a node
+        is saved.
+
+        Pass ?genome_build= to restrict to an analysis' build - what that leaves out comes back in
+        'excluded' rather than being quietly dropped. """
+    extraction = Extraction.get_for_user(request.user, extraction_id)
+    genome_build = None
+    if genome_build_name := request.GET.get("genome_build"):
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+
+    group = get_extraction_sample_group(request.user, extraction, genome_build)
+    return JsonResponse(sample_group_as_json(group))
 
 
 def view_patient_genes(request, patient_id):

@@ -21,6 +21,7 @@ from django.db import connection, models, transaction
 from django.db.models import IntegerField, QuerySet, Value
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
+from django.db.models.expressions import RawSQL
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
@@ -70,6 +71,47 @@ from snpdb.models import (
     Wiki,
 )
 from snpdb.variant_collection import write_sql_to_variant_collection
+
+
+def queryset_to_pk_in_q(qs: QuerySet) -> Q:
+    """ Embed a queryset as pk IN (subquery), NOT list(qs.values_list("pk")).
+        Callers reach this with querysets that are large by construction - small ones are substituted
+        to a literal PK list upstream by get_small_parent_arg_q_dict - so list() here could pull an
+        unbounded number of PKs into Python (e.g. a 7.4M-row cohort).
+        We render to RawSQL, capturing the compiled SQL + params (incl. the partition table rewrite the
+        TransformerQuerySet applies in as_sql), so it runs as a single DB-side semi-join. RawSQL also keeps
+        arg_q_dict picklable for the q-cache cache.set: a live TransformerQuerySet embedded in the Q is
+        unpicklable (closure-local compiler classes) which previously forced the materialise-to-list
+        workaround (issue #546, #240, ad35a7fb1). """
+    pk_qs = qs.values_list("pk", flat=True)
+    sql, params = pk_qs.query.sql_with_params()
+    return Q(pk__in=RawSQL(sql, params))
+
+
+def annotate_and_filter_queryset(qs: QuerySet, a_kwargs: dict, arg_q_dict: dict) -> tuple[QuerySet, list[Q]]:
+    """ Apply each annotation then the filters that use it, so that it forces an inner query - applying
+        them all at once can join to the same table twice. Returns the queryset plus the filters that
+        don't rely on an annotation (arg=None), for the caller to combine with its own.
+
+        arg_q_dict is consumed - anything left over means a filter had no annotation to hang off. """
+    for k, v in a_kwargs.items():
+        qs = qs.annotate(**{k: v})
+        if q_and_list := list(arg_q_dict.pop(k, {}).values()):
+            q = reduce(operator.and_, q_and_list)
+            try:
+                qs = qs.filter(q)
+            except FieldError as fe:
+                add_exception_note(fe, f"annotation kwarg: {k}: {q=}.")
+                raise
+
+    q_list = []
+    # Anything stored under None means filters that don't rely on annotation - do afterwards
+    if q_dict := arg_q_dict.pop(None, {}):
+        q_list.extend(q_dict.values())
+
+    if arg_q_dict:
+        raise ValueError(f"arg_q_dict filters {arg_q_dict.keys()} not applied (missing in {a_kwargs=})")
+    return qs, q_list
 
 
 def _default_position():
@@ -635,29 +677,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             arg_q_dict = self.get_arg_q_dict(disable_cache=disable_cache)
             # print(arg_q_dict)
 
-        if a_kwargs:
-            # If we apply the kwargs at the same time, it can join to the same table twice.
-            # We want to go through and apply each annotation then the filters that use it, so that it forces
-            # an inner query. Then do next annotation etc
-
-            for k, v in a_kwargs.items():
-                qs = qs.annotate(**{k: v})
-                if q_and_list := list(arg_q_dict.pop(k, {}).values()):
-                    q = reduce(operator.and_, q_and_list)
-                    try:
-                        qs = qs.filter(q)
-                    except FieldError as fe:
-                        add_exception_note(fe, f"annotation kwarg: {k}: {q=}.")
-                        raise
-
-        q_list = []
-        # Anything stored under None means filters that don't rely on annotation - do afterwards
-        if q_dict := arg_q_dict.pop(None, {}):
-            # print(f"q_dict(None): {q_dict}")
-            q_list.extend(q_dict.values())
-
-        if arg_q_dict:
-            raise Exception(f"arg_q_dict filters {arg_q_dict.keys()} not applied (missing in {a_kwargs=})")
+        qs, q_list = annotate_and_filter_queryset(qs, a_kwargs, arg_q_dict)
 
         if self.analysis.node_queryset_filter_contigs:
             q_list.append(Q(locus__contig__in=self.get_contigs()))

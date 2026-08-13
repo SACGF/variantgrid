@@ -12,6 +12,7 @@ from django.views.decorators.vary import vary_on_cookie
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 from patients.models import Clinician, Extraction, ExternalPK, Patient, Specimen
+from snpdb.views.views_autocomplete import GenomeBuildAutocompleteView
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
@@ -37,7 +38,7 @@ class SpecimenAutocompleteView(AutocompleteView):
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
-class ExtractionAutocompleteView(AutocompleteView):
+class ExtractionAutocompleteView(GenomeBuildAutocompleteView):
     """ Narrows on whichever of Patient -> Specimen a form has already set """
     # An extraction may be referred to by its own reference (eg a container suffix) or its specimen's
     fields = ['reference_id', 'specimen__reference_id']
@@ -48,7 +49,9 @@ class ExtractionAutocompleteView(AutocompleteView):
             qs = qs.filter(specimen__patient=patient)
         if specimen := self.forwarded.get('specimen'):
             qs = qs.filter(specimen=specimen)
-        return qs
+        # An analysis is one genome build, so only offer extractions it can actually read
+        qs = self.exclude_archived_if_forwarded(qs, "sample__vcf__data_archived_date")
+        return self.filter_to_genome_build(qs, "sample__vcf__genome_build").distinct()
 
 
 @method_decorator(cache_page(MINUTE_SECS), name='dispatch')

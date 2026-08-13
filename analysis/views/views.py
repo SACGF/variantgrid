@@ -101,6 +101,8 @@ from library.django_utils import add_save_message, get_field_counts, set_form_re
 from library.guardian_utils import is_superuser
 from library.utils import defaultdict_to_dict, full_class_name
 from library.utils.database_utils import queryset_to_sql, run_sql
+from patients.models import Extraction
+from patients.sample_grouping import get_extraction_sample_group
 from pedigree.models import Pedigree
 from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm
@@ -865,15 +867,11 @@ def cohort_zygosity_filters(request, analysis_id, node_id, cohort_id):
     return render(request, template, context)
 
 
-def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
-    node = get_node_subclass_or_404(request.user, node_id)
-    if vcf_id:
-        vcf = VCF.get_for_user(node.analysis.user, vcf_id)
-    else:
-        vcf = None
-
-    context = {"vcf": vcf}
-    if vcf:
+def _render_vcf_locus_filters(request, node, vcfs):
+    """ One node level selection of filter ids - NodeVCFFilter translates them into each VCF's own
+        codes at query time, so a node spanning VCFs offers the union of what they declare """
+    context = {"vcfs": vcfs}
+    if vcfs:
         vcf_filter_descriptions = {"PASS": "All filters passed"}
         set_filters = {}
         for raw_filter_id in NodeVCFFilter.get_filter_ids(node):
@@ -884,12 +882,15 @@ def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
             set_filters[filter_id] = True
         existing_filter_settings = {"PASS": "PASS" in set_filters}
 
-        for vcf_filter in vcf.vcffilter_set.all():
-            filter_id = vcf_filter.filter_id
-            vcf_filter_descriptions[filter_id] = vcf_filter.description
-            existing_filter_settings[filter_id] = filter_id in set_filters
+        has_filters = False
+        for vcf in vcfs:
+            has_filters |= vcf.has_filters
+            for vcf_filter in vcf.vcffilter_set.all():
+                filter_id = vcf_filter.filter_id
+                vcf_filter_descriptions[filter_id] = vcf_filter.description
+                existing_filter_settings[filter_id] = filter_id in set_filters
 
-        context["has_filters"] = vcf.has_filters
+        context["has_filters"] = has_filters
         context["has_filters_set"] = bool(set_filters)
         context["vlf_form"] = VCFLocusFilterForm(vcf_filters=existing_filter_settings)
         context["vlf_descriptions"] = vcf_filter_descriptions
@@ -897,9 +898,24 @@ def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
     return render(request, 'analysis/node_editors/vcf_locus_filters.html', context)
 
 
+def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
+    node = get_node_subclass_or_404(request.user, node_id)
+    vcfs = []
+    if vcf_id:
+        vcfs = [VCF.get_for_user(node.analysis.user, vcf_id)]
+    return _render_vcf_locus_filters(request, node, vcfs)
+
+
 def sample_vcf_locus_filters(request, analysis_id, node_id, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     return vcf_locus_filters(request, analysis_id, node_id, sample.vcf.pk)
+
+
+def extraction_vcf_locus_filters(request, analysis_id, node_id, extraction_id):
+    node = get_node_subclass_or_404(request.user, node_id)
+    extraction = Extraction.get_for_user(request.user, extraction_id)
+    group = get_extraction_sample_group(node.analysis.user, extraction, node.analysis.genome_build)
+    return _render_vcf_locus_filters(request, node, group.vcfs)
 
 
 def cohort_vcf_locus_filters(request, analysis_id, node_id, cohort_id):

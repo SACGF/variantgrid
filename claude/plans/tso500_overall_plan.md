@@ -327,13 +327,13 @@ decision as `SM` and `CN`, and wants deciding once for all three.
 `GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` (`genes/gene_matching.py:45`) is the resolver
 either way.
 
-Fusions are the genuinely new case, and Phase 5 has now put real ones in the database, so the
-single-grid vs multiple-grids question is decidable rather than hypothetical — "sort by gene brings the
-fusions together" is testable on the 31 fusion variants the test file produces. Phase 5 left them
-grid-ready rather than grid-complete: they carry a gene symbol and `overlapping_symbols` from their own
-annotation run, so what remains here is the kind filter and the columns that only make sense for a
-fusion (both breakpoints, caller, read counts — all in `CohortGenotype.info["observations"]`, one entry
-per row the caller wrote).
+Fusions are the genuinely new case, and Phase 5 has now put real ones in the database. **One grid, not
+several** — a fusion is a row like any other, so compound-het detection, gene lists and every downstream
+node keep working over the same result set rather than needing a per-kind union. That is also what Phase
+5's choice of a real `Variant` over a bare `Allele` was for. Phase 5 left them grid-ready rather than
+grid-complete: they carry a gene symbol and `overlapping_symbols` from their own annotation run, so what
+remains here is the kind filter and the columns that only make sense for a fusion (both breakpoints,
+caller, read counts — all in `CohortGenotype.info["observations"]`, one entry per row the caller wrote).
 
 #1706's grid half joins here because it is the same kind of change and wants the same pass over the
 column definitions: top-level specimen and extraction grids under the patients menu, an extraction link
@@ -408,9 +408,10 @@ With one person, the order above is the order.
 
 ## Decisions worth settling before their phase starts
 
-| Decision | Phase | Why it is cheaper now |
-|---|---|---|
-| Single grid or multiple grids for non-variants? | 6 | Now answerable — Phase 5's fusion rows exist to try it on |
+Phase 5's identity question is settled in code — `FusionGeneId` gives every partner an identity, HGNC
+where there is one and a local id where there is not, so no row is parked. Phase 6's
+single-vs-multiple grid question is settled — one grid, so fusions reach comp-het and every downstream
+node. Phase 7's four are settled in its own doc.
 
 ## Deferred, deliberately
 
