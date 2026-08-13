@@ -1,5 +1,7 @@
 """
-Loader for AllFusions.csv.
+Loader for Illumina DRAGEN TSO 500's AllFusions.csv - one vendor's format, not a standard. Anything
+here that reads a named column belongs to that format; the fusion identity it resolves to does not
+(@see genes.gene_fusions).
 
 The rows become a VCF of gene-level variants which goes through the normal VCF import pipeline, so
 the VCF/Sample/Cohort come from the header the way every other import's do, and the CohortGenotype
@@ -9,8 +11,8 @@ need a reference base a gene-level locus does not have.
 upload.vcf.gene_level_vcf_preprocess for exactly what is skipped and why.
 
 Two steps:
-  GeneFusionCreateVCFTask - parse the CSV, resolve gene names, write the VCF
-  GeneFusionInsertTask    - once the variants exist, create the GeneFusions against them
+  DragenTSO500AllFusionsCreateVCFTask - parse the CSV, resolve gene names, write the VCF
+  DragenTSO500AllFusionsInsertTask    - once the variants exist, create the GeneFusions against them
 
 Each caller row becomes an observation carried in INFO, so what the caller wrote survives import.
 Several rows can name one gene pair (one caller reports ENTPD3::RPL14 three times with three 5'
@@ -30,7 +32,7 @@ from library.genomics.vcf_writer import (
     percent_encode_info_value,
 )
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
-from upload.gene_fusions.all_fusions_parser import read_all_fusions
+from upload.tso500.dragen_all_fusions_parser import read_all_fusions
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
@@ -105,7 +107,7 @@ def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, s
                                 info=info, fmt="GT", sample_calls=[NO_GENOTYPE_CALL])
 
 
-class GeneFusionCreateVCFTask(ImportVCFStepTask):
+class DragenTSO500AllFusionsCreateVCFTask(ImportVCFStepTask):
     """ Write the fusion variants as a VCF so they go through the normal insert pipeline """
 
     def process_items(self, upload_step):
@@ -117,7 +119,7 @@ class GeneFusionCreateVCFTask(ImportVCFStepTask):
         return len(rows)
 
 
-class GeneFusionInsertTask(ImportVCFStepTask):
+class DragenTSO500AllFusionsInsertTask(ImportVCFStepTask):
     """ Runs after data insertion, so the Variants and their CohortGenotypes exist - create the
         GeneFusions against them """
 
@@ -160,5 +162,5 @@ def _record_merged_rows(upload_step, variant_qs):
     ])
 
 
-GeneFusionCreateVCFTask = app.register_task(GeneFusionCreateVCFTask())
-GeneFusionInsertTask = app.register_task(GeneFusionInsertTask())
+DragenTSO500AllFusionsCreateVCFTask = app.register_task(DragenTSO500AllFusionsCreateVCFTask())
+DragenTSO500AllFusionsInsertTask = app.register_task(DragenTSO500AllFusionsInsertTask())

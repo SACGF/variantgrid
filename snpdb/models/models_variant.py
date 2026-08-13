@@ -676,7 +676,7 @@ class Variant(PreviewModelMixin, models.Model):
         """ Events with no coordinate (gene fusions) - @see snpdb.gene_level_variants.
             The single predicate for "keep this away from anything that reads a reference
             sequence"; is_gene_level is the instance-level twin """
-        return Q(locus__contig__role=SequenceRole.GENE_LEVEL)
+        return Q(locus__contig__role=SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG)
 
     @cached_property
     def is_gene_level(self) -> bool:
@@ -848,10 +848,6 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_c_hgvs(self) -> bool:
-        """ Gene-level variants are annotated (by the GENE_LEVEL pipeline) but sit on no transcript, so
-            there is nothing to write a c.HGVS against. @see snpdb.gene_level_variants """
-        if self.is_gene_level:
-            return False
         return self.can_have_annotation and (self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH)
 
     def as_tuple(self) -> tuple[str, int, str, str, int]:
@@ -909,10 +905,16 @@ class Variant(PreviewModelMixin, models.Model):
             return any_at_all
 
     def get_canonical_c_hgvs(self, genome_build):
-        c_hgvs = None
+        from annotation.models import VariantAnnotationVersion
         if cta := self.get_canonical_transcript_annotation(genome_build):
-            c_hgvs = cta.get_hgvs_c_with_symbol()
-        return c_hgvs
+            return cta.get_hgvs_c_with_symbol()
+        if self.is_gene_level:
+            # Sits on no transcript, so the representative annotation is the only one there is - it
+            # carries the VICC gene-level nomenclature. @see snpdb.gene_level_variants
+            vav = VariantAnnotationVersion.latest(genome_build)
+            if va := self.variantannotation_set.filter(version=vav).first():
+                return va.get_hgvs_c_with_symbol()
+        return None
 
     @property
     def start(self):

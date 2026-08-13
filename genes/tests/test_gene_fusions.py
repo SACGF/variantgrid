@@ -55,7 +55,7 @@ class TestGeneLevelContig(GeneFusionTestCase):
 
     def test_contig_exists_for_every_build(self):
         contig = Contig.get_gene_level()
-        self.assertEqual(SequenceRole.GENE_LEVEL, contig.role)
+        self.assertEqual(SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG, contig.role)
         self.assertTrue(contig.is_gene_level)
         build_names = set(contig.get_genome_builds(require_annotation=False).values_list("name", flat=True))
         self.assertIn("GRCh37", build_names)

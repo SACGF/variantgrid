@@ -4,7 +4,7 @@ from django.db import models
 class UploadedFileTypes(models.TextChoices):
     BED = 'B', 'BED'
     CLINVAR = 'L', 'Clinvar'
-    GENE_FUSIONS = 'F', 'Gene Fusions'
+    DRAGEN_TSO500_ALL_FUSIONS = 'F', 'DRAGEN TSO500 AllFusions'
     GENE_LIST = 'G', 'Gene List'
     GENE_COVERAGE = 'O', 'Gene Coverage'
     LIFTOVER = 'I', 'Liftover'

@@ -14,9 +14,10 @@ ExampleSample_2600000001/
     └── ..._AllFusions.csv            fusions            33
 ```
 
-The VCFs go through the normal VCF import. `AllFusions.csv` has its own parser, which creates a VCF and
-Sample of its own and inserts gene-level variants directly - it cannot go through the bcftools stages, as
-a gene-level locus has no reference base to check against.
+The VCFs go through the normal VCF import. `AllFusions.csv` has a parser of its own (the format is
+DRAGEN TSO 500's, not a standard) which writes the rows as a VCF of gene-level variants. That VCF then
+goes through the normal import too - only the bcftools stages are skipped, as a gene-level locus has no
+reference base to check against.
 
 Everything is GRCh37 — b37 contigs renamed with a `chr` prefix, including `hs37d5`, `NC_007605`
 and the `GL000*` decoys, with `chrM` at 16569 (rCRS, not hg19's 16571).

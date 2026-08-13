@@ -119,7 +119,10 @@ def _annotate_gene_fusion(annotation_run, resolver: FusionGeneIdResolver, gene_f
         symbols.append(symbol)
         gene_ids.update(resolved_gene_ids)
 
-    # The anchor's symbol is the representative one, matching "the gene this row is about" everywhere else
+    # The anchor's symbol is the representative one, matching "the gene this row is about" everywhere
+    # else. hgvs_c/hgvs_g both carry the VICC gene-level nomenclature - HGVS defers to VICC for
+    # fusions, and a blank g.HGVS reads as broken rather than as "not applicable"
+    canonical_str = gene_fusion.canonical_str
     VariantAnnotation.objects.update_or_create(
         version=variant_annotation_version,
         variant=gene_fusion.variant,
@@ -127,6 +130,8 @@ def _annotate_gene_fusion(annotation_run, resolver: FusionGeneIdResolver, gene_f
             "annotation_run": annotation_run,
             "symbol": symbols[0],
             "overlapping_symbols": ",".join(sorted(set(symbols))),
+            "hgvs_c": canonical_str,
+            "hgvs_g": canonical_str,
         })
 
     overlaps = [

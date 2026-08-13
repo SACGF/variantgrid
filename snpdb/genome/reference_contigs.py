@@ -95,7 +95,7 @@ def create_gene_level_contig(get_model: callable, genome_build, order: int):
     contig, _ = Contig.objects.get_or_create(refseq_accession=GENE_LEVEL_CONTIG_REFSEQ_ACCESSION,
                                              defaults={
                                                  "name": GENE_LEVEL_CONTIG_NAME,
-                                                 "role": SequenceRole.GENE_LEVEL,
+                                                 "role": SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG,
                                                  "length": GENE_LEVEL_CONTIG_LENGTH,
                                              })
     GenomeBuildContig.objects.get_or_create(genome_build=genome_build,

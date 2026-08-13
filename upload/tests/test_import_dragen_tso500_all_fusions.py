@@ -18,7 +18,7 @@ from genes.gene_fusions import create_gene_fusions_for_variants
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.test_gene_fusions import GeneFusionTestCase
 from snpdb.models import GenomeBuild, ImportSource, Variant
-from upload.gene_fusions.all_fusions_parser import can_process_file, read_all_fusions
+from upload.tso500.dragen_all_fusions_parser import can_process_file, read_all_fusions
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,
@@ -27,11 +27,11 @@ from upload.models import (
     UploadedFileTypes,
     UploadPipeline,
 )
-from upload.tasks.import_gene_fusions_task import (
+from upload.tasks.import_dragen_tso500_all_fusions_task import (
     FUSION_INFO,
     FUSION_OBSERVATIONS_INFO,
     NO_GENOTYPE_CALL,
-    GeneFusionCreateVCFTask,
+    DragenTSO500AllFusionsCreateVCFTask,
 )
 from upload.models import UploadStep
 
@@ -64,7 +64,7 @@ class TestAllFusionsParser(TestCase):
 
     def test_claims_the_file_over_a_gene_list(self):
         factories = {type(f).__name__: f for f in get_import_task_factories()}
-        fusions = factories["GeneFusionsImportTaskFactory"]
+        fusions = factories["DragenTSO500AllFusionsImportTaskFactory"]
         gene_list = factories["GeneListImportTaskFactory"]
         user = User.objects.get_or_create(username='testuser')[0]
         self.assertGreater(fusions.get_processing_ability(user, ALL_FUSIONS_CSV, "csv"),
@@ -85,7 +85,7 @@ class TestGeneFusionVCF(GeneFusionTestCase):
                                                      import_source=ImportSource.COMMAND_LINE,
                                                      user=user,
                                                      name="ExampleSample_RNA_2600000001B_AllFusions.csv",
-                                                     file_type=UploadedFileTypes.GENE_FUSIONS,
+                                                     file_type=UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS,
                                                      # The file's breakpoints are chrN:pos with nothing
                                                      # to detect a build from, so it has to be declared
                                                      metadata={"genome_build": "GRCh37"})
@@ -95,7 +95,7 @@ class TestGeneFusionVCF(GeneFusionTestCase):
                                                     name="Create Gene Fusion Variant VCF", sort_order=0,
                                                     input_filename=ALL_FUSIONS_CSV,
                                                     output_filename=self.vcf_filename)
-        self.rows_processed = GeneFusionCreateVCFTask.process_items(create_vcf_step)
+        self.rows_processed = DragenTSO500AllFusionsCreateVCFTask.process_items(create_vcf_step)
         self.reader = cyvcf2.VCF(self.vcf_filename)
         self.records = list(self.reader)
 

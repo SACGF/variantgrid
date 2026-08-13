@@ -401,7 +401,7 @@ class Contig(models.Model, PreviewModelMixin):
 
     @property
     def is_gene_level(self) -> bool:
-        return self.role == SequenceRole.GENE_LEVEL
+        return self.role == SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG
 
     def get_absolute_url(self):
         return reverse("view_contig", kwargs={"contig_accession": self.refseq_accession})

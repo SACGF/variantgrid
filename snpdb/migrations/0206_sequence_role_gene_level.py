@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                     ("ALT", "alt-scaffold"),
                     ("FP", "fix-patch"),
                     ("NP", "novel-patch"),
-                    ("GL", "gene-level"),
+                    ("GL", "VariantGrid gene-level (not a sequence)"),
                 ],
                 max_length=3,
             ),

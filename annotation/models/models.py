@@ -1554,8 +1554,18 @@ class AbstractVariantAnnotation(models.Model):
                 pass  # Skip "?"
         raise ValueError(f"Unable to handle protein_position={protein_position}")
 
+    @cached_property
+    def is_gene_level_annotation(self) -> bool:
+        """ Computed from the gene identity rather than by VEP - @see snpdb.gene_level_variants.
+            Everything VEP produces is absent, so the detail page hides those sections """
+        return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL
+
     def get_hgvs_c_with_symbol(self) -> str:
         hgvs_c = self.hgvs_c
+        if self.is_gene_level_annotation:
+            # Already VICC gene-level nomenclature, which names both genes - there is no HGVS here to
+            # parse, and nothing to graft a symbol onto. @see genes.models.fusion_canonical_str
+            return hgvs_c
         if self.has_hgvs_c and self.symbol:
             from genes.hgvs import HGVSMatcher
             hgvs_matcher = HGVSMatcher.instance(self.version.genome_build)
@@ -1840,12 +1850,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @cached_property
     def is_standard_annotation(self) -> bool:
         return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD
-
-    @cached_property
-    def is_gene_level_annotation(self) -> bool:
-        """ Computed from the gene identity rather than by VEP - @see snpdb.gene_level_variants.
-            Everything VEP produces is absent, so the detail page hides those sections """
-        return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL
 
     @cached_property
     def repeat_masker_summary(self) -> RepeatMaskerSummary:
@@ -2203,8 +2207,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
         hgvs_g = None
         if data:
             hgvs_g = data[0]
-        if hgvs_g is None:
-            # Reference variants have no annotation - so we'll have to fall back to generating it
+        if hgvs_g is None and not variant.is_gene_level:
+            # Reference variants have no annotation - so we'll have to fall back to generating it.
+            # Not for gene-level, which has no coordinate to write a g.HGVS from - it is annotated, so
+            # a null here means it predates the column being filled rather than "generate one"
             from genes.hgvs import HGVSMatcher
             matcher = HGVSMatcher.instance(variant.any_genome_build)
             hgvs_g = matcher.variant_to_g_hgvs(variant)

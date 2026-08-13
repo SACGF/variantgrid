@@ -1,7 +1,7 @@
 """
 Reader for Illumina DRAGEN TSO 500's AllFusions.csv - the rows only, no database work.
 
-What becomes of them is upload.tasks.import_gene_fusions_task.
+What becomes of them is upload.tasks.import_dragen_tso500_all_fusions_task.
 
 The file is a '# key = description' comment block, then a header row, then one row per fusion call
 from either of two callers writing into the same file. The header warns their scores and filters are

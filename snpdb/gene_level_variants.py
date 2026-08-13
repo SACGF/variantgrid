@@ -37,7 +37,7 @@ a fusion is, and comp-het reaches them through the same `VariantGeneOverlap` row
 
 ## How it is arranged
 
-  * One `Contig` (`SequenceRole.GENE_LEVEL`) shared by every genome build, using the constants below.
+  * One `Contig` (`SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG`) shared by every genome build, using the constants below.
     Not the 5' gene's real chromosome: `AnalysisNode` narrows querysets by contig, an
     inter-chromosomal fusion names two chromosomes, and a gene list on the far partner would silently
     drop it. Sharing one contig across builds also means one `Variant` serves every build, so

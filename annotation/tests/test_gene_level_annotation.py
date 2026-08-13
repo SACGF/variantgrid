@@ -114,6 +114,19 @@ class GeneLevelAnnotationTest(TestCase):
                        .values_list("gene_id", flat=True))
         self.assertEqual({self.cd74_gene.pk, self.ros1_gene.pk}, gene_ids)
 
+    def test_canonical_c_hgvs_falls_back_to_the_representative_annotation(self):
+        """ There is no VariantTranscriptAnnotation to read, so what the detail page loads comes from
+            the representative annotation instead """
+        self._run_annotation()
+        variant = self.gene_fusion.variant
+        self.assertIsNone(variant.get_canonical_transcript_annotation(self.genome_build))
+        self.assertEqual("CD74::ROS1", variant.get_canonical_c_hgvs(self.genome_build))
+
+    def test_hgvs_g_is_not_regenerated(self):
+        """ The matcher fallback has no coordinate to work from, so it must not be reached """
+        self._run_annotation()
+        self.assertEqual("CD74::ROS1", VariantAnnotation.get_hgvs_g(self.gene_fusion.variant))
+
     def test_gene_list_on_the_three_prime_partner_finds_the_fusion(self):
         """ The plan's "a gene list containing ROS1 finds CD74::ROS1" """
         self._run_annotation()
@@ -126,6 +139,11 @@ class GeneLevelAnnotationTest(TestCase):
                                                            variant=self.gene_fusion.variant)
         self.assertEqual("CD74", variant_annotation.symbol)
         self.assertEqual("CD74,ROS1", variant_annotation.overlapping_symbols)
+        self.assertEqual("CD74::ROS1", variant_annotation.hgvs_c)
+        self.assertEqual("CD74::ROS1", variant_annotation.hgvs_g,
+                         "g.HGVS is the column that is never blank - VICC rather than nothing")
+        self.assertEqual("CD74::ROS1", variant_annotation.get_hgvs_c_with_symbol(),
+                         "not run through the HGVS parser - it already names both genes")
         self.assertIsNone(variant_annotation.vep_skipped_reason,
                           "VEP never saw it, so it wasn't skipped - it's blank the way dbNSFP is on an SV")
         self.assertEqual(annotation_run, variant_annotation.annotation_run)
@@ -185,8 +203,9 @@ class GeneLevelVariantContainmentTest(TestCase):
         self.assertFalse(self.variant.can_have_clingen_allele)
         self.assertIn("no coordinate", self.variant.clingen_allele_skip_reason())
 
-    def test_no_c_hgvs(self):
-        self.assertFalse(self.variant.can_have_c_hgvs)
+    def test_c_hgvs_column_is_shown(self):
+        """ It carries the VICC nomenclature, so the column has a value rather than being hidden """
+        self.assertTrue(self.variant.can_have_c_hgvs)
 
     def test_as_external_explicit_raises(self):
         genome_build = GenomeBuild.get_name_or_alias("GRCh38")
