@@ -78,6 +78,8 @@ class VariantAnnotationPipelineType(models.TextChoices):
     """ We have standard long and short  """
     STANDARD = "S", "Standard Short Variant"
     STRUCTURAL_VARIANT = "C", "Structural Variant"
+    # Never reaches VEP - annotation is computed locally from the gene identity in the alt
+    GENE_LEVEL = "G", "Gene Level"
 
 
 class NMDEscapeStatus(models.TextChoices):

@@ -13,6 +13,16 @@ ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = True
 ANNOTATION_VEP_FAKE_VERSION = False  # Overridden in unit tests to not call VEP to get version
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
+# #1710: heap ceiling for one VEP process, applied with prlimit (util-linux). None = no limit.
+# This bounds the run rather than the worker pool, so a plugin that runs away on one variant takes out
+# its own run and nothing else - a pool-wide cgroup cap would have to be divided by however many VEPs
+# are in flight, and could pick a healthy run as the OOM victim. Sized against the workload, not the
+# box: a full standard run (50,000 variants, every plugin and custom file) holds flat at ~0.4GB, and
+# the worst single variant measured is under 1GB, so this is roughly 10x headroom. Deployments whose
+# data needs more can raise it - keep ANNOTATION_VEP_MEMORY_LIMIT_GB x annotation_workers concurrency
+# comfortably below installed RAM.
+ANNOTATION_VEP_MEMORY_LIMIT_GB = 4
+
 # I've had VEP hang on me when running --fork so by default we run in small batches
 # This causes a small amount of overhead obtaining an AnnotationRangeLock
 # If you get ERROR: Forked process(es) died: read-through of cross-process communication detected

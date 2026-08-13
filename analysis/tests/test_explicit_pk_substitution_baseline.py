@@ -31,6 +31,7 @@ from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import AnnotationRun
 from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
 from patients.models_enums import Zygosity
+from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import GenomeBuild, Variant
 from snpdb.models.models_cohort import (
     CohortGenotype,
@@ -98,9 +99,7 @@ class TestExplicitPkSubstitutionBaseline(TestCase):
             (mirrors production - ORM inserts target the right partition). Per-sample
             arrays put the proband at index 0. """
         n = len(samples_zygosity)
-        old_db_table = CohortGenotype._meta.db_table
-        try:
-            CohortGenotype._meta.db_table = cgc.get_partition_table()
+        with temporary_db_table(CohortGenotype, cgc.get_partition_table()):
             CohortGenotype.objects.create(
                 collection=cgc, variant=variant,
                 ref_count=samples_zygosity.count('R'),
@@ -114,8 +113,6 @@ class TestExplicitPkSubstitutionBaseline(TestCase):
                 samples_genotype_quality=[30] * n,
                 samples_phred_likelihood=[0] * n,
             )
-        finally:
-            CohortGenotype._meta.db_table = old_db_table
 
     @staticmethod
     def _ready(node):
@@ -299,9 +296,7 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
     @classmethod
     def _add_genotype(cls, cgc, variant, samples_zygosity):
         n = len(samples_zygosity)
-        old_db_table = CohortGenotype._meta.db_table
-        try:
-            CohortGenotype._meta.db_table = cgc.get_partition_table()
+        with temporary_db_table(CohortGenotype, cgc.get_partition_table()):
             CohortGenotype.objects.create(
                 collection=cgc, variant=variant,
                 ref_count=samples_zygosity.count('R'),
@@ -315,8 +310,6 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
                 samples_genotype_quality=[30] * n,
                 samples_phred_likelihood=[0] * n,
             )
-        finally:
-            CohortGenotype._meta.db_table = old_db_table
 
     @classmethod
     def _add_annotation(cls, variant, gnomad_af, af_1kg, af_uk10k):
@@ -325,15 +318,11 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
             transformer that rewrites the query to that partition can see the row. """
         partition_table = cls.vav.get_partition_table(
             base_table_name=VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION)
-        old_db_table = VariantAnnotation._meta.db_table
-        try:
-            VariantAnnotation._meta.db_table = partition_table
+        with temporary_db_table(VariantAnnotation, partition_table):
             VariantAnnotation.objects.create(
                 version=cls.vav, variant=variant, annotation_run=cls.annotation_run,
                 gnomad_af=gnomad_af, af_1kg=af_1kg, af_uk10k=af_uk10k,
                 predictions_num_pathogenic=0, predictions_num_benign=0)
-        finally:
-            VariantAnnotation._meta.db_table = old_db_table
 
     def _ready_source(self):
         node = SampleNode.objects.create(analysis=self.analysis, sample=self.proband)

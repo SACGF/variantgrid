@@ -29,13 +29,19 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT, VCFSymbolicAllele
+from library.genomics.vcf_enums import (
+    GENE_LEVEL_ALT_PATTERN,
+    INFO_LIFTOVER_SWAPPED_REF_ALT,
+    GeneLevelSymbolicAlt,
+    VCFSymbolicAllele,
+)
 from library.guardian_utils import admin_bot
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
+from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, SequenceRole
+from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 LOCUS_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
@@ -43,6 +49,9 @@ LOCUS_NO_REF_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)$")
 VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 # This is our internal format for symbolic (ie <DEL>/<DUP> etc)
 VARIANT_SYMBOLIC_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV)>$", re.IGNORECASE)
+# Gene-level - the position is a gene id and the alt carries the partner. @see snpdb.gene_level_variants
+VARIANT_GENE_LEVEL_PATTERN = re.compile(
+    rf"^{GENE_LEVEL_CONTIG_NAME}\s*:\s*(\d+)\s*-\s*\d+\s*({GENE_LEVEL_ALT_PATTERN.pattern})$")
 # matches anything hgvs-like before any fixes
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+", re.IGNORECASE)
 
@@ -357,13 +366,24 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         return vc.as_internal_canonical_form(genome_build)
 
     @staticmethod
+    def from_gene_level_match(match) -> 'VariantCoordinate':
+        """ No genome build involved - a gene-level coordinate is the same on every build, and there
+            is no reference to read. @see snpdb.gene_level_variants """
+        # Explicit group numbers - the alt sub-pattern brings its own groups along
+        return VariantCoordinate(chrom=GENE_LEVEL_CONTIG_NAME, position=int(match.group(1)),
+                                 ref=GENE_LEVEL_REF, alt=match.group(2), svlen=GENE_LEVEL_SVLEN)
+
+    @staticmethod
     def from_string(variant_string: str, genome_build):
         """ Pass in genome build to be able to set REF from symbolic (will be N otherwise) """
         if full_match := VARIANT_PATTERN.fullmatch(variant_string):
             return VariantCoordinate.from_variant_match(full_match, genome_build)
         elif full_match := VARIANT_SYMBOLIC_PATTERN.fullmatch(variant_string):
             return VariantCoordinate.from_symbolic_match(full_match, genome_build)
-        regex_patterns = ", ".join(str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN))
+        elif full_match := VARIANT_GENE_LEVEL_PATTERN.fullmatch(variant_string):
+            return VariantCoordinate.from_gene_level_match(full_match)
+        regex_patterns = ", ".join(str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN,
+                                                    VARIANT_GENE_LEVEL_PATTERN))
         raise ValueError(f"{variant_string=} did not match against {regex_patterns=}")
 
     @staticmethod
@@ -381,10 +401,17 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         return Sequence.allele_is_symbolic(self.alt)
 
     @property
+    def is_gene_level(self) -> bool:
+        """ Coordinate-level twin of Variant.is_gene_level - keyed on the alt, since a bare coordinate
+            has no contig role to read. No coordinate means nothing can be read off a reference """
+        return GeneLevelSymbolicAlt.parse(self.alt) is not None
+
+    @property
     def can_be_made_explicit(self) -> bool:
         """ <CNV> (copy-number-variable region) and <INS> have no unambiguous explicit ref/alt
             expansion (cf. Variant.can_make_g_hgvs), so as_external_explicit() will raise for them.
-            Their external VCF representation stays symbolic. """
+            Their external VCF representation stays symbolic. Gene-level alts have no reference
+            sequence at all. """
         if not self.is_symbolic:
             return True
         return self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
@@ -397,6 +424,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def as_external_explicit(self, genome_build) -> 'VariantCoordinate':
         """ explicit ref/alt """
+        if self.is_gene_level:
+            raise ValueError(f"{self} is gene-level - it has no coordinate to read a reference from")
+
         if self.is_symbolic:
             if self.svlen is None:
                 raise ValueError(f"{self} has 'svlen' = None")
@@ -577,7 +607,11 @@ class Locus(models.Model):
 class Variant(PreviewModelMixin, models.Model):
     """ Variants represent the different alleles at a locus
         Usually 2+ per line in a VCF file (ref + >= 1 alts pointing to the same locus for the row)
-        There is only 1 Variant for a given locus/alt per database (handled via insertion queues) """
+        There is only 1 Variant for a given locus/alt per database (handled via insertion queues)
+
+        Gene-level events (gene fusions) are also stored as Variants, on a contig that isn't a
+        sequence and with a gene ID in place of a coordinate. That is not what you'd expect here -
+        @see snpdb.gene_level_variants before touching anything guarded by get_gene_level_q() """
 
     REFERENCE_ALT = "="
     _BASES = "GATC"
@@ -636,6 +670,18 @@ class Variant(PreviewModelMixin, models.Model):
     @staticmethod
     def get_symbolic_q() -> Q:
         return Q(svlen__isnull=False)
+
+    @staticmethod
+    def get_gene_level_q() -> Q:
+        """ Events with no coordinate (gene fusions) - @see snpdb.gene_level_variants.
+            The single predicate for "keep this away from anything that reads a reference
+            sequence"; is_gene_level is the instance-level twin """
+        return Q(locus__contig__role=SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG)
+
+    @cached_property
+    def is_gene_level(self) -> bool:
+        """ @see snpdb.gene_level_variants, and get_gene_level_q for the queryset form """
+        return self.locus.contig.is_gene_level
 
     @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):
@@ -782,6 +828,9 @@ class Variant(PreviewModelMixin, models.Model):
 
     def clingen_allele_skip_reason(self) -> Optional[str]:
         """Return why ClinGen should be skipped for this variant, or None if it can be used."""
+        if self.is_gene_level:
+            # ClinGen registers coordinates, and there isn't one - @see snpdb.gene_level_variants
+            return f"Gene-level variant {self.alt} has no coordinate, so cannot be registered"
         if not self.can_make_g_hgvs:
             return f"Symbolic variant {self.alt} cannot form g.HGVS (only DEL/DUP/INV supported)"
         size = self._clingen_allele_size
@@ -856,10 +905,16 @@ class Variant(PreviewModelMixin, models.Model):
             return any_at_all
 
     def get_canonical_c_hgvs(self, genome_build):
-        c_hgvs = None
+        from annotation.models import VariantAnnotationVersion
         if cta := self.get_canonical_transcript_annotation(genome_build):
-            c_hgvs = cta.get_hgvs_c_with_symbol()
-        return c_hgvs
+            return cta.get_hgvs_c_with_symbol()
+        if self.is_gene_level:
+            # Sits on no transcript, so the representative annotation is the only one there is - it
+            # carries the VICC gene-level nomenclature. @see snpdb.gene_level_variants
+            vav = VariantAnnotationVersion.latest(genome_build)
+            if va := self.variantannotation_set.filter(version=vav).first():
+                return va.get_hgvs_c_with_symbol()
+        return None
 
     @property
     def start(self):

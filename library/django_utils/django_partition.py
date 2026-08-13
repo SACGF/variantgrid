@@ -1,4 +1,5 @@
 import logging
+from contextlib import contextmanager
 
 from django.conf import settings
 from django.db import models, transaction
@@ -8,6 +9,32 @@ from django.utils.text import slugify
 from library.log_utils import log_traceback
 from library.utils import double_quote, single_quote
 from library.utils.database_utils import run_sql
+
+
+def _clear_cached_cols(meta):
+    for field in meta.concrete_fields:
+        field.__dict__.pop("cached_col", None)
+
+
+@contextmanager
+def temporary_db_table(model, db_table: str):
+    """ Point a model at one of its partition tables for the duration of a query.
+
+        Restoring _meta.db_table is not enough on its own: Field.cached_col is a cached_property
+        bound to whatever the table was called the first time that column was rendered, so a query
+        run while swapped leaves the model's fields pointing at the partition forever after. Later
+        queries then render a mix of both table names ('missing FROM-clause entry for table ...'),
+        which outlives the swap for the life of the process. Clear the cache both ways. """
+
+    meta = model._meta
+    original_db_table = meta.db_table
+    _clear_cached_cols(meta)
+    meta.db_table = db_table
+    try:
+        yield
+    finally:
+        meta.db_table = original_db_table
+        _clear_cached_cols(meta)
 
 
 class RelatedModelsPartitionModel(models.Model):

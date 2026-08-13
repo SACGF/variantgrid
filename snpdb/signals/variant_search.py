@@ -17,6 +17,7 @@ from annotation.manual_variant_entry import CreateManualVariantForbidden, check_
 from classification.models import Classification, CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher, HgvsOriginallyNormalized, VariantResolvingError
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
+from genes.gene_fusions import find_gene_fusions_for_string
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium, MANEStatus
 from library.enums.log_level import LogLevel
@@ -834,3 +835,36 @@ ALLELE_ID_SEARCH_PATTERN = re.compile(r"^a(\d+)$")
 )
 def search_allele_id(search_input: SearchInputInstance):
     yield Allele.objects.filter(pk=search_input.match.group(1))
+
+
+# '::' is the HGVS/ISCN fusion convention; a single hyphen is what callers write, so it separates
+# only where neither side contains one of its own (RP11-458D21.5 is a gene name, not a pair)
+GENE_FUSION_PATTERN = re.compile(r"^([A-Za-z0-9.]+)\s*(?:::|--|-)\s*([A-Za-z0-9.]+)$")
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=GENE_FUSION_PATTERN,
+    sub_name="Gene Fusion",
+    example=SearchExample(
+        note="A gene fusion, named by its gene pair",
+        examples=["BCR::ABL1", "CD74-ROS1"]
+    )
+)
+def search_variant_gene_fusion(search_input: SearchInputInstance):
+    """ Lookup only - searching must never mint a fusion identity.
+
+        A fusion Variant sits on the contig every build shares, so it is found once rather than per
+        build, and get_visible_variants still applies each build's permissions. """
+    seen = set()
+    for gene_fusion in find_gene_fusions_for_string(search_input.search_string):
+        if gene_fusion.variant_id in seen:
+            continue
+        seen.add(gene_fusion.variant_id)
+        for genome_build in search_input.genome_builds:
+            visible_variants_qs = search_input.get_visible_variants(genome_build)
+            if variant := visible_variants_qs.filter(pk=gene_fusion.variant_id).first():
+                yield SearchResult(variant.preview,
+                                   messages=[SearchMessage(f"Gene fusion {gene_fusion.canonical_str}",
+                                                           severity=LogLevel.INFO)])
+                break

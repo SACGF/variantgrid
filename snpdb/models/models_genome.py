@@ -21,6 +21,7 @@ from library.django_utils.django_object_managers import ObjectManagerCachingImmu
 from library.genomics.fasta_wrapper import FastaFileWrapper
 from library.preview_request import PreviewModelMixin
 from library.utils import invert_dict
+from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_REFSEQ_ACCESSION
 from snpdb.genome.fasta_index import load_genome_fasta_index
 from snpdb.models.models_enums import AssemblyMoleculeType, SequenceRole
 
@@ -392,6 +393,15 @@ class Contig(models.Model, PreviewModelMixin):
 
     class ContigNotInBuildError(ValueError):
         pass
+
+    @staticmethod
+    def get_gene_level() -> 'Contig':
+        """ The one contig every build shares for events with no coordinate - @see snpdb.gene_level_variants """
+        return Contig.objects.get(refseq_accession=GENE_LEVEL_CONTIG_REFSEQ_ACCESSION)
+
+    @property
+    def is_gene_level(self) -> bool:
+        return self.role == SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG
 
     def get_absolute_url(self):
         return reverse("view_contig", kwargs={"contig_accession": self.refseq_accession})

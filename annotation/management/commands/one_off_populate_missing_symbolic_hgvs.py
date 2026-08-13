@@ -58,7 +58,9 @@ class Command(BaseCommand):
         for genome_build in GenomeBuild.builds_with_annotation():
             matcher = HGVSMatcher(genome_build)
             qs = Variant.objects.filter(Variant.get_contigs_q(genome_build))
-            symbolic_qs = qs.filter(alt__seq__startswith='<')
+            # Gene-level alts also start with '<', but their HGVS is the VICC nomenclature the
+            # GENE_LEVEL pipeline writes, not something to calculate. @see snpdb.gene_level_variants
+            symbolic_qs = qs.filter(alt__seq__startswith='<').exclude(Variant.get_gene_level_q())
             total = symbolic_qs.count()
             print(f"{genome_build.name=} has {total} variants to update annotation")
 

@@ -102,25 +102,57 @@ a null `svlen` gives no database-level uniqueness. The cost is that `Variant.get
 null, `:637-638`) then calls gene-level events symbolic, which routes them at the SV annotation pipeline
 — they need excluding there regardless, since VEP cannot parse the alt, so this adds no new work.
 
+### The identifier space — `FusionGeneId`
+
+Anchors and partners are named by a `FusionGeneId` row rather than straight off `HGNC`:
+
+```python
+class FusionGeneId(models.Model):
+    CUSTOM_ID_START = 1_000_000
+    symbol_str = TextField(unique=True, db_collation='case_insensitive')
+    gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
+    hgnc = models.ForeignKey(HGNC, null=True, on_delete=SET_NULL)
+```
+
+`pk` **is** the HGNC ID where the gene has one, so an ordinary fusion's identity is the same number on
+every deployment. Symbols HGNC does not carry get a pk above `CUSTOM_ID_START`.
+
+That last part is why the table exists. Clone-based identifiers are routine fusion partners — the test
+file has `RP11-458D21.5;NOTCH2NL` and `PPARG/AC016683.6` — and keying identity on HGNC alone leaves
+them unrepresentable, forcing a park-or-guess decision on rows the caller reported perfectly clearly.
+With a local id every call becomes a `Variant`, and `<FUSION:UNKNOWN>` goes back to meaning only what
+it says: the caller named one gene and left the other unspecified.
+
+**Local ids do not travel.** Anything leaving the system — display, export, a classification sent to
+another instance — uses `symbol_str`, and the receiver resolves it through its own table.
+`GeneFusion.canonical_str` is that string form. This is stated on the model, because the numbers look
+portable and half of them are.
+
 ### Identity in the alt
 
 Biological identity is encoded in the alt string, which hashes to its own `Sequence` row and therefore
 its own `Variant`:
 
-- `<FUSION:HGNC:nnn>` — directional. Anchor is the 5′ partner; the alt carries the 3′ partner's HGNC ID.
+- `<FUSION:HGNC:nnn>` — directional. Anchor is the 5′ partner; the alt carries the 3′ partner's ID.
 - `<FUSION_UNORDERED:HGNC:nnn>` — both partners known, direction not asserted. Anchor is the gene with
-  the smaller HGNC ID; the alt carries the larger.
-- `<FUSION:UNKNOWN>` — one partner known (the anchor), the other unspecified.
+  the smaller ID; the alt carries the larger.
+- `<FUSION:GENE:nnn>` / `<FUSION_UNORDERED:GENE:nnn>` — same, for a partner with no HGNC entry. The
+  namespace says whether the number travels, so nobody has to know that 1,000,000 is the dividing line.
+- `<FUSION:UNKNOWN>` — the caller named one gene (the anchor) and no partner at all.
+- `<FUSION_UNORDERED:UNKNOWN>` — one gene named, and it is not the 5′ side. Anchoring a 3′ partner as
+  if it were 5′ would assert a direction the caller did not.
 
 Reciprocal fusions are distinct variants, because the 5′ promoter drives a different protein and the
-clinical significance differs (BCR-ABL1 vs ABL1-BCR is the canonical case). Ordered and unordered are
-distinct, because an unordered report does not assert direction. Unknown-partner does not collide with
-known-partner at the same anchor.
+clinical significance differs (BCR-ABL1 vs ABL1-BCR is the canonical case). The test file settles this
+rather than theory: `ENTPD3→RPL14` appears three times and `RPL14→ENTPD3` once, same caller, same
+sample. Ordered and unordered are distinct, because an unordered report does not assert direction.
 
-Partners are **HGNC only**. HGNC bridges RefSeq and Ensembl, so identity stays consortium-agnostic;
-HGNC IDs do not move, which symbols demonstrably do — the test file's `SEPT14` is HGNC's `SEPTIN14`, and
-`cnv.vcf`'s `SEGID` says `MYCL1` where the rest of the pipeline says `MYCL`. Delimiter normalisation
-(`-`, `::`, `/`, `~`) happens at the import layer and never reaches identity.
+HGNC-backed identity is preferred wherever available: HGNC bridges RefSeq and Ensembl, so it stays
+consortium-agnostic, and HGNC IDs do not move, which symbols demonstrably do — the test file's `SEPT14`
+is HGNC's `SEPTIN14`, and `cnv.vcf`'s `SEGID` says `MYCL1` where the rest of the pipeline says `MYCL`.
+Delimiter normalisation happens at the import layer and never reaches identity: `;` and `/` separate
+names *within* one side's cell (a hyphen cannot — `RP11-458D21.5` contains one), while `::`, `~`, `--`
+and a lone `-` separate the two sides of a fusion written as one string.
 
 ### `GeneFusion` companion model
 
@@ -129,13 +161,13 @@ One-to-one with `Variant`, denormalising what grids and filters need to join and
 ```python
 class GeneFusion(models.Model):
     variant = models.OneToOneField(Variant, on_delete=CASCADE)
-    anchor_hgnc = models.ForeignKey(HGNC, related_name='fusions_as_anchor', on_delete=PROTECT)
-    partner_hgnc = models.ForeignKey(HGNC, null=True, related_name='fusions_as_partner', on_delete=PROTECT)
+    anchor = models.ForeignKey(FusionGeneId, related_name='fusions_as_anchor', on_delete=PROTECT)
+    partner = models.ForeignKey(FusionGeneId, null=True, related_name='fusions_as_partner', on_delete=PROTECT)
     is_ordered = models.BooleanField(default=False)
 ```
 
-`partner_hgnc` is null only for `<FUSION:UNKNOWN>`. `is_ordered` is derivable from the alt prefix but
-denormalised for filtering. `clean()` enforces that the alt prefix, the alt's HGNC ID and the two FKs
+`partner` is null only for the UNKNOWN forms. `is_ordered` is derivable from the alt prefix but
+denormalised for filtering. `clean()` enforces that the alt prefix, the alt's gene ID and the two FKs
 agree.
 
 The `Allele` arrives the ordinary way, via `VariantAllele`, rather than being owned by `GeneFusion` —
@@ -190,20 +222,30 @@ What a run writes per fusion:
 - A new `VEPSkippedReason` value (`annotation/models/models_enums.py:150-154`) marking the row as locally
   computed, so an empty consequence field is not mistaken for "VEP found nothing".
 
-Resolution path is HGNC → symbol → release genes, not HGNC → gene. `HGNC` carries `ensembl_gene_id` but
-no Entrez ID (`genes/models.py:77-97`) while `Gene.identifier` is the Entrez ID for RefSeq releases, so
-RefSeq resolves through `HGNC.gene_symbol` and the per-release symbol cache (`ReleaseGeneSymbol` /
-`ReleaseGeneSymbolGene`, `genes/models.py:1521-1536`) — i.e. `GeneSymbolMatcher`, which is the same
-resolver Phase 6 of the overall plan needs for `cnv.vcf`'s `SEGID` symbols.
+Resolution path is `FusionGeneId` → symbol → release genes, not HGNC → gene. `HGNC` carries
+`ensembl_gene_id` but no Entrez ID (`genes/models.py:77-97`) while `Gene.identifier` is the Entrez ID
+for RefSeq releases, so RefSeq resolves through the symbol and the per-release symbol cache
+(`ReleaseGeneSymbol` / `ReleaseGeneSymbolGene`) — the same resolver Phase 6 of the overall plan needs
+for `cnv.vcf`'s `SEGID` symbols. Going through `FusionGeneId` rather than `HGNC` also means a
+locally-identified partner resolves by exactly the same path as an HGNC-backed one.
 
-Identity keys on the HGNC ID for stability and resolves through the symbol at annotation time. That is
-the right split: identity is fixed forever, resolution is versioned and re-runnable, so a later HGNC
-import that fixes `SEPT14` → `SEPTIN14` improves the mapping without touching a single `Variant`.
+Identity keys on the id for stability and resolves through the symbol at annotation time. That is the
+right split: identity is fixed forever, resolution is versioned and re-runnable, so a later HGNC import
+that fixes `SEPT14` → `SEPTIN14` improves the mapping without touching a single `Variant`.
 
-**Check before building:** everything in `annotation/tasks/annotate_variants.py` is built around
-dump-VCF → run VEP subprocess → import results, and gene-level has no VCF stage (it cannot be written as
-one). Read `_dispatch_trigger_sig` and the lane logic to decide whether GENE_LEVEL fits as a lane inside
-the scheduler or as a task the scheduler triggers alongside it.
+**How it runs.** `_handle_range_lock` already creates one `AnnotationRun` per member of
+`VariantAnnotationPipelineType`, and the dispatcher already launches a CREATED run through
+`annotate_variants`, so the scheduler needs no change at all. `annotate_variants` branches on
+`pipeline_type` to call `annotate_gene_level_run` instead of `dump_and_annotate_variants` — the same
+shape as STANDARD and STRUCTURAL_VARIANT sharing that task and branching inside it. Everything around
+the branch (the task_id lock, the blocker check, the lease heartbeat, error reporting, releasing the
+lease and kicking the dispatcher) is identical for all three types, so it stays in one place.
+
+The one thing gene-level does differently is finish there rather than at ANNOTATION_COMPLETED: with no
+VEP subprocess to throttle and only a handful of rows to write, there is nothing for the second lane
+(`db_workers` → `import_annotation_run`) to do, so `annotate_gene_level_run` writes the rows, walks the
+status fields to FINISHED and sends `annotation_run_complete_signal` itself. Gene-level variants are
+rare, so `count_annotation_run` finishes almost every GENE_LEVEL run as empty without dispatching it.
 
 ### Why not feed VEP a BND pair
 
@@ -229,9 +271,21 @@ and the `Caller,Gene A,Gene B,…` header row, with a processing ability above `
 default 1 (`upload/import_task_factories/import_task_factory.py:35-40`), which would otherwise win and
 import the fusions as a gene list.
 
-**No bcftools stage.** `bcftools norm --check-ref=s` reads the reference base from the fasta
-(`upload/vcf/vcf_preprocess.py:176-181`), and a gene-level locus has none. So the loader inserts variants
-directly and writes `CohortGenotype` rows, reusing the bulk-insert machinery but skipping preprocess.
+**Through the normal VCF import pipeline, minus the bcftools stages.** The rows are written out as a
+VCF of gene-level variants and inserted by the standard path, so the insertion queue, `VariantPKLookup`
+and per-pipeline-type max-variant tracking all apply unchanged - `UploadedVCFPipelineMaxVariant` is
+keyed on `VariantAnnotationPipelineType` and populated via `pipeline_type_variant_q`, so GENE_LEVEL
+tracking (and therefore the annotation gate) needs no new code.
+
+What is skipped is only what needs a reference base: `bcftools norm --check-ref=s` reads it from the
+fasta, and `vcf_clean_and_filter` maps chroms through `standard_contigs_only` (which excludes the
+gene-level contig by role) before replacing the header with one built the same way. Nothing is lost -
+the VCF is written by us rather than supplied by a lab, so it already has our contig names, no
+undeclared FILTERs, one alt per record and sorted order. `preprocess_gene_level_vcf` therefore goes
+straight to the split, and everything downstream of that is the shared code path.
+
+`END = POS` on each record is what gives `svlen` 0 through
+`vcf_get_ref_alt_svlen_and_modification`, which requires SVLEN or END for any symbolic alt.
 
 **The file creates its own `VCF` and `Sample`.** A `Sample` belongs to exactly one `VCF`
 (`snpdb/models/models_vcf.py:334`) and `CohortGenotype` hangs off a per-VCF collection, so fusion rows
@@ -248,7 +302,13 @@ one `Variant` and therefore one `CohortGenotype` row. That is the same merge Pha
 built `ModifiedImportedVariantOperation.SHARED_LOCUS` for (`upload/models/models_enums.py:56`), with
 `operation_detail` carrying what was summed (`upload/models/models.py:729-730`) so per-row values stay
 reconstructable. Use the same discipline: keep every row's data in the info list, and record that a merge
-happened.
+happened. The loader creates one `UploadStep` for the import, which is what `ModifiedImportedVariants`
+hangs off.
+
+**The genome build is declared, not detected.** The file's breakpoints are `chrN:pos` with no header to
+detect a build from, so a multi-build deployment needs `genome_build` upload metadata — the same key
+`_DragenExonCNV.vcf` already requires. The fusion `Variant` itself is build-independent, so this is only
+for the VCF/Sample bookkeeping and the `VariantAllele`.
 
 **Ingest unfiltered.** 1 of 149 rows in the real run passed the caller's own filter, and the filter
 strings are long semicolon-joined lists. Same posture as the CNV and small-variant VCFs: take everything,
@@ -290,32 +350,55 @@ Design it now, build it when a file needs it. It is purely additive — one enum
 
 1. The gene-level contig: `SequenceRole` value, `Contig` + `GenomeBuildContig` migration, and the
    `Variant.get_gene_level_q()` predicate.
-2. Containment — the five rows of the table above, each with a test.
-3. `GeneFusion` model, canonicalisation (delimiters, HGNC resolution, ordered/unordered/unknown), and
-   `get_or_create` from a gene pair.
+2. Containment — the rows of the table above, each with a test.
+3. `FusionGeneId`, the `GeneFusion` model, canonicalisation (delimiters, alias resolution,
+   ordered/unordered/unknown), and `get_or_create` from a gene pair.
 4. The `GENE_LEVEL` annotation pipeline type and its run.
 5. The `AllFusions.csv` factory and parser: VCF + Sample creation, direct variant insert, `CohortGenotype`
    with per-row info and merge recording.
-6. `ImportedAlleleInfo.gene_fusion` short-circuit.
+6. `ImportedAlleleInfo.gene_fusion` short-circuit, and the search receiver.
 
 Steps 1-2 are the foundation everything else sits on. Step 4 is independently testable against
 hand-created fusion variants, so it can run in parallel with step 5.
+
+Note on `VARIANT_ANNOTATION_Q`: the containment table above lists it as excluding gene-level, and it
+does not. It means "variants that get a `VariantAnnotation` row", which gene-level variants do — just
+written by the GENE_LEVEL run rather than VEP — and `get_variants_qs_for_annotation` builds every
+pipeline's queryset from it, so excluding there would leave the GENE_LEVEL pipeline with nothing to
+annotate. The exclusion belongs in `pipeline_type_variant_q` alone, which is the documented single
+source of truth and subtracts gene-level from both VEP types.
+
+## Search
+
+A fusion has to be findable by the name people call it: `BCR::ABL1` and `CD74-ROS1` both resolve
+through a `Variant` search receiver, either ordering, with aliases applied (`EGFR::SEPT14` finds
+`EGFR-SEPTIN14`). Search is **lookup only** — it runs on whatever a user types, so it must never mint a
+`GeneFusion` or a `FusionGeneId`, unlike the loader and the classification short-circuit, which both
+create on demand.
+
+Two things this leaves for later: finding a fusion by a single partner (`ROS1` returning every fusion
+it takes part in) belongs with Phase 6's grid work, and searching a `GENE:`-namespaced local id is
+deliberately not offered — the number means nothing to a person and nothing on another deployment.
 
 ## Decisions still open
 
 | Decision | Why it matters |
 |---|---|
-| How a non-HGNC partner gets an identity — `RP11-458D21.5`, `AC016683.6` and the multi-gene `ROS1;GOPC` forms | Parking the row is ruled out: these partners have to be storable as fusions. So the question is which namespace joins HGNC in `Locus.position` and the alt, and whether identity moves when HGNC later names one of these genes. Determines whether `GeneFusion` identity can be non-null on both sides |
 | Does VEP parse BND at all? | Only affects whether a future breakend phase can reuse VEP; nothing in phase 1 waits on it |
 | Single grid or multiple grids for non-variants | Overall plan Phase 6, best answered against real fusion rows |
+
+Settled during implementation: **a multi-gene side resolves to its first HGNC-backed member**, falling
+back to its first known gene symbol, then to the first name as written. A side that resolves to nothing
+known still gets an identity through `FusionGeneId`'s local id space, so there is no park-or-skip case
+and no row is lost. The cell is kept exactly as the caller wrote it in `CohortGenotype.info`.
 
 ## Done when
 
 All 33 rows of `ExampleSample_RNA_2600000001B_AllFusions.csv` import; `EGFR-SEPTIN14` resolves despite
 the file saying `SEPT14`; the same gene pair from both callers — and the three `ENTPD3-RPL14` rows from
 one caller — resolve to one `GeneFusion` with every row's breakpoints preserved in `CohortGenotype.info`;
-a gene list containing `ROS1` finds `CD74-ROS1` with contig narrowing turned on; and the fusion sample's
-variants carry gene symbols on the grid.
+a gene list containing `ROS1` finds `CD74-ROS1` with contig narrowing turned on; searching `BCR::ABL1`
+finds the fusion; and the fusion sample's variants carry gene symbols on the grid.
 
 ## Deferred, deliberately
 

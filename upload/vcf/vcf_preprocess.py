@@ -67,9 +67,9 @@ def get_bcftools_tool_version(bcftools_command):
     return tool_version
 
 
-def create_sub_step(upload_step, sub_step_name, sub_step_commands):
+def create_sub_step(upload_step, sub_step_name, sub_step_commands, tool_version):
+    """ tool_version is whatever runs this stage - null where the pipe has no versioned tool in it """
     start_date = timezone.now()
-    tool_version = get_bcftools_tool_version(settings.BCFTOOLS_COMMAND)
     command_line = ' '.join(sub_step_commands)
     return UploadStep.objects.create(name=sub_step_name,
                                      script=command_line,
@@ -206,14 +206,16 @@ def _build_pipe_commands(upload_step, files: PreprocessFiles, disable_swap=False
                                          "--filter='bash -c \"set -eo pipefail; { cat $VG_HEADER_FILE; cat; } | bgzip -c > $VG_SPLIT_VCF_DIR/$FILE\"'"]
 
     sub_steps = {}
+    bcftools_version = get_bcftools_tool_version(settings.BCFTOOLS_COMMAND)
     for sub_step_name in [VCF_CLEAN_AND_FILTER_SUB_STEP, SORT_VCF_SUB_STEP, UploadStep.NORMALIZE_SUB_STEP]:
         if sub_step_commands := pipe_commands.get(sub_step_name):
-            sub_steps[sub_step_name] = create_sub_step(upload_step, sub_step_name, sub_step_commands)
+            sub_steps[sub_step_name] = create_sub_step(upload_step, sub_step_name, sub_step_commands,
+                                                       bcftools_version)
 
     return pipe_commands, sub_steps
 
 
-def _run_pipe(pipe_commands: dict, sub_steps: dict, split_env: dict, upload_pipeline):
+def run_pipe(pipe_commands: dict, sub_steps: dict, split_env: dict, upload_pipeline):
     piped_command = ' | '.join([' '.join(command_with_args) for command_with_args in pipe_commands.values()])
 
     # if POPEN_SHELL=True we're running this all as one command as native shell text
@@ -325,7 +327,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
     pipe_commands, sub_steps = _build_pipe_commands(upload_step, files, disable_swap=disable_swap)
     sorted_vcf = False
     try:
-        _run_pipe(pipe_commands, sub_steps, split_env, upload_pipeline)
+        run_pipe(pipe_commands, sub_steps, split_env, upload_pipeline)
     except CalledProcessError:
         if not os.path.exists(files.unsorted_marker):
             raise
@@ -333,7 +335,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
             logging.info("Re-running through '%s sort': %s", settings.BCFTOOLS_COMMAND, f.read().strip())
         _reset_for_retry(files, sub_steps)
         pipe_commands, sub_steps = _build_pipe_commands(upload_step, files, disable_swap=disable_swap, sort_vcf=True)
-        _run_pipe(pipe_commands, sub_steps, split_env, upload_pipeline)
+        run_pipe(pipe_commands, sub_steps, split_env, upload_pipeline)
         sorted_vcf = True
 
     clean_sub_step = sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP]
@@ -355,11 +357,21 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
     _store_vcf_stats(files.skipped_alts_stats, clean_sub_step, "ALTs")
     _store_vcf_stats(files.converted_alts_stats, clean_sub_step, "ALTs", operation='Converted')
 
+    schedule_split_file_steps(upload_step, files.split_vcf_dir, annotate_gnomad_af=annotate_gnomad_af)
+
+    return files.swap_skipped
+
+
+def schedule_split_file_steps(upload_step, split_vcf_dir: str, annotate_gnomad_af=False):
+    """ One SeparateUnknownVariantsTask per split VCF, plus the UploadStepMultiFileOutput rows that
+        ScheduleMultiFileOutputTasksTask fans the data-insertion tasks out over. Shared by every
+        preprocess variant - a pipeline that skips the bcftools stages still needs all of this. """
+    upload_pipeline = upload_step.upload_pipeline
     # Create this here so downstream tasks (running in parallel) can all link against the same one
     ModifiedImportedVariants.get_for_pipeline(upload_pipeline)
     vcf_import_annotate_dir = upload_pipeline.get_pipeline_processing_subdir("vcf_import_annotate")
     sort_order = upload_pipeline.get_max_step_sort_order()
-    for split_vcf_filename in glob.glob(f"{files.split_vcf_dir}/*.vcf.gz"):
+    for split_vcf_filename in glob.glob(f"{split_vcf_dir}/*.vcf.gz"):
         sort_order += 1
         separate_upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                          name="Separate Unknown Variants Task",
@@ -387,8 +399,6 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
         # We don't know how big the last split file is, so leave items_to_process as null so no check
         UploadStepMultiFileOutput.objects.create(upload_step=upload_step,
                                                  output_filename=output_filename)
-
-    return files.swap_skipped
 
 
 def _store_vcf_stats(filename, upload_step, description, operation='Skipped'):

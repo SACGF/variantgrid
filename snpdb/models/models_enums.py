@@ -128,6 +128,9 @@ class SequenceRole(models.TextChoices):
     ALT_SCAFFOLD = 'ALT', "alt-scaffold"
     FIX_PATCH = 'FP', "fix-patch"
     NOVEL_PATCH = 'NP', "novel-patch"
+    # Not a real sequence role - the shared fake contig gene-level events (gene fusions) are
+    # anchored on, so they have somewhere to sit with no coordinate. @see snpdb.gene_level_variants
+    VG_GENE_LEVEL_FAKE_CONTIG = 'GL', "VariantGrid gene-level (not a sequence)"
 
 
 class AssemblyMoleculeType(models.TextChoices):
