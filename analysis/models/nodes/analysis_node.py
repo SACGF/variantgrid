@@ -501,11 +501,11 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             if self.has_input():
                 contigs = self.get_parent_contigs()
                 if self.modifies_parents():
-                    node_contigs = self._get_node_contigs()
+                    node_contigs = self._get_narrowing_contigs()
                     if node_contigs is not None:
                         contigs &= node_contigs
             else:
-                node_contigs = self._get_node_contigs()
+                node_contigs = self._get_narrowing_contigs()
                 if node_contigs is not None:
                     contigs = node_contigs
                 else:
@@ -611,6 +611,17 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def _get_node_contigs(self) -> Optional[set[Contig]]:
         """ Return the contigs we filter for in this node. None means we don't know how to describe that """
         return None
+
+    def _get_narrowing_contigs(self) -> Optional[set[Contig]]:
+        """ _get_node_contigs + always letting the gene-level contig through.
+
+            Nodes can restrict queries to contigs (though we don't actually use this yet)
+            Gene-level variants are on a contig of their own so should always be included
+            @see snpdb.gene_level_variants """
+        node_contigs = self._get_node_contigs()
+        if node_contigs is not None:
+            node_contigs = node_contigs | {Contig.get_gene_level()}
+        return node_contigs
 
     def get_queryset(self, extra_filters_q=None, extra_annotation_kwargs=None, arg_q_dict=None,
                      inner_query_distinct=False, disable_cache=False):

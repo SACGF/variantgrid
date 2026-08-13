@@ -168,7 +168,7 @@ class TestPreprocessVCFPipe(TestCase):
 
     # ------------------------------------------------------------------ retry orchestration
     def _run_preprocess_vcf(self, run_pipe_side_effect):
-        with patch("upload.vcf.vcf_preprocess._run_pipe", side_effect=run_pipe_side_effect) as mock_run_pipe:
+        with patch("upload.vcf.vcf_preprocess.run_pipe", side_effect=run_pipe_side_effect) as mock_run_pipe:
             preprocess_vcf(self.upload_step)
         return mock_run_pipe
 

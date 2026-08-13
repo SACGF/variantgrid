@@ -3,6 +3,7 @@ from collections import Counter
 
 from bgzip import BGZipWriter
 
+from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from library.genomics.vcf_writer import VCFWriter, symbolic_alt_info
 from snpdb.models import VCF, Sample, Zygosity
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs, get_vcf_header_lines
@@ -72,6 +73,11 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, 
         pos = data["locus__position"]
         ref = data["locus__ref__seq"]
         alt = data["alt__seq"]
+        # A gene-level variant has a gene id where a coordinate goes, so a VCF record of it would be a
+        # lie - and the one that reaches VEP is the expensive way to find that out. Callers keep them
+        # out by contig (@see snpdb.gene_level_variants); this is what says so if one slips through.
+        if alt.startswith("<") and GeneLevelSymbolicAlt.parse(alt):
+            raise ValueError(f"Gene-level variant '{chrom}:{pos} {ref}>{alt}' cannot be written to a VCF")
         # END/SVLEN/SVTYPE are only needed (and only selected) for symbolic alts
         info = symbolic_alt_info(alt, svlen=data.get("svlen"), end=data.get("end"))
 

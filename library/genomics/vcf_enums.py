@@ -1,4 +1,9 @@
+import re
+from typing import Optional
+
 from django.db import models
+
+from library.utils import Constant
 
 
 class VCFColumns:
@@ -19,6 +24,57 @@ class VCFSymbolicAllele:
     DUP = "<DUP>"
     INS = "<INS>"
     INV = "<INV>"
+
+
+class GeneIdNamespace(models.TextChoices):
+    """ Whether the number in a gene-level alt means anything outside this deployment.
+        HGNC is the same gene everywhere; GENE is a local id for a symbol HGNC doesn't carry -
+        @see genes.models.FusionGeneId for what to send instead when a record leaves. """
+    HGNC = "HGNC", "HGNC ID"
+    GENE = "GENE", "Local gene ID"
+
+
+class GeneLevelSymbolicAlt(models.TextChoices):
+    """ Symbolic alts for gene-level events (gene fusions), which live on the shared gene-level contig
+        with the anchor gene's FusionGeneId as position. The alt carries the partner's id, so
+        biological identity hashes to its own Sequence and therefore its own Variant.
+
+        Encoding identity in the alt is what lets the existing (locus, alt, svlen) unique constraint do
+        the work - @see snpdb.gene_level_variants for why these are Variants at all.
+
+        FUSION is directional - the anchor is the 5' partner, so BCR-ABL1 and ABL1-BCR are distinct.
+        FUSION_UNORDERED anchors on the smaller id, because an unordered report asserts no direction.
+        AMP/LOSS are for callers reporting a gene-level copy event with no coordinates at all. """
+
+    FUSION = "FUSION", "Gene fusion"
+    FUSION_UNORDERED = "FUSION_UNORDERED", "Gene fusion (direction not asserted)"
+    AMP = "AMP", "Gene amplification"
+    LOSS = "LOSS", "Gene loss"
+
+    # A partner the caller left unspecified, in place of the namespace:id
+    UNKNOWN_PARTNER = Constant("UNKNOWN")
+
+    @staticmethod
+    def format(kind: str, namespace: Optional[str], gene_id: Optional[int]) -> str:
+        if gene_id is None:
+            return f"<{kind}:{GeneLevelSymbolicAlt.UNKNOWN_PARTNER}>"
+        return f"<{kind}:{namespace}:{gene_id}>"
+
+    @staticmethod
+    def parse(alt) -> Optional[tuple[str, Optional[str], Optional[int]]]:
+        """ Returns (kind, namespace, gene id) - namespace/id are None for an unknown partner.
+            None if this isn't a gene-level alt at all """
+        if m := GENE_LEVEL_ALT_PATTERN.fullmatch(str(alt)):
+            kind, namespace, gene_id = m.groups()
+            return kind, namespace, int(gene_id) if gene_id else None
+        return None
+
+
+# Longest kind first, so FUSION_UNORDERED isn't shadowed by FUSION
+GENE_LEVEL_ALT_PATTERN = re.compile(
+    rf"<({'|'.join(sorted(GeneLevelSymbolicAlt.values, key=len, reverse=True))}):"
+    rf"(?:({'|'.join(GeneIdNamespace.values)}):(\d+)|{GeneLevelSymbolicAlt.UNKNOWN_PARTNER})>"
+)
 
 
 class VCFConstant:
