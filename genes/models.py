@@ -2710,6 +2710,14 @@ class FusionGeneId(models.Model):
     CUSTOM_ID_RETRIES = 5
 
 
+def fusion_canonical_str(anchor: FusionGeneId, partner: Optional[FusionGeneId]) -> str:
+    """ 'BCR::ABL1' - the VICC gene-level form, which HGNC and HGVS both point at for fusions.
+        '::' is the fusion separator; a single hyphen means a read-through transcript, which is a
+        different event, so it is never written here. An unnamed partner shows as '?'. """
+    partner_str = partner.symbol_str if partner else "?"
+    return f"{anchor.symbol_str}::{partner_str}"
+
+
 class GeneFusion(models.Model):
     """ A gene fusion, one-to-one with the Variant carrying it. The Variant is what makes a fusion
         reachable from gene lists, comp-het, grids and classifications - @see snpdb.gene_level_variants,
@@ -2731,9 +2739,7 @@ class GeneFusion(models.Model):
     @property
     def canonical_str(self) -> str:
         """ The form to display and to send anywhere off this deployment - @see FusionGeneId """
-        partner_str = self.partner.symbol_str if self.partner else "?"
-        separator = "-" if self.is_ordered else "::"
-        return f"{self.anchor.symbol_str}{separator}{partner_str}"
+        return fusion_canonical_str(self.anchor, self.partner)
 
     def __str__(self):
         return self.canonical_str

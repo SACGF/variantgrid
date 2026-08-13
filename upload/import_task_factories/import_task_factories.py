@@ -30,7 +30,6 @@ from upload.gene_fusions import all_fusions_parser
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_gene_fusions_task import (
-    GeneFusionCreateVCFModelTask,
     GeneFusionCreateVCFTask,
     GeneFusionInsertTask,
 )
@@ -63,6 +62,7 @@ from upload.tasks.vcf.import_vcf_tasks import (
     ProcessVCFLinkAllelesSetMaxVariantTask,
     ProcessVCFLinkManualVariantEntrySetMaxVariantTask,
     ProcessVCFSetMaxVariantTask,
+    UploadPipelineFinishedTask,
 )
 from upload.upload_metadata import VCF_METADATA_KEYS
 
@@ -119,7 +119,8 @@ class GeneFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
         return [UploadedVCF]
 
     def get_metadata_keys(self):
-        # Creates its own VCF and Sample, so it takes the same keys a VCF does
+        # Becomes a VCF with a sample, so it takes the same keys a VCF does - including genome_build,
+        # which the file itself declares nowhere
         return VCF_METADATA_KEYS
 
     def get_processing_ability(self, user, filename, file_extension):
@@ -143,16 +144,23 @@ class GeneFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
         return GeneFusionCreateVCFTask.si(upload_step.pk, 0)
 
     def get_create_data_from_vcf_header_task_class(self):
-        return GeneFusionCreateVCFModelTask
+        # The VCF we wrote declares its sample and source, so the standard header path makes the
+        # VCF/Sample/Cohort/CohortGenotypeCollection the way it does for a lab's VCF
+        return ImportCreateVCFModelForGenotypeVCFTask
 
     def _get_preprocess_class(self) -> type:
         return GeneLevelPreprocessVCFTask
 
     def get_known_variants_parallel_vcf_processing_task_class(self):
-        return ProcessVCFSetMaxVariantTask
+        # Each row carries a genotype and its caller's data in INFO, so the standard bulk importer
+        # writes the CohortGenotypes by SQL COPY
+        return ProcessGenotypeVCFDataTask
 
     def get_post_data_insertion_classes(self):
         return [GeneFusionInsertTask, VCFCheckAnnotationTask]
+
+    def get_finish_task_classes(self):
+        return [UploadPipelineFinishedTask, ImportGenotypeVCFSuccessTask]
 
 
 class GeneCoverageImportTaskFactory(ImportTaskFactory):
@@ -275,6 +283,21 @@ class VCFInsertVariantsOnlyImportFactory(AbstractVCFImportTaskFactory):
 
     def get_post_data_insertion_classes(self):
         return [VCFCheckAnnotationTask]
+
+
+class GeneLevelInsertVariantsOnlyImportFactory(VCFInsertVariantsOnlyImportFactory):
+    """ As VCFInsertVariantsOnlyImportFactory, for gene-level variants - a classification naming
+        'BCR::ABL1' comes in this way, so that a fusion enters the database by the same pipeline as
+        every other variant. @see snpdb.gene_level_variants """
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY
+
+    def _get_preprocess_class(self) -> type:
+        return GeneLevelPreprocessVCFTask
+
+    def get_post_data_insertion_classes(self):
+        return [GeneLevelInsertGeneFusionsTask, VCFCheckAnnotationTask]
 
 
 class ManualVariantEntryImportFactory(AbstractVCFImportTaskFactory):

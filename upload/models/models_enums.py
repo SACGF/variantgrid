@@ -15,6 +15,9 @@ class UploadedFileTypes(models.TextChoices):
     VARIANT_TAGS = "A", "Variant Tags"
     VCF = 'V', 'VCF'
     VCF_INSERT_VARIANTS_ONLY = 'Y', 'VCF - Insert variants only (no samples etc)'
+    # Gene-level variants skip the bcftools stages, which all need a reference base they have no
+    # coordinate for - @see snpdb.gene_level_variants
+    GENE_LEVEL_INSERT_VARIANTS_ONLY = 'y', 'VCF - Insert gene-level variants only'
     # Need to separate these as Variant needs to be imported using VCF (for normalization etc)
     WIKI_GENE = "w", "Gene Wiki records"
     WIKI_VARIANT = "W", "Variant Wiki records"

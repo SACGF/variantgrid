@@ -13,9 +13,8 @@ from annotation.models import (
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
-from annotation.models.models_enums import VEPSkippedReason
 from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
-from genes.gene_fusions import GeneFusionResolver
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.models import (
     HGNC,
     GeneSymbol,
@@ -84,10 +83,7 @@ class GeneLevelAnnotationTest(TestCase):
         cls.ros1_gene = _make_gene(cls.genome_build, release, "ENSG00000000002", "ROS1",
                                    "ENST00000000002.1", "6", 117_645_000)
 
-        resolver = GeneFusionResolver()
-        cls.gene_fusion = resolver.get_or_create_fusion(resolver.resolve_side("CD74"),
-                                                        resolver.resolve_side("ROS1"),
-                                                        directionality_known=True)
+        cls.gene_fusion = create_gene_fusion("CD74", "ROS1")
 
     def _run_annotation(self) -> AnnotationRun:
         variant = self.gene_fusion.variant
@@ -119,7 +115,7 @@ class GeneLevelAnnotationTest(TestCase):
         self.assertEqual({self.cd74_gene.pk, self.ros1_gene.pk}, gene_ids)
 
     def test_gene_list_on_the_three_prime_partner_finds_the_fusion(self):
-        """ The plan's "a gene list containing ROS1 finds CD74-ROS1" """
+        """ The plan's "a gene list containing ROS1 finds CD74::ROS1" """
         self._run_annotation()
         q = VariantTranscriptAnnotation.get_overlapping_genes_q(self.vav, [self.ros1_gene.pk])
         self.assertIn(self.gene_fusion.variant, list(Variant.objects.filter(q)))
@@ -130,9 +126,11 @@ class GeneLevelAnnotationTest(TestCase):
                                                            variant=self.gene_fusion.variant)
         self.assertEqual("CD74", variant_annotation.symbol)
         self.assertEqual("CD74,ROS1", variant_annotation.overlapping_symbols)
-        self.assertEqual(VEPSkippedReason.GENE_LEVEL, variant_annotation.vep_skipped_reason,
-                         "an empty consequence isn't 'VEP found nothing'")
+        self.assertIsNone(variant_annotation.vep_skipped_reason,
+                          "VEP never saw it, so it wasn't skipped - it's blank the way dbNSFP is on an SV")
         self.assertEqual(annotation_run, variant_annotation.annotation_run)
+        self.assertTrue(variant_annotation.is_gene_level_annotation)
+        self.assertFalse(variant_annotation.has_conservation)
 
     def test_run_finishes(self):
         """ There is no import lane for gene-level, so the run completes in annotate_gene_level_run """
@@ -181,10 +179,7 @@ class GeneLevelVariantContainmentTest(TestCase):
             GeneSymbol.objects.get_or_create(symbol=symbol)
             HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
                                 status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name")
-        resolver = GeneFusionResolver()
-        cls.variant = resolver.get_or_create_fusion(resolver.resolve_side("BCR"),
-                                                    resolver.resolve_side("ABL1"),
-                                                    directionality_known=True).variant
+        cls.variant = create_gene_fusion("BCR", "ABL1").variant
 
     def test_no_clingen_call(self):
         self.assertFalse(self.variant.can_have_clingen_allele)
@@ -222,15 +217,28 @@ class GeneFusionClassificationTest(TestCase):
             imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(
                 self.genome_build))
 
-    def test_fusion_string_short_circuits_hgvs(self):
+    def test_fusion_string_resolves_to_a_gene_level_coordinate(self):
+        """ The coordinate is what the insert pipeline is handed, exactly as for an HGVS that
+            resolved - there is one way a variant enters the database """
         allele_info = self._allele_info("BCR::ABL1")
-        self.assertIsNotNone(allele_info.gene_fusion)
-        self.assertEqual("BCR-ABL1", allele_info.gene_fusion.canonical_str)
-        self.assertEqual(allele_info.gene_fusion.variant, allele_info.matched_variant)
-        self.assertIsNotNone(allele_info.allele, "the Allele arrives the ordinary way")
+        variant_coordinate = allele_info.variant_coordinate_obj
+        self.assertIsNotNone(variant_coordinate)
+        self.assertTrue(variant_coordinate.is_gene_level)
+        self.assertIn("BCR::ABL1", allele_info.message)
+
+    def test_gene_fusion_is_read_off_the_matched_variant(self):
+        allele_info = self._allele_info("BCR::ABL1")
+        self.assertIsNone(allele_info.gene_fusion, "nothing is matched until the pipeline inserts it")
+
+        gene_fusion = create_gene_fusion("BCR", "ABL1")
+        allele_info.set_variant_and_save(matched_variant=gene_fusion.variant)
+        self.assertEqual(gene_fusion, allele_info.gene_fusion)
+        self.assertEqual("BCR::ABL1", allele_info.gene_fusion.canonical_str)
 
     def test_no_c_hgvs_attempted(self):
         allele_info = self._allele_info("BCR::ABL1")
+        gene_fusion = create_gene_fusion("BCR", "ABL1")
+        allele_info.set_variant_and_save(matched_variant=gene_fusion.variant)
         resolved = allele_info[self.genome_build]
         self.assertIsNone(resolved.c_hgvs, "a fusion sits on no transcript")
         self.assertIsNone(resolved.error, "and that is not an error")

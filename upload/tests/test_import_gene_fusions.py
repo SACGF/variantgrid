@@ -1,7 +1,8 @@
-"""End-to-end import of AllFusions.csv - the plan's "Done when" criteria."""
+"""Import of AllFusions.csv - the VCF the loader writes, and the GeneFusions made from it."""
 import os
 
 import cyvcf2
+import simplejson
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -10,11 +11,13 @@ from django.test import TestCase
 from annotation.fake_annotation import get_fake_annotation_version
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
+from library.genomics.vcf_writer import percent_decode_info_value
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from genes.models import GeneFusion, FusionGeneId
+from genes.gene_fusions import create_gene_fusions_for_variants
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.test_gene_fusions import GeneFusionTestCase
-from snpdb.models import CohortGenotype, GenomeBuild, ImportSource, ImportStatus, Sample
-from snpdb.models.models_enums import CohortGenotypeCollectionType
+from snpdb.models import GenomeBuild, ImportSource, Variant
 from upload.gene_fusions.all_fusions_parser import can_process_file, read_all_fusions
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
@@ -25,10 +28,10 @@ from upload.models import (
     UploadPipeline,
 )
 from upload.tasks.import_gene_fusions_task import (
-    GeneFusionCreateVCFModelTask,
+    FUSION_INFO,
+    FUSION_OBSERVATIONS_INFO,
+    NO_GENOTYPE_CALL,
     GeneFusionCreateVCFTask,
-    GeneFusionInsertTask,
-    _resolve_rows,
 )
 from upload.models import UploadStep
 
@@ -72,11 +75,11 @@ class TestAllFusionsParser(TestCase):
                                                        "ExampleSample_RNA_2600000001B_SpliceVariants.vcf")))
 
 
-class TestImportGeneFusions(GeneFusionTestCase):
+class TestGeneFusionVCF(GeneFusionTestCase):
+    """ The VCF the loader writes - what the standard insert pipeline then consumes """
 
     def setUp(self):
         super().setUp()
-        get_fake_annotation_version(GenomeBuild.get_name_or_alias("GRCh37"))
         user = User.objects.get_or_create(username='testuser')[0]
         self.file_upload = FileUpload.objects.create(path=ALL_FUSIONS_CSV,
                                                      import_source=ImportSource.COMMAND_LINE,
@@ -88,122 +91,64 @@ class TestImportGeneFusions(GeneFusionTestCase):
                                                      metadata={"genome_build": "GRCh37"})
         self.upload_pipeline = UploadPipeline.objects.create(file_upload=self.file_upload)
         self.vcf_filename = os.path.join(settings.PRIVATE_DATA_ROOT, "gene_fusion_variants.vcf")
-
-        # Step 1 - write the VCF the insert pipeline consumes
         create_vcf_step = UploadStep.objects.create(upload_pipeline=self.upload_pipeline,
                                                     name="Create Gene Fusion Variant VCF", sort_order=0,
                                                     input_filename=ALL_FUSIONS_CSV,
                                                     output_filename=self.vcf_filename)
         self.rows_processed = GeneFusionCreateVCFTask.process_items(create_vcf_step)
+        self.reader = cyvcf2.VCF(self.vcf_filename)
+        self.records = list(self.reader)
 
-        # Step 2 - the VCF/Sample/Cohort the rows hang off
-        UploadStep.objects.create(upload_pipeline=self.upload_pipeline,
-                                  name=UploadStep.PREPROCESS_VCF_NAME, sort_order=1)
-        model_step = UploadStep.objects.create(upload_pipeline=self.upload_pipeline,
-                                               name="Create Data from VCF Header", sort_order=2)
-        GeneFusionCreateVCFModelTask.process_items(model_step)
-
-        # The pipeline inserts the variants between steps 2 and 3 - stand in for it, since the insert
-        # path itself is the standard one and tested with the rest of the VCF pipeline
-        for resolved_fusion, _row in _resolve_rows(read_all_fusions(ALL_FUSIONS_CSV)[1]):
-            resolved_fusion.get_or_create()
-
-        # Step 3 - GeneFusions and CohortGenotypes against the now-existing variants
-        insert_step = UploadStep.objects.create(upload_pipeline=self.upload_pipeline,
-                                                name="Gene Fusion Insert", sort_order=3)
-        GeneFusionInsertTask.process_items(insert_step)
-        self.sample = Sample.objects.get(vcf__uploadedvcf__file_upload=self.file_upload)
-
-    def _cohort_genotypes(self):
-        collection = self.sample.vcf.cohort.cohortgenotypecollection_set.get(
-            collection_type=CohortGenotypeCollectionType.UNCOMMON)
-        return CohortGenotype.objects.filter(collection=collection)
-
-    def test_all_rows_import(self):
+    def test_all_rows_read(self):
         self.assertEqual(EXPECTED_ROWS, self.rows_processed)
 
-    def test_creates_its_own_vcf_and_sample(self):
-        vcf = self.sample.vcf
-        self.assertEqual(ImportStatus.SUCCESS, vcf.import_status)
-        self.assertEqual(ImportStatus.SUCCESS, self.sample.import_status)
-        self.assertEqual("FusionProcessor 1.0.0.614", vcf.source)
-        self.assertEqual(1, vcf.sample_set.count())
+    def test_header_declares_the_sample_and_source(self):
+        """ What ImportCreateVCFModelForGenotypeVCFTask makes the VCF and Sample from """
+        self.assertEqual([self.file_upload.name], self.reader.samples)
+        self.assertIn("FusionProcessor 1.0.0.614", self.reader.raw_header)
 
-    def test_sept14_resolves_to_septin14(self):
-        """ The file says SEPT14; the fusion is EGFR-SEPTIN14 """
-        egfr = FusionGeneId.objects.get(symbol_str="EGFR")
-        gene_fusion = GeneFusion.objects.get(anchor=egfr)
-        self.assertEqual("EGFR-SEPTIN14", gene_fusion.canonical_str)
-
-    def test_repeated_gene_pair_collapses_to_one_fusion(self):
-        """ ENTPD3-RPL14 appears three times from one caller with three different 5' breakpoints """
-        entpd3 = FusionGeneId.objects.get(symbol_str="ENTPD3")
-        gene_fusion = GeneFusion.objects.get(anchor=entpd3, is_ordered=True)
-        cohort_genotype = self._cohort_genotypes().get(variant=gene_fusion.variant)
-        self.assertEqual(3, len(cohort_genotype.info["observations"]))
-
-    def test_every_breakpoint_is_preserved(self):
-        entpd3 = FusionGeneId.objects.get(symbol_str="ENTPD3")
-        gene_fusion = GeneFusion.objects.get(anchor=entpd3, is_ordered=True)
-        cohort_genotype = self._cohort_genotypes().get(variant=gene_fusion.variant)
-        breakpoints = {o["Gene A Breakpoint"] for o in cohort_genotype.info["observations"]}
-        self.assertEqual({"chr3:40442308", "chr3:40446552", "chr3:40447887"}, breakpoints)
-
-    def test_reciprocal_pair_stays_separate(self):
-        """ The file has ENTPD3->RPL14 and RPL14->ENTPD3 as separate calls """
-        entpd3 = FusionGeneId.objects.get(symbol_str="ENTPD3")
-        rpl14 = FusionGeneId.objects.get(symbol_str="RPL14")
-        self.assertTrue(GeneFusion.objects.filter(anchor=entpd3, partner=rpl14, is_ordered=True).exists())
-        self.assertTrue(GeneFusion.objects.filter(anchor=rpl14, partner=entpd3, is_ordered=True).exists())
-
-    def test_merge_is_recorded(self):
-        miv_qs = ModifiedImportedVariant.objects.filter(
-            operation=ModifiedImportedVariantOperation.SHARED_LOCUS)
-        self.assertTrue(miv_qs.exists(), "the 3-row ENTPD3-RPL14 merge is recorded")
-        self.assertIn("3 calls merged", miv_qs.first().operation_detail)
-
-    def test_multi_gene_partner_resolves(self):
-        """ CD74 | ROS1;GOPC -> CD74-ROS1 """
-        cd74 = FusionGeneId.objects.get(symbol_str="CD74")
-        gene_fusion = GeneFusion.objects.get(anchor=cd74)
-        self.assertEqual("CD74-ROS1", gene_fusion.canonical_str)
-        cohort_genotype = self._cohort_genotypes().get(variant=gene_fusion.variant)
-        self.assertEqual("ROS1;GOPC", cohort_genotype.info["observations"][0]["Gene B"],
-                         "the cell is kept exactly as the caller wrote it")
-
-    def test_clone_based_partner_gets_a_local_identity(self):
-        """ PPARG/AC016683.6 -> PPARG, and RP11-458D21.5;NOTCH2NL -> NOTCH2NL """
-        pparg = FusionGeneId.objects.get(symbol_str="PPARG")
-        self.assertTrue(GeneFusion.objects.filter(anchor=pparg).exists())
-        notch2nl = FusionGeneId.objects.get(symbol_str="NOTCH2NL")
-        self.assertTrue(GeneFusion.objects.filter(anchor=notch2nl).exists())
-
-    def test_variants_are_on_the_gene_level_contig(self):
-        for cohort_genotype in self._cohort_genotypes():
-            self.assertTrue(cohort_genotype.variant.is_gene_level)
-
-    def test_one_cohort_genotype_per_fusion(self):
-        cohort_genotypes = self._cohort_genotypes()
-        variant_ids = {cg.variant_id for cg in cohort_genotypes}
-        self.assertEqual(len(variant_ids), cohort_genotypes.count())
-        self.assertLess(cohort_genotypes.count(), EXPECTED_ROWS, "some rows share a gene pair")
-
-    def test_written_vcf_is_readable_by_the_pipeline(self):
-        """ The insert pipeline reads the VCF with cyvcf2 and derives svlen the same way it does for
-            any symbolic alt - END=POS is what gives gene-level variants svlen 0 """
-        reader = cyvcf2.VCF(self.vcf_filename)
-        records = list(reader)
-        self.assertEqual(self._cohort_genotypes().count(), len(records),
-                         "one record per distinct gene pair")
-        for record in records:
-            ref, alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(
-                record, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
+    def test_records_are_on_the_gene_level_contig(self):
+        self.assertTrue(self.records)
+        for record in self.records:
             self.assertEqual(GENE_LEVEL_CONTIG_NAME, record.CHROM)
-            self.assertEqual("N", ref)
-            self.assertIsNotNone(GeneLevelSymbolicAlt.parse(alt), alt)
+            _ref, alt, svlen, _mod = vcf_get_ref_alt_svlen_and_modification(
+                record, ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
+            self.assertIsNotNone(GeneLevelSymbolicAlt.parse(alt))
             self.assertEqual(0, svlen)
 
-    def test_written_vcf_is_sorted(self):
-        """ Preprocess skips vcf_clean_and_filter, which is what would otherwise catch an unsorted VCF """
-        positions = [record.POS for record in cyvcf2.VCF(self.vcf_filename)]
-        self.assertEqual(sorted(positions), positions)
+    def test_genotype_asserts_presence_not_a_diploid_call(self):
+        for record in self.records:
+            self.assertIn(NO_GENOTYPE_CALL, str(record))
+
+    def test_sept14_resolves_to_septin14(self):
+        """ The file says SEPT14; the fusion is EGFR::SEPTIN14 """
+        fusions = {record.INFO.get(FUSION_INFO) for record in self.records}
+        self.assertIn("EGFR::SEPTIN14", fusions)
+
+    def test_repeated_gene_pair_collapses_keeping_every_observation(self):
+        """ ENTPD3::RPL14 appears three times from one caller with three different 5' breakpoints """
+        by_fusion = {record.INFO.get(FUSION_INFO): record for record in self.records}
+        record = by_fusion["ENTPD3::RPL14"]
+        observations = simplejson.loads(percent_decode_info_value(record.INFO.get(FUSION_OBSERVATIONS_INFO)))
+        self.assertEqual(3, len(observations))
+        self.assertEqual(3, len({o["Gene A Breakpoint"] for o in observations}))
+
+
+class TestGeneFusionInsert(GeneFusionTestCase):
+    """ The post-insert step - GeneFusion rows read off the variants the pipeline inserted """
+
+    def test_creates_a_gene_fusion_per_gene_level_variant(self):
+        gene_fusion = create_gene_fusion("BCR", "ABL1")
+        variant = gene_fusion.variant
+        GeneFusion.objects.filter(pk=gene_fusion.pk).delete()
+
+        self.assertEqual(1, create_gene_fusions_for_variants(Variant.objects.filter(pk=variant.pk)))
+        recreated = GeneFusion.objects.get(variant=variant)
+        self.assertEqual(FusionGeneId.objects.get(symbol_str="BCR"), recreated.anchor)
+        self.assertEqual(FusionGeneId.objects.get(symbol_str="ABL1"), recreated.partner)
+        self.assertTrue(recreated.is_ordered)
+
+    def test_is_idempotent(self):
+        """ Runs once per pipeline, and a retry runs it again """
+        create_gene_fusion("BCR", "ABL1")
+        self.assertEqual(0, create_gene_fusions_for_variants(Variant.objects.all()))

@@ -29,13 +29,19 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT, GeneLevelSymbolicAlt, VCFSymbolicAllele
+from library.genomics.vcf_enums import (
+    GENE_LEVEL_ALT_PATTERN,
+    INFO_LIFTOVER_SWAPPED_REF_ALT,
+    GeneLevelSymbolicAlt,
+    VCFSymbolicAllele,
+)
 from library.guardian_utils import admin_bot
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, SequenceRole
+from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 LOCUS_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
@@ -43,6 +49,9 @@ LOCUS_NO_REF_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)$")
 VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 # This is our internal format for symbolic (ie <DEL>/<DUP> etc)
 VARIANT_SYMBOLIC_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV)>$", re.IGNORECASE)
+# Gene-level - the position is a gene id and the alt carries the partner. @see snpdb.gene_level_variants
+VARIANT_GENE_LEVEL_PATTERN = re.compile(
+    rf"^{GENE_LEVEL_CONTIG_NAME}\s*:\s*(\d+)\s*-\s*\d+\s*({GENE_LEVEL_ALT_PATTERN.pattern})$")
 # matches anything hgvs-like before any fixes
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+", re.IGNORECASE)
 
@@ -357,13 +366,24 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         return vc.as_internal_canonical_form(genome_build)
 
     @staticmethod
+    def from_gene_level_match(match) -> 'VariantCoordinate':
+        """ No genome build involved - a gene-level coordinate is the same on every build, and there
+            is no reference to read. @see snpdb.gene_level_variants """
+        # Explicit group numbers - the alt sub-pattern brings its own groups along
+        return VariantCoordinate(chrom=GENE_LEVEL_CONTIG_NAME, position=int(match.group(1)),
+                                 ref=GENE_LEVEL_REF, alt=match.group(2), svlen=GENE_LEVEL_SVLEN)
+
+    @staticmethod
     def from_string(variant_string: str, genome_build):
         """ Pass in genome build to be able to set REF from symbolic (will be N otherwise) """
         if full_match := VARIANT_PATTERN.fullmatch(variant_string):
             return VariantCoordinate.from_variant_match(full_match, genome_build)
         elif full_match := VARIANT_SYMBOLIC_PATTERN.fullmatch(variant_string):
             return VariantCoordinate.from_symbolic_match(full_match, genome_build)
-        regex_patterns = ", ".join(str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN))
+        elif full_match := VARIANT_GENE_LEVEL_PATTERN.fullmatch(variant_string):
+            return VariantCoordinate.from_gene_level_match(full_match)
+        regex_patterns = ", ".join(str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN,
+                                                    VARIANT_GENE_LEVEL_PATTERN))
         raise ValueError(f"{variant_string=} did not match against {regex_patterns=}")
 
     @staticmethod

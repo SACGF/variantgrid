@@ -154,8 +154,6 @@ class VEPSkippedReason(models.TextChoices):
     INCOMPLETE = 'i', "Incomplete"
     UNKNOWN = 'u', "Unknown"
     TOO_LONG = 'l', "Too Long"
-    # Gene level - so an empty consequence isn't read as "VEP found nothing"
-    GENE_LEVEL = 'g', "Gene level (locally computed)"
 
 
 class ClinVarReviewStatus(models.TextChoices):

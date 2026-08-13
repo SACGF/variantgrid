@@ -16,21 +16,19 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from django.db import transaction
 from django.db.models import Q
 
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import GeneFusion, FusionGeneId, HGNC
+from genes.models import GeneFusion, FusionGeneId, HGNC, fusion_canonical_str
 from genes.models_enums import HGNCStatus
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
-from library.utils import sha256sum_str
 from snpdb.clingen_allele import get_variant_allele_for_variant
 from snpdb.gene_level_variants import (
     GENE_LEVEL_CONTIG_NAME,
     GENE_LEVEL_REF,
     GENE_LEVEL_SVLEN,
 )
-from snpdb.models import Contig, GenomeBuild, Locus, Sequence, Variant, VariantCoordinate
+from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 # Within one cell - a hyphen can't separate, as clone-based identifiers contain them (RP11-458D21.5)
 GENE_LIST_SEPARATOR = re.compile(r"[;/]")
@@ -135,13 +133,6 @@ class GeneFusionResolver:
         anchor, partner, is_ordered = _order_partners(gene_a, gene_b, directionality_known)
         return ResolvedFusion(anchor=anchor, partner=partner, is_ordered=is_ordered)
 
-    def get_or_create_fusion(self, gene_a: Optional[ResolvedFusionGene], gene_b: Optional[ResolvedFusionGene],
-                             directionality_known: bool) -> GeneFusion:
-        """ As resolve_fusion, but creating the Variant directly rather than through the VCF pipeline.
-            For the one-at-a-time paths (a lab naming 'BCR::ABL1' as a classification target); the
-            AllFusions loader goes through the pipeline instead """
-        return self.resolve_fusion(gene_a, gene_b, directionality_known).get_or_create()
-
 
 @dataclass(frozen=True)
 class ResolvedFusion:
@@ -164,18 +155,10 @@ class ResolvedFusion:
         return VariantCoordinate(chrom=GENE_LEVEL_CONTIG_NAME, position=self.anchor.pk,
                                  ref=GENE_LEVEL_REF, alt=self.alt, svlen=GENE_LEVEL_SVLEN)
 
-    def get_gene_fusion(self, variant: Variant) -> GeneFusion:
-        """ Attach to a Variant the insert pipeline has already created """
-        gene_fusion, _ = GeneFusion.objects.get_or_create(variant=variant,
-                                                          defaults={
-                                                              "anchor": self.anchor,
-                                                              "partner": self.partner,
-                                                              "is_ordered": self.is_ordered,
-                                                          })
-        return gene_fusion
-
-    def get_or_create(self) -> GeneFusion:
-        return get_or_create_gene_fusion(self.anchor, self.partner, self.is_ordered)
+    @property
+    def canonical_str(self) -> str:
+        """ The same string GeneFusion.canonical_str gives, before the Variant exists """
+        return fusion_canonical_str(self.anchor, self.partner)
 
 
 def _order_partners(gene_a: Optional[ResolvedFusionGene], gene_b: Optional[ResolvedFusionGene],
@@ -194,40 +177,30 @@ def _order_partners(gene_a: Optional[ResolvedFusionGene], gene_b: Optional[Resol
     return anchor, partner, False
 
 
-def _get_sequence(seq: str) -> Sequence:
-    sequence, _ = Sequence.objects.get_or_create(seq=seq, defaults={"seq_sha256_hash": sha256sum_str(seq)})
-    return sequence
+def create_gene_fusions_for_variants(variant_qs) -> int:
+    """ The GeneFusion rows for gene-level variants an insert pipeline has just created.
+
+        Everything a GeneFusion holds is already in the Variant - the anchor is Locus.position and the
+        alt carries the partner and whether a direction was asserted - so this reads the variants
+        rather than the file they came from, and one implementation serves every loader.
+
+        :return: how many were created """
+
+    gene_fusions = []
+    for variant in variant_qs.filter(Variant.get_gene_level_q(), genefusion__isnull=True) \
+                             .select_related("locus", "alt"):
+        kind, _namespace, partner_id = GeneLevelSymbolicAlt.parse(variant.alt.seq)
+        gene_fusions.append(GeneFusion(variant=variant,
+                                       anchor_id=variant.locus.position,
+                                       partner_id=partner_id,
+                                       is_ordered=kind == GeneLevelSymbolicAlt.FUSION))
+    created = GeneFusion.objects.bulk_create(gene_fusions, ignore_conflicts=True)
+    return len(created)
 
 
-@transaction.atomic
-def get_or_create_gene_fusion(anchor: FusionGeneId, partner: Optional[FusionGeneId],
-                              is_ordered: bool) -> GeneFusion:
-    """ The Variant beneath a fusion: gene-level contig, anchor id as position, partner id in the alt.
-        @see snpdb.gene_level_variants for why a fusion is shaped like this """
-
-    kind = GeneLevelSymbolicAlt.FUSION if is_ordered else GeneLevelSymbolicAlt.FUSION_UNORDERED
-    if partner is not None:
-        alt_str = GeneLevelSymbolicAlt.format(kind, partner.alt_namespace, partner.pk)
-    else:
-        alt_str = GeneLevelSymbolicAlt.format(kind, None, None)
-
-    locus, _ = Locus.objects.get_or_create(contig=Contig.get_gene_level(),
-                                           position=anchor.pk,
-                                           ref=_get_sequence(GENE_LEVEL_REF))
-    variant, _ = Variant.objects.get_or_create(locus=locus, alt=_get_sequence(alt_str),
-                                               svlen=GENE_LEVEL_SVLEN,
-                                               defaults={"end": anchor.pk})
-    gene_fusion, _ = GeneFusion.objects.get_or_create(variant=variant,
-                                                      defaults={
-                                                          "anchor": anchor,
-                                                          "partner": partner,
-                                                          "is_ordered": is_ordered,
-                                                      })
-    return gene_fusion
-
-
-def get_gene_fusion_for_string(fusion_string: str, resolver: GeneFusionResolver = None) -> Optional[GeneFusion]:
-    """ 'BCR::ABL1' -> the GeneFusion, creating it if this is the first time it's been seen.
+def resolve_fusion_string(fusion_string: str, resolver: GeneFusionResolver = None) -> Optional[ResolvedFusion]:
+    """ 'BCR::ABL1' -> the identity it will be stored under, whose variant_coordinate goes through the
+        VCF insert pipeline like any other coordinate.
 
         Direction is taken from the order written, which is the convention every fusion nomenclature
         uses. Both sides have to be genes we already know, so an arbitrary hyphenated string doesn't
@@ -239,7 +212,7 @@ def get_gene_fusion_for_string(fusion_string: str, resolver: GeneFusionResolver 
         gene_a = resolver.resolve_side(genes[0], allow_unknown=False)
         gene_b = resolver.resolve_side(genes[1], allow_unknown=False)
         if gene_a and gene_b:
-            return resolver.get_or_create_fusion(gene_a, gene_b, directionality_known=True)
+            return resolver.resolve_fusion(gene_a, gene_b, directionality_known=True)
     return None
 
 

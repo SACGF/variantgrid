@@ -1842,6 +1842,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD
 
     @cached_property
+    def is_gene_level_annotation(self) -> bool:
+        """ Computed from the gene identity rather than by VEP - @see snpdb.gene_level_variants.
+            Everything VEP produces is absent, so the detail page hides those sections """
+        return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL
+
+    @cached_property
     def repeat_masker_summary(self) -> RepeatMaskerSummary:
         """ Group the (possibly '&'-joined) RepeatMasker value by repeat class - see #1580 """
         return RepeatMaskerSummary.from_value(self.repeat_masker)
@@ -1882,6 +1888,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @property
     def has_conservation(self) -> bool:
         """ Thanks to summary stats we can now do this in VEP112 """
+        if self.is_gene_level_annotation:
+            return False
         return self.is_standard_annotation or self.version.vep >= 112
 
     @property

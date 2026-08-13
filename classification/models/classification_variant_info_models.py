@@ -23,9 +23,9 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from genes.gene_fusions import get_gene_fusion_allele, get_gene_fusion_for_string
+from genes.gene_fusions import resolve_fusion_string
 from genes.hgvs import HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher, hgvs_diff_description
-from genes.models import GeneSymbol, NoTranscript, Transcript, TranscriptVersion
+from genes.models import GeneFusion, GeneSymbol, NoTranscript, Transcript, TranscriptVersion
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
@@ -512,9 +512,14 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ not used for any logic other than storing the variant that was matched (so we can later find allele, and
     variants of other builds) """
 
-    gene_fusion = ForeignKey('genes.GeneFusion', null=True, blank=True, on_delete=SET_NULL)
-    """ set where the imported value named a gene pair ('BCR::ABL1') rather than an HGVS - the fusion
-    already carries its own Variant, so there is nothing to resolve """
+    @property
+    def gene_fusion(self) -> Optional['GeneFusion']:
+        """ Set where the imported value named a gene pair ('BCR::ABL1') rather than an HGVS. Read off
+        the matched Variant rather than stored - the pipeline that inserts the variant creates the
+        GeneFusion against it, so a second copy here could only go stale """
+        if variant := self.matched_variant:
+            return GeneFusion.objects.filter(variant=variant).first()
+        return None
 
     allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
     """ set this once it's matched, but record can exist prior to variant matching """
@@ -839,8 +844,10 @@ class ImportedAlleleInfo(TimeStampedModel):
                                            hgvs_converter_data_version=data_version)
 
     def resolve_gene_fusion(self) -> bool:
-        """ A lab submitting 'BCR::ABL1' names a gene pair, not a coordinate - there is no HGVS to
-            resolve, and the fusion already owns a Variant, so matching is immediate.
+        """ A lab submitting 'BCR::ABL1' names a gene pair, not a coordinate - so there is no HGVS to
+            resolve. The identity it resolves to has a variant coordinate of its own, which goes
+            through the VCF insert pipeline like every other coordinate, so a fusion enters the
+            database exactly the way a small variant submitted the same way does.
 
             Returns whether this was a fusion, so the caller can skip HGVS resolution. """
 
@@ -848,15 +855,12 @@ class ImportedAlleleInfo(TimeStampedModel):
         if not imported or HGVS_UNCLEANED_PATTERN.search(imported):
             return False
 
-        gene_fusion = get_gene_fusion_for_string(imported)
-        if gene_fusion is None:
+        resolved_fusion = resolve_fusion_string(imported)
+        if resolved_fusion is None:
             return False
 
-        self.gene_fusion = gene_fusion
-        # The Allele arrives the ordinary way - fusions have no coordinate for ClinGen, so this is the
-        # plain 'no ClinGen' path
-        get_gene_fusion_allele(gene_fusion, self.imported_genome_build_patch_version.genome_build)
-        self.set_variant_and_save(gene_fusion.variant, message=f"Matched gene fusion {gene_fusion}")
+        self.variant_coordinate = str(resolved_fusion.variant_coordinate)
+        self.message = f"Matched gene fusion {resolved_fusion.canonical_str}"
         return True
 
     def update_variant_coordinate(self):

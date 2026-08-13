@@ -619,7 +619,8 @@ function applyVariantValues() {
     {% endif %}
 
 
-{% if show_annotation and variant_annotation %}
+{# Everything below is VEP output. A gene-level variant has none of it - the gene identity it does have is shown above #}
+{% if show_annotation and variant_annotation and not variant_annotation.is_gene_level_annotation %}
     <div class="container mt-4">
         {% clinvar variant=variant annotation_version=annotation_version %}
     </div>

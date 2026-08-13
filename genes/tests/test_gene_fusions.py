@@ -3,12 +3,14 @@ from django.test import TestCase
 
 from django.core.exceptions import ValidationError
 
+from typing import Optional
+
 from genes.gene_fusions import (
     GeneFusionResolver,
     find_gene_fusions_for_string,
-    get_gene_fusion_for_string,
-    get_or_create_gene_fusion,
+    resolve_fusion_string,
 )
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.models import HGNC, GeneFusion, FusionGeneId, GeneSymbol, GeneSymbolAlias, HGNCImport
 from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
@@ -122,10 +124,8 @@ class TestFusionResolution(GeneFusionTestCase):
 
 class TestFusionVariant(GeneFusionTestCase):
 
-    def _fusion(self, gene_a: str, gene_b: str, directionality_known=True) -> GeneFusion:
-        return self.resolver.get_or_create_fusion(self.resolver.resolve_side(gene_a),
-                                                  self.resolver.resolve_side(gene_b),
-                                                  directionality_known)
+    def _fusion(self, gene_a: Optional[str], gene_b: Optional[str], directionality_known=True) -> GeneFusion:
+        return create_gene_fusion(gene_a, gene_b, directionality_known, resolver=self.resolver)
 
     def test_variant_is_on_the_gene_level_contig(self):
         gene_fusion = self._fusion("BCR", "ABL1")
@@ -169,23 +169,21 @@ class TestFusionVariant(GeneFusionTestCase):
         self.assertNotEqual(ordered.variant, unordered.variant)
 
     def test_unknown_partner(self):
-        gene_a = self.resolver.resolve_side("EGFR")
-        gene_fusion = self.resolver.get_or_create_fusion(gene_a, None, directionality_known=True)
+        gene_fusion = self._fusion("EGFR", None)
         self.assertIsNone(gene_fusion.partner_id)
         self.assertEqual("<FUSION:UNKNOWN>", gene_fusion.variant.alt.seq)
-        self.assertEqual("EGFR-?", gene_fusion.canonical_str)
+        self.assertEqual("EGFR::?", gene_fusion.canonical_str)
 
     def test_only_the_three_prime_side_known_does_not_assert_direction(self):
         """ Anchoring a 3' partner as if it were 5' would claim something the caller didn't """
-        gene_b = self.resolver.resolve_side("EGFR")
-        gene_fusion = self.resolver.get_or_create_fusion(None, gene_b, directionality_known=True)
+        gene_fusion = self._fusion(None, "EGFR")
         self.assertFalse(gene_fusion.is_ordered)
         self.assertEqual("<FUSION_UNORDERED:UNKNOWN>", gene_fusion.variant.alt.seq)
 
     def test_canonical_str_uses_symbols_not_numbers(self):
         """ What has to leave the system, since local ids mean nothing elsewhere """
         gene_fusion = self._fusion("EGFR", "SEPT14")
-        self.assertEqual("EGFR-SEPTIN14", gene_fusion.canonical_str)
+        self.assertEqual("EGFR::SEPTIN14", gene_fusion.canonical_str)
 
     def test_clean_rejects_a_mismatched_alt(self):
         gene_fusion = self._fusion("BCR", "ABL1")
@@ -202,44 +200,38 @@ class TestFusionString(GeneFusionTestCase):
         for fusion_string in ["BCR::ABL1", "BCR-ABL1", "BCR~ABL1", "BCR/ABL1", "BCR--ABL1"]:
             self.assertEqual(expected, GeneFusionResolver.split_fusion_string(fusion_string), fusion_string)
 
-    def test_resolves_to_the_same_fusion_as_the_loader(self):
-        from_loader = self.resolver.get_or_create_fusion(self.resolver.resolve_side("BCR"),
-                                                         self.resolver.resolve_side("ABL1"),
-                                                         directionality_known=True)
-        self.assertEqual(from_loader, get_gene_fusion_for_string("BCR::ABL1"))
+    def test_resolves_to_the_coordinate_the_loader_writes(self):
+        """ A classification target and the loader put the same coordinate through the pipeline, so
+            both arrive at one Variant """
+        from_loader = create_gene_fusion("BCR", "ABL1", resolver=self.resolver)
+        resolved = resolve_fusion_string("BCR::ABL1")
+        self.assertEqual(from_loader.variant.coordinate, resolved.variant_coordinate)
 
     def test_unknown_genes_do_not_mint_a_fusion(self):
         """ Otherwise any hyphenated string would become a gene fusion """
-        self.assertIsNone(get_gene_fusion_for_string("SOME-JUNK"))
-        self.assertIsNone(get_gene_fusion_for_string("not a fusion at all"))
+        self.assertIsNone(resolve_fusion_string("SOME-JUNK"))
+        self.assertIsNone(resolve_fusion_string("not a fusion at all"))
 
-    def test_get_or_create_is_idempotent(self):
-        anchor = self.resolver.resolve_side("BCR").fusion_gene_id
-        partner = self.resolver.resolve_side("ABL1").fusion_gene_id
-        first = get_or_create_gene_fusion(anchor, partner, is_ordered=True)
-        second = get_or_create_gene_fusion(anchor, partner, is_ordered=True)
-        self.assertEqual(first.pk, second.pk)
+    def test_resolving_a_string_creates_no_variant(self):
+        """ The Variant is the insert pipeline's to make - @see snpdb.gene_level_variants """
+        before = GeneFusion.objects.count()
+        self.assertIsNotNone(resolve_fusion_string("BCR::ABL1"))
+        self.assertEqual(before, GeneFusion.objects.count())
 
 
 class TestFusionLookup(GeneFusionTestCase):
     """ find_gene_fusions_for_string is what search runs on, so it must never create anything """
 
     def test_finds_an_existing_fusion(self):
-        gene_fusion = self.resolver.get_or_create_fusion(self.resolver.resolve_side("BCR"),
-                                                         self.resolver.resolve_side("ABL1"),
-                                                         directionality_known=True)
+        gene_fusion = create_gene_fusion("BCR", "ABL1", resolver=self.resolver)
         self.assertEqual([gene_fusion], find_gene_fusions_for_string("BCR::ABL1"))
 
     def test_finds_either_direction(self):
-        self.resolver.get_or_create_fusion(self.resolver.resolve_side("BCR"),
-                                           self.resolver.resolve_side("ABL1"),
-                                           directionality_known=True)
+        create_gene_fusion("BCR", "ABL1", resolver=self.resolver)
         self.assertEqual(1, len(find_gene_fusions_for_string("ABL1::BCR")))
 
     def test_resolves_the_alias(self):
-        gene_fusion = self.resolver.get_or_create_fusion(self.resolver.resolve_side("EGFR"),
-                                                         self.resolver.resolve_side("SEPTIN14"),
-                                                         directionality_known=True)
+        gene_fusion = create_gene_fusion("EGFR", "SEPTIN14", resolver=self.resolver)
         self.assertEqual([gene_fusion], find_gene_fusions_for_string("EGFR::SEPT14"))
 
     def test_creates_nothing(self):

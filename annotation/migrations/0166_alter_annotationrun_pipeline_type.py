@@ -23,20 +23,4 @@ class Migration(migrations.Migration):
                 max_length=1,
             ),
         ),
-        migrations.AlterField(
-            model_name="variantannotation",
-            name="vep_skipped_reason",
-            field=models.CharField(
-                blank=True,
-                choices=[
-                    ("c", "Unknown Contig"),
-                    ("i", "Incomplete"),
-                    ("u", "Unknown"),
-                    ("l", "Too Long"),
-                    ("g", "Gene level (locally computed)"),
-                ],
-                max_length=1,
-                null=True,
-            ),
-        ),
     ]

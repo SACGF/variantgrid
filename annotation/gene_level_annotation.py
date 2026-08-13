@@ -26,7 +26,6 @@ from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
 from annotation.models.models import VariantAnnotation, VariantGeneOverlap
-from annotation.models.models_enums import VEPSkippedReason
 from annotation.signals.manual_signals import annotation_run_complete_signal
 from genes.models import GeneAnnotationRelease, GeneFusion, FusionGeneId
 
@@ -128,7 +127,6 @@ def _annotate_gene_fusion(annotation_run, resolver: FusionGeneIdResolver, gene_f
             "annotation_run": annotation_run,
             "symbol": symbols[0],
             "overlapping_symbols": ",".join(sorted(set(symbols))),
-            "vep_skipped_reason": VEPSkippedReason.GENE_LEVEL,
         })
 
     overlaps = [

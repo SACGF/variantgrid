@@ -95,13 +95,37 @@ def _classification_upload_pipeline(
         * create Alleles for variants
         * perform liftover to other builds
         * set c_hgvs cache """
-    if unknown_variant_coordinates:
+    # Gene-level coordinates go through a pipeline of their own - the bcftools stages the ordinary one
+    # runs all need a reference base they have no coordinate for. @see snpdb.gene_level_variants
+    gene_level = [vc for vc in unknown_variant_coordinates if vc.is_gene_level]
+    ordinary = [vc for vc in unknown_variant_coordinates if not vc.is_gene_level]
+
+    # Always run the ordinary pipeline, even with no variants to insert, as we need:
+    # * create Alleles for variants
+    # * perform liftover to other builds
+    # * set c_hgvs cache
+    _run_insert_variants_pipeline(classification_import, ordinary, import_source,
+                                  UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY, "classification_import.vcf")
+    if gene_level:
+        _run_insert_variants_pipeline(classification_import, gene_level, import_source,
+                                      UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY,
+                                      "classification_import_gene_level.vcf")
+
+
+def _run_insert_variants_pipeline(
+        classification_import: ClassificationImport,
+        variant_coordinates: list[VariantCoordinate],
+        import_source: ImportSource,
+        file_type: UploadedFileTypes,
+        vcf_name: str):
+    if variant_coordinates:
         working_dir = get_import_processing_dir(classification_import.pk, "classification_import")
-        vcf_filename = os.path.join(working_dir, "classification_import.vcf")
-        used_chroms = set(vc.chrom for vc in unknown_variant_coordinates)
-        header_lines = get_contigs_header_lines(classification_import.genome_build, use_accession=False,
-                                                contig_allow_list=used_chroms)
-        write_vcf_from_variant_coordinates(vcf_filename, unknown_variant_coordinates, header_lines=header_lines)
+        vcf_filename = os.path.join(working_dir, vcf_name)
+        used_chroms = set(vc.chrom for vc in variant_coordinates)
+        # standard_only excludes the gene-level contig by role, so the allow list decides instead
+        header_lines = get_contigs_header_lines(classification_import.genome_build, standard_only=False,
+                                                use_accession=False, contig_allow_list=used_chroms)
+        write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates, header_lines=header_lines)
     else:
         vcf_filename = None
 
@@ -109,7 +133,7 @@ def _classification_upload_pipeline(
                                             import_source=import_source,
                                             name='Variants from API',
                                             user=classification_import.user,
-                                            file_type=UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY)
+                                            file_type=file_type)
 
     UploadedClassificationImport.objects.create(file_upload=file_upload,
                                                 classification_import=classification_import)
