@@ -71,7 +71,9 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
 
     def c_hgvs_for(self, cg: ClassificationGrouping) -> HGVSDisplay:
         is_preferred_genome_build = True
-        allele_info = cg.latest_classification_modification.classification.allele_info
+        # update() keeps this in step with latest_classification_modification.classification.allele_info,
+        # and reading it here avoids walking that chain as three lazy FK loads per row
+        allele_info = cg.latest_allele_info
         for gb in self.genome_build_prefs:
             if ri := allele_info[gb]:
                 if c_hgvs := ri.c_hgvs_obj:
@@ -84,7 +86,9 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
     def render_allele(self, row: CellData) -> JsonDataType:
         allele_group = _allele_group(row.get("allele"))
         # FIXME cache this
-        cgs = ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping=allele_group.pk, dirty=False)
+        cgs = ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping=allele_group.pk,
+                                                    dirty=False) \
+            .select_related("latest_allele_info__grch37__genome_build", "latest_allele_info__grch38__genome_build")
         all_chgvs = sorted({self.c_hgvs_for(cg) for cg in cgs})
         c_hgvs_json: JsonDataType
         if all_chgvs:

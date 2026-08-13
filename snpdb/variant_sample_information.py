@@ -391,7 +391,7 @@ class VariantSampleGenotypes(VariantZygosityCounts):
         classifications_by_sample_id = defaultdict(list)
         qs = ClassificationModification.latest_for_user(self.user, allele=allele, published=True,
                                                         classification__sample__in=sample_ids)
-        for cm in qs:
+        for cm in qs.select_related("classification__lab"):
             classification = cm.classification
             pills = clinical_significance_pills(classification.summary_typed, classification.allele_origin_bucket)
             classification_json = {
@@ -441,7 +441,10 @@ class VariantSampleGenotypes(VariantZygosityCounts):
     def _get_locus_counts(self) -> list[dict]:
         """ Zygosity counts for every variant at this locus, this variant first """
         counts_by_variant_id = self._get_locus_zygosity_counts()
-        variant_by_id = {v.pk: v for v in Variant.objects.filter(pk__in=counts_by_variant_id)}
+        # str(v) and v.alt.seq below reach through to the locus/sequence rows
+        variant_qs = Variant.objects.filter(pk__in=counts_by_variant_id) \
+            .select_related("locus__contig", "locus__ref", "alt")
+        variant_by_id = {v.pk: v for v in variant_qs}
 
         sorted_rows = []
         for variant_id, zygosity_counts in counts_by_variant_id.items():
