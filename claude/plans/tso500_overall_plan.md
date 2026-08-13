@@ -4,16 +4,14 @@ Sequencing plan for [SACGF/variantgrid_sapath#431](https://github.com/SACGF/vari
 and the issues under it. Covers what to build in what order and why, not how to build each piece —
 each issue carries its own design.
 
-The file-level ingestion analysis is in [`tso500_ingestion_plan.md`](tso500_ingestion_plan.md); the
-test data and its gotchas are in [`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md).
+The test data and its gotchas are in
+[`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md).
 [`somatic_curation_reuse_issue_1419_plan.md`](somatic_curation_reuse_issue_1419_plan.md) is Phase 8's
-reporting design, the one phase still ahead with a doc of its own. Two landed docs are kept:
-[`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md), the reference for how
-gene-level variants are identified and annotated — Phase 6 displays them — and
-[`tso500_phase_7_plan.md`](tso500_phase_7_plan.md), whose §"Order of work" step 5 (specimen and patient
-levels) is the only part of it not built. Phases 2, 3 and 4 had docs of their own, deleted once they
-landed — what outlived them is in the Done entries below, and the PRs that reference them are #1712,
-#1715 and #1716.
+reporting design, the one phase still ahead with a doc of its own. The rest — the file-level ingestion
+analysis, and one doc each for phases 2, 3, 4, 5 and 7 — were deleted as they landed; what outlived them
+is in the Done and Still-open entries below, and the PRs are #1705, #1709, #1712, #1715, #1716, #1718
+and #1719. The design reasoning that outlived Phase 5 lives in code, in
+[`snpdb/gene_level_variants.py`](../../snpdb/gene_level_variants.py).
 
 ---
 
@@ -159,8 +157,9 @@ landed — what outlived them is in the Done entries below, and the PRs that ref
   everything matches.
 
 - **Phase 5 — gene fusions as variants and the `AllFusions.csv` parser (#1506, phase 1)** (PR #1719,
-  branch `issue_1506_tso500_phase5_gene_fusions`), designed in
-  [`fusion_variants_issue_1506_plan.md`](fusion_variants_issue_1506_plan.md), which stays the spec.
+  branch `issue_1506_tso500_phase5_gene_fusions`). The design reasoning lives in
+  `snpdb/gene_level_variants.py`'s module docstring — in code rather than here, because a `Variant` with
+  no coordinate is a special case every reader of `Variant` eventually trips over.
   Gene-level events get a real `Variant`, anchored on one gene-level contig shared by every build, with
   the gene pair encoded in a symbolic alt and a `GeneFusion` companion model. A `Variant` rather than the
   bare `Allele` the issue originally proposed, because `VariantGeneOverlap` and `CohortGenotype` are both
@@ -178,7 +177,7 @@ landed — what outlived them is in the Done entries below, and the PRs that ref
   `ENTPD3-RPL14` appears three times from one caller with three different 5′ breakpoints, so identity is
   the gene pair and the coordinates live in `CohortGenotype.info` with the rest of the per-row data.
 
-  The one design change from the plan as written: partners are identified by a **`FusionGeneId`** row
+  The one design change that came out of building it: partners are identified by a **`FusionGeneId`** row
   whose pk is the HGNC ID where there is one, and a locally allocated id above 1,000,000 where there is
   not. Clone-based identifiers are routine fusion partners (`RP11-458D21.5`, `AC016683.6` are both in
   the test file), and HGNC-only identity left them unrepresentable. The alt namespaces the two apart
@@ -205,8 +204,8 @@ landed — what outlived them is in the Done entries below, and the PRs that ref
   as `_DragenExonCNV.vcf` already does.
 
 - **Phase 7 — analysis grouping node, extraction level (private#223)** (PR #1718, branch
-  `private_issue_223_tso500_phase7_analysis_grouping_node`). Steps 1-4 of
-  [`tso500_phase_7_plan.md`](tso500_phase_7_plan.md)'s §"Order of work", which stays the spec for step 5.
+  `private_issue_223_tso500_phase7_analysis_grouping_node`). Everything but the specimen and patient
+  levels, which are below.
   One entry point gathers every VCF sample belonging to an extraction, so the DNA arm's small-variant,
   CNV and exon-CNV calls land in one analysis without anyone concatenating files outside VG.
 
@@ -375,22 +374,38 @@ the ordinary genotype import path the existing VCF suite covers. So a real end-t
 
 ## Still open from Phase 7
 
-Step 5 of the phase 7 plan — **specimen level, then patient**. The same node with a wider sample query;
-both report a configuration error today rather than resolving. Dropping the cohort dropped its
-`genome_build` FK with it, so the single-build constraint that originally ruled Patient out is gone —
-the node restricts to the analysis build and reports what that excluded, which makes Patient one more
-level a deployment can leave switched off.
+**Specimen level, then patient.** The same node with a wider sample query — the only thing a level
+changes is "object → set of samples", which is why it is `SampleNode.source_level` rather than sibling
+node classes. `IMPLEMENTED_SOURCE_LEVELS` (`analysis/models/nodes/sources/sample_node.py:73`) is the
+gate, and both unimplemented levels report a configuration error today rather than resolving. Everything
+else is already level-blind: the per-sample thresholds, the per-VCF locus filters, the exclusion
+reporting and the `GET /patients/extraction/<pk>/samples` preview all key on the resolved sample set or
+on the source object's pk, so Phase 3's specimen page reuses the preview as it stands.
 
-Two smaller pieces went with it: add-node menu entries per level (the level is switched from the editor
-dropdown today), and `analysis_templates_tag`'s `single_model_args`
-(`analysis/templatetags/related_analyses_tags.py:134`), which takes exactly one of
-sample/cohort/trio/quad/pedigree — extraction and specimen are the natural extension, and that is what
-launching a template from the extraction page needs.
+Dropping the cohort dropped its `genome_build` FK with it, so the single-build constraint that
+originally ruled Patient out is gone — an analysis has exactly one build, so restricting to it is a fact
+rather than a policy choice, and the node reports what that excluded the same way it reports an archived
+VCF. That makes Patient one more level a deployment can leave switched off.
 
-The plan's §"Done when" run joins the manual list below: one extraction node over the real TSO 500 run
-returning the DNA arm's three callers in one grid, each row carrying its own VCF's `INFO`/`FORMAT`,
-different `min_ad` per caller, ×3 on the canvas. PR #1718's evidence stops at the unit suites over
-synthetic VCFs.
+Two smaller pieces went with it:
+
+- **Add-node menu entries per level.** The level is switched from the editor dropdown today, because
+  `get_node_types_hash()` (`analysis/models/nodes/node_types.py:19`) is keyed by class, so one class is
+  one menu entry — a user hunting for "Specimen" has to add a Sample node and change a dropdown. Fix it
+  in the menu rather than the models: let a node class declare extra entries carrying initial field
+  values, so `node_create` (`analysis/views/views_json.py:115-127`, currently `NODE_TYPES_HASH[node_type]`
+  → `objects.create(...)`) can split `SampleNode:EXTRACTION` into class plus defaults. Four menu entries,
+  four labels and icons, one table.
+- **`analysis_templates_tag`'s `single_model_args`**
+  (`analysis/templatetags/related_analyses_tags.py:137`), which takes exactly one of
+  sample/cohort/trio/quad/pedigree — extraction and specimen are the natural extension, and that is what
+  launching a template from the extraction page needs. `AnalysisVariable` is keyed `(node, field)` and
+  `hidden_inputs` is already keyed on field name, so a template built around a `SampleNode` exposes
+  `extraction` as its variable and nothing else in the template changes.
+
+One run joins the manual list: an extraction node over the real TSO 500 run returning the DNA arm's
+three callers in one grid, each row carrying its own VCF's `INFO`/`FORMAT`, different `min_ad` per
+caller, ×3 on the canvas. PR #1718's evidence stops at the unit suites over synthetic VCFs.
 
 Deployment-wide threshold defaults per VCF source and per panel are #1717 rather than part of this
 phase — the per-node values built here run either way; #1717 only changes what a new node starts from.
@@ -416,6 +431,11 @@ node keep working over the same result set rather than needing a per-kind union.
 grid-complete: they carry a gene symbol and `overlapping_symbols` from their own annotation run, so what
 remains here is the kind filter and the columns that only make sense for a fusion (both breakpoints,
 caller, read counts — all in `CohortGenotype.info["observations"]`, one entry per row the caller wrote).
+
+Finding a fusion by a **single** partner — `ROS1` returning every fusion it takes part in — belongs here
+too. Phase 5's search receiver resolves a full pair either way round (`BCR::ABL1`, `CD74-ROS1`, aliases
+applied) and is deliberately lookup-only, minting no `GeneFusion` or `FusionGeneId` on whatever a user
+types; the single-partner query is the same discipline over `GeneFusion`'s anchor and partner FKs.
 
 #1706's grid half joins here because it is the same kind of change and wants the same pass over the
 column definitions: top-level specimen and extraction grids under the patients menu, an extraction link
@@ -477,6 +497,17 @@ group level.
   reuse as a copy in the meantime, over exactly the key set such an object would own.
 - **Breakend representation and BND VCF export** — #1506 phases 2 and 3. The breakpoint values themselves
   arrive in `AllFusions.csv` and Phase 5 stores them, so this is a read-side change when a consumer appears.
+  Whether VEP parses BND ALT syntax at all is unverified — a 20-minute experiment before anyone designs
+  around either answer — but what VEP would give is per-position feature overlap rather than frame or
+  domain analysis, and the caller already reports that as `Gene A/B Location`.
+- **Coordinate-free gene-level CNV** — designed alongside Phase 5 and purely additive to it:
+  `<AMP:HGNC:nnn>` / `<LOSS:HGNC:nnn>` on the same gene-level contig, same anchor, same annotation run —
+  one enum value and one alt prefix. Only for a caller that reports a gene-level event with no
+  coordinates at all (the `CombinedVariantOutput` "JAK2 amplification (5 copies)" style); `cnv.vcf`'s
+  `<DUP>`/`<DEL>` carry real coordinates and stay structural variants. Copy number stays
+  observation-level in `CohortGenotype.info` rather than in the alt, because labs use different
+  amplification thresholds and per-count identity would stop two labs ever agreeing on "JAK2
+  amplification". Build it when a file needs it.
 - **`abcn_annotated.vcf` / gene-level LOH** — cannot start until TAU supplies a file; the format is
   undocumented and not usefully mockable.
 - **`_DragenExonCNV.vcf` exact field spelling** — provisional until a run with a real large rearrangement
