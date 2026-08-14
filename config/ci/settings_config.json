@@ -1,0 +1,6 @@
+{
+  "comment": "Settings for GitHub Actions (.github/workflows/django-tests.yml sets SETTINGS_CONFIG to this file). DB is not listed as the workflow's postgres service matches the defaults in secret_settings.py. RabbitMQ's guest user only accepts loopback connections, which service containers aren't, so the workflow creates a 'variantgrid' user.",
+  "CELERY": {
+    "broker_url": "amqp://variantgrid:variantgrid@localhost"
+  }
+}
