@@ -4,22 +4,32 @@ from django.contrib.auth.models import User
 from django.db.models import Count
 from django.db.models.query_utils import Q
 
+from annotation.models import AnnotationVersion, GeneAnnotation
 from annotation.models.damage_enums import PathogenicityImpact
 from classification.enums import ClinicalSignificance
-from classification.models import Classification, GenomeBuild
+from classification.models import Classification
 from snpdb.models.models_enums import BuiltInFilters
 
 
-def get_extra_filters_q(user: User, genome_build: GenomeBuild, extra_filters):
+def get_omim_q(annotation_version: AnnotationVersion) -> Q:
+    """ Genes with OMIM terms, as a subquery against the small GeneAnnotation table - going through
+        'variantannotation__gene__geneannotation' joins the huge VariantAnnotation table through Gene """
+    gene_annotation_qs = GeneAnnotation.objects.filter(omim_terms__isnull=False)
+    if gene_annotation_version_id := annotation_version.gene_annotation_version_id:
+        gene_annotation_qs = gene_annotation_qs.filter(version_id=gene_annotation_version_id)
+    return Q(variantannotation__gene__in=gene_annotation_qs.values_list("gene_id", flat=True))
+
+
+def get_extra_filters_q(user: User, annotation_version: AnnotationVersion, extra_filters):
     if extra_filters == BuiltInFilters.CLINVAR:
         q = Q(clinvar__highest_pathogenicity__gte=4)
     elif extra_filters == BuiltInFilters.OMIM:
-        q = Q(variantannotation__gene__geneannotation__omim_terms__isnull=False)
+        q = get_omim_q(annotation_version)
     elif extra_filters in [BuiltInFilters.CLASSIFIED, BuiltInFilters.CLASSIFIED_PATHOGENIC]:
         clinical_significance_list = None
         if extra_filters == BuiltInFilters.CLASSIFIED_PATHOGENIC:
             clinical_significance_list = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-        q = Classification.get_variant_q(user, genome_build, clinical_significance_list)
+        q = Classification.get_variant_q(user, annotation_version.genome_build, clinical_significance_list)
     elif extra_filters == BuiltInFilters.IMPACT_HIGH_OR_MODERATE:
         q = Q(variantannotation__impact__in=(PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE))
     elif extra_filters == BuiltInFilters.COSMIC:
@@ -77,7 +87,7 @@ def get_node_counts_and_labels_dict(node, counts_to_get):
         if count_type == BuiltInFilters.TOTAL:
             q = None
         else:
-            q = get_extra_filters_q(node.analysis.user, node.analysis.genome_build, count_type)
+            q = get_extra_filters_q(node.analysis.user, node.analysis.annotation_version, count_type)
         # empty_result_set_value=0 only works for Django >= 4, so we handle manually below
         aggregate_kwargs[count_type] = Count("pk", filter=q, empty_result_set_value=0)
     node_counts = qs.aggregate(**aggregate_kwargs)

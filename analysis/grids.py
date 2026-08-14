@@ -159,7 +159,7 @@ class VariantGrid(AbstractVariantGrid):
         q = None
         if self.node_count:
             analysis = self.node.analysis
-            q = get_extra_filters_q(analysis.user, analysis.genome_build, self.node_count.label)
+            q = get_extra_filters_q(analysis.user, analysis.annotation_version, self.node_count.label)
         return q
 
     def _get_grid_only_annotation_kwargs(self):
