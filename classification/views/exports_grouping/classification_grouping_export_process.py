@@ -245,9 +245,12 @@ class ClassificationGroupingExportProcess:
         end_time = datetime.now()
         duration = end_time - self.start_time
         minutes, seconds = divmod(duration.seconds, 60)
+        seconds_per_hundred = 0.0
+        if self.row_count:
+            seconds_per_hundred = (duration.seconds * 100) / self.row_count
         nb = NotificationBuilder("Classification Download Completed")
         nb.add_header(":arrow_down: Classification Download Completed")
-        nb.add_markdown(f":simple_smile: {self.user.username}\n*Rows Downloaded*: {self.row_count}\n*Duration*: {minutes:02d}m {seconds:02d}s")
+        nb.add_markdown(f":simple_smile: {self.user.username}\n*Rows Downloaded*: {self.row_count:,}\n*Duration*: {minutes:02d}m {seconds:02d}s\n*Rate*: {seconds_per_hundred:.2f}s per 100 rows")
         for key, value in self.params.items():
             nb.add_field(key, ", ".join(value))
         nb.send()
