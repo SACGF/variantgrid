@@ -166,10 +166,8 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
                 if tag_id:
                     tag = get_object_or_404(Tag, pk=tag_id)
                     tags_qs = tags_qs.filter(tag=tag)
-                # Tagging is done manually so this will only ever be small - much faster to convert to list
-                allele_ids = [a for a in tags_qs.values_list("variant__variantallele__allele", flat=True)
-                              if a is not None]
-                q_list.append(Q(variantallele__allele__in=allele_ids))
+                alleles_qs = tags_qs.values_list("variant__variantallele__allele")
+                q_list.append(Q(variantallele__allele__in=alleles_qs))
 
         q = None
         if q_list:

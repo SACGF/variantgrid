@@ -39,10 +39,8 @@ def get_has_classifications_q(genome_build) -> Q:
 
 def get_has_variant_tags(genome_build) -> Q:
     tags_qs = VariantTag.get_for_build(genome_build)
-    # Tagging is done manually so this will only ever be small - much faster to convert to list
-    allele_ids = [a for a in tags_qs.values_list("variant__variantallele__allele", flat=True) if a is not None]
     return Q(variantallele__genome_build=genome_build,
-             variantallele__allele__in=allele_ids)
+             variantallele__allele__in=tags_qs.values_list("variant__variantallele__allele", flat=True))
 
 
 def variant_qs_filter_has_internal_data(variant_qs: QuerySet, annotation_version: AnnotationVersion,
