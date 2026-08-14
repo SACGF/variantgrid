@@ -143,7 +143,7 @@ class SomaticClinicalSignificanceValue:
     @property
     def pretty_value(self):
         from classification.models import EvidenceKeyMap
-        parts = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.tier_level)
+        parts = [EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.tier_level)]
         if amp_level := self.amp_level:
             parts.append(amp_level)
         return "".join(parts)
