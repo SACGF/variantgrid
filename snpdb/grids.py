@@ -3,8 +3,7 @@ from functools import reduce
 from typing import Any, Optional
 
 from django.conf import settings
-from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import F, Func, IntegerField, OuterRef, QuerySet, Subquery, Value
+from django.db.models import F, Func, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import CharField, TextField
 from django.db.models.query_utils import Q
@@ -824,7 +823,7 @@ class SampleColumns(DatatableConfig[Sample]):
         annotation_kwargs = {}
         for ot in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
             q_ot = Q(**{f"{sample_patient_ontology_path}__ontology_service": ot})
-            annotation_kwargs[ot.label] = StringAgg(ontology_path, '|',
+            annotation_kwargs[ot.label] = StringAgg(ontology_path, Value('|'),
                                                     filter=q_ot, distinct=True,
                                                     output_field=TextField())
         return qs.annotate(**annotation_kwargs)

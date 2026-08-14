@@ -4,9 +4,8 @@ from functools import reduce
 from typing import Any, Optional
 
 from django.conf import settings
-from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, IntegerField, OuterRef, QuerySet, Subquery, TextField
+from django.db.models import Count, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, TextField, Value
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -288,7 +287,7 @@ class CanonicalTranscriptCollectionColumns(DatatableConfig[CanonicalTranscriptCo
 
     def get_initial_queryset(self) -> QuerySet[GeneList]:
         qs = CanonicalTranscriptCollection.objects.all()
-        return qs.annotate(enrichment_kits=StringAgg("enrichmentkit__name", ',', output_field=TextField()),
+        return qs.annotate(enrichment_kits=StringAgg("enrichmentkit__name", Value(','), output_field=TextField()),
                            num_transcripts=Count("canonicaltranscript"))
 
     def filter_queryset(self, qs: QuerySet[GeneList]) -> QuerySet[GeneList]:

@@ -1,8 +1,7 @@
 from typing import Any
 
 from django.conf import settings
-from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import QuerySet, TextField
+from django.db.models import QuerySet, StringAgg, TextField, Value
 from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
 from django.utils.html import format_html_join, mark_safe
@@ -39,7 +38,7 @@ class ExperimentColumns(DatatableConfig[Experiment]):
 
     def get_initial_queryset(self) -> QuerySet[Experiment]:
         queryset = Experiment.objects.all()
-        return queryset.annotate(sequencing_runs=StringAgg("sequencingrun", ',', output_field=TextField()))
+        return queryset.annotate(sequencing_runs=StringAgg("sequencingrun", Value(','), output_field=TextField()))
 
 
 class SequencingRunListGrid(JqGridUserRowConfig):
@@ -76,12 +75,12 @@ class SequencingRunListGrid(JqGridUserRowConfig):
 
         annotate = {
             "sample_count": Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample"),
-            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), ',',
-                                 output_field=TextField(), ordering="vcffromsequencingrun"),
-            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", ',',
-                                            output_field=TextField(), ordering="vcffromsequencingrun"),
-            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", ',',
-                                           ordering="vcffromsequencingrun"),
+            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), Value(','),
+                                 output_field=TextField(), order_by="vcffromsequencingrun"),
+            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", Value(','),
+                                            output_field=TextField(), order_by="vcffromsequencingrun"),
+            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", Value(','),
+                                           order_by="vcffromsequencingrun"),
         }
 
         # Add sample_count to queryset

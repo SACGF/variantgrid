@@ -7,9 +7,8 @@ from typing import Any, Optional
 import pandas as pd
 from auditlog.models import LogEntry
 from django.conf import settings
-from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import F, Max, Q, QuerySet
+from django.db.models import F, Max, Q, QuerySet, StringAgg, Value
 from django.db.models.functions import Substr
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -458,7 +457,7 @@ class AnalysesGrid(JqGridUserRowConfig):
         qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
         q_last_lock = Q(analysislock=F("last_lock")) | Q(analysislock__isnull=True)
         qs = qs.annotate(last_lock=Max("analysislock__pk")).filter(q_last_lock)
-        qs = qs.annotate(tags=StringAgg("varianttag__tag", delimiter='|'))
+        qs = qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value('|')))
         self.queryset = qs.values(*fields)
         self.extra_config.update({'sortname': 'modified',
                                   'sortorder': 'desc'})
