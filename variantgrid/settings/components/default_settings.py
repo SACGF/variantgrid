@@ -88,8 +88,6 @@ AVATAR_THUMB_FORMAT = "PNG"
 
 MANAGERS = ADMINS
 
-CONN_MAX_AGE = 60  # Reuse DB connections
-
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 DATABASES = {
@@ -101,6 +99,10 @@ DATABASES = {
         'HOST': get_secret('DB.host'),
         # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
         'PORT': get_secret('DB.port'),  # Set to empty string for default.
+        'CONN_MAX_AGE': 60,  # Reuse DB connections
+        # Reused connections can be closed server side (restart, pg_terminate_backend) - ping and
+        # reconnect rather than handing a dead socket to the next request
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
@@ -193,10 +195,6 @@ LANGUAGE_CODE = 'en-us'
 # If you set this to False, Django will make some optimizations so as not
 # to load the internationalization machinery.
 USE_I18N = False
-
-# If you set this to False, Django will not format dates, numbers and
-# calendars according to the current locale.
-USE_L10N = True
 
 # If you set this to False, Django will not use timezone-aware datetimes.
 USE_TZ = True
@@ -720,8 +718,6 @@ STATICFILES_FINDERS = (
     #    'django.contrib.staticfiles.finders.DefaultStorageFinder',
     'compressor.finders.CompressorFinder'
 )
-
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
 
 # Needs to be unique and not checked into source control, so make
 # django_secret_key.txt in this dir (which is hidden via .gitignore)
