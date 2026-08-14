@@ -275,7 +275,8 @@ class VariantTranscriptSelections:
         # Convert once to explicit, then pass this around
         variant_coordinate = variant.coordinate.as_external_explicit(self.genome_build)
         has_other_annotation_consortium_transcripts = False
-        for transcript_version in TranscriptVersion.objects.filter(**kwargs).order_by("-version"):
+        transcript_version_qs = TranscriptVersion.objects.filter(**kwargs).select_related("gene_version")
+        for transcript_version in transcript_version_qs.order_by("-version"):
             # Don't duplicate ones already available via RefSeq/Ensembl equivalence
             # and only take the highest version we have
             if transcript_version.transcript_id not in existing_other_transcripts:
