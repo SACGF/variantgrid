@@ -573,10 +573,15 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             total_records = qs.count()
 
             # apply filters
-            qs = self.filter_queryset(qs)
+            filtered_qs = self.filter_queryset(qs)
 
-            # number of records after filtering
-            total_display_records = qs.count()
+            # number of records after filtering - filter_queryset hands back the same queryset when no
+            # filters were supplied, and the count is often expensive enough to be worth not repeating
+            if filtered_qs is qs:
+                total_display_records = total_records
+            else:
+                total_display_records = filtered_qs.count()
+            qs = filtered_qs
 
             # apply ordering
             qs = self.ordering(qs)
