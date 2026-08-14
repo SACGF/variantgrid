@@ -27,3 +27,10 @@ ANNOTATION[BUILD_GRCH38].update({
 })
 
 ANNOTATION[BUILD_T2TV2]["enabled"] = True
+
+# Sparse test fastas: real contig names/lengths but almost all N - real sequence only in
+# the regions the unit tests fetch. See variantgrid/data/reference/sparse_test_fastas/README.md
+_SPARSE_TEST_FASTA_DIR = os.path.join(VARIANTGRID_REPO_REFERENCE_DIR, "sparse_test_fastas")
+for _build in [BUILD_GRCH37, BUILD_GRCH38, BUILD_T2TV2]:
+    _fasta_basename = os.path.basename(ANNOTATION[_build]["reference_fasta"])
+    ANNOTATION[_build]["reference_fasta"] = os.path.join(_SPARSE_TEST_FASTA_DIR, _fasta_basename)
