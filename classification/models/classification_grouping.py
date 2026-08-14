@@ -93,7 +93,8 @@ class AlleleGrouping(TimeStampedModel):
     @cached_property
     def allele_origin_dict(self) -> dict[AlleleOriginBucket, 'AlleleOriginGrouping']:
         by_bucket = {}
-        for ao in AlleleOriginGrouping.objects.filter(allele_grouping=self).prefetch_related("classificationgrouping_set"):
+        for ao in AlleleOriginGrouping.objects.filter(allele_grouping=self) \
+                .prefetch_related("classificationgrouping_set__lab__organization"):
             by_bucket[ao.allele_origin_bucket] = ao
         return by_bucket
 
@@ -477,7 +478,8 @@ class ClassificationGrouping(TimeStampedModel):
     @staticmethod
     def update_all_dirty():
         # maybe move this out since it does AlleleOriginGroupings too
-        for dirty in ClassificationGrouping.objects.filter(dirty=True).iterator():
+        # update() dirties the allele_origin_grouping straight away, so bring it along
+        for dirty in ClassificationGrouping.objects.filter(dirty=True).select_related("allele_origin_grouping").iterator():
             dirty.update()
         for dirty in AlleleOriginGrouping.objects.filter(dirty=True).iterator():
             dirty.update()
