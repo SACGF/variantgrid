@@ -66,5 +66,7 @@ def serve_export(request: HttpRequest) -> HttpResponseBase:
 
     return ClassificationGroupingExportProcess(
         classification_export_format=classification_export_format,
-        export_settings=export_settings
+        export_settings=export_settings,
+        params=dict(request.GET),
+        user=request.user
     ).serve()

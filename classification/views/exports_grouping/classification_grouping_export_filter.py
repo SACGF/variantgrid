@@ -57,13 +57,13 @@ class ClassificationGroupingExportFilter:
 
         since = None
         if since_str := request.GET.get("since"):
-            if re.match("$[0-9]+^", since_str):
+            if re.match("^[0-9]+$", since_str):
                 since_days = int(since_str)
                 # TODO round off to midnight
                 since = datetime.now() - timedelta(days=since_days)
+                since = since.replace(hour=0, minute=0, second=0, microsecond=0)
             elif date_match := re.match(r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})", since_str):
                 since = datetime(year=int(date_match.group("year")), month=int(date_match.group("month")), day=int(date_match.group("day")))
-                # TODO truncate date
 
         if allele_origin_str := request.GET.get("allele_origin"):
             allele_origin = AlleleOriginBucket(allele_origin_str)
@@ -117,6 +117,11 @@ class ClassificationGroupingExportFilter:
         )
 
         return groupings
+
+    def latest_date(self) -> Optional[datetime]:
+        if latest_record := self.queryset().order_by('-latest_classification_modification__modified').values_list('latest_classification_modification__modified', flat=True).first():
+            return latest_record
+        return None
 
 
 @dataclass
