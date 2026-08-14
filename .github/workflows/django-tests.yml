@@ -45,6 +45,18 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      redis:
+        # Celery result backend - tests that wait on task results talk to it directly
+        # (the Django cache is locmem under UNIT_TEST, this is only for Celery)
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
       rabbitmq:
         # Some tests exercise code that publishes Celery tasks, so a real broker
         # must be listening. The default guest user only accepts loopback
@@ -82,6 +94,11 @@ jobs:
         run: |
           uv venv --python 3.12
           uv pip install -r requirements.txt
+
+      - name: Generate js_reverse static file
+        # django-compressor resolves it from STATIC_ROOT when rendering templates;
+        # deploys generate it via the migrator, a fresh checkout doesn't have it
+        run: .venv/bin/python manage.py collectstatic_js_reverse
 
       - name: Run unit tests
         # data/ is PRIVATE_DATA_ROOT (untracked) - some upload tests write output files there
