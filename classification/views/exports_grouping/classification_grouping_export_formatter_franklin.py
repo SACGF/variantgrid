@@ -231,11 +231,14 @@ class ClassificationGroupingExportFormatterFranklin(ClassificationGroupingExport
             for allele_grouping in self.allele_group_iterator():
                 for allele_origin_grouping in allele_grouping.sub_by_allele_origin():
                     if allele_origin_grouping.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
-                        yield FranklinExportRow(allele_origin_grouping, TestingContextMode.GERMLINE, date_str=self.classification_grouping_filter.date_str)
+                        row = FranklinExportRow(allele_origin_grouping, TestingContextMode.GERMLINE, date_str=self.classification_grouping_filter.date_str)
+                        if row.c_hgvs_obj and row.classification():
+                            yield row
+
                     elif allele_origin_grouping.allele_origin_bucket == AlleleOriginBucket.SOMATIC:
                         for mode in (TestingContextMode.SOMATIC, TestingContextMode.ONCOGENIC):
                             row = FranklinExportRow(allele_origin_grouping, mode, date_str=self.classification_grouping_filter.date_str)
-                            if row.classification():
+                            if row.c_hgvs_obj and row.classification():
                                 yield row
 
         for row in data_iterator():
