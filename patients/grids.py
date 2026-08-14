@@ -1,7 +1,6 @@
 from functools import partial
 
-from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import QuerySet, TextField
+from django.db.models import QuerySet, StringAgg, TextField, Value
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
@@ -54,18 +53,18 @@ class PatientListGrid(JqGridUserRowConfig):
         q_mondo = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.MONDO})
         q_hgnc = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HGNC})
         # Add sample_count to queryset
-        annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',',
+        annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", Value(','),
                                                        distinct=True, output_field=TextField()),
-                             "hpo": StringAgg(ontology_path, '|',
+                             "hpo": StringAgg(ontology_path, Value('|'),
                                               filter=q_hpo, distinct=True, output_field=TextField()),
-                             "omim": StringAgg(ontology_path, '|',
+                             "omim": StringAgg(ontology_path, Value('|'),
                                                filter=q_omim, distinct=True, output_field=TextField()),
-                             "mondo": StringAgg(ontology_path, '|',
+                             "mondo": StringAgg(ontology_path, Value('|'),
                                                 filter=q_mondo, distinct=True, output_field=TextField()),
-                             "hgnc": StringAgg(ontology_path, '|',
+                             "hgnc": StringAgg(ontology_path, Value('|'),
                                                filter=q_hgnc, distinct=True, output_field=TextField()),
                              "sample_count": Count("sample", distinct=True),
-                             "samples": StringAgg("sample__name", ", ", distinct=True, output_field=TextField())}
+                             "samples": StringAgg("sample__name", Value(", "), distinct=True, output_field=TextField())}
         queryset = queryset.annotate(**annotation_kwargs)
         field_names = self.get_field_names() + list(annotation_kwargs.keys())
         self.queryset = queryset.values(*field_names)

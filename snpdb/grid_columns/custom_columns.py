@@ -1,6 +1,5 @@
 from django.contrib.auth.models import User
-from django.contrib.postgres.aggregates import StringAgg
-from django.db.models import Max, OuterRef, Q, Subquery, Value
+from django.db.models import Max, OuterRef, Q, StringAgg, Subquery, Value
 from django.db.models.functions import Coalesce
 
 from analysis.models import VariantTag
@@ -69,14 +68,14 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
 
 def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> dict:
     classification_qs = ClassificationModification.latest_for_user(user).filter(classification__allele__variantallele__variant_id=OuterRef("id")).order_by("pk")  # So comma sep fields line up
-    internally_classified = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('U'))).values("classification__allele").annotate(cs_summary=StringAgg("cs", delimiter='|')).values_list("cs_summary")
-    internally_classified_labs = classification_qs.annotate(cln=Coalesce("classification__lab__name", Value(''))).values("classification__allele").annotate(c_lab=StringAgg("cln", delimiter='|')).values_list("c_lab")
+    internally_classified = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('U'))).values("classification__allele").annotate(cs_summary=StringAgg("cs", delimiter=Value('|'))).values_list("cs_summary")
+    internally_classified_labs = classification_qs.annotate(cln=Coalesce("classification__lab__name", Value(''))).values("classification__allele").annotate(c_lab=StringAgg("cln", delimiter=Value('|'))).values_list("c_lab")
     max_internal_classification = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('0'))).values("classification__allele").annotate(cs_max=Max("classification__clinical_significance")).values_list("cs_max")
 
     tags_qs = VariantTag.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
     if exclude_analysis:
         tags_qs = tags_qs.filter(Q(analysis__isnull=True) | Q(analysis__id__ne=exclude_analysis.pk))
-    tags_global = tags_qs.values("allele").annotate(tags=StringAgg("tag_id", delimiter='|')).values_list("tags")
+    tags_global = tags_qs.values("allele").annotate(tags=StringAgg("tag_id", delimiter=Value('|'))).values_list("tags")
 
     return {
         "internally_classified": Subquery(internally_classified[:1]),

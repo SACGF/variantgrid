@@ -15,7 +15,6 @@ from urllib.error import URLError
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib.auth.models import Group, User
-from django.contrib.postgres.aggregates import StringAgg
 from django.core.cache import cache
 from django.core.exceptions import (
     MultipleObjectsReturned,
@@ -24,7 +23,7 @@ from django.core.exceptions import (
     ValidationError,
 )
 from django.db import IntegrityError, models, transaction
-from django.db.models import QuerySet, TextField
+from django.db.models import QuerySet, StringAgg, TextField, Value
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.functions import Collate, Upper
 from django.db.models.query_utils import Q
@@ -1832,7 +1831,7 @@ class GeneListGeneSymbol(models.Model):
     def get_joined_genes_qs_annotation_for_release(release: GeneAnnotationRelease):
         """ Used to annotate GeneListGeneSymbol queryset """
         return StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene",
-                         delimiter=',', distinct=True, output_field=TextField(),
+                         delimiter=Value(','), distinct=True, output_field=TextField(),
                          filter=Q(gene_symbol__releasegenesymbol__release=release))
 
     def __str__(self):
