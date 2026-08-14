@@ -2,13 +2,28 @@ import logging
 from contextlib import contextmanager
 
 from django.conf import settings
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.db.utils import ProgrammingError
 from django.utils.text import slugify
 
 from library.log_utils import log_traceback
 from library.utils import double_quote, single_quote
 from library.utils.database_utils import run_sql
+
+
+def _get_id_sequence(base_table_name: str) -> str:
+    """ Postgres only names the sequence behind an identity/serial column '<table>_id_seq' if that name
+        happened to be free when the column was created - a table that was rebuilt or renamed while the
+        old sequence was still around gets '<table>_id_seq1' instead, so ask for the real name. """
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_get_serial_sequence(%s, 'id')", [base_table_name])
+        sequence_name = cursor.fetchone()[0]
+
+    if sequence_name is None:
+        msg = f"'{base_table_name}.id' has no identity/serial sequence, so partition inserts would have no default"
+        raise ValueError(msg)
+    return sequence_name
 
 
 def _clear_cached_cols(meta):
@@ -69,8 +84,8 @@ class RelatedModelsPartitionModel(models.Model):
     -- If a column in the parent table is an identity column, that property is not inherited
     -- @see https://www.postgresql.org/docs/current/sql-createtable.html
     
-    ALTER TABLE "%(table_name)s" 
-    ALTER COLUMN id SET DEFAULT nextval('%(base_table_name)s_id_seq');
+    ALTER TABLE "%(table_name)s"
+    ALTER COLUMN id SET DEFAULT nextval('%(id_sequence)s');
     """
 
         table_name = self.get_partition_table(base_table_name=base_table_name)
@@ -81,7 +96,8 @@ class RelatedModelsPartitionModel(models.Model):
         sql = sql_template % {"base_table_name": base_table_name,
                               "table_name": table_name,
                               "records_fk_field": self.RECORDS_FK_FIELD_TO_THIS_MODEL,
-                              "pk": pk}
+                              "pk": pk,
+                              "id_sequence": _get_id_sequence(base_table_name)}
         run_sql(sql)
 
     def get_partition_table(self, base_table_name=None):
