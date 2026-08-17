@@ -4,6 +4,7 @@ from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,
     AnnotationVersion,
+    GeneAnnotation,
     VariantAnnotationVersion,
 )
 from annotation.models.models_enums import AnnotationStatus
@@ -44,6 +45,28 @@ def check_annotation_versions() -> dict:
             build_av["fix"] = f"{e}: See 'Annotation' web page for details"
         annotation_versions_checks[f"Annotation Version for {genome_build=}"] = build_av
     return annotation_versions_checks
+
+
+def check_gene_annotation_versions() -> dict:
+    """ Saving a GeneAnnotationVersion points a new AnnotationVersion at it, so a gene_annotation run
+        that died before writing its records leaves an empty version live. Gene level filters (eg the
+        OMIM built in filter) then match nothing at all rather than failing, @see
+        analysis.models.nodes.node_counts.get_omim_q """
+    gene_annotation_checks = {}
+    for genome_build in GenomeBuild.builds_with_annotation():
+        build_ga = {"valid": True}
+        av = AnnotationVersion.latest(genome_build, validate=False)
+        if av and av.gene_annotation_version_id:
+            if not GeneAnnotation.objects.filter(version_id=av.gene_annotation_version_id).exists():
+                gar_id = av.gene_annotation_version.gene_annotation_release_id
+                build_ga = {
+                    "valid": False,
+                    "fix": f"GeneAnnotationVersion {av.gene_annotation_version_id} has no GeneAnnotation "
+                           f"records. Run: python3 manage.py gene_annotation "
+                           f"--gene-annotation-release {gar_id} --force",
+                }
+        gene_annotation_checks[f"Gene Annotation for {genome_build=}"] = build_ga
+    return gene_annotation_checks
 
 
 def check_variant_annotation_runs_status() -> dict:

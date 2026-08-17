@@ -17,6 +17,7 @@ from annotation.models import (
     OntologyTerm,
     VariantAnnotationVersion,
 )
+from annotation.models.models import SubVersionPartition
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import Gene, GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
 from library.django_utils.django_file_utils import get_import_processing_filename
@@ -131,9 +132,8 @@ class Command(BaseCommand):
             if gar and not force:
                 num_gene_annotations = gar.geneannotation_set.count()
                 raise ValueError(f"Existing GeneAnnotationVersion for {gene_annotation_release=} exists (records={num_gene_annotations}, created={gar.created})! Use --force?")
-            gav = self._create_gene_annotation_version(gene_annotation_release, ontology_version,
-                                                       dbnsfp_gene_version)
-            self._populate_gene_annotation_version(gav, gene_symbols)
+            self._create_and_populate_gene_annotation_version(gene_annotation_release, ontology_version,
+                                                              dbnsfp_gene_version, gene_symbols)
         elif missing:
             if ov_id is not None:
                 raise ValueError("Only specify ontology-version when gene-annotation-release also specified")
@@ -160,8 +160,8 @@ class Command(BaseCommand):
                 if not gar:
                     raise InvalidAnnotationVersionError(f"VariantAnnotationVersion {av.variant_annotation_version} needs to be assigned an GeneAnnotationRelease")
 
-                gav = self._create_gene_annotation_version(gar, av.ontology_version, dbnsfp_gene_version)
-                self._populate_gene_annotation_version(gav, gene_symbols)
+                self._create_and_populate_gene_annotation_version(gar, av.ontology_version,
+                                                                  dbnsfp_gene_version, gene_symbols)
         elif latest_releases or new_releases:
             ontology_version = self._get_latest_ontology_version(ov_id)
             if dbnsfp_gene_version_id:
@@ -186,8 +186,22 @@ class Command(BaseCommand):
             print(f"GeneAnnotationVersion already exists for {gene_annotation_release} / {ontology_version} "
                   f"(records={num_gene_annotations}, created={existing.created}) - skipping. Use --force to recreate.")
             return
-        gav = self._create_gene_annotation_version(gene_annotation_release, ontology_version, dbnsfp_gene_version)
-        self._populate_gene_annotation_version(gav, gene_symbols)
+        self._create_and_populate_gene_annotation_version(gene_annotation_release, ontology_version,
+                                                          dbnsfp_gene_version, gene_symbols)
+
+    def _create_and_populate_gene_annotation_version(self, gene_annotation_release, ontology_version,
+                                                     dbnsfp_gene_version, gene_symbols) -> GeneAnnotationVersion:
+        """ Hold the AnnotationVersion bump back until the records are written. Creating a sub version
+            otherwise points a new AnnotationVersion at it straight away, so a populate step that dies
+            leaves a live version with no gene annotation - gene level filters (eg the OMIM built in
+            filter) then match nothing at all rather than failing. Deployments running with the previous
+            AnnotationVersion keep the gene annotation they already had. """
+        with SubVersionPartition.defer_new_sub_version():
+            gav = self._create_gene_annotation_version(gene_annotation_release, ontology_version,
+                                                       dbnsfp_gene_version)
+            self._populate_gene_annotation_version(gav, gene_symbols)
+        AnnotationVersion.new_sub_version(None)
+        return gav
 
     @staticmethod
     def _get_latest_ontology_version(ov_id):
@@ -418,7 +432,8 @@ class Command(BaseCommand):
         gnomad_gene_constraint = GnomADGeneConstraint.objects.first()  # Only ever 1
 
         # Only 1 of each of Gnomad (CachedWebResource - deleted upon reload)
-        # When you create GeneAnnotationVersion (sub version) it automatically creates/bumps a new annotation version
+        # Saving a sub version bumps a new AnnotationVersion pointing at it, which callers hold back until
+        # the records are written @see _create_and_populate_gene_annotation_version
         return GeneAnnotationVersion.objects.create(gene_annotation_release=gene_annotation_release,
                                                     ontology_version=ontology_version,
                                                     dbnsfp_gene_version=dbnsfp_gene_version,
@@ -502,8 +517,13 @@ class Command(BaseCommand):
             ga_data["version_id"] = gav.pk
             gene_annotation_records.append(tuple(ga_data.get(k) for k in self.GENE_ANNOTATION_HEADER))
 
-        if gene_annotation_records:
-            self._write_records(gav, gene_annotation_records)
+        if not gene_annotation_records:
+            # Creating the GeneAnnotationVersion has already bumped a new AnnotationVersion pointing at it,
+            # so returning quietly here leaves an empty version live - gene level filters (eg OMIM) then
+            # match nothing at all rather than failing
+            raise ValueError(f"{gav} produced no GeneAnnotation records - "
+                             f"{gav.gene_annotation_release} matched no gene symbols ({missing_genes})")
+        self._write_records(gav, gene_annotation_records)
 
         if missing_genes:
             print("WARNING: Could not map genes to the following records: ")
