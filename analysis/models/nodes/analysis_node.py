@@ -608,7 +608,14 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
                 f"get_cached_node_pks: refusing to cache {node} PKs "
                 f"(count={node.count}, max={max_size})"
             )
-        return list(node.get_queryset().values_list("pk", flat=True))
+        # count can come from a stats cache that doesn't match the live query, so take one more than it
+        # claims - that bounds what a bad count can pull into RAM and tells us the list can't be trusted
+        pks = list(node.get_queryset().values_list("pk", flat=True)[:node.count + 1])
+        if len(pks) > node.count:
+            raise ValueError(
+                f"get_cached_node_pks: {node}(pk={node.pk}) query returned more than count={node.count}"
+            )
+        return pks
 
     @staticmethod
     def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
@@ -1012,6 +1019,11 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             NodeCount.objects.bulk_create(node_counts)
 
         total_count = label_counts[BuiltInFilters.TOTAL]
+
+        # Every label count is a subset of the total - a bigger one means the query fanned out over a
+        # multi-valued join, or a cached count is out of sync with the live query
+        if bigger_than_total := {l: c for l, c in label_counts.items() if c > total_count}:
+            raise ValueError(f"Node {self}(pk={self.pk}) label counts {bigger_than_total} > total count={total_count}")
 
         # Single parent nodes should always reduce the number of variants - run a check to make sure the
         # query wasn't bad and returned more results than it should have

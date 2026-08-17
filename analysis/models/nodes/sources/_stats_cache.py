@@ -82,6 +82,10 @@ class TrioInheritanceHandler(FilterKeyHandler):
     }
 
     def filter_key_for_node(self, node) -> FilterKey:
+        # The precomputed buckets require both parents to have a zygosity call (@see _trio_predicates).
+        # require_zygosity=False also matches parent no-calls, which no bucket represents.
+        if not node.require_zygosity:
+            return UNCACHEABLE
         # TrioNode always has an inheritance set.
         mode = self.CACHED_MODES.get(TrioInheritance(node.inheritance))
         if mode is None:

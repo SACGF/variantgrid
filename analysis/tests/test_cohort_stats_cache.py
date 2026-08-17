@@ -78,7 +78,20 @@ class TestFilterKeyHandlerRoundTrip(TestCase):
                 pass
             n = _FakeNode()
             n.inheritance = inheritance
+            n.require_zygosity = True
             self.assertIn(handler.filter_key_for_node(n), precomputed)
+
+    def test_trio_handler_uncacheable_without_require_zygosity(self):
+        """ The buckets are computed requiring a parent zygosity call, so a node that also
+            accepts parent no-calls has to count live """
+        handler = TrioInheritanceHandler()
+        for inheritance, _ in TrioInheritanceHandler.CACHED_MODES.items():
+            class _FakeNode:
+                pass
+            n = _FakeNode()
+            n.inheritance = inheritance
+            n.require_zygosity = False
+            self.assertIs(handler.filter_key_for_node(n), UNCACHEABLE)
 
     def test_no_filter_handler_returns_none_only(self):
         handler = NoFilterHandler()
