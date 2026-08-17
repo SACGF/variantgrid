@@ -497,10 +497,7 @@ USER_CREATE_ORG_LABS = {
     # "test_organization": "user_group_%(username)s",
 }
 
-# Lab heads can add/remove users from their own lab. Enabling this in an env file also needs
-# URLS_NAME_REGISTER.update({"lab_members_tab": True}), as URLS_NAME_REGISTER is built while
-# this file is read
-LAB_HEAD_MANAGE_MEMBERS = False
+LAB_HEAD_MANAGE_MEMBERS = True
 
 # key/value = Lab.group_name : why membership of this lab is managed outside VariantGrid. Shown on the
 # lab Members page, and removal is disabled for these labs. Name whatever the lab head has to quote to

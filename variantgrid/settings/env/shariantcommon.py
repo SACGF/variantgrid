@@ -35,6 +35,7 @@ AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY = \
     [aws_s3_dict[k] for k in ("AWS_S3_ACCESS_KEY_ID", "AWS_S3_SECRET_ACCESS_KEY")]
 AWS_DEFAULT_ACL = None
 
+LAB_HEAD_MANAGE_MEMBERS = False
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 
 # HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m788641874-4c58c98a716180f36670e551a0bd03fff47abfea'
