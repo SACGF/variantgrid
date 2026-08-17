@@ -604,7 +604,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             return diff_dict
 
         if imported_c_hgvs and normalized_c_hgvs:
-            if normal_diff_dict := calculate_diff_dict(imported_c_hgvs.diff(normalized_c_hgvs)):
+            if normal_diff_dict := calculate_diff_dict(imported_c_hgvs.components.diff(normalized_c_hgvs)):
                 validation_dict["normalize"] = normal_diff_dict
 
         # a g.HGVS only submission resolves to the genomic form when there's no transcript, and the contig accession
@@ -944,7 +944,7 @@ class ImportedAlleleInfo(TimeStampedModel):
                 original_chgvs_obj = self.imported_c_hgvs_obj
                 new_chgvs_obj = HGVSComponents(new_chgvs)
                 if original_chgvs_obj and original_chgvs_obj.transcript and new_chgvs_obj.transcript:
-                    c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
+                    c_hgvs_diffs = original_chgvs_obj.components.diff(new_chgvs_obj)
                     if not bool(hgvs_diff_description(c_hgvs_diffs, include_minor=False)):
                         return True
             return False
