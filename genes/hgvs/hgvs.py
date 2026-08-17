@@ -2,10 +2,7 @@ import enum
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Self
-
-from networkx.utils import union_find
-
+from typing import Optional, Self, Union
 from genes.transcript_parts import TranscriptParts, get_transcript_id_and_version
 from genes.transcripts_utils import clean_transcript_accession
 from snpdb.models.models_genome import GenomeBuild
@@ -265,7 +262,7 @@ class HGVSDisplay:
             instead would let a longer key win wherever a shorter one is a prefix of it """
         return self.sort_str, self.genome_build.pk if self.genome_build else "", self.full_hgvs
 
-    def diff(self, other: union_find[Self, HGVSComponents]) -> HGVSDiff:
+    def diff(self, other: Union[Self, HGVSComponents]) -> HGVSDiff:
         if isinstance(other, HGVSDisplay):
             other = other.components
         return self.components.diff(other)
