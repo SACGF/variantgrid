@@ -5,6 +5,7 @@ from django.urls import reverse
 from classification.enums import ShareLevel, SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
+from library.django_utils.unittest_utils import PLAIN_STATICFILES_STORAGES
 from snpdb.models import Lab
 from sync.classification_sync_status import ClassificationSyncState, classification_sync_status
 from sync.models.enums import SyncStatus
@@ -18,7 +19,7 @@ SYNC_DETAILS = {"test_shariant": {"host": REMOTE_HOST}}
 
 @override_settings(CLASSIFICATION_MATCH_VARIANTS=False,
                    SYNC_DETAILS=SYNC_DETAILS,
-                   STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+                   STORAGES=PLAIN_STATICFILES_STORAGES)
 class ClassificationSyncStatusTestCase(TestCase):
 
     def setUp(self):

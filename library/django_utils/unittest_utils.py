@@ -17,6 +17,13 @@ from django.utils.http import urlencode
 QUERY_PROFILE_FILE = os.environ.get("VG_QUERY_PROFILE")
 QUERY_TRACE_PATTERN = os.environ.get("VG_QUERY_TRACE")  # regex: log stack traces for matching SQL
 
+# override_settings(STORAGES=...) replaces the whole dict, so this carries the default file storage
+# through alongside the plain (non-manifest) static files storage
+PLAIN_STATICFILES_STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
 # Models whose managers (ObjectManagerCachingImmutable/Request) cache lookups in production
 # but disable caching under settings.UNIT_TEST - so repeated gets on these tables in a test
 # are not real production queries. Used by production_query_count().
@@ -122,7 +129,7 @@ def prevent_request_warnings(original_function):
     return new_function
 
 
-@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage',
+@override_settings(STORAGES=PLAIN_STATICFILES_STORAGES,
                    VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
                    LOG_PARTITION_WARNINGS=False,
                    GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID=None,
