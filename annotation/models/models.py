@@ -2468,7 +2468,7 @@ class AnnotationVersion(models.Model):
         else:
             av_qs = av_qs.filter(variant_annotation_version__status=VariantAnnotationVersion.Status.ACTIVE)
         av: AnnotationVersion = av_qs.order_by("annotation_date").last()
-        if validate:
+        if validate and settings.VARIANT_ANNOTATION_VALIDATE:
             if av is None:
                 raise AnnotationVersion.DoesNotExist(f"Warning: GenomeBuild {genome_build} has no annotation version!")
             av.validate()
