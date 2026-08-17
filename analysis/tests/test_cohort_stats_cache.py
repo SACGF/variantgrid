@@ -19,6 +19,7 @@ from analysis.models.nodes.sources._stats_cache import (
     NoFilterHandler,
     TrioInheritanceHandler,
     get_filter_keys_to_precompute_for_cohort,
+    inheritance_filter_key,
 )
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import (
@@ -72,14 +73,45 @@ class TestFilterKeyHandlerRoundTrip(TestCase):
         handler = TrioInheritanceHandler()
         # Build a fake "node" for each cached mode and check the key matches
         # one of the precompute keys (ignoring None).
-        precomputed = set(handler.filter_keys_to_precompute(_FakeTrioCohort()))
+        cohort = _FakeTrioCohort()
+        precomputed = set(handler.filter_keys_to_precompute(cohort))
         for inheritance, _ in TrioInheritanceHandler.CACHED_MODES.items():
             class _FakeNode:
                 pass
             n = _FakeNode()
             n.inheritance = inheritance
             n.require_zygosity = True
+            n.trio = cohort.trio
             self.assertIn(handler.filter_key_for_node(n), precomputed)
+
+    def test_dominant_key_varies_with_affected_flags(self):
+        """ The dominant predicate branches on who is affected, so a flag edit has to miss the
+            bucket built for the previous flags rather than read it """
+        handler = TrioInheritanceHandler()
+
+        def dominant_key(mother_affected, father_affected):
+            class _FakeNode:
+                pass
+            n = _FakeNode()
+            n.inheritance = TrioInheritance.DOMINANT
+            n.require_zygosity = True
+            n.trio = _FakeTrio(mother_affected=mother_affected, father_affected=father_affected)
+            return handler.filter_key_for_node(n)
+
+        self.assertNotEqual(dominant_key(True, False), dominant_key(False, True))
+        # And the writer builds the same key off the trio it computed the bucket from
+        cohort = _FakeTrioCohort(_FakeTrio(mother_affected=True, father_affected=False))
+        self.assertIn(dominant_key(True, False), set(handler.filter_keys_to_precompute(cohort)))
+
+    def test_modes_without_affected_flags_keep_one_key(self):
+        """ Only dominant depends on affected status - a flag edit leaves the other buckets valid """
+        handler = TrioInheritanceHandler()
+        unaffected_parents = set(handler.filter_keys_to_precompute(
+            _FakeTrioCohort(_FakeTrio(mother_affected=False, father_affected=False))))
+        affected_mother = set(handler.filter_keys_to_precompute(
+            _FakeTrioCohort(_FakeTrio(mother_affected=True, father_affected=False))))
+        # 5 modes + None, differing only in the dominant key
+        self.assertEqual(len(unaffected_parents & affected_mother), len(TrioInheritanceHandler.CACHED_MODES))
 
     def test_trio_handler_uncacheable_without_require_zygosity(self):
         """ The buckets are computed requiring a parent zygosity call, so a node that also
@@ -91,6 +123,7 @@ class TestFilterKeyHandlerRoundTrip(TestCase):
             n = _FakeNode()
             n.inheritance = inheritance
             n.require_zygosity = False
+            n.trio = _FakeTrio()
             self.assertIs(handler.filter_key_for_node(n), UNCACHEABLE)
 
     def test_no_filter_handler_returns_none_only(self):
@@ -99,12 +132,29 @@ class TestFilterKeyHandlerRoundTrip(TestCase):
         self.assertIsNone(handler.filter_key_for_node(object()))
 
 
+class _FakeTrio:
+    def __init__(self, mother_affected=False, father_affected=True):
+        self.mother_affected = mother_affected
+        self.father_affected = father_affected
+
+
 class _FakeTrioCohort:
-    class _TrioSet:
-        @staticmethod
-        def exists():
-            return True
-    trio_set = _TrioSet
+    def __init__(self, trio=None):
+        self.trio = trio or _FakeTrio()
+
+    @property
+    def trio_set(self):
+        trio = self.trio
+
+        class _TrioSet:
+            @staticmethod
+            def exists():
+                return True
+
+            @staticmethod
+            def first():
+                return trio
+        return _TrioSet
 
 
 class _FakeNonTrioCohort:
@@ -112,6 +162,10 @@ class _FakeNonTrioCohort:
         @staticmethod
         def exists():
             return False
+
+        @staticmethod
+        def first():
+            return None
     trio_set = _TrioSet
 
 
@@ -169,7 +223,7 @@ class TestPrecomputeKeysForCohort(TestCase):
         keys = get_filter_keys_to_precompute_for_cohort(trio.cohort)
         self.assertIn(None, keys)
         for mode in TrioInheritanceHandler.CACHED_MODES.values():
-            self.assertIn(canonical_filter_key({"inheritance": mode}), keys)
+            self.assertIn(inheritance_filter_key(mode, trio), keys)
         self.assertEqual(len(keys), 6)
 
     def test_non_trio_cohort_only_precomputes_none(self):

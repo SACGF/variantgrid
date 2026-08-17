@@ -280,7 +280,10 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
     """ Accumulate the four CohortGenotype*Stats families for the cohort and persist
         them via _persist_cohort_stats. Must run inside the per-CGC locked
         transaction opened by calculate_cohort_stats, using the locked cgc. """
-    from analysis.models.nodes.sources._stats_cache import get_filter_keys_to_precompute_for_cohort
+    from analysis.models.nodes.sources._stats_cache import (
+        get_filter_keys_to_precompute_for_cohort,
+        inheritance_filter_key,
+    )
 
     cohort_samples = list(cohort.get_cohort_samples())
     sample_index_pairs = [(cs.sample, cs.cohort_genotype_packed_field_index) for cs in cohort_samples]
@@ -524,7 +527,7 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
                                     else UNK)
                 f_z, f_z_hm, f_z_omim, f_z_cv = PRIORITY_TO_F[proband_priority]
                 for mode in modes:
-                    key = canonical_filter_key({"inheritance": mode})
+                    key = inheritance_filter_key(mode, trio)
                     if key not in precompute_keys:
                         continue
                     bucket = aggregate_counters[(key, pf_pass)]
@@ -556,7 +559,7 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
 
     # Compound het post-processing — only genes with both "mum" and "dad"
     # sources contribute. Add to the compound_het filter_key bucket.
-    chet_key = canonical_filter_key({"inheritance": "compound_het"})
+    chet_key = inheritance_filter_key("compound_het", trio)
     if chet_key in precompute_keys:
         for entry in chet_pending:
             (gene_id, pf_pass, type_field, dbsnp, dbsnp_class_field,
