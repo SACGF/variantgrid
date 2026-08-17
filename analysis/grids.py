@@ -7,9 +7,8 @@ from typing import Any, Optional
 import pandas as pd
 from auditlog.models import LogEntry
 from django.conf import settings
-from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import F, Max, Q, QuerySet
+from django.db.models import F, Max, Q, QuerySet, StringAgg, Value
 from django.db.models.functions import Substr
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -74,6 +73,7 @@ from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, So
 class VariantGrid(AbstractVariantGrid):
     caption = 'VariantGrid'
     GENOTYPE_COLUMNS_MISSING_VALUE = "."
+    SOURCE_COLUMN = "vcf_source"
     colmodel_overrides = {
         'tags': {'classes': 'no-word-wrap', 'formatter': 'tagsFormatter', 'sortable': False},
     }
@@ -159,7 +159,7 @@ class VariantGrid(AbstractVariantGrid):
         q = None
         if self.node_count:
             analysis = self.node.analysis
-            q = get_extra_filters_q(analysis.user, analysis.genome_build, self.node_count.label)
+            q = get_extra_filters_q(analysis.user, analysis.annotation_version, self.node_count.label)
         return q
 
     def _get_grid_only_annotation_kwargs(self):
@@ -212,6 +212,13 @@ class VariantGrid(AbstractVariantGrid):
 
             sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(self.cohorts, self.visibility,
                                                                                                    af_show_in_percent, sample_formatter)
+            if len(self.cohorts) > 1:
+                # Worth a column only where rows can come from more than one VCF
+                source_columns, source_overrides = VariantGrid.get_source_columns_and_overrides(self.cohorts,
+                                                                                                self.visibility)
+                sample_columns = source_columns + sample_columns
+                sample_overrides.update(source_overrides)
+
             if sample_cols_pos:
                 fields = fields[:sample_cols_pos] + sample_columns + fields[sample_cols_pos:]
             else:
@@ -255,6 +262,47 @@ class VariantGrid(AbstractVariantGrid):
         return server_side_formatter
 
     @staticmethod
+    def _get_sample_cohort_index(cohorts, visibility) -> dict:
+        """ sample -> (cohort, index into that cohort's packed genotype columns) """
+        sample_cohort_index = {}
+        for cohort in cohorts:
+            for cohort_sample in cohort.get_cohort_samples():  # orders by sort_order
+                sample = cohort_sample.sample
+                if visibility.get(sample) and sample not in sample_cohort_index:
+                    cohort_index = cohort_sample.cohort_genotype_packed_field_index
+                    sample_cohort_index[sample] = (cohort, cohort_index)
+        return sample_cohort_index
+
+    @staticmethod
+    def get_source_columns_and_overrides(cohorts, visibility):
+        """ Which VCF a row came from. The pk driven filter of a grouping node carries no provenance,
+            but the grid doesn't display from the filter - each row already arrives carrying, per VCF,
+            either real packed genotype data or the missing value placeholder. """
+        vcf_packed_columns = []
+        for sample, (cohort, cohort_index) in VariantGrid._get_sample_cohort_index(cohorts, visibility).items():
+            packed_column = cohort.cohort_genotype_collection.get_packed_column_alias("samples_zygosity")
+            vcf_packed_columns.append((str(sample.vcf), packed_column, cohort_index))
+
+        def source_formatter(row, _field):
+            vcf_names = []
+            for vcf_name, packed_column, cohort_index in vcf_packed_columns:
+                packed_data = row.get(packed_column)
+                if packed_data and packed_data[cohort_index] != VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE:
+                    if vcf_name not in vcf_names:
+                        vcf_names.append(vcf_name)
+            return ", ".join(vcf_names)
+
+        col_data_dict = {
+            "label": "Source",
+            "width": 120,
+            "sortable": False,  # Derived from packed data, there's nothing to sort on
+            "server_side_formatter": source_formatter,
+        }
+        column_names = [VariantGrid.SOURCE_COLUMN]
+        overrides = get_overrides(column_names, [col_data_dict], model_field=False, queryset_field=False)
+        return column_names, overrides
+
+    @staticmethod
     def get_grid_genotype_columns_and_overrides(cohorts, visibility,
                                                 af_show_in_percent: bool, sample_formatter: Optional[Callable] = None):
         available_format_columns = get_available_format_columns(cohorts)
@@ -274,13 +322,7 @@ class VariantGrid(AbstractVariantGrid):
         packed_data_replace.update(dict.fromkeys(MISSING_VALUES, VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE))
 
         # We now have separate aliases for packed data, so each cohort handled separately
-        sample_cohort_index = {}
-        for cohort in cohorts:
-            for cohort_sample in cohort.get_cohort_samples():  # orders by sort_order
-                sample = cohort_sample.sample
-                if visibility.get(sample) and sample not in sample_cohort_index:
-                    cohort_index = cohort_sample.cohort_genotype_packed_field_index
-                    sample_cohort_index[sample] = (cohort, cohort_index)
+        sample_cohort_index = VariantGrid._get_sample_cohort_index(cohorts, visibility)
 
         column_names = []
         column_data = []
@@ -415,7 +457,7 @@ class AnalysesGrid(JqGridUserRowConfig):
         qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
         q_last_lock = Q(analysislock=F("last_lock")) | Q(analysislock__isnull=True)
         qs = qs.annotate(last_lock=Max("analysislock__pk")).filter(q_last_lock)
-        qs = qs.annotate(tags=StringAgg("varianttag__tag", delimiter='|'))
+        qs = qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value('|')))
         self.queryset = qs.values(*fields)
         self.extra_config.update({'sortname': 'modified',
                                   'sortorder': 'desc'})

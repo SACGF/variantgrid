@@ -15,6 +15,7 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, CohortNode
 from annotation.fake_annotation import get_fake_annotation_version
+from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import GenomeBuild, Variant, VariantCollection
 from snpdb.models.models_cohort import (
     CohortGenotype,
@@ -70,9 +71,7 @@ class TestSubCohortAnySampleCalledVC(TestCase):
         """ Insert a CohortGenotype row into the parent CGC's partition table (mirrors production -
             ORM inserts hit the base table, but the build SQL reads the partition directly). """
         n = len(samples_zygosity)
-        old_db_table = CohortGenotype._meta.db_table
-        try:
-            CohortGenotype._meta.db_table = cls.cgc.get_partition_table()
+        with temporary_db_table(CohortGenotype, cls.cgc.get_partition_table()):
             CohortGenotype.objects.create(
                 collection=cls.cgc, variant=variant,
                 ref_count=samples_zygosity.count('R'),
@@ -86,8 +85,6 @@ class TestSubCohortAnySampleCalledVC(TestCase):
                 samples_genotype_quality=[30] * n,
                 samples_phred_likelihood=[0] * n,
             )
-        finally:
-            CohortGenotype._meta.db_table = old_db_table
 
     def _create_sub_cohort(self):
         samples = list(self.parent_cohort.get_samples()[:2])  # proband + mother

@@ -139,7 +139,7 @@ class ClassificationGroupUtils:
 
         if self._modifications:
             flag_collections_ids = {mod.classification.flag_collection_id for mod in self._modifications}
-            flags_qs.filter(collection_id__in=flag_collections_ids)
+            flags_qs = flags_qs.filter(collection_id__in=flag_collections_ids)
 
         for flag in flags_qs:
             mod_id_to_clin_sig[flag.collection_id] = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'

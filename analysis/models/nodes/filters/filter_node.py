@@ -19,7 +19,7 @@ class FilterNode(AnalysisNode):
     group_operation = models.CharField(max_length=3)  # "OR" or "AND"
 
     def modifies_parents(self):
-        return self.filternodeitem_set.count()
+        return self.filternodeitem_set.exists()
 
     def _get_node_q(self) -> Optional[Q]:
         class FakeFilterGrid(JqGrid):
@@ -34,7 +34,7 @@ class FilterNode(AnalysisNode):
     def get_extra_grid_config(self):
         existing_extra_config = super().get_extra_grid_config()
 
-        if self.filternodeitem_set.count():
+        if self.filternodeitem_set.exists():
             existing_extra_config['search'] = True
             post_data = existing_extra_config.get('postData', {})
             post_data.update({'filters': self.get_filters_json()})

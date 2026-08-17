@@ -119,6 +119,7 @@ CELERY_TASK_ROUTES = {
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
 
     # Partition archive
+    'patients.tasks.extraction_matching_tasks.reconcile_pending_extractions': DB_WORKERS,
     'snpdb.tasks.partition_archive_tasks.perform_partition_archive': DB_WORKERS,
     "snpdb.tasks.sub_cohort_tasks.build_sub_cohort_any_sample_called_vc_task": DB_WORKERS,
 }
@@ -138,6 +139,7 @@ CELERY_IMPORTS = (
     'classification.tasks.classification_import_task',
     'classification.tasks.classification_candidate_search_tasks',
     'genes.tasks.gene_coverage_tasks',
+    'patients.tasks.extraction_matching_tasks',
     'pedigree.models',
     'seqauto.tasks.gold_summary_tasks',
     'snpdb.models',

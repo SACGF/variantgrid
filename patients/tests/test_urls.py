@@ -59,6 +59,8 @@ class Test(URLTestCase):
             # ('view_patient_contact_tab', patient_kwargs, 200),
             ('view_patient_specimens', patient_kwargs, 200),
             ('view_patient_extractions', patient_kwargs, 200),
+            ('view_specimen', {"specimen_id": cls.specimen.pk}, 200),
+            ('view_extraction', {"extraction_id": cls.extraction.pk}, 200),
             ('view_patient_genes', patient_kwargs, 200),
             ('view_patient_modifications', patient_kwargs, 200),
             ('view_patient_import', {"patient_records_id": patient_records.pk}, 200),
@@ -87,6 +89,17 @@ class Test(URLTestCase):
             ("patient_term_matches", {}, 200),
             ("bulk_patient_term", {}, 200),
             ("patient_term_approvals", {}, 200),
+        ]
+        self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
+
+    def testApiUrls(self):
+        """ #1707 - the API list endpoints, which only ever show what the user can see """
+        URL_NAMES_AND_KWARGS = [
+            ("api_patient-list", {}, 200),
+            ("api_specimen-list", {}, 200),
+            ("api_extraction-list", {}, 200),
+            ("api_specimen_measure-list", {}, 200),
+            ("api_specimen_measure_bulk_create", {}, 405),  # POST only
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 

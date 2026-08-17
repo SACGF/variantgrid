@@ -19,6 +19,7 @@ from annotation.annotsv_annotation import (
     get_annotsv_tsv_filename,
     run_annotsv,
 )
+from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals.manual_signals import (
@@ -265,7 +266,12 @@ def annotate_variants(annotation_run_id):
         # Renew the lease while the (potentially many-hour, e.g. structural-variant) VEP work runs, so a
         # live worker is never reclaimed under us into a duplicate run.
         with AnnotationRunLeaseHeartbeat(annotation_run, my_task_id) as lease_heartbeat:
-            if annotation_run.vcf_annotated_filename is None:
+            if annotation_run.pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
+                # No VCF to dump and no VEP to run - the annotation is computed from the variant's own
+                # gene identity, and there are few enough rows to write here rather than handing the
+                # run to the import lane, so this one goes straight to FINISHED
+                annotate_gene_level_run(annotation_run)
+            elif annotation_run.vcf_annotated_filename is None:
                 dump_and_annotate_variants(annotation_run, lease_heartbeat=lease_heartbeat)
         # DB upload now runs as a separate db_workers task (import_annotation_run), launched by the
         # dispatcher when this run reaches ANNOTATION_COMPLETED. #1649
@@ -652,6 +658,9 @@ def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
 def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT, use_accession=False) -> int:
     # We had an issue with writing accessions in VEP, so use chrom names and the default VEP fasta instead
     # @see https://github.com/Ensembl/ensembl-vep/issues/1635
+    # Contigs are shared between builds (eg GRCh37/hg19) so the ordering join needs restricting to this
+    # build, otherwise a variant is written once per build its contig belongs to
+    qs = qs.filter(locus__contig__genomebuildcontig__genome_build=genome_build)
     qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
     if use_accession:
         chrom_key = "locus__contig__refseq_accession"

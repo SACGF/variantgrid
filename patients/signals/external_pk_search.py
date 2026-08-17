@@ -15,7 +15,7 @@ from snpdb.search import HAS_ALPHA_PATTERN, SearchExample, SearchInputInstance, 
 def search_external_pk(search_input: SearchInputInstance):
     # TODO test me
     # Returns related objects
-    RELATED_OBJECT_FIELDS = ["case", "pathologytestorder", "patient"]
+    RELATED_OBJECT_FIELDS = ["case", "pathologytestorder", "patient", "specimen", "extraction"]
     for external_pk in ExternalPK.objects.filter(code__iexact=search_input.search_string):
         for f in RELATED_OBJECT_FIELDS:
             try:

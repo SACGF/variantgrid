@@ -508,17 +508,17 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
     """ Return a stalled run to a dispatchable state so the dispatcher can re-launch it. Always clears
         the lease/task lock. Two flavours of pipeline progress:
 
-        #1646 resume-upload: the run is already past VEP (annotated VCF present on disk) and only the
-        quick DB upload remains. Keep the expensive VEP output - just scrub any partially-imported rows
-        and reset the upload markers, leaving status ANNOTATION_COMPLETED so the dispatcher re-launches
-        it upload-only (annotate_variants skips dump+VEP straight to import_vcf_annotations). This avoids
-        throwing away minutes of VEP per stalled run.
+        #1646 resume-upload: the run is already past VEP and only the quick DB upload remains. Keep the
+        expensive VEP output - just scrub any partially-imported rows and reset the upload markers,
+        leaving status ANNOTATION_COMPLETED so the dispatcher re-launches it upload-only
+        (annotate_variants skips dump+VEP straight to import_vcf_annotations). This avoids throwing away
+        minutes of VEP per stalled run.
 
-        Otherwise (pre-VEP progress): scrub all partial output (on-disk dumps + partial rows) back to a
-        clean CREATED state so a re-dump won't collide.
+        Otherwise (pre-VEP progress, or VEP part-way): scrub all partial output (on-disk dumps + partial
+        rows) back to a clean CREATED state so a re-dump won't collide.
 
-        #1660: which flavour applies is decided by *deriving* the annotated path from the dump stem, not
-        by reading vcf_annotated_filename off the row. That field is only persisted at the final save in
+        #1660: which flavour applies is decided by *deriving* the paths from the dump stem, not by
+        reading vcf_annotated_filename off the row. That field is only persisted at the final save in
         dump_and_annotate_variants - after VEP, AnnotSV and the conservation sidecar have all finished -
         so a run reclaimed while AnnotSV is still running has a complete annotated VCF on disk but a NULL
         field, and reading the field would scrub minutes of finished VEP work the resume path exists to
@@ -532,13 +532,25 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
         warning level, not as a pipeline error. """
     dump_filename = annotation_run.vcf_dump_filename
     annotated_filename = None
+    skipped_variants_filename = None
+    vep_finished = False
     if dump_filename:
         annotated_filename = get_annotated_filename(annotation_run, dump_filename)
+        # #1710: VEP creates the annotated VCF at startup and writes to it progressively, so its presence
+        # says nothing about how far the run got - a run reclaimed mid-VEP used to resume upload-only off
+        # a part-written file, and the #1701 checks in the import lane then failed it. Runner::run closes
+        # the output handle and only then calls finish(), which writes the skipped-variants list (even
+        # when nothing was skipped), so that file appearing is the proof VEP reached the end. It is named
+        # off the per-attempt dump stem, so it can only have come from this attempt.
+        skipped_variants_filename = get_vep_skipped_variants_filename(annotated_filename)
+        vep_finished = os.path.exists(skipped_variants_filename)
     elif annotation_run.vcf_annotated_filename:
-        # No dump stem to derive from (eg an external run, #1568, imported without a local dump).
+        # No dump stem to derive from (eg an external run, #1568, imported without a local dump) - no VEP
+        # of ours ran, so the annotated VCF we were handed is all the proof there is.
         annotated_filename = annotation_run.vcf_annotated_filename
+        vep_finished = True
 
-    if annotated_filename and os.path.exists(annotated_filename):
+    if vep_finished and os.path.exists(annotated_filename):
         # Past VEP - resume upload-only. Scrub partially-imported rows; keep dump/VEP/AnnotSV artifacts.
         annotation_run.delete_related_objects()
         # The row may not name the annotated VCF yet (reclaimed mid-AnnotSV) - record the derived path so
@@ -546,20 +558,19 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
         annotation_run.vcf_annotated_filename = annotated_filename
         # #1701: same reasoning for VEP's skipped-variants list - record it so the upload-only relaunch
         # checks records-in vs records-out against VEP's own list rather than the warnings-text fallback.
-        skipped_variants_filename = get_vep_skipped_variants_filename(annotated_filename)
-        if os.path.exists(skipped_variants_filename):
+        if skipped_variants_filename:
             annotation_run.vep_skipped_variants_filename = skipped_variants_filename
         # annotation_end is persisted at that same final save, and get_status() keys ANNOTATION_COMPLETED
         # off it - so without this the resumed run sits at ANNOTATION_STARTED, which is neither
-        # dispatchable nor upload-resumable, and it would never be picked up again. The annotated VCF on
-        # disk is the proof VEP finished; stamp the time we observed it.
+        # dispatchable nor upload-resumable, and it would never be picked up again. Stamp the time we
+        # observed VEP had finished.
         if annotation_run.annotation_end is None:
             annotation_run.annotation_end = timezone.now()
         annotation_run.upload_start = None
         annotation_run.upload_end = None
         annotation_run.annotsv_imported = False  # re-import re-updates the recreated rows (idempotent)
     elif annotation_run.status != AnnotationStatus.CREATED:
-        # Worker got part-way before dying (pre-VEP) - scrub partial output (a CREATED run has none).
+        # Worker died before VEP finished - scrub partial output (a CREATED run has none).
         annotation_run.delete_related_objects()
         # #1670: announce the discard - annotation.signals.annotation_run_cleanup owns the removal, and
         # collects the same derived-plus-persisted set of paths that the losing attempt's cleanup does.

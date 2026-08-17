@@ -13,7 +13,7 @@
 
 {% block inlinejs %}
     {{ block.super }}
-    
+
     function getSampleId() {
     {% if node.analysis.lock_input_sources %}
         var sampleId = "{{ sample.pk }}";
@@ -27,13 +27,65 @@
         var sampleId = getSampleId();
         setCrossLink($("#sample-link"), Urls.view_sample, sampleId);
     }
+
+    function getExtractionId() {
+        return $("#id_extraction").find(":selected").val();
+    }
+
+    function getSampleThresholds() {
+        // Only the rows the user actually overrode reach the server - the node's own values are
+        // what any other sample gets
+        const thresholds = {};
+        $("tr.sample-threshold-row").each(function() {
+            const row = $(this);
+            const sampleId = row.attr("sample_id");
+            const values = {};
+            row.find("input.sample-threshold").each(function() {
+                const field = $(this).attr("threshold_field");
+                const val = $(this).val();
+                values[field] = val === "" ? null : parseInt(val);
+            });
+            thresholds[sampleId] = values;
+        });
+        return thresholds;
+    }
+
+    function loadSampleGroupPreview() {
+        const extractionId = getExtractionId();
+        const preview = $("#sample-group-preview");
+        if (!extractionId) {
+            preview.html("No extraction selected");
+            return;
+        }
+        setCrossLink($("#extraction-link"), Urls.view_extraction, extractionId);
+        const url = Urls.extraction_samples(extractionId) + "?genome_build={{ node.analysis.genome_build }}";
+        preview.html("Loading samples...");
+        $.getJSON(url, function(data) {
+            const totals = data["totals"];
+            let html = "<b>" + totals["samples"] + "</b> sample(s) in <b>" + totals["vcfs"] + "</b> VCF(s)";
+            if (totals["variant_count"] !== null) {
+                html += " - " + totals["variant_count"] + " variants";
+            }
+            const list = $("<ul/>");
+            $.each(data["samples"], function(i, s) {
+                const count = s["variant_count"] === null ? "count not calculated" : s["variant_count"] + " variants";
+                $("<li/>").text(s["sample"] + " (" + s["vcf"] + ") - " + count).appendTo(list);
+            });
+            $.each(data["warnings"], function(i, w) {
+                $("<li/>").addClass("warning").text(w).appendTo(list);
+            });
+            preview.html(html).append(list);
+        });
+    }
 {% endblock inlinejs %}
 
 {% block docreadyjs %}
     {{ block.super }}
 
     var sampleForm = $("form#sample-form");
-    ajaxForm(sampleForm);
+    ajaxForm(sampleForm, function() {
+        $("input#id_sample_thresholds").val(JSON.stringify(getSampleThresholds()));
+    });
 
 	function resetGenotypeEditors() {
 		$(".no-genotype-row").hide();
@@ -47,8 +99,20 @@
         resetGenotypeEditors();
 	}
 
+	function changeExtraction() {
+	    loadSampleGroupPreview();
+	    loadExtractionVCFLocusFilter(getExtractionId());
+	}
+
+{% if node.is_group_level %}
+    loadSampleGroupPreview();
+    $("select#id_extraction").change(changeExtraction);
+{% else %}
 	setSampleLink();
 	$("select#id_sample").change(changeSample);
+{% endif %}
+	// Changing what the node reads changes which editors apply, so save to redraw them
+	$("select#id_source_level").change(function() { sampleForm.submit(); });
 	$("#slider-group-operation").hide(); // SampleNode doesnt use this
 {% endblock docreadyjs %}
 
@@ -126,6 +190,24 @@ table.zygosity-table tr.top-header th {
         {{ hidden }}
     {% endfor %}
     <div>
+        {% if form.source_level %}
+            <div>
+                <b>Source:</b> {{ form.source_level }}
+            </div>
+        {% endif %}
+
+        {% if node.is_group_level %}
+            <div>
+                <b>{{ node.get_source_level_display }}:</b>
+                {% if node.analysis.lock_input_sources and node.analysis.template_type is None %}
+                    {{ node.get_source_object }}
+                {% else %}
+                    {{ form.extraction }}
+                {% endif %}
+                <a class="cross-link" id="extraction-link" target='_blank'>View Extraction</a>
+            </div>
+            <div id='sample-group-preview'></div>
+        {% else %}
         <div>
             <b>Sample:</b>
 
@@ -137,6 +219,7 @@ table.zygosity-table tr.top-header th {
 
             <a class="cross-link" id="sample-link" target='_blank'>View Sample</a>
         </div>
+        {% endif %}
 
         {% if node.analysis.template_type %}
             <!-- We never set this manually, but show so it can be set as an analysis variable via template -->
@@ -150,7 +233,11 @@ table.zygosity-table tr.top-header th {
 
         <div>
             {% load vcf_locus_filter_tags %}
-            {% vcf_locus_filter node sample.vcf %}
+            {% if node.is_group_level %}
+                {% vcf_locus_filter node None node.extraction %}
+            {% else %}
+                {% vcf_locus_filter node sample.vcf %}
+            {% endif %}
         </div>
     {% if has_genotype %}
         <div class='genotype-row'>
@@ -159,6 +246,25 @@ table.zygosity-table tr.top-header th {
             <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }}
             <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }}
         </div>
+        {% if source_samples %}
+        <div class='genotype-row'>
+            <b>Per sample thresholds</b> - a row applies instead of the values above (sapath#301)
+            <table id='sample-thresholds-table' class='left'>
+                <tr><th>Sample<th>VCF<th title='Allelic Depth'>AD&ge;<th title='Read Depth'>DP&ge;
+                    <th title='Genotype Quality'>GQ&ge;<th title='Phred-scaled Likelihoods for Genotypes'>PL&le;
+                {% for ss in source_samples %}
+                <tr class='sample-threshold-row' sample_id='{{ ss.sample.pk }}'>
+                    <td>{{ ss.sample.name }}
+                    <td>{{ ss.sample.vcf }}
+                    <td><input class='sample-threshold narrow' threshold_field='min_ad' type='number' min='0' step='1' value='{{ ss.thresholds.min_ad }}' />
+                    <td><input class='sample-threshold narrow' threshold_field='min_dp' type='number' min='0' step='1' value='{{ ss.thresholds.min_dp }}' />
+                    <td><input class='sample-threshold narrow' threshold_field='min_gq' type='number' min='0' step='1' value='{{ ss.thresholds.min_gq }}' />
+                    <td><input class='sample-threshold narrow' threshold_field='max_pl' type='number' min='0' step='1' value='{{ ss.thresholds.max_pl|default_if_none:"" }}' />
+                {% endfor %}
+            </table>
+            <div class='clear'></div>
+        </div>
+        {% endif %}
         <div class='genotype-row'>
             <table class='zygosity-table left' style='text-align: center'>
                 <tr class='top-header'>

@@ -1,0 +1,107 @@
+name: Django Tests
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**.md'
+      - 'claude/**'
+      - '.github/ISSUE_TEMPLATE/**'
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - '**.md'
+      - 'claude/**'
+      - '.github/ISSUE_TEMPLATE/**'
+
+# Push bursts coalesce rather than each triggering a run: on master (no cancel)
+# GitHub keeps one running plus at most one pending run per group, replacing the
+# pending run as newer pushes land - a burst during a ~25 min run costs 2 runs
+# total. PR branches instead cancel the superseded run for fast feedback.
+concurrency:
+  group: django-tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        # POSTGRES_USER/PASSWORD/DB match the defaults in
+        # variantgrid/settings/components/secret_settings.py so
+        # config/ci/settings_config.json needs no DB section
+        image: postgres:16
+        env:
+          POSTGRES_USER: snpdb
+          POSTGRES_PASSWORD: snpdb
+          POSTGRES_DB: snpdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U snpdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        # Celery result backend - tests that wait on task results talk to it directly
+        # (the Django cache is locmem under UNIT_TEST, this is only for Celery)
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      rabbitmq:
+        # Some tests exercise code that publishes Celery tasks, so a real broker
+        # must be listening. The default guest user only accepts loopback
+        # connections and service containers aren't loopback, hence its own user.
+        image: rabbitmq:4
+        env:
+          RABBITMQ_DEFAULT_USER: variantgrid
+          RABBITMQ_DEFAULT_PASS: variantgrid
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DJANGO_SETTINGS_MODULE: variantgrid.settings.env.github_actions
+      SETTINGS_CONFIG: ${{ github.workspace }}/config/ci/settings_config.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system libraries
+        # libpq-dev for psycopg2, zlib1g-dev for bgzip (both build from sdist)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpq-dev zlib1g-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          uv venv --python 3.12
+          uv pip install -r requirements.txt
+
+      - name: Generate js_reverse static file
+        # django-compressor resolves it from STATIC_ROOT when rendering templates;
+        # deploys generate it via the migrator, a fresh checkout doesn't have it
+        run: .venv/bin/python manage.py collectstatic_js_reverse
+
+      - name: Run unit tests
+        # data/ is PRIVATE_DATA_ROOT (untracked) - some upload tests write output files there
+        run: |
+          mkdir -p data media_root
+          .venv/bin/python manage.py test

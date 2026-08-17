@@ -35,6 +35,7 @@ AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY = \
     [aws_s3_dict[k] for k in ("AWS_S3_ACCESS_KEY_ID", "AWS_S3_SECRET_ACCESS_KEY")]
 AWS_DEFAULT_ACL = None
 
+LAB_HEAD_MANAGE_MEMBERS = False
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 
 # HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m788641874-4c58c98a716180f36670e551a0bd03fff47abfea'
@@ -150,8 +151,6 @@ STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
 
-HGVS_DEFAULT_METHOD = "biocommons_hgvs"
-
 # SITE_MESSAGE = "Shariant is currently in pre-BETA. Please excuse bugs and missing features, and the site may be shut down for upgrades"
 
 # "LRG_" has been disabled, see https://github.com/SACGF/shariant-admin/issues/126
@@ -191,6 +190,19 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "patient_imports": False,
     "patient_term_approvals": False,
     "patients": False,
+    "view_specimen": False,
+    "view_extraction": False,
+
+    # Shariant has no patients menu and should not grow a patient API (#1707)
+    "api_patient-list": False,
+    "api_patient-detail": False,
+    "api_specimen-list": False,
+    "api_specimen-detail": False,
+    "api_extraction-list": False,
+    "api_extraction-detail": False,
+    "api_specimen_measure-list": False,
+    "api_specimen_measure-detail": False,
+    "api_specimen_measure_bulk_create": False,
 
     "gene_lists": False,
     "genes": False,

@@ -9,9 +9,29 @@ class NucleicAcid(models.TextChoices):
     RNA = 'R', 'RNA'
 
 
-class Mutation(models.TextChoices):
-    GERMLINE = 'G', 'Germline'
-    SOMATIC = 'S', 'Somatic'
+class TissueStatus(models.TextChoices):
+    """ What role the material plays in the test - the same tissue can be either, eg blood is the
+        reference in a solid tumour workup and is the tumour in leukaemia """
+    REFERENCE = 'R', 'Reference (unaffected)'
+    AFFECTED = 'A', 'Affected / lesional'
+    UNKNOWN = 'U', 'Unknown'
+
+
+class MatchStatus(models.TextChoices):
+    """ An identifier's journey from posted to resolved - independent feeds arrive in any order, so a
+        reference we cannot resolve yet is parked rather than rejected """
+    MATCHED = 'M', 'Matched'
+    PENDING = 'P', 'Pending'
+    NEEDS_ATTENTION = 'N', 'Needs attention'
+
+
+class SpecimenMeasureType(models.TextChoices):
+    """ Vendor-neutral - other panels push the same shape """
+    TMB = 'T', 'Tumour mutational burden'
+    MSI = 'M', 'Microsatellite instability'
+    GIS = 'G', 'Genomic instability score'
+    TUMOUR_FRACTION = 'F', 'Tumour fraction'
+    PLOIDY = 'P', 'Ploidy'
 
 
 class SimpleZygosity(models.TextChoices):

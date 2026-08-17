@@ -407,7 +407,15 @@ admin.site.register(models.GenomeBuild, ModelAdminBasics)
 admin.site.register(models.LabProject)
 admin.site.register(models.Manufacturer)
 admin.site.register(models.Project, ModelAdminBasics)
-admin.site.register(models.Sample, ModelAdminBasics)
+
+
+@admin.register(models.Sample)
+class SampleAdmin(ModelAdminBasics):
+    """ list_filter on extraction_match_status is the cheapest 'show me everything needing attention' """
+    list_display = ("pk", "name", "vcf", "patient", "extraction", "extraction_match_status")
+    list_filter = ("extraction_match_status",)
+
+
 admin.site.register(models.SampleLabProject)
 admin.site.register(models.SampleTag, ModelAdminBasics)
 admin.site.register(models.SettingsInitialGroupPermission, ModelAdminBasics)

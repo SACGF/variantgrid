@@ -61,6 +61,16 @@ class NoFilterHandler(FilterKeyHandler):
         return [None]
 
 
+class SampleNodeHandler(NoFilterHandler):
+    """ A group level SampleNode spans genotype collections, so there's no single cohort's stats
+        row to read - its counts are live queries. """
+
+    def filter_key_for_node(self, node) -> FilterKey:
+        if node.is_group_level:
+            return UNCACHEABLE
+        return None
+
+
 class TrioInheritanceHandler(FilterKeyHandler):
     # 5 inheritance modes precomputed including compound het.
     CACHED_MODES = {
@@ -72,20 +82,37 @@ class TrioInheritanceHandler(FilterKeyHandler):
     }
 
     def filter_key_for_node(self, node) -> FilterKey:
+        # The precomputed buckets require both parents to have a zygosity call (@see _trio_predicates).
+        # require_zygosity=False also matches parent no-calls, which no bucket represents.
+        if not node.require_zygosity:
+            return UNCACHEABLE
         # TrioNode always has an inheritance set.
         mode = self.CACHED_MODES.get(TrioInheritance(node.inheritance))
         if mode is None:
             return UNCACHEABLE
-        return canonical_filter_key({"inheritance": mode})
+        return inheritance_filter_key(mode, node.trio)
 
     def filter_keys_to_precompute(self, cohort) -> Iterable[Optional[str]]:
-        if not _cohort_has_trio(cohort):
+        trio = _cohort_trio(cohort)
+        if trio is None:
             return [None]
-        return [None] + [canonical_filter_key({"inheritance": m}) for m in self.CACHED_MODES.values()]
+        return [None] + [inheritance_filter_key(m, trio) for m in self.CACHED_MODES.values()]
 
 
-def _cohort_has_trio(cohort) -> bool:
-    return cohort.trio_set.exists()
+def inheritance_filter_key(mode: str, trio) -> str:
+    """ The key a mode's bucket is stored under - the writer and the readers both come through here
+        so they can't drift apart. autosomal_dominant's predicate branches on which parents are
+        affected (@see _trio_predicates), so those flags belong in its key: editing them misses the
+        old bucket and recomputes, rather than reading one built for the previous flags. """
+    key = {"inheritance": mode}
+    if mode == "autosomal_dominant":
+        key["mother_affected"] = bool(trio.mother_affected)
+        key["father_affected"] = bool(trio.father_affected)
+    return canonical_filter_key(key)
+
+
+def _cohort_trio(cohort):
+    return cohort.trio_set.first()
 
 
 def get_handler_for_node(node) -> FilterKeyHandler:
@@ -96,7 +123,7 @@ def get_handler_for_node(node) -> FilterKeyHandler:
     from analysis.models.nodes.sources.trio_node import TrioNode
 
     handlers = {
-        SampleNode: NoFilterHandler(),
+        SampleNode: SampleNodeHandler(),
         CohortNode: NoFilterHandler(),
         TrioNode: TrioInheritanceHandler(),
         PedigreeNode: NoFilterHandler(),
@@ -108,11 +135,7 @@ def get_filter_keys_to_precompute_for_cohort(cohort) -> list[Optional[str]]:
     """ Used by the writer (calculate_cohort_stats) to know which filter_key
         buckets to populate beyond the raw aggregate (None) row. Trios get the
         5 inheritance keys; everything else gets just None. """
-    keys: list[Optional[str]] = [None]
-    if _cohort_has_trio(cohort):
-        keys.extend(canonical_filter_key({"inheritance": m})
-                    for m in TrioInheritanceHandler.CACHED_MODES.values())
-    return keys
+    return list(TrioInheritanceHandler().filter_keys_to_precompute(cohort))
 
 
 def get_cached_label_count_for_cohort(cohort, sample, filter_key: FilterKey,

@@ -164,10 +164,16 @@ def classifications_dataset(user, allele: Optional[Allele], granularity_is_recor
         return result
 
     qs = beacon_eligible_classifications().filter(classification__allele=allele)
-    count = qs.count()
+    if granularity_is_record:
+        # Records are wanted either way, so evaluate once rather than counting and then iterating
+        records = list(qs)
+        count = len(records)
+    else:
+        records = None
+        count = qs.count()
     result.count = count
     result.reportable_count = count
     result.exists = count > 0
-    if result.exists and granularity_is_record:
-        result.records = [_classification_record(m) for m in qs]
+    if result.exists and records is not None:
+        result.records = [_classification_record(m) for m in records]
     return result

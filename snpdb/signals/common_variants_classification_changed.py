@@ -24,9 +24,10 @@ to the uncommon one - see snpdb.tasks.cohort_genotype_tasks.common_variant_class
 def _launch_common_variant_classified_tasks(cgcfv: CohortGenotypeCommonFilterVersion, variant_qs: QuerySet[Variant]):
     """ common_variant_classified_task creates the CommonVariantClassified, so only call it for variants that
         don't have one yet """
-    for variant in variant_qs.exclude(commonvariantclassified__common_filter=cgcfv):
-        task_name = "snpdb.tasks.cohort_genotype_tasks.common_variant_classified_task"
-        task = Signature(task_name, args=(variant.pk, cgcfv.pk), immutable=True)
+    task_name = "snpdb.tasks.cohort_genotype_tasks.common_variant_classified_task"
+    unhandled_qs = variant_qs.exclude(commonvariantclassified__common_filter=cgcfv)
+    for variant_id in unhandled_qs.values_list("pk", flat=True):
+        task = Signature(task_name, args=(variant_id, cgcfv.pk), immutable=True)
         task.apply_async()
 
 

@@ -22,6 +22,14 @@
         });
     </script>
     <div class="container">
+        {% if extraction_formset.queryset %}
+            <div class="mb-2">
+                Extraction pages:
+                {% for extraction in extraction_formset.queryset %}
+                    <a href="{% url 'view_extraction' extraction.pk %}">{{ extraction }}</a>{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+        {% endif %}
         <form id="patient-extractions-form" method="post" action="{% url 'view_patient_extractions' patient.pk %}">
             {% csrf_token %}
             {% crispy extraction_formset form_helper.horizontal %}

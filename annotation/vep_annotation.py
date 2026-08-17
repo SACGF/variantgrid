@@ -188,6 +188,16 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT:
         cmd.insert(0, settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT)
 
+    if memory_limit_gb := settings.ANNOTATION_VEP_MEMORY_LIMIT_GB:
+        # Outermost so the limit is inherited by everything VEP starts. --data covers brk + anonymous
+        # mmap, which is where a plugin's per-record hashes live, and leaves the fasta/tabix file
+        # mappings out of it - --as would count those and force a much looser number. Perl hits it as a
+        # failed malloc and exits non-zero with "Out of memory!" on stderr, so the run fails naming its
+        # own cause; a cgroup kill would arrive as SIGKILL, which _abort_process already uses for lease
+        # aborts and so can't be told apart.
+        limit_bytes = int(memory_limit_gb * 1024 ** 3)
+        cmd[0:0] = ["prlimit", f"--data={limit_bytes}", "--"]
+
     if settings.ANNOTATION_VEP_FORK and settings.ANNOTATION_VEP_FORK > 1:
         cmd.extend(["--fork", str(settings.ANNOTATION_VEP_FORK)])
 
@@ -231,7 +241,8 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
 
         if vc.columns_version >= 3:
             plugin_data_func.update({
-                VEPPlugin.MAVEDB: lambda: f"MaveDB,file={vc['mave']},single_aminoacid_changes=0,transcript_match=0 ",
+                # Perl only treats "0" as false, so a trailing space here would switch transcript_match back on
+                VEPPlugin.MAVEDB: lambda: f"MaveDB,file={vc['mave']},single_aminoacid_changes=0,transcript_match=0",
             })
 
         if vc.columns_version >= 5:
@@ -467,10 +478,12 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     try:
         # MaveDB is GRCh38 only - filename encodes the dataset date,
         # e.g. annotation_data/GRCh38/MaveDB_variants_2023-11-29.tsv.gz
+        # ".stripped" files (see generate_annotation/mavedb_strip.py) carry the same dataset and
+        # produce the same annotations, so they share the version of the download they came from
         mave_filename = vep_config["mave"]
         if mave_filename and os.path.exists(mave_filename):
             mave_basename = os.path.basename(mave_filename)
-            if m := re.match(r"^MaveDB_variants_(\d{4}-\d{2}-\d{2})\.tsv\.gz$", mave_basename):
+            if m := re.match(r"^MaveDB_variants_(\d{4}-\d{2}-\d{2})(\.stripped)?\.tsv\.gz$", mave_basename):
                 kwargs["mave_db"] = m.group(1)
             else:
                 msg = f"Couldn't determine MaveDB version from file: {mave_basename}"

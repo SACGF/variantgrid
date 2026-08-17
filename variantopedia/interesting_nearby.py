@@ -4,8 +4,7 @@ from collections import Counter, defaultdict
 from functools import reduce
 
 from django.conf import settings
-from django.contrib.postgres.aggregates import StringAgg
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q, StringAgg, Sum, Value
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import AnnotationVersion, VariantTranscriptAnnotation
@@ -169,7 +168,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
 
     agg_kwargs = {
         "total": Count("id", distinct=True),
-        "tags": StringAgg("variantallele__allele__varianttag__tag", delimiter='|'),
+        "tags": StringAgg("variantallele__allele__varianttag__tag", delimiter=Value('|')),
     }
 
     clinical_significance_list = [c[0] for c in ClinicalSignificance.SHORT_CHOICES]

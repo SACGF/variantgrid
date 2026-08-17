@@ -977,10 +977,12 @@ def clin_sig_change_data(request):
                 discordance_dates.append(discordance.created)
 
             if allele := source.allele:
-                cl: Classification
-                for cl in Classification.objects.filter(variant__in=allele.variants):
-                    if cl.lab != source.lab and cl.created < flag.created:
-                        other_labs.add(cl.lab)
+                # Only lab and created are read, so avoid pulling the wide evidence JSONB per classification
+                classification_labs = Classification.objects.filter(variant__in=allele.variants) \
+                    .values_list("lab_id", "created")
+                other_lab_ids = {lab_id for lab_id, created in classification_labs
+                                 if lab_id != source.lab_id and created < flag.created}
+                other_labs = set(Lab.objects.filter(pk__in=other_lab_ids))
 
             for index, flag_comment in enumerate(flag.flagcomment_set.order_by('created')):
                 if text := flag_comment.text:

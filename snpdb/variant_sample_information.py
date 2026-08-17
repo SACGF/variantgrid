@@ -4,8 +4,7 @@ from functools import cached_property
 from typing import Optional
 
 from django.conf import settings
-from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import Q, TextField
+from django.db.models import Q, StringAgg, TextField, Value
 from django.urls import reverse
 
 from annotation.models.models import VariantAnnotation
@@ -268,11 +267,11 @@ class VariantZygosityCounts:
         q_hpo = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HPO})
         q_omim = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.OMIM})
         q_mondo = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.MONDO})
-        annotation_kwargs = {"patient_hpo": StringAgg(ontology_path, '|', filter=q_hpo,
+        annotation_kwargs = {"patient_hpo": StringAgg(ontology_path, Value('|'), filter=q_hpo,
                                                       distinct=True, output_field=TextField()),
-                             "patient_omim": StringAgg(ontology_path, '|', filter=q_omim,
+                             "patient_omim": StringAgg(ontology_path, Value('|'), filter=q_omim,
                                                        distinct=True, output_field=TextField()),
-                             "patient_mondo": StringAgg(ontology_path, '|', filter=q_mondo,
+                             "patient_mondo": StringAgg(ontology_path, Value('|'), filter=q_mondo,
                                                         distinct=True, output_field=TextField())}
         samples_qs = Sample.objects.filter(pk__in=sample_ids).order_by("pk").annotate(**annotation_kwargs)
         sample_values = samples_qs.values("vcf__allele_frequency_percent", *COPY_SAMPLE_FIELDS,
@@ -391,7 +390,7 @@ class VariantSampleGenotypes(VariantZygosityCounts):
         classifications_by_sample_id = defaultdict(list)
         qs = ClassificationModification.latest_for_user(self.user, allele=allele, published=True,
                                                         classification__sample__in=sample_ids)
-        for cm in qs:
+        for cm in qs.select_related("classification__lab"):
             classification = cm.classification
             pills = clinical_significance_pills(classification.summary_typed, classification.allele_origin_bucket)
             classification_json = {
@@ -441,7 +440,10 @@ class VariantSampleGenotypes(VariantZygosityCounts):
     def _get_locus_counts(self) -> list[dict]:
         """ Zygosity counts for every variant at this locus, this variant first """
         counts_by_variant_id = self._get_locus_zygosity_counts()
-        variant_by_id = {v.pk: v for v in Variant.objects.filter(pk__in=counts_by_variant_id)}
+        # str(v) and v.alt.seq below reach through to the locus/sequence rows
+        variant_qs = Variant.objects.filter(pk__in=counts_by_variant_id) \
+            .select_related("locus__contig", "locus__ref", "alt")
+        variant_by_id = {v.pk: v for v in variant_qs}
 
         sorted_rows = []
         for variant_id, zygosity_counts in counts_by_variant_id.items():

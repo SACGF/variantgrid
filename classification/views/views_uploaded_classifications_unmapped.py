@@ -6,7 +6,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Optional
 
-import django
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -243,11 +242,6 @@ class UploadedClassificationsUnmappedView(View):
             raise ValueError(f"Detected banned file extension {', '.join(sorted(detected_banned_extensions))}")
 
     def post(self, request, **kwargs):
-        # lazily have s3boto3 requirements
-
-        django.utils.encoding.force_text1 = django.utils.encoding.force_str
-        django.utils.encoding.smart_text = django.utils.encoding.smart_str
-
         lab_picker = LabPickerData.from_request(request=request, selection=kwargs.get('lab_id'))
         lab = lab_picker.selected_lab
         if not lab:

@@ -35,6 +35,7 @@ from annotation.tasks.annotate_variants import (
     annotate_variants,
     get_annotated_filename,
     get_annotsv_dir,
+    get_vep_skipped_variants_filename,
     import_annotation_run,
 )
 from annotation.tasks.annotation_scheduler_task import (
@@ -109,7 +110,8 @@ class AnnotationDispatchTestCase(TestCase):
         with mock.patch.object(annotate_variants, "apply_async") as launch:
             _handle_range_lock(lock)
         runs = AnnotationRun.objects.filter(annotation_range_lock=lock)
-        self.assertEqual(runs.count(), 2)  # one per pipeline type
+        num_pipeline_types = len(VariantAnnotationPipelineType)
+        self.assertEqual(runs.count(), num_pipeline_types)
         for run in runs:
             self.assertEqual(run.status, AnnotationStatus.CREATED)
             self.assertIsNone(run.task_id)
@@ -610,7 +612,9 @@ class AnnotationDispatchTestCase(TestCase):
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
             run = self._run_with_dump(tmp_dir)
             annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
+            skipped_variants_filename = get_vep_skipped_variants_filename(annotated_filename)
             open(annotated_filename, "w").close()  # VEP finished; row not saved yet
+            open(skipped_variants_filename, "w").close()  # ... written by Runner::finish()
             self.assertIsNone(run.vcf_annotated_filename)
 
             with mock.patch.object(AnnotationRun, "delete_related_objects"):
@@ -619,9 +623,37 @@ class AnnotationDispatchTestCase(TestCase):
             run.refresh_from_db()
             self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
             self.assertTrue(os.path.exists(annotated_filename))  # VEP output kept
-            # Derived path recorded, so the upload-only relaunch can find what we kept
+            # Derived paths recorded, so the upload-only relaunch can find what we kept
             self.assertEqual(run.vcf_annotated_filename, annotated_filename)
+            self.assertEqual(run.vep_skipped_variants_filename, skipped_variants_filename)
             self.assertTrue(run.is_upload_resumable())
+
+    def test_reclaim_scrubs_run_killed_mid_vep(self):
+        # #1710: VEP creates the annotated VCF at startup and writes to it progressively, so a run killed
+        # mid-VEP leaves a part-written file. Resuming that upload-only sent a truncated VCF to the import
+        # lane, where the #1701 checks failed it - turning one stalled run into an ERROR. Only the
+        # skipped-variants list (written by Runner::finish, after the output handle is closed) says VEP
+        # got to the end, so without it the run goes back for a full re-dump.
+        with tempfile.TemporaryDirectory() as tmp_dir, \
+                override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
+            run = self._run_with_dump(tmp_dir)
+            annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
+            with open(annotated_filename, "w") as f:
+                f.write("##fileformat=VCFv4.2\n")  # VEP got as far as the header
+            self.assertFalse(os.path.exists(get_vep_skipped_variants_filename(annotated_filename)))
+
+            with mock.patch.object(AnnotationRun, "delete_related_objects"):
+                reclaim_stalled_annotation_runs(self.vav)
+
+            run.refresh_from_db()
+            self.assertEqual(run.status, AnnotationStatus.CREATED)
+            self.assertTrue(run.is_dispatchable())
+            self.assertFalse(run.is_upload_resumable())
+            self.assertIsNone(run.vcf_annotated_filename)
+            self.assertIsNone(run.annotation_end)
+            self.assertIsNone(run.dump_count)  # re-dumped from scratch, so the old count can't stand
+            # The part-written VCF is collected, so the re-dump doesn't land next to it
+            self.assertFalse(os.path.exists(annotated_filename))
 
     def test_reclaim_full_scrub_removes_derived_files(self):
         # #1660: the row names only the dump; the annotated VCF, conservation sidecar and AnnotSV TSV are

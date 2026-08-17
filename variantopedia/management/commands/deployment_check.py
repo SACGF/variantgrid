@@ -9,6 +9,7 @@ from variantgrid.deployment_validation.annotation_files_check import (
 )
 from variantgrid.deployment_validation.annotation_status_checks import (
     check_annotation_versions,
+    check_gene_annotation_versions,
     check_variant_annotation_runs_status,
 )
 from variantgrid.deployment_validation.celery_checks import check_celery_tasks
@@ -34,6 +35,7 @@ class Command(BaseCommand):
         checks = {
             "Annotation data exists": annotation_data_exists(flat=True),
             "Annotation Versions": check_annotation_versions(),
+            "Gene Annotation": check_gene_annotation_versions(),
             "Variant Annotation status": check_variant_annotation_runs_status(),
             "Library versions": check_library_versions(),
             "Tool versions": check_tool_versions(),

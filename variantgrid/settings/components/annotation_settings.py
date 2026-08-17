@@ -13,6 +13,16 @@ ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = True
 ANNOTATION_VEP_FAKE_VERSION = False  # Overridden in unit tests to not call VEP to get version
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
+# #1710: heap ceiling for one VEP process, applied with prlimit (util-linux). None = no limit.
+# This bounds the run rather than the worker pool, so a plugin that runs away on one variant takes out
+# its own run and nothing else - a pool-wide cgroup cap would have to be divided by however many VEPs
+# are in flight, and could pick a healthy run as the OOM victim. Sized against the workload, not the
+# box: a full standard run (50,000 variants, every plugin and custom file) holds flat at ~0.4GB, and
+# the worst single variant measured is under 1GB, so this is roughly 10x headroom. Deployments whose
+# data needs more can raise it - keep ANNOTATION_VEP_MEMORY_LIMIT_GB x annotation_workers concurrency
+# comfortably below installed RAM.
+ANNOTATION_VEP_MEMORY_LIMIT_GB = 4
+
 # I've had VEP hang on me when running --fork so by default we run in small batches
 # This causes a small amount of overhead obtaining an AnnotationRangeLock
 # If you get ERROR: Forked process(es) died: read-through of cross-process communication detected
@@ -30,8 +40,14 @@ ANNOTATION_VEP_BUFFER_SIZE = {
     # annotation_workers runs several VEPs concurrently.
     #
     # 12.5k small variants: 4000 -> 1295MB, 2000 -> 1260MB, 1000 -> 1049MB, 500 -> 871MB, 250 -> 858MB.
-    # Flattens at 500 - below that fixed startup dominates.
-    _VARIANT_ANNOTATION_PIPELINE_STANDARD: 500,
+    # Flattens at 500 for *dense* variants - 500 consecutive ones sit in a handful of regions, so
+    # regions-per-buffer was never the dominant term there. A sparse range inverts that: 500 consecutive
+    # variants scattered across a build can touch hundreds of distinct regions, which is how #1710 reached
+    # 5.3GB and 7.3GB on a 6,250 variant run. 100 costs nothing to hold it down - AnnotationSource::
+    # clean_cache keeps the current buffer's regions, and we dump position-sorted, so a region is loaded
+    # once per run whatever the buffer size. Keep well above 2 x ANNOTATION_VEP_FORK: VEP divides the
+    # buffer between forks (Runner::_forked_buffer_to_output).
+    _VARIANT_ANNOTATION_PIPELINE_STANDARD: 100,
     # SVs span whole regions each, so they load far more cache per variant and keep scaling down:
     # 1000 DELs (median 49kb) -> 1774MB @1000, 1212MB @500, 752MB @250, 505MB @100, matching the
     # worst-case regions in one buffer (247 / 126 / 67 / 29). 250 keeps enough per buffer to avoid
@@ -192,7 +208,7 @@ ANNOTATION = {
             "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
-            "mave": "annotation_data/GRCh38/MaveDB_variants_2026-04-30.tsv.gz",
+            "mave": "annotation_data/GRCh38/MaveDB_variants_2026-04-30.stripped.tsv.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh38/hg38.phastCons100way.bw",
             'phastcons46way': None,  # n/a for GRCh38

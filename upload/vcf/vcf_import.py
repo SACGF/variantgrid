@@ -20,6 +20,9 @@ from library.genomics.vcf_utils import (
 )
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.utils import get_single_element, invert_dict
+from patients.external_references import ExternalReference, resolve_reference
+from patients.models import Extraction
+from patients.models_enums import MatchStatus
 from seqauto.models import (
     JointCalledVCF,
     QCGeneList,
@@ -57,7 +60,12 @@ from upload.models import (
     VCFPipelineStage,
 )
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
-from upload.upload_metadata import get_metadata_genome_build, get_metadata_source
+from upload.upload_metadata import (
+    SAMPLE_EXTRACTIONS,
+    get_metadata_extractions,
+    get_metadata_genome_build,
+    get_metadata_source,
+)
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
 from user_messages.models import Message
@@ -223,7 +231,43 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
         link_samples_and_vcfs_to_sequencing(backend_vcf, upload_step=upload_step)
         backend_vcf_import_start_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
 
+    assign_sample_extractions(vcf, upload_step)
     return vcf
+
+
+def assign_sample_extractions(vcf: VCF, upload_step=None):
+    """ Route 2 - the extraction upload metadata keys, which need no seqauto records at all.
+
+        Where a file has both this and a seqauto link and they name different extractions we fail the
+        import, the same rule a declared genome_build the header contradicts gets. """
+    samples = list(vcf.sample_set.all())
+    declared = get_metadata_extractions(_get_file_upload(vcf), [s.vcf_sample_name for s in samples])
+    if unknown := set(declared) - {s.vcf_sample_name for s in samples}:
+        raise ExtractionMismatchException(f"'{SAMPLE_EXTRACTIONS}' names sample(s) not in this VCF: "
+                                          f"{', '.join(sorted(unknown))}")
+
+    for sample in samples:
+        reference = declared.get(sample.vcf_sample_name)
+        if reference is None and not sample.extraction_reference:
+            reference = _derive_extraction_reference(sample.name)
+        if reference is None:
+            continue
+        resolved = resolve_reference(Extraction, reference, vcf.user)
+        if sample.extraction_id and resolved.matched and resolved.obj != sample.extraction:
+            msg = f"Sample '{sample.vcf_sample_name}': declared extraction '{reference}' disagrees " \
+                  f"with '{sample.extraction}' linked through the sequencing sample"
+            raise ExtractionMismatchException(msg)
+        sample.apply_extraction_match(resolved)
+        if upload_step and not resolved.matched:
+            SimpleVCFImportInfo.add_message_count(1, resolved.error, upload_step)
+
+
+def _derive_extraction_reference(sample_name: str) -> Optional[ExternalReference]:
+    """ Only for deployments with nothing upstream to quote an identifier - @see the setting """
+    if pattern := settings.PATIENT_EXTRACTION_SAMPLE_NAME_REGEX:
+        if m := re.search(pattern, sample_name):
+            return ExternalReference(reference_id=m.group("extraction"), derived=True)
+    return None
 
 
 def _get_file_upload(vcf) -> Optional[FileUpload]:
@@ -487,6 +531,19 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upl
                     sample.variants_type = ek.sample_variants_type
                     modified_sample = True
 
+            # One link call per sequencing sample reaches all of that arm's VCFs through here
+            if sequencing_sample.extraction_id and not sample.extraction_id:
+                sample.extraction = sequencing_sample.extraction
+                sample.extraction_match_status = MatchStatus.MATCHED
+                sample.extraction_match_date = timezone.now()
+                modified_sample = True
+            elif sequencing_sample.extraction_reference and not sample.extraction_reference:
+                # Still parked upstream - carry the claim so one reconcile pass settles both rows
+                sample.extraction_reference = sequencing_sample.extraction_reference
+                sample.extraction_match_status = sequencing_sample.extraction_match_status
+                sample.extraction_match_date = sequencing_sample.extraction_match_date
+                modified_sample = True
+
             if bam_file := sequencing_sample.get_single_bam():
                 SampleFilePath.objects.get_or_create(sample=sample, file_path=bam_file.path,
                                                      file_type=SampleFileType.BAM)
@@ -556,6 +613,11 @@ class GenomeBuildDetectionException(Exception):
 
 class GenomeBuildMismatchException(Exception):
     """ Declared genome build contradicts the one detected from the header - fail rather than guess """
+
+
+class ExtractionMismatchException(Exception):
+    """ A file's declared extraction contradicts the one its sequencing sample was linked to, or names
+        a sample the VCF doesn't have - fail rather than guess, as no later arrival fixes either """
 
 
 class ContigMismatchException(GenomeBuildDetectionException):

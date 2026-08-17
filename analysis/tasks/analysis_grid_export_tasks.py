@@ -10,7 +10,7 @@ import celery
 from celery.exceptions import Retry
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.contrib.postgres.aggregates.general import StringAgg
+from django.db.models import StringAgg, Value
 from django.utils import timezone
 
 from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
@@ -214,7 +214,7 @@ def export_node_to_downloadable_file(self, node_id, node_version, user_id, expor
                 pk=canonical_transcript_collection_id)
 
         variant_tags_qs = Variant.objects.filter(varianttag__analysis=node.analysis)
-        variant_tags_qs = variant_tags_qs.annotate(tags=StringAgg("varianttag__tag", delimiter=', ', distinct=True))
+        variant_tags_qs = variant_tags_qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value(', '), distinct=True))
         variant_tags_dict = dict(variant_tags_qs.values_list("id", "tags"))
 
         request = FakeRequest(user=user)

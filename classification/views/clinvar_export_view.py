@@ -604,7 +604,7 @@ def clinvar_export_create_batch(request: HttpRequest, clinvar_key_id: str) -> Ht
     all_ids = set(int(cid) for cid in re.compile(r"\d+").findall(clinvar_export_ids_str))
     clinvar_export_qs = ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key, pk__in=all_ids)
     id_count = clinvar_export_qs.count()
-    if clinvar_export_qs.count() != len(all_ids):
+    if id_count != len(all_ids):
         # find the IDs that didn't exist for the lab
         found_ids = set(clinvar_export_qs.values_list('pk', flat=True).all())
         missing = sorted(all_ids - found_ids)

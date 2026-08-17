@@ -88,8 +88,6 @@ AVATAR_THUMB_FORMAT = "PNG"
 
 MANAGERS = ADMINS
 
-CONN_MAX_AGE = 60  # Reuse DB connections
-
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 DATABASES = {
@@ -101,6 +99,10 @@ DATABASES = {
         'HOST': get_secret('DB.host'),
         # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
         'PORT': get_secret('DB.port'),  # Set to empty string for default.
+        'CONN_MAX_AGE': 60,  # Reuse DB connections
+        # Reused connections can be closed server side (restart, pg_terminate_backend) - ping and
+        # reconnect rather than handing a dead socket to the next request
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
@@ -193,10 +195,6 @@ LANGUAGE_CODE = 'en-us'
 # If you set this to False, Django will make some optimizations so as not
 # to load the internationalization machinery.
 USE_I18N = False
-
-# If you set this to False, Django will not format dates, numbers and
-# calendars according to the current locale.
-USE_L10N = True
 
 # If you set this to False, Django will not use timezone-aware datetimes.
 USE_TZ = True
@@ -424,7 +422,6 @@ COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
 
-HGVS_DEFAULT_METHOD = "biocommons_hgvs"  # HGVSConverterType (any case) ie "pyhgvs", "biocommons_hgvs", "combo"
 HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
 HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH = True
 HGVS_MAX_SEQUENCE_LENGTH = 50_000
@@ -437,6 +434,17 @@ PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 # Users can still see live preview matches on the patient page along with a warning.
 # Set to None / empty to disable.
 PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
+# How long a parked extraction reference stays Pending before it needs a human - past this it is a
+# real mismatch rather than feeds arriving out of order. Same window Mocha settled on
+PATIENT_EXTRACTION_MATCH_PENDING_DAYS = 3
+# Deployments with no tracking system to quote identifiers: a regex read against a VCF sample name,
+# whose 'extraction' named group is the extraction's reference_id. Only consulted where nothing was
+# posted, so it can never override a client
+PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$"
+# An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
+# tracking systems is known - so only a superuser creates one via the API. A public server taking
+# records from systems it has never seen would set this False
+PATIENTS_API_EXTERNAL_MANAGER_CREATE_ADMIN_ONLY = True
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = True
 
@@ -489,10 +497,7 @@ USER_CREATE_ORG_LABS = {
     # "test_organization": "user_group_%(username)s",
 }
 
-# Lab heads can add/remove users from their own lab. Enabling this in an env file also needs
-# URLS_NAME_REGISTER.update({"lab_members_tab": True}), as URLS_NAME_REGISTER is built while
-# this file is read
-LAB_HEAD_MANAGE_MEMBERS = False
+LAB_HEAD_MANAGE_MEMBERS = True
 
 # key/value = Lab.group_name : why membership of this lab is managed outside VariantGrid. Shown on the
 # lab Members page, and removal is disabled for these labs. Name whatever the lab head has to quote to
@@ -710,8 +715,6 @@ STATICFILES_FINDERS = (
     #    'django.contrib.staticfiles.finders.DefaultStorageFinder',
     'compressor.finders.CompressorFinder'
 )
-
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
 
 # Needs to be unique and not checked into source control, so make
 # django_secret_key.txt in this dir (which is hidden via .gitignore)
@@ -1064,6 +1067,7 @@ PUBLIC_PATHS = [
     r'^/oidc/.*',  # all oidc URLs
     r'^/api/.*',  # OpenAPI schema + Swagger/ReDoc docs pages (drf-spectacular)
     r'^/classification/api/.*',  # REST framework used by command line tools
+    r'^/patients/api/.*',
     r'^/seqauto/api/.*',
     r'^/upload/api/.*',
     r'^/mme/api/.*',  # Inbound MME /match + /metrics - authenticated by per-peer X-Auth-Token (see mme/auth.py)

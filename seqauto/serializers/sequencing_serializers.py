@@ -1,7 +1,11 @@
 import os.path
 
+from django.db.models import Q
 from rest_framework import serializers
 
+from patients.external_references import resolve_reference
+from patients.models import Extraction
+from patients.serializers import ExternalReferenceField
 from seqauto.models import (
     Aligner,
     BamFile,
@@ -229,6 +233,36 @@ def resolve_sequencing_sample(data):
     return SequencingSampleLookupSerializer.get_object(data)
 
 
+class SequencingSampleExtractionLinkSerializer(serializers.Serializer):
+    """ One call per sequencing sample. All of that arm's VCFs inherit the extraction from it, since
+        link_samples_and_vcfs_to_sequencing carries it down to every Sample it creates """
+    sequencing_sample = SequencingSampleLookupSerializer()
+    extraction = ExternalReferenceField()
+
+    def save(self, **kwargs):
+        sequencing_sample = SequencingSampleLookupSerializer.get_object(self.validated_data["sequencing_sample"])
+        # Unscoped - a SequencingSample has no user, and seqauto only runs where records are global
+        resolved = resolve_reference(Extraction, self.validated_data["extraction"])
+        sequencing_sample.apply_extraction_match(resolved)
+        return sequencing_sample
+
+
+def carry_extractions_to_new_sample_sheet(previous: SampleSheet, current: SampleSheet):
+    """ A re-sent sheet builds new SequencingSample rows, and the extraction is a property of the
+        library rather than of the sheet that described it """
+    current_by_sample_id = {ss.sample_id: ss for ss in current.sequencingsample_set.all()}
+    for old in previous.sequencingsample_set.filter(Q(extraction__isnull=False) |
+                                                    Q(extraction_reference__isnull=False)):
+        new = current_by_sample_id.get(old.sample_id)
+        if new and not (new.extraction_id or new.extraction_reference):
+            new.extraction = old.extraction
+            new.extraction_reference = old.extraction_reference
+            new.extraction_match_status = old.extraction_match_status
+            new.extraction_match_error = old.extraction_match_error
+            new.extraction_match_date = old.extraction_match_date
+            new.save()
+
+
 class SequencingSampleSerializer(serializers.ModelSerializer):
     """ This is when we want the whole object as a dict """
     sequencingsampledata_set = SequencingSampleDataSerializer(many=True, required=False)
@@ -270,12 +304,17 @@ class SampleSheetSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         sequencing_samples_data = validated_data.pop('sequencingsample_set')
         sequencing_run = validated_data["sequencing_run"]
+        # Captured before set_as_current_sample_sheet moves the pointer
+        previous_sheet = SampleSheet.objects.filter(
+            sequencingruncurrentsamplesheet__sequencing_run=sequencing_run).first()
         sample_sheet, created = SampleSheet.objects.update_or_create(
             sequencing_run=sequencing_run,
             hash=validated_data["hash"],
             defaults=validated_data,
         )
         self._create_sequencing_samples(sample_sheet, sequencing_samples_data)
+        if previous_sheet and previous_sheet != sample_sheet:
+            carry_extractions_to_new_sample_sheet(previous_sheet, sample_sheet)
         # Whatever is last sent via API is the current sample sheet
         sample_sheet.set_as_current_sample_sheet(sequencing_run, created)
         return sample_sheet

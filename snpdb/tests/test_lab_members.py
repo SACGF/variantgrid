@@ -62,6 +62,7 @@ class LabMembershipModelTest(TestCase):
         self.organization.add_member(user)
         self.assertEqual(Message.objects.filter(recipient=user).count(), 1, "2nd add doesn't re-message")
 
+    @override_settings(LAB_HEAD_MANAGE_MEMBERS=False)
     def test_can_manage_members_setting_off(self):
         self.assertFalse(self.lab.can_manage_members(self.head))
         self.assertFalse(self.lab.can_manage_members(self.superuser))
@@ -185,6 +186,7 @@ class LabMembershipViewTest(URLTestCase):
         self.assertEqual(self.client.get(url).status_code, 200)
 
 
+@override_settings(LAB_HEAD_MANAGE_MEMBERS=False)
 class LabMembersUrlsDisabledTest(URLTestCase):
     """ With LAB_HEAD_MANAGE_MEMBERS off the feature doesn't exist for anyone """
 

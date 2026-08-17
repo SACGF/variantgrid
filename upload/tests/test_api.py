@@ -3,6 +3,7 @@ import os
 import tempfile
 from hashlib import sha256
 from unittest.mock import patch
+from urllib.parse import quote
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -180,6 +181,52 @@ class UploadMetadataAPITest(UploadAPITestBase):
         before = set(FileUpload.objects.values_list("pk", flat=True))
         self._upload("meta_rollback", "?genome_build=GRCh99")
         self.assertEqual(set(FileUpload.objects.values_list("pk", flat=True)), before)
+
+    def test_extraction_as_a_bare_string(self):
+        response = self._upload("meta_extraction", "?extraction=2600000001C")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata, {"extraction": {"reference_id": "2600000001C"}})
+
+    def test_extraction_as_an_object(self):
+        query = '?extraction={"code": "H12345", "external_type": "HelixID"}'
+        response = self._upload("meta_extraction_obj", quote(query, safe="?="))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata,
+                         {"extraction": {"code": "H12345", "external_type": "HelixID"}})
+
+    def test_sample_extractions_as_a_map(self):
+        query = '?sample_extractions={"TUMOUR": "2600000001C", "NORMAL": "2600000002C"}'
+        response = self._upload("meta_sample_extractions", quote(query, safe="?="))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata["sample_extractions"],
+                         {"TUMOUR": {"reference_id": "2600000001C"},
+                          "NORMAL": {"reference_id": "2600000002C"}})
+
+    def test_malformed_extraction_rejected(self):
+        """ A code without its external_type names nothing, and is worth saying while connected """
+        query = '?extraction={"code": "H12345"}'
+        response = self._upload("meta_extraction_bad", quote(query, safe="?="))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("external_type", response.json()["error"])
+
+    def test_unknown_extraction_is_accepted(self):
+        """ Existence is the ordering race the reconcile task absorbs, not an upload-time error """
+        response = self._upload("meta_extraction_unknown", "?extraction=NOT-CREATED-YET")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+
+    def test_both_extraction_keys_rejected(self):
+        query = '?extraction=2600000001C&sample_extractions={"TUMOUR": "2600000001C"}'
+        response = self._upload("meta_extraction_both", quote(query, safe="?=&"))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("sample_extractions", response.json()["error"])
 
     def test_path_and_force_are_not_metadata(self):
         response = self._upload("meta_reserved", "?path=/client/x.vcf&force=1")
