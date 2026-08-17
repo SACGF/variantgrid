@@ -119,6 +119,8 @@ router.register(r'api/v1/variant_caller', VariantCallerViewSet, basename='api_va
 router.register(r'api/v1/sequencing_run', SequencingRunViewSet, basename='api_sequencing_run')
 router.register(r'api/v1/sample_sheet', SampleSheetViewSet, basename='api_sample_sheet')
 router.register(r'api/v1/vcf_file', VCFFileViewSet, basename='api_vcf_file')
+router.register(r'api/v1/joint_called_vcf', SampleSheetCombinedVCFFileViewSet, basename='api_joint_called_vcf')
+# Old name kept for clients that haven't moved to joint_called_vcf yet
 router.register(r'api/v1/sample_sheet_combined_vcf_file', SampleSheetCombinedVCFFileViewSet, basename='api_sample_sheet_combined_vcf_file')
 router.register(r'api/v1/fastqc', FastQCViewSet, basename='api_fastqc')
 router.register(r'api/v1/illumina_flowcell_qc', IlluminaFlowcellQCViewSet, basename='api_illumina_flowcell_qc')
