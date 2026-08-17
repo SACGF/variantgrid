@@ -12,16 +12,37 @@ Ideally, this could have been done via Django FilteredRelation - but that doesn'
 
 import operator
 from functools import reduce
-from typing import TypeVar, Optional
+from typing import Optional, TypeVar
 
-from django.conf import settings
-from django.db.models import QuerySet, Model, F
+from django.db.models import Model, QuerySet
 from django.db.models.query_utils import Q
 
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from snpdb.archive import DataArchivedError
-from snpdb.models import Variant, GenomeBuild
+from snpdb.models import GenomeBuild, Variant
+
+
+def pipeline_type_variant_q(pipeline_type: VariantAnnotationPipelineType) -> Q:
+    """ Single source of truth for "which variants are subject to a given annotation pipeline type".
+
+        A variant is structural iff it's symbolic - long variants are stored symbolically (svlen set)
+        by Variant.as_internal_canonical_form on import, so Variant.get_symbolic_q() (svlen not null) is
+        the canonical signal, matching AnnotationRun.get_for_variant's variant.is_symbolic. New pipeline
+        types register their predicate here - a type's predicate may overlap another's. """
+
+    q_sv = Variant.get_symbolic_q()  # symbolic (eg <DEL>/<DUP>/<INS>) -> structural variant pipeline
+    # Gene-level variants carry svlen=0 (so unique_together works - Postgres treats nulls as distinct),
+    # which makes them look symbolic. VEP can't parse their alt and they have no coordinate anyway, so
+    # subtract them from both VEP pipelines. @see snpdb.gene_level_variants
+    q_gene_level = Variant.get_gene_level_q()
+    if pipeline_type == VariantAnnotationPipelineType.STANDARD:
+        return ~q_sv & ~q_gene_level
+    elif pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
+        return q_sv & ~q_gene_level
+    elif pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
+        return q_gene_level
+    raise ValueError(f"Unrecognised {pipeline_type=}")
 
 
 def get_variant_queryset_for_latest_annotation_version(genome_build: GenomeBuild) -> QuerySet[Variant]:
@@ -83,17 +104,7 @@ def get_variants_qs_for_annotation(
         q_filters.append(Q(variantannotation__isnull=True))
 
     if pipeline_type:
-        # We also need to handle very long ref/alts that are not symbolic
-        qs = qs.annotate(variant_length=F("end") - F("locus__position"))
-        q_symbolic = Q(locus__ref__seq__contains='<') | Q(alt__seq__contains='<')
-        q_long = Q(variant_length__gt=settings.VARIANT_SYMBOLIC_ALT_SIZE)
-        q_sv = q_symbolic | q_long
-        if pipeline_type == VariantAnnotationPipelineType.STANDARD:
-            q_filters.append(~q_sv)
-        elif pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
-            q_filters.append(q_sv)
-        else:
-            raise ValueError(f"Unrecognised {pipeline_type=}")
+        q_filters.append(pipeline_type_variant_q(pipeline_type))
 
     if min_variant_id:
         q_filters.append(Q(pk__gte=min_variant_id))

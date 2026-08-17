@@ -1,4 +1,4 @@
-from django.db.models.functions import TruncHour, TruncDay, TruncWeek, TruncMonth, TruncYear
+from django.db.models.functions import TruncDay, TruncHour, TruncMonth, TruncWeek, TruncYear
 
 
 class TimePeriod:

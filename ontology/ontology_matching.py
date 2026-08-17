@@ -1,15 +1,16 @@
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Any, Iterable, TypedDict
+from typing import Any, Optional, TypedDict
 
 from django.urls import reverse
 
 from annotation.regexes import db_ref_regexes
 from classification.models.condition_text_search import condition_text_search
-from library.log_utils import report_message, report_exc_info
+from library.log_utils import report_exc_info, report_message
 from library.utils import empty_to_none
-from ontology.models import OntologyTerm, OntologyService, OntologySnake
+from ontology.models import OntologyService, OntologySnake, OntologyTerm
 
 
 class OntologySnakeJson(TypedDict):
@@ -210,7 +211,7 @@ class SearchText:  # TODO shold be renamed ConditionSearchText
 
     def effective_equals(self, other: 'SearchText') -> bool:
         # TODO handle a little bit off by 1 letter matching
-        return self.prefix_terms == other.prefix_terms and self.suffix_terms == other.suffix_terms or self.all_terms == other.all_terms
+        return (self.prefix_terms == other.prefix_terms and self.suffix_terms == other.suffix_terms) or self.all_terms == other.all_terms
 
 
 def pretty_set(s: Iterable[str]) -> str:

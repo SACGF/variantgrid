@@ -1,10 +1,11 @@
 import json
-from abc import abstractmethod, ABC
-from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
+from collections.abc import Mapping
+from dataclasses import dataclass, field, fields
 from decimal import Decimal
 from functools import cached_property
-from typing import Union, Any, Mapping, Optional, Type
-
+from typing import Any, Optional, Union
+from dataclasses_json import config
 from django.db.models.enums import TextChoices
 
 
@@ -178,7 +179,7 @@ class JsonDiffs:
 
     @staticmethod
     def differences(obj1: JsonDataType, obj2: JsonDataType) -> 'JsonDiffs':
-        diffs: list['JsonDiff'] = []
+        diffs: list[JsonDiff] = []
         JsonDiffs._differences(obj1, obj2, [], diffs)
         diffs.sort()
         return JsonDiffs(diffs)
@@ -217,7 +218,7 @@ def json_default_converter(obj):
     raise TypeError("Type not serializable")
 
 
-def json_enum_encoder_for_text_choices(text_choices_type: Type[TextChoices]) -> field:
+def json_enum_encoder_for_text_choices(text_choices_type: type[TextChoices]) -> field:
     """
     Return a field declaration used for dataclasses_json when you want a TextChoices (not quite a StrEnum but very close)
     :param text_choices_type: The TextChoices

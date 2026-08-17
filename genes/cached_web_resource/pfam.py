@@ -12,7 +12,14 @@ from io import BytesIO
 
 import pandas as pd
 
-from genes.models import TranscriptVersion, Pfam, Transcript, PfamSequence, PfamSequenceIdentifier, PfamDomains
+from genes.models import (
+    Pfam,
+    PfamDomains,
+    PfamSequence,
+    PfamSequenceIdentifier,
+    Transcript,
+    TranscriptVersion,
+)
 from genes.models_enums import AnnotationConsortium
 
 BULK_INSERT_SIZE = 2000

@@ -5,10 +5,9 @@ from typing import Optional
 from django.conf import settings
 from django.dispatch.dispatcher import receiver
 
-from classification.enums import ValidationCode, SpecialEKeys, AlleleOriginBucket
+from classification.enums import AlleleOriginBucket, SpecialEKeys, ValidationCode
 from classification.models import EvidenceKeyMap, PatchMeta
-from classification.models.classification import Classification, \
-    classification_validation_signal
+from classification.models.classification import Classification, classification_validation_signal
 from classification.models.classification_utils import ValidationMerger
 from genes.hgvs import HGVSMatcher
 from genes.models import NoTranscript
@@ -156,7 +155,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
     vm = ValidationMerger()
 
     if not settings.CLASSIFICATION_MATCH_VARIANTS:
-        # while this technically isn't about matching a variant, much of the work in get_variant_coordinate -> pyhgvs
+        # while this technically isn't about matching a variant, much of the work in get_variant_coordinate -> hgvs
         # requires
         return vm
 
@@ -191,7 +190,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
             genome_build = None
 
         if genome_build:
-            hgvs_matcher = HGVSMatcher(genome_build)
+            hgvs_matcher = HGVSMatcher.instance(genome_build)
             for evidence_key, variant_value in variant_values.items():
                 try:
                     if evidence_key in SpecialEKeys.VARIANT_LINKING_HGVS_KEYS:

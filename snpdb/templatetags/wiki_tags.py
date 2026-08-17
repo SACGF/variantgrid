@@ -23,5 +23,5 @@ def wiki_editor(context, wiki, class_name, unique_keyword, unique_value):
                'unique_keyword': unique_keyword,
                'unique_value': unique_value,
                'has_write_permission': wiki.can_write(request.user)}
-    t = loader.get_template(f"snpdb/tags/wiki_tag.html")
+    t = loader.get_template("snpdb/tags/wiki_tag.html")
     return t.render(context, request=request)

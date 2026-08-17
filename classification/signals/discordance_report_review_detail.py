@@ -8,7 +8,7 @@ from django.utils.safestring import SafeString
 
 from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, EvidenceKeyMap
-from review.models import review_detail_signal, Review
+from review.models import Review, review_detail_signal
 from snpdb.models import Lab
 
 
@@ -44,7 +44,7 @@ def discordance_report_changes_summary(sender, instance: Review, **kwargs):
     if data := instance.post_review_data:
         if changes := data.get("changes"):
             t = loader.get_template("classification/snippets/pending_change.html")
-            changes_d = list(sorted(PendingChange.from_dict(change) for change in changes))
+            changes_d = sorted(PendingChange.from_dict(change) for change in changes)
             return SafeString(t.render(context={"changes": changes_d}))
         elif outcome := data.get("outcome"):
             if outcome == "postpone":

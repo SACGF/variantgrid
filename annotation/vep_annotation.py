@@ -10,9 +10,13 @@ from django.conf import settings
 
 from annotation import vep_columns
 from annotation.fake_annotation import get_fake_vep_version
-from annotation.models.models_enums import VEPPlugin, VEPCustom, VariantAnnotationPipelineType
+from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
 from annotation.vep_columns import VEPColumnDef
-from annotation.vep_config import VEPConfig, parse_gnomad_version_from_filename
+from annotation.vep_config import (
+    VEPConfig,
+    parse_gnomad_version_from_filename,
+    vep_component_version_kwargs,
+)
 from genes.models_enums import AnnotationConsortium
 from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
@@ -98,6 +102,23 @@ def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path) -> 
     return ["--custom", command]
 
 
+def _get_vep_fasta(vep_config: VEPConfig, genome_build: GenomeBuild) -> str:
+    """ VEP renamed contigs when given an NCBI fasta before v112, silently dropping plugin annotations
+        (https://github.com/Ensembl/ensembl-vep/issues/1635) - deployments pinned to those versions set
+        vep_config "fasta" to a chromosome-named one """
+    try:
+        return vep_config["fasta"]
+    except KeyError:
+        return genome_build.reference_fasta
+
+
+def get_vep_skipped_variants_filename(vcf_annotated_filename: str) -> str:
+    """ Path VEP writes its --skipped_variants_file to, alongside the annotated VCF (mirroring the VEP
+        `_warnings.txt` pattern). Derived from the annotated name, which #1658 makes per-attempt, so two
+        attempts on one run never share it. """
+    return vcf_annotated_filename + "_skipped_variants.tsv"
+
+
 def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
                     pipeline_type: VariantAnnotationPipelineType, compress_output: bool = True,
                     variant_annotation_version=None):
@@ -114,12 +135,15 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--dir_cache", settings.ANNOTATION_VEP_CACHE_DIR,
         "--dir_plugins", settings.ANNOTATION_VEP_PLUGINS_DIR,
         # Need to provide VEP a fasta rather than use the default - https://github.com/Ensembl/VEP_plugins/issues/708
-        "--fasta", vc["fasta"],
+        "--fasta", _get_vep_fasta(vc, genome_build),
         "--assembly", genome_build.name,
         "--offline", "--use_given_ref", "--vcf",
         "--force_overwrite", "--flag_pick", "--exclude_predicted", "--no_stats",
         "--check_existing",  # COSMIC ids
         "--no_escape",  # Don't URI escape HGVS strings
+        # #1701: a structured list of everything VEP deliberately dropped, so the import lane can check
+        # records in == records out + records skipped rather than trusting the exit code
+        "--skipped_variants_file", get_vep_skipped_variants_filename(output_filename),
 
         # flags for fields
         "--hgvs",
@@ -164,6 +188,16 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT:
         cmd.insert(0, settings.ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT)
 
+    if memory_limit_gb := settings.ANNOTATION_VEP_MEMORY_LIMIT_GB:
+        # Outermost so the limit is inherited by everything VEP starts. --data covers brk + anonymous
+        # mmap, which is where a plugin's per-record hashes live, and leaves the fasta/tabix file
+        # mappings out of it - --as would count those and force a much looser number. Perl hits it as a
+        # failed malloc and exits non-zero with "Out of memory!" on stderr, so the run fails naming its
+        # own cause; a cgroup kill would arrive as SIGKILL, which _abort_process already uses for lease
+        # aborts and so can't be told apart.
+        limit_bytes = int(memory_limit_gb * 1024 ** 3)
+        cmd[0:0] = ["prlimit", f"--data={limit_bytes}", "--"]
+
     if settings.ANNOTATION_VEP_FORK and settings.ANNOTATION_VEP_FORK > 1:
         cmd.extend(["--fork", str(settings.ANNOTATION_VEP_FORK)])
 
@@ -207,7 +241,8 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
 
         if vc.columns_version >= 3:
             plugin_data_func.update({
-                VEPPlugin.MAVEDB: lambda: f"MaveDB,file={vc['mave']},single_aminoacid_changes=0,transcript_match=0 ",
+                # Perl only treats "0" as false, so a trailing space here would switch transcript_match back on
+                VEPPlugin.MAVEDB: lambda: f"MaveDB,file={vc['mave']},single_aminoacid_changes=0,transcript_match=0",
             })
 
         if vc.columns_version >= 5:
@@ -219,7 +254,12 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             if vc.vep_version >= 116:
                 plugin_data_func.update({
                     VEPPlugin.EVE: lambda: f"EVE,file={vc['eve']},popeve_file={vc['popeve']}",
-                    VEPPlugin.PROMOTER_AI: lambda: f"PromoterAI,file={vc['promoter_ai']}",
+                    # match_to=any: our GRCh38 VEP runs use --refseq, but the PromoterAI data file keys
+                    # transcripts/genes by Ensembl ID (ENST/ENSG), so the default match_to=transcript never
+                    # matches RefSeq feature IDs and returns empty. match_to=any matches on genomic position
+                    # + alt allele only. The file is pre-filtered to TSS±500 promoter variants, so every hit
+                    # is a genuine promoter prediction.
+                    VEPPlugin.PROMOTER_AI: lambda: f"PromoterAI,file={vc['promoter_ai']},match_to=any",
                 })
 
     else:
@@ -244,6 +284,10 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg))
 
     for vep_plugin, plugin_arg_func in plugin_data_func.items():
+        # Skip plugins that don't apply to this build per their VEPColumnDef genome_builds
+        # config (e.g. GRCh38-only plugins on GRCh37) so we never probe for their data.
+        if not vep_columns.plugin_applies_to_build(vep_plugin, genome_build.name):
+            continue
         try:
             cmd.extend(["--plugin", plugin_arg_func()])
         except Exception as e:
@@ -294,6 +338,9 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
         raise ValueError(f"VEP returned {returncode}")
     vep_version = get_vep_version_from_vcf(output_filename)
     os.remove(output_filename)
+    skipped_variants_filename = get_vep_skipped_variants_filename(output_filename)
+    if os.path.exists(skipped_variants_filename):
+        os.remove(skipped_variants_filename)
     return vep_version
 
 
@@ -366,6 +413,8 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
             kwargs[python_field] = value
 
     genome_build = vep_config.genome_build
+    # The data files / settings the ##VEP= header doesn't cover - see #462
+    kwargs.update(vep_component_version_kwargs(genome_build.settings))
     kwargs["genome_build"] = genome_build
     kwargs["vep_cache"] = vep_config.cache_version
     kwargs["annotation_consortium"] = vep_config.annotation_consortium
@@ -429,10 +478,12 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     try:
         # MaveDB is GRCh38 only - filename encodes the dataset date,
         # e.g. annotation_data/GRCh38/MaveDB_variants_2023-11-29.tsv.gz
+        # ".stripped" files (see generate_annotation/mavedb_strip.py) carry the same dataset and
+        # produce the same annotations, so they share the version of the download they came from
         mave_filename = vep_config["mave"]
         if mave_filename and os.path.exists(mave_filename):
             mave_basename = os.path.basename(mave_filename)
-            if m := re.match(r"^MaveDB_variants_(\d{4}-\d{2}-\d{2})\.tsv\.gz$", mave_basename):
+            if m := re.match(r"^MaveDB_variants_(\d{4}-\d{2}-\d{2})(\.stripped)?\.tsv\.gz$", mave_basename):
                 kwargs["mave_db"] = m.group(1)
             else:
                 msg = f"Couldn't determine MaveDB version from file: {mave_basename}"

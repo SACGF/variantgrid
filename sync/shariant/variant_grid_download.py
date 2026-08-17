@@ -3,15 +3,15 @@ from typing import Optional
 
 import ijson
 
+from classification.models.classification_inserter import BulkClassificationInserter
 from classification.models.evidence_key import EvidenceKeyMap
-from classification.views.classification_view import BulkClassificationInserter
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
+from library.log_utils import report_message
 from library.oauth import ServerAuth
-from library.utils import make_json_safe_in_place, batch_iterator
-from snpdb.models.models import Lab, Organization, Country
-from sync.models.models import SyncRun
-from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
+from library.utils import batch_iterator, make_json_safe_in_place
+from snpdb.models.models import Country, Lab, Organization
+from sync.sync_runner import SyncRunInstance, SyncRunner, register_sync_runner
 
 
 @register_sync_runner(config={"type": {"shariant", "variantgrid"}, "direction": "download"})
@@ -21,7 +21,7 @@ class VariantGridDownloadSyncer(SyncRunner):
         if sync_run_instance.max_rows:
             raise ValueError("VariantGridDownloadSyncer does not support max_rows")
 
-        sync_destination = self.sync_destination
+        sync_destination = sync_run_instance.sync_destination
 
         config = sync_destination.config
         other_variant_grid = ServerAuth.for_sync_details(sync_destination.sync_details)
@@ -40,7 +40,6 @@ class VariantGridDownloadSyncer(SyncRunner):
             params['exclude_orgs'] = ','.join(exclude_orgs)
 
         if not sync_run_instance.full_sync:
-            last_download: SyncRun
             if since := sync_run_instance.last_success_server_date():
                 params['since'] = str(since.timestamp())
 
@@ -93,7 +92,7 @@ class VariantGridDownloadSyncer(SyncRunner):
 
             if not lab:
                 parts = lab_group_name.split('/')
-                org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
+                org, org_created = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
                 australia, _ = Country.objects.get_or_create(name='Australia')
                 Lab.objects.create(
                     group_name=lab_group_name,
@@ -103,6 +102,12 @@ class VariantGridDownloadSyncer(SyncRunner):
                     country=australia,
                     external=True,
                 )
+                report_message("Sync download created external lab", extra_data={
+                    "target": lab_group_name,
+                    "lab_name": meta.get('lab_name'),
+                    "organization_created": org_created,
+                    "sync_destination": sync_run_instance.sync_destination.name,
+                })
             return data
 
         sync_run_instance.run_start()

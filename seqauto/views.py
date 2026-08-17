@@ -7,8 +7,8 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
-from django.http.response import JsonResponse, HttpResponse
-from django.shortcuts import render, get_object_or_404, redirect
+from django.http.response import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import UpdateView
@@ -19,20 +19,48 @@ from library.django_utils import get_model_fields, staff_only
 from library.log_utils import log_traceback
 from library.utils import full_class_name
 from seqauto import forms
-from seqauto.forms import SequencingRunForm, AllEnrichmentKitForm, AutocompleteSequencingRunForm
+from seqauto.forms import AllEnrichmentKitForm, AutocompleteSequencingRunForm, SequencingRunForm
 from seqauto.graphs.index_metrics_qc_graph import IndexMetricsQCGraph
 from seqauto.graphs.qc_exec_summary_graph import QCExecSummaryGraph
 from seqauto.graphs.sequencing_run_qc_graph import SequencingRunQCGraph
 from seqauto.illumina.run_parameters import get_run_parameters
-from seqauto.models import BamFile, SequencingRun, FastQC, Flagstats, UnalignedReads, QCType, SingleSampleVCF, QC, \
-    Experiment, SequencingSample, JointCalledVCF, QCExecSummary, IlluminaFlowcellQC, \
-    Library, Sequencer, Assay, Aligner, VariantCaller, VariantCallingPipeline, \
-    GoldReference, GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage, QCColumn
+from seqauto.models import (
+    QC,
+    Aligner,
+    Assay,
+    BamFile,
+    EnrichmentKit,
+    Experiment,
+    FastQC,
+    Flagstats,
+    GoldGeneCoverageCollection,
+    GoldReference,
+    IlluminaFlowcellQC,
+    JointCalledVCF,
+    Library,
+    QCColumn,
+    QCExecSummary,
+    QCGeneCoverage,
+    QCType,
+    Sequencer,
+    SequencingRun,
+    SequencingSample,
+    SingleSampleVCF,
+    UnalignedReads,
+    VariantCaller,
+    VariantCallingPipeline,
+)
 from seqauto.models.models_enums import QCCompareType
-from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, get_qc_exec_summary_data, \
-    get_sequencing_run_columns, SEQUENCING_RUN_QC_COLUMNS
+from seqauto.qc.sequencing_run_utils import (
+    SEQUENCING_RUN_QC_COLUMNS,
+    get_qc_exec_summary_data,
+    get_sequencing_run_columns,
+    get_sequencing_run_data,
+)
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
-from seqauto.sequencing_files.sample_sheet import assign_old_sample_sheet_data_to_current_sample_sheet
+from seqauto.sequencing_files.sample_sheet import (
+    assign_old_sample_sheet_data_to_current_sample_sheet,
+)
 from snpdb.graphs import graphcache
 from snpdb.models import Sample, UserSettings
 
@@ -452,7 +480,7 @@ def qc_column_graph(request, qc_column_id, use_percent):
     logging.info("Using %s", qc_column)
     use_percent = json.loads(use_percent)  # Boolean
 
-    SEQUENCING_SAMPLE_PATH = 'bam_file__unaligned_reads__sequencing_sample'
+    SEQUENCING_SAMPLE_PATH = 'bam_file__sequencing_sample'
     ENRICHMENT_KIT_PATH = SEQUENCING_SAMPLE_PATH + '__enrichment_kit'
 
     def get_field(f):
@@ -530,7 +558,7 @@ def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):
     # Create a new label based on sequencing_run + sample
     current_label = get_label(qc_exec_summary.sequencing_run.name, qc_exec_summary.sample_name)
     sequencing_run_names = qc_exec_summary_data[sequencing_run_column]
-    sample_names = qc_exec_summary_data["qc__bam_file__unaligned_reads__sequencing_sample__sample_name"]
+    sample_names = qc_exec_summary_data["qc__bam_file__sequencing_sample__sample_name"]
     labels = [get_label(sr, ss) for sr, ss in zip(sequencing_run_names, sample_names)]
     qc_exec_summary_data["label"] = labels
 

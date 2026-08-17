@@ -2,8 +2,6 @@ from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, Set
-
-from celery.utils.functional import pass1
 from django.db.models import QuerySet, Subquery, Q, OuterRef
 from django.db.models.aggregates import Max
 from django.http import HttpRequest
@@ -16,7 +14,7 @@ from classification.models import ClassificationGrouping, Overlap, OverlapType, 
     ClassificationResultValue, OverlapContributionStatus, OverlapContributionSkew, TriageNextStep, EvidenceKey, \
     EvidenceKeyMap
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Organization, Lab
@@ -189,7 +187,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 if allele_info := grouping.latest_allele_info:
                     # TODO imported value or resolved value?
                     if c_hgvs := allele_info.preferred_c_hgvs_obj(genome_build=GenomeBuildManager.get_current_genome_build()):
-                        return c_hgvs.to_json()
+                        return HGVSDisplay(c_hgvs).to_json()
         return None
 
     def render_context(self, cell: CellData[Overlap]):

@@ -70,7 +70,7 @@ class Command(BaseCommand):
                     count = count + 1
                     if count >= max_records:
                         break
-            except Exception as e:
+            except Exception:
                 log_traceback()
                 raise
             finally:

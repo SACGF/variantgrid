@@ -1,4 +1,14 @@
-from snpdb.clingen_allele import ClinGenAlleleRegistryAPI, ClinGenAlleleServerException
+import json
+import os
+
+from django.conf import settings
+
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI, ClinGenAlleleServerException
+
+# Recorded GET /allele?hgvs= responses, keyed by the HGVS string. To add one, request it against the real
+# registry and paste the JSON in - the file is verbatim API output.
+CLINGEN_HGVS_RESPONSES_FILENAME = os.path.join(settings.BASE_DIR, "snpdb", "tests", "test_data",
+                                               "clingen_hgvs_responses.json")
 
 
 class MockServerErrorClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):
@@ -437,5 +447,19 @@ class MockClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):
         return clingen_records
 
     @classmethod
+    def get(cls, url):
+        raise ValueError(f"MockClinGenAlleleRegistryAPI: no recorded response for '{url}' - record one and "
+                         f"serve it from an override here")
+
+    @classmethod
     def get_code(cls, code):
         return cls.CANONICAL_ALLELES[code]
+
+    @classmethod
+    def get_hgvs(cls, hgvs_string: str):
+        with open(CLINGEN_HGVS_RESPONSES_FILENAME) as f:
+            responses = json.load(f)
+        if response := responses.get(hgvs_string):
+            return response
+        raise ValueError(f"MockClinGenAlleleRegistryAPI: no recorded response for '{hgvs_string}' - "
+                         f"add it to {CLINGEN_HGVS_RESPONSES_FILENAME}")

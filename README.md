@@ -1,5 +1,7 @@
 # VariantGrid
 
+[![Django Tests](https://github.com/SACGF/variantgrid/actions/workflows/django-tests.yml/badge.svg?branch=master)](https://github.com/SACGF/variantgrid/actions/workflows/django-tests.yml)
+
 VariantGrid is a database and web application for storing, analysing and classifying variants.
 
 ## Use cases

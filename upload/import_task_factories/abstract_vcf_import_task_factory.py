@@ -2,7 +2,6 @@ import logging
 import operator
 from abc import abstractmethod
 from functools import reduce
-from typing import Type
 
 from django.conf import settings
 
@@ -10,8 +9,13 @@ from library.utils import full_class_name, is_not_none
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
 from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_vcf_step_task import pipeline_start_task
-from upload.tasks.vcf.import_vcf_tasks import CheckStartAnnotationTask, ScheduleMultiFileOutputTasksTask, \
-    PreprocessVCFTask, UploadPipelineFinishedTask, DoNothingVCFTask
+from upload.tasks.vcf.import_vcf_tasks import (
+    CheckStartAnnotationTask,
+    DoNothingVCFTask,
+    PreprocessVCFTask,
+    ScheduleMultiFileOutputTasksTask,
+    UploadPipelineFinishedTask,
+)
 
 
 class AbstractVCFImportTaskFactory(ImportTaskFactory):
@@ -66,7 +70,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
                                                           **kwargs)
         return create_data_from_vcf_header_task_clazz.si(unknown_variants_step.pk, 0)
 
-    def _get_preprocess_class(self) -> Type:
+    def _get_preprocess_class(self) -> type:
         return PreprocessVCFTask
 
     def get_preprocess_vcf_step_and_task(self, upload_pipeline, input_filename):
@@ -128,7 +132,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
         return clazz.si(preprocess_step.pk, 0)
 
     def _get_vcf_filename(self, upload_pipeline) -> str:
-        return upload_pipeline.uploaded_file.get_filename()
+        return upload_pipeline.file_upload.get_filename()
 
     def create_import_task(self, upload_pipeline):
         vcf_filename = self._get_vcf_filename(upload_pipeline)

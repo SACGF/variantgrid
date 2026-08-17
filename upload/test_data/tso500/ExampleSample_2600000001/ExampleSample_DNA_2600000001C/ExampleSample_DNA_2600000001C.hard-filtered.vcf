@@ -1,0 +1,223 @@
+##fileformat=VCFv4.2
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths (counting only informative reads out of the total reads) for the ref and alt alleles in the order listed">
+##FORMAT=<ID=AF,Number=A,Type=Float,Description="Allele fractions for alt alleles in the order listed">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (reads with MQ=255 or with bad mates are filtered)">
+##FORMAT=<ID=F1R2,Number=R,Type=Integer,Description="Count of reads in F1R2 pair orientation supporting each allele">
+##FORMAT=<ID=F2R1,Number=R,Type=Integer,Description="Count of reads in F2R1 pair orientation supporting each allele">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=MB,Number=4,Type=Integer,Description="Per-sample component statistics to detect mate bias">
+##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Physical phasing ID information, where each unique ID within a given sample (but not across samples) connects records within a phasing group">
+##FORMAT=<ID=SB,Number=4,Type=Integer,Description="Per-sample component statistics which comprise the Fisher's Exact Test to detect strand bias">
+##FORMAT=<ID=SQ,Number=A,Type=Float,Description="Somatic quality">
+##DRAGENCommandLine=<ID=HashTableBuild,Version="SW: 01.003.044.3.11.2, HashTableVersion: 8",CommandLineOptions="/opt/dragen/3.11.2/bin/dragen --build-hash-table true --output-directory /staging/DRAGEN_TSO500_2.6.2/ref_hashtable --ht-reference /staging/DRAGEN_TSO500_2.6.2/ref_hashtable/genome.fa --ht-num-threads 64 --ht-build-rna-hashtable true --enable-cnv true">
+##DRAGENCommandLine=<ID=dragen,Version="SW: 07.021.624.3.11.2, HW: 07.021.624",Date="Thu Jan 01 12:23:42 UTC 2026",CommandLineOptions="--ref-dir hashtable --output-directory DnaDragenCaller --output-file-prefix ExampleSample_DNA_2600000001C --events-log-file events.csv --tso500-solid-umi true --umi-metrics-interval-file resource_bundle/small_variants/TSO_HRD_manifest_randomized.bed --tso500-solid-snv true --vc-sq-call-threshold=-1 --vc-target-bed resource_bundle/small_variants/TST500C_manifest.bed --vc-target-bed-padding 8 --vc-systematic-noise resource_bundle/small_variants/mean_gvcf_bq30_lowSQ_v1.0_systematic_noise_v2_novaseqx.bed.gz --vc-depth-annotation-threshold 100 --vc-homref-depth-filter-threshold 100 --tumor-fastq-list ExampleSample_DNA_2600000001C.fastq_list.csv --tumor-fastq-list-sample-id ExampleSample_DNA_2600000001C --vc-somatic-hotspots resource_bundle/small_variants/pepe2_prior.vcf --vc-hotspot-log10-prior-boost 3.0 --vc-blacklist-bed resource_bundle/small_variants/pepe_blacklist_sorted.bed --qc-coverage-ignore-overlaps true --gc-metrics-enable true --qc-coverage-region-1 resource_bundle/small_variants/TST500C_CodingRegions_hg19.bed --qc-coverage-reports-1 callability --qc-coverage-tag-1 tmb --qc-coverage-region-2 resource_bundle/small_variants/TST500C_manifest.exon.bed --qc-coverage-tag-2 exon --qc-coverage-reports-2 cov_report --tso500-contam-vcf resource_bundle/contamination/Contamination.vcf --qc-contam-min-basequal 30 --qc-contam-min-mapq 30 --tso500-solid-cnv true --cnv-combined-counts resource_bundle/cnv/TSO500_DRAGEN_BASELINE_SOLID_matched_targets_v2_novaseqx.combined.counts.txt.gz --cnv-segmentation-bed resource_bundle/cnv/dragen_tso500_manifest_cnv_genes_predefined_cutoff_FFPE.bed --cnv-target-bed resource_bundle/cnv/TSO500_DRAGEN_TARGET_SOLID_matched_targets.bed --tso500-solid-msi true --msi-microsatellites-file resource_bundle/msi/references/microsatellites-TSO500-SOLID-concordant.list --msi-ref-normal-dir resource_bundle/msi/data/TSO500-Solid --tso500-use-combined-license true --tso500-cnv-enable-low-validation-filter false --logging-to-output-dir true --force">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (informative and non-informative); some reads may have been filtered based on mapq etc.">
+##INFO=<ID=END,Number=1,Type=Integer,Description="Stop position of the interval">
+##INFO=<ID=FractionInformativeReads,Number=1,Type=Float,Description="The fraction of informative reads out of the total reads">
+##INFO=<ID=MQ,Number=1,Type=Float,Description="RMS Mapping Quality">
+##INFO=<ID=MQRankSum,Number=1,Type=Float,Description="Z-score From Wilcoxon rank sum test of Alt vs. Ref read mapping qualities">
+##INFO=<ID=ReadPosRankSum,Number=1,Type=Float,Description="Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias">
+##INFO=<ID=AQ,Number=A,Type=Float,Description="Systematic noise score">
+##INFO=<ID=hotspot,Number=0,Type=Flag,Description="Known somatic site, used to increase confidence in call">
+##INFO=<ID=MNVTAG,Number=1,Type=String,Description="Denotes the MNV call to which the variant belongs. Format is 'CHROM:POS_REF->ALT'.">
+##INFO=<ID=GermlineStatus,Number=1,Type=String,Description="Germline status. Possible values: Germline_DB, Germline_Proxi, Somatic, Somatic_Putative_CH">
+##FILTER=<ID=base_quality,Description="Site filtered because median base quality of alt reads at this locus does not meet threshold">
+##FILTER=<ID=filtered_reads,Description="Site filtered because too large a fraction of reads have been filtered out">
+##FILTER=<ID=fragment_length,Description="Site filtered because absolute difference between the median fragment length of alt reads and median fragment length of ref reads at this locus exceeds threshold">
+##FILTER=<ID=low_depth,Description="Site filtered because the read depth is too low">
+##FILTER=<ID=low_frac_info_reads,Description="Site filtered because the fraction of informative reads is below threshold">
+##FILTER=<ID=low_normal_depth,Description="Site filtered because the normal sample read depth is too low">
+##FILTER=<ID=long_indel,Description="Site filtered because the indel length is too long">
+##FILTER=<ID=mapping_quality,Description="Site filtered because median mapping quality of alt reads at this locus does not meet threshold">
+##FILTER=<ID=multiallelic,Description="Site filtered because more than two alt alleles pass tumor LOD">
+##FILTER=<ID=non_homref_normal,Description="Site filtered because the normal sample genotype is not homozygous reference">
+##FILTER=<ID=no_reliable_supporting_read,Description="Site filtered because no reliable supporting somatic read exists">
+##FILTER=<ID=panel_of_normals,Description="Seen in at least one sample in the panel of normals vcf">
+##FILTER=<ID=read_position,Description="Site filtered because median of distances between start/end of read and this locus is below threshold">
+##FILTER=<ID=RMxNRepeatRegion,Description="Site filtered because all or part of the variant allele is a repeat of the reference">
+##FILTER=<ID=str_contraction,Description="Site filtered due to suspected PCR error where the alt allele is one repeat unit less than the reference">
+##FILTER=<ID=too_few_supporting_reads,Description="Site filtered because there are too few supporting reads in the tumor sample">
+##FILTER=<ID=weak_evidence,Description="Somatic variant score does not meet threshold">
+##FILTER=<ID=systematic_noise,Description="Site filtered based on evidence of systematic noise in normals">
+##FILTER=<ID=excluded_regions,Description="Site overlaps with vc excluded regions bed">
+##contig=<ID=chr1,length=249250621>
+##contig=<ID=chr2,length=243199373>
+##contig=<ID=chr3,length=198022430>
+##contig=<ID=chr4,length=191154276>
+##contig=<ID=chr5,length=180915260>
+##contig=<ID=chr6,length=171115067>
+##contig=<ID=chr7,length=159138663>
+##contig=<ID=chr8,length=146364022>
+##contig=<ID=chr9,length=141213431>
+##contig=<ID=chr10,length=135534747>
+##contig=<ID=chr11,length=135006516>
+##contig=<ID=chr12,length=133851895>
+##contig=<ID=chr13,length=115169878>
+##contig=<ID=chr14,length=107349540>
+##contig=<ID=chr15,length=102531392>
+##contig=<ID=chr16,length=90354753>
+##contig=<ID=chr17,length=81195210>
+##contig=<ID=chr18,length=78077248>
+##contig=<ID=chr19,length=59128983>
+##contig=<ID=chr20,length=63025520>
+##contig=<ID=chr21,length=48129895>
+##contig=<ID=chr22,length=51304566>
+##contig=<ID=chrX,length=155270560>
+##contig=<ID=chrY,length=59373566>
+##contig=<ID=chrM,length=16569>
+##contig=<ID=GL000207.1,length=4262>
+##contig=<ID=GL000226.1,length=15008>
+##contig=<ID=GL000229.1,length=19913>
+##contig=<ID=GL000231.1,length=27386>
+##contig=<ID=GL000210.1,length=27682>
+##contig=<ID=GL000239.1,length=33824>
+##contig=<ID=GL000235.1,length=34474>
+##contig=<ID=GL000201.1,length=36148>
+##contig=<ID=GL000247.1,length=36422>
+##contig=<ID=GL000245.1,length=36651>
+##contig=<ID=GL000197.1,length=37175>
+##contig=<ID=GL000203.1,length=37498>
+##contig=<ID=GL000246.1,length=38154>
+##contig=<ID=GL000249.1,length=38502>
+##contig=<ID=GL000196.1,length=38914>
+##contig=<ID=GL000248.1,length=39786>
+##contig=<ID=GL000244.1,length=39929>
+##contig=<ID=GL000238.1,length=39939>
+##contig=<ID=GL000202.1,length=40103>
+##contig=<ID=GL000234.1,length=40531>
+##contig=<ID=GL000232.1,length=40652>
+##contig=<ID=GL000206.1,length=41001>
+##contig=<ID=GL000240.1,length=41933>
+##contig=<ID=GL000236.1,length=41934>
+##contig=<ID=GL000241.1,length=42152>
+##contig=<ID=GL000243.1,length=43341>
+##contig=<ID=GL000242.1,length=43523>
+##contig=<ID=GL000230.1,length=43691>
+##contig=<ID=GL000237.1,length=45867>
+##contig=<ID=GL000233.1,length=45941>
+##contig=<ID=GL000204.1,length=81310>
+##contig=<ID=GL000198.1,length=90085>
+##contig=<ID=GL000208.1,length=92689>
+##contig=<ID=GL000191.1,length=106433>
+##contig=<ID=GL000227.1,length=128374>
+##contig=<ID=GL000228.1,length=129120>
+##contig=<ID=GL000214.1,length=137718>
+##contig=<ID=GL000221.1,length=155397>
+##contig=<ID=GL000209.1,length=159169>
+##contig=<ID=GL000218.1,length=161147>
+##contig=<ID=GL000220.1,length=161802>
+##contig=<ID=GL000213.1,length=164239>
+##contig=<ID=GL000211.1,length=166566>
+##contig=<ID=GL000199.1,length=169874>
+##contig=<ID=GL000217.1,length=172149>
+##contig=<ID=GL000216.1,length=172294>
+##contig=<ID=GL000215.1,length=172545>
+##contig=<ID=GL000205.1,length=174588>
+##contig=<ID=GL000219.1,length=179198>
+##contig=<ID=GL000224.1,length=179693>
+##contig=<ID=GL000223.1,length=180455>
+##contig=<ID=GL000195.1,length=182896>
+##contig=<ID=GL000212.1,length=186858>
+##contig=<ID=GL000222.1,length=186861>
+##contig=<ID=GL000200.1,length=187035>
+##contig=<ID=GL000193.1,length=189789>
+##contig=<ID=GL000194.1,length=191469>
+##contig=<ID=GL000225.1,length=211173>
+##contig=<ID=GL000192.1,length=547496>
+##contig=<ID=NC_007605,length=171823>
+##contig=<ID=hs37d5,length=35477943>
+##reference=file://hashtable/reference.bin
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	ExampleSample_DNA_2600000001C
+chr1	2488109	.	G	A	.	weak_evidence	DP=508;MQ=245.71;FractionInformativeReads=0.976;AQ=12.98	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:494,2:0.0040:274,0:220,2:496:228,266,0,2:236,258,2,0
+chr1	2488137	.	T	A	.	PASS	DP=495;MQ=246.63;FractionInformativeReads=0.982;AQ=100.00;GermlineStatus=Germline_DB	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:64.73:0,486:1.0000:0,268:0,218:486:0,0,218,268:0,0,236,250
+chr1	2489183	.	C	T	.	weak_evidence	DP=751;MQ=247.76;FractionInformativeReads=0.984;AQ=6.85	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:737,2:0.0027:401,0:336,2:739:362,375,1,1:372,365,1,1
+chr1	2494175	.	C	T	.	no_reliable_supporting_read;read_position;weak_evidence	DP=409;MQ=248.77;FractionInformativeReads=0.978;AQ=6.29	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:398,1:0.0025:209,1:189,0:400:204,194,1,1:187,211,1,1
+chr1	2494411	.	TGG	T	.	weak_evidence	DP=480;MQ=248.33;FractionInformativeReads=0.977;AQ=5.98	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:468,1:0.0021:245,1:223,0:469:216,252,0,1:235,233,0,1
+chr1	4367162	.	C	A	.	PASS	DP=585;MQ=247.96;FractionInformativeReads=0.976;AQ=100.00;GermlineStatus=Germline_DB	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:11.80:360,211:0.3695:178,97:182,114:571:179,181,102,109:189,171,102,109
+chr1	8075440	.	A	T	.	no_reliable_supporting_read;read_position;weak_evidence	DP=557;MQ=247.82;FractionInformativeReads=0.968;AQ=12.56	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB:PS	0|1:0.00:537,2:0.0037:271,0:266,2:539:283,254,2,0:265,272,0,2:8075440
+chr1	9784452	.	A	T	.	PASS	DP=748;MQ=196.61;FractionInformativeReads=0.971;AQ=100.00;GermlineStatus=Germline_DB	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:11.80:472,254:0.3499:244,131:228,123:726:215,257,118,136:229,243,127,127
+chr1	11175495	.	C	T	.	read_position;weak_evidence	DP=695;MQ=248.30;FractionInformativeReads=0.986;AQ=19.77	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:682,3:0.0044:337,1:345,2:685:345,337,2,1:338,344,0,3
+chr1	11182490	.	C	A	.	read_position;weak_evidence	DP=495;MQ=248.85;FractionInformativeReads=0.986;AQ=13.21	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:486,2:0.0041:230,2:256,0:488:175,311,1,1:271,215,1,1
+chr1	11205290	.	TCG	T	.	too_few_supporting_reads;weak_evidence	DP=508;MQ=246.86;FractionInformativeReads=0.976;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:496,0:0.0000:266,0:230,0:496:282,214,0,0:270,226,0,0
+chr1	11206712	.	T	A	.	multiallelic;too_few_supporting_reads;weak_evidence	DP=401;MQ=248.20;FractionInformativeReads=0.885;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:350,0:0.0000:179,0:171,0:355:139,211,1,4:188,162,3,2
+chr1	11206721	.	G	T	.	too_few_supporting_reads;weak_evidence	DP=518;MQ=247.22;FractionInformativeReads=0.977;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:506,0:0.0000:241,0:265,0:506:264,242,0,0:267,239,0,0
+chr1	11276217	.	G	T	.	multiallelic;weak_evidence	DP=352;MQ=247.98;FractionInformativeReads=0.977;AQ=3.19	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:341,1:0.0029:171,1:170,0:344:125,216,2,1:171,170,1,2
+chr1	11317046	.	T	A	.	multiallelic;weak_evidence	DP=779;MQ=247.83;FractionInformativeReads=0.982;AQ=7.82	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:760,2:0.0026:360,1:400,1:765:385,375,1,4:347,413,3,2
+chr1	16200392	.	TA	T	.	multiallelic;weak_evidence;excluded_regions	DP=354;MQ=248.39;FractionInformativeReads=0.831;AQ=1.03	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:275,9:0.0306:129,5:146,4:294:142,133,7,12:134,141,8,11
+chr1	16200392	.	T	TT	.	weak_evidence;excluded_regions	DP=354;MQ=248.39;FractionInformativeReads=0.831;AQ=1.65	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:275,10:0.0340:129,9:146,1:294:142,133,7,12:134,141,8,11
+chr1	16248466	.	C	T	.	weak_evidence;excluded_regions	DP=170;MQ=247.95;FractionInformativeReads=0.935;AQ=3.40	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:156,3:0.0189:74,2:82,1:159:91,65,3,0:79,77,2,1
+chr1	17380263	.	C	G	.	excluded_regions	DP=373;MQ=246.83;FractionInformativeReads=0.984;AQ=100.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:64.73:0,367:1.0000:0,220:0,147:367:0,0,168,199:0,0,177,190
+chr1	19074317	.	A	AAT	.	weak_evidence;excluded_regions	DP=146;MQ=245.63;FractionInformativeReads=0.685;AQ=2.23	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:94,3:0.0300:49,1:45,2:100:38,56,2,4:47,47,2,4
+chr1	36936791	.	T	G	.	PASS	DP=565;MQ=248.31;FractionInformativeReads=0.986;AQ=100.00;MNVTAG=chr1:36936791_TGCCCGC->GGTGGGG;GermlineStatus=Germline_DB	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB:PS	0|1:43.42:282,275:0.4937:134,134:148,141:557:152,130,136,139:144,138,119,156:36936791
+chr1	36936791	.	TGCCCGC	GGTGGGG	.	PASS	DP=570;MQ=248.46;FractionInformativeReads=0.974;AQ=100.00;MNVTAG=chr1:36936791_TGCCCGC->GGTGGGG;GermlineStatus=Germline_DB	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:36.44:289,266:0.4793:135,130:154,136:555:158,131,139,127:152,137,113,153
+chr1	36936797	.	C	G	.	PASS	DP=570;MQ=248.46;FractionInformativeReads=0.974;AQ=100.00;MNVTAG=chr1:36936791_TGCCCGC->GGTGGGG;GermlineStatus=Germline_DB	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB:PS	0|1:36.44:289,266:0.4793:135,130:154,136:555:158,131,139,127:152,137,113,153:36936791
+chr1	40357132	.	CAA	C	.	multiallelic;weak_evidence;excluded_regions	DP=181;MQ=237.72;FractionInformativeReads=0.895;AQ=0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:101,5:0.0309:59,3:42,2:162:48,53,40,21:52,49,34,27
+chr1	46714095	.	A	T	.	PASS	DP=327;MQ=248.03;FractionInformativeReads=0.976;AQ=100.00;GermlineStatus=Germline_Proxi	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:31.92:170,149:0.4671:84,66:86,83:319:87,83,84,65:79,91,71,78
+chr1	46715643	.	A	T	.	PASS	DP=343;MQ=247.50;FractionInformativeReads=0.985;AQ=100.00;GermlineStatus=Germline_Proxi	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:39.05:172,166:0.4911:106,85:66,81:338:90,82,100,66:82,90,79,87
+chr1	92238058	.	A	AATCCCATTTTTGTTTAGG	.	excluded_regions	DP=119;MQ=225.29;FractionInformativeReads=0.815;AQ=100.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:63.45:0,97:1.0000:0,57:0,40:97:0,0,42,55:0,0,44,53
+chr1	115251865	.	C	T	.	low_depth;too_few_supporting_reads;weak_evidence;excluded_regions	DP=33;MQ=227.72;FractionInformativeReads=0.879;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:29,0:0.0000:14,0:15,0:29:11,18,0,0:12,17,0,0
+chr1	115252196	.	G	C	.	low_depth;too_few_supporting_reads;weak_evidence	DP=60;MQ=179.64;FractionInformativeReads=0.933;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:56,0:0.0000:26,0:30,0:56:23,33,0,0:25,31,0,0
+chr1	115252215	.	AT	A	.	low_depth;weak_evidence;excluded_regions	DP=31;MQ=231.59;FractionInformativeReads=0.710;AQ=6.35	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:20,2:0.0909:11,0:9,2:22:6,14,1,1:7,13,1,1
+chr1	115252349	.	C	T	.	low_depth;weak_evidence	DP=57;MQ=245.06;FractionInformativeReads=0.982;AQ=16.44	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:55,1:0.0179:25,0:30,1:56:35,20,1,0:27,28,0,1
+chr1	115252929	.	A	C	.	low_depth;weak_evidence	DP=79;MQ=232.87;FractionInformativeReads=0.937;AQ=5.30	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:73,1:0.0135:32,1:41,0:74:40,33,0,1:41,32,0,1
+chr1	115252949	.	A	C	.	low_depth;weak_evidence;excluded_regions	DP=62;MQ=225.57;FractionInformativeReads=0.919;AQ=8.57	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:56,1:0.0175:28,0:28,1:57:40,16,1,0:28,28,0,1
+chr1	115254922	.	G	C	.	mapping_quality;no_reliable_supporting_read;weak_evidence	DP=415;MQ=246.72;FractionInformativeReads=0.959;AQ=6.92	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:397,1:0.0025:214,0:183,1:398:199,198,0,1:202,195,1,0
+chr1	120054255	.	C	A	.	multiallelic;too_few_supporting_reads;weak_evidence	DP=414;MQ=113.20;FractionInformativeReads=0.928;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:383,0:0.0000:204,0:179,0:384:179,204,1,0:208,175,1,0
+chr1	120057307	.	G	A	.	no_reliable_supporting_read;weak_evidence	DP=368;MQ=60.35;FractionInformativeReads=0.810;AQ=11.28	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:296,2:0.0067:122,0:174,2:298:107,189,0,2:149,147,2,0
+chr1	120512252	.	C	A	.	PASS	DP=633;MQ=247.55;FractionInformativeReads=0.983;AQ=100.00;GermlineStatus=Somatic	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:12.04:361,261:0.4196:190,146:171,115:622:130,231,101,160:183,178,122,139
+chr1	156842065	.	CGG	C	.	low_depth;multiallelic;weak_evidence;excluded_regions	DP=88;MQ=249.39;FractionInformativeReads=0.739;AQ=0.12	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:61,1:0.0154:26,0:35,1:65:32,29,2,2:33,28,1,3
+chr1	156842603	.	GACT	G	.	base_quality;weak_evidence;excluded_regions	DP=143;MQ=161.50;FractionInformativeReads=0.930;AQ=65.22	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB:PS	0|1:0.00:126,7:0.0526:63,3:63,4:133:57,69,6,1:72,54,2,5:156842596
+chr1	156842663	.	GTT	G	.	low_frac_info_reads;weak_evidence;excluded_regions	DP=300;MQ=214.83;FractionInformativeReads=0.290;AQ=7.60	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:39,22:0.2529:16,7:23,15:87:6,33,7,41:25,14,32,16
+chr1	156842663	.	GTTTCAC	G	.	low_frac_info_reads;multiallelic;weak_evidence;excluded_regions	DP=300;MQ=214.83;FractionInformativeReads=0.290;AQ=0.02	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:39,9:0.1034:16,2:23,7:87:6,33,7,41:25,14,32,16
+chr1	156842663	.	G	GGT	.	low_frac_info_reads;multiallelic;weak_evidence;excluded_regions	DP=300;MQ=214.83;FractionInformativeReads=0.290;AQ=0.31	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:39,13:0.1494:16,4:23,9:87:6,33,7,41:25,14,32,16
+chr1	156842964	.	G	C	.	mapping_quality;no_reliable_supporting_read;weak_evidence;excluded_regions	DP=125;MQ=137.77;FractionInformativeReads=1.000;AQ=2.76	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:124,1:0.0080:64,0:60,1:125:55,69,0,1:59,65,1,0
+chr1	156845286	.	T	TGTGT	.	low_frac_info_reads;excluded_regions	DP=543;MQ=218.88;FractionInformativeReads=0.488;AQ=56.32	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:37.43:107,86:0.3245:51,32:56,54:265:49,58,18,140:65,42,101,57
+chr1	156845286	.	T	TGT	.	low_frac_info_reads;multiallelic;excluded_regions	DP=543;MQ=218.88;FractionInformativeReads=0.488;AQ=2.91	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:37.70:107,54:0.2038:51,24:56,30:265:49,58,18,140:65,42,101,57
+chr1	156845286	.	T	TGTGTGT	.	low_frac_info_reads;multiallelic;excluded_regions	DP=543;MQ=218.88;FractionInformativeReads=0.488;AQ=0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:37.33:107,11:0.0415:51,3:56,8:265:49,58,18,140:65,42,101,57
+chr1	156845314	.	C	CTGTGTT	.	too_few_supporting_reads;weak_evidence;excluded_regions	DP=535;MQ=222.47;FractionInformativeReads=0.953;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:510,0:0.0000:247,0:263,0:510:219,291,0,0:290,220,0,0
+chr1	156845368	.	T	TTGTT	.	too_few_supporting_reads;weak_evidence;excluded_regions	DP=522;MQ=219.51;FractionInformativeReads=0.950;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:496,0:0.0000:241,0:255,0:496:197,299,0,0:280,216,0,0
+chr1	158583862	.	AA	A	.	low_depth;multiallelic;weak_evidence	DP=88;MQ=246.18;FractionInformativeReads=0.693;AQ=0.15	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:32,5:0.0820:17,3:15,2:61:16,16,8,21:19,13,13,16
+chr1	158583862	.	A	AA	.	low_depth;multiallelic;weak_evidence	DP=88;MQ=246.18;FractionInformativeReads=0.693;AQ=2.27	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:32,9:0.1475:17,7:15,2:61:16,16,8,21:19,13,13,16
+chr1	161326734	.	T	C	.	mapping_quality;no_reliable_supporting_read;weak_evidence	DP=465;MQ=79.25;FractionInformativeReads=0.970;AQ=4.54	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:450,1:0.0022:234,1:216,0:451:235,215,0,1:229,221,0,1
+chr1	179081530	.	C	G	.	fragment_length;no_reliable_supporting_read;weak_evidence	DP=310;MQ=247.57;FractionInformativeReads=0.965;AQ=6.87	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:298,1:0.0033:154,1:144,0:299:160,138,1,0:162,136,1,0
+chr1	193201967	.	A	C	.	base_quality;weak_evidence	DP=250;MQ=217.89;FractionInformativeReads=0.980;AQ=12.46	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:243,2:0.0082:120,1:123,1:245:90,153,1,1:113,130,2,0
+chr1	204399231	.	T	TA	.	multiallelic	DP=682;MQ=245.57;FractionInformativeReads=0.930;AQ=21.42	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:23.20:0,3:0.0047:0,0:0,3:634:0,0,353,281:0,0,308,326
+chr1	204507273	.	AC	A	.	base_quality;weak_evidence	DP=301;MQ=248.35;FractionInformativeReads=0.950;AQ=12.97	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:284,2:0.0070:159,1:125,1:286:131,153,1,1:150,134,0,2
+chr1	226259170	.	A	G	.	mapping_quality;no_reliable_supporting_read;weak_evidence;excluded_regions	DP=173;MQ=77.18;FractionInformativeReads=0.694;AQ=1.26	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:116,4:0.0333:49,3:67,1:120:30,86,4,0:69,47,3,1
+chr1	226551493	.	A	T	.	fragment_length;weak_evidence	DP=452;MQ=215.96;FractionInformativeReads=0.967;AQ=14.41	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:435,2:0.0046:220,2:215,0:437:233,202,1,1:206,229,1,1
+chr1	241663762	.	CA	C	.	no_reliable_supporting_read;weak_evidence	DP=341;MQ=85.59;FractionInformativeReads=0.953;AQ=6.75	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB:PS	0|1:0.00:324,1:0.0031:173,1:151,0:325:146,178,0,1:155,169,0,1:241663762
+chr1	241665430	.	A	T	.	fragment_length;no_reliable_supporting_read;weak_evidence	DP=372;MQ=213.14;FractionInformativeReads=0.997;AQ=7.48	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:370,1:0.0027:194,1:176,0:371:215,155,1,0:197,173,1,0
+chr1	243667922	.	ATT	A	.	low_depth;too_few_supporting_reads;weak_evidence;excluded_regions	DP=68;MQ=243.32;FractionInformativeReads=0.853;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB:PS	0|1:0.00:58,0:0.0000:32,0:26,0:58:29,29,0,0:33,25,0,0:243667922
+chr1	243667922	.	ATT	A	.	low_depth;multiallelic;weak_evidence;excluded_regions	DP=65;MQ=242.76;FractionInformativeReads=0.723;AQ=1.11	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:38,3:0.0638:22,2:16,1:47:21,17,7,2:21,17,6,3
+chr1	243668081	.	AC	A	.	low_frac_info_reads;weak_evidence;excluded_regions	DP=108;MQ=244.72;FractionInformativeReads=0.454;AQ=6.19	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:42,6:0.1224:19,6:23,0:49:19,23,1,6:28,14,2,5
+chr2	16076416	.	G	GTT	.	multiallelic;too_few_supporting_reads;weak_evidence;excluded_regions	DP=136;MQ=237.85;FractionInformativeReads=0.691;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:46,0:0.0000:25,0:21,0:94:2,44,6,42:23,23,30,18
+chr2	16083350	.	T	TTTT	.	base_quality;multiallelic;weak_evidence;excluded_regions	DP=172;MQ=235.93;FractionInformativeReads=0.872;AQ=0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:39,3:0.0200:24,2:15,1:150:24,15,81,30:21,18,63,48
+chr2	29432841	.	T	C	.	weak_evidence	DP=418;MQ=248.39;FractionInformativeReads=0.950;AQ=5.80;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.01:395,2:0.0050:208,1:187,1:397:237,158,1,1:200,195,0,2
+chr2	29449329	.	A	C	.	low_depth;mapping_quality;no_reliable_supporting_read;read_position;weak_evidence;excluded_regions	DP=73;MQ=161.05;FractionInformativeReads=0.918;AQ=3.39	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:66,1:0.0149:36,0:30,1:67:38,28,1,0:38,28,0,1
+chr2	29449620	.	CCCAC	C	.	low_depth;low_frac_info_reads;multiallelic;excluded_regions	DP=87;MQ=194.36;FractionInformativeReads=0.460;AQ=1.49	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:55.83:0,7:0.1750:0,5:0,2:40:0,0,14,26:0,0,24,16
+chr2	29449620	.	CCCACC	C	.	low_depth;low_frac_info_reads;excluded_regions	DP=87;MQ=194.36;FractionInformativeReads=0.460;AQ=3.96	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:49.32:0,9:0.2250:0,5:0,4:40:0,0,14,26:0,0,24,16
+chr2	29449620	.	CCC	C	.	low_depth;low_frac_info_reads;multiallelic;excluded_regions	DP=87;MQ=194.36;FractionInformativeReads=0.460;AQ=0.04	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:56.48:0,3:0.0750:0,3:0,0:40:0,0,14,26:0,0,24,16
+chr2	29449620	.	CCCACCTTTCA	C	.	low_depth;low_frac_info_reads;multiallelic;weak_evidence;excluded_regions	DP=87;MQ=194.36;FractionInformativeReads=0.460;AQ=0.35	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:0,5:0.1250:0,2:0,3:40:0,0,14,26:0,0,24,16
+chr2	39572797	.	A	C	.	low_depth;no_reliable_supporting_read;read_position;weak_evidence	DP=32;MQ=103.25;FractionInformativeReads=0.969;AQ=4.05	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:30,1:0.0323:11,0:19,1:31:19,11,1,0:14,16,0,1
+chr2	39572980	.	AT	A	.	base_quality;low_depth;low_frac_info_reads;weak_evidence;excluded_regions	DP=23;MQ=142.38;FractionInformativeReads=0.130;AQ=13.44	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:0,2:0.6667:0,0:0,2:3:0,0,0,3:0,0,3,0
+chr2	39572980	.	ATG	A	.	low_depth;multiallelic;too_few_supporting_reads;weak_evidence;excluded_regions	DP=23;MQ=142.38;FractionInformativeReads=0.130;AQ=-0.00	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:0,0:0.0000:0,0:0,0:3:0,0,0,3:0,0,3,0
+chr2	39572980	.	A	AA	.	low_depth;low_frac_info_reads;multiallelic;weak_evidence;excluded_regions	DP=23;MQ=142.38;FractionInformativeReads=0.130;AQ=4.71	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:0,1:0.3333:0,0:0,1:3:0,0,0,3:0,0,3,0
+chr2	47641595	.	AATG	A	.	low_depth;low_frac_info_reads;weak_evidence;excluded_regions	DP=78;MQ=241.27;FractionInformativeReads=0.423;AQ=0.23	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:21,3:0.0909:8,3:13,0:33:10,11,9,3:13,8,9,3
+chr2	47641595	.	AATGTTGA	A	.	low_depth;low_frac_info_reads;weak_evidence;excluded_regions	DP=78;MQ=241.27;FractionInformativeReads=0.423;AQ=0.23	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:21,3:0.0909:8,2:13,1:33:10,11,9,3:13,8,9,3
+chr2	178098891	.	T	C	.	PASS	DP=524;MQ=247.35;FractionInformativeReads=0.973;AQ=100.00;GermlineStatus=Germline_Proxi	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:15.56:290,220:0.4314:152,104:138,116:510:131,159,97,123:151,139,111,109
+chr3	178952120	.	T	G	.	weak_evidence	DP=698;MQ=248.43;FractionInformativeReads=0.980;AQ=8.23;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:682,2:0.0029:362,2:320,0:684:324,358,1,1:350,332,1,1
+chr4	123788570	.	G	C	.	PASS	DP=225;MQ=249.15;FractionInformativeReads=0.991;AQ=100.00;GermlineStatus=Germline_Proxi	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:34.95:116,107:0.4798:54,45:62,62:223:82,34,62,45:58,58,44,63
+chr6	29912913	.	G	T	.	excluded_regions	DP=191;MQ=45.99;FractionInformativeReads=0.545;AQ=100.00;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB:PS	0|1:72.66:0,104:1.0000:0,47:0,57:104:0,0,58,46:0,0,57,47:29912909
+chr7	151926788	.	T	A	.	low_frac_info_reads;no_reliable_supporting_read;excluded_regions	DP=1077;MQ=30.97;FractionInformativeReads=0.333;AQ=68.89;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB:PS	0|1:27.44:267,92:0.2563:126,47:141,45:359:174,93,63,29:129,138,46,46:151926788
+chr7	151927214	.	A	G	.	low_frac_info_reads;no_reliable_supporting_read;excluded_regions	DP=1143;MQ=30.98;FractionInformativeReads=0.338;AQ=54.52;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:28.24:297,89:0.2306:141,43:156,46:386:190,107,65,24:142,155,47,42
+chr8	37697525	.	A	G	.	PASS	DP=810;MQ=247.11;FractionInformativeReads=0.979;AQ=100.00;GermlineStatus=Somatic	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:41.91:208,585:0.7377:109,312:99,273:793:111,97,386,199:102,106,313,272
+chr11	534115	.	A	C	.	weak_evidence	DP=326;MQ=243.88;FractionInformativeReads=0.969;AQ=4.27;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:315,1:0.0032:163,0:152,1:316:154,161,1,0:164,151,0,1
+chr11	534262	.	T	C	.	weak_evidence	DP=327;MQ=244.04;FractionInformativeReads=0.979;AQ=9.55;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.02:318,2:0.0063:162,2:156,0:320:154,164,1,1:166,152,1,1
+chr12	25380100	.	AAA	A	.	weak_evidence	DP=236;MQ=204.07;FractionInformativeReads=0.996;AQ=6.56;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.00:234,1:0.0043:119,0:115,1:235:125,109,0,1:116,118,1,0
+chr13	41219109	.	A	G	.	PASS	DP=373;MQ=248.18;FractionInformativeReads=0.984;AQ=100.00;GermlineStatus=Somatic	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:27.66:200,167:0.4550:90,74:110,93:367:120,80,84,83:100,100,77,90
+chr13	102819261	.	A	T	.	PASS	DP=395;MQ=247.37;FractionInformativeReads=0.982;AQ=100.00;GermlineStatus=Somatic	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:20.07:219,169:0.4356:116,88:103,81:388:118,101,85,84:115,104,90,79
+chr17	7577441	.	G	T	.	PASS	DP=277;MQ=248.26;FractionInformativeReads=0.960;AQ=100.00;hotspot;GermlineStatus=Somatic	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:71.91:70,196:0.7368:23,82:47,114:266:37,33,82,114:38,32,108,88
+chr17	29559823	.	A	T	.	PASS	DP=498;MQ=189.95;FractionInformativeReads=0.954;AQ=100.00;GermlineStatus=Somatic	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:24.97:260,215:0.4526:122,88:138,127:475:137,123,115,100:139,121,106,109
+chr17	56448282	.	A	C	.	PASS	DP=679;MQ=248.28;FractionInformativeReads=0.976;AQ=100.00;GermlineStatus=Somatic	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:12.18:382,281:0.4238:177,122:205,159:663:163,219,137,144:196,186,126,155
+chr17	74733085	.	T	A	.	weak_evidence	DP=528;MQ=249.30;FractionInformativeReads=0.979;AQ=24.26;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.02:514,3:0.0058:271,3:243,0:517:361,153,2,1:264,250,2,1
+chr20	31022733	.	AC	A	.	weak_evidence;excluded_regions	DP=757;MQ=249.28;FractionInformativeReads=0.877;AQ=3.01;hotspot	GT:SQ:AD:AF:F1R2:F2R1:DP:SB:MB	0/1:0.01:650,14:0.0211:283,5:367,9:664:340,310,6,8:303,347,9,5

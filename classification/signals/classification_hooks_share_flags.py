@@ -3,8 +3,7 @@ from django.db.models.signals import post_save
 from django.dispatch.dispatcher import receiver
 
 from classification.enums.classification_enums import ShareLevel
-from classification.models.classification import \
-    Classification, classification_revalidate_signal
+from classification.models.classification import Classification, classification_revalidate_signal
 from classification.models.flag_types import classification_flag_types
 
 """

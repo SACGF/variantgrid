@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
-from django.http.response import HttpResponseServerError, JsonResponse, HttpResponseNotFound
+from django.http.response import HttpResponseNotFound, HttpResponseServerError, JsonResponse
 from django.shortcuts import redirect, render
 from django.template.loader import get_template, render_to_string
 from django.urls.base import resolve, reverse
@@ -21,7 +21,7 @@ from library.django_utils import require_superuser
 from library.email import Email
 from library.git import Git
 from library.keycloak import Keycloak, KeycloakError, KeycloakNewUser
-from library.log_utils import report_exc_info, AdminNotificationBuilder
+from library.log_utils import AdminNotificationBuilder, report_exc_info
 from library.utils.database_utils import get_postgresql_version
 from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm

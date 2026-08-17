@@ -15,6 +15,19 @@ from classification.models.uploaded_classifications_unmapped import UploadedClas
 from library.log_utils import NotificationBuilder
 
 classification_imports_complete_signal = dispatch.Signal()
+"""
+Sent when the last ongoing ClassificationImportRun completes.
+
+This is how we defer per-classification work that's too expensive to do row-by-row during a bulk import -
+skip it while ClassificationImportRun.ongoing_imports(), then do it in one batch here. Existing examples:
+
+* ClassificationGrouping - classification.signals.classification_hooks_grouping
+* ClinicalContext/discordance - ClinicalContext.recalc_and_save + classification_hooks_import_notifications
+* Common variant filters - snpdb.signals.common_variants_classification_changed
+
+Note the deferred state has to live in the DB (a dirty flag, a pending column, or something the batch step can
+re-derive) as an import run spans processes - whichever process closes the run is the one that gets this signal.
+"""
 
 
 class ClassificationImportRunStatus(models.TextChoices):
@@ -123,6 +136,8 @@ class ClassificationImportRun(TimeStampedModel):
 
     @staticmethod
     def ongoing_imports() -> Optional[str]:
+        """ Guard for expensive per-classification work - see classification_imports_complete_signal for how to
+            defer it and do it in bulk instead """
         # should this check to see if there are any abandoned imports
         if ongoings := list(ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING).order_by('-created')):
             return ", ".join(ongoing.identifier for ongoing in ongoings) or "ongoing-import"

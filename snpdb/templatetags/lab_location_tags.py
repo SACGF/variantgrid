@@ -1,16 +1,14 @@
-from django.template.library import Library
+from django import template
+from django.conf import settings
+from django.template.loader import render_to_string
 
 from snpdb.models import Lab
-from variantgrid import settings
-
-register = Library()
-
-
-from django import template
-from django.template.loader import render_to_string
-from django.conf import settings
 
 register = template.Library()
+
+
+def _maps_enabled() -> bool:
+    return "leaflet" in settings.INSTALLED_APPS
 
 
 @register.simple_tag
@@ -18,7 +16,7 @@ def lab_locations(labs=None, samples_only=False, involved_only=True,
                   center_lat=19.434403, center_long=37.238392, zoom_level=1):
     # Made this a simple tag, so that if Leaflet is not loaded, we don't load any Leaflet tags
 
-    if "leaflet" not in settings.INSTALLED_APPS:
+    if not _maps_enabled():
         return ""
 
     if labs is None:
@@ -47,8 +45,11 @@ def lab_locations(labs=None, samples_only=False, involved_only=True,
     )
 
 
-@register.inclusion_tag("snpdb/tags/lab_families.html")
+@register.simple_tag
 def lab_families(samples_only=False, involved_only=False, zoom_level=1):
+    if not _maps_enabled():
+        return ""
+
     lab_info = Lab.objects.filter(labproject__families__gt=0)  # With families
 
     if samples_only:
@@ -57,5 +58,13 @@ def lab_families(samples_only=False, involved_only=False, zoom_level=1):
     if involved_only:
         lab_info = lab_info.filter(labproject__involved=True)
 
-    return {"lab_info": lab_info,
-            "zoom_level": zoom_level}
+    if not lab_info.exists():
+        return ""
+
+    return render_to_string(
+        "snpdb/tags/lab_families.html",
+        {
+            "lab_info": lab_info,
+            "zoom_level": zoom_level,
+        }
+    )

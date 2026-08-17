@@ -10,15 +10,17 @@ from django.db.models import Count
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.enums import TrioInheritance, NodeErrorSource, AnalysisTemplateType
+from analysis.models.enums import AnalysisTemplateType, NodeErrorSource, TrioInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.sources._stats_cache import (
-    get_cached_label_count_for_cohort, get_handler_for_node, UNCACHEABLE,
+    UNCACHEABLE,
+    get_cached_label_count_for_cohort,
+    get_handler_for_node,
 )
 from annotation.models.models import VariantTranscriptAnnotation
 from library.constants import DAY_SECS
-from patients.models_enums import Zygosity, Sex
-from snpdb.models import Trio, Sample, Contig
+from patients.models_enums import Sex, Zygosity
+from snpdb.models import Contig, Sample, Trio
 
 
 def _build_family_zyg_q(cohort_genotype_collection, sample_zyg_require: list[tuple]) -> Q:
@@ -214,18 +216,20 @@ class CompHet(AbstractTrioInheritance):
         # Need to pass in kwargs in case we have parent (eg Venn node) that doesn't have same cohort annotation kwargs
         annotation_kwargs = self.node.get_annotation_kwargs()
 
+        # Gene overlaps (not transcript annotation) - a long SV is skipped by VEP so its only
+        # record of the genes it crosses is VariantGeneOverlap @see issue #940
         def get_parent_genes(q):
             qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
-            return qs.values_list("varianttranscriptannotation__gene", flat=True).distinct()
+            return qs.values_list("variantgeneoverlap__gene", flat=True).distinct()
 
         # This ends up doing 3 queries (where we call set() - to work out what Q we need to return)
         common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
         variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
         q_in_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, common_genes)
         parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
-        parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
+        parent_genes_qs = parent_genes_qs.values_list("variantgeneoverlap__gene")
         two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
-        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True).distinct())
+        two_hit_genes = set(two_hits.values_list("variantgeneoverlap__gene", flat=True).distinct())
         return comp_het_q, two_hit_genes
 
     def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
@@ -328,7 +332,7 @@ class TrioNode(AbstractCohortBasedNode):
         # Allow template to configure anything w/o checks
         if self.analysis.template_type != AnalysisTemplateType.TEMPLATE:
             if trio_errors := self.get_trio_inheritance_errors(self.trio, self.inheritance):
-                errors.extend(((NodeErrorSource.CONFIGURATION, e) for e in trio_errors))
+                errors.extend((NodeErrorSource.CONFIGURATION, e) for e in trio_errors)
         if flat:
             errors = self.flatten_errors(errors)
         return errors
@@ -537,7 +541,7 @@ class TrioNode(AbstractCohortBasedNode):
         if self.trio:
             cohort = self.trio.cohort
             cohorts = [cohort]
-            visibility = {s: cohort.has_genotype for s in self.trio.get_samples()}
+            visibility = dict.fromkeys(self.trio.get_samples(), cohort.has_genotype)
         return cohorts, visibility
 
     def _get_proband_sample_for_node(self) -> Optional[Sample]:

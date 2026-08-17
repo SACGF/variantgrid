@@ -6,19 +6,31 @@ from typing import Optional
 from django.contrib import messages
 from django.db.models import Q
 from django.db.models.functions import Length
-from django.http import StreamingHttpResponse, HttpRequest
+from django.http import HttpRequest, StreamingHttpResponse
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
 
-from classification.models import ConditionText, top_level_suggestion, condition_matching_suggestions, \
-    ConditionMatchingSuggestion, ConditionTextMatch
+from classification.models import (
+    ConditionMatchingSuggestion,
+    ConditionText,
+    ConditionTextMatch,
+    condition_matching_suggestions,
+    top_level_suggestion,
+)
 from genes.models import GeneSymbol
 from library.django_utils import require_superuser
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
-from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, OntologyImportSource, \
-    OntologyTermRelation, OntologyTerm, OntologyTermDescendant, \
-    ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER
+from ontology.models import (
+    ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
+    OntologyImportSource,
+    OntologySnake,
+    OntologyTerm,
+    OntologyTermDescendant,
+    OntologyTermRelation,
+    OntologyTermStatus,
+    OntologyVersion,
+)
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 

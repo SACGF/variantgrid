@@ -1,5 +1,5 @@
 from django.apps.config import AppConfig
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 
 
 class AnnotationConfig(AppConfig):
@@ -12,13 +12,33 @@ class AnnotationConfig(AppConfig):
 
         from Bio import Entrez
         from django.conf import settings
-        from annotation.models import CachedWebResource
-        from annotation.signals.manual_signals import clinvar_citations_post_save_handler
-        from annotation.signals import citation_preview, citation_search, clinvar_annotation_health_check
-        from annotation.signals.manual_signals import gene_counts_classification_withdraw_handler, \
-            gene_counts_classification_publish_handler
-        from classification.models import Classification, classification_withdraw_signal, \
-            classification_post_publish_signal
+
+        from annotation.models import AnnotationRun, CachedWebResource
+
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        from annotation.signals import (  # noqa: F401
+            citation_preview,
+            citation_search,
+            clinvar_annotation_health_check,
+        )
+        from annotation.signals.annotation_run_cleanup import (
+            annotation_run_complete_cleanup_handler,
+            annotation_run_discarded_cleanup_handler,
+            annotation_run_post_delete_handler,
+        )
+        from annotation.signals.manual_signals import (
+            annotation_run_complete_signal,
+            annotation_run_discarded_signal,
+            clinvar_citations_post_save_handler,
+            gene_counts_classification_publish_handler,
+            gene_counts_classification_withdraw_handler,
+        )
+        from classification.models import (
+            Classification,
+            classification_post_publish_signal,
+            classification_withdraw_signal,
+        )
         # pylint: enable=import-outside-toplevel,unused-import
 
         # Entrez wants both email and API key
@@ -28,6 +48,11 @@ class AnnotationConfig(AppConfig):
             Entrez.email = entrez_email
 
         post_save.connect(clinvar_citations_post_save_handler, sender=CachedWebResource)
+
+        # #1670: every route by which an AnnotationRun's on-disk output is reclaimed
+        annotation_run_complete_signal.connect(annotation_run_complete_cleanup_handler)
+        annotation_run_discarded_signal.connect(annotation_run_discarded_cleanup_handler)
+        post_delete.connect(annotation_run_post_delete_handler, sender=AnnotationRun)
 
         classification_withdraw_signal.connect(gene_counts_classification_withdraw_handler,
                                                sender=Classification)

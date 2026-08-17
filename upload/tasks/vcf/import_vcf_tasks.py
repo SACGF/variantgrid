@@ -8,26 +8,33 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
+from genes.gene_fusions import create_gene_fusions_for_variants
 from library.log_utils import log_traceback
 from library.utils import import_class
 from snpdb.bcftools_liftover import bcftools_liftover
-from snpdb.models import AlleleLiftover
-from snpdb.models.models_enums import ProcessingStatus, AlleleConversionTool
-from upload.models import UploadStep, UploadedVCF, ModifiedImportedVariants
+from snpdb.models import AlleleLiftover, Variant
+from snpdb.models.models_enums import AlleleConversionTool, ProcessingStatus
+from upload.models import ModifiedImportedVariants, UploadedVCF, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_vcf_file
-from upload.vcf.bulk_allele_linking_vcf_processor import BulkAlleleLinkingVCFProcessor, FailedLiftoverVCFProcessor
+from upload.vcf.bulk_allele_linking_vcf_processor import (
+    BulkAlleleLinkingVCFProcessor,
+    FailedLiftoverVCFProcessor,
+)
 from upload.vcf.bulk_clingen_allele_vcf_processor import BulkClinGenAlleleVCFProcessor
-from upload.vcf.bulk_manual_variant_entry_linking_vcf_processor import BulkManualVariantEntryLinkingVCFProcessor
+from upload.vcf.bulk_manual_variant_entry_linking_vcf_processor import (
+    BulkManualVariantEntryLinkingVCFProcessor,
+)
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 from upload.vcf.vcf_import import import_vcf_file
+from upload.vcf.gene_level_vcf_preprocess import preprocess_gene_level_vcf
 from upload.vcf.vcf_preprocess import preprocess_vcf
 from variantgrid.celery import app
 
 
 class PreprocessVCFTask(ImportVCFStepTask):
-    """ * Decompose (multi-alts to different lines) using vt
-        * Normalise (@see https://genome.sph.umich.edu/wiki/Variant_Normalization) using vt
+    """ * Decompose (multi-alts to different lines) using bcftools
+        * Normalise (@see https://genome.sph.umich.edu/wiki/Variant_Normalization) using bcftools
         * Split VCF file into sub files (so it can be processed in parallel)
 
         This VCFStepTask has multi-file output, get via upload_step.get_input_filenames() """
@@ -54,6 +61,27 @@ class PreprocessAndAnnotateVCFTask(ImportVCFStepTask):
         # Reload from DB - vcf_extract_unknown_and_split_file set items_processed in a different process
         upload_step = UploadStep.objects.get(pk=upload_step.pk)
         return upload_step.items_processed
+
+
+class GeneLevelPreprocessVCFTask(ImportVCFStepTask):
+    """ Preprocess for gene-level variants - splits only. Every bcftools stage needs a reference
+        base a gene-level locus does not have. @see preprocess_gene_level_vcf """
+
+    def process_items(self, upload_step):
+        preprocess_gene_level_vcf(upload_step)
+        upload_step = UploadStep.objects.get(pk=upload_step.pk)
+        return upload_step.items_processed
+
+
+class GeneLevelInsertGeneFusionsTask(ImportVCFStepTask):
+    """ The GeneFusion rows for gene-level variants a pipeline has just inserted.
+
+        A gene-level Variant with no GeneFusion is one that has just arrived - everything the row
+        holds is in the Variant, so there is nothing to carry through from the file that named it.
+        @see genes.gene_fusions.create_gene_fusions_for_variants """
+
+    def process_items(self, upload_step):
+        return create_gene_fusions_for_variants(Variant.objects.all())
 
 
 class LiftoverPreprocessVCFTask(ImportVCFStepTask):
@@ -86,7 +114,7 @@ class LiftoverPreprocessVCFTask(ImportVCFStepTask):
                     allele_ids.append(int(parts[0]))
         if not allele_ids:
             return
-        liftover = upload_step.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_step.upload_pipeline.file_upload.uploadedliftover.liftover
         records = []
         for al in AlleleLiftover.objects.filter(liftover=liftover, allele__in=allele_ids):
             al.status = ProcessingStatus.ERROR
@@ -134,9 +162,11 @@ class ImportCreateUploadedVCFTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         upload_pipeline = upload_step.upload_pipeline
-        uploaded_file = upload_pipeline.uploaded_file
-        UploadedVCF.objects.create(uploaded_file=uploaded_file,
-                                   upload_pipeline=upload_pipeline)
+        file_upload = upload_pipeline.file_upload
+        # UploadedVCF can already exist from an earlier run of this pipeline (ie retry import) - re-use it
+        UploadedVCF.objects.update_or_create(file_upload=file_upload,
+                                             defaults={"upload_pipeline": upload_pipeline,
+                                                       "vcf_importer": None})
         return 0
 
 
@@ -195,7 +225,7 @@ class DoNothingVCFTask(ImportVCFStepTask):
 class LiftoverCreateVCFTask(ImportVCFStepTask):
     def process_items(self, upload_step: UploadStep):
         upload_pipeline = upload_step.upload_pipeline
-        liftover = upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_pipeline.file_upload.uploadedliftover.liftover
         AlleleLiftover.objects.filter(liftover=liftover).update(status=ProcessingStatus.PROCESSING)
 
         if liftover.conversion_tool == AlleleConversionTool.BCFTOOLS_LIFTOVER:
@@ -209,7 +239,7 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
 
     def _error(self, upload_step: UploadStep, error_message: str):
         super()._error(upload_step, error_message)
-        liftover = upload_step.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_step.upload_pipeline.file_upload.uploadedliftover.liftover
         liftover.error()
 
 
@@ -224,7 +254,7 @@ class LiftoverCompleteTask(ImportVCFStepTask):
 
     def process_items(self, upload_step: UploadStep):
         upload_pipeline = upload_step.upload_pipeline
-        liftover = upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_pipeline.file_upload.uploadedliftover.liftover
         liftover.complete()
 
 
@@ -244,6 +274,8 @@ def process_vcf_file_task(vcf_filename, name, user_id, import_source):
 PreprocessVCFTask = app.register_task(PreprocessVCFTask())
 PreprocessAndAnnotateVCFTask = app.register_task(PreprocessAndAnnotateVCFTask())
 LiftoverPreprocessVCFTask = app.register_task(LiftoverPreprocessVCFTask())
+GeneLevelPreprocessVCFTask = app.register_task(GeneLevelPreprocessVCFTask())
+GeneLevelInsertGeneFusionsTask = app.register_task(GeneLevelInsertGeneFusionsTask())
 CheckStartAnnotationTask = app.register_task(CheckStartAnnotationTask())
 ScheduleMultiFileOutputTasksTask = app.register_task(ScheduleMultiFileOutputTasksTask())
 UploadPipelineFinishedTask = app.register_task(UploadPipelineFinishedTask())

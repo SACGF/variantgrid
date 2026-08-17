@@ -2,17 +2,25 @@ import copy
 from typing import Optional
 
 from bioutils.sequences import reverse_complement
-from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError, HGVSUnsupportedOperationError, HGVSInvalidVariantError
+from hgvs.exceptions import (
+    HGVSDataNotAvailableError,
+    HGVSError,
+    HGVSInvalidVariantError,
+    HGVSUnsupportedOperationError,
+)
 from hgvs.sequencevariant import SequenceVariant
 from hgvs_shim import BioCommonsHGVSConverter as _BioCommonsHGVSConverterBase
 from hgvs_shim.hgvs_converter_biocommons import BioCommonsHGVSVariant
 
-from genes.hgvs import HGVSNomenclatureException, HGVSImplementationException
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
-from genes.hgvs.hgvs_converter import HgvsMatchRefAllele, HgvsOriginallyNormalized, HGVSConverterType
+from genes.hgvs.hgvs_converter import (
+    HGVSConverterType,
+    HgvsMatchRefAllele,
+    HgvsOriginallyNormalized,
+)
 from genes.models import TranscriptVersion
 from genes.transcripts_utils import get_refseq_type
-from snpdb.models import GenomeBuild, VariantCoordinate, Contig
+from snpdb.models import Contig, GenomeBuild, VariantCoordinate
 
 
 class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):

@@ -1,7 +1,7 @@
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.core.management import BaseCommand
 from django.db.models import Max
@@ -9,11 +9,11 @@ from django.urls import reverse
 from django.utils.http import urlencode
 
 from classification.models import ImportedAlleleInfo
-from genes.hgvs import HGVSMatcher, HGVSConverterType, VariantResolvingError
-from genes.models import TranscriptVersion, TranscriptParts
+from genes.hgvs import HGVSConverterType, HGVSMatcher, VariantResolvingError
+from genes.models import TranscriptParts, TranscriptVersion
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column, delimited_row
-from snpdb.models import Variant, GenomeBuild, VariantCoordinate
+from library.utils import ExportRow, delimited_row, export_column
+from snpdb.models import Variant, VariantCoordinate
 
 
 class Change(int, Enum):
@@ -113,7 +113,7 @@ class ChgvsDiff(ExportRow):
         return get_url_from_view_path(reverse('hgvs_resolution_tool')) + "?" + urlencode(
             {
                 "genome_build": self.imported_allele_info.imported_genome_build.pk,
-                "hgvs": self.imported_allele_info.imported_c_hgvs
+                "hgvs": self.imported_allele_info.imported_hgvs
             }
         )
 
@@ -224,11 +224,6 @@ class Command(BaseCommand):
         c_hgvs_diff_count = Counter()
 
         iai: ImportedAlleleInfo
-        hgvs_matchers_by_build = {}
-        for genome_build in GenomeBuild.builds_with_annotation():
-            matcher = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type)
-            hgvs_matchers_by_build[genome_build] = matcher
-
         filename = "classification_match_diff.csv"
         with open(filename, "w") as out:
             out.write(delimited_row(ChgvsDiff.csv_header()))
@@ -237,7 +232,7 @@ class Command(BaseCommand):
             # iai_qs = iai_qs.exclude(message="HGVS matched by 'ClinGen Allele Registry'")
             for iai in iai_qs.iterator(chunk_size=100):
                 genome_build = iai.imported_genome_build
-                matcher = hgvs_matchers_by_build[genome_build]
+                matcher = HGVSMatcher.instance(genome_build, hgvs_converter_type=hgvs_converter_type)
                 imported_c_hgvs = iai.imported_c_hgvs
 
                 provided = HgvsSummary()

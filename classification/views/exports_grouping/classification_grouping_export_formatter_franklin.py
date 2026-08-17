@@ -14,6 +14,7 @@ from classification.models.evidence_mixin import SomaticClinicalSignificanceValu
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
     ClassificationGroupingExportFilter, ClassificationGroupingByAlleleAndOrigin
+from genes.hgvs import HGVSComponents
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, delimited_row, export_column
 from ontology.models import OntologyTerm
@@ -40,12 +41,12 @@ class FranklinExportRow(ExportRow):
         self.date_str = date_str
 
     @cached_property
-    def c_hgvs_obj(self):
+    def c_hgvs_obj(self) -> HGVSComponents:
         return self.data.c_hgvs
 
     @export_column("Gene")
     def gene(self):
-        return self.c_hgvs_obj.gene
+        return self.c_hgvs_obj.gene_symbol
 
     @export_column("transcript")
     def transcript(self):
@@ -53,7 +54,7 @@ class FranklinExportRow(ExportRow):
 
     @export_column("DNA")
     def dna(self):
-        return self.c_hgvs_obj.raw_c
+        return self.c_hgvs_obj.nomen
 
     # don't need to provide Chromosome, Position, Ref or Alt when gene, transcript and DNA are provided
 

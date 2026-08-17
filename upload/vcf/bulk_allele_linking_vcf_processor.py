@@ -4,8 +4,16 @@ import cyvcf2
 from django.conf import settings
 
 from library.utils import invert_dict
-from snpdb.models import AlleleOrigin, VariantAllele, Allele, SequenceRole, Variant, AlleleLiftover, ProcessingStatus, \
-    VariantCoordinate
+from snpdb.models import (
+    Allele,
+    AlleleLiftover,
+    AlleleOrigin,
+    ProcessingStatus,
+    SequenceRole,
+    Variant,
+    VariantAllele,
+    VariantCoordinate,
+)
 from upload.models import ModifiedImportedVariant
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 
@@ -15,7 +23,7 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.allele_ids = []
-        self.liftover = self.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        self.liftover = self.upload_pipeline.file_upload.uploadedliftover.liftover
         self.allele_liftovers_by_allele_id = {}
         for al in AlleleLiftover.objects.filter(liftover=self.liftover):
             self.allele_liftovers_by_allele_id[al.allele_id] = al
@@ -118,7 +126,7 @@ class FailedLiftoverVCFProcessor(BulkMinimalVCFProcessor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.allele_id_reject_reason = {}
-        self.liftover = self.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        self.liftover = self.upload_pipeline.file_upload.uploadedliftover.liftover
         self.set_max_variant_called = True  # Just need warning to go away
 
     @property

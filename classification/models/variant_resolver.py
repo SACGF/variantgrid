@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 
 from classification.models import ClassificationImport, ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.tasks.classification_import_task import process_classification_import_task
-from snpdb.models import ImportSource, GenomeBuild
+from snpdb.models import GenomeBuild, ImportSource
 
 
 class VariantResolver:

@@ -87,9 +87,9 @@ class ClinVarXmlParser(XmlParser, ABC):
                 def hgvs_score(some_hgvs):
                     if some_hgvs is None:
                         return 0
-                    if not "c." in some_hgvs:
+                    if "c." not in some_hgvs:
                         return 1
-                    if not "(" in some_hgvs:
+                    if "(" not in some_hgvs:
                         return 2
                     return 3
 

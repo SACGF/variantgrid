@@ -4,12 +4,12 @@ Helper functions for grid to join to cohort genotype
 This is in snpdb not analysis as it needs to be called by snpdb.tasks.cohort_genotype_tasks
 and I don't want cross-dependencies between those apps
 """
-from typing import Iterable
+from collections.abc import Iterable
 
 from django.db.models import Value
 from django.db.models.functions import Coalesce
 
-from snpdb.models import CohortGenotype, VCF, Cohort
+from snpdb.models import VCF, Cohort, CohortGenotype
 
 
 def get_available_format_columns(cohorts):

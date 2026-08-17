@@ -2,8 +2,9 @@ import itertools
 import logging
 import re
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from itertools import zip_longest
-from typing import Optional, Iterable, Union, Callable
+from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -12,22 +13,43 @@ from django.urls import reverse
 from hgvs_shim import HGVSException, HGVSImplementationException, HGVSNomenclatureException
 
 from annotation.cosmic import CosmicAPI
-from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from annotation.manual_variant_entry import CreateManualVariantForbidden, check_can_create_variants
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher, VariantResolvingError, HgvsOriginallyNormalized
+from genes.hgvs import HGVSMatcher, HgvsOriginallyNormalized, VariantResolvingError
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
-from genes.models import MissingTranscript, MANE, TranscriptVersion, BadTranscript
+from genes.gene_fusions import find_gene_fusions_for_string
+from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium, MANEStatus
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
-from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
-    ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN, VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN, Allele, \
-    Sequence
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResult, SearchMessageOverall, \
-    SearchMessage, INVALID_INPUT
+from snpdb.models import (
+    DBSNP_PATTERN,
+    HGVS_UNCLEANED_PATTERN,
+    LOCUS_NO_REF_PATTERN,
+    LOCUS_PATTERN,
+    VARIANT_PATTERN,
+    VARIANT_SYMBOLIC_PATTERN,
+    Allele,
+    ClinGenAllele,
+    Contig,
+    DbSNP,
+    GenomeBuild,
+    Sequence,
+    Variant,
+    VariantCoordinate,
+)
+from snpdb.search import (
+    INVALID_INPUT,
+    SearchExample,
+    SearchInputInstance,
+    SearchMessage,
+    SearchMessageOverall,
+    SearchResult,
+    search_receiver,
+)
 from upload.models import ModifiedImportedVariant
 
 COSMIC_PATTERN = re.compile(r"^(COS[VM])[0-9]{3,}$", re.IGNORECASE)
@@ -103,7 +125,7 @@ class VariantExtra:
 def variant_cosmic_search(search_input: SearchInputInstance):
     # Do via API as a full table scan takes way too long with big data
     for genome_build in search_input.genome_builds:
-        matcher = HGVSMatcher(genome_build)
+        matcher = HGVSMatcher.instance(genome_build)
         cosmic = CosmicAPI(search_input.search_string, genome_build)
         results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
         hgvs_by_variant_identifier: dict[str, list[str]] = defaultdict(list)
@@ -369,7 +391,7 @@ def search_variant_db_snp(search_input: SearchInputInstance):
     dbsnp = DbSNP.get(search_input.search_string)
 
     for genome_build in search_input.genome_builds:
-        matcher = HGVSMatcher(genome_build)
+        matcher = HGVSMatcher.instance(genome_build)
         for data in dbsnp.get_alleles_for_genome_build(genome_build):
             if hgvs_string := data.get("hgvs"):
                 search_message = SearchMessage(f'dbSNP "{search_input.search_string}" resolved to "{hgvs_string}"',
@@ -557,7 +579,7 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
 
 
 def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visible_variants: QuerySet, classify: bool = False) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
-    hgvs_matcher = HGVSMatcher(genome_build)
+    hgvs_matcher = HGVSMatcher.instance(genome_build)
     variant_qs = visible_variants
 
     # TODO, add genome build to more of the SearchMessages that are genome build specific
@@ -597,7 +619,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     except MissingTranscript:
         pass
-    except Contig.ContigNotInBuildError as e:
+    except Contig.ContigNotInBuildError:
         # HGVS is valid but g.HGVS contig from a different genome build than this one
         # we don't want to throw an error for 37 contig not in 38 (if both enabled)
         # but we do want to throw one if the contig is completely unrecognised
@@ -813,3 +835,36 @@ ALLELE_ID_SEARCH_PATTERN = re.compile(r"^a(\d+)$")
 )
 def search_allele_id(search_input: SearchInputInstance):
     yield Allele.objects.filter(pk=search_input.match.group(1))
+
+
+# '::' is the HGVS/ISCN fusion convention; a single hyphen is what callers write, so it separates
+# only where neither side contains one of its own (RP11-458D21.5 is a gene name, not a pair)
+GENE_FUSION_PATTERN = re.compile(r"^([A-Za-z0-9.]+)\s*(?:::|--|-)\s*([A-Za-z0-9.]+)$")
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=GENE_FUSION_PATTERN,
+    sub_name="Gene Fusion",
+    example=SearchExample(
+        note="A gene fusion, named by its gene pair",
+        examples=["BCR::ABL1", "CD74-ROS1"]
+    )
+)
+def search_variant_gene_fusion(search_input: SearchInputInstance):
+    """ Lookup only - searching must never mint a fusion identity.
+
+        A fusion Variant sits on the contig every build shares, so it is found once rather than per
+        build, and get_visible_variants still applies each build's permissions. """
+    seen = set()
+    for gene_fusion in find_gene_fusions_for_string(search_input.search_string):
+        if gene_fusion.variant_id in seen:
+            continue
+        seen.add(gene_fusion.variant_id)
+        for genome_build in search_input.genome_builds:
+            visible_variants_qs = search_input.get_visible_variants(genome_build)
+            if variant := visible_variants_qs.filter(pk=gene_fusion.variant_id).first():
+                yield SearchResult(variant.preview,
+                                   messages=[SearchMessage(f"Gene fusion {gene_fusion.canonical_str}",
+                                                           severity=LogLevel.INFO)])
+                break

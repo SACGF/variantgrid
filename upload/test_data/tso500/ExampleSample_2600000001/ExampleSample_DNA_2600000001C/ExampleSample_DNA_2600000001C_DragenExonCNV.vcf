@@ -1,0 +1,15 @@
+##fileformat=VCFv4.1
+##20260807=fileDate=20260101=20260807
+##source=LrCalculator 1.0.0.11
+##reference=file:resource_bundle/hg19_decoy/
+##ALT=<ID=DEL,Description="Deletion relative to the reference.">
+##ALT=<ID=DUP,Description="Region of elevated copy number relative to the reference.">
+##FILTER=<ID=Undetermined,Number=1,Type=String,Description="Both segments for this gene have segment means difference from baseline below a specified threshold, meaning that CNV type may be considered undetermined. ">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=GENE,Number=1,Type=String,Description="Gene name, can be either BRCA1 or BRCA2.">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=FC,Number=1,Type=Float,Description="Fold Change">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	ExampleSample_DNA_2600000001C
+chr17	41243452	.	N	<DEL>	.	PASS	SVTYPE=CNV;END=41277500;GENE=BRCA1	GT:FC	./1:0.532
+chr13	32889611	.	N	.	.	Undetermined	SVTYPE=CNV;END=32973805;GENE=BRCA2	GT:FC	./.:0.978

@@ -2,23 +2,34 @@ import mimetypes
 
 import pandas as pd
 from django.conf import settings
+from django.db.models import Prefetch
 from django.http.response import HttpResponse, JsonResponse
-from django.shortcuts import render, get_object_or_404
-from django.views.decorators.http import require_POST, require_http_methods
+from django.shortcuts import get_object_or_404, render
+from django.views.decorators.http import require_http_methods, require_POST
 
 from annotation.models.models_phenotype_match import TextPhenotypeMatch
 from annotation.phenotype_matching import create_phenotype_description
 from library.django_utils import add_save_message, set_form_read_only
-from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
+from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.log_utils import log_traceback
 from library.utils import invert_dict
 from library.utils.file_utils import rm_if_exists
-from ontology.forms import OMIMForm, HPOForm, HGNCForm, MONDOForm
+from ontology.forms import HGNCForm, HPOForm, MONDOForm, OMIMForm
 from patients import forms
-from patients.forms import PatientSearchForm, PatientContactForm
-from patients.models import PatientColumns, PatientRecords, Patient, PatientModification, PatientRecordOriginType, \
-    PatientAttachment, PatientRecord
-from snpdb.models import Sample
+from patients.forms import PatientContactForm, PatientSearchForm
+from patients.models import (
+    Extraction,
+    Patient,
+    PatientAttachment,
+    PatientColumns,
+    PatientModification,
+    PatientRecord,
+    PatientRecordOriginType,
+    PatientRecords,
+    Specimen,
+)
+from patients.sample_grouping import get_extraction_sample_group, sample_group_as_json
+from snpdb.models import GenomeBuild, Sample
 from uicore.utils.form_helpers import form_helper_horizontal
 
 
@@ -87,6 +98,96 @@ def view_patient_specimens(request, patient_id):
     return render(request, 'patients/view_patient_specimens.html', context)
 
 
+def _patient_extraction_formset(patient, data=None):
+    """ Restricted to the patient's own specimens - Extraction has no direct FK to Patient """
+    specimen_qs = patient.specimen_set.all()
+    formset_class = forms.patient_extraction_formset_factory(patient)
+    formset = formset_class(data, queryset=Extraction.objects.filter(specimen__in=specimen_qs))
+    for form in formset.forms:
+        form.fields["specimen"].queryset = specimen_qs
+    return formset
+
+
+def view_patient_extractions(request, patient_id):
+    patient = Patient.get_for_user(request.user, patient_id)
+    if request.method == "POST":
+        extraction_formset = _patient_extraction_formset(patient, data=request.POST)
+        valid = extraction_formset.is_valid()
+        if valid:
+            extraction_formset.save()
+        add_save_message(request, valid, "Patient Extraction")
+
+    context = {"patient": patient,
+               "num_extractions": patient.num_extractions,
+               "extraction_formset": _patient_extraction_formset(patient),
+               "has_write_permission": patient.can_write(request.user)}
+    return render(request, 'patients/view_patient_extractions.html', context)
+
+
+def view_specimen(request, specimen_id):
+    specimen = Specimen.get_for_user(request.user, specimen_id)
+    form = forms.SpecimenForm(request.POST or None, instance=specimen)
+    form.helper = form_helper_horizontal()
+
+    has_write_permission = specimen.can_write(request.user)
+    if not has_write_permission:
+        set_form_read_only(form)
+
+    if request.method == "POST":
+        valid = form.is_valid()
+        if valid:
+            specimen = form.save()
+        add_save_message(request, valid, "Specimen")
+
+    # Samples carry their VCF's permissions, so they're filtered separately to the specimen's own
+    visible_samples = Prefetch("sample_set", queryset=Sample.filter_for_user(request.user).order_by("pk"))
+    context = {"specimen": specimen,
+               "form": form,
+               "extractions": specimen.extraction_set.order_by("pk").prefetch_related(visible_samples),
+               "measures": specimen.specimenmeasure_set.order_by("measure_type", "-measured_date"),
+               "has_write_permission": has_write_permission}
+    return render(request, 'patients/view_specimen.html', context)
+
+
+def view_extraction(request, extraction_id):
+    extraction = Extraction.get_for_user(request.user, extraction_id)
+    form = forms.ExtractionForm(request.POST or None, instance=extraction)
+    form.helper = form_helper_horizontal()
+
+    has_write_permission = extraction.can_write(request.user)
+    if not has_write_permission:
+        set_form_read_only(form)
+
+    if request.method == "POST":
+        valid = form.is_valid()
+        if valid:
+            extraction = form.save()
+        add_save_message(request, valid, "Extraction")
+
+    context = {"extraction": extraction,
+               "form": form,
+               "samples": Sample.filter_for_user(request.user).filter(extraction=extraction).order_by("pk"),
+               "sequencing_samples": extraction.sequencingsample_set.order_by("pk"),
+               "has_write_permission": has_write_permission}
+    return render(request, 'patients/view_extraction.html', context)
+
+
+def extraction_samples(request, extraction_id):
+    """ The samples an analysis grouping node reaches for this extraction, with per sample counts off
+        the stats rows. Keyed on the extraction rather than a node, as it has to answer before a node
+        is saved.
+
+        Pass ?genome_build= to restrict to an analysis' build - what that leaves out comes back in
+        'excluded' rather than being quietly dropped. """
+    extraction = Extraction.get_for_user(request.user, extraction_id)
+    genome_build = None
+    if genome_build_name := request.GET.get("genome_build"):
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+
+    group = get_extraction_sample_group(request.user, extraction, genome_build)
+    return JsonResponse(sample_group_as_json(group))
+
+
 def view_patient_genes(request, patient_id):
     patient = Patient.get_for_user(request.user, patient_id)
     context = {"patient": patient}
@@ -105,8 +206,8 @@ def patient_file_upload(request, patient_id):
     try:
         patient = Patient.get_for_user(request.user, patient_id)
         patient.check_can_write(request.user)
-        uploaded_file = filepond_upload_receive(request)
-        patient_attachment = PatientAttachment.objects.create(patient=patient, file=uploaded_file)
+        django_uploaded_file = filepond_upload_receive(request)
+        patient_attachment = PatientAttachment.objects.create(patient=patient, file=django_uploaded_file)
     except Exception:
         log_traceback()
         return HttpResponse("Upload failed", status=500)
@@ -166,7 +267,7 @@ def patient_imports(request):
 
 def view_patient_import(request, patient_records_id):
     patient_records = get_object_or_404(PatientRecords, pk=patient_records_id)
-    patient_records.uploaded_file.check_can_view(request.user)
+    patient_records.check_can_view(request.user)
     context = {"patient_records": patient_records}
     return render(request, 'patients/view_patient_import.html', context)
 
@@ -179,7 +280,7 @@ def import_patient_records_details(request):
 
 def view_patient_record(request, pk):
     patient_record = get_object_or_404(PatientRecord, pk=pk)
-    patient_record.patient_records.uploaded_file.check_can_view(request.user)
+    patient_record.patient_records.check_can_view(request.user)
     context = {"patient_record": patient_record}
     return render(request, 'patients/view_patient_record.html', context)
 
@@ -216,7 +317,7 @@ def get_patient_upload_csv(filename, sample_qs, columns_lookup=None):
         }
     sample_values_qs = sample_qs.values(*columns_lookup)
 
-    empty_row = {c: '' for c in PatientColumns.COLUMNS}
+    empty_row = dict.fromkeys(PatientColumns.COLUMNS, '')
     rows = []
     for values in sample_values_qs:
         data = empty_row.copy()
@@ -257,7 +358,7 @@ def patients(request):
         if valid:
             patient = form.save()
             form = forms.PatientForm(user=request.user)  # clear form for next patient
-            msg = f"Patient #{patient.pk}: {str(patient)}"
+            msg = f"Patient #{patient.pk}: {patient!s}"
         else:
             msg = "Patient"
         add_save_message(request, valid, msg, created=True)

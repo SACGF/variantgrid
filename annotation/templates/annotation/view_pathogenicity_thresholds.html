@@ -26,17 +26,21 @@
                     <thead>
                         <tr>
                             <th>Tool</th>
-                            <th class="text-monospace">Raw range</th>
+                            <th class="text-monospace">Raw min</th>
                             <th class="text-monospace">BP4-supporting (benign) &le;</th>
                             <th class="text-monospace">PP3-supporting (pathogenic) &ge;</th>
+                            <th class="text-monospace">Raw max</th>
                             <th>Source</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for t in tools %}
                             <tr>
-                                <th>{{ t.name }}</th>
-                                <td class="text-monospace">{{ t.raw_min }} &ndash; {{ t.raw_max }}</td>
+                                <th>
+                                    {{ t.name }}
+                                    {% if t.note %}<div class="text-muted small font-weight-normal mt-1">{{ t.note }}</div>{% endif %}
+                                </th>
+                                <td class="text-monospace">{{ t.raw_min }}</td>
                                 <td class="text-monospace">
                                     {% if t.raw_max_benign_threshold is not None %}
                                         <span class="threshold threshold-low">{{ t.raw_max_benign_threshold }}</span>
@@ -47,6 +51,7 @@
                                         <span class="threshold threshold-high">{{ t.raw_pathogenic_threshold }}</span>
                                     {% else %}—{% endif %}
                                 </td>
+                                <td class="text-monospace">{{ t.raw_max }}</td>
                                 <td>
                                     {% if t.source_url %}
                                         <a class="hover-link" href="{{ t.source_url }}" target="_blank" title="{{ t.source_detail }}">{{ t.source }}</a>

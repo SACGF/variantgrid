@@ -1,21 +1,25 @@
 import zipfile
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from io import StringIO
-from typing import Optional, Iterator, Any, Callable, Iterable
+from typing import Any, Optional
 
 from django.http import HttpResponse, StreamingHttpResponse
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from more_itertools import peekable
-from stream_zip import stream_zip, ZIP_64
+from stream_zip import ZIP_64, stream_zip
 from threadlocals.threadlocals import get_current_request
 
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+)
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder, report_exc_info
-from snpdb.models import GenomeBuild, AlleleOriginFilterDefault
+from snpdb.models import AlleleOriginFilterDefault, GenomeBuild
 
 
 @dataclass(frozen=True)
@@ -194,7 +198,7 @@ class ClassificationExportFormatter(ABC):
         except:
             report_exc_info()
             def yield_error_bytes():
-                yield "An error occurred generating the file".encode()
+                yield b"An error occurred generating the file"
             yield "error.txt", modified_at, perms, ZIP_64, yield_error_bytes()
             raise
 

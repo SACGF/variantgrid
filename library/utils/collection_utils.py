@@ -3,9 +3,10 @@ import operator
 import re
 from abc import ABC
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from itertools import islice
-from typing import Iterable, Iterator, TypeVar, Any, Generic, Callable, Optional, Sequence, Union
+from typing import Any, Generic, Optional, TypeVar, Union
 
 from django.utils.functional import SimpleLazyObject
 
@@ -409,6 +410,6 @@ class FormerTuple(ABC):
 
     def __eq__(self, other):
         # default implementation assumes all parts implement __eq__
-        if not type(self) is type(other):
+        if type(self) is not type(other):
             return False
         return self.as_tuple == other.as_tuple

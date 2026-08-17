@@ -1,15 +1,15 @@
 from collections import Counter, defaultdict
-from typing import TypeAlias, Optional
+from typing import Optional, TypeAlias
 
 import numpy as np
 import pandas as pd
 from django.db.models import ExpressionWrapper, F, fields
-from django.db.models.aggregates import Sum, Count
+from django.db.models.aggregates import Count, Sum
 from django.utils import timezone
 from django.utils.datastructures import OrderedSet
 
 from snpdb.models import VCF
-from upload.models import UploadStep, UploadPipeline
+from upload.models import UploadPipeline, UploadStep
 
 
 def get_upload_stats(uploadstep_qs, max_step_names: int = None):

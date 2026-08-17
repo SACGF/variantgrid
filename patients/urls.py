@@ -1,6 +1,21 @@
+from django.urls import include
+from rest_framework import routers
+
 from library.django_utils.jqgrid_view import JQGridView
 from patients import views, views_autocomplete
-from patients.grids import PatientListGrid, PatientOntologyGenesGrid, PatientRecordColumns, PatientRecordsColumns
+from patients.grids import (
+    PatientListGrid,
+    PatientOntologyGenesGrid,
+    PatientRecordColumns,
+    PatientRecordsColumns,
+)
+from patients.views_rest import (
+    ExtractionViewSet,
+    PatientViewSet,
+    SpecimenMeasureBulkCreateView,
+    SpecimenMeasureViewSet,
+    SpecimenViewSet,
+)
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
@@ -18,6 +33,10 @@ urlpatterns = [
     path('view_patient/<int:patient_id>', views.view_patient, name='view_patient'),
     path('view_patient/contact/<int:patient_id>', views.view_patient_contact_tab, name='view_patient_contact_tab'),
     path('view_patient/patient_specimens/<int:patient_id>', views.view_patient_specimens, name='view_patient_specimens'),
+    path('view_patient/patient_extractions/<int:patient_id>', views.view_patient_extractions, name='view_patient_extractions'),
+    path('view_specimen/<int:specimen_id>', views.view_specimen, name='view_specimen'),
+    path('view_extraction/<int:extraction_id>', views.view_extraction, name='view_extraction'),
+    path('extraction/<int:extraction_id>/samples', views.extraction_samples, name='extraction_samples'),
     path('view_patient/genes/<int:patient_id>', views.view_patient_genes, name='view_patient_genes'),
     path('view_patient/modifications/<int:patient_id>', views.view_patient_modifications, name='view_patient_modifications'),
 
@@ -47,6 +66,20 @@ urlpatterns = [
     # Autocomplete
     path('autocomplete/Patient/', views_autocomplete.PatientAutocompleteView.as_view(), name='patient_autocomplete'),
     path('autocomplete/Specimen/', views_autocomplete.SpecimenAutocompleteView.as_view(), name='specimen_autocomplete'),
+    path('autocomplete/Extraction/', views_autocomplete.ExtractionAutocompleteView.as_view(), name='extraction_autocomplete'),
     path('autocomplete/Clinician/', views_autocomplete.ClinicianAutocompleteView.as_view(), name='clinician_autocomplete'),
     path('autocomplete/ExternalPKAutocompleteView', views_autocomplete.ExternalPKAutocompleteView.as_view(), name='external_pk_autocomplete'),
+]
+
+router = routers.DefaultRouter()
+router.register(r'api/v1/patient', PatientViewSet, basename='api_patient')
+router.register(r'api/v1/specimen', SpecimenViewSet, basename='api_specimen')
+router.register(r'api/v1/extraction', ExtractionViewSet, basename='api_extraction')
+router.register(r'api/v1/specimen_measure', SpecimenMeasureViewSet, basename='api_specimen_measure')
+
+urlpatterns += [
+    # Ahead of the router, whose detail route would otherwise read 'bulk_create' as a primary key
+    path('api/v1/specimen_measure/bulk_create', SpecimenMeasureBulkCreateView.as_view(),
+         name='api_specimen_measure_bulk_create'),
+    path('', include(router.urls), name='patients_apis'),
 ]

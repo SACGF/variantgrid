@@ -3,7 +3,7 @@ from datetime import date
 from django.core.management import BaseCommand
 from django.utils import timezone
 
-from snpdb.clingen_allele import ClinGenAlleleRegistryAPI
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models import ClinGenAllele, Variant
 
 
@@ -23,7 +23,7 @@ class Command(BaseCommand):
             cga_qs = cga_qs.filter(modified__lte=before_date)
 
         if indels:
-            filter_message.append(f"(Indels only)")
+            filter_message.append("(Indels only)")
             variants_with_clingen = Variant.objects.filter(variantallele__allele__clingen_allele__in=cga_qs)
             indel_qs = variants_with_clingen.exclude(Variant.get_snp_q())
             values_qs = indel_qs.values_list("variantallele__allele__clingen_allele__id", flat=True)
@@ -33,7 +33,7 @@ class Command(BaseCommand):
 
         print(f"There are {len(clingen_allele_by_id)} CA IDs {', '.join(filter_message)}")
 
-        clingen_api = ClinGenAlleleRegistryAPI()
+        clingen_api = ClinGenAlleleRegistryAPI.instance()
         records = clingen_allele_by_id.keys()
         clingen_to_update = []
         now = timezone.now()

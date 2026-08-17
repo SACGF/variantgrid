@@ -6,18 +6,19 @@ The original implementation RedisVariantPKLookup used Redis to store a hash, was
 import logging
 import os
 from collections import defaultdict
-from typing import Iterable, TypeAlias, Tuple, Callable, Collection, Any
+from collections.abc import Callable, Collection, Iterable
+from typing import Any, TypeAlias
 
-from django.db.models import Q, Value, TextField, QuerySet
+from django.db.models import Q, QuerySet, TextField, Value
 from django.db.models.aggregates import Max
 from django.db.models.functions import Concat
 
 from library.utils import sha256sum_str
-from snpdb.models import Variant, Locus, Sequence, GenomeBuild, VariantCoordinate
+from snpdb.models import GenomeBuild, Locus, Sequence, Variant, VariantCoordinate
 from upload.vcf import sql_copy_files
 
-VariantHash: TypeAlias = Tuple[int, int, int, int, int | str]
-LocusHash: TypeAlias = Tuple[int, int, int]
+VariantHash: TypeAlias = tuple[int, int, int, int, int | str]
+LocusHash: TypeAlias = tuple[int, int, int]
 LociHash: TypeAlias = Any
 AnyHash: TypeAlias = VariantHash | LocusHash | LociHash
 

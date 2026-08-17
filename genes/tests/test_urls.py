@@ -8,12 +8,22 @@ from django.utils import timezone
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import CachedWebResource
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.models import CanonicalTranscriptCollection, GeneCoverageCollection, GeneCoverage, GeneList, PanelAppPanel, \
-    GeneListCategory, Gene, CanonicalTranscript, GeneListGeneSymbol, PanelAppServer
+from genes.models import (
+    CanonicalTranscript,
+    CanonicalTranscriptCollection,
+    Gene,
+    GeneCoverage,
+    GeneCoverageCollection,
+    GeneList,
+    GeneListCategory,
+    GeneListGeneSymbol,
+    PanelAppPanel,
+    PanelAppServer,
+)
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
-from ontology.models import OntologyService, OntologyImport, OntologyTerm
-from snpdb.models import ImportStatus, DataState
+from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from snpdb.models import DataState, ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
@@ -155,7 +165,8 @@ class Test(URLTestCase):
             # Test accession has no version
             ("view_transcript_accession", {"transcript_accession": self.transcript_version.transcript_id}, 200),
             # ("api_panel_app_gene_evidence", gene_symbol_kwargs, 200),
-            ("api_gene_info", gene_symbol_kwargs, 200),
+            ("api_gene_detail", {"gene_id": self.gene.pk}, 200),
+            ("api_gene_symbol_detail", gene_symbol_kwargs, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 
@@ -239,7 +250,6 @@ class Test(URLTestCase):
 # ('api/gene_list/modify/<int:pk>', views_rest.ModifyGeneListView.as_view(), name='api_modify_gene_list'),
 # ('api/gene_list/create', views_rest.CreateGeneListView.as_view(), name='api_create_gene_list'),
 # ('api/named_gene_list/<category__name>/<name>', views_rest.NamedGeneListView.as_view(), name='api_named_gene_list'),
-# ('api/gene/batch_info', views_rest.BatchGeneInfoView.as_view(), name='api_batch_gene_info'),
 # ('api/text_to_gene_list', views_rest.TextToGeneListView.as_view(), name='api_text_to_gene_list'),
 
 

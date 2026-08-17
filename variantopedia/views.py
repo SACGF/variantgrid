@@ -4,7 +4,7 @@ import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from functools import reduce
 from typing import Any, Optional
 
@@ -14,20 +14,34 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.forms import model_to_dict
-from django.shortcuts import get_object_or_404, render, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.timesince import timesince
 from django.utils.timezone import localtime
 from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
-from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
-    VariantAnnotationVersion, VariantAnnotation, AnnotationStatus, ClinVarRecordCollection
 from annotation.manual_variant_entry import check_can_create_variants
+from annotation.models import (
+    AnnotationRun,
+    AnnotationStatus,
+    AnnotationVersion,
+    Classification,
+    ClassificationModification,
+    ClinVarRecordCollection,
+    VariantAnnotation,
+    VariantAnnotationVersion,
+)
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, OverlapType
-from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
-    EvidenceKeyMap, ClassificationGroupingEntry, Overlap
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
+from classification.models import (
+    AlleleOriginGrouping,
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
+    DiscordanceReport,
+    EvidenceKeyMap,
+    OverlapStatus,
+)
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -36,12 +50,17 @@ from classification.views.exports.classification_export_formatter_csv import For
 from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
-from library.django_utils import require_superuser, highest_pk, get_field_counts
+from library.django_utils import get_field_counts, highest_pk, require_superuser
 from library.django_utils.jqgrid_view import JQGridView
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
-from library.log_utils import log_traceback, report_message, slack_bot_username, AdminNotificationBuilder
+from library.log_utils import (
+    AdminNotificationBuilder,
+    log_traceback,
+    report_message,
+    slack_bot_username,
+)
 from library.utils import flatten_nested_lists
 from pathtests.models import cases_for_user
 from patients.models import Clinician
@@ -51,28 +70,66 @@ from snpdb.clingen_allele import link_allele_to_existing_variants
 from snpdb.forms import TagForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleConversionTool, ImportSource, AlleleOrigin, \
-    VariantGridColumn, Tag
+from snpdb.models import (
+    VCF,
+    Allele,
+    AlleleConversionTool,
+    AlleleOrigin,
+    ImportSource,
+    Sample,
+    Tag,
+    Variant,
+    VariantGridColumn,
+    get_igv_data,
+)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.utils import get_genome_build_or_404
-from snpdb.variant_sample_information import VariantSampleInformation
-from upload.models import ModifiedImportedVariant
+from snpdb.variant_filters import (
+    get_all_variant_types,
+    get_all_variants_filters,
+    get_gene_symbol_alias_strs,
+    get_variant_type_label,
+    resolve_gene_symbols,
+)
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
-from variantopedia.grids import VariantTagsGrid, TaggedVariantGrid
-from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
+from variantopedia.grids import TaggedVariantGrid, VariantTagsGrid
+from variantopedia.interesting_nearby import (
+    get_method_summaries,
+    get_nearby_qs,
+    get_nearby_summaries,
+)
 from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
 
 def variants(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    context = {"genome_build": genome_build}
+    initial_filters = get_all_variants_filters(request.user, genome_build)
+
+    selected_gene_symbols = resolve_gene_symbols(initial_filters.get("gene_symbols"))
+    # Aliases are traversed when querying, so tell the user which extra symbols that brought in
+    gene_symbol_aliases = {}
+    for gene_symbol in selected_gene_symbols:
+        alias_symbol_strs = get_gene_symbol_alias_strs(gene_symbol)
+        if extra_symbols := [s for s in alias_symbol_strs if s != gene_symbol.symbol]:
+            gene_symbol_aliases[gene_symbol.symbol] = extra_symbols
+
+    gene_symbol_form = forms.AllVariantsGeneSymbolForm(initial={"gene_symbols": selected_gene_symbols})
+    context = {
+        "genome_build": genome_build,
+        "standard_contigs": genome_build.standard_contigs,
+        "variant_types": [(vt, get_variant_type_label(vt)) for vt in get_all_variant_types()],
+        "initial_filters": initial_filters,
+        "initial_filters_json": json.dumps(initial_filters),
+        "gene_symbol_form": gene_symbol_form,
+        "gene_symbol_aliases": gene_symbol_aliases,
+    }
     return render(request, "variantopedia/variants.html", context)
 
 
@@ -267,8 +324,7 @@ def server_status_settings(request):
     slack_emoji = (settings.SLACK or {}).get('emoji') or ':dna:'
     slack_username = f"{slack_emoji} {slack_bot_username()}"
 
-    hgvs_matcher_id = settings.HGVS_DEFAULT_METHOD
-    hgvs_matcher = HGVSMatcher(GenomeBuild.grch38(), hgvs_converter_type=hgvs_matcher_id)
+    hgvs_matcher = HGVSMatcher(GenomeBuild.grch38())
 
     return render(request, "variantopedia/server_status_settings_detail.html", {
         "settings": settings,
@@ -543,6 +599,7 @@ def view_allele(request, allele_id: int):
     }
     return render(request, "variantopedia/view_allele.html", context)
 
+
 def export_classifications_allele(request, allele_id: int):
     """
     CSV export of what is currently filtered into the classification grid
@@ -675,18 +732,16 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
 
 def variant_sample_information(request, variant_id, genome_build_name):
+    """ Shell only - the samples grid, locus counts and multi-allelic list are drawn client side
+        from the variant_sample_genotypes API, one request per variant """
     variant = get_object_or_404(Variant, pk=variant_id)
-    genome_build = get_genome_build_or_404(genome_build_name)
-    vsi = VariantSampleInformation(request.user, variant, genome_build)
-    other_loci_variants_by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(variant)
-    g_hgvs = VariantAnnotation.get_hgvs_g(variant)
+    get_genome_build_or_404(genome_build_name)  # Validate, builds we search come from the variants' contigs
 
     context = {
         "variant": variant,
-        "vsi": vsi,
-        "g_hgvs": g_hgvs,
-        "other_loci_variants_by_multiallelic": other_loci_variants_by_multiallelic,
-        "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build=genome_build).exists(),
+        "variant_ids": [v.pk for v in variant.all_build_variants],
+        "has_samples_in_other_builds":
+            Sample.objects.exclude(vcf__genome_build__in=variant.all_genome_builds).exists(),
     }
     return render(request, "variantopedia/variant_sample_information.html", context)
 

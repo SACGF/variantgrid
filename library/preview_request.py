@@ -1,7 +1,8 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Union, Any, Callable, Type
+from typing import Any, Optional, Union
 
 from django.db.models import Model
 from django.dispatch import Signal
@@ -169,7 +170,7 @@ class PreviewModelMixin:
         return self.preview_with()
 
 
-PreviewCoordinator = Union[Type[PreviewModelMixin], PreviewProxyModel]
+PreviewCoordinator = Union[type[PreviewModelMixin], PreviewProxyModel]
 
 
 @dataclass(eq=True)

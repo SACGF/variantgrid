@@ -2,4 +2,9 @@
 
 VG_DIR=$(dirname $0)/../..
 
-autopep8 ${VG_DIR} --recursive --select=W293,W391,E203,E242,E251,E252,E261,E27,E303,W291,W292,W293,W391 --in-place --exclude "*env/*"
+# Ruff replaces the old autopep8 pass. Safe auto-fixes only: whitespace,
+# unused imports, import ordering, modern-syntax. Config: ruff.toml
+ruff check "${VG_DIR}" --fix
+
+# Full black-style reformatting is opt-in (large diff) - uncomment to adopt:
+# ruff format "${VG_DIR}"

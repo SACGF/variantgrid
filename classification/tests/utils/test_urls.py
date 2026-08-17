@@ -2,13 +2,24 @@ import unittest
 
 from django.contrib.auth.models import User
 
-from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants
-from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
-    create_classification_for_sample_and_variant_objects
+from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
+    create_classification_for_sample_and_variant_objects,
+)
 from classification.models import EvidenceKey
-from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
-from snpdb.models import GenomeBuild, Variant, ClinGenAllele, Allele, VariantAllele, AlleleOrigin, Lab, Organization, \
-    Country, UserSettings
+from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from snpdb.models import (
+    Allele,
+    AlleleOrigin,
+    ClinGenAllele,
+    Country,
+    GenomeBuild,
+    Lab,
+    Organization,
+    UserSettings,
+    Variant,
+    VariantAllele,
+)
 
 
 class Test(URLTestCase):
@@ -74,6 +85,8 @@ class Test(URLTestCase):
             # ('view_template_report', record_kwargs, 200),
             ('classification_history', classification_kwargs, 200),
             ('view_classification', classification_kwargs, 200),
+            ('view_classification_lab_record',
+             {"classification_ref": f"{cls.lab.group_name}/{classification.lab_record_id}"}, 302),
             # ('discordance_report', report_kwargs, 200),
             # ('discordance_export', report_kwargs, 200),
         ]
@@ -95,6 +108,7 @@ class Test(URLTestCase):
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [
             ("classifications", {}, 200),
+            ("classification_groupings", {}, 200),
             ("export_classifications_grid", {}, 200),
             ("export_classifications_grid_redcap", {}, 200),
             ("redcap_data_dictionary", {}, 200),

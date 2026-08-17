@@ -3,8 +3,11 @@ from typing import Optional
 
 from django.dispatch import receiver
 
-from library.health_check import HealthCheckRequest, HealthCheckAge, \
-    health_check_overall_stats_signal
+from library.health_check import (
+    HealthCheckAge,
+    HealthCheckRequest,
+    health_check_overall_stats_signal,
+)
 from ontology.models import OntologyImport
 
 

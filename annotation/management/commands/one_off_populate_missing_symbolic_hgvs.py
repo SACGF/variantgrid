@@ -3,8 +3,12 @@ from typing import Optional
 
 from django.core.management import BaseCommand
 
-from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, AbstractVariantAnnotation
-from genes.hgvs import HGVSMatcher, HGVSException
+from annotation.models import (
+    AbstractVariantAnnotation,
+    VariantAnnotation,
+    VariantTranscriptAnnotation,
+)
+from genes.hgvs import HGVSException, HGVSMatcher
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 
@@ -33,7 +37,7 @@ class Command(BaseCommand):
                     try:
                         hgvs_c = matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
                         va_list.append(va)
-                    except (ValueError, HGVSException) as e:
+                    except (ValueError, HGVSException):
                         # print(f"FAILED: {transcript_accession}: {e} - {quick_reject=}")
                         pass
 
@@ -54,7 +58,9 @@ class Command(BaseCommand):
         for genome_build in GenomeBuild.builds_with_annotation():
             matcher = HGVSMatcher(genome_build)
             qs = Variant.objects.filter(Variant.get_contigs_q(genome_build))
-            symbolic_qs = qs.filter(alt__seq__startswith='<')
+            # Gene-level alts also start with '<', but their HGVS is the VICC nomenclature the
+            # GENE_LEVEL pipeline writes, not something to calculate. @see snpdb.gene_level_variants
+            symbolic_qs = qs.filter(alt__seq__startswith='<').exclude(Variant.get_gene_level_q())
             total = symbolic_qs.count()
             print(f"{genome_build.name=} has {total} variants to update annotation")
 

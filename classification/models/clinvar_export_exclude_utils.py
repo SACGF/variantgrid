@@ -7,9 +7,14 @@ from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.dispatch import receiver
 
-from classification.models import ClassificationModification, EvidenceMixin, classification_flag_types, \
-    classification_post_publish_signal, Classification
-from flags.models import FlagStatus, Flag
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    EvidenceMixin,
+    classification_flag_types,
+    classification_post_publish_signal,
+)
+from flags.models import Flag, FlagStatus
 from library.guardian_utils import admin_bot
 from library.utils import get_timer
 from snpdb.models import ClinVarKey, ClinVarKeyExcludePattern

@@ -1,17 +1,20 @@
-import json
 import logging
 import time
 
 import ijson
 from django.core.management.base import BaseCommand
-from django.db.models import Max
 from django.db.models.functions import Upper
 
-from annotation.models import VariantAnnotationVersion
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
-from genes.gene_matching import ReleaseGeneMatcher
-from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript, HGNC, \
-    GeneAnnotationRelease, ReleaseGeneVersion, ReleaseTranscriptVersion
+from genes.models import (
+    HGNC,
+    Gene,
+    GeneAnnotationImport,
+    GeneSymbol,
+    GeneVersion,
+    Transcript,
+    TranscriptVersion,
+)
 from genes.models_enums import AnnotationConsortium
 from library.utils import invert_dict
 from library.utils.file_utils import open_handle_gzip
@@ -40,6 +43,11 @@ class GeneAnnotationImportManager:
 
 class Command(BaseCommand):
     """
+        Insert the gene/transcript versions from a cdot JSON.gz file.
+
+        To create a GeneAnnotationRelease (which links the versions from a single GFF/GTF so they
+        match a VEP build) use 'import_cdot_gene_annotation_release'.
+
         This makes use of files produced by a spin-off project: cdot
         @see https://github.com/SACGF/cdot
     """
@@ -51,8 +59,6 @@ class Command(BaseCommand):
 
         parser.add_argument('--genome-build', choices=builds, required=True)
         parser.add_argument('--annotation-consortium', choices=consortia, required=True)
-        parser.add_argument('--release', required=False,
-                            help="Make a release (to match VEP) store all gene/transcript versions")
         parser.add_argument('--json-file', required=True,
                             help='cdot JSON.gz')
         parser.add_argument('--clear-obsolete', action='store_true', help='Clear old transcripts')
@@ -64,24 +70,13 @@ class Command(BaseCommand):
         ac_dict = invert_dict(dict(AnnotationConsortium.choices))
         annotation_consortium = ac_dict[annotation_consortium_name]
 
-        json_file = options["json_file"]
-        if release_version := options["release"]:
-            # A release needs random access / multiple passes over the data, so load it all in
-            with open_handle_gzip(json_file, "rb") as f:
-                cdot_data = json.load(f)
-                cdot_version = cdot_data.get("cdot_version")
-                if cdot_version is None:
-                    raise ValueError("JSON does not contain 'cdot_version' key")
-                print(f"JSON uses cdot version {cdot_version}")
-            self._create_release(genome_build, annotation_consortium, release_version, cdot_data, cdot_version)
-        else:
-            # Stream the file (genes then transcripts) so we never hold the whole thing in RAM
-            with open_handle_gzip(json_file, "rb") as f:
-                cdot_version = self.read_cdot_version(f)
-                if cdot_version is None:
-                    raise ValueError("JSON does not contain 'cdot_version' key")
-                print(f"JSON uses cdot version {cdot_version}")
-                self.import_cdot_data_file(genome_build, annotation_consortium, f, cdot_version)
+        # Stream the file (genes then transcripts) so we never hold the whole thing in RAM
+        with open_handle_gzip(options["json_file"], "rb") as f:
+            cdot_version = self.read_cdot_version(f)
+            if cdot_version is None:
+                raise ValueError("JSON does not contain 'cdot_version' key")
+            print(f"JSON uses cdot version {cdot_version}")
+            self.import_cdot_data_file(genome_build, annotation_consortium, f, cdot_version)
 
         if options["clear_obsolete"]:
             # These were really old json format (before cdot schema change)
@@ -90,104 +85,6 @@ class Command(BaseCommand):
                                                      genome_build=genome_build)
             ret = tv_qs.filter(data__genome_builds__isnull=True).delete()
             print(f"Deleted: {ret}")
-
-    def _create_release(self, genome_build: GenomeBuild, annotation_consortium, release_version, cdot_data, cdot_version):
-        """ A GeneAnnotationRelease doesn't change/store transcript data, but does keep track of e.g. what
-            symbols are used and how things are linked together """
-
-        # A release should be from a single GTF - so all URLs should be the same, so take any one
-        random_transcript = next(iter(cdot_data["transcripts"].values()))
-        url = random_transcript["genome_builds"][genome_build.name]["url"]
-        ga_import_manager = GeneAnnotationImportManager()
-        # For a release, this must be there as it was imported before
-        import_source = ga_import_manager.get_import_source_by_url(url)
-        release, created = GeneAnnotationRelease.objects.update_or_create(version=release_version,
-                                                                          genome_build=genome_build,
-                                                                          annotation_consortium=annotation_consortium,
-                                                                          defaults={
-                                                                              "gene_annotation_import": import_source
-                                                                          })
-        if not created:
-            print("Release exists - clearing existing data")
-            release.releasegeneversion_set.all().delete()
-            release.releasetranscriptversion_set.all().delete()
-
-        gene_version_ids_by_accession = GeneVersion.id_by_accession(genome_build=genome_build,
-                                                                    annotation_consortium=annotation_consortium)
-        transcript_version_ids_by_accession = TranscriptVersion.id_by_accession(genome_build=genome_build,
-                                                                                annotation_consortium=annotation_consortium)
-
-        release_transcript_version_list = []
-        gene_versions_used_by_transcripts = set()
-        for transcript_accession, tv_data in cdot_data["transcripts"].items():
-            # cdot has some fake transcripts (e.g. 'fake-rna-ATP6') that import_cdot_data skips
-            # because they have no version — they won't be in transcript_version_ids_by_accession.
-            _, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-            if version is None:
-                continue
-            transcript_version_id = transcript_version_ids_by_accession[transcript_accession]
-            rtv = ReleaseTranscriptVersion(release=release, transcript_version_id=transcript_version_id)
-            release_transcript_version_list.append(rtv)
-
-            if gene_version := tv_data.get("gene_version"):
-                gene_versions_used_by_transcripts.add(gene_version)
-
-        # It's possible that we have gene versions in this release that we don't have normally in merged files
-        # as a later transcript uses a different gene so this one was never stored. We'll have to make those now
-        missing_gene_versions = gene_versions_used_by_transcripts - set(gene_version_ids_by_accession)
-        if missing_gene_versions:
-            print(f"Missing {len(missing_gene_versions)} gene versions")
-            max_gene_version = GeneVersion.objects.all().aggregate(pk__max=Max("pk"))["pk__max"]
-            fake_cdot_data = {
-                "genes": {k: v for k, v in cdot_data["genes"].items() if k in missing_gene_versions},
-                "transcripts": {},  # Don't insert any of these
-            }
-            self.import_cdot_data(genome_build, annotation_consortium, fake_cdot_data, cdot_version)
-            new_gene_versions = GeneVersion.objects.filter(genome_build=genome_build,
-                                                           gene__annotation_consortium=annotation_consortium,
-                                                           pk__gt=max_gene_version)
-            gene_version_ids_by_accession.update({gv.accession: gv.pk for gv in new_gene_versions})
-
-        release_gene_version_list = []
-        for gene_accession in cdot_data["genes"]:
-            # Gene accession may not have
-            # We only store gene versions that are used in the merged files (which is what's used to insert data)
-            if gene_accession in gene_versions_used_by_transcripts:
-                gene_version_id = gene_version_ids_by_accession[gene_accession]
-                release_gene_version_list.append(ReleaseGeneVersion(release=release, gene_version_id=gene_version_id))
-
-        if release_gene_version_list:
-            print(f"Inserting {len(release_gene_version_list)} gene versions for release {release}")
-            ReleaseGeneVersion.objects.bulk_create(release_gene_version_list)
-
-        if release_transcript_version_list:
-            print(f"Inserting {len(release_transcript_version_list)} transcript versions for release {release}")
-            ReleaseTranscriptVersion.objects.bulk_create(release_transcript_version_list)
-
-        print("Matching existing gene list symbols to this release...")
-        gm = ReleaseGeneMatcher(release)
-        gm.match_unmatched_in_hgnc_and_gene_lists()
-
-        # Attempt to link it...
-        if not release.variantannotationversion_set.exists():
-            auto_linked = False
-            for vav in VariantAnnotationVersion.objects.filter(gene_annotation_release__isnull=True,
-                                                               genome_build=genome_build):
-                if vav.gene_annotation_release_gff_url == release.gene_annotation_import.url:
-                    print(f"Auto-linking release to {vav}")
-                    vav.gene_annotation_release = release
-                    vav.save()
-                    auto_linked = True
-                    break
-            if not auto_linked:
-                print("Release not linked - you will have to manually do so via Django Admin")
-
-        print(f"To create a GeneAnnotationVersion for this release, run: "
-              f"python3 manage.py gene_annotation --gene-annotation-release {release.pk}")
-        print("Or to create GeneAnnotationVersions for the latest release of every build, run: "
-              "python3 manage.py gene_annotation --latest-releases")
-        print("Or to create GeneAnnotationVersions for all latest AnnotationVersions missing one, run: "
-              "python3 manage.py gene_annotation --missing")
 
     # How many transcript versions to hold in memory before flushing to the DB. Bounds peak RAM
     # when importing large streamed files (see import_cdot_data_file).

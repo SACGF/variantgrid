@@ -4,14 +4,14 @@ from functools import reduce
 from django.core.management import BaseCommand
 from django.db.models import Q
 from hgvs.exceptions import HGVSInvalidVariantError
-from pyhgvs import InvalidHGVSName
 
 from classification.classification_import import reattempt_variant_matching
-from classification.models.classification_variant_info_models import ImportedAlleleInfo, \
-    ImportedAlleleInfoStatus
+from classification.models.classification_variant_info_models import (
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
+)
 from genes.hgvs import HGVSMatcher
 from library.guardian_utils import admin_bot
-from snpdb.models import GenomeBuild
 
 
 class Command(BaseCommand):
@@ -27,11 +27,6 @@ class Command(BaseCommand):
     """
 
     def handle(self, *args, **options):
-        genome_build_matchers = {}
-
-        for genome_build in GenomeBuild.builds_with_annotation():
-            genome_build_matchers[genome_build] = HGVSMatcher(genome_build)
-
         regex_span_plus_provided = r"\d+_\d+(del|dup)[GATC]+"
         filters = [
             Q(imported_c_hgvs__regex=regex_span_plus_provided),
@@ -41,11 +36,11 @@ class Command(BaseCommand):
         iai_qs = ImportedAlleleInfo.objects.all()
         iai_ids_with_hgvs_errors = set()
         for iai in iai_qs.filter(q).iterator():
-            matcher = genome_build_matchers[iai.imported_genome_build]
-            hgvs_name = iai.imported_c_hgvs or iai.imported_g_hgvs
+            matcher = HGVSMatcher.instance(iai.imported_genome_build)
+            hgvs_name = iai.imported_hgvs
             try:
                 matcher.get_variant_coordinate(hgvs_name)
-            except (HGVSInvalidVariantError, InvalidHGVSName) as e:
+            except HGVSInvalidVariantError as e:
                 print(f"REMATCHING {iai.pk} due to: {hgvs_name}: {e}")
                 iai_ids_with_hgvs_errors.add(iai.pk)
             except ValueError:

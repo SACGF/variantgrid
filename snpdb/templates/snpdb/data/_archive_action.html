@@ -16,7 +16,7 @@
                 <form method="post" action="{% url archive_url_name obj.pk %}">
                     {% csrf_token %}
                     <p>Are you sure you want to archive this VCF? This will drop the underlying data and keep only metadata.
-                        The source file <code>{{ obj.uploadedvcf.uploaded_file.get_filename }}</code> will be remembered so the data can be re-imported later.</p>
+                        The source file <code>{{ obj.uploadedvcf.file_upload.get_filename }}</code> will be remembered so the data can be re-imported later.</p>
                     <div class="form-group">
                         <label for="archive-reason">Reason</label>
                         <textarea id="archive-reason" name="reason" class="form-control" rows="3"></textarea>

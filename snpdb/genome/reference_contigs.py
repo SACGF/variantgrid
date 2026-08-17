@@ -19,7 +19,12 @@ from django.conf import settings
 from django.utils.text import slugify
 
 from library.pandas_utils import read_csv_skip_header
-from snpdb.models import SequenceRole, AssemblyMoleculeType
+from snpdb.gene_level_variants import (
+    GENE_LEVEL_CONTIG_LENGTH,
+    GENE_LEVEL_CONTIG_NAME,
+    GENE_LEVEL_CONTIG_REFSEQ_ACCESSION,
+)
+from snpdb.models import AssemblyMoleculeType, SequenceRole
 
 GRCH37 = "GCF_000001405.25_GRCh37.p13_assembly_report.txt"
 ASSEMBLY_REPORTS = {
@@ -82,6 +87,23 @@ def get_assembly_report_df(build):
     return df
 
 
+def create_gene_level_contig(get_model: callable, genome_build, order: int):
+    """ The one contig every build shares for events with no coordinate - @see snpdb.gene_level_variants """
+    Contig = get_model("Contig")
+    GenomeBuildContig = get_model("GenomeBuildContig")
+
+    contig, _ = Contig.objects.get_or_create(refseq_accession=GENE_LEVEL_CONTIG_REFSEQ_ACCESSION,
+                                             defaults={
+                                                 "name": GENE_LEVEL_CONTIG_NAME,
+                                                 "role": SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG,
+                                                 "length": GENE_LEVEL_CONTIG_LENGTH,
+                                             })
+    GenomeBuildContig.objects.get_or_create(genome_build=genome_build,
+                                            contig=contig,
+                                            defaults={"order": order})
+    return contig
+
+
 def create_build_and_contigs(get_model: callable, build_name, alias=None, igv_genome=None):
     """ Explicitly pass in the models, because we want this to be able to work from a Django data migration """
     GenomeBuild = get_model("GenomeBuild")
@@ -107,8 +129,8 @@ def create_build_and_contigs(get_model: callable, build_name, alias=None, igv_ge
 
     genome_build = GenomeBuild.objects.create(**kwargs)
     logging.info("Created build %s", genome_build)
-    role_lookup = dict(((k.label, k.value) for k in SequenceRole))
-    molecule_type_lookup = dict(((k.label, k.value) for k in AssemblyMoleculeType))
+    role_lookup = dict((k.label, k.value) for k in SequenceRole)
+    molecule_type_lookup = dict((k.label, k.value) for k in AssemblyMoleculeType)
     molecule_type_lookup["na"] = None
 
     i = 0
@@ -130,3 +152,5 @@ def create_build_and_contigs(get_model: callable, build_name, alias=None, igv_ge
                                                 contig=contig,
                                                 defaults={"order": i})
         i += 1
+
+    create_gene_level_contig(get_model, genome_build, i)

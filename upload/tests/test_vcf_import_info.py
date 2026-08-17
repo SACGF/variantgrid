@@ -3,22 +3,27 @@ from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
 from library.utils import sha256sum_str
-from snpdb.models import Sequence, GenomeBuild
+from snpdb.models import GenomeBuild, Sequence
 from snpdb.models.models_enums import ImportSource
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from upload.models import (
-    UploadedFile, UploadPipeline, UploadStep, UploadedFileTypes,
-    SimpleVCFImportInfo, ModifiedImportedVariants, ModifiedImportedVariant,
+    FileUpload,
+    ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
+    ModifiedImportedVariants,
+    SimpleVCFImportInfo,
+    UploadedFileTypes,
+    UploadPipeline,
+    UploadStep,
 )
 
 
 def _make_upload_step(user, step_name="test step"):
-    uploaded_file = UploadedFile.objects.create(
+    file_upload = FileUpload.objects.create(
         user=user, name="test.vcf", path="/tmp/test.vcf",
         file_type=UploadedFileTypes.VCF, import_source=ImportSource.COMMAND_LINE,
     )
-    pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+    pipeline = UploadPipeline.objects.create(file_upload=file_upload)
     return UploadStep.objects.create(upload_pipeline=pipeline, name=step_name, sort_order=0)
 
 

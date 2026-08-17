@@ -2,26 +2,32 @@ import operator
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Self, Tuple
+from typing import Optional, Self
 
 import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
-from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet, OuterRef, Count, \
-    F
+from django.db.models import CASCADE, SET_NULL, IntegerChoices, Q, QuerySet, TextChoices, F, OuterRef, Count
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
-from classification.enums import TestingContextBucket, TestingContextFull
+from classification.enums import TestingContextBucket, TestingContextFull, ClassificationResultValue
 from django.db import models, transaction
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
-from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved, ConditionReference, ClassificationSummaryCacheObj
-from classification.enums.overlaps_enums import ClassificationResultValue
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    ConditionResolved,
+    EvidenceKeyMap,
+    ImportedAlleleInfo, ConditionReference,
+)
+from classification.models.evidence_mixin_summary_cache import (
+    ClassificationSummaryCacheObj
+)
 from genes.models import GeneSymbol
 from library.utils import strip_json
 from snpdb.models import Allele, Lab
@@ -251,7 +257,7 @@ class ClassificationGrouping(TimeStampedModel):
         return reverse('classification_grouping_detail', kwargs={"classification_grouping_id": self.pk})
 
     @staticmethod
-    def _desired_grouping_for_classification(classification: Classification) -> Tuple[Optional['ClassificationGrouping'], bool]:
+    def _desired_grouping_for_classification(classification: Classification) -> tuple[Optional['ClassificationGrouping'], bool]:
         # withdrawn classifications are removed from groupings
         if classification.withdrawn:
             return None, False
@@ -323,7 +329,7 @@ class ClassificationGrouping(TimeStampedModel):
         all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
         all_modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True)
         all_modifications = all_modifications.select_related("classification")
-        return list(sorted(all_modifications, key=lambda mod: mod.curated_date_check))
+        return sorted(all_modifications, key=lambda mod: mod.curated_date_check)
 
     @cached_property
     def allele(self) -> Allele:
@@ -397,7 +403,7 @@ class ClassificationGrouping(TimeStampedModel):
             if None in all_zygosities:
                 all_zygosities.remove(None)
 
-            all_zygosities = list(sorted(evidence_map[SpecialEKeys.ZYGOSITY].sort_values(all_zygosities)))
+            all_zygosities = sorted(evidence_map[SpecialEKeys.ZYGOSITY].sort_values(all_zygosities))
             self.zygosity_values = all_zygosities
 
             # self.conditions = strip_json(ConditionResolved.from_uncounted_terms(

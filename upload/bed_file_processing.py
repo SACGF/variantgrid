@@ -15,11 +15,11 @@ def process_bed_file(bed_file, processed_file, has_chr):
     if not os.path.isabs(bed_file):
         msg = f"bed_file must be an absolute path: '{bed_file}'"
         raise ValueError(msg)
-    # Resolve symlinks so a poisoned UploadedFile.path can't redirect the subprocess at an unrelated file.
+    # Resolve symlinks so a poisoned FileUpload.path can't redirect the subprocess at an unrelated file.
     bed_file = os.path.realpath(bed_file)
     if not os.path.exists(bed_file):
         msg = f"'{bed_file}' does not exist"
-        raise IOError(msg)
+        raise OSError(msg)
 
     mk_path(settings.PROCESSED_BED_FILES_DIR)
 

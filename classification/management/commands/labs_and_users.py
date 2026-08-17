@@ -16,7 +16,7 @@ user_path = os.path.join(module_dir, 'users.csv')
 
 def csv_to_dict(file_path):
     header = None
-    with open(file_path, 'r') as csvfile:
+    with open(file_path) as csvfile:
         reader = csv.reader(csvfile, delimiter=',', quotechar='"')
         rows = []
         for csv_row in reader:

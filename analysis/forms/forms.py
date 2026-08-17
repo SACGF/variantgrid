@@ -4,16 +4,30 @@ import re
 from collections import defaultdict
 
 from crispy_forms.bootstrap import FieldWithButtons, StrictButton
-from crispy_forms.layout import Layout, Field
+from crispy_forms.layout import Field, Layout
 from dal import forward
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
 from django.forms.widgets import TextInput
 
-from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate, AnalysisTemplateVersion, \
-    AnalysisNode, CandidateStatus, AutoLaunchAnalysisTemplate
-from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample, QuadSample, AnalysisType
+from analysis.models import (
+    Analysis,
+    AnalysisNode,
+    AnalysisTemplate,
+    AnalysisTemplateVersion,
+    AutoLaunchAnalysisTemplate,
+    CandidateStatus,
+    FilterNodeItem,
+    NodeGraphType,
+)
+from analysis.models.enums import (
+    AnalysisTemplateType,
+    AnalysisType,
+    QuadSample,
+    SNPMatrix,
+    TrioSample,
+)
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion
@@ -23,7 +37,7 @@ from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
 from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
-from snpdb.models import CustomColumnsCollection, VariantGridColumn, Trio, UserSettings
+from snpdb.models import CustomColumnsCollection, Trio, UserSettings, VariantGridColumn
 from uicore.utils.form_helpers import form_helper_horizontal
 
 

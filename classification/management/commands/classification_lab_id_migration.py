@@ -7,7 +7,7 @@ from django.core.management import BaseCommand
 
 from classification.enums import SpecialEKeys
 from classification.models import Classification
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSComponents
 from snpdb.models import Lab
 
 
@@ -30,7 +30,7 @@ class LabRecordIdCalculator:
 
     @cached_property
     def c_hgvs_obj(self):
-        return CHGVS(self.c_hgvs)
+        return HGVSComponents(self.c_hgvs)
 
     @cached_property
     def genome_build_prefix(self):
@@ -78,10 +78,10 @@ class Command(BaseCommand):
                     last_imported = c.created
                     if import_run := c.last_import_run:
                         last_imported = import_run.created
-                    c_hgvs = CHGVS(c.imported_c_hgvs)
-                    return f"{c.lab_record_id}\t{c_hgvs.full_c_hgvs}\t{c_hgvs.transcript_parts.version}\t{c_hgvs.gene_symbol}\t{c.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)}\t{last_imported:%Y-%m-%d}"
+                    c_hgvs = HGVSComponents(c.imported_c_hgvs)
+                    return f"{c.lab_record_id}\t{c_hgvs.full_hgvs}\t{c_hgvs.transcript_parts.version}\t{c_hgvs.gene_symbol}\t{c.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)}\t{last_imported:%Y-%m-%d}"
 
-                records = sorted(records, key=lambda c: (CHGVS(c.imported_c_hgvs).transcript_parts.version, c.last_import_run.created), reverse=True)
+                records = sorted(records, key=lambda c: (HGVSComponents(c.imported_c_hgvs).transcript_parts.version, c.last_import_run.created), reverse=True)
 
                 best = records[0]
                 print(f"Keep\t{detailed_classification_str(best)}")

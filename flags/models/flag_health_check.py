@@ -1,10 +1,11 @@
 # NOTE it would be ideal for this to react to notification instead of having to be called directly
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Optional, Iterable
+from typing import Optional
 
 from django.db.models import Q
 
-from flags.models import FlagType, FlagComment, Flag, FlagStatus, FlagResolution
+from flags.models import Flag, FlagComment, FlagResolution, FlagStatus, FlagType
 
 
 class FlagDelta:

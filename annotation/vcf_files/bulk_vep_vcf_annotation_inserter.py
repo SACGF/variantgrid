@@ -1,33 +1,46 @@
 import logging
 import operator
+import os
 import shutil
 import time
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
+from collections.abc import Iterable
+from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Iterable, TypeAlias
+from typing import Optional, TypeAlias
 
 import intervaltree
 from django.conf import settings
 
 from annotation import vep_columns as vep_columns_registry
-from annotation.models.models import VariantAnnotation, \
-    VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
-from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
+from annotation.models.models import (
+    AnnotationRun,
+    VariantAnnotation,
+    VariantAnnotationVersion,
+    VariantGeneOverlap,
+    VariantTranscriptAnnotation,
+)
+from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType, VEPCustom
+from annotation.ptc import calculate_ptc_position, parse_ptc_distance_codons, predict_nmd_escape
 from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
+from annotation.sv_conservation import conservation_sidecar_filename, read_conservation_sidecar
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
-from annotation.vep_field_formatters import VEP_SEPARATOR, EMPTY_VALUES
+from annotation.vep_field_formatters import EMPTY_VALUES, VEP_SEPARATOR
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion, GeneVersion
+from genes.models import GeneVersion, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
-from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
-from library.genomics import overlap_fraction, Range, parse_gnomad_coord
+from library.django_utils.django_file_utils import (
+    get_import_processing_dir,
+    get_import_processing_filename,
+)
+from library.genomics import Range, overlap_fraction, parse_gnomad_coord
 from library.log_utils import log_traceback
 from library.utils import split_dict_multi_values
 from snpdb.models import VariantCoordinate
-from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
+from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 DELIMITER = '\t'
 EXTENSIONS = {",": "csv",
@@ -47,6 +60,93 @@ class VEPColumns:
 
 
 TranscriptData: TypeAlias = dict
+
+FRAMESHIFT_CONSEQUENCE = "frameshift_variant"
+
+
+@dataclass(frozen=True)
+class TranscriptGeometry:
+    """ The three numbers the PTC calculation needs, cached per transcript so the
+        cdot blob is read once per annotation run rather than once per row. """
+    fivep_utr_length: int
+    coding_length: int
+    last_junction_cdna: int
+    single_exon: bool
+
+    @classmethod
+    def for_transcript_version(cls, transcript_version: TranscriptVersion) -> Optional['TranscriptGeometry']:
+        """ None when the cdot data is too sparse to place exons - @see TranscriptVersion.get_coordinates """
+        build_data = transcript_version.data.get("genome_builds", {}).get(transcript_version.genome_build.name)
+        if not (build_data and build_data.get("exons") and build_data.get("strand")):
+            return None
+
+        exons = build_data["exons"]
+        # cdot exons are in genomic order, so the transcript's final exon is at whichever end
+        # the strand puts it. Everything before it sums to the last exon-exon junction in cDNA.
+        final_exon = exons[-1] if build_data["strand"] == '+' else exons[0]
+        transcript_length = sum(end - start for start, end, *_ in exons)
+        final_exon_length = final_exon[1] - final_exon[0]
+        return cls(fivep_utr_length=transcript_version.fivep_utr_length,
+                   coding_length=transcript_version.coding_length,
+                   last_junction_cdna=transcript_length - final_exon_length,
+                   single_exon=len(exons) == 1)
+
+
+class TranscriptGeometryCache:
+    """ Lazily loads TranscriptGeometry per transcript_version_id, storing a None sentinel for
+        transcripts whose cdot data is sparse so each is read at most once. Only frameshift rows
+        (~1 in 47) consult it, so the working set stays a few % of the transcriptome. """
+
+    def __init__(self):
+        self._geometry_by_transcript_version_id: dict[int, Optional[TranscriptGeometry]] = {}
+
+    def get(self, transcript_version_id: int) -> Optional[TranscriptGeometry]:
+        if transcript_version_id not in self._geometry_by_transcript_version_id:
+            geometry = None
+            if transcript_version := TranscriptVersion.objects.filter(pk=transcript_version_id).first():
+                geometry = TranscriptGeometry.for_transcript_version(transcript_version)
+            self._geometry_by_transcript_version_id[transcript_version_id] = geometry
+        return self._geometry_by_transcript_version_id[transcript_version_id]
+
+
+def add_calculated_ptc(transcript_data: TranscriptData, indel_offset: int,
+                       transcript_geometry_cache: TranscriptGeometryCache):
+    """ Writes ptc_distance_codons / ptc_last_junction_distance / nmd_escape_status into
+        transcript_data. Shared by the inserter and `manage.py backfill_ptc_annotation`.
+
+        @param indel_offset len(ref) - len(alt) @see annotation.ptc.calculate_ptc_position """
+    transcript_data["nmd_escape_status"] = NMDEscapeStatus.NOT_APPLICABLE
+
+    consequence = transcript_data.get("consequence") or ""
+    if FRAMESHIFT_CONSEQUENCE not in consequence:
+        return
+
+    protein_position = transcript_data.get("protein_position")
+    transcript_version_id = transcript_data.get("transcript_version_id")
+    if not (protein_position and transcript_version_id):
+        return
+
+    ptc_distance_codons = parse_ptc_distance_codons(transcript_data.get("hgvs_p"))
+    if ptc_distance_codons is None:
+        return
+
+    geometry = transcript_geometry_cache.get(transcript_version_id)
+    if geometry is None or not geometry.coding_length:
+        return
+
+    try:
+        protein_position_int = VariantAnnotation.protein_position_to_int(protein_position)
+    except ValueError:
+        return
+
+    ptc_cds = calculate_ptc_position(protein_position_int, ptc_distance_codons, indel_offset)
+    ptc_cdna = ptc_cds + geometry.fivep_utr_length
+    ptc_last_junction_distance = geometry.last_junction_cdna - ptc_cdna
+
+    transcript_data["ptc_distance_codons"] = ptc_distance_codons
+    transcript_data["ptc_last_junction_distance"] = ptc_last_junction_distance
+    transcript_data["nmd_escape_status"] = predict_nmd_escape(ptc_cds, ptc_last_junction_distance,
+                                                              geometry.single_exon)
 
 
 class BulkVEPVCFAnnotationInserter:
@@ -71,6 +171,9 @@ class BulkVEPVCFAnnotationInserter:
         "transcript_id",
         "transcript_version_id",
         "maxentscan_percent_diff_ref",
+        "ptc_distance_codons",
+        "ptc_last_junction_distance",
+        "nmd_escape_status",
     ]
     DB_MANUALLY_POPULATED_VARIANT_ONLY_COLUMNS = [
         "predictions_num_pathogenic",
@@ -107,6 +210,13 @@ class BulkVEPVCFAnnotationInserter:
     # These are present in columns_version > 2
     ALOFT_COLUMNS = ['aloft_prob_tolerant', 'aloft_prob_recessive', 'aloft_prob_dominant',
                      'aloft_pred', 'aloft_high_confidence', 'aloft_ensembl_transcript']
+
+    # PromoterAI (GRCh38, columns_version >= 5) runs with match_to=any, matching on genomic
+    # position + alt allele only. A variant overlapping multiple nearby TSS windows gets
+    # parallel '&'-joined arrays of score / tss_pos - collapse to the single strongest-effect
+    # entry (largest absolute score) in _pick_promoter_ai_values.
+    PROMOTER_AI_SCORE_COLUMN = 'promoter_ai_score'
+    PROMOTER_AI_COLUMNS = [PROMOTER_AI_SCORE_COLUMN, 'promoter_ai_tss_pos']
 
     # dbNSFP source fields that come as &-separated arrays parallel to Ensembl_transcriptid
     # (columns_version >= 4 only — earlier versions only consumed dbNSFP variant-level fields).
@@ -150,6 +260,7 @@ class BulkVEPVCFAnnotationInserter:
         )
 
         self._setup_vep_fields_and_db_columns(validate_columns, cvf_list)
+        self._load_sv_conservation()
         self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build,
                                         # We only want exact transcript version for annotation
                                         allow_alternative_transcript_version=False)
@@ -162,6 +273,7 @@ class BulkVEPVCFAnnotationInserter:
         self.sv_overlap_processor = sv_overlap_processor
         self.sv_gene_overlap_resolver = sv_gene_overlap_resolver
         self._generated_hgvs_c = Counter()
+        self.transcript_geometry_cache = TranscriptGeometryCache()
 
         # Resolver for picking per-transcript dbNSFP values (RefSeq <-> Ensembl translation).
         # Only relevant for columns_version >= 4 (which introduced per-transcript dbNSFP
@@ -217,7 +329,11 @@ class BulkVEPVCFAnnotationInserter:
 
         # cvf_list is already filtered through vep_config so unconfigured customs are dropped.
         # Sort to have consistent VCF headers (case-insensitive to match postgres `ORDER BY source_field`)
+        # Defs without a source_field are calculated at insert time (see DB_MANUALLY_POPULATED_COLUMNS)
+        # so there's no CSQ column to copy from.
         for cvf in sorted(cvf_list, key=lambda c: (c.source_field or "").lower()):
+            if cvf.vep_info_field is None:
+                continue
             for vgc_id in cvf.variant_grid_columns:
                 self.source_field_to_columns[cvf.vep_info_field].add(vgc_id)
 
@@ -290,6 +406,29 @@ class BulkVEPVCFAnnotationInserter:
         }
         self.aloft_columns = self._has_all_aloft_columns(self.all_variant_columns)
 
+    def _load_sv_conservation(self):
+        """ Load the pyBigWig conservation sidecar (#1657) written by the SV annotate stage, if present.
+            For SVs the 4 conservation _max columns are computed with pyBigWig rather than VEP --custom
+            bigWig overlaps, so their ColumnVEPField rows are STANDARD-only and _setup_vep_fields_and_db_columns
+            drops the columns as out-of-scope/unpopulated. Re-add the columns the sidecar carries so they
+            get written, and hold the {variant_id: {column: value}} map for process_entry to merge in. """
+        self.sv_conservation: dict[int, dict[str, float]] = {}
+        self.sv_conservation_columns: set[str] = set()
+        vcf_annotated_filename = self.annotation_run.vcf_annotated_filename
+        if not vcf_annotated_filename:
+            return
+        sidecar = conservation_sidecar_filename(vcf_annotated_filename)
+        if not os.path.exists(sidecar):
+            return
+        self.sv_conservation = read_conservation_sidecar(sidecar)
+        for values in self.sv_conservation.values():
+            self.sv_conservation_columns.update(values)
+        if self.sv_conservation_columns:
+            # Conservation columns are variant-level (VariantAnnotation only, not the transcript model),
+            # so re-add them only to the variant column sets that _setup dropped as out-of-scope.
+            self.all_variant_columns |= self.sv_conservation_columns
+            self.variant_only_columns = self.all_variant_columns - self.transcript_columns
+
     @staticmethod
     def _has_all_aloft_columns(columns) -> bool:
         return all([ac in columns for ac in BulkVEPVCFAnnotationInserter.ALOFT_COLUMNS])
@@ -329,6 +468,8 @@ class BulkVEPVCFAnnotationInserter:
 
         if self.aloft_columns and self._has_all_aloft_columns(raw_db_data):
             self._pick_aloft_values(raw_db_data)
+
+        self._pick_promoter_ai_values(raw_db_data)
 
         if self.sv_overlap_processor:
             self.sv_overlap_processor.process(raw_db_data)
@@ -423,6 +564,27 @@ class BulkVEPVCFAnnotationInserter:
             best_aloft["aloft_ensembl_transcript"] = "."
         raw_db_data.update(best_aloft)
 
+    @classmethod
+    def _pick_promoter_ai_values(cls, raw_db_data: dict):
+        """ PromoterAI (match_to=any) emits parallel '&'-joined arrays of promoter_ai_score /
+            promoter_ai_tss_pos, one entry per nearby TSS the variant overlaps. Scores are signed
+            (predicted expression up/down) so we keep the strongest-effect entry (largest absolute
+            score) along with its matching TSS position. """
+        if raw_db_data.get(cls.PROMOTER_AI_SCORE_COLUMN) is None:
+            return
+
+        empty_scores = EMPTY_VALUES | {"NA"}
+        records = VariantAnnotation.vep_multi_fields_to_list_of_dicts(raw_db_data, cls.PROMOTER_AI_COLUMNS)
+        scored = [r for r in records if r.get(cls.PROMOTER_AI_SCORE_COLUMN) not in empty_scores]
+        if scored:
+            best = max(scored, key=lambda r: abs(float(r[cls.PROMOTER_AI_SCORE_COLUMN])))
+            if best.get("promoter_ai_tss_pos") in empty_scores:
+                best["promoter_ai_tss_pos"] = None
+            raw_db_data.update(best)
+        else:
+            for f in cls.PROMOTER_AI_COLUMNS:
+                raw_db_data.pop(f, None)
+
     def get_gene_id(self, vep_transcript_data: TranscriptData):
         gene_id = None
         vep_gene = vep_transcript_data[VEPColumns.GENE]
@@ -479,6 +641,8 @@ class BulkVEPVCFAnnotationInserter:
 
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD:
             self._add_calculated_maxentscan(transcript_data)
+            if self.vep_config.columns_version >= 5:
+                self._add_calculated_ptc(variant_coordinate, transcript_data)
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             self._add_hgvs_c(variant_coordinate, transcript_accession, transcript_data)
 
@@ -543,6 +707,13 @@ class BulkVEPVCFAnnotationInserter:
             maxentscan_ref = float(maxentscan_ref)
             if maxentscan_ref:
                 transcript_data["maxentscan_percent_diff_ref"] = 100 * maxentscan_diff / maxentscan_ref
+
+    def _add_calculated_ptc(self, variant_coordinate: Optional[VariantCoordinate],
+                            transcript_data: TranscriptData):
+        """ #579 - where the frameshift's premature termination codon lands, and the
+            PTC-anchored NMD prediction that falls out of it. """
+        indel_offset = len(variant_coordinate.ref) - len(variant_coordinate.alt)
+        add_calculated_ptc(transcript_data, indel_offset, self.transcript_geometry_cache)
 
     @staticmethod
     def _merge_cosmic_ids(transcript_data: TranscriptData, custom_vcf_cosmic_id: str):
@@ -651,6 +822,10 @@ class BulkVEPVCFAnnotationInserter:
                 if representative_transcript:
                     variant_data = self.vep_to_db_dict(vep_transcript_data, self.variant_only_columns)
                     variant_data.update(transcript_data)
+                    if conservation := self.sv_conservation.get(variant_id):
+                        # pyBigWig SV conservation _max columns (#1657) - the values VEP --custom bigwig
+                        # would have written, computed separately and merged onto the variant here.
+                        variant_data.update(conservation)
                     self._fix_multiple_values(variant_data)
                     self.add_calculated_variant_annotation_columns(variant_coordinate, variant_data)
                     # If we're using custom COSMIC vcf, merge with those from VEP existing variation
@@ -831,7 +1006,7 @@ class SVOverlapProcessor:
                 update_fields[f] = VEP_SEPARATOR.join([r[f] for r in filtered_sv_records])
         else:
             # Nothing left after filtering - need to blank out all our values
-            update_fields = {f: None for f in self.sv_fields}
+            update_fields = dict.fromkeys(self.sv_fields)
 
         raw_db_data.update(update_fields)
 

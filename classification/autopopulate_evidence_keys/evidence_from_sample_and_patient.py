@@ -3,8 +3,10 @@ from typing import Optional
 
 from classification.autopopulate_evidence_keys.evidence_from_variant import AutopopulateData
 from classification.enums import SpecialEKeys
-from patients.models_enums import Zygosity, Sex
-from snpdb.models import Sample, Specimen, SampleGenotype
+from patients.models_enums import Sex, TissueStatus, Zygosity
+from patients.models import Extraction
+from snpdb.models import Sample, SampleGenotype
+from snpdb.models.models_enums import VariantsType
 from snpdb.models.models_variant import Variant
 
 
@@ -30,9 +32,22 @@ def negative_as_none(value):
     return value
 
 
+def get_allele_origin(sample: Sample) -> Optional[str]:
+    """ The specimen says what the material is and the sample says what's in the call set, so an origin
+        is only asserted where both agree - a mixed tumour sample's origin is genuinely per-variant and
+        is left for the curator. Returns an allele_origin evidence key option, not a display label """
+    if sample.variants_type == VariantsType.SOMATIC_ONLY:
+        return "somatic"
+    if sample.variants_type == VariantsType.GERMLINE and sample.extraction:
+        if sample.extraction.specimen.tissue_status == TissueStatus.REFERENCE:
+            return "germline"
+    return None
+
+
 def get_evidence_fields_for_sample_and_patient(variant: Variant, sample: Sample) -> AutopopulateData:
     data = AutopopulateData("sample")
     data[SpecialEKeys.SAMPLE_ID] = sample.name
+    data[SpecialEKeys.ALLELE_ORIGIN] = get_allele_origin(sample)
 
     patient = sample.patient
     if patient:
@@ -40,8 +55,8 @@ def get_evidence_fields_for_sample_and_patient(variant: Variant, sample: Sample)
         if patient.family_code:
             data[SpecialEKeys.FAMILY_ID] = patient.family_code
 
-    if sample.specimen:
-        data.update(get_evidence_fields_for_specimen(sample.specimen))
+    if sample.extraction:
+        data.update(get_evidence_fields_for_extraction(sample.extraction))
 
     if variant and sample:
         if sample_genotype := sample.get_genotype(variant):
@@ -83,13 +98,13 @@ def get_evidence_fields_for_sample_and_patient(variant: Variant, sample: Sample)
     return data
 
 
-def get_evidence_fields_for_specimen(specimen: Specimen) -> AutopopulateData:
+def get_evidence_fields_for_extraction(extraction: Extraction) -> AutopopulateData:
     data = AutopopulateData("specimen")
+    specimen = extraction.specimen
     data[SpecialEKeys.SPECIMEN_ID] = specimen.reference_id
-    data[SpecialEKeys.ALLELE_ORIGIN] = specimen.get_mutation_type_display()
     data[SpecialEKeys.SAMPLE_TYPE] = str(specimen.tissue)
     data[SpecialEKeys.AGE] = specimen.age_at_collection_date
-    data[SpecialEKeys.NUCLEIC_ACID_SOURCE] = specimen.get_nucleic_acid_source_display()
+    data[SpecialEKeys.NUCLEIC_ACID_SOURCE] = extraction.get_nucleic_acid_source_display()
 
     return data
 

@@ -3,8 +3,8 @@ import os
 
 import cyvcf2
 from django.conf import settings
-from django.core.exceptions import PermissionDenied
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 
 from annotation.models import ClinVarReviewStatus, Variant
 from annotation.models.models import ClinVar, ClinVarVersion
@@ -12,7 +12,7 @@ from annotation.vcf_files.vcf_types import VCFVariant
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadStep
-from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
+from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 """
 ##fileformat=VCFv4.1
@@ -270,7 +270,7 @@ def import_clinvar_vcf(upload_step: UploadStep):
     """ This can run in parallel """
     logging.debug("import_clinvar_file start")
 
-    clinvar_version = ClinVarVersion.objects.get(sha256_hash=upload_step.uploaded_file.sha256_hash)
+    clinvar_version = ClinVarVersion.objects.get(sha256_hash=upload_step.file_upload.sha256_hash)
 
     vcf_reader = cyvcf2.VCF(upload_step.input_filename)
     bulk_inserter = BulkClinVarInserter(clinvar_version, upload_step)

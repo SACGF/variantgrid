@@ -10,16 +10,29 @@ from django.db.models import QuerySet
 from django.dispatch import receiver
 from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from classification.enums import SpecialEKeys, TestingContextBucket
-from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
-from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
-    EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
+from classification.enums import SpecialEKeys, TestingContextBucket, ClassificationResultValue
+from classification.enums.discordance_enums import (
+    ContinuedDiscordanceReason,
+    DiscordanceReportResolution,
+)
+from classification.models import (
+    ClassificationFlagTypes,
+    ClassificationModification,
+    ClinicalContext,
+    ClinicalContextChangeData,
+    ClinicalContextRecalcTrigger,
+    DiscordanceReportClassification,
     ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger, Overlap, OverlapType, \
-    ClassificationResultValue
-from classification.models.classification_groups import ClassificationGroupUtils, ClassificationGroups
+    classification_flag_types,
+    discordance_change_signal, EvidenceKeyMap,
+)
+from classification.models.classification_groups import (
+    ClassificationGroups,
+    ClassificationGroupUtils,
+)
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.evidence_key import EvidenceKeyOption
@@ -28,13 +41,13 @@ from classification.views.discordance_report_triage_view import DiscordanceRepor
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSDisplay
 from library.log_utils import log_admin_change
-from library.preview_request import preview_extra_signal, PreviewKeyValue
+from library.preview_request import PreviewKeyValue, preview_extra_signal
 from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab, GenomeBuild, Allele
+from snpdb.models import Allele, GenomeBuild, Lab
 from uicore.views.ajax_form_view import LazyRender
 
 
@@ -240,7 +253,7 @@ class DiscordanceReportTemplateData:
         return self._effectives_and_not_considered[1]
 
     @property
-    def c_hgvses(self) -> list[CHGVS]:
+    def c_hgvses(self) -> list[HGVSDisplay]:
         return sorted({cm.c_hgvs_best(self.genome_build) for cm in self.report.all_classification_modifications})
 
     def resolve_label(self):

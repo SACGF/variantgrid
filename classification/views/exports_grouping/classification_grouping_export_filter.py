@@ -14,7 +14,7 @@ from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, \
     OverlapContribution
 from classification.models import EvidenceKeyMap
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSComponents
 from library.utils import local_date_string
 from snpdb.models import Organization, Lab, GenomeBuild, Variant, Allele
 import re
@@ -162,7 +162,7 @@ class ClassificationGroupingByAllele:
         return None
 
     @cached_property
-    def c_hgvs(self) -> Optional[CHGVS]:
+    def c_hgvs(self) -> Optional[HGVSComponents]:
         for cg in self.classification_groupings:
             if allele_info := cg.latest_allele_info:
                 if preferred_build := allele_info[self.genome_build]:

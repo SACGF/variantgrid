@@ -1,0 +1,13 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% block title %}MatchMaker Exchange{% endblock title %}
+{% block content %}
+    <div class="container">
+        <h3>MatchMaker Exchange</h3>
+        <p class="text-muted">
+            Classification {{ classification.pk }} — {{ classification.friendly_label }}
+        </p>
+        {% include "mme/_mme_classification_card.html" %}
+    </div>
+{% endblock content %}

@@ -55,6 +55,13 @@ function gridComplete() {
 	$("input.variant-select").click(selectVariant);
     registerComponent(unique_code, GRID);
 
+    // The placeholder is the download route that matters most for big nodes - the user may never load
+    // the grid at all - so keep its links in sync with any export already running for this node
+    registerNodeGridDownloadButton("#placeholder-export-csv-{{ node_id }}", {{ analysis_id }}, {{ node_id }},
+                                   unique_code, 'csv', false, "CSV");
+    registerNodeGridDownloadButton("#placeholder-export-vcf-{{ node_id }}", {{ analysis_id }}, {{ node_id }},
+                                   unique_code, 'vcf', false, "VCF");
+
     // The deferred placeholder fires gridComplete for its empty datatype:'local' init (needed so
     // the editor's everythingLoaded can proceed). Only a genuine row fetch (server datatype) counts
     // as "loaded this session" - otherwise revisiting would auto-fire the query the user never asked for.
@@ -114,16 +121,16 @@ $(document).ready(function() {
 <div id="{{ node_id }}_{{ node_version }}">
 	{% if not grid_auto_load %}
 	<div id="grid-placeholder-{{ node_id }}" class="node-grid-placeholder">
-		<p>Node contains {{ node.count|default_if_none:"?"|intcomma }} variants, grid auto-loads under {{ grid_auto_load_max_variants_display }} variants (change this in <a href="{% url 'view_user_settings' %}" target="_blank">user settings</a>)</p>
+		<p>This view contains {{ grid_row_count|default_if_none:"?"|intcomma }} variants, grid auto-loads under {{ grid_auto_load_max_variants_display }} variants (change this in <a href="{% url 'view_user_settings' %}" target="_blank">user settings</a>)</p>
 		<div class="placeholder-buttons">
 			<a id="load-variants-{{ node_id }}" title="Show Grid" href="javascript:void(0)">
 				<div class="show-grid-icon icon32"></div> Show grid
 			</a>
-			<a title="Download as CSV"
+			<a id="placeholder-export-csv-{{ node_id }}" title="Download as CSV"
 			   href="javascript:export_grid({{ analysis_id }}, {{ node_id }}, '{{ node_id }}_{{ node_version }}', 'csv')">
 				<div class="csv-icon icon32"></div> CSV
 			</a>
-			<a title="Download as VCF"
+			<a id="placeholder-export-vcf-{{ node_id }}" title="Download as VCF"
 			   href="javascript:export_grid({{ analysis_id }}, {{ node_id }}, '{{ node_id }}_{{ node_version }}', 'vcf')">
 				<div class="vcf-icon icon32"></div> VCF
 			</a>
@@ -131,6 +138,11 @@ $(document).ready(function() {
 	</div>
 	{% endif %}
 	<div id='node-data-grid' class='node-data'{% if not grid_auto_load %} style='display: none'{% endif %}>
+	{% if grid_sorting_disabled %}
+	<div class="alert alert-info" role="alert">
+        <b>Sorting is disabled</b> above {{ grid_sort_max_variants|intcomma }} variants (grid={{ grid_row_count|default_if_none:"?"|intcomma }}) Please add more filters to re-enable sorting.
+	</div>
+	{% endif %}
 	<table id='grid-{{ node_id }}' class='grid'>
 	</table>
 	<div id='pager-{{ node_id }}'></div>

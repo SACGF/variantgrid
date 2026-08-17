@@ -2,12 +2,17 @@ import json
 from datetime import timedelta
 from typing import Any
 
-from django.db.models import QuerySet, ExpressionWrapper, F, fields
+from django.db.models import ExpressionWrapper, F, QuerySet, fields
 
-from annotation.models import VariantAnnotationVersion, AnnotationRun, AnnotationStatus, VariantAnnotationPipelineType
+from annotation.models import (
+    AnnotationRun,
+    AnnotationStatus,
+    VariantAnnotationPipelineType,
+    VariantAnnotationVersion,
+)
 from genes.models_enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class AnnotationRunColumns(DatatableConfig):
@@ -118,6 +123,25 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
             RichColumn(key="regbuild", label="Regulatory Build", orderable=True, detail=True),
             RichColumn(key="sift", orderable=True, detail=True),
             RichColumn(key="dbnsfp", label="dbNSFP", orderable=True, detail=True),
+            RichColumn(key="dbscsnv", label="dbscSNV", orderable=True, detail=True),
+            RichColumn(key="mastermind", label="Mastermind", orderable=True, detail=True),
+            RichColumn(key="gnomad_sv", label="gnomAD SV", orderable=True, detail=True),
+            RichColumn(key="topmed", label="TopMed", orderable=True, detail=True),
+            RichColumn(key="uk10k", label="UK10K", orderable=True, detail=True),
+            RichColumn(key="conservation", orderable=True, detail=True),
+            RichColumn(key="repeat_masker", label="RepeatMasker", orderable=True, detail=True),
+            RichColumn(key="maxentscan", label="MaxEntScan", orderable=True, detail=True),
+            RichColumn(key="protvar", label="ProtVar", orderable=True, detail=True),
+            RichColumn(key="eve", label="EVE", orderable=True, detail=True),
+            RichColumn(key="promoter_ai", label="PromoterAI", orderable=True, detail=True),
+            RichColumn(key="fasta", orderable=True, detail=True),
+            RichColumn(key="transcript_blocklist", orderable=True, detail=True),
+            RichColumn(key="pick_order", orderable=True, detail=True),
+            RichColumn(key="sift_enabled", label="SIFT Enabled", orderable=True, detail=True),
+            RichColumn(key="sv_max_size", label="SV Max Size", orderable=True, detail=True),
+            RichColumn(key="sv_overlap_min_fraction", label="SV Overlap Min Fraction",
+                       orderable=True, detail=True),
+            RichColumn(key="vep_args", label="VEP Args", orderable=True, detail=True),
             RichColumn(key="distance", orderable=True, detail=True)
         ]
 

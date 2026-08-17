@@ -3,16 +3,37 @@ import operator
 import os
 import re
 from collections import defaultdict
-from typing import Optional, Iterable, IO, Union
+from collections.abc import Iterable
+from typing import IO, Optional, Union
 
 import cyvcf2
 import vcf
 from django.conf import settings
 
 from library.genomics.vcf_enums import VCFSymbolicAllele
-from library.genomics.vcf_writer import VCFInfoHeader, build_header_lines, symbolic_alt_info, VCFWriter
-from library.utils import open_handle_gzip, open_file_or_filename
-from snpdb.models import Variant, Sequence, GenomeFasta, SequenceRole, VariantCoordinate
+from library.genomics.vcf_writer import (
+    VCFInfoHeader,
+    VCFWriter,
+    build_header_lines,
+    symbolic_alt_info,
+)
+from library.utils import open_file_or_filename, open_handle_gzip
+from snpdb.models import GenomeFasta, Sequence, SequenceRole, Variant, VariantCoordinate
+
+
+VCF_HEADER_FILTER_ID_PATTERN = re.compile(r'^##FILTER=<ID=([^,>]+)')
+
+
+def vcf_header_filter_ids(vcf_header_lines: Iterable[str]) -> set[str]:
+    """ Declared FILTER IDs, read straight out of the raw header lines.
+
+        Callers write keys beyond ID/Description here (eg Illumina's LrCalculator adds Number/Type) which
+        strict parsers reject outright, so we only pull out the ID rather than parsing the whole line """
+    filter_ids = set()
+    for line in vcf_header_lines:
+        if m := VCF_HEADER_FILTER_ID_PATTERN.match(line):
+            filter_ids.add(m.group(1))
+    return filter_ids
 
 
 def cyvcf2_header_types(cyvcf2_reader) -> defaultdict:
@@ -121,6 +142,35 @@ def get_variant_caller_and_version_from_vcf(filename) -> tuple[str, str]:
 
 def vcf_allele_is_symbolic(allele: str) -> bool:
     return allele.startswith("<") and allele.endswith(">")
+
+
+class UnsortedVCFError(ValueError):
+    pass
+
+
+class VCFSortChecker:
+    """ Streaming check that records are grouped by contig, and ascending in position within a contig.
+        This is what 'bcftools index' requires - see #127 """
+
+    ADVICE = "VCF records must be sorted - please sort (eg 'bcftools sort') and re-upload."
+
+    def __init__(self):
+        self._seen_contigs = set()
+        self._contig = None
+        self._position = None
+
+    def check(self, contig, position: int, chrom: str, line_number: int):
+        """ contig identifies the contig (so aliases compare equal), chrom is how it's written in the VCF """
+        if contig != self._contig:
+            if contig in self._seen_contigs:
+                raise UnsortedVCFError(f"Line {line_number}: '{chrom}' records are not all grouped together. "
+                                       f"{self.ADVICE}")
+            self._seen_contigs.add(contig)
+            self._contig = contig
+        elif position < self._position:
+            raise UnsortedVCFError(f"Line {line_number}: {chrom}:{position} comes after {chrom}:{self._position}. "
+                                   f"{self.ADVICE}")
+        self._position = position
 
 
 def vcf_get_ref_alt_svlen_and_modification(variant: cyvcf2.Variant, old_variant_info: str) -> tuple[str, str, Optional[int], Optional[str]]:

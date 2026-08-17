@@ -1,15 +1,18 @@
+import re
 import tempfile
 
 import cyvcf2
 from django.test import TestCase
 
 from analysis.grid_export import _grid_item_to_vcf_row
+from analysis.tests.test_grid_export import GridExportTestCase
 from library.genomics.vcf_writer import VCFWriter
 from snpdb.models import GenomeBuild
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
 # cyvcf2 gt_types: 0=HOM_REF, 1=HET, 3=HOM_ALT (expanded zygosity labels the grid stores)
 GT_TYPE_TO_ZYGOSITY = {0: "REF", 1: "HET", 3: "HOM_ALT"}
+CONTIG_HEADER_PATTERN = re.compile(r"^##contig=<ID=([^,>]+)")
 
 
 class TestGridExportVCF(TestCase):
@@ -42,7 +45,7 @@ class TestGridExportVCF(TestCase):
 
         header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=False)
         with tempfile.NamedTemporaryFile(mode="wt", suffix=".vcf", delete=True) as temp_file:
-            with open(temp_file.name, "wt") as f:
+            with open(temp_file.name, "w") as f:
                 writer = VCFWriter(f, header_lines)
                 for item in items:
                     chrom, pos, vcf_id, ref, alt, info, fmt, sample_calls = \
@@ -58,3 +61,24 @@ class TestGridExportVCF(TestCase):
             self.assertEqual(list(src.ALT), list(out.ALT))
             # genotype (from expanded zygosity) round-trips back to the source call
             self.assertEqual(src.genotypes[0], out.genotypes[0])
+
+
+class TestGridExportVCFOrder(GridExportTestCase):
+    """ (B) The export walks contigs in genome build order, which is the order the header declares
+        them in - so records come out sorted consistently with their own header """
+
+    def test_records_follow_header_contig_order(self):
+        node = self._sample_node()
+        lines = self._export_lines(node, export_type="vcf")
+
+        header_contigs = [CONTIG_HEADER_PATTERN.match(line).group(1)
+                          for line in lines if line.startswith("##contig=")]
+        self.assertGreater(len(header_contigs), 1)
+        contig_order = {name: i for i, name in enumerate(header_contigs)}
+
+        records = [line.split("\t") for line in lines if not line.startswith("#")]
+        self.assertEqual(len(records), node.count)
+        sort_keys = [(contig_order[r[0]], int(r[1])) for r in records]
+        self.assertEqual(sort_keys, sorted(sort_keys))
+        # more than one contig actually appears, so the ordering is exercised
+        self.assertGreater(len({k[0] for k in sort_keys}), 1)

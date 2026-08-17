@@ -4,7 +4,7 @@ from analysis.models.nodes.filters.filter_node import FilterNode, FilterNodeItem
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.node_utils import update_analysis
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.models import GeneListCategory, CustomTextGeneList
+from genes.models import CustomTextGeneList, GeneListCategory
 from snpdb.models import VariantGridColumn
 
 

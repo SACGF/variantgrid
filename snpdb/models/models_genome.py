@@ -2,11 +2,12 @@ import itertools
 import operator
 import os
 import re
+from collections.abc import Iterable
 from functools import cached_property, reduce
-from typing import Optional, Iterable
+from typing import Optional
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
@@ -20,8 +21,9 @@ from library.django_utils.django_object_managers import ObjectManagerCachingImmu
 from library.genomics.fasta_wrapper import FastaFileWrapper
 from library.preview_request import PreviewModelMixin
 from library.utils import invert_dict
+from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_REFSEQ_ACCESSION
 from snpdb.genome.fasta_index import load_genome_fasta_index
-from snpdb.models.models_enums import SequenceRole, AssemblyMoleculeType
+from snpdb.models.models_enums import AssemblyMoleculeType, SequenceRole
 
 
 class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
@@ -141,6 +143,10 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     def contigs(self):
         qs = Contig.objects.filter(genomebuildcontig__genome_build=self)
         return qs.order_by("genomebuildcontig__order")
+
+    @cached_property
+    def contig_ids(self) -> list[int]:
+        return list(self.contigs.values_list("pk", flat=True))
 
     @cached_property
     def standard_contigs(self):
@@ -392,6 +398,15 @@ class Contig(models.Model, PreviewModelMixin):
     class ContigNotInBuildError(ValueError):
         pass
 
+    @staticmethod
+    def get_gene_level() -> 'Contig':
+        """ The one contig every build shares for events with no coordinate - @see snpdb.gene_level_variants """
+        return Contig.objects.get(refseq_accession=GENE_LEVEL_CONTIG_REFSEQ_ACCESSION)
+
+    @property
+    def is_gene_level(self) -> bool:
+        return self.role == SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG
+
     def get_absolute_url(self):
         return reverse("view_contig", kwargs={"contig_accession": self.refseq_accession})
 
@@ -439,7 +454,7 @@ class GenomeBuildContig(models.Model):
 
 
 class GenomeFasta(models.Model):
-    """ Incoming VCF chroms are mapped to contigs from VCF header then converted to fasta names (for VT) """
+    """ Incoming VCF chroms are mapped to contigs from VCF header then converted to fasta names (for bcftools) """
     filename = models.TextField(unique=True)
     index_filename = models.TextField()
     index_sha256sum = models.TextField()
@@ -455,8 +470,13 @@ class GenomeFasta(models.Model):
     def get_contig_id_to_name_mappings(self):
         contig_id_to_name_mappings = dict(self.genomefastacontig_set.all().values_list("contig_id", "name"))
         if not contig_id_to_name_mappings:
-            msg = f"Contig/Fasta names empty for {self}"
-            raise ValueError(msg)
+            # A previous index load must have died after this record was created (eg missing/bad .fai file)
+            # Retry it, so we recover once the underlying problem is fixed, and raise the real error if not
+            load_genome_fasta_index(self, self.genome_build)
+            contig_id_to_name_mappings = dict(self.genomefastacontig_set.all().values_list("contig_id", "name"))
+            if not contig_id_to_name_mappings:
+                msg = f"Contig/Fasta names empty for {self} - no fasta index contigs matched build contigs"
+                raise ValueError(msg)
         return contig_id_to_name_mappings
 
     def __str__(self):
@@ -464,10 +484,13 @@ class GenomeFasta(models.Model):
 
     @staticmethod
     def get_for_genome_build(genome_build: GenomeBuild):
-        genome_fasta, created = GenomeFasta.objects.get_or_create(filename=genome_build.reference_fasta,
-                                                                  genome_build=genome_build)
-        if created:
-            load_genome_fasta_index(genome_fasta, genome_build)
+        # Atomic so a failed index load rolls back the GenomeFasta record, rather than leaving behind an
+        # empty one that get_or_create will keep returning (created=False, so index is never loaded)
+        with transaction.atomic():
+            genome_fasta, created = GenomeFasta.objects.get_or_create(filename=genome_build.reference_fasta,
+                                                                      genome_build=genome_build)
+            if created:
+                load_genome_fasta_index(genome_fasta, genome_build)
         return genome_fasta
 
     def convert_chrom_to_fasta_sequence(self, chrom: str) -> str:

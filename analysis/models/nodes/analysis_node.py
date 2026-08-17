@@ -3,10 +3,11 @@ import abc
 import logging
 import operator
 from collections import defaultdict
+from collections.abc import Sequence
 from functools import cached_property, reduce
 from random import random
 from time import time
-from typing import Sequence, Optional
+from typing import Optional
 
 from auditlog.context import disable_auditlog
 from auditlog.models import AuditlogHistoryField, LogEntry
@@ -17,33 +18,100 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import FieldError
 from django.db import connection, models, transaction
-from django.db.models import Value, IntegerField, QuerySet
+from django.db.models import IntegerField, QuerySet, Value
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
+from django.db.models.expressions import RawSQL
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-from django_dag.models import node_factory, edge_factory
+from django_dag.models import edge_factory, node_factory
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
-from analysis.exceptions import NonFatalNodeError, NodeParentErrorsException, NodeConfigurationException, \
-    NodeParentNotReadyException, NodeNotFoundException, NodeOutOfDateException
-from analysis.models.enums import GroupOperation, NodeStatus, NodeColors, NodeErrorSource, AnalysisTemplateType
+from analysis.exceptions import (
+    NodeConfigurationException,
+    NodeNotFoundException,
+    NodeOutOfDateException,
+    NodeParentErrorsException,
+    NodeParentNotReadyException,
+    NonFatalNodeError,
+)
+from analysis.models.enums import (
+    AnalysisTemplateType,
+    GroupOperation,
+    NodeColors,
+    NodeErrorSource,
+    NodeStatus,
+)
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
-from library.log_utils import report_event, log_traceback
-from library.utils import format_percent, add_exception_note
+from library.django_utils.django_postgres import get_backend_pid
+from library.log_utils import log_traceback
+from library.utils import add_exception_note, format_percent
 from library.utils.database_utils import queryset_to_sql
 from library.utils.django_utils import get_model_content_type_dict
-from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
-    ProcessingStatus, GenomeBuild, AlleleSource, Contig, SampleFilePath
+from snpdb.models import (
+    AlleleSource,
+    BuiltInFilters,
+    Cohort,
+    Contig,
+    GenomeBuild,
+    ProcessingStatus,
+    Sample,
+    SampleFilePath,
+    Variant,
+    VariantCollection,
+    VCFFilter,
+    Wiki,
+)
 from snpdb.variant_collection import write_sql_to_variant_collection
+
+
+def queryset_to_pk_in_q(qs: QuerySet) -> Q:
+    """ Embed a queryset as pk IN (subquery), NOT list(qs.values_list("pk")).
+        Callers reach this with querysets that are large by construction - small ones are substituted
+        to a literal PK list upstream by get_small_parent_arg_q_dict - so list() here could pull an
+        unbounded number of PKs into Python (e.g. a 7.4M-row cohort).
+        We render to RawSQL, capturing the compiled SQL + params (incl. the partition table rewrite the
+        TransformerQuerySet applies in as_sql), so it runs as a single DB-side semi-join. RawSQL also keeps
+        arg_q_dict picklable for the q-cache cache.set: a live TransformerQuerySet embedded in the Q is
+        unpicklable (closure-local compiler classes) which previously forced the materialise-to-list
+        workaround (issue #546, #240, ad35a7fb1). """
+    pk_qs = qs.values_list("pk", flat=True)
+    sql, params = pk_qs.query.sql_with_params()
+    return Q(pk__in=RawSQL(sql, params))
+
+
+def annotate_and_filter_queryset(qs: QuerySet, a_kwargs: dict, arg_q_dict: dict) -> tuple[QuerySet, list[Q]]:
+    """ Apply each annotation then the filters that use it, so that it forces an inner query - applying
+        them all at once can join to the same table twice. Returns the queryset plus the filters that
+        don't rely on an annotation (arg=None), for the caller to combine with its own.
+
+        arg_q_dict is consumed - anything left over means a filter had no annotation to hang off. """
+    for k, v in a_kwargs.items():
+        qs = qs.annotate(**{k: v})
+        if q_and_list := list(arg_q_dict.pop(k, {}).values()):
+            q = reduce(operator.and_, q_and_list)
+            try:
+                qs = qs.filter(q)
+            except FieldError as fe:
+                add_exception_note(fe, f"annotation kwarg: {k}: {q=}.")
+                raise
+
+    q_list = []
+    # Anything stored under None means filters that don't rely on annotation - do afterwards
+    if q_dict := arg_q_dict.pop(None, {}):
+        q_list.extend(q_dict.values())
+
+    if arg_q_dict:
+        raise ValueError(f"arg_q_dict filters {arg_q_dict.keys()} not applied (missing in {a_kwargs=})")
+    return qs, q_list
 
 
 def _default_position():
@@ -475,11 +543,11 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             if self.has_input():
                 contigs = self.get_parent_contigs()
                 if self.modifies_parents():
-                    node_contigs = self._get_node_contigs()
+                    node_contigs = self._get_narrowing_contigs()
                     if node_contigs is not None:
                         contigs &= node_contigs
             else:
-                node_contigs = self._get_node_contigs()
+                node_contigs = self._get_narrowing_contigs()
                 if node_contigs is not None:
                     contigs = node_contigs
                 else:
@@ -530,15 +598,17 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return arg_q_dict
 
     @staticmethod
-    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda p: (p.pk, p.version))
-    def get_parent_pks(parent) -> list:
+    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda n: (n.pk, n.version))
+    def get_cached_node_pks(node) -> list:
+        """ Materialised variant PKs for a node small enough to hold them - the source for explicit-PK
+            substitution (@see get_small_parent_arg_q_dict) and the grid export """
         max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        if parent.count is None or parent.count > max_size:
+        if node.count is None or node.count > max_size:
             raise ValueError(
-                f"get_parent_pks: refusing to cache {parent} PKs "
-                f"(count={parent.count}, max={max_size})"
+                f"get_cached_node_pks: refusing to cache {node} PKs "
+                f"(count={node.count}, max={max_size})"
             )
-        return list(parent.get_queryset().values_list("pk", flat=True))
+        return list(node.get_queryset().values_list("pk", flat=True))
 
     @staticmethod
     def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
@@ -551,7 +621,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             which case callers fall back to parent.get_arg_q_dict(). """
         max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
         if max_size and parent.count is not None and parent.count <= max_size:
-            variant_ids = AnalysisNode.get_parent_pks(parent)
+            variant_ids = AnalysisNode.get_cached_node_pks(parent)
             q = Q(pk__in=variant_ids)
             return {None: {q: q}}
         return None
@@ -584,6 +654,17 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ Return the contigs we filter for in this node. None means we don't know how to describe that """
         return None
 
+    def _get_narrowing_contigs(self) -> Optional[set[Contig]]:
+        """ _get_node_contigs + always letting the gene-level contig through.
+
+            Nodes can restrict queries to contigs (though we don't actually use this yet)
+            Gene-level variants are on a contig of their own so should always be included
+            @see snpdb.gene_level_variants """
+        node_contigs = self._get_node_contigs()
+        if node_contigs is not None:
+            node_contigs = node_contigs | {Contig.get_gene_level()}
+        return node_contigs
+
     def get_queryset(self, extra_filters_q=None, extra_annotation_kwargs=None, arg_q_dict=None,
                      inner_query_distinct=False, disable_cache=False):
         if extra_annotation_kwargs is None:
@@ -596,29 +677,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             arg_q_dict = self.get_arg_q_dict(disable_cache=disable_cache)
             # print(arg_q_dict)
 
-        if a_kwargs:
-            # If we apply the kwargs at the same time, it can join to the same table twice.
-            # We want to go through and apply each annotation then the filters that use it, so that it forces
-            # an inner query. Then do next annotation etc
-
-            for k, v in a_kwargs.items():
-                qs = qs.annotate(**{k: v})
-                if q_and_list := list(arg_q_dict.pop(k, {}).values()):
-                    q = reduce(operator.and_, q_and_list)
-                    try:
-                        qs = qs.filter(q)
-                    except FieldError as fe:
-                        add_exception_note(fe, f"annotation kwarg: {k}: {q=}.")
-                        raise
-
-        q_list = []
-        # Anything stored under None means filters that don't rely on annotation - do afterwards
-        if q_dict := arg_q_dict.pop(None, {}):
-            # print(f"q_dict(None): {q_dict}")
-            q_list.extend(q_dict.values())
-
-        if arg_q_dict:
-            raise Exception(f"arg_q_dict filters {arg_q_dict.keys()} not applied (missing in {a_kwargs=})")
+        qs, q_list = annotate_and_filter_queryset(qs, a_kwargs, arg_q_dict)
 
         if self.analysis.node_queryset_filter_contigs:
             q_list.append(Q(locus__contig__in=self.get_contigs()))
@@ -1060,8 +1119,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         Analysis.objects.filter(pk=self.analysis.pk).update(modified=timezone.now())
 
     def set_node_task_and_status(self, celery_task, status):
-        cursor = connection.cursor()
-        db_pid = cursor.db.connection.get_backend_pid()
+        with connection.cursor() as cursor:
+            db_pid = get_backend_pid(cursor)
         self.update(status=status)
 
         NodeTask.objects.filter(node_version__node=self, node_version__version=self.version) \
@@ -1196,10 +1255,6 @@ class AnalysisNodeAlleleSource(AlleleSource):
             qs = Variant.objects.none()
         return qs
 
-    def liftover_complete(self, genome_build: GenomeBuild):
-        report_event('Completed AnalysisNode liftover',
-                     extra_data={'node_id': self.node_id, 'allele_count': self.get_allele_qs().count()})
-
 
 class NodeVersion(TimeStampedModel):
     """ This will be deleted once a node updates, so make all version specific caches cascade delete from this """
@@ -1283,7 +1338,7 @@ class NodeColumnSummaryCacheCollection(models.Model):
                                                                                 variant_column=variant_column,
                                                                                 extra_filters=extra_filters)
         if created:
-            extra_filters_q = get_extra_filters_q(node.analysis.user, node.analysis.genome_build, extra_filters)
+            extra_filters_q = get_extra_filters_q(node.analysis.user, node.analysis.annotation_version, extra_filters)
             queryset = node.get_queryset(extra_filters_q)
             count_qs = queryset.values_list(variant_column).distinct().annotate(Count('id'))
             data_list = []

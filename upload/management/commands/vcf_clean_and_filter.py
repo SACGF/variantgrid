@@ -1,5 +1,10 @@
 """
-Uploaded VCFs are first passed through this command to fix things that will cause VT to die (eg bad contigs)
+Uploaded VCFs are first passed through this command to fix things that will cause bcftools to die (eg bad contigs)
+
+It also fails the import early on unsorted VCFs, which would otherwise only be noticed by 'bcftools index'
+several pipeline stages later. When '--unsorted-marker-file' is given, the reason is written there before
+failing, so the caller can tell an unsorted VCF apart from any other failure and retry through 'bcftools sort'
+(pass '--allow-unsorted' on that second pass).
 
 We also rename chromosomes to the RefSeq contig IDs used in our fasta file
 
@@ -10,14 +15,24 @@ Which we unfortunately see sometimes.
 import re
 import sys
 from collections import Counter
-from io import StringIO
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
-from vcf import Reader
+from django.core.management.base import BaseCommand, CommandError
 
-from library.genomics.vcf_enums import VCFColumns
+from library.genomics.vcf_enums import (
+    UNDECLARED_FILTERS_INFO,
+    UNDECLARED_FILTERS_SEPARATOR,
+    VCFColumns,
+)
+from library.genomics.vcf_utils import (
+    UnsortedVCFError,
+    VCFSortChecker,
+    parse_vcf_info_column,
+    vcf_header_filter_ids,
+)
 from snpdb.models import GenomeBuild, GenomeFasta
+
+REFERENCE_SPAN_SKIP_REASON = "reference call over a span (ALT='.' with END)"
 
 
 class Command(BaseCommand):
@@ -29,6 +44,8 @@ class Command(BaseCommand):
         parser.add_argument('--skipped-contigs-stats-file', help='File name')
         parser.add_argument('--skipped-records-stats-file', help='File name')
         parser.add_argument('--skipped-filters-stats-file', help='File name')
+        parser.add_argument('--unsorted-marker-file', help='Write reason here if VCF is unsorted')
+        parser.add_argument('--allow-unsorted', action='store_true', help='Skip the sorted check')
 
     @staticmethod
     def _write_header(vcf_header_lines: list[str]):
@@ -43,6 +60,8 @@ class Command(BaseCommand):
         skipped_contigs_stats_file = options.get("skipped_contigs_stats_file")
         skipped_records_stats_file = options.get("skipped_records_stats_file")
         skipped_filters_stats_file = options.get("skipped_filters_stats_file")
+        unsorted_marker_file = options.get("unsorted_marker_file")
+        allow_unsorted = options.get("allow_unsorted")
 
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         genome_fasta = GenomeFasta.get_for_genome_build(genome_build)
@@ -68,12 +87,13 @@ class Command(BaseCommand):
 
         vcf_header_lines = []
         if replace_header:
-            with open(replace_header, "r") as rh_f:
+            with open(replace_header) as rh_f:
                 vcf_header_lines = rh_f.readlines()
 
         first_non_header_line = True
         defined_filters = None
-        for line in f:
+        sort_checker = None if allow_unsorted else VCFSortChecker()
+        for line_number, line in enumerate(f, start=1):
             if line[0] == '#':
                 if not replace_header:
                     vcf_header_lines.append(line)
@@ -110,6 +130,10 @@ class Command(BaseCommand):
                         skipped_records[skip_reason] += 1
                         continue
 
+                if self._is_reference_span(columns):
+                    skipped_records[REFERENCE_SPAN_SKIP_REASON] += 1
+                    continue
+
                 # Check ref bases are ok
                 # Alts are checked in 'vcf_remove_non_standard_alts', which happens after split multi-allelic
                 ref = columns[VCFColumns.REF]
@@ -121,21 +145,34 @@ class Command(BaseCommand):
                     skipped_records[skip_reason] += 1
                     continue
 
-                # Remove filters not in header
+                # Move filters not in the header into INFO. They can't stay in the FILTER column -
+                # bcftools norm dies on an undeclared FILTER rather than warning - but dropping them
+                # loses real calls, so the record carries them past norm and the genotype processor
+                # puts them back via _add_undeclared_filter_code
                 filter_column = columns[VCFColumns.FILTER]
                 if filter_column not in QUICK_ACCEPT_FILTERS:
                     cleaned_filters = []
+                    undeclared_filters = []
                     for fc in filter_column.split(";"):
                         if fc in defined_filters:
                             cleaned_filters.append(fc)
                         else:
+                            undeclared_filters.append(fc)
                             skipped_filters[fc] += 1
 
-                    if cleaned_filters:
-                        filter_column = ";".join(cleaned_filters)
-                    else:
-                        filter_column = "."
-                    columns[VCFColumns.FILTER] = filter_column
+                    columns[VCFColumns.FILTER] = ";".join(cleaned_filters) if cleaned_filters else "."
+                    if undeclared_filters:
+                        columns[VCFColumns.INFO] = self._add_undeclared_filters_info(
+                            columns[VCFColumns.INFO], undeclared_filters)
+
+                # Only the records we write need to be sorted - skipped ones can't break the downstream index
+                if sort_checker:
+                    try:
+                        sort_checker.check(contig_id, position, chrom, line_number)
+                    except UnsortedVCFError as e:
+                        reason = f"VCF is not sorted. {e}"
+                        self._write_unsorted_marker(unsorted_marker_file, reason)
+                        raise CommandError(reason) from e
 
                 sys.stdout.write("\t".join(columns))
 
@@ -148,12 +185,37 @@ class Command(BaseCommand):
         self._write_skip_counts(skipped_filters, skipped_filters_stats_file)
 
     @staticmethod
+    def _add_undeclared_filters_info(info_column: str, undeclared_filters: list[str]) -> str:
+        # INFO is the last column when a VCF has no samples, so it can be carrying the line's newline
+        info, newline, _ = info_column.partition("\n")
+        value = f"{UNDECLARED_FILTERS_INFO}={UNDECLARED_FILTERS_SEPARATOR.join(undeclared_filters)}"
+        if info not in (".", ""):
+            value = f"{info};{value}"
+        return value + newline
+
+    @staticmethod
+    def _is_reference_span(columns: list[str]) -> bool:
+        """ A reference call over a span is a no-call region, not a variant - the same statement we already
+            make about gVCF reference blocks. This is 406 of 500 records in a real TSO 500 cnv.vcf.
+
+            SVTYPE present means the caller is describing an event rather than a segmentation interval
+            (e.g. an 'Undetermined' per-gene CNV call), so those are kept. A reference record at a single
+            position - no END - is a normal reference variant and also kept. """
+
+        if columns[VCFColumns.ALT] != ".":
+            return False
+        info = parse_vcf_info_column(columns[VCFColumns.INFO])
+        return "END" in info and "SVTYPE" not in info
+
+    @staticmethod
     def _get_defined_vcf_filters(vcf_header_lines) -> set:
-        defined_filters = {"PASS"}
-        stream = StringIO("".join(vcf_header_lines))
-        reader = Reader(stream)
-        defined_filters.update(reader.filters.keys())
-        return defined_filters
+        return {"PASS"} | vcf_header_filter_ids(vcf_header_lines)
+
+    @staticmethod
+    def _write_unsorted_marker(filename, reason: str):
+        if filename:
+            with open(filename, "w") as f:
+                f.write(reason + "\n")
 
     @staticmethod
     def _write_skip_counts(counts, filename):

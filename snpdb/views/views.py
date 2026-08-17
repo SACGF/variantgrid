@@ -3,23 +3,29 @@ import json
 import logging
 import os
 from collections import OrderedDict, defaultdict
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.models import User, Group
-from django.core.exceptions import PermissionDenied, ImproperlyConfigured, ObjectDoesNotExist
+from django.contrib.auth.models import Group, User
+from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist, PermissionDenied
 from django.db.utils import IntegrityError
-from django.forms.models import inlineformset_factory, ALL_FIELDS
-from django.utils.html import escape
+from django.forms.models import ALL_FIELDS, inlineformset_factory
 from django.forms.widgets import TextInput
 from django.http import HttpRequest
-from django.http.response import HttpResponse, HttpResponseRedirect, HttpResponseServerError, JsonResponse
-from django.shortcuts import get_object_or_404, render, redirect
+from django.http.response import (
+    HttpResponse,
+    HttpResponseRedirect,
+    HttpResponseServerError,
+    JsonResponse,
+)
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.defaultfilters import pluralize
 from django.urls.base import reverse
+from django.utils.html import escape, format_html
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
@@ -33,26 +39,43 @@ from analysis.forms import AnalysisOutputNodeChoiceForm
 from analysis.models import AnalysisTemplate
 from analysis.tasks.analysis_grid_export_tasks import get_annotated_download_files_cgf
 from annotation.forms import GeneCountTypeChoiceForm
-from annotation.manual_variant_entry import create_manual_variants, can_create_variants
-from annotation.models import AnnotationVersion, CohortGenotypeVariantAnnotationStats, \
-    CohortGenotypeGeneAnnotationStats, CohortGenotypeClinVarAnnotationStats
+from annotation.manual_variant_entry import can_create_variants, create_manual_variants
+from annotation.models import (
+    AnnotationVersion,
+    CohortGenotypeClinVarAnnotationStats,
+    CohortGenotypeGeneAnnotationStats,
+    CohortGenotypeVariantAnnotationStats,
+    VCFAnnotationStats,
+)
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
-from annotation.models.models_gene_counts import GeneValueCountCollection, \
-    GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
+from annotation.models.models_gene_counts import (
+    CohortGeneCounts,
+    GeneCountType,
+    GeneValueCountCollection,
+    SampleAnnotationVersionVariantSource,
+)
 from annotation.serializers import ManualVariantEntryCollectionSerializer
+from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
 from classification.classification_stats import get_grouped_classification_counts
 from classification.enums import AlleleOriginBucket
 from classification.models.clinvar_export_sync import clinvar_export_sync
-from classification.views.classification_accumulation_graph import get_accumulation_graph_data, \
-    AccumulationReportMode
+from classification.views.classification_accumulation_graph import (
+    AccumulationReportMode,
+    get_accumulation_graph_data,
+)
 from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
-from genes.models import GeneListCategory, CustomTextGeneList, GeneList
+from genes.forms import CustomGeneListForm, GeneAndTranscriptForm, UserGeneListForm
+from genes.models import CustomTextGeneList, GeneList, GeneListCategory
 from library import uptime_check
-from library.constants import WEEK_SECS, HOUR_SECS
-from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser, \
-    get_field_counts
+from library.constants import HOUR_SECS, WEEK_SECS
+from library.django_utils import (
+    add_save_message,
+    get_field_counts,
+    get_model_fields,
+    require_superuser,
+    set_form_read_only,
+)
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
@@ -60,29 +83,87 @@ from library.utils import full_class_name, import_class, rgb_invert
 from library.utils.django_utils import render_ajax_view
 from ontology.models import OntologyTerm
 from patients.forms import PatientForm
-from patients.models import Patient, Clinician
+from patients.models import Clinician, Patient
 from patients.views import get_patient_upload_csv
 from snpdb import forms
-from snpdb.archive import DataArchivedError, ArchivePreconditionError, check_vcf_archive_precondition, \
-    mark_vcf_archive_started
-from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
-    UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
-    OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
+from snpdb.archive import (
+    ArchivePreconditionError,
+    DataArchivedError,
+    check_vcf_archive_precondition,
+    mark_vcf_archive_started,
+)
+from snpdb.forms import (
+    LabForm,
+    LabMemberForm,
+    LabUserSettingsOverrideForm,
+    OrganizationForm,
+    OrganizationUserSettingsOverrideForm,
+    SampleChoiceForm,
+    SampleForm,
+    SettingsInitialGroupPermissionForm,
+    TagForm,
+    UserContactForm,
+    UserForm,
+    UserSettingsOverrideForm,
+    VCFChoiceForm,
+)
 from snpdb.graphs import graphcache
 from snpdb.graphs.allele_frequency_graph import AlleleFrequencyHistogramGraph
 from snpdb.graphs.chromosome_density_graph import SampleChromosomeDensityGraph
 from snpdb.graphs.chromosome_intervals_graph import ChromosomeIntervalsGraph
 from snpdb.graphs.homozygosity_percent_graph import HomozygosityPercentGraph
 from snpdb.import_status import set_vcf_and_samples_import_status
-from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
-    VCF, CustomColumnsCollection, CustomColumn, Cohort, \
-    CohortSample, GenomicIntervalsCollection, Sample, UserDataPrefix, UserGridConfig, \
-    get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
-    Trio, Quad, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, \
-    Lab, LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, \
-    CohortGenotypeStats, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
-from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, AlleleConversionTool
+from snpdb.models import (
+    VCF,
+    AbstractNodeCountSettings,
+    Allele,
+    AlleleLiftover,
+    AllVariantsFilter,
+    AvatarDetails,
+    CachedGeneratedFile,
+    ClinVarKey,
+    Cohort,
+    CohortGenotypeCollection,
+    CohortGenotypeStats,
+    CohortSample,
+    Contig,
+    CustomColumn,
+    CustomColumnsCollection,
+    GenomeBuild,
+    GenomicIntervalsCollection,
+    Lab,
+    LabHead,
+    LabUserSettingsOverride,
+    LiftoverRun,
+    NodeCountSettingsCollection,
+    Organization,
+    OrganizationUserSettingsOverride,
+    Quad,
+    Sample,
+    SampleLocusCount,
+    SomalierRelatePairs,
+    State,
+    Tag,
+    TagColorsCollection,
+    Trio,
+    UserContact,
+    UserDataPrefix,
+    UserGridConfig,
+    UserSettings,
+    UserSettingsOverride,
+    VariantGridColumn,
+    VariantZygosityCountCollection,
+    VariantZygosityCountForVCF,
+    VCFLengthStatsCollection,
+    Wiki,
+    get_igv_data,
+)
+from snpdb.models.models_enums import (
+    AlleleConversionTool,
+    BuiltInFilters,
+    ImportStatus,
+    ProcessingStatus,
+)
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.liftover_tasks import liftover_alleles
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
@@ -91,6 +172,7 @@ from snpdb.utils import LabNotificationBuilder, get_tag_styles_and_colors
 from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
 from upload.views.views import get_remaining_annotation_runs
+from user_messages.models import Message
 
 
 @terms_required
@@ -294,6 +376,23 @@ def _get_vcf_infos(vcf) -> list[str]:
     return infos
 
 
+def _get_vcf_skipped_annotation_count(vcf) -> int:
+    """ Number of variants VEP was unable to annotate for a VCF (latest annotation version) - see issue #1409 """
+    if annotation_version := AnnotationVersion.latest_or_none(vcf.genome_build, validate=False):
+        if vas := VCFAnnotationStats.objects.filter(
+                vcf=vcf, variant_annotation_version=annotation_version.variant_annotation_version).first():
+            return vas.vep_skipped_count
+    return 0
+
+
+def _skipped_annotation_message(count: int, tab_anchor: str) -> str:
+    """ HTML warning message linking to the skipped-annotation tab - see issue #1409 """
+    plural = pluralize(count)
+    return format_html('Variant Effect Predictor (VEP) was unable to annotate {} variant{}. '
+                       '<a class="activate-tab" href="#{}">View skipped variants</a>',
+                       count, plural, tab_anchor)
+
+
 def view_vcf(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
@@ -302,7 +401,7 @@ def view_vcf(request, vcf_id):
     sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, passing_filter=True)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
-                                             fields=["vcf_sample_name", "name", "patient", "specimen"],
+                                             fields=["vcf_sample_name", "name", "patient", "extraction"],
                                              widgets=SampleForm.Meta.widgets)
 
     post = request.POST or None
@@ -336,7 +435,7 @@ def view_vcf(request, vcf_id):
 
     if reload_vcf:
         set_vcf_and_samples_import_status(vcf, ImportStatus.IMPORTING)
-        retry_upload_pipeline(vcf.uploadedvcf.uploaded_file.uploadpipeline)
+        retry_upload_pipeline(vcf.uploadedvcf.file_upload.uploadpipeline)
         vcf_form = forms.VCFForm(post, instance=vcf)  # Reload as import status has changed
         messages.add_message(request, messages.INFO, "Reloading VCF")
 
@@ -360,7 +459,7 @@ def view_vcf(request, vcf_id):
         variant_zygosity_count_collections[vzcc] = vzc_vcf
 
     try:
-        can_view_upload_pipeline = vcf.uploadedvcf.uploaded_file.can_view(request.user)
+        can_view_upload_pipeline = vcf.uploadedvcf.file_upload.can_view(request.user)
     except UploadedVCF.DoesNotExist:
         can_view_upload_pipeline = False
 
@@ -370,6 +469,13 @@ def view_vcf(request, vcf_id):
             annotated_download_files = get_annotated_download_files_cgf("export_cohort_to_downloadable_file", cohort_id)
 
     vcf_length_stats = _get_vcf_length_stats(vcf)
+
+    # VEP-skipped variants for the latest annotation version (VG only - see issue #1409)
+    skipped_annotation_count = _get_vcf_skipped_annotation_count(vcf)
+    if skipped_annotation_count:
+        messages.add_message(request, messages.WARNING,
+                             _skipped_annotation_message(skipped_annotation_count, "vcf-skipped-annotation"),
+                             extra_tags='html import-message')
 
     from snpdb.archive import vcf_can_be_archived
     can_archive = has_write_permission and vcf_can_be_archived(vcf)
@@ -395,6 +501,7 @@ def view_vcf(request, vcf_id):
         "can_archive": can_archive,
         "restore_source_exists": restore_source_exists,
         "restore_source_kind": restore_source_kind,
+        "skipped_annotation_count": skipped_annotation_count,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
 
@@ -457,7 +564,8 @@ def get_patient_upload_csv_for_vcf(request, pk):
 def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
     annotation_version = AnnotationVersion.latest(sample.genome_build)
     try:
-        cgc = sample.vcf.cohort.cohort_genotype_collection
+        cohort = sample.vcf.cohort
+        cgc = cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
         return pd.DataFrame(), pd.DataFrame()
 
@@ -473,6 +581,7 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     variant_class_data = {}
     zygosity_data = {}
+    missing_stats = False
     for name, (stats_klass, shared_fields) in STATS.items():
         base_kwargs = {
             "cohort_genotype_collection": cgc,
@@ -486,7 +595,8 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
         try:
             objs[name] = stats_klass.objects.get(passing_filter=False, **base_kwargs)
         except ObjectDoesNotExist:
-            pass
+            # Stats absent for the latest annotation version (eg it was bumped since import)
+            missing_stats = True
 
         try:
             objs[f"{name} PASS filters"] = stats_klass.objects.get(passing_filter=True, **base_kwargs)
@@ -518,13 +628,16 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
         sample_stats_variant_class_df["Total %"] = 100 * total / total["variant"]
 
     sample_stats_zygosity_df = pd.DataFrame.from_dict(zygosity_data).reindex(ZYGOSITY)
+
+    if missing_stats:
+        enqueue_cohort_stats_recompute(cohort, annotation_version)
+
     return sample_stats_variant_class_df, sample_stats_zygosity_df
 
 
 def _get_sample_genotype_stats(sample):
     """ Resolve the per-sample CohortGenotypeStats row (passing_filter=False,
-        filter_key NULL) for the template, replacing the old `sample.samplestats`
-        reverse accessor. Returns None if missing (e.g. legacy data). """
+        filter_key NULL) for the template. Returns None if missing (e.g. legacy data). """
     try:
         cgc = sample.vcf.cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
@@ -567,6 +680,14 @@ def view_sample(request, sample_id):
 
     sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
     sample_genotype_stats = _get_sample_genotype_stats(sample)
+
+    # VEP-skipped variants for the latest annotation version (VG only - see issue #1409)
+    skipped_annotation_count = _get_vcf_skipped_annotation_count(sample.vcf)
+    if skipped_annotation_count:
+        messages.add_message(request, messages.WARNING,
+                             _skipped_annotation_message(skipped_annotation_count, "sample-skipped-annotation"),
+                             extra_tags='html import-message')
+
     annotated_download_files = {}
     if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
         if sample.import_status == ImportStatus.SUCCESS:
@@ -586,7 +707,8 @@ def view_sample(request, sample_id):
         "sample_stats_variant_class_df": sample_stats_variant_class_df,
         "sample_stats_zygosity_df": sample_stats_zygosity_df,
         "sample_genotype_stats": sample_genotype_stats,
-        "related_samples": related_samples
+        "related_samples": related_samples,
+        "skipped_annotation_count": skipped_annotation_count,
     }
     return render(request, 'snpdb/data/view_sample.html', context)
 
@@ -816,6 +938,17 @@ def set_user_data_grid_config(request):
     return HttpResponse()
 
 
+@require_POST
+def set_all_variants_filter(request, genome_build_name):
+    """ Remember the All Variants page filter selections - set from variants.html whenever a filter changes """
+
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    filters = json.loads(request.body)
+    AllVariantsFilter.objects.update_or_create(user=request.user, genome_build=genome_build,
+                                               defaults={"filters": filters})
+    return HttpResponse()
+
+
 def view_user_settings(request):
     user = request.user
     user_contact = UserContact.get_for_user(user)
@@ -1040,12 +1173,13 @@ def view_lab(request, lab_id: int):
     if settings.CLASSIFICATION_STATS_USE_SHARED:
         visibility = "Shared"
     else:
-        visibility = f"Created"
+        visibility = "Created"
 
     context = {
         "lab": lab,
         "visibility": visibility,
         "is_member": lab.is_member(request.user) or request.user.is_superuser,
+        "can_manage_members": lab.can_manage_members(request.user),
 
         "lab_form": lab_form,
         'settings_override_form': lab_settings_override_form,
@@ -1056,6 +1190,50 @@ def view_lab(request, lab_id: int):
         'clinvar_export_enabled': clinvar_export_sync.is_enabled
     }
     return render(request, 'snpdb/settings/view_lab.html', context)
+
+
+def lab_members_tab(request, pk):
+    lab = get_object_or_404(Lab, pk=pk)
+    lab.check_can_manage_members(request.user)
+
+    lab_users = lab.lab_users
+    removable_user_pks = {lu.user.pk for lu in lab_users
+                          if not lab.remove_member_blocked_reason(lu.user, request.user)}
+
+    context = {
+        "lab": lab,
+        "lab_users": lab_users,
+        "removable_user_pks": removable_user_pks,
+        "lab_member_form": LabMemberForm(lab=lab, for_user=request.user),
+    }
+    return render(request, 'snpdb/settings/lab_members_tab.html', context)
+
+
+@require_POST
+def lab_add_member(request, pk):
+    lab = get_object_or_404(Lab, pk=pk)
+    lab.check_can_manage_members(request.user)
+
+    form = LabMemberForm(request.POST, lab=lab, for_user=request.user)
+    if form.is_valid():
+        user = form.cleaned_data["user"]
+        lab.add_member(user, added_by=request.user)
+        messages.add_message(request, messages.SUCCESS, f"{user} added to {lab}")
+    else:
+        messages.add_message(request, messages.ERROR, "Could not add that user to the lab")
+    return redirect(reverse('view_lab', kwargs={"lab_id": lab.pk}))
+
+
+@require_POST
+def lab_remove_member(request, pk):
+    lab = get_object_or_404(Lab, pk=pk)
+    lab.check_can_manage_members(request.user)
+
+    members_qs = lab.group.user_set.all() if lab.group else User.objects.none()
+    user = get_object_or_404(members_qs, pk=request.POST.get("user") or 0)
+    lab.remove_member(user, removed_by=request.user)
+    messages.add_message(request, messages.SUCCESS, f"{user} removed from {lab}")
+    return redirect(reverse('view_lab', kwargs={"lab_id": lab.pk}))
 
 
 def view_clinvar_key(request, pk: str):
@@ -1836,7 +2014,7 @@ def global_sample_gene_matrix(request):
         try:
             genome_build = GenomeBuild.builds_with_annotation().get()
         except GenomeBuild.MultipleObjectsReturned:
-            msg = f"settings.PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD must be set when there are multiple genome builds"
+            msg = "settings.PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD must be set when there are multiple genome builds"
             raise ImproperlyConfigured(msg)
     else:
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)

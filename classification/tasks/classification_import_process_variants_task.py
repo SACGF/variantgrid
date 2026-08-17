@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.conf import settings
 
@@ -6,7 +6,7 @@ from classification.models import ImportedAlleleInfo
 from classification.models.classification import ClassificationImport
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import GenomeBuild, ImportSource, Variant, VariantCoordinate, Allele
+from snpdb.models import Allele, GenomeBuild, ImportSource, Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import ModifiedImportedVariant, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
@@ -21,7 +21,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         any were normalised during import process """
 
     def process_items(self, upload_step: UploadStep):
-        vc_import = upload_step.uploaded_file.uploadedclassificationimport.classification_import
+        vc_import = upload_step.file_upload.uploadedclassificationimport.classification_import
         genome_build = vc_import.genome_build
 
         self.link_inserted_variants(genome_build, vc_import, upload_step)

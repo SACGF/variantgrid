@@ -6,8 +6,10 @@ from django.db.models.aggregates import Count
 from library.guardian_utils import check_can_write
 from library.log_utils import log_traceback
 from snpdb.models import VCF, ImportStatus, Sample
-from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf, \
-    update_all_variant_zygosity_counts_for_sample
+from snpdb.variant_zygosity_count import (
+    update_all_variant_zygosity_counts_for_sample,
+    update_all_variant_zygosity_counts_for_vcf,
+)
 
 
 def soft_delete_vcfs(user, *vcf_ids):

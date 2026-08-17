@@ -9,7 +9,7 @@ from unittest import mock
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 
-from library.django_utils.major_operation import major_operation, TooManyMajorOperationsError
+from library.django_utils.major_operation import TooManyMajorOperationsError, major_operation
 
 LOCMEM_CACHE = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},

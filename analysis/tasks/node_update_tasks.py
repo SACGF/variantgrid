@@ -6,18 +6,30 @@ from auditlog.context import disable_auditlog
 from celery.canvas import Signature
 from celery.contrib.abortable import AbortableTask
 from celery.result import AsyncResult
-from django.db.models import OuterRef, Subquery, F, Q
-from django.db.utils import OperationalError, IntegrityError
+from django.db.models import F, OuterRef, Q, Subquery
+from django.db.utils import IntegrityError, OperationalError
 from django.utils import timezone
 
-from analysis.exceptions import NodeConfigurationException, NodeParentErrorsException, CeleryTasksObsoleteException, \
-    NodeOutOfDateException, NodeOutOfMemoryException
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion, NodeCache, NodeTask, NodeColors
+from analysis.exceptions import (
+    CeleryTasksObsoleteException,
+    NodeConfigurationException,
+    NodeOutOfDateException,
+    NodeOutOfMemoryException,
+    NodeParentErrorsException,
+)
+from analysis.models.nodes.analysis_node import (
+    AnalysisNode,
+    NodeCache,
+    NodeColors,
+    NodeStatus,
+    NodeTask,
+    NodeVersion,
+)
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
-from library.log_utils import log_traceback, get_traceback
-from snpdb.models import ProcessingStatus, JobsControl
+from library.log_utils import get_traceback, log_traceback
+from snpdb.models import JobsControl, ProcessingStatus
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"
 
@@ -269,9 +281,10 @@ def delete_analysis_old_node_versions(analysis_id):
 def wait_for_node(self, node_id):
     """ Used to build a dependency on a node that's already loading.
 
-        No longer added to scheduling chains (issue #346 removed the worker-starvation pattern);
-        kept because analysis_grid_export_tasks._wait_for_output_node() still calls it
-        synchronously as a blocking export gate.
+        No longer added to scheduling chains (issue #346 removed the worker-starvation pattern).
+        Also no longer used by analysis_grid_export_tasks - calling this synchronously leaked its
+        self.retry() Retry up into the caller and wedged the export task in a stale RETRY state, so
+        the exports now do their own node-readiness retry. Kept as a standalone building block.
 
         Uses Celery retry (not sleep) to free the worker between checks, preventing deadlocks
         when all workers are occupied waiting for parent nodes.

@@ -12,7 +12,7 @@
 """
 import operator
 
-from annotation.models.damage_enums import SIFTPrediction, AlphaMissensePrediction
+from annotation.models.damage_enums import AlphaMissensePrediction, SIFTPrediction
 from library.utils import invert_dict
 
 VEP_SEPARATOR = '&'

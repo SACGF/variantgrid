@@ -11,7 +11,7 @@
 {% load related_data_tags %}
 {% load related_analyses_tags %}
 {% block title %}View Patient {{ patient }}{% endblock title %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block submenu %}{% menu_bar_patients %}{% endblock submenu %}
 {% block head %}
     <link href="{% static 'js/lib/filepond/4.32.12/filepond.min.css' %}" rel="stylesheet">
     <link href="{% static 'js/lib/filepond/file-poster/2.5.2/filepond-plugin-file-poster.min.css' %}" rel="stylesheet">
@@ -95,6 +95,7 @@
         {% end_ui_register_tab_embedded %}
         {% ui_register_tab label="Contact" url="view_patient_contact_tab" param=patient.pk url_check=True tab_set="patients" %}
         {% ui_register_tab label="Specimens" url="view_patient_specimens" param=patient.pk url_check=True tab_set="patients"%}
+        {% ui_register_tab label="Extractions" url="view_patient_extractions" param=patient.pk url_check=True tab_set="patients"%}
         {% ui_register_tab label="Genes" url="view_patient_genes" param=patient.pk url_check=True tab_set="patients" %}
         {% if has_write_permission %}
             {% ui_register_tab_embedded label="Sharing / Permissions" tab_set="patients" %}{% url "group_permissions" 'patients.models.Patient' patient.pk %}{% end_ui_register_tab_embedded %}
@@ -177,7 +178,7 @@
         {% endif %}
 
         {% related_data_for_patient patient %}
-        {% related_analyses_for_samples patient.get_samples show_sample_info=True %}
+        {% related_analyses_for_samples patient.get_samples show_sample_info=True show_create_analyses=False %}
 
     </div>
 {% endblock content %}

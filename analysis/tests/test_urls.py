@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -7,14 +8,30 @@ from django.test.client import Client
 from django.urls.base import reverse
 from django.utils import timezone
 
-from analysis.models import Analysis, SampleNode, KaryomappingAnalysis, GeneListNode, GeneListNodeGeneList
+from analysis.models import (
+    Analysis,
+    GeneListNode,
+    GeneListNodeGeneList,
+    KaryomappingAnalysis,
+    SampleNode,
+)
 from analysis.models.enums import SNPMatrix
+from analysis.tasks.analysis_grid_export_tasks import (
+    NODE_EXPORT_GENERATOR,
+    export_node_to_downloadable_file,
+)
 from annotation.fake_annotation import get_fake_annotation_version
 from genes.models import GeneList
-from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
+from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
-from snpdb.models import Variant
-from snpdb.models.models_cohort import Cohort, Trio, CohortSample, CohortGenotypeCollection, CohortGenotype
+from snpdb.models import CachedGeneratedFile, Variant
+from snpdb.models.models_cohort import (
+    Cohort,
+    CohortGenotype,
+    CohortGenotypeCollection,
+    CohortSample,
+    Trio,
+)
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, Sample
@@ -205,6 +222,8 @@ class Test(URLTestCase):
         self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
     def _testVariantGridExport(self, export_type: str):
+        """ The export runs under Celery now (#1257) - the view launches it and redirects to the
+            CachedGeneratedFile poll URL """
         client = Client()
         client.force_login(self.user_owner)
         url = reverse("node_grid_export", kwargs={"analysis_id": self.analysis.pk})
@@ -215,9 +234,16 @@ class Test(URLTestCase):
             "export_type": export_type,
         }
         url = url + "?" + "&".join([f"{k}={v}" for k, v in params.items()])
-        response = client.get(url)
-        response.getvalue()  # Read streaming content
-        self.assertEqual(response.status_code, 200)
+        with mock.patch.object(export_node_to_downloadable_file, "apply_async") as mock_apply_async:
+            # A real worker would run the export against the deployment's DB, not the test one
+            mock_apply_async.return_value = mock.Mock(id="fake-celery-task-id", result=None)
+            response = client.get(url)
+        self.assertEqual(response.status_code, 302)
+
+        cgf = CachedGeneratedFile.objects.get(generator=NODE_EXPORT_GENERATOR)
+        self.assertEqual(response.url, reverse("cached_generated_file_check", kwargs={"cgf_id": cgf.pk}))
+        self.assertIsNone(cgf.exception)
+        cgf.delete()
 
     def testVariantGridExport(self):
         for export_type in ["vcf", "csv"]:

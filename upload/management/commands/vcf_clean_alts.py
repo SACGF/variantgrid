@@ -9,7 +9,7 @@ from collections import Counter
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from library.genomics.vcf_enums import VCFColumns, INFO_LIFTOVER_SWAPPED_REF_ALT
+from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT, VCFColumns
 from library.genomics.vcf_utils import parse_vcf_info_column
 
 

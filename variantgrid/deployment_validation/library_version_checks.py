@@ -9,8 +9,8 @@ def check_library_versions() -> dict:
     """ Check library versions to make sure bug fixes have been applied """
 
     def _test_biocommons_hgvs():
-        from snpdb.models import GenomeBuild
         from genes.hgvs import HGVSMatcher
+        from snpdb.models import GenomeBuild
         matcher = HGVSMatcher(GenomeBuild.grch38(), hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
         # Check it can handle reference variants
         matcher.get_variant_coordinate("NC_000006.12:g.49949407_49949408=")
@@ -25,7 +25,6 @@ def check_library_versions() -> dict:
         "cdot": (0, 2, 26),
         "cyvcf2": (0, 30, 14),  # ploidy fix
         "hgvs": _test_biocommons_hgvs,
-        "pyhgvs": (0, 12, 4),
     }
 
     library_version_valid = {}

@@ -2,11 +2,12 @@ import datetime
 import itertools
 import re
 import typing
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Iterable, Union, Any, Iterator
+from typing import Any, Optional, Union
 
 from Bio import Entrez, Medline
 from django.db import models
@@ -693,7 +694,7 @@ class CitationFetchRequest:
         except Exception as ex:
             # if this fails it's probably because a single id in ids ruined it for everybody
             report_exc_info(extra_data={"target": f'Error when attempting to Entrez.efetch ids {ids}'})
-            self._mark_error_if_not_fetched(ids, f'Error when attempting to Entrez.efetch ids {request_ids} : {str(ex)}')
+            self._mark_error_if_not_fetched(ids, f'Error when attempting to Entrez.efetch ids {request_ids} : {ex!s}')
 
     @staticmethod
     def _populate_from_entrez(citation: Citation, record: JsonObjType):
@@ -735,7 +736,7 @@ class CitationFetchRequest:
 
             except RuntimeError as run_error:
                 report_exc_info(extra_data={'bookshelf_rid': bookshelf_rid})
-                self._mark_error_if_not_fetched([bookshelf_rid], f'Error when attempting to Entrez.efetch ids {bookshelf_rid} : {str(run_error)}')
+                self._mark_error_if_not_fetched([bookshelf_rid], f'Error when attempting to Entrez.efetch ids {bookshelf_rid} : {run_error!s}')
 
     @staticmethod
     def _populate_from_nbk(citation: Citation, record: JsonObjType):

@@ -1,23 +1,23 @@
-# -*- coding: utf-8 -*-
 import enum
 import itertools
 import logging
 import operator
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import auto
 from functools import cached_property, reduce
-from typing import Optional, Any, Callable, Union, TypeVar, Generic, Type, List
+from typing import Any, Generic, Optional, TypeVar, Union
 
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import QuerySet, Q, F, OrderBy
+from django.db.models import F, OrderBy, Q, QuerySet
 from django.http import HttpRequest, QueryDict
 from django.urls import reverse
 from kombu.utils import json
 
 from library.log_utils import report_exc_info
-from library.utils import pretty_label, nice_class_name, JsonDataType, JsonObjType, full_class_name
+from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,9 @@ class CellData(Generic[RDC]):
 
     def __getitem__(self, item):
         return self.all_data[item]
+
+    def __contains__(self, item) -> bool:
+        return item in self.all_data
 
     def get_nested_json(self, key, sub_key):
         if data := self.all_data.get(key):
@@ -95,7 +98,7 @@ class RichColumn:
                  enabled: bool = True,
                  renderer: Optional[Callable[[CellData], JsonDataType]] = None,
                  default_sort: Optional[SortOrder] = None,
-                 order_sequence: Optional[List[SortOrder]] = None,
+                 order_sequence: Optional[list[SortOrder]] = None,
                  client_renderer: Optional[str] = None,
                  client_renderer_td: Optional[str] = None,
                  visible: bool = True,
@@ -398,16 +401,19 @@ class DatatableConfig(Generic[DC]):
         pass
 
     @cached_property
-    def _model(self) -> Type[DC]:
+    def _model(self) -> type[DC]:
         return self.get_initial_queryset().model
 
     def view_primary_key(self, row: CellData) -> JsonDataType:
         """ Relies on being 'id' and object defining get_absolute_url  """
         primary_key_name = self._model._meta.pk.name
-        pk = row.get(primary_key_name)
-        if not pk:
+        if primary_key_name not in row:
             raise ValueError(f"Need to include primary key ('{primary_key_name}') in columns")
+        pk = row[primary_key_name]
         text = row.value
+        if pk is None or pk == "":
+            # Legacy data can have blank text primary keys (eg Experiment) - no URL to link to
+            return {"text": text}
         obj = self._model(pk=pk)
         return {
             "text": text,
@@ -432,7 +438,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
     config: DatatableConfig
     max_display_length = 100
 
-    column_class: Type[DC] = None
+    column_class: type[DC] = None
 
     def config_for_request(self, request: HttpRequest) -> DatatableConfig[DC]:
         return self.column_class(request)
@@ -622,10 +628,15 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             total_records = qs.count()
 
             # apply filters
-            qs = self.filter_queryset(qs)
+            filtered_qs = self.filter_queryset(qs)
 
-            # number of records after filtering
-            total_display_records = qs.count()
+            # number of records after filtering - filter_queryset hands back the same queryset when no
+            # filters were supplied, and the count is often expensive enough to be worth not repeating
+            if filtered_qs is qs:
+                total_display_records = total_records
+            else:
+                total_display_records = filtered_qs.count()
+            qs = filtered_qs
 
             # apply ordering
             qs = self.ordering(qs)

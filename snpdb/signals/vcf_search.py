@@ -1,5 +1,5 @@
 from snpdb.models import VCF
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 
 @search_receiver(

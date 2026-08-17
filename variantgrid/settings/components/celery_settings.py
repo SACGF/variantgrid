@@ -73,6 +73,9 @@ CELERY_TASK_ROUTES = {
     "annotation.tasks.annotate_variants.delete_annotation_run": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.delete_annotation_run_uploaded_data": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.assign_range_lock_to_annotation_run": ANNOTATION_WORKERS,
+    # #1654: retry clears a run's annotation rows (a big delete) then resets it to CREATED. On db_workers
+    # like import_annotation_run so the bulk delete never consumes a throttled VEP slot.
+    "annotation.tasks.annotate_variants.reset_annotation_run_for_retry": DB_WORKERS,
     # annotate_variants is the VEP lane (dump + VEP). Its DB upload phase is a separate task,
     # import_annotation_run, pinned to db_workers so quick bulk inserts never consume a throttled VEP
     # slot - the dispatcher runs it once a run reaches ANNOTATION_COMPLETED. See #1649.
@@ -82,9 +85,14 @@ CELERY_TASK_ROUTES = {
     "annotation.tasks.cohort_sample_gene_damage_counts.CalculateCohortSampleGeneDamageCountsTask": ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CohortSampleGeneDamageCountTask": ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CohortSampleClassificationGeneDamageCountTask": ANNOTATION_WORKERS,
-    "annotation.tasks.import_clinvar_vcf_task.ImportCreateVersionForClinVarVCFTask": ANNOTATION_WORKERS,
-    "annotation.tasks.import_clinvar_vcf_task.ProcessClinVarVCFDataTask": ANNOTATION_WORKERS,
-    "annotation.tasks.import_clinvar_vcf_task.ImportClinVarSuccessTask": ANNOTATION_WORKERS,
+    # ClinVar import is a VCF import-processing pipeline that reuses AbstractVCFImportTaskFactory, so it
+    # is routed to match the normal (genotype) VCF import: the parallel per-split data-processing lane
+    # goes to WEB_WORKERS (mirrors ProcessGenotypeVCFDataTask), while the create-version and success
+    # steps fall through to the default db_workers (mirrors ImportCreateVCFModelForGenotypeVCFTask /
+    # ImportGenotypeVCFSuccessTask, which are likewise unrouted). It was previously all on
+    # ANNOTATION_WORKERS - the VEP lane - where it serialised behind long annotate_variants runs on the
+    # single-concurrency annotation worker, stalling imports for hours.
+    "annotation.tasks.import_clinvar_vcf_task.ProcessClinVarVCFDataTask": WEB_WORKERS,
 
     # Anything that runs on data uploaded from the web should be WEB_WORKERS
     # 1. As it may be a different machine than DB workers etc.
@@ -111,6 +119,7 @@ CELERY_TASK_ROUTES = {
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
 
     # Partition archive
+    'patients.tasks.extraction_matching_tasks.reconcile_pending_extractions': DB_WORKERS,
     'snpdb.tasks.partition_archive_tasks.perform_partition_archive': DB_WORKERS,
     "snpdb.tasks.sub_cohort_tasks.build_sub_cohort_any_sample_called_vc_task": DB_WORKERS,
 }
@@ -130,6 +139,7 @@ CELERY_IMPORTS = (
     'classification.tasks.classification_import_task',
     'classification.tasks.classification_candidate_search_tasks',
     'genes.tasks.gene_coverage_tasks',
+    'patients.tasks.extraction_matching_tasks',
     'pedigree.models',
     'seqauto.tasks.gold_summary_tasks',
     'snpdb.models',

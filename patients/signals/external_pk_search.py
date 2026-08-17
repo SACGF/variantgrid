@@ -2,8 +2,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.exceptions import PermissionDenied
 
 from patients.models import ExternalPK
-from snpdb.search import search_receiver, HAS_ALPHA_PATTERN, \
-    SearchInputInstance, SearchExample
+from snpdb.search import HAS_ALPHA_PATTERN, SearchExample, SearchInputInstance, search_receiver
 
 
 @search_receiver(
@@ -16,7 +15,7 @@ from snpdb.search import search_receiver, HAS_ALPHA_PATTERN, \
 def search_external_pk(search_input: SearchInputInstance):
     # TODO test me
     # Returns related objects
-    RELATED_OBJECT_FIELDS = ["case", "pathologytestorder", "patient"]
+    RELATED_OBJECT_FIELDS = ["case", "pathologytestorder", "patient", "specimen", "extraction"]
     for external_pk in ExternalPK.objects.filter(code__iexact=search_input.search_string):
         for f in RELATED_OBJECT_FIELDS:
             try:

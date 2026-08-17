@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Optional, Any
+from typing import Any, Optional
 
 
 def _get_env_variable(key: str) -> tuple[Any, bool]:
@@ -32,7 +32,7 @@ def _load_settings():
         with open(settings_file) as f:
             return json.load(f)
     except Exception as e:
-        logging.info(f"Could not load settings_config from {settings_file} : {str(e)}\n")
+        logging.info(f"Could not load settings_config from {settings_file} : {e!s}\n")
         return {}
 
 

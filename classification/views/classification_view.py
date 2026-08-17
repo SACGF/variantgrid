@@ -6,15 +6,15 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.utils.decorators import method_decorator
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
-from rest_framework.status import HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR, HTTP_400_BAD_REQUEST
+from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.views import APIView
 
 from classification.classification_stats import get_lab_gene_counts
 from classification.enums import ClinicalSignificance
-from classification.models import ClassificationRef, ClassificationJsonParams
+from classification.models import ClassificationJsonParams, ClassificationRef
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.utils import empty_to_none, force_json

@@ -2,7 +2,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 
 from pedigree.models import PedFile, Pedigree
-from snpdb.models import UserGridConfig, ImportStatus
+from snpdb.models import ImportStatus, UserGridConfig
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 

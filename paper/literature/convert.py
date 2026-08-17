@@ -2,6 +2,7 @@
 """Convert downloaded PDFs in pdfs/ to plain text in text/ using pypdf."""
 import sys
 from pathlib import Path
+
 from pypdf import PdfReader
 
 base = Path(__file__).parent
@@ -16,5 +17,5 @@ for pdf in sorted(pdf_dir.glob("*.pdf")):
         text = "\n".join((page.extract_text() or "") for page in reader.pages)
         out.write_text(text, encoding="utf-8")
         print(f"OK   {pdf.name} -> {out.name} ({len(text)} chars, {len(reader.pages)} pages)")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"FAIL {pdf.name}: {e}", file=sys.stderr)

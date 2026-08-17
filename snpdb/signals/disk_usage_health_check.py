@@ -1,7 +1,11 @@
+from django.conf import settings
 from django.dispatch import receiver
 
-from library.health_check import HealthCheckRequest, HealthCheckCapacity, \
-    health_check_overall_stats_signal
+from library.health_check import (
+    HealthCheckCapacity,
+    HealthCheckRequest,
+    health_check_overall_stats_signal,
+)
 from variantgrid.deployment_validation.disk_usage import get_disk_usage_objects
 
 
@@ -13,7 +17,7 @@ def disk_usage_health_check(sender, health_request: HealthCheckRequest, **kwargs
             name=f"Mount Point '{disk_usage.mount_point}",
             used=disk_usage.percent_nice,
             available=disk_usage.available_nice,
-            warning=not disk_usage.has_safe_capacity
+            warning=not disk_usage.has_capacity(settings.SERVER_MIN_DISK_WARNING_GIGS)
         ))
     if not checks:
         checks.append(HealthCheckCapacity(

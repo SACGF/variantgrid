@@ -1,5 +1,5 @@
 import operator
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from functools import reduce
 
 from django.contrib.auth.models import User
@@ -9,7 +9,9 @@ from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 
-from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
+from annotation.annotation_version_querysets import (
+    get_variant_queryset_for_latest_annotation_version,
+)
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from patients.models_enums import Zygosity

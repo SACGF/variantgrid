@@ -1,14 +1,27 @@
 import os
 
 from variantgrid.settings.components.secret_settings import get_secret
-from variantgrid.settings.components.settings_paths import ANNOTATION_BASE_DIR, VARIANTGRID_REPO_REFERENCE_DIR, \
-    PRIVATE_DATA_ROOT
+from variantgrid.settings.components.settings_paths import (
+    ANNOTATION_BASE_DIR,
+    PRIVATE_DATA_ROOT,
+    VARIANTGRID_REPO_REFERENCE_DIR,
+)
 
 # GeneAnnotation is only in analyses, as an optimisation to stpre e.g. per-gene ontology records.
 ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = True
 
 ANNOTATION_VEP_FAKE_VERSION = False  # Overridden in unit tests to not call VEP to get version
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
+
+# #1710: heap ceiling for one VEP process, applied with prlimit (util-linux). None = no limit.
+# This bounds the run rather than the worker pool, so a plugin that runs away on one variant takes out
+# its own run and nothing else - a pool-wide cgroup cap would have to be divided by however many VEPs
+# are in flight, and could pick a healthy run as the OOM victim. Sized against the workload, not the
+# box: a full standard run (50,000 variants, every plugin and custom file) holds flat at ~0.4GB, and
+# the worst single variant measured is under 1GB, so this is roughly 10x headroom. Deployments whose
+# data needs more can raise it - keep ANNOTATION_VEP_MEMORY_LIMIT_GB x annotation_workers concurrency
+# comfortably below installed RAM.
+ANNOTATION_VEP_MEMORY_LIMIT_GB = 4
 
 # I've had VEP hang on me when running --fork so by default we run in small batches
 # This causes a small amount of overhead obtaining an AnnotationRangeLock
@@ -21,8 +34,25 @@ _VARIANT_ANNOTATION_PIPELINE_STRUCTURAL_VARIANT = "C"
 
 ANNOTATION_VEP_BUFFER_SIZE = {
     # Default VEP is 5k but this has crashed out a 16G machine...
-    _VARIANT_ANNOTATION_PIPELINE_STANDARD: 2000,
-    _VARIANT_ANNOTATION_PIPELINE_STRUCTURAL_VARIANT: 1000,
+    # VEP holds the transcript cache for every 1Mb region the current buffer spans (it drops the rest
+    # in AnnotationSource::clean_cache), so peak RSS tracks regions-per-buffer, not variant count.
+    # Runtime was flat across every size measured; output byte-identical. Matters most when
+    # annotation_workers runs several VEPs concurrently.
+    #
+    # 12.5k small variants: 4000 -> 1295MB, 2000 -> 1260MB, 1000 -> 1049MB, 500 -> 871MB, 250 -> 858MB.
+    # Flattens at 500 for *dense* variants - 500 consecutive ones sit in a handful of regions, so
+    # regions-per-buffer was never the dominant term there. A sparse range inverts that: 500 consecutive
+    # variants scattered across a build can touch hundreds of distinct regions, which is how #1710 reached
+    # 5.3GB and 7.3GB on a 6,250 variant run. 100 costs nothing to hold it down - AnnotationSource::
+    # clean_cache keeps the current buffer's regions, and we dump position-sorted, so a region is loaded
+    # once per run whatever the buffer size. Keep well above 2 x ANNOTATION_VEP_FORK: VEP divides the
+    # buffer between forks (Runner::_forked_buffer_to_output).
+    _VARIANT_ANNOTATION_PIPELINE_STANDARD: 100,
+    # SVs span whole regions each, so they load far more cache per variant and keep scaling down:
+    # 1000 DELs (median 49kb) -> 1774MB @1000, 1212MB @500, 752MB @250, 505MB @100, matching the
+    # worst-case regions in one buffer (247 / 126 / 67 / 29). 250 keeps enough per buffer to avoid
+    # re-loading shared regions between consecutive buffers.
+    _VARIANT_ANNOTATION_PIPELINE_STRUCTURAL_VARIANT: 250,
 }
 # get_unannotated_count_min_max does quick queries to try and get VEP batch sizes within a range
 # If it gets below min, it does a slower query to get range lock.
@@ -42,10 +72,15 @@ ANNOTATION_WORKER_SLOTS_FALLBACK = 2
 ANNOTATION_UPLOAD_WORKER_SLOTS = 4
 # Lease reclaims (dead-worker re-dispatch) allowed before a run is failed to ERROR.
 ANNOTATION_MAX_RUN_ATTEMPTS = 3
-# Lease window. Must exceed the worst-case single-run time so a live worker is never reclaimed
-# under us. A run is capped at BATCH_MAX (25k ~= 45 min); prod runs ~1.5 h / 50k. 16200 = 4.5 h
-# is a deliberately generous 3x margin - reclaim is the rare dead-worker path so erring long is cheap.
-ANNOTATION_RUN_LEASE_SECONDS = 16200
+# Lease window for dead-worker reclaim. A live run renews its own lease on a background heartbeat
+# (AnnotationRunLeaseHeartbeat in annotate_variants) every ANNOTATION_RUN_LEASE_HEARTBEAT_SECONDS,
+# so the window no longer has to exceed the worst-case run time - a long structural-variant VEP run
+# (no SV-count cap, can run many hours) stays leased by heartbeating, not by a generous static window.
+# So we keep it short: a genuinely dead/SIGKILLed worker stops heartbeating and its run is reclaimed
+# within one window (~15 min) instead of hours. The heartbeat interval is well under the window
+# (~7 beats/window) so a transient DB/process stall doesn't falsely reclaim a live run.
+ANNOTATION_RUN_LEASE_SECONDS = 900
+ANNOTATION_RUN_LEASE_HEARTBEAT_SECONDS = 120
 ANNOTATION_VEP_ARGS = []
 ANNOTATION_VEP_VERSION = "116"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
@@ -65,12 +100,15 @@ ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD = "lowest_af"  # "greatest_overlap
 ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION = 0.8
 ANNOTATION_VEP_SV_MAX_SIZE = 10_000_000  # VEP default = 10M
 
+# Use pyBigWig as optimisation rather than VEP --custom (see #1657)
+ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED = True
+
 ANNOTATION_MAX_BENIGN_RANKSCORE = 0.15
 ANNOTATION_MIN_PATHOGENIC_RANKSCORE = 0.85
 
 # dbNSFP rankscores are legacy (replaced by raw scores at columns_version >= 4). New deployments hide
 # them so nobody filters/views by them going forward. Deployments that previously used rankscores set
-# this True (see env/vgaws.py, env/vgtest.py). A value that was already set is always shown/applied
+# this True (see env/vgaws.py, env/vgtest2.py). A value that was already set is always shown/applied
 # regardless of this flag.
 ANNOTATION_SHOW_LEGACY_RANKSCORES = False
 
@@ -82,8 +120,10 @@ BUILD_T2TV2 = "T2T-CHM13v2.0"
 
 
 ANNOTATION = {
-    # We need separate 'reference_fasta' as cdot requires a NCBI fasta with contig_ids as the names
-    # While VEP has issues with this, so has 'vep_config.fasta' see https://github.com/Ensembl/ensembl-vep/issues/1635
+    # 'reference_fasta' is an NCBI fasta, with contig accessions as the sequence names - required by cdot,
+    # and used for VEP. The 'liftover' fasta has sequences named by chromosome, to match the contig names in
+    # the chain files - it's only needed when LIFTOVER_BCFTOOLS_ENABLED. bcftools +liftover has no
+    # --rename-chrs equivalent, so using 'reference_fasta' here would mean rewriting the chain contigs (see #1373)
 
     BUILD_GRCH37: {
         "enabled": True,
@@ -93,8 +133,11 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "liftover": {
-            BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR,"liftover/GRCh37_to_GRCh38.chain.gz"),
-            BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg19ToHs1.over.chain.gz"),
+            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"),
+            "chain": {
+                BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR, "liftover/GRCh37_to_GRCh38.chain.gz"),
+                BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg19ToHs1.over.chain.gz"),
+            },
         },
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
@@ -110,8 +153,6 @@ ANNOTATION = {
             # We use gnomAD SV VCF with --custom twice
             "gnomad_sv": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
-            # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
-            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"),
             "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2023.10.02-grch37.vcf.gz",
             "mave": None,  # n/a for GRCh37
             "maxentscan": "annotation_data/all_builds/maxentscan",
@@ -144,8 +185,11 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "liftover": {
-            BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/GRCh38_to_GRCh37.chain.gz"),
-            BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg38ToHs1.over.chain.gz"),
+            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.toplevel.fa.gz"),
+            "chain": {
+                BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/GRCh38_to_GRCh37.chain.gz"),
+                BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg38ToHs1.over.chain.gz"),
+            },
         },
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
@@ -157,8 +201,6 @@ ANNOTATION = {
             "dbnsfp": "annotation_data/GRCh38/dbNSFP5.3.1a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
             "denovo_db": "annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz",
-            # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
-            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.toplevel.fa.gz"),
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
             "gnomad4": "annotation_data/GRCh38/gnomad4.1_GRCh38_contigs.vcf.gz",
@@ -166,7 +208,7 @@ ANNOTATION = {
             "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
-            "mave": "annotation_data/GRCh38/MaveDB_variants_2026-04-30.tsv.gz",
+            "mave": "annotation_data/GRCh38/MaveDB_variants_2026-04-30.stripped.tsv.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh38/hg38.phastCons100way.bw",
             'phastcons46way': None,  # n/a for GRCh38
@@ -196,8 +238,11 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_009914755.1_T2T-CHM13v2.0_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "liftover": {
-            BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg19.over.chain.gz"),
-            BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg38.over.chain.gz"),
+            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens-GCA_009914755.4-softmasked.fa.gz"),
+            "chain": {
+                BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg19.over.chain.gz"),
+                BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg38.over.chain.gz"),
+            },
         },
 
         "vep_config": {
@@ -210,8 +255,6 @@ ANNOTATION = {
             "gnomad4": "annotation_data/T2T-CHM13v2.0/gnomad4.1.t2t_liftover_T2T-CHM13v2.0_combined_af.vcf.bgz",
             "gnomad_sv": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
-            # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
-            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens-GCA_009914755.4-softmasked.fa.gz"),
             "mastermind": None,  # N/A
             "mave": None,  # N/A
             "maxentscan": "annotation_data/all_builds/maxentscan",
@@ -266,6 +309,18 @@ def pin_annotation_to_columns_version_4(annotation):
     _disable_columns_version_5_plugins(annotation)
 
 
+def use_pre_vep112_fasta(annotation):
+    """Annotate against the chromosome-named (liftover) fasta rather than the NCBI 'reference_fasta'.
+
+    Before v112, VEP renamed contigs to match an NCBI fasta, which silently dropped plugin/custom
+    annotations - see https://github.com/Ensembl/ensembl-vep/issues/1635. Deployments that keep
+    ANNOTATION_VEP_VERSION below 112 call this from their env settings file.
+    """
+    for build_settings in annotation.values():
+        if fasta := build_settings["liftover"].get("fasta"):
+            build_settings["vep_config"]["fasta"] = fasta
+
+
 def pin_annotation_to_columns_version_3(annotation):
     """Restore the historical (pre-#1625) columns_version 3 annotation config.
 
@@ -295,6 +350,11 @@ def pin_annotation_to_columns_version_3(annotation):
 
 
 ANNOTATION_VCF_DUMP_DIR = os.path.join(PRIVATE_DATA_ROOT, 'annotation_dump')
+
+# #1670: delete a run's dump/VEP/AnnotSV output once imported (failed runs always keep theirs)
+ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = True
+# #1670: don't dispatch new VEP runs below this free space on ANNOTATION_VCF_DUMP_DIR (None = no limit)
+ANNOTATION_MIN_FREE_DISK_GIGS = 1
 
 # AnnotSV (post-VEP stage on the STRUCTURAL_VARIANT pipeline). Strictly opt-in:
 # leaving ANNOTATION_ANNOTSV_ENABLED=False means no AnnotSV invocation, no version

@@ -1,27 +1,39 @@
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Any, TypedDict, Literal, Tuple
+from typing import Any, Literal, Optional, TypedDict
 
 import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices, \
-    CharField, JSONField, BooleanField, PROTECT
+from django.db.models import (
+    CASCADE,
+    PROTECT,
+    SET_NULL,
+    BooleanField,
+    CharField,
+    ForeignKey,
+    JSONField,
+    OneToOneField,
+    TextChoices,
+    TextField,
+)
 from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff, HGVSConverterType, chgvs_diff_description
-from genes.models import TranscriptVersion, GeneSymbol, Transcript, NoTranscript
+from genes.gene_fusions import resolve_fusion_string
+from genes.hgvs import HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher, hgvs_diff_description
+from genes.models import GeneFusion, GeneSymbol, NoTranscript, Transcript, TranscriptVersion
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
-from library.utils import pretty_label, IconWithTooltip, md5sum_str
+from library.utils import IconWithTooltip, md5sum_str, pretty_label
 from library.utils.django_utils import get_cached_project_git_hash
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
+from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
+from snpdb.models.models_variant import HGVS_UNCLEANED_PATTERN
 
 """
 Now we have
@@ -113,11 +125,14 @@ class ResolvedVariantInfo(TimeStampedModel):
     """ c.HGVS as you'd normally represent it """
 
     @property
-    def c_hgvs_obj(self) -> Optional[CHGVS]:
+    def c_hgvs_obj(self) -> Optional[HGVSComponents]:
         if self.c_hgvs:
-            c_hgvs = CHGVS(self.c_hgvs)
-            c_hgvs.genome_build = self.genome_build
-            return c_hgvs
+            return HGVSComponents(self.c_hgvs)
+
+    @property
+    def c_hgvs_display(self) -> Optional[HGVSDisplay]:
+        if components := self.c_hgvs_obj:
+            return HGVSDisplay(components, genome_build=self.genome_build)
 
     c_hgvs_compat = TextField(null=True, blank=True)
     """ c.HGVS with all bases explicit in the case of dels & dups """
@@ -171,6 +186,14 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.variant = variant
         self.genomic_sort = variant.sort_string
 
+        if variant.is_gene_level:
+            # Sits on no transcript, so there is nothing to write a c.HGVS against. The gene symbol is
+            # the fusion's anchor - what a grid sorts and groups on
+            if gene_fusion := self.allele_info.gene_fusion:
+                self.gene_symbol = GeneSymbol.objects.filter(pk=gene_fusion.anchor.gene_symbol_id).first()
+            self.save()
+            return self
+
         try:
             c_hgvs_resolution = self.recalc_c_hgvs()
             self.c_hgvs = c_hgvs_resolution.c_hgvs
@@ -199,15 +222,15 @@ class ResolvedVariantInfo(TimeStampedModel):
         variant = self.variant
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build) #
+        hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
 
         result = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
         c_hgvs = result.hgvs_variant.format()
-        c_hgvs_obj = CHGVS(c_hgvs)
+        c_hgvs_obj = HGVSComponents(c_hgvs)
 
         hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         version = hgvs_matcher.hgvs_converter.get_version()
-        transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
+        transcript_version = TranscriptVersion.get_for_parts(genome_build, c_hgvs_obj.transcript_parts)
         # Prefer data version from the transcript directly used; fall back to the c_hgvs_obj lookup
         data_version = (result.converter_info.hgvs_converter_data_version
                         or (transcript_version.data.get('cdot', '') if transcript_version else ''))
@@ -403,10 +426,10 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
 
 
 _DIFF_TO_VALIDATION_KEY = {
-    CHGVSDiff.DIFF_TRANSCRIPT_ID: 'transcript_id_change',
-    CHGVSDiff.DIFF_TRANSCRIPT_VER: 'transcript_version_change',
-    CHGVSDiff.DIFF_GENE: 'gene_symbol_change',
-    CHGVSDiff.DIFF_RAW_CGVS: 'c_nomen_change'
+    HGVSDiff.DIFF_TRANSCRIPT_ID: 'transcript_id_change',
+    HGVSDiff.DIFF_TRANSCRIPT_VER: 'transcript_version_change',
+    HGVSDiff.DIFF_GENE: 'gene_symbol_change',
+    HGVSDiff.DIFF_NOMEN: 'c_nomen_change'
 }
 
 
@@ -490,6 +513,15 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ not used for any logic other than storing the variant that was matched (so we can later find allele, and
     variants of other builds) """
 
+    @property
+    def gene_fusion(self) -> Optional['GeneFusion']:
+        """ Set where the imported value named a gene pair ('BCR::ABL1') rather than an HGVS. Read off
+        the matched Variant rather than stored - the pipeline that inserts the variant creates the
+        GeneFusion against it, so a second copy here could only go stale """
+        if variant := self.matched_variant:
+            return GeneFusion.objects.filter(variant=variant).first()
+        return None
+
     allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
     """ set this once it's matched, but record can exist prior to variant matching """
 
@@ -517,7 +549,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return reverse('view_imported_allele_info_detail', kwargs={'allele_info_id': self.pk})
 
     def __str__(self):
-        return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
+        return f"{self.imported_genome_build_patch_version} {self.imported_hgvs}"
 
     @classmethod
     def supported_genome_builds(cls) -> set:
@@ -549,7 +581,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None, **kwargs):
         if not self.imported_md5_hash:
-            self.imported_md5_hash = md5sum_str(self.imported_c_hgvs or self.imported_g_hgvs)
+            self.imported_md5_hash = md5sum_str(self.imported_hgvs)
 
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields, **kwargs)
 
@@ -557,39 +589,49 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         validation_dict: ImportedAlleleInfoValidationTags = {}
         imported_c_hgvs = self.imported_c_hgvs_obj
-        normalized_c_hgvs: Optional[CHGVS] = None
+        normalized_c_hgvs: Optional[HGVSComponents] = None
         if normalised := self.variant_info_for_imported_genome_build:
             normalized_c_hgvs = normalised.c_hgvs_obj
-        lifted_c_hgvs: Optional[CHGVS] = None
+        lifted_c_hgvs: Optional[HGVSComponents] = None
         if lifted := self.variant_info_for_lifted_over_genome_build:
             lifted_c_hgvs = lifted.c_hgvs_obj
 
-        def calculate_diff_dict(c_hgvs_diff: CHGVSDiff) -> ImportedAlleleValidationTagsDiff:
+        def calculate_diff_dict(c_hgvs_diff: HGVSDiff, severity: Optional[ALLELE_INFO_VALIDATION_SEVERITY] = None) -> ImportedAlleleValidationTagsDiff:
             diff_dict: ImportedAlleleValidationTagsDiff = {}
             for diff_flag, field_name in _DIFF_TO_VALIDATION_KEY.items():
                 if c_hgvs_diff & diff_flag:
-                    diff_dict[field_name] = _VALIDATION_TO_SEVERITY.get(field_name, "E")
+                    diff_dict[field_name] = severity or _VALIDATION_TO_SEVERITY.get(field_name, "E")
             return diff_dict
 
         if imported_c_hgvs and normalized_c_hgvs:
             if normal_diff_dict := calculate_diff_dict(imported_c_hgvs.diff(normalized_c_hgvs)):
                 validation_dict["normalize"] = normal_diff_dict
 
-        if normalized_c_hgvs and lifted_c_hgvs:
-            if lifted_diff_dict := calculate_diff_dict(normalized_c_hgvs.diff(lifted_c_hgvs)):
+        # a g.HGVS only submission resolves to the genomic form when there's no transcript, and the contig accession
+        # differs by build - only diff the builds when both sides resolved to a real transcript
+        both_builds_have_transcript = all(
+            build_info and build_info.transcript_version_id for build_info in (normalised, lifted)
+        )
+        if normalized_c_hgvs and lifted_c_hgvs and (self.imported_as_c_hgvs or both_builds_have_transcript):
+            diff_severity = None if self.imported_as_c_hgvs else "W"
+            if lifted_diff_dict := calculate_diff_dict(normalized_c_hgvs.diff(lifted_c_hgvs), diff_severity):
                 validation_dict["liftover"] = lifted_diff_dict
 
         builds: ImportedAlleleValidationTagsBuilds = {}
-        if not self.grch37 or not self.grch37.c_hgvs_obj:
-            builds["missing_37"] = _VALIDATION_TO_SEVERITY.get("missing_37", "E")
-        if not self.grch38 or not self.grch38.c_hgvs_obj:
-            builds["missing_38"] = _VALIDATION_TO_SEVERITY.get("missing_38", "E")
+        for build_str, build_info in (("37", self.grch37), ("38", self.grch38)):
+            if self.imported_as_c_hgvs:
+                resolved = build_info and build_info.c_hgvs_obj
+            else:
+                # a g.HGVS submission only needs the variant coordinate in each build, the c.HGVS is a bonus
+                resolved = build_info and build_info.variant_id
+            if not resolved:
+                builds[f"missing_{build_str}"] = _VALIDATION_TO_SEVERITY.get(f"missing_{build_str}", "E")
 
         if builds:
             validation_dict["builds"] = builds
 
         general: ImportedAlleleValidationTagsGeneral = {}
-        if not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
+        if self.imported_as_c_hgvs and not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
             general["transcript_type_not_supported"] = _VALIDATION_TO_SEVERITY.get("transcript_type_not_supported", "E")
         if not self.variant_coordinate:
             # we couldn't derive a variant coordinate, should be the end of it
@@ -633,20 +675,25 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def __lt__(self, other: 'ImportedAlleleInfo'):
         def sort_key(obj: ImportedAlleleInfo):
-            return obj.imported_genome_build_patch_version, obj.imported_c_hgvs or obj.imported_g_hgvs or ""
+            return obj.imported_genome_build_patch_version, obj.imported_hgvs or ""
         return sort_key(self) < sort_key(other)
 
     @property
-    def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
-        if self.imported_c_hgvs:
-            return CHGVS(self.imported_c_hgvs)
+    def imported_hgvs(self) -> Optional[str]:
+        """ The HGVS exactly as it was imported - only one of c/g is ever provided """
+        return self.imported_c_hgvs or self.imported_g_hgvs
 
     @property
-    def imported_g_hgvs_obj(self) -> Optional[CHGVS]:
-        if self.imported_g_hgvs:
-            return CHGVS(self.imported_g_hgvs)
+    def imported_c_hgvs_obj(self) -> Optional[HGVSComponents]:
+        if self.imported_c_hgvs:
+            return HGVSComponents(self.imported_c_hgvs)
 
-    def imported_hgvs_obj(self) -> Optional[CHGVS]:
+    @property
+    def imported_g_hgvs_obj(self) -> Optional[HGVSComponents]:
+        if self.imported_g_hgvs:
+            return HGVSComponents(self.imported_g_hgvs)
+
+    def imported_hgvs_obj(self) -> Optional[HGVSComponents]:
         if c_hgvs := self.imported_c_hgvs_obj:
             return c_hgvs
         if g_hgvs := self.imported_g_hgvs_obj:
@@ -654,17 +701,17 @@ class ImportedAlleleInfo(TimeStampedModel):
         return None
 
     @property
-    def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
+    def imported_c_hgvs_obj(self) -> Optional[HGVSDisplay]:
         # TODO - deprecate this in favour of imported hgvs (which handles g.HGVS imports)
         if imported_c_hgvs := self.imported_c_hgvs:
-            c_hgvs = CHGVS(imported_c_hgvs)
+            c_hgvs = HGVSComponents(imported_c_hgvs)
             if imported_genome_build := self.imported_genome_build:
-                c_hgvs.genome_build = imported_genome_build
-            return c_hgvs
+                return HGVSDisplay(c_hgvs, genome_build=imported_genome_build)
+            return HGVSDisplay(c_hgvs)
         else:
             return None
 
-    def preferred_c_hgvs_obj(self, genome_build: Optional[GenomeBuild] = None) -> CHGVS:
+    def preferred_c_hgvs_obj(self, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
         if genome_build is None:
             genome_build = GenomeBuildManager.get_current_genome_build()
 
@@ -673,27 +720,35 @@ class ImportedAlleleInfo(TimeStampedModel):
         else:
             for genome_build in GenomeBuild.builds_with_annotation_cached():
                 if alternative := self[genome_build]:
-                    if c_hgvs_obj := alternative.c_hgvs_obj:
-                        c_hgvs_obj.is_desired_build = False
-                        c_hgvs_obj.genome_build = genome_build
-                        return c_hgvs_obj
+                    if c_hgvs_obj := HGVSComponents(alternative.c_hgvs_obj):
+                        return HGVSDisplay(
+                            c_hgvs_obj,
+                            is_desired_build=False,
+                            genome_build=genome_build
+                        )
         return self.imported_hgvs_obj()
 
     @staticmethod
-    def all_chgvs(allele: Allele) -> list[CHGVS]:
+    def all_chgvs(allele: Allele) -> list[HGVSDisplay]:
         all_chgvs = set()
         for iai in allele.importedalleleinfo_set.all():
             for rb in iai.resolved_builds:
-                if c_hgvs := rb.c_hgvs_obj:
+                if c_hgvs := rb.c_hgvs_display:
                     all_chgvs.add(c_hgvs)
-        return list(sorted(all_chgvs, key=lambda x: (x.genome_build, x.sort_str)))
+        return sorted(all_chgvs, key=lambda x: (x.genome_build, x.sort_str))
 
     @property
     def get_transcript(self) -> str:
         if self.imported_transcript:
             return self.imported_transcript
         elif self.imported_c_hgvs:
-            return CHGVS(self.imported_c_hgvs).transcript
+            return HGVSComponents(self.imported_c_hgvs).transcript
+
+    @property
+    def imported_as_c_hgvs(self) -> bool:
+        """ True when the submission supplied a transcript-based HGVS, so a resolved c.HGVS is expected.
+            Reads the fields directly so a malformed imported_c_hgvs that parses to no transcript still counts """
+        return bool(self.imported_c_hgvs or self.imported_transcript)
 
     @property
     def gene_symbols(self) -> list[GeneSymbol]:
@@ -704,15 +759,15 @@ class ImportedAlleleInfo(TimeStampedModel):
                 if imported_gene_symbol_str := c_hgvs_obj.gene_symbol:
                     if symbol := GeneSymbol.cast(imported_gene_symbol_str):
                         gene_symbol_set.add(symbol)
-        return list(sorted(gene_symbol_set))
+        return sorted(gene_symbol_set)
 
     @property
     def transcript_versions(self) -> list[TranscriptVersion]:
-        return list(sorted({build.transcript_version for build in self.resolved_builds if build.transcript_version}))
+        return sorted({build.transcript_version for build in self.resolved_builds if build.transcript_version})
 
     @property
     def transcripts(self) -> list[Transcript]:
-        return list(sorted({build.transcript_version.transcript for build in self.resolved_builds if build.transcript_version}))
+        return sorted({build.transcript_version.transcript for build in self.resolved_builds if build.transcript_version})
 
     @staticmethod
     def icon_for(status: str, include: bool) -> Optional[IconWithTooltip]:
@@ -790,8 +845,8 @@ class ImportedAlleleInfo(TimeStampedModel):
         vc: Optional[VariantCoordinate] = None
         message = None
         genome_build = self.imported_genome_build_patch_version.genome_build
-        use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
-        hgvs_matcher = HGVSMatcher(genome_build)
+        use_hgvs = self.imported_hgvs
+        hgvs_matcher = HGVSMatcher.instance(genome_build)
         hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         version = hgvs_matcher.hgvs_converter.get_version()
         used_converter_type = hgvs_converter_type
@@ -816,6 +871,26 @@ class ImportedAlleleInfo(TimeStampedModel):
         return CalculatedVariantCoordinate(variant_coordinate=vc, genome_build=genome_build,
                                            message=message, hgvs_converter_version=hgvs_converter_version,
                                            hgvs_converter_data_version=data_version)
+
+    def resolve_gene_fusion(self) -> bool:
+        """ A lab submitting 'BCR::ABL1' names a gene pair, not a coordinate - so there is no HGVS to
+            resolve. The identity it resolves to has a variant coordinate of its own, which goes
+            through the VCF insert pipeline like every other coordinate, so a fusion enters the
+            database exactly the way a small variant submitted the same way does.
+
+            Returns whether this was a fusion, so the caller can skip HGVS resolution. """
+
+        imported = self.imported_hgvs
+        if not imported or HGVS_UNCLEANED_PATTERN.search(imported):
+            return False
+
+        resolved_fusion = resolve_fusion_string(imported)
+        if resolved_fusion is None:
+            return False
+
+        self.variant_coordinate = str(resolved_fusion.variant_coordinate)
+        self.message = f"Matched gene fusion {resolved_fusion.canonical_str}"
+        return True
 
     def update_variant_coordinate(self):
         """ returns if a valid variant_coordinate could be derived """
@@ -853,24 +928,24 @@ class ImportedAlleleInfo(TimeStampedModel):
                     if existing_vc and new_vc and existing_vc.ref != new_vc.ref:
                         new_dirty_message = f"DIFF REF\n{cvc.message}\nRef {existing_vc.ref} -> {new_vc.ref}"
                     else:
-                        new_dirty_message = f"????\n{cvc.message}\n{repr(existing_vc)} -> {repr(new_vc)}"
+                        new_dirty_message = f"????\n{cvc.message}\n{existing_vc!r} -> {new_vc!r}"
 
         def c_hgvs_diff_if_applicable(original_chgvs: str, new_chgvs: str):
 
-            original_chgvs_obj = CHGVS(original_chgvs)
-            new_chgvs_obj = CHGVS(new_chgvs)
+            original_chgvs_obj = HGVSComponents(original_chgvs)
+            new_chgvs_obj = HGVSComponents(new_chgvs)
             if original_chgvs_obj.transcript and new_chgvs_obj.transcript:
                 c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
-                return chgvs_diff_description(c_hgvs_diffs, include_minor=True)
+                return hgvs_diff_description(c_hgvs_diffs, include_minor=True)
 
         def is_c_hgvs_same_as_imported(genome_build: GenomeBuild, new_chgvs: str) -> bool:
             nonlocal self
             if self.imported_genome_build == genome_build:
                 original_chgvs_obj = self.imported_c_hgvs_obj
-                new_chgvs_obj = CHGVS(new_chgvs)
+                new_chgvs_obj = HGVSComponents(new_chgvs)
                 if original_chgvs_obj and original_chgvs_obj.transcript and new_chgvs_obj.transcript:
                     c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
-                    if not bool(chgvs_diff_description(c_hgvs_diffs, include_minor=False)):
+                    if not bool(hgvs_diff_description(c_hgvs_diffs, include_minor=False)):
                         return True
             return False
 
@@ -894,7 +969,7 @@ class ImportedAlleleInfo(TimeStampedModel):
                             message_parts += diffs
                 except Exception as ex:
                     # Make sure that we still fail
-                    if rvi.c_hgvs and CHGVS.HGVS_REGEX.match(rvi.c_hgvs):
+                    if rvi.c_hgvs and HGVSComponents.HGVS_REGEX.match(rvi.c_hgvs):
                         message_parts.append(f"Error resolving {rvi.genome_build} c.HGVS: {ex}")
             if message_parts:
                 new_dirty_message = "\n".join(message_parts)
@@ -904,11 +979,18 @@ class ImportedAlleleInfo(TimeStampedModel):
             logging.info("Found %s", new_dirty_message)
             self.save()
 
-    def update_status(self):
+    def update_status(self, force_complete: bool = False):
+        """
+        :param force_complete: We've stopped attempting liftover, so a missing genome build is an inability to
+        liftover rather than work still in progress
+        """
         if self.grch37 and self.grch38:
             self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
         elif self.variant_info_for_imported_genome_build:
-            self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
+            if force_complete:
+                self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
+            else:
+                self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
         else:
             self.status = ImportedAlleleInfoStatus.FAILED
 
@@ -925,7 +1007,8 @@ class ImportedAlleleInfo(TimeStampedModel):
         try:
             allele_info, created = ImportedAlleleInfo.objects.get_or_create(**tidied)
             if created:
-                allele_info.update_variant_coordinate()
+                if not allele_info.resolve_gene_fusion():
+                    allele_info.update_variant_coordinate()
                 allele_info.apply_validation()
                 allele_info.save()
             return allele_info
@@ -970,15 +1053,15 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.save()
         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
-    def refresh_and_save(self, force_update=False, liftover_complete=False):
+    def refresh_and_save(self, force_update=False, force_complete=False):
         """
         Updates linked variants (c.hgvs, etc)
         """
         if va := self.matched_variant:
             # chances are that variant is linked to an allele now
-            self.set_variant_and_save(matched_variant=va, force_update=force_update, liftover_complete=liftover_complete)
+            self.set_variant_and_save(matched_variant=va, force_update=force_update, force_complete=force_complete)
 
-    def set_variant_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False, liftover_complete: bool = False):
+    def set_variant_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False, force_complete: bool = False):
         """
         Call to update this object, and attached ResolvedVariantInfos (will check if matched_variant has an attached allele).
         If the variant is not yet attached to an allele (or the attached allele doesn't have a variant for each build yet
@@ -986,8 +1069,8 @@ class ImportedAlleleInfo(TimeStampedModel):
         :param matched_variant: The variant (for the imported genome build) that we matched on.
         :param message: Details about the matching (if blank previous message will remain)
         :param force_update: Forces recalc of c.hgvs etc. on variants, we will still test to see if variants for certain
-        :param liftover_complete: Indicates if liftover is complete (and if any missing genome build should be considered an inability to liftover)
         builds are newly provided, change etc.
+        :param force_complete: We've stopped attempting liftover, so mark as complete even if a build is missing
         """
 
         if not matched_variant:
@@ -996,7 +1079,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.dirty_message = None
         if not force_update and self.matched_variant == matched_variant and self.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
             # nothing to do, and no force update, just update message if we need to
-            if message and message != self.message or self.dirty_message:
+            if (message and message != self.message) or self.dirty_message:
                 self.message = message
                 self.save()
             return
@@ -1013,30 +1096,17 @@ class ImportedAlleleInfo(TimeStampedModel):
         if not self.pk:
             self.save()
 
-        applied_all = False
-        applied_any = False
         if matched_allele:
             # we have an allele, attempt to update config of relevant genome builds
-            missing_variant = False
             for genome_build in ImportedAlleleInfo._genome_builds():
                 variant = self.allele.variant_for_build_optional(genome_build)
                 self._update_variant(genome_build, variant, force_update)
-                if variant:
-                    applied_any = True
-                else:
-                    missing_variant = True
-            applied_all = not missing_variant
         elif matched_variant:
             # no allele, but we do have the variant for the current genome build
             self._update_variant(self.imported_genome_build_patch_version.genome_build, matched_variant, force_update)
 
-        if applied_all or (liftover_complete and applied_any):
-            self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
-        else:
-            self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
-
         self.apply_validation()
-        self.update_status()
+        self.update_status(force_complete=force_complete)
         self.save()
         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
@@ -1065,12 +1135,16 @@ class ImportedAlleleInfo(TimeStampedModel):
     @staticmethod
     def relink_variants(vc_import: Optional['ClassificationImport'] = None,
                         liftover_run: Optional['LiftoverRun'] = None,
-                        force_update=False):
+                        force_update=False,
+                        force_complete=False):
         """
             Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
             Updates all records that have a variant but not cached c.hgvs values or no clinical context.
 
             :param vc_import: if provided only classifications associated to this import will have their values set
+            :param liftover_run: if provided only records for alleles in this liftover run will be updated
+            :param force_update: recalc c.hgvs etc. even if the variant hasn't changed
+            :param force_complete: we've stopped attempting liftover, so mark as complete even if a build is missing
             :return: A tuple of records now correctly set and those still outstanding
         """
 
@@ -1082,5 +1156,5 @@ class ImportedAlleleInfo(TimeStampedModel):
             relink_qs = relink_qs.filter(allele__alleleliftover__liftover=liftover_run).distinct()
 
         for allele_info in relink_qs:
-            allele_info.refresh_and_save(force_update=force_update)
+            allele_info.refresh_and_save(force_update=force_update, force_complete=force_complete)
             # note that refresh_and_save will update linked classifications

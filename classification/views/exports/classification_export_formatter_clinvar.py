@@ -1,24 +1,39 @@
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
 from functools import cached_property
 from itertools import groupby
-from typing import Optional, Callable
+from typing import Optional
 
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
 
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
-from annotation.models import ClinVar, ClinVarVersion, ClinVarRecord, ClinVarReviewStatus
+from annotation.models import ClinVar, ClinVarRecord, ClinVarReviewStatus, ClinVarVersion
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from classification.enums import SpecialEKeys, AlleleOriginBucket
-from classification.models import EvidenceKeyMap, ClassificationModification
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.models import ClassificationModification, EvidenceKeyMap
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column, delimited_row, first, ExportDataType, ExportTweak
+from library.utils import (
+    ExportDataType,
+    ExportRow,
+    ExportTweak,
+    delimited_row,
+    export_column,
+    first,
+)
 from snpdb.models import GenomeBuild, VariantAllele
 
 
@@ -69,8 +84,8 @@ class ClinVarCompareRowAbstract(ExportRow):
     def c_hgvs(self) -> str:
         for cm in self.allele_group.cms_regardless_of_issues:
             if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
-                if full_c_hgvs := c_hgvs.full_c_hgvs:
-                    return full_c_hgvs
+                if full_hgvs := c_hgvs.full_hgvs:
+                    return full_hgvs
 
     @cached_property
     def clinvar_url(self) -> str:

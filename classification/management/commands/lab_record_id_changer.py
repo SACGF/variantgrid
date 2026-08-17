@@ -5,8 +5,8 @@ from django.core.management import BaseCommand
 
 from classification.enums import SpecialEKeys
 from classification.models import Classification
-from genes.hgvs import CHGVS
-from snpdb.models import Lab, GenomeBuild
+from genes.hgvs import HGVSComponents
+from snpdb.models import GenomeBuild, Lab
 
 
 class Command(BaseCommand):
@@ -27,7 +27,7 @@ class Command(BaseCommand):
         should_commit = options["commit"]
         for cr in Classification.objects.filter(lab=lab).iterator():
             c_hgvs_str = cr.get(SpecialEKeys.C_HGVS)
-            c_hgvs = CHGVS(c_hgvs_str)
+            c_hgvs = HGVSComponents(c_hgvs_str)
             genome_build_str = cr.get(SpecialEKeys.GENOME_BUILD)
 
             if c_hgvs.transcript and genome_build_str:
@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 # new ID should exclude transcript version and gene symbol
                 # only include genome_build if it's not GRCh38
 
-                c_dot_normal = c_hgvs.c_dot
+                c_dot_normal = c_hgvs.nomen
                 if m := re_nucleotides.match(c_dot_normal):
                     c_dot_normal = m.group(1)
                 c_dot_normal = c_dot_normal.replace("c.-", "c_minus")

@@ -6,7 +6,7 @@ import json
 import time
 from enum import Enum
 from json.encoder import JSONEncoder
-from typing import TypeVar, Optional, Any
+from typing import Any, Optional, TypeVar
 from urllib.parse import urlparse
 
 from django.core.serializers import serialize

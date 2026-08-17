@@ -1,23 +1,30 @@
 import operator
 import re
 from collections import Counter
-from typing import Iterator, Optional
+from collections.abc import Callable, Iterator
+from typing import Optional
 
 from analysis.grids import ExportVariantGrid
 from analysis.models import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
-from library.django_utils.jqgrid_view import grid_export_csv
+from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, grid_export_csv
 from library.genomics.vcf_writer import VCFWriter
-from library.utils import StashFile
+from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
-from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes
+from snpdb.models import Sample, VariantGridColumn
+from snpdb.vcf_export_columns import COLUMN_VCF_INFO
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
+
+TRANSCRIPT_REPLACE_BATCH_SIZE = 1000
 
 
 def node_grid_get_export_iterator(request, node, export_type, canonical_transcript_collection=None,
-                                  variant_tags_dict=None, basename: str = None, grid_kwargs: dict = None) -> tuple[str, Iterator[str]]:
+                                  variant_tags_dict=None, basename: str = None, grid_kwargs: dict = None,
+                                  row_wrapper: Callable = None) -> tuple[str, Iterator[str]]:
+    """ row_wrapper: wraps the rows iterator, e.g. so a Celery task can report progress per row -
+        the file iterator yields a chunk of rows at a time so is no use for counting """
 
     if grid_kwargs is None:
         grid_kwargs = {}
@@ -25,8 +32,7 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
         grid_kwargs = grid_kwargs.copy()
 
     if export_type == 'vcf':
-        # TODO: If we use the contig at a time method in ExportVariantGrid we can remove the sort by contig
-        grid_kwargs["order_by"] = ["locus__contig__name", "locus__position"]
+        # ExportVariantGrid emits genome build contig order, which is what the header declares
         grid_kwargs["af_show_in_percent"] = False
 
     extra_filters = request.GET.get("extra_filters")
@@ -39,9 +45,11 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
 
     if canonical_transcript_collection:
         basename += f"_{canonical_transcript_collection}"
-        items = _replace_transcripts_iterator(request, grid, canonical_transcript_collection, items)
+        items = _replace_transcripts_iterator(grid, canonical_transcript_collection, items)
 
-    items = format_items_iterator(sample_ids, items, variant_tags_dict)
+    items = format_items_iterator(items, variant_tags_dict)
+    if row_wrapper:
+        items = row_wrapper(items)
 
     colmodels = grid.get_colmodels()
 
@@ -91,19 +99,31 @@ def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by
     writer = VCFWriter(pseudo_buffer, header_lines)
     yield pseudo_buffer.value  # header
 
-    for obj in items:
+    for i, obj in enumerate(items, start=1):
         chrom, pos, vcf_id, ref, alt, info, fmt, sample_calls = \
             _grid_item_to_vcf_row(info_dict, obj, sample_ids, samples, use_accession=use_accession)
         writer.write_record(chrom, pos, ref, alt, vcf_id=vcf_id, info=info, fmt=fmt, sample_calls=sample_calls)
-        yield pseudo_buffer.value
+        if i % EXPORT_ROWS_PER_CHUNK == 0:
+            yield pseudo_buffer.value
+    if remaining := pseudo_buffer.value:
+        yield remaining
 
 
 def _get_column_vcf_info():
+    columns = [c.column for c in COLUMN_VCF_INFO]
+    variant_column_by_name = dict(
+        VariantGridColumn.objects.filter(pk__in=columns).values_list("grid_column_name", "variant_column")
+    )
     column_vcf_info = {}
-    for cvi in ColumnVCFInfo.objects.all().values('column__variant_column', 'info_id', 'number', 'type', 'description'):
-        cvi['type'] = VCFInfoTypes(cvi['type']).label
-        index = cvi['column__variant_column']
-        column_vcf_info[index] = cvi
+    for c in COLUMN_VCF_INFO:
+        if variant_column := variant_column_by_name.get(c.column):
+            column_vcf_info[variant_column] = {
+                "column__variant_column": variant_column,
+                "info_id": c.info_id,
+                "number": c.number,
+                "type": c.type.label,
+                "description": c.description,
+            }
     return column_vcf_info
 
 
@@ -190,8 +210,8 @@ def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accessio
     return chrom, pos, vcf_id, ref, alt, info or None, fmt, sample_calls
 
 
-def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] = None):
-    """ A few things are done in JS formatters, e.g. changing -1 to missing values (? in grid) and tags
+def format_items_iterator(items, variant_tags_dict: Optional[dict] = None):
+    """ A few things are done in JS formatters, e.g. tags
         We can't just add tags via node queryset (in monkey patch func above) as we'll get an issue with
         tacked on zygosity columns etc not being in GROUP BY or aggregate func. So, just patch items via iterator
 
@@ -200,16 +220,7 @@ def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] =
     if variant_tags_dict is None:
         variant_tags_dict = {}
 
-    SAMPLE_FIELDS = ["allele_depth", "allele_frequency", "read_depth", "genotype_quality", "phred_likelihood"]
-
     for item in items:
-        for sample_id in sample_ids:
-            for f in SAMPLE_FIELDS:
-                sample_field = f"sample_{sample_id}_ov_{f}"
-                val = item.get(sample_field)
-                if val and val == -1:
-                    item[sample_field] = "."
-
         if tags_global := item["tags_global"]:
             tag_counts = Counter(tags_global.split("|"))
             summarised_tags = []
@@ -227,8 +238,12 @@ def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] =
         yield item
 
 
-def _replace_transcripts_iterator(request, grid, ctc: CanonicalTranscriptCollection, items):
-    """ This uses a large amount of RAM - reading a whole  """
+def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items):
+    """ Overwrite the representative ('pick') variantannotation__ values with the canonical transcript ones.
+
+        Transcript rows are looked up in batches of variant IDs taken off the streamed items, so we hit the
+        (version, variant, transcript_version) index directly rather than re-running the node queryset as an
+        'IN' subquery, and only hold one batch in RAM """
 
     variant_transcript_annotation_variant_id_field = "variant_id"
 
@@ -246,30 +261,27 @@ def _replace_transcripts_iterator(request, grid, ctc: CanonicalTranscriptCollect
                 transcript_replace_fields[suffix] = f
 
     # We only need things from VariantTranscriptAnnotation - so join there directly
-    variants_qs = grid.get_queryset(request).values_list("id")
     version = grid.node.analysis.annotation_version.variant_annotation_version
     ct_qs = ctc.canonicaltranscript_set
     transcript_versions = ct_qs.values_list("transcript_version", flat=True)
-    vta_qs = VariantTranscriptAnnotation.objects.filter(version=version, variant__in=variants_qs,
-                                                        transcript_version__in=transcript_versions)
-    transcript_values = vta_qs.values(*transcript_replace_fields.keys())
 
-    # Read into a massive dictionary
-    transcript_items_by_id = {}
+    def _transcript_items_by_id(variant_ids: list[int]) -> dict[int, dict]:
+        vta_qs = VariantTranscriptAnnotation.objects.filter(version=version, variant__in=variant_ids,
+                                                           transcript_version__in=transcript_versions)
 
-    def transcript_items():
-        for transcript_data in transcript_values:
-            transcript_item = {}
-            for before, after in transcript_replace_fields.items():
-                transcript_item[after] = transcript_data[before]
-            yield transcript_item
+        def transcript_items():
+            for transcript_data in vta_qs.values(*transcript_replace_fields.keys()):
+                transcript_item = {}
+                for before, after in transcript_replace_fields.items():
+                    transcript_item[after] = transcript_data[before]
+                yield transcript_item
 
-    for item in grid.iter_format_items(transcript_items()):
-        transcript_items_by_id[item["id"]] = item
+        return {item["id"]: item for item in grid.iter_format_items(transcript_items())}
 
     # Loop through items and changeroo
-    for item in items:
-        variant_id = item["id"]
-        if transcript_data := transcript_items_by_id.get(variant_id):
-            item.update(transcript_data)
-        yield item
+    for batch in iter_fixed_chunks(items, TRANSCRIPT_REPLACE_BATCH_SIZE):
+        transcript_items_by_id = _transcript_items_by_id([item["id"] for item in batch])
+        for item in batch:
+            if transcript_data := transcript_items_by_id.get(item["id"]):
+                item.update(transcript_data)
+            yield item

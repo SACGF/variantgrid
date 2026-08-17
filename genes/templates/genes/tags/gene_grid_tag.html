@@ -100,10 +100,6 @@ table#gene-grid tr {
     background-image: url({% static 'images/gencc-logo-standard.jpg' %});
 }
 
-.gene-icons-container {
-    width: 40%;
-}
-
 .hp-icon {
     width: 35px;
     height: 55px;
@@ -202,11 +198,6 @@ let goldCoverageTimer;
 let goldCoverageRequestId = 0;
 let goldCoverageGenesByEnrichmentKitId = {}; // values = { genes : coverage data }
 let goldCoverageGenesRequestsByEnrichmentKitId = {}; // values = { genes : request job }
-
-let geneInfoTimer;
-let geneInfoRequestId = 0;
-let geneInfoData = {}; // values = { genes : coverage data }
-let geneInfoRequests = {}; // values = { genes : request job }
 
 let symbolGeneIdentifierTimer;
 let symbolGeneIdentifierRequestId = 0;
@@ -974,87 +965,6 @@ function gcEmptyRows(tbody) {
 }
 
 
-function getGeneInfo(geneIconContainer, geneSymbol) {
-    // GeneInfo shows whether genes belong in special gene lists (eg pseudogene/triplet repeats)
-    {% if has_gene_info %}
-    
-    let geneInfo = geneInfoData[geneSymbol];
-    if (geneInfo) {
-        setGeneInfo(geneIconContainer, geneInfo);
-    } else {
-        clearTimeout(geneInfoTimer);
-        
-        if (!(geneSymbol in geneInfoRequests)) {
-            geneInfoRequests[geneSymbol] = null;
-        }
-        geneInfoTimer = setTimeout(batchRetrieveGeneInfo, BATCH_RETRIEVE_INTERVAL);
-    
-    }
-    {% endif %}
-}
-
-
-
-function batchRetrieveGeneInfo() {
-    let geneSymbols = [];
-    for (let geneSymbol in geneInfoRequests) {
-        let req = geneInfoRequests[geneSymbol];
-        if (!req) {
-            geneSymbols.push(geneSymbol);
-        }
-    }
-
-    if (geneSymbols.length) {      
-        geneInfoRequestId++;
-        for (let i=0 ; i<geneSymbols.length; ++i) {
-            let geneSymbol = geneSymbols[i];
-            geneInfoRequests[geneSymbol] = geneInfoRequestId;
-        }
-        // Lots of genes (could exceed url limits) so use POST
-        let data = 'gene_symbols_json=' + encodeURIComponent(JSON.stringify(geneSymbols));
-
-        $.ajax({
-            type: "POST",
-            data: data,
-            url: Urls.api_batch_gene_info(),
-            success: function(data) {
-                handleBatchRetrieveGeneInfo(geneInfoRequests, geneSymbols, data);                    
-            }
-        });
-    }
-}
-
-function setGeneInfo(geneIconContainer, data) {
-    if (data.length) {
-        geneIconContainer.empty(); // remove nbsp
-    }
-
-    for (let i=0 ; i<data.length ; ++i) {
-        let geneInfo = data[i];
-        let iconDiv = $("<div />");
-        iconDiv.addClass("gene-icon");
-        iconDiv.addClass(geneInfo.icon_css_class);
-        iconDiv.attr('title', geneInfo.name);
-        geneIconContainer.append(iconDiv);
-    }
-}
-
-
-function handleBatchRetrieveGeneInfo(requests, geneSymbols, data) {
-    // Not all genes requested will be returned. No data = no info
-
-    // Put the data into the cache
-    for (let i=0 ; i<geneSymbols.length; ++i) {
-        let geneSymbol = geneSymbols[i];
-        let returnedData = data[geneSymbol] || {};
-        geneInfoData[geneSymbol] = returnedData;
-        delete geneInfoRequests[geneSymbol];
-        let geneIconContainer = getGeneRowSelector(geneSymbol, ".gene-icons-container");
-        setGeneInfo(geneIconContainer, returnedData);
-    }
-}
-
-
 function addGeneRows(tbody, geneListId, geneListClass, genes, geneClickHandler) {
     let geneDataList = [];
     for (let i=0 ; i<genes.length ; ++i) {
@@ -1109,13 +1019,9 @@ function addGeneDataRows(tbody, geneListId, geneListClass, geneDataList, geneCli
         createRowColumns(tr);
         let geneLabel = $(".gene-label", tr);
         let geneLabelDiv = $("<div />").addClass("gene-label-container").addClass("left");
-        let geneIconsDiv = $("<div />").html("&nbsp;");
-        geneIconsDiv.addClass("gene-icons-container").addClass("left");
-        geneLabel.append(geneIconsDiv);
 
         if (rowType === 'gene' || rowType === 'unmatched') {
             if (rowType === 'gene') {
-                getGeneInfo(geneIconsDiv, gene);
                 const URL = Urls.view_gene_symbol(gene);
                 let geneLink = $("<a />").text(gene).attr({"class": 'hover-link', "href": URL, "target": "_blank"});
                 geneLabelDiv.append(geneLink);

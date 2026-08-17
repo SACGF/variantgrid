@@ -10,9 +10,9 @@ from django.db.models.query_utils import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status
-from rest_framework.generics import get_object_or_404, RetrieveAPIView
+from rest_framework.generics import RetrieveAPIView, get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
@@ -21,18 +21,53 @@ from genes.models import GeneVersion
 from genes.views.views import get_coverage_stats
 from library.constants import WEEK_SECS
 from library.utils import defaultdict_to_dict
-from seqauto.models import GoldCoverageSummary, EnrichmentKit, SequencerModel, Sequencer, Experiment, VariantCaller, \
-    SequencingRun, SampleSheet, SingleSampleVCF, JointCalledVCF, FastQC, QCExecSummary, QCGeneCoverage, QCGeneList, \
-    QC, IlluminaFlowcellQC
-from seqauto.serializers import EnrichmentKitSerializer, \
-    GoldCoverageSummarySerializer, EnrichmentKitSummarySerializer
-from seqauto.serializers.seqauto_qc_serializers import FastQCSerializer, QCExecSummarySerializer, \
-    QCGeneCoverageSerializer, QCGeneListSerializer, QCSerializer, IlluminaFlowcellQCSerializer, \
-    QCGeneListCreateSerializer, QCGeneListBulkCreateSerializer, QCExecSummaryBulkCreateSerializer, \
-    QCGeneCoverageBulkCreateSerializer
-from seqauto.serializers.sequencing_serializers import SequencerModelSerializer, SequencerSerializer, \
-    ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer, SampleSheetSerializer, \
-    SingleSampleVCFSerializer, JointCalledVCFSerializer, SequencingFilesBulkCreateSerializer
+from seqauto.models import (
+    QC,
+    EnrichmentKit,
+    Experiment,
+    FastQC,
+    GoldCoverageSummary,
+    IlluminaFlowcellQC,
+    JointCalledVCF,
+    QCExecSummary,
+    QCGeneCoverage,
+    QCGeneList,
+    SampleSheet,
+    Sequencer,
+    SequencerModel,
+    SequencingRun,
+    SingleSampleVCF,
+    VariantCaller,
+)
+from seqauto.serializers import (
+    EnrichmentKitSerializer,
+    EnrichmentKitSummarySerializer,
+    GoldCoverageSummarySerializer,
+)
+from seqauto.serializers.seqauto_qc_serializers import (
+    FastQCSerializer,
+    IlluminaFlowcellQCSerializer,
+    QCExecSummaryBulkCreateSerializer,
+    QCExecSummarySerializer,
+    QCGeneCoverageBulkCreateSerializer,
+    QCGeneCoverageSerializer,
+    QCGeneListBulkCreateSerializer,
+    QCGeneListCreateSerializer,
+    QCGeneListSerializer,
+    QCSerializer,
+)
+from seqauto.serializers.sequencing_serializers import (
+    ExperimentSerializer,
+    JointCalledVCFSerializer,
+    SampleSheetSerializer,
+    SequencerModelSerializer,
+    SequencerSerializer,
+    SequencingFilesBulkCreateSerializer,
+    SequencingRunSerializer,
+    SequencingSampleExtractionLinkSerializer,
+    SingleSampleVCFSerializer,
+    VariantCallerSerializer,
+)
 
 
 class EnrichmentKitSummaryView(RetrieveAPIView):
@@ -118,6 +153,32 @@ class SequencingFilesBulkCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class SequencingSampleExtractionLinkView(APIView):
+    """ Name the extraction a sequencing sample was made from.
+
+        The sequencing sample is the anchor: without it there is nothing to park a claim on, so an
+        unknown one is a 400. An extraction that hasn't been created yet is a 202 - it is parked on
+        the row and re-resolved by reconcile_pending_extractions. """
+
+    @extend_schema(
+        summary="Link a sequencing sample to the extraction it was made from",
+        request=SequencingSampleExtractionLinkSerializer,
+        responses=OpenApiTypes.OBJECT,
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = SequencingSampleExtractionLinkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        sequencing_sample = serializer.save()
+        response = {
+            "sequencing_sample": str(sequencing_sample),
+            "match_status": sequencing_sample.get_extraction_match_status_display(),
+            "match_error": sequencing_sample.extraction_match_error,
+            "extraction": str(sequencing_sample.extraction) if sequencing_sample.extraction else None,
+        }
+        status_code = status.HTTP_200_OK if sequencing_sample.extraction else status.HTTP_202_ACCEPTED
+        return Response(response, status=status_code)
+
+
 class QCViewSet(ModelViewSet):
     queryset = QC.objects.all()
     serializer_class = QCSerializer
@@ -194,7 +255,7 @@ class EnrichmentKitGeneCoverageView(APIView):
     """ Coverage stats (mean, percent_20x) for a gene symbol across samples sequenced with an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
-        return Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit=enrichment_kit)
+        return Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit=enrichment_kit)
 
     @extend_schema(
         summary="Coverage stats (mean, percent_20x) for a gene symbol across samples for an enrichment kit",
@@ -247,7 +308,7 @@ class EnrichmentKitGeneGoldCoverageView(EnrichmentKitGeneCoverageView):
     """ Coverage stats for a gene symbol restricted to gold standard sequencing runs for an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
-        gold_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__gold_standard=True)
+        gold_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__sample_sheet__sequencing_run__gold_standard=True)
         return reduce(operator.and_, [super().get_coverage_q(enrichment_kit), gold_q])
 
 

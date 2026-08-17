@@ -1,41 +1,87 @@
 import json
 from datetime import timedelta
-from typing import Union, Optional
+from typing import Optional, Union
 
 from django.contrib import admin, messages
-from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter, TabularInline
+from django.contrib.admin import (
+    BooleanFieldListFilter,
+    DateFieldListFilter,
+    RelatedFieldListFilter,
+    TabularInline,
+)
 from django.db.models import QuerySet
 from django.forms import Widget
 from django.utils import timezone
 from django.utils.safestring import SafeString
 
 from annotation.models.models import AnnotationVersion
-from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
-from classification.classification_import import reattempt_variant_matching, variant_matching_dry_run
+from classification.autopopulate_evidence_keys.evidence_from_variant import (
+    get_evidence_fields_for_variant,
+)
+from classification.classification_import import (
+    reattempt_variant_matching,
+    variant_matching_dry_run,
+)
 from classification.enums import WithdrawReason
-from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
-    ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
-    classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
-    DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    ClassificationGroupingSearchTerm, OverlapDiscordanceNotification, \
-    AlleleOriginGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator
+from classification.enums.classification_enums import (
+    EvidenceCategory,
+    ShareLevel,
+    SpecialEKeys,
+    SubmissionSource,
+)
+from classification.models import (
+    AlleleOriginGrouping,
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
+    ClassificationGroupingSearchTerm,
+    ClassificationImport,
+    ClassificationModification,
+    ClassificationReportTemplate,
+    ClinicalContext,
+    DiscordanceReport,
+    DiscordanceReportClassification,
+    DiscordanceReportTriage,
+    DiscordanceReportTriageStatus,
+    EvidenceKey,
+    EvidenceKeyMap,
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
+    UploadedClassificationsUnmapped,
+    classification_flag_types,
+    ensure_discordance_report_triages_bulk, OverlapDiscordanceNotification, ClassificationSummaryCalculator,
+)
 from classification.models.classification import Classification
-from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
-from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
-from classification.models.clinical_context_models import ClinicalContextRecalcTrigger, DiscordanceNotification
+from classification.models.classification_import_run import (
+    ClassificationImportRun,
+    ClassificationImportRunStatus,
+)
+from classification.models.classification_variant_info_models import (
+    ImportedAlleleInfoValidation,
+    ResolvedVariantInfo,
+)
+from classification.models.clinical_context_models import (
+    ClinicalContextRecalcTrigger,
+    DiscordanceNotification,
+)
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
-from classification.services.overlaps_services import send_prepared_discordance_notifications
-from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
+from classification.signals import send_prepared_discordance_notifications
+from classification.tasks.classification_import_map_and_insert_task import (
+    ClassificationImportMapInsertTask,
+)
 from library.cache import timed_cache
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
-from library.utils import ExportRow, export_column, ExportDataType, first
-from ontology.models import OntologyTerm, AncestorCalculator
-from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
-    admin_model_action, get_admin_url
+from library.utils import ExportDataType, ExportRow, export_column, first
+from ontology.models import AncestorCalculator, OntologyTerm
+from snpdb.admin_utils import (
+    AllValuesChoicesFieldListFilter,
+    ModelAdminBasics,
+    admin_action,
+    admin_list_column,
+    admin_model_action,
+    get_admin_url,
+)
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import GenomeBuild, Lab
 
@@ -754,7 +800,7 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("# classifications")
     def _classification_count(self):
-        return sum((summary.count for summary in self.summaries))
+        return sum(summary.count for summary in self.summaries)
 
     @export_column("Status")
     def _status(self):
@@ -895,11 +941,11 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Upgrade/Downgrade")
     def _upgrade_downgrade(self):
-        return "\n".join((DiscordanceReportAdminExport._up_down_for(summary) for summary in self.summaries))
+        return "\n".join(DiscordanceReportAdminExport._up_down_for(summary) for summary in self.summaries)
 
     @export_column("Certainty")
     def _certainty(self):
-        return "\n".join((DiscordanceReportAdminExport._less_more_certain(summary) for summary in self.summaries))
+        return "\n".join(DiscordanceReportAdminExport._less_more_certain(summary) for summary in self.summaries)
 
     @export_column("Triage", sub_data=DiscordanceReportRowDataTriagesRowData)
     def _triages(self):
@@ -1230,7 +1276,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
 
     @admin_list_column("Imported HGVS", "imported_c_hgvs")
     def imported_hgvs(self, obj: ImportedAlleleInfo):
-        return obj.imported_c_hgvs or obj.imported_g_hgvs
+        return obj.imported_hgvs
 
     @admin_list_column("Include in Exports", "latest_validation__include", is_boolean=True)
     def validation_include(self, obj: ImportedAlleleInfo):

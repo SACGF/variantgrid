@@ -1,6 +1,13 @@
+"""
+Settings template for a deployed server - copy to env/<hostname>.py
+
+Development machines copy env_developers/_settings_template.py instead, which is set up for
+runserver over plain HTTP.
+"""
 from variantgrid.settings.components.annotation_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
+from variantgrid.settings.components.https_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 
 # ANNOTATION_ENTREZ_EMAIL = 'your_email@yourdomain.com'
@@ -9,6 +16,8 @@ WEB_HOSTNAME = 'yourdomain.com'
 WEB_IP = '127.0.0.1'
 
 ALLOWED_HOSTS = ["localhost", WEB_HOSTNAME, WEB_IP]
+
+# Intranet deployments served over plain HTTP drop the https_settings import above
 
 # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 
@@ -36,6 +45,7 @@ if _historical_annotation:
     ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
     ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
     pin_annotation_to_columns_version_3(ANNOTATION)
+    use_pre_vep112_fasta(ANNOTATION)  # VEP below 112 needs a chromosome-named fasta
 
 _use_grch38 = False
 if _use_grch38:

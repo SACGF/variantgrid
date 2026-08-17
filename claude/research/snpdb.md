@@ -91,7 +91,7 @@ The **snpdb** app is the core application of VariantGrid. Originally named for "
 
 **VCFFilter** — VCF filter codes (PASS, LowQual, etc.)
 
-**SampleStats, SampleStatsPassingFilter** — Variant counts per sample by annotation type
+**CohortGenotypeStats** — Genotype-level variant counts keyed by CohortGenotypeCollection + nullable sample/filter_key (see `snpdb/models/models_cohort_stats.py`); annotation-version-keyed counterparts live in `annotation/models/models_cohort_stats.py`
 
 ### Cohort Models
 

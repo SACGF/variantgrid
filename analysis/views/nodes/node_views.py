@@ -4,12 +4,30 @@ from django.conf import settings
 from django.http.response import HttpResponse
 
 from analysis.exceptions import NonFatalNodeError
-from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeForm, \
-    ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
-    PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, QuadNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
-    VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm, \
-    MOINodeForm, ConservationNodeForm
-from analysis.models import TagNode, OntologyTerm, MOINode
+from analysis.forms.forms_nodes import (
+    AlleleFrequencyNodeForm,
+    AllVariantsNodeForm,
+    BuiltInFilterNodeForm,
+    ClassificationsNodeForm,
+    CohortNodeForm,
+    ConservationNodeForm,
+    DamageNodeForm,
+    FilterNodeForm,
+    IntersectionNodeForm,
+    MergeNodeForm,
+    MOINodeForm,
+    PedigreeNodeForm,
+    PhenotypeNodeForm,
+    PopulationNodeForm,
+    QuadNodeForm,
+    SelectedInParentNodeForm,
+    TagNodeForm,
+    TissueNodeForm,
+    TrioNodeForm,
+    VennNodeForm,
+    ZygosityNodeForm,
+)
+from analysis.models import MOINode, OntologyTerm, TagNode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
@@ -33,11 +51,11 @@ from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
 from analysis.views.views_json import get_sample_patient_gene_disease_data
-from snpdb.models.models_user_settings import UserSettings
 from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.jqgrid.jqgrid import JqGrid
+from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
 
 

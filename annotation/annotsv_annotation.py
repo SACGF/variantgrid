@@ -33,6 +33,14 @@ def get_annotsv_command(vcf_filename: str, output_dir: str,
     return cmd
 
 
+def get_annotsv_tsv_filename(vcf_filename: str, output_dir: str) -> str:
+    """ Path AnnotSV writes its TSV to for a given input VCF - <basename>.annotated.tsv inside output_dir.
+        A pure function of the input name, so any party holding the dump path can name the TSV without
+        reading it off the AnnotationRun row (#1660). """
+    base = os.path.splitext(os.path.basename(vcf_filename))[0]
+    return os.path.join(output_dir, f"{base}.annotated.tsv")
+
+
 def run_annotsv(vcf_filename: str, output_dir: str,
                 genome_build: GenomeBuild,
                 annotation_consortium: str) -> tuple[str, int, str, str]:
@@ -58,8 +66,7 @@ def run_annotsv(vcf_filename: str, output_dir: str,
         stderr = f"AnnotSV timed out after {settings.ANNOTATION_ANNOTSV_TIMEOUT_SECONDS}s"
         logging.warning(stderr)
 
-    base = os.path.splitext(os.path.basename(vcf_filename))[0]
-    tsv_filename = os.path.join(output_dir, f"{base}.annotated.tsv")
+    tsv_filename = get_annotsv_tsv_filename(vcf_filename, output_dir)
     if rc != 0 or not os.path.exists(tsv_filename):
         logging.warning("AnnotSV failed (rc=%s): %s", rc, stderr[:2000])
     return tsv_filename, rc, stdout, stderr

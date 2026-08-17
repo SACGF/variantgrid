@@ -4,9 +4,9 @@ from django.test import TestCase
 
 from library.genomics.vcf_writer import (
     VCFInfoHeader,
+    VCFWriter,
     build_header_lines,
     symbolic_alt_info,
-    VCFWriter,
 )
 
 BASE_COLUMNS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]

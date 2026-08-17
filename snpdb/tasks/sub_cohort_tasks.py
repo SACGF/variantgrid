@@ -8,8 +8,14 @@ from library.log_utils import log_traceback
 from library.utils.database_utils import run_sql
 from patients.models_enums import Zygosity
 from snpdb.archive import DataArchivedError
-from snpdb.models import Cohort, CohortGenotypeCollection, CohortVersion, SubCohortVariantCollection, \
-    VariantCollection, ProcessingStatus
+from snpdb.models import (
+    Cohort,
+    CohortGenotypeCollection,
+    CohortVersion,
+    ProcessingStatus,
+    SubCohortVariantCollection,
+    VariantCollection,
+)
 
 
 def enqueue_sub_cohort_any_sample_called_vc(cohort: Cohort, run_async: bool = True) -> Optional[str]:
@@ -56,7 +62,7 @@ def build_sub_cohort_any_sample_called_vc_task(cohort_id):
     # Variants kept by the EXCLUDE filter = those where NOT every sub-cohort sample is missing. This is
     # the same regex CohortGenotypeCollection.get_zygosity_q(exclude=True) uses at filter time.
     missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
-    sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
+    sample_zygosities_dict = dict.fromkeys(cohort.get_samples(), missing)
     regex_string = cgc.get_sample_zygosity_regex(sample_zygosities_dict, {})
     regex_excl = f"^((?!{regex_string}))"
 

@@ -1,25 +1,37 @@
-import logging
 import operator
-import time
 from collections import defaultdict
+from collections.abc import Callable
 from functools import reduce
-from typing import Optional, Any, Callable
+from typing import Any, Optional
 
 import pandas as pd
 from auditlog.models import LogEntry
 from django.conf import settings
-from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Max, F, Q, QuerySet
+from django.db.models import F, Max, Q, QuerySet, StringAgg, Value
 from django.db.models.functions import Substr
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
-from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, GroupOperation, \
-    CandidateSearchRun, CandidateSearchType, Candidate, CandidateStatus, AnalysisType
+from analysis.models import (
+    Analysis,
+    AnalysisNode,
+    AnalysisTemplate,
+    AnalysisType,
+    Candidate,
+    CandidateSearchRun,
+    CandidateSearchType,
+    CandidateStatus,
+    GroupOperation,
+    NodeCount,
+    NodeStatus,
+)
 from analysis.models.models_karyomapping import KaryomappingAnalysis
-from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
+from analysis.models.nodes.analysis_node import (
+    NodeColumnSummaryCacheCollection,
+    get_extra_filters_q,
+)
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
 from genes.grids import GeneListGenesColumns
@@ -28,23 +40,40 @@ from library.jqgrid.jqgrid_sql import get_overrides
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import update_dict_of_dict_values, JsonDataType, sha256sum_str
+from library.utils import (
+    JsonDataType,
+    iter_fixed_chunks,
+    sha256sum_str,
+    update_dict_of_dict_values,
+)
 from ontology.grids import AbstractOntologyGenesGrid
-from ontology.models import OntologyTermRelation, GeneDiseaseClassification, OntologyVersion
+from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
 from patients.models_enums import Zygosity
-from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
-    get_variantgrid_extra_annotate
-from snpdb.grid_columns.grid_sample_columns import get_available_format_columns, \
-    get_variantgrid_zygosity_annotation_kwargs
+from snpdb.grid_columns.custom_columns import (
+    get_custom_column_fields_override_and_sample_position,
+    get_variantgrid_extra_annotate,
+)
+from snpdb.grid_columns.grid_sample_columns import (
+    get_available_format_columns,
+    get_variantgrid_zygosity_annotation_kwargs,
+)
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype, ProcessingStatus
+from snpdb.models import (
+    CohortGenotype,
+    ProcessingStatus,
+    Sample,
+    UserGridConfig,
+    VariantGridColumn,
+    VCFFilter,
+)
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class VariantGrid(AbstractVariantGrid):
     caption = 'VariantGrid'
     GENOTYPE_COLUMNS_MISSING_VALUE = "."
+    SOURCE_COLUMN = "vcf_source"
     colmodel_overrides = {
         'tags': {'classes': 'no-word-wrap', 'formatter': 'tagsFormatter', 'sortable': False},
     }
@@ -60,9 +89,6 @@ class VariantGrid(AbstractVariantGrid):
 
         self.url = SimpleLazyObject(lambda: reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id}))
         self.extra_config.update(node.get_extra_grid_config())
-        default_sort_by_column = node.analysis.default_sort_by_column
-        if default_sort_by_column:
-            self.extra_config['sortname'] = default_sort_by_column.variant_column
 
         update_dict_of_dict_values(self._overrides, override)
 
@@ -74,6 +100,14 @@ class VariantGrid(AbstractVariantGrid):
         except NodeCount.DoesNotExist:
             node_count = None
         self.node_count = node_count
+
+        # Only set an initial sort column when sorting is allowed (below the row limit) - otherwise the
+        # first grid load would request a sort on default_sort_by_column and blow the statement_timeout.
+        if not self.sorting_disabled():
+            default_sort_by_column = node.analysis.default_sort_by_column
+            if default_sort_by_column:
+                self.extra_config['sortname'] = default_sort_by_column.variant_column
+
         self._set_post_data(node, extra_filters)
 
     def _get_permission_user(self):
@@ -98,19 +132,34 @@ class VariantGrid(AbstractVariantGrid):
             post_data['zygosity_samples_hash'] = sha256sum_str(samples_str)
         self.extra_config['postData'] = post_data
 
+    def _grid_row_count(self) -> Optional[int]:
+        """ Current view's row count, or None if unknown """
+        if self.node_count:
+            return self.node_count.count
+        return self.node.count
+
+    def sorting_disabled(self) -> bool:
+        """ Disable sorting on large nodes - sorting by joined/unindexed columns full-sorts the whole
+            result set before LIMIT, blowing the statement_timeout (see issue #1651) """
+        count = self._grid_row_count()
+        return count is None or count >= settings.ANALYSIS_GRID_SORT_MAX_ROWS
+
     def get_colmodels(self, remove_server_side_only=False):
         """ Put 'analysisNode' into every colmodel """
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         global_colmodel = {"analysisNode": {"visible": self.node.visible}}
+        sorting_disabled = self.sorting_disabled()
         for cm in colmodels:
             cm.update(global_colmodel)
+            if sorting_disabled:
+                cm["sortable"] = False
         return colmodels
 
     def _get_q(self) -> Optional[Q]:
         q = None
         if self.node_count:
             analysis = self.node.analysis
-            q = get_extra_filters_q(analysis.user, analysis.genome_build, self.node_count.label)
+            q = get_extra_filters_q(analysis.user, analysis.annotation_version, self.node_count.label)
         return q
 
     def _get_grid_only_annotation_kwargs(self):
@@ -126,22 +175,12 @@ class VariantGrid(AbstractVariantGrid):
                                                                             annotation_gnomad_version=annotation_gnomad_version))
         return annotation_kwargs
 
-    def get_count(self, request):  # pylint: disable=unused-argument
-        """ Used by paginator, set from stored value so that we don't
-            have to make another SQL query """
-        if self.node_count:
-            count = self.node_count.count
-        elif self.node.count is not None:
-            count = self.node.count
-        else:
-            class_name = self.node.get_class_name()
-            node_details_list = [f"pk: {self.node.pk}",
-                                 f"version: {self.node.version}",
-                                 f"status: {self.node.status}"]
-            node_details = ", ".join(node_details_list)
-            msg = f"Node {class_name} ({node_details}) does not have count set"
-            raise ValueError(msg)
-        return count
+    def get_known_count(self, request, items) -> Optional[int]:
+        """ The node load pipeline has already counted this node version, so the paginator doesn't
+            have to count the annotated grid queryset again """
+        if self.get_filters(request):
+            return None  # jqGrid column filters narrow the rows the stored count was taken over
+        return self._grid_row_count()
 
     def get_column_colmodel(self, column_name):
         for cm in self.get_colmodels():
@@ -173,6 +212,13 @@ class VariantGrid(AbstractVariantGrid):
 
             sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(self.cohorts, self.visibility,
                                                                                                    af_show_in_percent, sample_formatter)
+            if len(self.cohorts) > 1:
+                # Worth a column only where rows can come from more than one VCF
+                source_columns, source_overrides = VariantGrid.get_source_columns_and_overrides(self.cohorts,
+                                                                                                self.visibility)
+                sample_columns = source_columns + sample_columns
+                sample_overrides.update(source_overrides)
+
             if sample_cols_pos:
                 fields = fields[:sample_cols_pos] + sample_columns + fields[sample_cols_pos:]
             else:
@@ -195,6 +241,8 @@ class VariantGrid(AbstractVariantGrid):
 
         server_side_formatter = packed_data_formatter
         if column == "samples_filters" and cohort.vcf:
+            filter_formatter = VCFFilter.get_formatter(sample.vcf)  # Per VCF - look up once, not per row
+
             def sample_filters_formatter(row, field):
                 """ Need to unpack then switch filters """
                 # Sample Filters can be "."
@@ -202,7 +250,6 @@ class VariantGrid(AbstractVariantGrid):
                 if val is None:
                     return '.'
                 # empty string ('') is PASS
-                filter_formatter = VCFFilter.get_formatter(sample.vcf)
                 row[field] = val
                 return filter_formatter(row, field)
 
@@ -213,6 +260,47 @@ class VariantGrid(AbstractVariantGrid):
                                                                    get_data_func=packed_data_formatter,
                                                                    missing_value=VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE)
         return server_side_formatter
+
+    @staticmethod
+    def _get_sample_cohort_index(cohorts, visibility) -> dict:
+        """ sample -> (cohort, index into that cohort's packed genotype columns) """
+        sample_cohort_index = {}
+        for cohort in cohorts:
+            for cohort_sample in cohort.get_cohort_samples():  # orders by sort_order
+                sample = cohort_sample.sample
+                if visibility.get(sample) and sample not in sample_cohort_index:
+                    cohort_index = cohort_sample.cohort_genotype_packed_field_index
+                    sample_cohort_index[sample] = (cohort, cohort_index)
+        return sample_cohort_index
+
+    @staticmethod
+    def get_source_columns_and_overrides(cohorts, visibility):
+        """ Which VCF a row came from. The pk driven filter of a grouping node carries no provenance,
+            but the grid doesn't display from the filter - each row already arrives carrying, per VCF,
+            either real packed genotype data or the missing value placeholder. """
+        vcf_packed_columns = []
+        for sample, (cohort, cohort_index) in VariantGrid._get_sample_cohort_index(cohorts, visibility).items():
+            packed_column = cohort.cohort_genotype_collection.get_packed_column_alias("samples_zygosity")
+            vcf_packed_columns.append((str(sample.vcf), packed_column, cohort_index))
+
+        def source_formatter(row, _field):
+            vcf_names = []
+            for vcf_name, packed_column, cohort_index in vcf_packed_columns:
+                packed_data = row.get(packed_column)
+                if packed_data and packed_data[cohort_index] != VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE:
+                    if vcf_name not in vcf_names:
+                        vcf_names.append(vcf_name)
+            return ", ".join(vcf_names)
+
+        col_data_dict = {
+            "label": "Source",
+            "width": 120,
+            "sortable": False,  # Derived from packed data, there's nothing to sort on
+            "server_side_formatter": source_formatter,
+        }
+        column_names = [VariantGrid.SOURCE_COLUMN]
+        overrides = get_overrides(column_names, [col_data_dict], model_field=False, queryset_field=False)
+        return column_names, overrides
 
     @staticmethod
     def get_grid_genotype_columns_and_overrides(cohorts, visibility,
@@ -231,16 +319,10 @@ class VariantGrid(AbstractVariantGrid):
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
         # empty values (what CyVCF2 returns using format()) @see https://github.com/SACGF/variantgrid/issues/59
         MISSING_VALUES = [CohortGenotype.MISSING_NUMBER_VALUE, CohortGenotype.MISSING_FT_VALUE, -2147483648]
-        packed_data_replace.update({mv: VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE for mv in MISSING_VALUES})
+        packed_data_replace.update(dict.fromkeys(MISSING_VALUES, VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE))
 
         # We now have separate aliases for packed data, so each cohort handled separately
-        sample_cohort_index = {}
-        for cohort in cohorts:
-            for cohort_sample in cohort.get_cohort_samples():  # orders by sort_order
-                sample = cohort_sample.sample
-                if visibility.get(sample) and sample not in sample_cohort_index:
-                    cohort_index = cohort_sample.cohort_genotype_packed_field_index
-                    sample_cohort_index[sample] = (cohort, cohort_index)
+        sample_cohort_index = VariantGrid._get_sample_cohort_index(cohorts, visibility)
 
         column_names = []
         column_data = []
@@ -280,6 +362,10 @@ class VariantGrid(AbstractVariantGrid):
 
     def _sort_items(self, items, sidx, sord):
         """ Special case to handle sort by CohortGenotype packed fields """
+        if self.sorting_disabled():
+            # Ignore any requested sort - order by -pk only (indexed scan + LIMIT). See issue #1651
+            return super()._sort_items(items, None, sord)
+
         if sidx is not None:
             # For special fields, we pack sorting info into the 'index' which doesn't map to a field
             # looks like 'cohortgenotype_134:1:samples_zygosity'
@@ -306,36 +392,33 @@ class VariantGrid(AbstractVariantGrid):
 class ExportVariantGrid(VariantGrid):
     """ This is for exporting into VCF/CSV - ie not using any paging """
 
-    def __init__(self, *args, **kwargs):
-        self.order_by = kwargs.pop("order_by", None)
-        super().__init__(*args, **kwargs)
+    EXPORT_PK_BATCH_SIZE = 10000
 
     def sort_items(self, request, items):
-        if self.order_by:
-            items = items.order_by(*self.order_by)
+        """ Export order is set by paginate_items (genome build contig, then position), so the grid's
+            requested sidx/sord is ignored - applying it here would be both wrong and expensive """
         return items
 
-    @staticmethod
-    def _iter_time(items):
-        start = time.time()
-        yield from items
-        end = time.time()
-        logging.debug("Download took %s seconds", end - start)
+    def _iter_by_pk_batches(self, items):
+        """ Take the PKs a contig at a time off the node queryset - that has no annotation joins or
+            get_variantgrid_extra_annotate subqueries, so it stays inside the contig/position index -
+            then run the full annotated grid queryset against batches of those PKs.
 
-    @staticmethod
-    def _iter_by_contigs(genome_build, items):
-        for contig in genome_build.standard_contigs:
-            # print(f"getting {contig}")
-            contig_items = items.filter(locus__contig=contig).iterator()
-            yield from contig_items
+            Every query is bounded by the variant PK index and the annotation joins run once per row at
+            any node size. A contig with no variants costs one cheap index probe and no annotated query. """
+        node_qs = self.node.get_queryset()
+        for contig in self.node.analysis.genome_build.standard_contigs:
+            contig_pks_qs = node_qs.filter(locus__contig=contig).order_by("locus__position", "pk")
+            # A node queryset can fan out over a multi-valued join, so de-dupe (keeping order) to stop
+            # a repeated PK straddling a batch boundary and being exported twice
+            contig_pks = list(dict.fromkeys(contig_pks_qs.values_list("pk", flat=True)))
+            for batch in iter_fixed_chunks(contig_pks, self.EXPORT_PK_BATCH_SIZE):
+                batch_items = items.filter(pk__in=batch).order_by("locus__position", "pk")
+                yield from batch_items.iterator()
 
     def paginate_items(self, request, items):
-        # This is the step after queryset is sorted
-        # We want everything, but will retrieve contig at a time to reduce DB query
-        genome_build = self.node.analysis.genome_build
-        items = self._iter_by_contigs(genome_build, items)
-        # items = self._iter_time(items)
-        return None, None, items
+        # This is the step after queryset is sorted - we want everything, with no paging
+        return None, None, self._iter_by_pk_batches(items)
 
 
 class AnalysesGrid(JqGridUserRowConfig):
@@ -374,7 +457,7 @@ class AnalysesGrid(JqGridUserRowConfig):
         qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
         q_last_lock = Q(analysislock=F("last_lock")) | Q(analysislock__isnull=True)
         qs = qs.annotate(last_lock=Max("analysislock__pk")).filter(q_last_lock)
-        qs = qs.annotate(tags=StringAgg("varianttag__tag", delimiter='|'))
+        qs = qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value('|')))
         self.queryset = qs.values(*fields)
         self.extra_config.update({'sortname': 'modified',
                                   'sortorder': 'desc'})

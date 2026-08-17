@@ -7,14 +7,15 @@ from typing import Optional
 import celery
 from auditlog.registry import auditlog
 from django.db import models
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
-from snpdb.models import VariantCollection, ProcessingStatus, VariantCollectionRecord
+from library.django_utils.django_partition import temporary_db_table
+from snpdb.models import ProcessingStatus, VariantCollection, VariantCollectionRecord
 
 
 class VennNode(AnalysisNode):
@@ -294,15 +295,11 @@ def venn_cache_count(vennode_cache_id):
             variants = b_variants - a_variants
 
         if variants:
-            # We need to join to our partition - so hack the db_table but be sure to put it back in finally
-            old_db_table = VariantCollectionRecord._meta.db_table
-            try:
-                VariantCollectionRecord._meta.db_table = vc.get_partition_table()
+            # We need to write into our partition, so point the model at it for the insert
+            with temporary_db_table(VariantCollectionRecord, vc.get_partition_table()):
                 vcr_iterator = (VariantCollectionRecord(variant_collection=vc, variant_id=v_id)
                                 for v_id in variants)
                 VariantCollectionRecord.objects.bulk_create(vcr_iterator, batch_size=2000)
-            finally:
-                VariantCollectionRecord._meta.db_table = old_db_table
 
         logging.debug("Done writing variant collection")
         vc.status = ProcessingStatus.SUCCESS

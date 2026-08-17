@@ -31,7 +31,7 @@ def auto_run_analyses_for_vcf(vcf_id: int, analysis_description: str, skip_alrea
 @celery.shared_task
 def reload_auto_analyses_for_vcf(vcf_id: int):
     """ On VCF re-import, reload nodes in any existing auto-analyses so node counts stay fresh. """
-    from analysis.models import SampleAnalysisTemplateRun, CohortAnalysisTemplateRun
+    from analysis.models import CohortAnalysisTemplateRun, SampleAnalysisTemplateRun
 
     vcf = VCF.objects.get(pk=vcf_id)
 

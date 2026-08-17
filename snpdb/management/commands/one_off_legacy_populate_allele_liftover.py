@@ -2,11 +2,20 @@ import logging
 from collections import defaultdict
 
 from django.core.management.base import BaseCommand
-from django.db.models import Min, F, Count
+from django.db.models import Count, F, Min
 
 from library.guardian_utils import admin_bot
-from snpdb.models import GenomeBuild, Allele, ClinGenAllele, Contig, VariantAllele, \
-    AlleleLiftover, LiftoverRun, AlleleConversionTool, ProcessingStatus
+from snpdb.models import (
+    Allele,
+    AlleleConversionTool,
+    AlleleLiftover,
+    ClinGenAllele,
+    Contig,
+    GenomeBuild,
+    LiftoverRun,
+    ProcessingStatus,
+    VariantAllele,
+)
 
 
 class Command(BaseCommand):
@@ -98,8 +107,8 @@ class Command(BaseCommand):
             if i % 10 == 0:
                 logging.info("Assigning alleles to Liftover runs - %d/%d", i, num_liftover_runs)
             try:
-                status = lr.uploadedliftover.uploaded_file.uploadpipeline.status
-            except Exception as e:
+                status = lr.uploadedliftover.file_upload.uploadpipeline.status
+            except Exception:
                 if lr not in known_missing_upload_pipelines:
                     logging.error("Couldn't get upload pipeline status for run: %s", lr)
                 continue
@@ -199,7 +208,7 @@ class Command(BaseCommand):
         unused_liftover_runs_qs = LiftoverRun.objects.all().annotate(num_alleles=Count("alleleliftover")).filter(num_alleles=0)
         for lr in unused_liftover_runs_qs:
             try:
-                lr.uploadedliftover.uploaded_file.delete()
+                lr.uploadedliftover.file_upload.delete()
             except:
                 pass
         unused_liftover_runs_qs.delete()

@@ -3,22 +3,25 @@ import re
 from functools import reduce
 from typing import Optional
 
-from django.db.models import QuerySet, Q, Count
+from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from requests import Response
 
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus, Classification, \
-    ClassificationModification
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
+)
 from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
-from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
-from library.django_utils import get_url_from_view_path
-from library.django_utils import require_superuser
-from library.utils import MultiDiff, MultiDiffInput, ExportRow, export_column
+from genes.hgvs import HGVSDisplay, HGVSDiff, hgvs_diff_description
+from library.django_utils import get_url_from_view_path, require_superuser
+from library.utils import ExportRow, MultiDiff, MultiDiffInput, export_column
 from library.utils.django_utils import render_ajax_view
 from snpdb.admin_utils import get_admin_url
-from snpdb.models import GenomeBuild, Lab, Allele
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
+from snpdb.models import Allele, GenomeBuild, Lab
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
@@ -26,7 +29,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
     @staticmethod
     def render_c_hgvs(data: CellData):
         c_hgvs_str: Optional[str]
-        c_hgvs: Optional[CHGVS]
+        c_hgvs: Optional[HGVSDisplay]
         variant_id: Optional[int] = None
         error: Optional[str] = None
 
@@ -42,7 +45,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             c_hgvs_str = data.get(data.key)
 
         if c_hgvs_str:
-            if c_hgvs := CHGVS(c_hgvs_str):
+            if c_hgvs := HGVSDisplay.parse(c_hgvs_str):
                 json_data = c_hgvs.to_json()
                 # json_data['variant_id'] = variant_id
                 return json_data
@@ -266,8 +269,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     if not allele_info.imported_c_hgvs:
         diff_output = [None] + diff_output
 
-    normalized_diff: Optional[CHGVSDiff] = None
-    liftover_diff: Optional[CHGVSDiff] = None
+    normalized_diff: Optional[HGVSDiff] = None
+    liftover_diff: Optional[HGVSDiff] = None
     if imported_c_hgvs := allele_info.imported_c_hgvs_obj:
         if normalized := allele_info.variant_info_for_imported_genome_build:
             if c_hgvs := normalized.c_hgvs_obj:
@@ -283,8 +286,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "g_hgvs_label": f"Imported g.HGVS ({allele_info.imported_genome_build_patch_version})",
         "c_hgvses": diff_output,
         "c_hgvs_resolved_variant_info": c_hgvs_resolved_variant_info,
-        "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
-        "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
+        "normalized_diff": hgvs_diff_description(normalized_diff) if normalized_diff else None,
+        "liftover_diff": hgvs_diff_description(liftover_diff) if liftover_diff else None,
         "variant_coordinate_label": f"Variant Coordinate (from HGVS resolution) ({allele_info.imported_genome_build_patch_version})",
         "variant_coordinate_normalized_label": f"Variant Coordinate Normalized ({allele_info.imported_genome_build_patch_version})",
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,

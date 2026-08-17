@@ -2,6 +2,8 @@ import gzip
 import logging
 import os
 import subprocess
+from collections.abc import Iterable
+from dataclasses import dataclass
 from hashlib import md5
 from pathlib import Path
 from typing import Optional, Union, IO
@@ -126,18 +128,21 @@ class IteratorFile:
 
 
 class StashFile:
-    """ File-like object that holds a value """
+    """ File-like object that holds a value.
+
+        Parts are accumulated and joined on read - repeated string concatenation goes quadratic
+        once many writes stack up before a read (as when buffering rows for export) """
 
     def __init__(self):
-        self.data = ''
+        self.parts = []
 
     def write(self, value):
-        self.data += value
+        self.parts.append(value)
 
     @property
     def value(self):
-        data = self.data
-        self.data = ''
+        data = "".join(self.parts)
+        self.parts = []
         return data
 
 
@@ -161,6 +166,58 @@ def open_handle_gzip(filename: str, mode=None, **kwargs):
     if mode:
         args = (mode,)
     return open_func(filename, *args, **kwargs)
+
+
+@dataclass
+class DiskUsage:
+    """ Free space on one mounted filesystem. Callers pass the minimum they need, so one class serves
+        every threshold - SERVER_MIN_DISK_WARNING_GIGS for deployment warnings,
+        ANNOTATION_MIN_FREE_DISK_GIGS for the annotation dispatcher, and so on. """
+    mount_point: str
+    available_kb: int
+    available_nice: str  # human readable
+    percent_nice: str  # human readable
+
+    def has_capacity(self, min_gigs: float) -> bool:
+        return self.available_kb >= min_gigs * 1000000
+
+    def as_status_message(self, min_gigs: float) -> tuple[str, str]:
+        """ (status, message) describing this mount against min_gigs. """
+        message = f"Mount point '{self.mount_point}' ({self.percent_nice} used, {self.available_nice} available)"
+        if self.has_capacity(min_gigs):
+            return "info", message
+        return "warning", message + f" is below minimum of {min_gigs}G"
+
+
+def get_mount_point_for_directory(directory: str, mount_points: Iterable[str]) -> Optional[str]:
+    """ The mount point `directory` lives on - the longest one that contains it.
+
+        Longest wins because every absolute path is under '/', so a plain prefix test attributes
+        '/data/annotation_scratch' to whichever of '/' and '/data' df happened to list first. Matching on
+        a trailing separator also keeps '/database' from being read as living under '/data'.
+
+        Purely textual, so it answers for a directory that does not exist yet. """
+    best = None
+    for mount_point in mount_points:
+        prefix = mount_point if mount_point.endswith(os.sep) else mount_point + os.sep
+        if directory == mount_point or directory.startswith(prefix):
+            if best is None or len(mount_point) > len(best):
+                best = mount_point
+    return best
+
+
+def get_disk_usage_for_directory(directory: str) -> Optional[DiskUsage]:
+    """ Usage of the filesystem holding `directory`, or None if it can't be determined. """
+    disk_usage = get_disk_usage()
+    mount_point = get_mount_point_for_directory(directory, disk_usage)
+    if mount_point is None:
+        return None
+    data = disk_usage[mount_point]
+    nice_disk_usage = get_disk_usage(human_readable=True)
+    return DiskUsage(mount_point=mount_point,
+                     available_kb=int(data["avail"]),
+                     available_nice=nice_disk_usage[mount_point]["avail"],
+                     percent_nice=data["percent"])
 
 
 def get_disk_usage(human_readable=False):

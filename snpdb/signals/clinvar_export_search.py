@@ -3,7 +3,14 @@ from django.core.exceptions import PermissionDenied
 
 from classification.models import ClinVarExport, ClinVarExportBatch
 from library.enums.log_level import LogLevel
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchMessageOverall, CE_SEARCH, CB_SEARCH
+from snpdb.search import (
+    CB_SEARCH,
+    CE_SEARCH,
+    SearchExample,
+    SearchInputInstance,
+    SearchMessageOverall,
+    search_receiver,
+)
 
 
 @search_receiver(

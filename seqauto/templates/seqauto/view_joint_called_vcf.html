@@ -23,7 +23,7 @@
             {% if sample_count is None %}
                 loading…
             {% else %}
-                {{ sample_count }} / {{ joint_called_vcf.sample_sheet.sequencingsample_set.count }} samples
+                {{ sample_count }} / {{ joint_called_vcf.sequencing_sample_count }} samples
                 {% if joint_called_vcf.is_full_sheet %}
                     <span class="badge badge-primary">full sheet</span>
                 {% else %}
@@ -31,6 +31,16 @@
                 {% endif %}
             {% endif %}
         {% endwith %}
+        {% if joint_called_vcf.is_cross_run %}
+            <span class="badge badge-info">cross-run</span>
+        {% endif %}
+    {% endlabelled %}
+    {% labelled label="Enrichment Kit" %}
+        {% if joint_called_vcf.has_mixed_enrichment_kits %}
+            <span class="badge badge-warning">mixed across runs</span>
+        {% else %}
+            {{ joint_called_vcf.enrichment_kit|default_if_none:"Unknown EnrichmentKit" }}
+        {% endif %}
     {% endlabelled %}
     </div>
 
@@ -38,7 +48,9 @@
 	<div>
 		<h3>Input</h3>
 		<ul>
-		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' joint_called_vcf.sequencing_run.pk %}">{{ joint_called_vcf.sequencing_run }}</a></li>
+		{% for sequencing_run in joint_called_vcf.sequencing_runs %}
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' sequencing_run.pk %}">{{ sequencing_run }}</a></li>
+		{% endfor %}
 		</ul>
 
 		{% if joint_called_vcf.upload_pipeline %}

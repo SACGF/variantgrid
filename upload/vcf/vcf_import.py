@@ -3,32 +3,75 @@ import os
 import re
 import sys
 import traceback
-from typing import Any
+from typing import Any, Optional
 
 import cyvcf2
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django.utils import timezone
-from user_messages.models import Message
 
 from library.genomics.vcf_enums import VCFConstant
-from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, cyvcf2_get_contig_lengths_dict
+from library.genomics.vcf_utils import (
+    cyvcf2_get_contig_lengths_dict,
+    cyvcf2_header_get,
+    cyvcf2_header_types,
+)
 from library.guardian_utils import assign_permission_to_user_and_groups
-from library.utils import invert_dict, get_single_element
-from seqauto.models import JointCalledVCF, SingleSampleVCF, VCFFromSequencingRun, \
-    SampleFromSequencingSample, QCGeneList
+from library.utils import get_single_element, invert_dict
+from patients.external_references import ExternalReference, resolve_reference
+from patients.models import Extraction
+from patients.models_enums import MatchStatus
+from seqauto.models import (
+    JointCalledVCF,
+    QCGeneList,
+    SampleFromSequencingSample,
+    SingleSampleVCF,
+    VCFFromSequencingRun,
+)
 from seqauto.signals.signals_list import backend_vcf_import_start_signal
-from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
-    Cohort, CohortSample, UserSettings, VCFSourceSettings, SampleFilePath, VCFInfo, AbstractVCFField, VCFFormat
-from snpdb.models.models_enums import ImportSource, VariantsType, SampleFileType, VCFInfoTypes
+from snpdb.models import (
+    VCF,
+    AbstractVCFField,
+    Cohort,
+    CohortSample,
+    ImportStatus,
+    Sample,
+    SampleFilePath,
+    UserSettings,
+    VCFFilter,
+    VCFFormat,
+    VCFInfo,
+    VCFSourceSettings,
+)
+from snpdb.models.models_enums import ImportSource, SampleFileType, VariantsType, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
-from upload.models import UploadedVCF, PipelineFailedJobTerminateEarlyException, \
-    BackendVCF, UploadStep, UploadStepTaskType, VCFPipelineStage
+from upload.models import (
+    BackendVCF,
+    FileUpload,
+    PipelineFailedJobTerminateEarlyException,
+    SimpleVCFImportInfo,
+    UploadedVCF,
+    UploadedVCFPipelineMaxVariant,
+    UploadStep,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
+from upload.upload_metadata import (
+    SAMPLE_EXTRACTIONS,
+    get_metadata_extractions,
+    get_metadata_genome_build,
+    get_metadata_source,
+)
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
+from user_messages.models import Message
+
+MIXED_ENRICHMENT_KIT_MESSAGE = "Joint called VCF spans sequencing runs with different enrichment kits - " \
+                               "enrichment kit settings were not applied to this VCF"
 
 
 def get_format_field(vcf_formats, wanted_format_id):
@@ -156,17 +199,17 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     """ Reads header only - returns VCF object """
 
     upload_pipeline = upload_step.upload_pipeline
-    uploaded_file = upload_pipeline.uploaded_file
+    file_upload = upload_pipeline.file_upload
     # There is no VCF file if this method is called, but it could be possible for UploadedVCF
     # to exist if there was an error before previous VCF was created, so re-use if there
     try:
         # Reload as VCF may have been deleted before calling this and still attached
         uploaded_vcf = UploadedVCF.objects.get(upload_pipeline=upload_pipeline)
-        uploaded_vcf.uploaded_file = uploaded_file
+        uploaded_vcf.file_upload = file_upload
         uploaded_vcf.vcf_importer = None
         uploaded_vcf.save()
     except UploadedVCF.DoesNotExist:
-        uploaded_vcf = UploadedVCF.objects.create(uploaded_file=uploaded_file,
+        uploaded_vcf = UploadedVCF.objects.create(file_upload=file_upload,
                                                   upload_pipeline=upload_pipeline)
         logging.info("import_vcf_file: CREATED uploaded_vcf: %d", uploaded_vcf.pk)
 
@@ -174,30 +217,101 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     vcf = create_vcf_from_uploaded_vcf(uploaded_vcf, num_genotype_samples)
     # Save header ASAP if case something goes wrong
     vcf.header = vcf_reader.raw_header
-
-    try:
-        vcf.genome_build = vcf_detect_genome_build_from_header(vcf_reader)
-    except GenomeBuildDetectionException:
-        pass
+    vcf.save()
     uploaded_vcf.vcf = vcf
     uploaded_vcf.save()
+
+    vcf.genome_build = resolve_genome_build(vcf_reader, file_upload)
 
     configure_vcf_from_header(vcf, vcf_reader)
 
     backend_vcf = create_backend_vcf_links(uploaded_vcf)
     if backend_vcf:
         logging.info("Handle backend VCF")
-        link_samples_and_vcfs_to_sequencing(backend_vcf)
+        link_samples_and_vcfs_to_sequencing(backend_vcf, upload_step=upload_step)
         backend_vcf_import_start_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
 
+    assign_sample_extractions(vcf, upload_step)
     return vcf
+
+
+def assign_sample_extractions(vcf: VCF, upload_step=None):
+    """ Route 2 - the extraction upload metadata keys, which need no seqauto records at all.
+
+        Where a file has both this and a seqauto link and they name different extractions we fail the
+        import, the same rule a declared genome_build the header contradicts gets. """
+    samples = list(vcf.sample_set.all())
+    declared = get_metadata_extractions(_get_file_upload(vcf), [s.vcf_sample_name for s in samples])
+    if unknown := set(declared) - {s.vcf_sample_name for s in samples}:
+        raise ExtractionMismatchException(f"'{SAMPLE_EXTRACTIONS}' names sample(s) not in this VCF: "
+                                          f"{', '.join(sorted(unknown))}")
+
+    for sample in samples:
+        reference = declared.get(sample.vcf_sample_name)
+        if reference is None and not sample.extraction_reference:
+            reference = _derive_extraction_reference(sample.name)
+        if reference is None:
+            continue
+        resolved = resolve_reference(Extraction, reference, vcf.user)
+        if sample.extraction_id and resolved.matched and resolved.obj != sample.extraction:
+            msg = f"Sample '{sample.vcf_sample_name}': declared extraction '{reference}' disagrees " \
+                  f"with '{sample.extraction}' linked through the sequencing sample"
+            raise ExtractionMismatchException(msg)
+        sample.apply_extraction_match(resolved)
+        if upload_step and not resolved.matched:
+            SimpleVCFImportInfo.add_message_count(1, resolved.error, upload_step)
+
+
+def _derive_extraction_reference(sample_name: str) -> Optional[ExternalReference]:
+    """ Only for deployments with nothing upstream to quote an identifier - @see the setting """
+    if pattern := settings.PATIENT_EXTRACTION_SAMPLE_NAME_REGEX:
+        if m := re.search(pattern, sample_name):
+            return ExternalReference(reference_id=m.group("extraction"), derived=True)
+    return None
+
+
+def _get_file_upload(vcf) -> Optional[FileUpload]:
+    """ The upload a VCF came from, if it came from one (absent for VCFs made by other means) """
+    try:
+        return vcf.uploadedvcf.file_upload
+    except ObjectDoesNotExist:
+        return None
+
+
+def resolve_genome_build(vcf_reader, file_upload) -> Optional[GenomeBuild]:
+    """ Header detection first, then whatever the submitter declared at upload.
+
+        Where both are present and disagree we fail rather than pick a winner - differing contigs mean
+        the coordinates aren't what the submitter thinks they are. Returns None if nothing resolves,
+        which the caller turns into REQUIRES_USER_INPUT. """
+
+    detected_genome_build = None
+    try:
+        detected_genome_build = vcf_detect_genome_build_from_header(vcf_reader)
+    except GenomeBuildDetectionException:
+        pass
+
+    declared_genome_build = get_metadata_genome_build(file_upload)
+    if declared_genome_build and detected_genome_build and declared_genome_build != detected_genome_build:
+        msg = f"Declared genome build '{declared_genome_build}' disagrees with build " \
+              f"'{detected_genome_build}' detected from the VCF header"
+        raise GenomeBuildMismatchException(msg)
+
+    if genome_build := detected_genome_build or declared_genome_build:
+        return genome_build
+
+    # Nothing to disambiguate on a single-build server - same fallback ImportBedFileTask already applies
+    genome_builds = list(GenomeBuild.builds_with_annotation())
+    if len(genome_builds) == 1:
+        return genome_builds[0]
+    return None
 
 
 def _get_vcf_sample_names(vcf, vcf_reader) -> list[str]:
     if vcf.genotype_samples > 0:
         sample_names = vcf_reader.samples
     else:  # Need at least 1 sample per VCF
-        default_name = vcf.uploadedvcf.uploaded_file.name
+        default_name = vcf.uploadedvcf.file_upload.name
         sample_names = [default_name]
     return sample_names
 
@@ -210,7 +324,9 @@ def configure_vcf_from_header(vcf, vcf_reader):
     create_vcf_filters(vcf, header_types.get("FILTER", {}))
     create_vcf_format(vcf, header_types.get("FORMAT", {}))
     vcf_formats = set(header_types["FORMAT"])
-    source = cyvcf2_header_get(vcf_reader, "source", "")
+    # A client-declared source wins over '##source' - it's the only way to reach a file that declares
+    # none. The header text stays in vcf.header either way
+    source = get_metadata_source(_get_file_upload(vcf)) or cyvcf2_header_get(vcf_reader, "source", "")
     vcf.source = source
     if vcf.genotype_samples:  # Has sample format fields
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
@@ -252,6 +368,8 @@ def handle_vcf_source(vcf):
             if re.match(vss.source_regex, vcf.source):
                 vcf.sample_set.all().update(variants_type=vss.sample_variants_type)
                 vcf.variant_zygosity_count = vss.variant_zygosity_count
+                # Runs last in configure_vcf_from_header, so this lands on top of the by-name defaults
+                vss.apply_sample_field_overrides(vcf)
                 vcf.save()
 
 
@@ -291,30 +409,37 @@ def import_vcf_file(upload_step, bulk_inserter) -> int:
         raise ValueError(message)
 
     bulk_inserter.finish()
-    update_uploaded_vcf_max_variant(uploaded_vcf.pk, bulk_inserter.get_max_variant_id())
+    update_uploaded_vcf_max_variant(uploaded_vcf.pk, bulk_inserter.get_max_variant_id_by_pipeline_type())
     return bulk_inserter.rows_processed
 
 
-def update_uploaded_vcf_max_variant(pk, max_inserted_variant_id):
-    """ This can be run in parallel """
+def update_uploaded_vcf_max_variant(pk, max_inserted_variant_id_by_pipeline_type: dict):
+    """ Upsert one UploadedVCFPipelineMaxVariant row per pipeline type. This can be run in parallel
+        (multiple import steps) so each type's row is only raised, never lowered. """
 
-    if max_inserted_variant_id is not None:
-        uploaded_vcf_qs = UploadedVCF.objects.filter(pk=pk)
-        q_not_set_or_less_than = Q(max_variant__isnull=True) | Q(max_variant_id__lt=max_inserted_variant_id)
-        uploaded_vcf_qs.filter(q_not_set_or_less_than).update(max_variant_id=max_inserted_variant_id)
+    for pipeline_type, max_inserted_variant_id in max_inserted_variant_id_by_pipeline_type.items():
+        if max_inserted_variant_id is None:
+            continue
+        row, created = UploadedVCFPipelineMaxVariant.objects.get_or_create(
+            uploaded_vcf_id=pk, pipeline_type=pipeline_type,
+            defaults={"max_variant_id": max_inserted_variant_id})
+        if not created:
+            q_not_set_or_less_than = Q(max_variant__isnull=True) | Q(max_variant_id__lt=max_inserted_variant_id)
+            UploadedVCFPipelineMaxVariant.objects.filter(pk=row.pk).filter(q_not_set_or_less_than) \
+                .update(max_variant_id=max_inserted_variant_id)
 
 
 def create_vcf_from_uploaded_vcf(uploaded_vcf, num_genotype_samples):
-    vcf = VCF.objects.create(name=uploaded_vcf.uploaded_file.name,
+    vcf = VCF.objects.create(name=uploaded_vcf.file_upload.name,
                              date=timezone.now(),
-                             user=uploaded_vcf.uploaded_file.user,
+                             user=uploaded_vcf.file_upload.user,
                              genotype_samples=num_genotype_samples,
                              import_status=ImportStatus.IMPORTING)
     logging.debug("Saved vcf %d from uploaded_vcf %d", vcf.pk, uploaded_vcf.pk)
 
     # Assign view permission to all of users groups
     # TODO: Make this a user option (auto share to groups?)
-    user = uploaded_vcf.uploaded_file.user
+    user = uploaded_vcf.file_upload.user
     assign_permission_to_user_and_groups(user, vcf)
 
     return vcf
@@ -324,11 +449,16 @@ def create_backend_vcf_links(uploaded_vcf):
     """ returns backend_vcf if we can link to SeqAuto data (None if Web VCF) """
 
     backend_vcf = None
-    uploaded_file = uploaded_vcf.uploaded_file
-    # APIFileUploadView comes through as WEB_UPLOAD
+    if not settings.SEQAUTO_ENABLED:
+        # Only SeqAuto deployments link uploads to backend sequencing VCFs by path.
+        # Elsewhere 'path' is just an optional client hint (e.g. API dedup), so skip linking.
+        return backend_vcf
+
+    file_upload = uploaded_vcf.file_upload
+    # APIFileUploadView (including the SeqAuto API client) comes through as WEB_UPLOAD
     sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.WEB_UPLOAD}
-    if uploaded_file.path and uploaded_file.import_source in sequencing_vcf_sources:
-        path = uploaded_file.path
+    if file_upload.path and file_upload.import_source in sequencing_vcf_sources:
+        path = file_upload.path
         if path:
             joint_called_vcf = None
             single_sample_vcf = None
@@ -348,20 +478,28 @@ def create_backend_vcf_links(uploaded_vcf):
     return backend_vcf
 
 
-def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
+def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upload_step=None):
     if backend_vcf:
         logging.info("link_samples_and_vcfs_to_sequencing backend_vcf: %s", backend_vcf.pk)
+        filesystem_vcf = backend_vcf.filesystem_vcf
         sequencing_run = backend_vcf.sample_sheet.sequencing_run
         vcf = backend_vcf.vcf
-        if ek := sequencing_run.enrichment_kit:
+        if ek := filesystem_vcf.enrichment_kit:
             vcf.variant_zygosity_count = ek.variant_zygosity_count
             logging.info("Setting %s variant_zygosity_count to %s", vcf, vcf.variant_zygosity_count)
+        elif filesystem_vcf.has_mixed_enrichment_kits:
+            logging.warning("%s: %s", vcf, MIXED_ENRICHMENT_KIT_MESSAGE)
+            if upload_step:
+                SimpleVCFImportInfo.objects.create(upload_step=upload_step,
+                                                   message_string=MIXED_ENRICHMENT_KIT_MESSAGE)
         vcf.fake_data = sequencing_run.fake_data
         vcf.save()
 
         samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
         if not samples_by_sequencing_sample:
-            raise ValueError("Couldn't link VCF samples to sequencing samples. VCF samples must start with sample names in SampleSheet.csv")
+            expected = ", ".join(str(ss) for ss in filesystem_vcf.get_sequencing_samples())
+            raise ValueError("Couldn't link VCF samples to sequencing samples. "
+                             f"VCF samples must start with one of: {expected}")
 
         if backend_vcf.joint_called_vcf:
             VCFFromSequencingRun.objects.update_or_create(
@@ -393,6 +531,19 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
                     sample.variants_type = ek.sample_variants_type
                     modified_sample = True
 
+            # One link call per sequencing sample reaches all of that arm's VCFs through here
+            if sequencing_sample.extraction_id and not sample.extraction_id:
+                sample.extraction = sequencing_sample.extraction
+                sample.extraction_match_status = MatchStatus.MATCHED
+                sample.extraction_match_date = timezone.now()
+                modified_sample = True
+            elif sequencing_sample.extraction_reference and not sample.extraction_reference:
+                # Still parked upstream - carry the claim so one reconcile pass settles both rows
+                sample.extraction_reference = sequencing_sample.extraction_reference
+                sample.extraction_match_status = sequencing_sample.extraction_match_status
+                sample.extraction_match_date = sequencing_sample.extraction_match_date
+                modified_sample = True
+
             if bam_file := sequencing_sample.get_single_bam():
                 SampleFilePath.objects.get_or_create(sample=sample, file_path=bam_file.path,
                                                      file_type=SampleFileType.BAM)
@@ -416,7 +567,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
                                                           sequencing_sample=sequencing_sample)
 
             # Link any QCGeneLists
-            for qcgl in QCGeneList.objects.filter(qc__bam_file__unaligned_reads__sequencing_sample=sequencing_sample,
+            for qcgl in QCGeneList.objects.filter(qc__bam_file__sequencing_sample=sequencing_sample,
                                                   custom_text_gene_list__gene_list__isnull=False,
                                                   sample_gene_list__isnull=True).distinct():
                 qcgl.create_and_assign_sample_gene_list(sample)
@@ -458,6 +609,15 @@ def create_modified_imported_variants_job(upload_pipeline, num_modified_imported
 
 class GenomeBuildDetectionException(Exception):
     pass
+
+
+class GenomeBuildMismatchException(Exception):
+    """ Declared genome build contradicts the one detected from the header - fail rather than guess """
+
+
+class ExtractionMismatchException(Exception):
+    """ A file's declared extraction contradicts the one its sequencing sample was linked to, or names
+        a sample the VCF doesn't have - fail rather than guess, as no later arrival fixes either """
 
 
 class ContigMismatchException(GenomeBuildDetectionException):

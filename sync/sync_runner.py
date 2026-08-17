@@ -1,10 +1,14 @@
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Callable
+from typing import Optional
 
+from django.db.models import QuerySet
+
+from classification.models.classification import ClassificationModification
 from library.oauth import ServerAuth
 from library.utils import parse_http_header_date
 from sync.models import SyncStatus
@@ -72,6 +76,29 @@ class SyncRunner(ABC):
 
     def report_on(self, sync_run: SyncRun):
         pass
+
+
+class ClassificationUploadSyncRunner(SyncRunner, ABC):
+    """
+    Upload runners that select local classifications, and so can report on where a single record stands
+    with regards to a destination. Call configure() before any of the reporting methods.
+    """
+
+    @abstractmethod
+    def configure(self, sync_destination: SyncDestination):
+        pass
+
+    @abstractmethod
+    def records_to_sync(self, apply_filters: bool = True, full_sync: bool = False) -> QuerySet[ClassificationModification]:
+        pass
+
+    @abstractmethod
+    def exclusion_reasons(self, cm: ClassificationModification) -> list[str]:
+        """ Human readable reasons why records_to_sync() leaves this modification out """
+
+    def remote_url_for(self, cm: ClassificationModification) -> Optional[str]:
+        """ Where the record would live on the destination, for records yet to be uploaded """
+        return None
 
 
 SyncRunnerFactory = Callable[[], SyncRunner]

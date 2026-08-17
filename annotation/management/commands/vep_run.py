@@ -10,7 +10,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from annotation.models import VariantAnnotationPipelineType
-from annotation.vep_annotation import run_vep, VEPConfig
+from annotation.vep_annotation import VEPConfig, run_vep
 from snpdb.models.models_genome import GenomeBuild
 
 DO_SMALL = False

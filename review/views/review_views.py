@@ -1,19 +1,26 @@
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django import forms
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.forms import Form, DateField, BoundField
-from django.shortcuts import render, redirect
+from django.forms import BoundField, DateField, Form
+from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from library.log_utils import log_admin_change
 from library.utils.django_utils import render_ajax_view
-from review.models import ReviewedObject, Review, ReviewTopic, ReviewQuestion, ReviewMedium, ReviewParticipants, \
-    ReviewableModelMixin
+from review.models import (
+    Review,
+    ReviewableModelMixin,
+    ReviewedObject,
+    ReviewMedium,
+    ReviewParticipants,
+    ReviewQuestion,
+    ReviewTopic,
+)
 from review.widgets.multi_lab_selector import MultiChoiceLabField
 from snpdb.models import UserSettings
-from uicore.widgets.describe_difference_widget import DescribeDifferenceField, DescribeDifference
+from uicore.widgets.describe_difference_widget import DescribeDifference, DescribeDifferenceField
 from uicore.widgets.radio_other_widget import MultiChoiceFieldWithOther
 
 
@@ -38,7 +45,7 @@ class ReviewForm(Form):
                 if bound.errors or bound.data:
                     # we have at least 1 checkbox ticked, all good
                     return data
-            raise ValidationError(f"At least one option must be ticked")
+            raise ValidationError("At least one option must be ticked")
 
     def __init__(self, review: Review, data: Optional[Any] = None, initial: Optional[Any] = None):
         super().__init__(data=data, initial=initial)

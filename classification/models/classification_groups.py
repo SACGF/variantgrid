@@ -1,19 +1,26 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from itertools import groupby
-from typing import Optional, Iterable, TypeVar, Generic
+from typing import Generic, Optional, TypeVar
 
 import deprecation
 from django.contrib.auth.models import User
 from more_itertools import first
 
 from classification.criteria_strengths import CriteriaStrength
-from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
-from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved, \
-    classification_flag_types, ImportedAlleleInfo
+from classification.enums import CriteriaEvaluation, ShareLevel, SpecialEKeys
+from classification.models import (
+    ClassificationModification,
+    ConditionResolved,
+    CuratedDate,
+    EvidenceKeyMap,
+    ImportedAlleleInfo,
+    classification_flag_types,
+)
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
-from genes.hgvs import CHGVS, PHGVS
+from genes.hgvs import HGVSDisplay, PHGVS
 from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab
@@ -133,7 +140,7 @@ class ClassificationGroupUtils:
 
         if self._modifications:
             flag_collections_ids = {mod.classification.flag_collection_id for mod in self._modifications}
-            flags_qs.filter(collection_id__in=flag_collections_ids)
+            flags_qs = flags_qs.filter(collection_id__in=flag_collections_ids)
 
         for flag in flags_qs:
             mod_id_to_clin_sig[flag.collection_id] = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
@@ -232,7 +239,7 @@ class ClassificationGroup:
 
     @property
     def allele_infos(self) -> list[ImportedAlleleInfo]:
-        return list(sorted({mod.classification.allele_info for mod in self.modifications if mod.classification.allele_info}))
+        return sorted({mod.classification.allele_info for mod in self.modifications if mod.classification.allele_info})
 
     def diff_ids(self) -> str:
         return ",".join([str(cm.classification_id) for cm in self.modifications])
@@ -306,24 +313,22 @@ class ClassificationGroup:
                 return cc.is_discordant
 
     @staticmethod
-    def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> CHGVS:
-        c_parts: CHGVS
+    def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
         if c_str := cm.classification.get_c_hgvs(genome_build):
-            c_parts = CHGVS(c_str)
-            c_parts.is_normalised = True
-            c_parts.genome_build = genome_build
-        else:
-            c_parts = cm.classification.c_parts
-            c_parts.is_normalised = False
-            try:
-                c_parts.genome_build = cm.classification.get_genome_build()
-                c_parts.is_desired_build = genome_build.name == c_parts.genome_build.name
-            except ValueError:
-                pass
-        return c_parts
+            return HGVSDisplay.parse(c_str, genome_build=genome_build, is_normalised=True)
+
+        imported_genome_build = None
+        is_desired_build = None
+        try:
+            imported_genome_build = cm.classification.get_genome_build()
+            is_desired_build = genome_build.name == imported_genome_build.name
+        except ValueError:
+            pass
+        return HGVSDisplay(cm.classification.c_parts, genome_build=imported_genome_build,
+                           is_normalised=False, is_desired_build=is_desired_build)
 
     @cached_property
-    def c_hgvses(self) -> list[CHGVS]:
+    def c_hgvses(self) -> list[HGVSDisplay]:
         unique_c = set()
         for ge in self.group_entries:
             unique_c.add(ge.c_hgvs)
@@ -341,7 +346,7 @@ class ClassificationGroup:
         return prefix + self.c_hgvs.sort_str
 
     @property
-    def c_hgvs(self) -> CHGVS:
+    def c_hgvs(self) -> HGVSDisplay:
         return self.c_hgvses[0]
 
     @property

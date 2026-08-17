@@ -21,7 +21,7 @@ class LazyEncoder(DjangoJSONEncoder):
         return super().default(obj)
 
 
-class JSONResponseMixin(object):
+class JSONResponseMixin:
     is_clean = False
 
     def render_to_response(self, context):

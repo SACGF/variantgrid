@@ -2,13 +2,18 @@ function defaultFor(arg, val) {
 	return typeof arg !== 'undefined' ? arg : val;
 }
 
+/** Pass width=null for a plot that fills (and resizes with) its container */
 function defaultLayout(title, width, height) {
     let layout = {
       title: title,
-      'width': defaultFor(width, 600),
       'height': defaultFor(height, 400),
       xaxis: { autotick: false },
     };
+    if (width === null) {
+        layout.autosize = true;
+    } else {
+        layout.width = defaultFor(width, 600);
+    }
     return layout;
 }
 
@@ -130,10 +135,9 @@ function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
     layout["xaxis"] = {autotick: true};
 
     if (margin) {
-        layout["autosize"] = false;
         layout["margin"] = margin;
     }
-    Plotly.newPlot(selector, [data], layout);
+    Plotly.newPlot(selector, [data], layout, {responsive: layout.autosize === true});
 }
 
 

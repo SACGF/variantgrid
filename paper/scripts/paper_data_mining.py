@@ -79,7 +79,7 @@ class Command(BaseCommand):
                 rows = fn()
                 self.manifest.append((name, "ok", rows))
                 self.stdout.write(self.style.SUCCESS(f"{name}: {rows} rows"))
-            except Exception as e:  # noqa: BLE001 — one collector failing must not kill the rest
+            except Exception as e:
                 self.manifest.append((name, f"FAILED: {e}", 0))
                 self.stderr.write(self.style.ERROR(f"{name} FAILED: {e}"))
                 self.stderr.write(traceback.format_exc())
@@ -210,7 +210,7 @@ class Command(BaseCommand):
             if issubclass(m, AnalysisNode) and m is not AnalysisNode and not m._meta.abstract:
                 try:
                     n = m.objects.count()
-                except Exception:  # noqa: BLE001 — proxy/abstract edge cases
+                except Exception:
                     continue
                 if n:
                     rows.append([m.__name__, self._suppress(n)])

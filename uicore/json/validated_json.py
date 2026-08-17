@@ -1,10 +1,11 @@
 import copy
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Iterator, Union, Optional, Any
+from typing import Any, Optional, Union
 
-from library.utils import invalidate_cached_property, JsonDataType
+from library.utils import JsonDataType, invalidate_cached_property
 
 """
 ValidatedJson (with JSonMessages) is used for serializing to JSon where there's also the need to providing infos or warnings

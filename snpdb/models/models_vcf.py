@@ -5,12 +5,12 @@ from functools import cached_property, reduce
 from typing import Optional, Union
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields.array import ArrayField
-from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import models
-from django.db.models import Lookup, Field
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models import Field, Lookup
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Substr
 from django.db.models.query_utils import Q
 from django.db.models.signals import pre_delete
@@ -25,15 +25,20 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
-from library.log_utils import log_traceback, report_event
-from library.preview_request import PreviewModelMixin, PreviewKeyValue
-from patients.models import FakeData, Patient, Specimen
-from patients.models_enums import Sex
-from snpdb.models.models import Tag, LabProject
-from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus, SampleFileType, VCFInfoTypes
+from library.log_utils import log_traceback
+from library.preview_request import PreviewKeyValue, PreviewModelMixin
+from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
+from snpdb.models.models import LabProject, Tag
+from snpdb.models.models_enums import (
+    ImportStatus,
+    ProcessingStatus,
+    SampleFileType,
+    VariantsType,
+    VCFInfoTypes,
+)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
-from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
+from snpdb.models.models_variant import AlleleSource, Variant, VariantCollection
 
 
 @Field.register_lookup
@@ -74,7 +79,7 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     source = models.TextField(blank=True)
     # Most callers put allele depths in AD e.g. AD=[10,12] but some can split into separate ref/alt fields
     allele_depth_field = models.TextField(null=True)
-    # If AF is provided, we use it, otherwise if it is null we calculate it ourselves (post normalization w/VT)
+    # If AF is provided, we use it, otherwise if it is null we calculate it ourselves (post normalization w/bcftools)
     # which can sometimes cause issues with splitting multi-alts
     allele_frequency_field = models.TextField(null=True)
     ref_depth_field = models.TextField(null=True)
@@ -293,18 +298,23 @@ class VCFFilter(models.Model):
         unique_together = (('vcf', 'filter_code'), ('vcf', 'filter_id'))
 
     @staticmethod
+    def get_code_lookup(vcf: VCF) -> dict[str, str]:
+        """ Filter codes are assigned per-VCF, so this can only decode that VCF's records """
+        return {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
+
+    @staticmethod
+    def format_filter_codes(lookup: dict[str, str], filter_string: Optional[str]) -> str:
+        """ Empty/null means the record passed all of the VCF's filters """
+        if filter_string:
+            return ','.join(lookup.get(f, f) for f in filter_string)
+        return "PASS"
+
+    @staticmethod
     def get_formatter(vcf: VCF):
-        lookup = {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
+        lookup = VCFFilter.get_code_lookup(vcf)
 
         def filter_string_formatter(row, field):
-            if filter_string := row[field]:
-                formatted_filters = []
-                for f in filter_string:
-                    formatted_filters.append(lookup[f])
-                formatted_filters = ','.join(formatted_filters)
-            else:
-                formatted_filters = "PASS"
-            return formatted_filters
+            return VCFFilter.format_filter_codes(lookup, row[field])
 
         return filter_string_formatter
 
@@ -318,7 +328,7 @@ class VCFTag(models.Model):
         return f"{self.tag}:{self.vcf}"
 
 
-class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.Model):
+class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, ExtractionMatchMixin, models.Model):
     """ A VCF sample storing genotype information
         Sample data is stored as packed fields in CohortGenotype (via vcf.cohort.cohortgenotypecollection) """
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
@@ -327,8 +337,6 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.
     no_dna_control = models.BooleanField(default=False)
     research_consent = models.BooleanField(null=True, blank=True)
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
-    # TODO: A sample may have >1 specimens (eg tumor/normal subtraction)
-    specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
 
@@ -347,6 +355,12 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.
             genome_builds={self.vcf.genome_build},
             summary_extra=[PreviewKeyValue("VCF", str(self.vcf))]
         )
+
+    @property
+    def specimen(self) -> Optional[Specimen]:
+        if self.extraction:
+            return self.extraction.specimen
+        return None
 
     @property
     def genome_build(self):
@@ -401,43 +415,18 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.
 
     def delete_internal_data(self):
         """ for reloading in place """
-        try:
-            self.samplestats.delete()
-        except Exception:
-            pass
-
-        try:
-            self.samplestatspassingfilter.delete()
-        except Exception:
-            pass
-
+        # Only the per-sample (sample IS NOT NULL) CohortGenotype*Stats rows belong to this Sample -
+        # aggregate / filter-keyed rows are owned by the CGC and die when it's deleted
         related_objects = [
-            self.sampleclinvarannotationstats_set,
-            self.sampleclinvarannotationstatspassingfilter_set,
-            self.samplegeneannotationstats_set,
-            self.samplegeneannotationstatspassingfilter_set,
             self.samplelocuscount_set,
-            self.samplevariantannotationstats_set,
-            self.samplevariantannotationstatspassingfilter_set,
+            self.cohortgenotypestats_set,
+            self.cohortgenotypevariantannotationstats_set,
+            self.cohortgenotypegeneannotationstats_set,
+            self.cohortgenotypeclinvarannotationstats_set,
         ]
 
         for o in related_objects:
             o.all().delete()
-
-        # New CohortGenotype*Stats family — only the per-sample (sample IS NOT NULL)
-        # rows belong to this Sample. Aggregate / filter-keyed rows are owned by
-        # the CGC and die when the CGC is deleted. Imports are inline to avoid
-        # a snpdb-internal load-order cycle (CohortGenotypeStats → SampleStatsCodeVersion
-        # in this module) and a snpdb→annotation cycle.
-        from annotation.models import (
-            CohortGenotypeClinVarAnnotationStats, CohortGenotypeGeneAnnotationStats,
-            CohortGenotypeVariantAnnotationStats,
-        )
-        from snpdb.models.models_cohort_stats import CohortGenotypeStats as _CGS
-        _CGS.objects.filter(sample=self).delete()
-        CohortGenotypeVariantAnnotationStats.objects.filter(sample=self).delete()
-        CohortGenotypeGeneAnnotationStats.objects.filter(sample=self).delete()
-        CohortGenotypeClinVarAnnotationStats.objects.filter(sample=self).delete()
 
     @cached_property
     def cohort_genotype_collection(self):
@@ -579,7 +568,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, models.
                 for t in sample_label_template.split("||"):
                     try:
                         return t % params
-                    except (ValueError, KeyError) as e:
+                    except (ValueError, KeyError):
                         pass
             # In theory this should be valid due to form validator, but just in case
             return sample.name
@@ -627,10 +616,6 @@ class VCFAlleleSource(AlleleSource):
             qs = Variant.objects.none()
         return qs
 
-    def liftover_complete(self, genome_build: GenomeBuild):
-        report_event('Completed VCF liftover',
-                     extra_data={'vcf_id': self.vcf.pk, 'allele_count': self.get_allele_qs().count()})
-
 
 class SampleStatsCodeVersion(TimeStampedModel):
     """ Track the version and code used to calculate sample stats, in case there are bugs/changes needed """
@@ -643,104 +628,6 @@ class SampleStatsCodeVersion(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} v{self.version}, git: {self.code_git_hash}, {self.created}"
-
-
-class AbstractVariantStats(TimeStampedModel):
-    """ Base class used for Cohort/Sample stats (note don't have Cohort stats yet)
-        @see also annotation.models.models_sample_stats """
-
-    code_version = models.ForeignKey(SampleStatsCodeVersion, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-    variant_count = models.IntegerField(default=0)
-    snp_count = models.IntegerField(default=0)
-    insertions_count = models.IntegerField(default=0)
-    deletions_count = models.IntegerField(default=0)
-    ref_count = models.IntegerField(default=0)
-    het_count = models.IntegerField(default=0)
-    hom_count = models.IntegerField(default=0)
-    unk_count = models.IntegerField(default=0)
-    x_hom_count = models.IntegerField(default=0)
-    x_het_count = models.IntegerField(default=0)
-    x_unk_count = models.IntegerField(default=0)
-
-    class Meta:
-        abstract = True
-
-    @staticmethod
-    def percent(a, b):
-        percent = float('NaN')
-        if b:
-            percent = 100.0 * a / b
-        return percent
-
-    @property
-    def total_count(self):
-        return self.variant_count
-
-    @property
-    def variant_percent(self):
-        return AbstractVariantStats.percent(self.variant_count, self.total_count)
-
-    @property
-    def snp_percent(self):
-        return AbstractVariantStats.percent(self.snp_count, self.total_count)
-
-    @property
-    def insertions_percent(self):
-        return AbstractVariantStats.percent(self.insertions_count, self.total_count)
-
-    @property
-    def deletions_percent(self):
-        return AbstractVariantStats.percent(self.deletions_count, self.total_count)
-
-    def count_for_zygosity(self, zygosity_ref, zygosity_het, zygosity_hom, zygosity_unk, label=None):
-        count = 0
-
-        if zygosity_ref:
-            count += self.ref_count
-        if zygosity_het:
-            count += self.het_count
-        if zygosity_hom:
-            count += self.hom_count
-        if zygosity_unk:
-            count += self.unk_count
-
-        return count
-
-
-class AbstractSampleStats(AbstractVariantStats):
-    """ @see also annotation.models.models_sample_stats """
-    sample = models.OneToOneField(Sample, on_delete=CASCADE)
-
-    class Meta:
-        abstract = True
-
-    @classmethod
-    def load_version(cls, sample, annotation_version):
-        # Ignores annotation_version as not used, but want consistent interface
-        return cls.objects.get(sample=sample)
-
-    @property
-    def chrx_sex_guess(self):
-        """ returns sex by using hom/het ratio <0.2 = female, >0.8=male """
-
-        sex = Sex.UNKNOWN
-        if self.x_het_count and self.x_hom_count:
-            hom_het_ratio = self.x_hom_count / self.x_het_count
-            if hom_het_ratio < 0.2:
-                sex = Sex.FEMALE
-            elif hom_het_ratio > 0.8:
-                sex = Sex.MALE
-
-        return Sex(sex).label
-
-
-class SampleStats(AbstractSampleStats):
-    pass
-
-
-class SampleStatsPassingFilter(AbstractSampleStats):
-    pass
 
 
 class VCFLengthStatsCollection(TimeStampedModel):
@@ -776,9 +663,42 @@ class SampleLabProject(models.Model):
 
 class VCFSourceSettings(models.Model):
     """ Modifies VCF based on 'source' header field - applied in upload.vcf.vcf_import.handle_vcf_source """
+
+    # VCF sample-field columns a source may override. configure_vcf_from_header binds these by name, which
+    # is wrong for callers that reuse a standard ID for something else (e.g. SpliceGirl's DP is *reference*
+    # reads, not total depth) - so a source says what its fields actually mean
+    OVERRIDABLE_SAMPLE_FIELDS = frozenset({
+        "allele_depth_field",
+        "allele_frequency_field",
+        "ref_depth_field",
+        "alt_depth_field",
+        "read_depth_field",
+        "genotype_field",
+        "genotype_quality_field",
+        "phred_likelihood_field",
+        "sample_filters_field",
+    })
+
     source_regex = models.TextField()
     sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)
+    # A key present sets that field, including to null - which is how you clear a by-name default. A JSON
+    # blob rather than nullable columns because null can't tell "no override" from "clear this field"
+    sample_field_overrides = models.JSONField(default=dict, blank=True)
+
+    def clean(self):
+        super().clean()
+        if unknown_fields := set(self.sample_field_overrides or {}) - self.OVERRIDABLE_SAMPLE_FIELDS:
+            unknown = ", ".join(sorted(unknown_fields))
+            valid = ", ".join(sorted(self.OVERRIDABLE_SAMPLE_FIELDS))
+            raise ValidationError({"sample_field_overrides": f"Unknown VCF field(s): {unknown}. Valid: {valid}"})
+
+    def apply_sample_field_overrides(self, vcf):
+        """ Applied after the by-name defaults, so overrides land on top """
+        for field, value in (self.sample_field_overrides or {}).items():
+            if field not in self.OVERRIDABLE_SAMPLE_FIELDS:
+                raise ValueError(f"{self}: '{field}' is not an overridable VCF sample field")
+            setattr(vcf, field, value)
 
     def __str__(self):
         return f"{self.source_regex} sample_variants_type={self.get_sample_variants_type_display()}, " \

@@ -56,6 +56,8 @@ def handle_sample_pre_delete(sender, instance, **kwargs):
     # Source SampleNode + AncestorSampleMixin filter nodes (Zygosity/GeneList/AlleleFrequency/MOI)
     # all carry a `sample` FK. Walk them via the multi-table inheritance reverse relations
     # on AnalysisNode in a single query.
+    # A group level SampleNode resolves its samples at query time, so deleting one changes its result
+    # without touching any of its FKs - it has to be bumped via the object the sample belonged to.
     q = (
         Q(samplenode__sample=instance)
         | Q(zygositynode__sample=instance)
@@ -63,6 +65,8 @@ def handle_sample_pre_delete(sender, instance, **kwargs):
         | Q(allelefrequencynode__sample=instance)
         | Q(moinode__sample=instance)
     )
+    if instance.extraction_id:
+        q |= Q(samplenode__extraction=instance.extraction_id)
     _schedule_analysis_updates(_bump_nodes(q))
 
 

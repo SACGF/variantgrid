@@ -1,0 +1,357 @@
+import gzip
+import os
+import tempfile
+from hashlib import sha256
+from unittest.mock import patch
+from urllib.parse import quote
+
+from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from analysis.models import AnalysisTemplate
+from annotation.fake_annotation import get_fake_annotation_version
+from snpdb.models import CachedGeneratedFile, GenomeBuild
+from snpdb.models.models_enums import ImportSource, ProcessingStatus
+from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
+from upload.models import FileUpload, UploadedFileTypes, UploadedVCF, UploadPipeline
+
+COHORT_EXPORT_TEMPLATE_NAME = "Cohort VCF Export auto analysis"  # settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT
+
+
+def _vcf_bytes(marker: str) -> bytes:
+    return (
+        "##fileformat=VCFv4.1\n"
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+        f"1\t123\t{marker}\tA\tG\t.\t.\t.\n"
+    ).encode()
+
+
+class UploadAPITestBase(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.owner = User.objects.create_user(username="api_owner", password="x")
+        cls.other_user = User.objects.create_user(username="api_other", password="x")
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
+        cls._temp_upload_paths = []
+
+    @classmethod
+    def tearDownClass(cls):
+        for path in getattr(cls, "_temp_upload_paths", []):
+            try:
+                if os.path.exists(path):
+                    os.unlink(path)
+            except OSError:
+                pass
+        super().tearDownClass()
+
+    @classmethod
+    def _create_vcf_upload(cls, marker: str, *, pipeline_status=ProcessingStatus.SUCCESS, path=None):
+        """ Build a fully-processed VCF upload (FileUpload + UploadPipeline + UploadedVCF)
+            attached to a permissioned cohort's VCF. """
+        cohort = create_fake_cohort(cls.owner, cls.grch37)
+        vcf = cohort.vcf
+        django_file = SimpleUploadedFile(f"{marker}.vcf", _vcf_bytes(marker))
+        file_upload = FileUpload.objects.create(
+            user=cls.owner,
+            name=f"{marker}.vcf",
+            path=path,
+            file_type=UploadedFileTypes.VCF,
+            import_source=ImportSource.WEB_UPLOAD,
+            file_field=django_file,
+        )
+        file_upload.store_sha256_hash()
+        cls._temp_upload_paths.append(file_upload.get_filename())
+        pipeline = UploadPipeline.objects.create(status=pipeline_status, file_upload=file_upload)
+        UploadedVCF.objects.create(file_upload=file_upload, vcf=vcf, upload_pipeline=pipeline)
+        return file_upload
+
+
+class UploadFileAPITest(UploadAPITestBase):
+    def test_upload_populates_sha256(self):
+        """ handle_file_upload stores sha256_hash for new uploads (dedup/poll by content) """
+        self.client.force_authenticate(user=self.owner)
+        content = _vcf_bytes("newupload")
+        expected_hash = sha256(content).hexdigest()
+
+        with patch("upload.views.views.upload_processing.process_uploaded_file"):
+            response = self.client.post(
+                reverse("api_file_upload"),
+                {"file": SimpleUploadedFile("newupload.vcf", content)},
+                format="multipart",
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        file_upload = FileUpload.objects.get(pk=data["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.sha256_hash, expected_hash)
+        self.assertEqual(data["sha256_hash"], expected_hash)
+
+    def test_deprecated_uploaded_file_id_alias(self):
+        """ file_upload_id is the identifier - uploaded_file_id is a retained alias for older clients.
+            Delete this test along with the alias. """
+        file_upload = self._create_vcf_upload("alias")
+        self.client.force_authenticate(user=self.owner)
+
+        with patch("upload.views.views.upload_processing.process_uploaded_file"):
+            upload_response = self.client.post(
+                reverse("api_file_upload"),
+                {"file": SimpleUploadedFile("alias_new.vcf", _vcf_bytes("alias_new"))},
+                format="multipart",
+            )
+        self._temp_upload_paths.append(
+            FileUpload.objects.get(pk=upload_response.json()["file_upload_id"]).get_filename())
+
+        status_response = self.client.get(reverse("api_upload_status",
+                                                  kwargs={"file_upload_id": file_upload.pk}))
+        self.client.force_login(self.owner)  # upload_poll is a session-auth view
+        poll_response = self.client.get(reverse("upload_poll"))
+
+        payloads = [upload_response.json(), status_response.json()]
+        payloads.extend(ufd for ufd in poll_response.json() if ufd["file_upload_id"] == file_upload.pk)
+        self.assertEqual(len(payloads), 3)
+        for payload in payloads:
+            self.assertIn("uploaded_file_id", payload)
+            self.assertEqual(payload["uploaded_file_id"], payload["file_upload_id"])
+
+    def test_upload_dedups_by_hash_without_path(self):
+        existing = self._create_vcf_upload("dedup_nopath")
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            reverse("api_file_upload"),
+            {"file": SimpleUploadedFile("dedup_nopath.vcf", _vcf_bytes("dedup_nopath"))},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertEqual(data["file_upload_id"], existing.pk)
+        self.assertIn("message", data)
+
+    def test_upload_dedups_by_hash_with_path(self):
+        existing = self._create_vcf_upload("dedup_path", path="/client/sample.vcf")
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            reverse("api_file_upload") + "?path=/client/sample.vcf",
+            {"file": SimpleUploadedFile("dedup_path.vcf", _vcf_bytes("dedup_path"))},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["file_upload_id"], existing.pk)
+
+
+class UploadMetadataAPITest(UploadAPITestBase):
+    """ Upload metadata is validated while the client is still connected, so a mistyped key is a 400
+        rather than a silent fallback to header detection @see upload.upload_metadata """
+
+    def _upload(self, marker: str, query_string: str = ""):
+        self.client.force_authenticate(user=self.owner)
+        with patch("upload.views.views.upload_processing.process_uploaded_file"):
+            return self.client.post(
+                reverse("api_file_upload") + query_string,
+                {"file": SimpleUploadedFile(f"{marker}.vcf", _vcf_bytes(marker))},
+                format="multipart",
+            )
+
+    def test_valid_metadata_stored(self):
+        response = self._upload("meta_ok", "?genome_build=GRCh37&source=DRAGEN%20TSO500%20CNV")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata,
+                         {"genome_build": "GRCh37", "source": "DRAGEN TSO500 CNV"})
+
+    def test_unknown_key_rejected(self):
+        response = self._upload("meta_typo", "?genomeBuild=GRCh37")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("genomeBuild", response.json()["error"])
+
+    def test_unresolvable_genome_build_rejected(self):
+        response = self._upload("meta_badbuild", "?genome_build=GRCh99")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("GRCh99", response.json()["error"])
+
+    def test_rejected_upload_leaves_no_file_upload(self):
+        """ We create the FileUpload to detect the file type, so a rejected one has to be cleaned up """
+        before = set(FileUpload.objects.values_list("pk", flat=True))
+        self._upload("meta_rollback", "?genome_build=GRCh99")
+        self.assertEqual(set(FileUpload.objects.values_list("pk", flat=True)), before)
+
+    def test_extraction_as_a_bare_string(self):
+        response = self._upload("meta_extraction", "?extraction=2600000001C")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata, {"extraction": {"reference_id": "2600000001C"}})
+
+    def test_extraction_as_an_object(self):
+        query = '?extraction={"code": "H12345", "external_type": "HelixID"}'
+        response = self._upload("meta_extraction_obj", quote(query, safe="?="))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata,
+                         {"extraction": {"code": "H12345", "external_type": "HelixID"}})
+
+    def test_sample_extractions_as_a_map(self):
+        query = '?sample_extractions={"TUMOUR": "2600000001C", "NORMAL": "2600000002C"}'
+        response = self._upload("meta_sample_extractions", quote(query, safe="?="))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata["sample_extractions"],
+                         {"TUMOUR": {"reference_id": "2600000001C"},
+                          "NORMAL": {"reference_id": "2600000002C"}})
+
+    def test_malformed_extraction_rejected(self):
+        """ A code without its external_type names nothing, and is worth saying while connected """
+        query = '?extraction={"code": "H12345"}'
+        response = self._upload("meta_extraction_bad", quote(query, safe="?="))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("external_type", response.json()["error"])
+
+    def test_unknown_extraction_is_accepted(self):
+        """ Existence is the ordering race the reconcile task absorbs, not an upload-time error """
+        response = self._upload("meta_extraction_unknown", "?extraction=NOT-CREATED-YET")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+
+    def test_both_extraction_keys_rejected(self):
+        query = '?extraction=2600000001C&sample_extractions={"TUMOUR": "2600000001C"}'
+        response = self._upload("meta_extraction_both", quote(query, safe="?=&"))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("sample_extractions", response.json()["error"])
+
+    def test_path_and_force_are_not_metadata(self):
+        response = self._upload("meta_reserved", "?path=/client/x.vcf&force=1")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.metadata, {})
+        self.assertEqual(file_upload.path, "/client/x.vcf")
+
+
+class UploadStatusAPITest(UploadAPITestBase):
+    def test_status_by_id_processing(self):
+        file_upload = self._create_vcf_upload("status_proc", pipeline_status=ProcessingStatus.PROCESSING)
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.get(reverse("api_upload_status",
+                                           kwargs={"file_upload_id": file_upload.pk}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertEqual(data["file_upload_id"], file_upload.pk)
+        self.assertEqual(data["pipeline_status"], ProcessingStatus.PROCESSING.label)
+        self.assertFalse(data["annotation_complete"])
+        self.assertIsNotNone(data["vcf_id"])
+        self.assertTrue(data["samples"])
+
+    def test_status_before_vcf_created(self):
+        """ Race: client polls immediately after upload, UploadedVCF exists but its vcf is still None """
+        django_file = SimpleUploadedFile("racey.vcf", _vcf_bytes("racey"))
+        file_upload = FileUpload.objects.create(
+            user=self.owner, name="racey.vcf", file_type=UploadedFileTypes.VCF,
+            import_source=ImportSource.WEB_UPLOAD, file_field=django_file)
+        file_upload.store_sha256_hash()
+        self._temp_upload_paths.append(file_upload.get_filename())
+        pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, file_upload=file_upload)
+        UploadedVCF.objects.create(file_upload=file_upload, vcf=None, upload_pipeline=pipeline)
+
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(reverse("api_upload_status",
+                                           kwargs={"file_upload_id": file_upload.pk}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertIsNone(data["vcf_id"])
+        self.assertEqual(data["samples"], [])
+        self.assertFalse(data["annotation_complete"])
+
+    def test_status_by_sha256_success(self):
+        file_upload = self._create_vcf_upload("status_ok", pipeline_status=ProcessingStatus.SUCCESS)
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.get(reverse("api_upload_status_sha256",
+                                           kwargs={"sha256_hash": file_upload.sha256_hash}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertEqual(data["file_upload_id"], file_upload.pk)
+        self.assertEqual(data["remaining_annotation_runs"], 0)
+        self.assertTrue(data["annotation_complete"])
+        # Default settings name a template that doesn't exist in tests -> downloads not available
+        self.assertFalse(data["downloads_available"])
+
+    def test_status_permission_denied_for_other_user(self):
+        file_upload = self._create_vcf_upload("status_perm")
+        self.client.force_authenticate(user=self.other_user)
+
+        response = self.client.get(reverse("api_upload_status",
+                                           kwargs={"file_upload_id": file_upload.pk}))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AnnotatedDownloadAPITest(UploadAPITestBase):
+    def _make_export_template(self):
+        return AnalysisTemplate.objects.create(name=COHORT_EXPORT_TEMPLATE_NAME, user=self.owner)
+
+    def test_invalid_export_type(self):
+        file_upload = self._create_vcf_upload("dl_badtype")
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(reverse("api_annotated_download",
+                                           kwargs={"file_upload_id": file_upload.pk,
+                                                   "export_type": "bam"}))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_download_template_not_configured(self):
+        file_upload = self._create_vcf_upload("dl_notemplate")
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(reverse("api_annotated_download",
+                                           kwargs={"file_upload_id": file_upload.pk,
+                                                   "export_type": "vcf"}))
+        self.assertEqual(response.status_code, status.HTTP_501_NOT_IMPLEMENTED)
+        self.assertIn("error", response.json())
+
+    def test_download_generating_returns_202(self):
+        file_upload = self._create_vcf_upload("dl_generating")
+        self._make_export_template()
+        self.client.force_authenticate(user=self.owner)
+
+        cgf = CachedGeneratedFile(generator="export_cohort_to_downloadable_file",
+                                  params_hash="fake", progress=0.3, filename=None)
+        with patch.object(CachedGeneratedFile, "get_or_create_and_launch", return_value=cgf):
+            response = self.client.get(reverse("api_annotated_download",
+                                               kwargs={"file_upload_id": file_upload.pk,
+                                                       "export_type": "vcf"}))
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        data = response.json()
+        self.assertEqual(data["status"], "generating")
+        self.assertEqual(data["progress"], 0.3)
+
+    def test_download_ready_streams_file(self):
+        file_upload = self._create_vcf_upload("dl_ready")
+        self._make_export_template()
+        self.client.force_authenticate(user=self.owner)
+
+        payload = _vcf_bytes("annotated")
+        fd, gz_path = tempfile.mkstemp(suffix=".vcf.gz")
+        os.close(fd)
+        self._temp_upload_paths.append(gz_path)
+        with gzip.open(gz_path, "wb") as f:
+            f.write(payload)
+
+        cgf = CachedGeneratedFile(generator="export_cohort_to_downloadable_file",
+                                  params_hash="fake", progress=1.0, filename=gz_path)
+        with patch.object(CachedGeneratedFile, "get_or_create_and_launch", return_value=cgf):
+            response = self.client.get(reverse("api_annotated_download",
+                                               kwargs={"file_upload_id": file_upload.pk,
+                                                       "export_type": "vcf"}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/gzip")
+        self.assertIn("attachment", response["Content-Disposition"])
+        streamed = b"".join(response.streaming_content)
+        self.assertEqual(gzip.decompress(streamed), payload)

@@ -12,7 +12,7 @@ class ModelUtilsMixin:
     """
 
     @classmethod
-    def get(cls: Type[Model], value):
+    def get(cls: type[Model], value):
         if value is None:
             return None
         if isinstance(value, cls):
@@ -34,7 +34,7 @@ class AsciiValue(models.Func):
     function = 'ASCII'
 
 
-def model_has_field(model: Type[Model], field_name: str) -> bool:
+def model_has_field(model: type[Model], field_name: str) -> bool:
     try:
         if field_name.endswith('_id'):
             field = model._meta.get_field(field_name.strip('_id'))

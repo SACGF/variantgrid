@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.contrib.auth.models import User
 from django.utils.timezone import localtime
 
-from library.health_check import HealthCheckRequest, HealthCheckRecentActivity, health_check_signal
+from library.health_check import HealthCheckRecentActivity, HealthCheckRequest, health_check_signal
 from library.utils import flatten_nested_lists
 
 

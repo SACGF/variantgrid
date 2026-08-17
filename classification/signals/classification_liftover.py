@@ -5,7 +5,7 @@ from django.dispatch import receiver
 from classification.models import ImportedAlleleInfo
 from library.log_utils import report_event
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
-from snpdb.models import liftover_run_complete_signal, LiftoverRun, AlleleConversionTool, Variant
+from snpdb.models import AlleleConversionTool, LiftoverRun, Variant, liftover_run_complete_signal
 
 
 @receiver(liftover_run_complete_signal, sender=LiftoverRun)
@@ -19,6 +19,7 @@ def liftover_run_complete_handler(sender, instance: LiftoverRun, **kwargs):
                                                 variantallele__allele__in=allele_qs)
         populate_clingen_alleles_for_variants(instance.genome_build, build_variants)
 
-    ImportedAlleleInfo.relink_variants(liftover_run=instance, force_update=True)
+    # force_complete as this run was our last attempt at liftover - a build we don't have now is one we couldn't get
+    ImportedAlleleInfo.relink_variants(liftover_run=instance, force_update=True, force_complete=True)
     report_event('Completed import liftover',
                  extra_data={'liftover_id': instance.pk, 'allele_count': allele_qs.count()})

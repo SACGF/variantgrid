@@ -3,7 +3,7 @@ import re
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import QuerySet, OuterRef, Count, Subquery
+from django.db.models import Count, OuterRef, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 
 from annotation.phenotype_matcher import get_ambiguous_acronym_denylist

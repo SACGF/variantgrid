@@ -1,12 +1,18 @@
 from dal import forward
 from django import forms
-from django.forms.models import inlineformset_factory, ALL_FIELDS
+from django.forms.models import inlineformset_factory, modelform_factory, modelformset_factory
 from django.forms.widgets import TextInput
 
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Patient, Specimen, ExternalPK, PatientModification, \
-    PatientRecordOriginType
+from patients.models import (
+    Extraction,
+    ExternalPK,
+    Patient,
+    PatientModification,
+    PatientRecordOriginType,
+    Specimen,
+)
 from patients.models_enums import PopulationGroup
 
 
@@ -115,7 +121,7 @@ class PatientSearchForm(forms.Form):
 PatientSpecimenFormSet = inlineformset_factory(Patient,
                                                Specimen,
                                                can_delete=True,
-                                               fields=ALL_FIELDS,
+                                               exclude=['external_pk'],
                                                widgets={'name': TextInput(),
                                                         'description': TextInput(),
                                                         'reference_id': TextInput(),
@@ -123,6 +129,38 @@ PatientSpecimenFormSet = inlineformset_factory(Patient,
                                                         'collection_date': TextInput(attrs={'class': 'date-picker'}),
                                                         'received_date': TextInput(attrs={'class': 'date-picker'})},
                                                extra=1)
+
+
+# The specimen/extraction pages edit the same fields as the patient tabs' formsets - the tabs stay the
+# bulk editor, external_pk is the tracking system's identity so both show it read only beside the form
+SpecimenForm = modelform_factory(Specimen,
+                                 exclude=['external_pk', 'patient'],
+                                 widgets={'description': TextInput(),
+                                          'reference_id': TextInput(),
+                                          'collected_by': TextInput(),
+                                          'collection_date': TextInput(attrs={'class': 'date-picker'}),
+                                          'received_date': TextInput(attrs={'class': 'date-picker'})})
+
+ExtractionForm = modelform_factory(Extraction,
+                                   fields=['reference_id', 'nucleic_acid_source', 'extraction_date'],
+                                   widgets={'reference_id': TextInput(),
+                                            'extraction_date': TextInput(attrs={'class': 'date-picker'})})
+
+
+def patient_extraction_formset_factory(patient):
+    """ Not an inline formset as Extraction hangs off Specimen rather than Patient, so the patient is
+        forwarded as a constant to narrow the specimen autocomplete. The view sets the queryset,
+        which is what actually restricts what can be saved """
+    specimen_widget = ModelSelect2(url='specimen_autocomplete',
+                                   forward=(forward.Const(patient.pk, 'patient'),),
+                                   attrs={'data-placeholder': 'Specimen...'})
+    return modelformset_factory(Extraction,
+                                can_delete=True,
+                                fields=['specimen', 'reference_id', 'nucleic_acid_source', 'extraction_date'],
+                                widgets={'specimen': specimen_widget,
+                                         'reference_id': TextInput(),
+                                         'extraction_date': TextInput(attrs={'class': 'date-picker'})},
+                                extra=1)
 
 
 def external_pk_autocomplete_form_factory(external_type):

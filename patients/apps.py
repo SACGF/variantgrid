@@ -7,5 +7,12 @@ class PatientsConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
-        from patients.signals import external_pk_search, patient_search
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        from patients.signals import (  # noqa: F401
+            extraction_match_health_check,
+            external_pk_search,
+            patient_search,
+            specimen_search,
+        )
         # pylint: enable=import-outside-toplevel,unused-import

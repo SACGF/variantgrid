@@ -1,14 +1,20 @@
 import logging
 import multiprocessing as mp
 import time
-from typing import Optional, Iterable
+from collections.abc import Iterable
+from typing import Optional
 
 import nltk
 from django.conf import settings
 from django.db import connections
 
-from annotation.models.models_phenotype_match import TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, \
-    TextPhenotypeSentence, filter_ambiguous_acronym_matches
+from annotation.models.models_phenotype_match import (
+    PhenotypeDescription,
+    TextPhenotype,
+    TextPhenotypeMatch,
+    TextPhenotypeSentence,
+    filter_ambiguous_acronym_matches,
+)
 from annotation.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
 from annotation.phenotype_tokenizer import PhenotypeTokenizer
 from patients.models import Patient

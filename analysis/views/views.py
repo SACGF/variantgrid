@@ -14,7 +14,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied, EmptyResultSet
+from django.core.exceptions import EmptyResultSet, PermissionDenied
 from django.db.models import Count
 from django.forms.models import inlineformset_factory
 from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
@@ -28,40 +28,99 @@ from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
 from analysis import forms
-from analysis.analysis_templates import populate_analysis_from_template_run, get_auto_launch_analysis_template_matches
-from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
-from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, UserQuadWizardForm, VCFLocusFilterForm, \
-    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm, AnalysisTemplateForm, \
-    AnalysisTemplateAutoLaunchForm, AutoLaunchFormSet
+from analysis.analysis_templates import (
+    get_auto_launch_analysis_template_matches,
+    populate_analysis_from_template_run,
+)
+from analysis.exceptions import NodeOutOfDateException, NonFatalNodeError
+from analysis.forms import (
+    AnalysisChoiceForm,
+    AnalysisTemplateAutoLaunchForm,
+    AnalysisTemplateForm,
+    AnalysisTemplateTypeChoiceForm,
+    AnalysisTemplateVersionForm,
+    AutoLaunchFormSet,
+    SelectGridColumnForm,
+    UserQuadWizardForm,
+    UserTrioWizardForm,
+    VCFLocusFilterForm,
+)
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
-from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
-    AnalysisTemplateRun, AnalysisLock, Analysis
-from analysis.models.enums import AnalysisTemplateType, SNPMatrix, MinimisationResultType, NodeStatus, TrioSample, QuadSample
+from analysis.models import (
+    Analysis,
+    AnalysisLock,
+    AnalysisNode,
+    AnalysisTemplate,
+    AnalysisTemplateRun,
+    AnalysisVariable,
+    NodeGraphType,
+    TagNode,
+    VariantTag,
+)
+from analysis.models.enums import (
+    AnalysisTemplateType,
+    MinimisationResultType,
+    NodeStatus,
+    QuadSample,
+    SNPMatrix,
+    TrioSample,
+)
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask, NodeCount
-from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
+from analysis.models.nodes.analysis_node import (
+    AnalysisClassification,
+    NodeCount,
+    NodeTask,
+    NodeVCFFilter,
+)
+from analysis.models.nodes.node_counts import (
+    get_node_count_colors,
+    get_node_counts_mine_and_available,
+)
 from analysis.models.nodes.node_types import get_node_types_hash
-from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
+from analysis.models.nodes.sources.cohort_node import (
+    CohortNodeZygosityFilter,
+    CohortNodeZygosityFiltersCollection,
+)
 from analysis.serializers import AnalysisNodeSerializer
-from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
-    get_node_subclass_or_non_fatal_exception
+from analysis.views.analysis_permissions import (
+    get_analysis_or_404,
+    get_node_subclass_or_404,
+    get_node_subclass_or_non_fatal_exception,
+)
 from analysis.views.nodes.node_view import NodeView
 from annotation.models.models import MutationalSignatureInfo
-from classification.views.views import create_classification_object, CreateClassificationForVariantView
+from classification.views.views import (
+    CreateClassificationForVariantView,
+    create_classification_object,
+)
 from library import pandas_utils
-from library.constants import WEEK_SECS, HOUR_SECS
+from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
-from library.utils import full_class_name, defaultdict_to_dict
-from library.utils.database_utils import run_sql, queryset_to_sql
+from library.utils import defaultdict_to_dict, full_class_name
+from library.utils.database_utils import queryset_to_sql, run_sql
+from patients.models import Extraction
+from patients.sample_grouping import get_extraction_sample_group
 from pedigree.models import Pedigree
 from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm
 from snpdb.graphs import graphcache
-from snpdb.models import UserSettings, Sample, \
-    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Quad, Variant, GenomeBuild, JobsControl
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CohortSample,
+    GenomeBuild,
+    ImportStatus,
+    JobsControl,
+    Quad,
+    Sample,
+    Trio,
+    UserSettings,
+    Variant,
+    get_igv_data,
+)
 from variantgrid.celery import app
 
 
@@ -399,6 +458,8 @@ def analysis_template_settings(request, pk):
             valid = formset.is_valid()
             if valid:
                 formset.save()
+                # Rebuild unbound, so saved rows are re-displayed along with a new blank one to add another
+                formset = AutoLaunchFormSet(prefix='auto-launch', instance=analysis_template)
             add_save_message(request, valid, "Auto Launch Config")
 
         if atv_form and atv_form.is_bound:
@@ -529,14 +590,25 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         }
         return HttpResponseRedirect(reverse("node_load", kwargs=kwargs))
 
+    # Use the count for the view being shown - if an extra filter (eg clinvar) is selected, that filtered
+    # count (not the whole node's count) decides auto-load/sorting. Mirrors VariantGrid._grid_row_count().
+    try:
+        grid_row_count = NodeCount.load_for_node(node, extra_filters).count
+    except NodeCount.DoesNotExist:
+        grid_row_count = node.count
+
     max_variants = (UserSettings.get_for_user(request.user).node_grid_auto_load_max_variants
                     or settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS)
-    grid_auto_load = (max_variants is None) or (node.count is not None and node.count < max_variants)
+    grid_auto_load = (max_variants is None) or (grid_row_count is not None and grid_row_count < max_variants)
 
     max_variants_display = None
     if max_variants is not None:
         # eg 50000 -> "50k", 50500 -> "50.5k"
         max_variants_display = f"{max_variants / 1000:g}k" if max_variants >= 1000 else str(max_variants)
+
+    # Sorting is disabled on large grids (see issue #1651) - warn the user so they filter first
+    grid_sort_max_variants = settings.ANALYSIS_GRID_SORT_MAX_ROWS
+    grid_sorting_disabled = grid_row_count is None or grid_row_count >= grid_sort_max_variants
 
     context = {
         "analysis_id": analysis_id,
@@ -546,8 +618,11 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         "extra_filters": extra_filters,
         "bams_dict": node.get_bams_dict(),
         "node": node,
+        "grid_row_count": grid_row_count,
         "grid_auto_load": grid_auto_load,
         "grid_auto_load_max_variants_display": max_variants_display,
+        "grid_sorting_disabled": grid_sorting_disabled,
+        "grid_sort_max_variants": grid_sort_max_variants,
     }
     return render(request, 'analysis/node_data/node_data_grid.html', context)
 
@@ -785,21 +860,18 @@ def cohort_zygosity_filters(request, analysis_id, node_id, cohort_id):
                                         extra=0)
 
     formset = CNZFFormSet(request.POST or None, instance=cnzfc)
-    context = {'formset': formset}
+    context = {'formset': formset,
+               'cohort': cohort}
 
     template = 'analysis/node_editors/cohort_zygosity_filters.html'
     return render(request, template, context)
 
 
-def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
-    node = get_node_subclass_or_404(request.user, node_id)
-    if vcf_id:
-        vcf = VCF.get_for_user(node.analysis.user, vcf_id)
-    else:
-        vcf = None
-
-    context = {"vcf": vcf}
-    if vcf:
+def _render_vcf_locus_filters(request, node, vcfs):
+    """ One node level selection of filter ids - NodeVCFFilter translates them into each VCF's own
+        codes at query time, so a node spanning VCFs offers the union of what they declare """
+    context = {"vcfs": vcfs}
+    if vcfs:
         vcf_filter_descriptions = {"PASS": "All filters passed"}
         set_filters = {}
         for raw_filter_id in NodeVCFFilter.get_filter_ids(node):
@@ -810,12 +882,15 @@ def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
             set_filters[filter_id] = True
         existing_filter_settings = {"PASS": "PASS" in set_filters}
 
-        for vcf_filter in vcf.vcffilter_set.all():
-            filter_id = vcf_filter.filter_id
-            vcf_filter_descriptions[filter_id] = vcf_filter.description
-            existing_filter_settings[filter_id] = filter_id in set_filters
+        has_filters = False
+        for vcf in vcfs:
+            has_filters |= vcf.has_filters
+            for vcf_filter in vcf.vcffilter_set.all():
+                filter_id = vcf_filter.filter_id
+                vcf_filter_descriptions[filter_id] = vcf_filter.description
+                existing_filter_settings[filter_id] = filter_id in set_filters
 
-        context["has_filters"] = vcf.has_filters
+        context["has_filters"] = has_filters
         context["has_filters_set"] = bool(set_filters)
         context["vlf_form"] = VCFLocusFilterForm(vcf_filters=existing_filter_settings)
         context["vlf_descriptions"] = vcf_filter_descriptions
@@ -823,9 +898,24 @@ def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
     return render(request, 'analysis/node_editors/vcf_locus_filters.html', context)
 
 
+def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
+    node = get_node_subclass_or_404(request.user, node_id)
+    vcfs = []
+    if vcf_id:
+        vcfs = [VCF.get_for_user(node.analysis.user, vcf_id)]
+    return _render_vcf_locus_filters(request, node, vcfs)
+
+
 def sample_vcf_locus_filters(request, analysis_id, node_id, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     return vcf_locus_filters(request, analysis_id, node_id, sample.vcf.pk)
+
+
+def extraction_vcf_locus_filters(request, analysis_id, node_id, extraction_id):
+    node = get_node_subclass_or_404(request.user, node_id)
+    extraction = Extraction.get_for_user(request.user, extraction_id)
+    group = get_extraction_sample_group(node.analysis.user, extraction, node.analysis.genome_build)
+    return _render_vcf_locus_filters(request, node, group.vcfs)
 
 
 def cohort_vcf_locus_filters(request, analysis_id, node_id, cohort_id):

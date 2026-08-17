@@ -8,11 +8,11 @@ from django.conf import settings
 from django.core.cache import cache
 
 from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
-from library.utils.file_utils import name_from_filename, mk_path
+from library.utils.file_utils import mk_path, name_from_filename
 from snpdb import variant_collection
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
-from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage, ModifiedImportedVariant
+from upload.models import ModifiedImportedVariant, UploadStep, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.vcf import sql_copy_files
 from variantgrid.celery import app
@@ -141,7 +141,7 @@ class InsertUnknownVariantsTask(ImportVCFStepTask):
         LOCK_ID = "insert-unknown-variants-lock"
 
         if not settings.UPLOAD_ENABLED:
-            raise ValueError(f"Uploads disabled, this should not have been called!")
+            raise ValueError("Uploads disabled, this should not have been called!")
 
         if cache.add(LOCK_ID, "true", LOCK_EXPIRE):  # fails if already exists
             try:

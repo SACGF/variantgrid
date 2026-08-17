@@ -1,10 +1,22 @@
 from rest_framework import serializers
 
-from genes.serializers import SampleGeneListSerializer, GeneCoverageCollectionSerializer
-from seqauto.models import IlluminaFlowcellQC, QCGeneList, QC, QCGeneCoverage, QCExecSummary, FastQC, SequencingSample, \
-    SampleSheet, SequencingRun, SingleSampleVCF
-from seqauto.serializers.sequencing_serializers import SampleSheetLookupSerializer, FastqSerializer, \
-    BamFilePathSerializer, SingleSampleVCFPathSerializer, SequencingSampleLookupSerializer
+from genes.serializers import GeneCoverageCollectionSerializer, SampleGeneListSerializer
+from seqauto.models import (
+    QC,
+    FastQC,
+    IlluminaFlowcellQC,
+    QCExecSummary,
+    QCGeneCoverage,
+    QCGeneList,
+    SingleSampleVCF,
+)
+from seqauto.serializers.sequencing_serializers import (
+    BamFilePathSerializer,
+    FastqSerializer,
+    SampleSheetLookupSerializer,
+    SequencingSampleLookupSerializer,
+    SingleSampleVCFPathSerializer,
+)
 
 
 class FastQCSerializer(serializers.ModelSerializer):
@@ -38,12 +50,8 @@ class QCSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_object(data):
         # We are passed "sequencing_sample" - which we can use to get what we really want
-        sequencing_sample_data = data.pop("sequencing_sample")
-        sheet_data = sequencing_sample_data["sample_sheet"]
-        sequencing_run = SequencingRun.objects.get(pk=sheet_data["sequencing_run"])
-        sample_sheet = SampleSheet.objects.get(hash=sheet_data["hash"], sequencing_run=sequencing_run)
-        sample_name = sequencing_sample_data["sample_name"]
-        sequencing_sample = SequencingSample.objects.get(sample_sheet=sample_sheet, sample_name=sample_name)
+        sequencing_sample = SequencingSampleLookupSerializer.get_object(data.pop("sequencing_sample"))
+        sequencing_run = sequencing_sample.sequencing_run
         # Occasionally we could have multiple bam and VCF files in there that match path
         # we want to make sure we get the bam out that is linked to the VCF file we pull out
         bam_file_data = data.pop("bam_file")
@@ -53,7 +61,7 @@ class QCSerializer(serializers.ModelSerializer):
             # Make sure bam file also matches
             "bam_file__path": bam_file_data["path"],
             "bam_file__sequencing_run": sequencing_run,
-            "bam_file__unaligned_reads__sequencing_sample": sequencing_sample
+            "bam_file__sequencing_sample": sequencing_sample
 
         }
         vcf_file = SingleSampleVCF.objects.filter(**vcf_file_kwargs).first()

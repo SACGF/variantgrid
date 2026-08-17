@@ -2,15 +2,15 @@ import collections
 from functools import cached_property
 
 from crispy_forms.bootstrap import FieldWithButtons
-from crispy_forms.layout import Layout, Submit, Field
+from crispy_forms.layout import Field, Layout, Submit
 from dal import forward
 from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.forms import EmailInput, URLInput, inlineformset_factory, ALL_FIELDS
+from django.forms import ALL_FIELDS, EmailInput, URLInput, inlineformset_factory
 from django.forms.forms import DeclarativeFieldsMetaclass
-from django.forms.widgets import TextInput, HiddenInput, NullBooleanSelect
+from django.forms.widgets import HiddenInput, NullBooleanSelect, TextInput
 from guardian import shortcuts
 from guardian.shortcuts import assign_perm, remove_perm
 
@@ -20,15 +20,31 @@ from library.cache import timed_cache
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
+from patients.models import Extraction, Patient, Specimen
 from snpdb import models
-from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
-    ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
-    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath, \
-    GridLoadingAnimation, DEFAULT_GRID_LOADING_ANIMATIONS
-from patients.models import Patient, Specimen
+from snpdb.models import (
+    DEFAULT_GRID_LOADING_ANIMATIONS,
+    VCF,
+    Cohort,
+    CustomColumnsCollection,
+    GenomicIntervalsCollection,
+    GridLoadingAnimation,
+    ImportStatus,
+    LabUserSettingsOverride,
+    OrganizationUserSettingsOverride,
+    Project,
+    Sample,
+    SampleFilePath,
+    SettingsInitialGroupPermission,
+    Tag,
+    UserContact,
+    UserSettings,
+    UserSettingsOverride,
+    VariantsType,
+)
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
-from uicore.utils.form_helpers import form_helper_horizontal, FormHelperHelper
+from uicore.utils.form_helpers import FormHelperHelper, form_helper_horizontal
 from variantgrid.perm_path import get_visible_url_names
 
 
@@ -72,6 +88,28 @@ class GenomeBuildAutocompleteForwardMixin:
             if self.exclude_archived:
                 widget_forward.append(forward.Const(True, "exclude_archived"))
             self.fields[f].widget.forward = widget_forward
+
+
+class LabMemberForm(forms.Form):
+    """ Pick someone to add to a lab - the pool is whoever the acting user is allowed to add """
+    user = forms.ModelChoiceField(queryset=User.objects.none(),
+                                  label="User",
+                                  widget=ModelSelect2(url='lab_add_member_autocomplete',
+                                                      attrs={'data-placeholder': 'User...'}))
+
+    def __init__(self, *args, **kwargs):
+        self.lab = kwargs.pop("lab")
+        self.for_user = kwargs.pop("for_user")
+        super().__init__(*args, **kwargs)
+        user_field = self.fields['user']
+        user_field.queryset = self.lab.candidate_members_qs(self.for_user)
+        user_field.widget.forward = [forward.Const(self.lab.pk, "lab_id")]
+
+    def clean_user(self):
+        user = self.cleaned_data["user"]
+        if not self.lab.candidate_members_qs(self.for_user).filter(pk=user.pk).exists():
+            raise ValidationError(f"{user} cannot be added to {self.lab}")
+        return user
 
 
 class UserSelectForm(forms.Form):
@@ -180,8 +218,16 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "slack_webhook": "Slack Webhook",
             "contact_name": "Contact Name",
             "contact_email": "Contact Email",
-            "contact_phone": "Contact Phone"
+            "contact_phone": "Contact Phone",
+            "mme_enabled": "MatchMaker Exchange Enabled — shares VUS and above at "
+                           "3rd Party Databases level"
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Labs on non-MME deployments never see the opt-in toggle.
+        if not settings.MME_ENABLED:
+            self.fields.pop("mme_enabled", None)
         help_texts = {
             "email": "Lab wide email for discordance and general communications.",
             "contact_name": "Name of contact person available for other labs to contact (if applicable)",
@@ -190,8 +236,16 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
             "upload_auto_pattern": "If provided, then uploading files that match this pattern will be automatically processed, otherwise there will be a delay for manual review.",
             "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI",
-            "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit."
+            "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit.",
+            "mme_enabled": "Opt this lab into MatchMaker Exchange, a federated rare-disease "
+                           "patient-matching network. Classifications of VUS and above that are "
+                           "shared at '3rd Party Databases' level become candidate genes other "
+                           "labs can match against, and a match results in a person-to-person "
+                           "email to your Contact Email.",
         }
+        for field_name, help_text in help_texts.items():
+            if field := self.fields.get(field_name):
+                field.help_text = help_text
 
 
 class OrganizationForm(forms.ModelForm, ROFormMixin):
@@ -309,9 +363,9 @@ class SampleForm(forms.ModelForm, ROFormMixin):
                    'name': TextInput(),
                    'patient': ModelSelect2(url='patient_autocomplete',
                                            attrs={'data-placeholder': 'Patient...'}),
-                   'specimen': ModelSelect2(url='specimen_autocomplete',
-                                            forward=['patient'],
-                                            attrs={'data-placeholder': 'Specimen...'})}
+                   'extraction': ModelSelect2(url='extraction_autocomplete',
+                                              forward=['patient'],
+                                              attrs={'data-placeholder': 'Extraction...'})}
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
@@ -330,14 +384,14 @@ class SampleForm(forms.ModelForm, ROFormMixin):
 
     def clean(self):
         cleaned_data = super().clean()
-        specimen = cleaned_data.get('specimen')
-        if specimen:
+        extraction = cleaned_data.get('extraction')
+        if extraction:
             patient = cleaned_data.get('patient')
             if patient is None:
-                self.add_error('patient', "Patient must be supplied if specimen supplied")
-            elif specimen.patient != patient:
-                msg = "Specimen must be from supplied patient"
-                self.add_error('specimen', msg)
+                self.add_error('patient', "Patient must be supplied if extraction supplied")
+            elif extraction.specimen.patient != patient:
+                msg = "Extraction must be from supplied patient"
+                self.add_error('extraction', msg)
                 self.add_error('patient', msg)
         return cleaned_data
 
@@ -506,10 +560,11 @@ class SettingsOverrideForm(BaseModelForm):
     @staticmethod
     def _validate_sample_formatter_func(sample_label_template):
         """ Throws error if invalid """
-        specimen = Specimen(reference_id='refId', description='description')
+        specimen = Specimen(pk=3, reference_id='refId', description='description')
+        extraction = Extraction(pk=4, specimen=specimen)
         patient = Patient(pk=2, first_name='first_name', last_name='last_name',
                           patient_code='patient_code')
-        sample = Sample(pk=1, name="sample", patient=patient, specimen=specimen)
+        sample = Sample(pk=1, name="sample", patient=patient, extraction=extraction)
         params = sample._get_sample_formatter_params()
         errors = []
         for i, t in enumerate(sample_label_template.split("||")):

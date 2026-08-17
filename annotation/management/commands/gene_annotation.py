@@ -1,22 +1,35 @@
 import argparse
 import os
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from datetime import timedelta
 
 from django.conf import settings
 from django.core.management import BaseCommand
 from django.utils import timezone
 
-from annotation.models import GeneAnnotationVersion, OntologyTerm, GenomeBuild, AnnotationVersion, \
-    InvalidAnnotationVersionError, GeneAnnotation, DBNSFPGeneAnnotationVersion, VariantAnnotationVersion
+from annotation.models import (
+    AnnotationVersion,
+    DBNSFPGeneAnnotationVersion,
+    GeneAnnotation,
+    GeneAnnotationVersion,
+    GenomeBuild,
+    InvalidAnnotationVersionError,
+    OntologyTerm,
+    VariantAnnotationVersion,
+)
 from genes.gene_matching import ReleaseGeneMatcher
-from genes.models import GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene, Gene
+from genes.models import Gene, GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
 from library.django_utils.django_file_utils import get_import_processing_filename
-from ontology.models import OntologyService, GeneDiseaseClassification, OntologyTermRelation, \
-    OntologyVersion, ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER
+from ontology.models import (
+    ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER,
+    GeneDiseaseClassification,
+    OntologyService,
+    OntologyTermRelation,
+    OntologyVersion,
+)
 from ontology.ontology_traversal import get_ontology_traverser
 from ontology.panel_app_ontology import bulk_update_gene_relations, panel_app_bulk_data_age
-from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
+from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 
 class Command(BaseCommand):
@@ -38,6 +51,11 @@ class Command(BaseCommand):
                                  'before annotation, unless it was already refreshed within '
                                  'PANEL_APP_CACHE_DAYS (so a multi-build run only crawls once). '
                                  'Default on; pass --no-update-panel-app to skip entirely.')
+        parser.add_argument('--status', choices=list(VariantAnnotationVersion.Status),
+                            default=VariantAnnotationVersion.Status.NEW,
+                            help="Which VariantAnnotationVersion status --missing operates on. Defaults to NEW "
+                                 "(the version being built); pass --status=ACTIVE to backfill gene annotation for "
+                                 "a build whose only version has already been promoted.")
 
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument('--gene-annotation-release', type=int, help=gar_ov_dbsnfp_help)
@@ -45,8 +63,12 @@ class Command(BaseCommand):
                            help="Automatically create for latest AnnotationVersions for each build if missing")
         group.add_argument('--latest-releases', action="store_true",
                            help="Create a GeneAnnotationVersion (using the latest OntologyVersion) for the "
-                                "GeneAnnotationRelease used by the latest VariantAnnotationVersion of each build. "
-                                "Skips builds that already have a matching version (use --force to recreate)")
+                                "GeneAnnotationRelease used by the latest ACTIVE VariantAnnotationVersion of each "
+                                "build. Skips builds that already have a matching version (use --force to recreate)")
+        group.add_argument('--new-releases', action="store_true",
+                           help="As per --latest-releases but for the latest NEW (not yet promoted) "
+                                "VariantAnnotationVersion of each build - run this to satisfy the gene annotation "
+                                "promote blocker before promoting a new VariantAnnotationVersion")
         group.add_argument('--add-new-to-existing', action="store_true",
                            help="Add new columns gene/disease and MONDO terms to existing gene annotation")
         group.add_argument('--add-dbnsfp-gene', action="store_true",
@@ -69,7 +91,9 @@ class Command(BaseCommand):
         self.update_panel_app = options["update_panel_app"]
 
         missing = options["missing"]
+        missing_status = options["status"]
         latest_releases = options["latest_releases"]
+        new_releases = options["new_releases"]
         self._validate_has_required_data()
 
         if options["add_new_to_existing"]:
@@ -115,10 +139,9 @@ class Command(BaseCommand):
                 raise ValueError("Only specify ontology-version when gene-annotation-release also specified")
 
             for genome_build in GenomeBuild.builds_with_annotation():
-                av = AnnotationVersion.latest(genome_build, validate=False,
-                                              status=VariantAnnotationVersion.Status.NEW)
+                av = AnnotationVersion.latest(genome_build, validate=False, status=missing_status)
                 if not av:
-                    raise InvalidAnnotationVersionError(f"No AnnotationVersion for {genome_build}")
+                    raise InvalidAnnotationVersionError(f"No {missing_status} AnnotationVersion for {genome_build}")
 
                 if not av.variant_annotation_version:
                     raise InvalidAnnotationVersionError(f"AnnotationVersion {av} has no VariantAnnotationVersion set")
@@ -139,14 +162,16 @@ class Command(BaseCommand):
 
                 gav = self._create_gene_annotation_version(gar, av.ontology_version, dbnsfp_gene_version)
                 self._populate_gene_annotation_version(gav, gene_symbols)
-        elif latest_releases:
+        elif latest_releases or new_releases:
             ontology_version = self._get_latest_ontology_version(ov_id)
             if dbnsfp_gene_version_id:
                 dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
 
-            releases = GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()
+            status = VariantAnnotationVersion.Status.NEW if new_releases else VariantAnnotationVersion.Status.ACTIVE
+            releases = GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds(status=status)
             if not releases:
-                print("No GeneAnnotationReleases linked to the latest VariantAnnotationVersions - nothing to do")
+                print(f"No GeneAnnotationReleases linked to the latest {status.label} "
+                      f"VariantAnnotationVersions - nothing to do")
             for gene_annotation_release in releases:
                 print(f"=== {gene_annotation_release.genome_build}: {gene_annotation_release} ===")
                 self._create_if_missing(gene_annotation_release, ontology_version, dbnsfp_gene_version,
@@ -285,7 +310,7 @@ class Command(BaseCommand):
                 snake = traverser.terms_for_gene_symbol(hgnc_ot.name, OntologyService.MONDO,
                                                         max_depth=0)
                 uc_symbol = gene_symbol.upper()
-                hgnc_data[uc_symbol]["mondo_terms"] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
+                hgnc_data[uc_symbol]["mondo_terms"] = self.TERM_JOIN_STRING.join(str(lt) for lt in snake.leafs())
                 hgnc_data[uc_symbol]["gene_disease"] = self._get_gene_disease(traverser,
                                                                               gene_symbol, Command.TERM_JOIN_STRING)
 
@@ -351,7 +376,7 @@ class Command(BaseCommand):
                 if gene_symbol := gene_symbol_for_gene.get(ga.gene_id):
                     try:
                         snake = traverser.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=1)
-                        if omim_terms := self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs())):
+                        if omim_terms := self.TERM_JOIN_STRING.join(str(lt) for lt in snake.leafs()):
                             ga.omim_terms = omim_terms
                             update_records.append(ga)
                     except ValueError:
@@ -428,7 +453,7 @@ class Command(BaseCommand):
             gene_symbol = hgnc_ot.name
             for ontology_service in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
                 snake = traverser.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=1)
-                service_terms[ontology_service] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
+                service_terms[ontology_service] = self.TERM_JOIN_STRING.join(str(lt) for lt in snake.leafs())
 
             gene_disease_supportive_or_below, gene_disease_moderate_or_above = self._get_gene_disease(traverser,
                                                                                                       gene_symbol,
@@ -475,7 +500,7 @@ class Command(BaseCommand):
         for gene_id, ga_data in annotation_by_gene.items():
             ga_data["gene_id"] = gene_id
             ga_data["version_id"] = gav.pk
-            gene_annotation_records.append(tuple((ga_data.get(k) for k in self.GENE_ANNOTATION_HEADER)))
+            gene_annotation_records.append(tuple(ga_data.get(k) for k in self.GENE_ANNOTATION_HEADER))
 
         if gene_annotation_records:
             self._write_records(gav, gene_annotation_records)

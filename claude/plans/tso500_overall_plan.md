@@ -1,0 +1,520 @@
+# TSO 500 — order of work
+
+Sequencing plan for [SACGF/variantgrid_sapath#431](https://github.com/SACGF/variantgrid_sapath/issues/431)
+and the issues under it. Covers what to build in what order and why, not how to build each piece —
+each issue carries its own design.
+
+The test data and its gotchas are in
+[`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md).
+[`somatic_curation_reuse_issue_1419_plan.md`](somatic_curation_reuse_issue_1419_plan.md) is Phase 8's
+reporting design, the one phase still ahead with a doc of its own. The rest — the file-level ingestion
+analysis, and one doc each for phases 2, 3, 4, 5 and 7 — were deleted as they landed; what outlived them
+is in the Done and Still-open entries below, and the PRs are #1705, #1709, #1712, #1715, #1716, #1718
+and #1719. The design reasoning that outlived Phase 5 lives in code, in
+[`snpdb/gene_level_variants.py`](../../snpdb/gene_level_variants.py).
+
+---
+
+## Done
+
+- **Phase 0 — pipeline fixes** (PR #1709, branch `issue_1506_tso500_pipeline_fixes`).
+  `vcf_header_filter_ids()` in `library/genomics/vcf_utils.py` reads declared FILTER IDs off the raw
+  header lines, so `_DragenExonCNV.vcf` no longer dies at the first pipe stage on PyVCF's FILTER regex.
+  A regex rather than cyvcf2, which needs a real file descriptor and so does not suit a stdin filter.
+  Also stopped `PatientRecordsImportTaskFactory.get_processing_ability` raising out of file-type
+  detection on a CSV pandas cannot read, which was breaking detection for every other CSV type.
+
+- **Phase 1 — `Specimen → Extraction → Sample` (#1704)** (PR #1705, branch
+  `issue_1704_specimen_extraction_sample`). The join key everything below groups on:
+
+  ```
+  Patient └── Specimen └── Extraction └── [SequencingSample] └── Sample
+  ```
+
+  `nucleic_acid_source` moved off `Specimen` onto the new `Extraction`, so the DNA and RNA arms of one
+  block share a specimen instead of becoming two. `Specimen` swapped its `TextField` primary key for a
+  surrogate one with `reference_id` unique per patient. Both levels extend `ExternallyManagedModel` and
+  carry a local `reference_id` beside the nullable `external_pk`, since not every deployment has a system
+  managing its records. `Sample.extraction` replaced `Sample.specimen`; `SequencingSample.extraction`
+  added as optional enrichment. R7's consumers updated, the patient CSV still round-trips through one
+  extraction per specimen, and the patient page gained an Extractions tab. Everything in `patients` is now
+  a `TimeStampedModel`, and `Extraction.extraction_date` tells re-extractions apart.
+
+- **Phase 2 — per-file loader refinements** (PR #1712, branch
+  `issue_1711_tso500_phase2_loader_refinements`, issue #1711). All four items:
+
+  `FileUpload.metadata` is a JSON blob carrying the facts a file doesn't reliably hold itself, with each
+  `ImportTaskFactory` declaring the keys it accepts and validation running at upload time — so a mistyped
+  key is a 400 while the client is still connected rather than a `REQUIRES_USER_INPUT` several stages
+  later. A declared `genome_build` that contradicts header detection fails the import rather than picking
+  a winner. `VCFSourceSettings` grew a `sample_field_overrides` JSONField (one column, so "clear this
+  field" is expressible), and the `^SpliceGirl` row remaps `AD`/`DP` so VAF derives as
+  `ALTDEDUP/(ALTDEDUP+REFDEDUP)`. FILTER values the source header never declared are moved into
+  `INFO/VG_UNDECLARED_FILTERS` by `vcf_clean_and_filter` and restored by the genotype processor at
+  insert — they can't stay in the FILTER column, because `bcftools norm` *dies* on an undeclared FILTER
+  rather than warning, and dropping them loses real calls. Copy-neutral records
+  (`ALT=.` + `END` + no `SVTYPE`) are skipped and counted;
+  `SVTYPE` marks a caller describing an event rather than a segmentation interval, so `_DragenExonCNV.vcf`'s
+  per-gene `Undetermined` call survives. Where separate VCF rows share a locus and have their depths
+  summed, a `ModifiedImportedVariant` with the new `SHARED_LOCUS` operation records the summed depths so
+  the per-record VAF stays reconstructable.
+
+- **Phase 3 — tissue status, and pages for Specimen / Extraction** (PR #1715, branch
+  `issue_1706_tso500_phase3_tissue_status_and_pages`, issues #1706 and private#2447). Both Phase 1
+  leftovers, done before Phase 4 puts `Specimen` behind a public API:
+
+  `Specimen.mutation_type` became `Specimen.tissue_status` — Reference / Affected / Unknown, not null,
+  defaulting to Unknown. The old field was Germline/Somatic with `default=GERMLINE`, so every tumour
+  block nobody had touched was stamping its classifications "Germline" through autopopulate and filing
+  them alongside other labs' real germline records. It sits on `Specimen` rather than on `Tissue`
+  because the same tissue plays different roles — blood is the reference in a solid-tumour workup and
+  *is* the tumour in leukaemia.
+
+  Three levels answer three different questions, and the phase settled which field owns each — worth
+  quoting rather than rederiving, since #1707 serializes the first and #1559 and Phase 8 read all three:
+
+  | Level | Question | Where | Values |
+  |---|---|---|---|
+  | Specimen | What is this material, and what role does it play in the test? | `Specimen.tissue_status` | Reference / Affected / Unknown |
+  | Call set | What's in this VCF? | `Sample.variants_type` | Unknown / Germline / Mixed / Somatic only |
+  | Variant | What is *this* variant's origin? | `allele_origin` → `AlleleOriginBucket` | germline / somatic / other |
+
+  private#2447 says `VCF.variants_type`; it is actually on **`Sample`**
+  (`snpdb/models/models_vcf.py:343`), alongside `Sample.extraction` and `Sample.is_somatic`. That is why
+  the derivation sits in `get_evidence_fields_for_sample_and_patient` rather than the extraction helper,
+  which cannot see the call set.
+
+  Autopopulate became a derivation across two of those levels instead of one field read: an
+  `allele_origin` is asserted only where the specimen and `Sample.variants_type` agree — reference +
+  germline is `germline`, anything + somatic-only is `somatic`, everything else stays unset and falls
+  back to `settings.ALLELE_ORIGIN_NOT_PROVIDED_BUCKET`, because a mixed tumour sample's origin is
+  genuinely per-variant and cannot be known at accession. It emits the evidence key's own option string
+  rather than a display label, which is what `bucket_for_allele_origin` matches on.
+
+  `tissue_status` is per-specimen only — both arms of one block share the material, so it did not go on
+  `Extraction` the way `nucleic_acid_source` did. `Tissue` stays a lookup table with no page of its own.
+  Matched normal stays derivable — "reference specimen, same patient" — rather than becoming an FK.
+
+  `patients/0016` maps `S` → Affected and `G` → Unknown, `G` being indistinguishable from an untouched
+  record, and registers a `ManualOperation` only where a `PatientRecord` actually carries a `G`. The
+  patient CSV column is a hard rename to `'Specimen Tissue status (Reference/Affected/Unknown)'` — an
+  old spreadsheet fails the import naming the missing column, since Germline → Unknown is a loss of
+  meaning rather than a translation.
+
+  Both models now delegate permissions to their patient the way `Trio` delegates to its cohort, which
+  gave them `filter_for_user` and let the autocompletes drop their hand-rolled patient filters. Detail
+  pages at `view_specimen` / `view_extraction`, editable except `external_pk`; samples on both pages
+  filter through `Sample.filter_for_user` separately, since a sample carries its VCF's permissions
+  rather than its patient's. `PreviewModelMixin` on both, search on `HAS_3_ANY` (a TSO 500 reference is
+  all digits), `ExternalPK` search reaching both, and links each way along
+  `Patient → Specimen → Extraction → Sample`.
+
+- **Phase 4 — how identifiers cross the lab boundary** (PR #1716, branch
+  `issue_1707_tso500_phase4_patient_api_and_extraction_linking`, issues #1707 and #1559). #431's
+  decision governs it — **upload the files separately and join later** — so the whole phase is
+  assignment on top of the per-file upload that already existed, in four steps: resolve, create, name,
+  reconcile, then measures on top.
+
+  `patients/external_references.py` is the one place a client's identifier becomes a row. A bare string
+  is the local reference (`reference_id` / `patient_code`); reaching an `ExternalPK` takes `code` **and**
+  `external_type` together, since `ExternalPK` is unique on `(code, external_type, external_manager)` and
+  a code alone names nothing — rejected on shape while the client is still connected. Resolution has
+  three outcomes rather than two: nothing found is **Pending**, because an extraction legitimately
+  arrives after the VCF that names it, and more than one found is **Needs attention** — `reference_id` is
+  unique per parent rather than globally, so that is ambiguity rather than a precedence rule.
+
+  #1707's API (`api/v1/patient`, `specimen`, `extraction`, `specimen_measure` + `bulk_create`) upserts
+  on the identifiers sent, so a client re-posting a run gets the same rows back. A specimen naming an
+  unknown patient is a 400 — it has nowhere to live — unlike a VCF naming an extraction, which has a row
+  to park on. An unknown `external_manager` is a 400 naming the configured ones unless the poster is a
+  superuser (`PATIENTS_API_EXTERNAL_MANAGER_CREATE_ADMIN_ONLY`), since creating one silently would decide
+  `can_modify` off a misspelling. `/patients/api/` joins `PUBLIC_PATHS` because
+  `GlobalLoginRequiredMiddleware` runs before DRF and would redirect API calls; `IsAuthenticated` still
+  applies.
+
+  Two routes let a VCF name its extraction: `POST api/v1/sequencing_sample/link_extraction`, one call per
+  sequencing sample reaching all of that arm's VCFs through `link_samples_and_vcfs_to_sequencing` and
+  carried across when a sheet is re-sent; and `extraction` / `sample_extractions` upload metadata keys,
+  which need no seqauto records at all. Two keys rather than one so each carries a single type and VCF
+  sample names share a namespace with nothing. Where the two routes name different extractions the import
+  fails, the same rule a declared `genome_build` the header contradicts gets.
+
+  `ExtractionMatchMixin` parks the claim beside the FK on both `Sample` and `SequencingSample`, so an
+  unresolvable reference is parked rather than rejected. `reconcile_pending_extractions` re-resolves
+  hourly and again whenever an extraction is created, promoting stale Pending to Needs attention after
+  `PATIENT_EXTRACTION_MATCH_PENDING_DAYS = 3`. `extraction_match_date` moves only when the claim itself
+  changes — stamping it every pass renewed the clock, so a Pending row could never age out. The task also
+  carries an extraction down to `Sample`s whose link call arrived *after* their VCF imported, which
+  nothing else can, `link_samples_and_vcfs_to_sequencing` running once at import.
+  `PATIENT_EXTRACTION_SAMPLE_NAME_REGEX` derives a reference from the VCF sample name for deployments
+  with nothing upstream to quote one — off by default, consulted only where nothing was posted, marked
+  `derived` on the parked row, and it creates no `Specimen` or `Extraction`.
+
+  #1559's `SpecimenMeasure` is vendor-neutral and client-posted rather than parsed out of pipeline
+  output, keeping both the score and the call plus the raw payload, one current value per
+  `(specimen, measure_type)`, shown on `view_specimen`. Parked references surface on `view_sample`, in
+  the `Sample` / `SequencingSample` admin filters, and through a health check that stays silent while
+  everything matches.
+
+- **Phase 5 — gene fusions as variants and the `AllFusions.csv` parser (#1506, phase 1)** (PR #1719,
+  branch `issue_1506_tso500_phase5_gene_fusions`). The design reasoning lives in
+  `snpdb/gene_level_variants.py`'s module docstring — in code rather than here, because a `Variant` with
+  no coordinate is a special case every reader of `Variant` eventually trips over.
+  Gene-level events get a real `Variant`, anchored on one gene-level contig shared by every build, with
+  the gene pair encoded in a symbolic alt and a `GeneFusion` companion model. A `Variant` rather than the
+  bare `Allele` the issue originally proposed, because `VariantGeneOverlap` and `CohortGenotype` are both
+  `Variant`-keyed — without one, fusions cannot reach gene lists, compound-het detection or any analysis
+  node. VEP never sees them; a third annotation pipeline type resolves gene → symbol → release genes
+  locally and writes the overlap rows for **both** partners.
+
+  Scoped to ingestion, storage and identity — fusion classification equivalence stays deferred, which is
+  what the user-group's "research level project" feedback on #1506 was actually about. Somatic
+  classifications already land on `MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED`, so nothing regresses.
+
+  Two things the issue's original design assumed otherwise. Every row carries both breakpoints
+  (`chr8:128806980` form), so fusions are *not* coordinate-free — what is deferred is the breakend
+  representation, not the data, which is captured from day one. And the breakpoints are per-observation:
+  `ENTPD3-RPL14` appears three times from one caller with three different 5′ breakpoints, so identity is
+  the gene pair and the coordinates live in `CohortGenotype.info` with the rest of the per-row data.
+
+  The one design change that came out of building it: partners are identified by a **`FusionGeneId`** row
+  whose pk is the HGNC ID where there is one, and a locally allocated id above 1,000,000 where there is
+  not. Clone-based identifiers are routine fusion partners (`RP11-458D21.5`, `AC016683.6` are both in
+  the test file), and HGNC-only identity left them unrepresentable. The alt namespaces the two apart
+  (`<FUSION:HGNC:nnn>` vs `<FUSION:GENE:nnn>`) because only the first kind means the same thing on
+  another deployment — anything leaving the system sends `GeneFusion.canonical_str`, not the number.
+
+  Two changes came out of review on #1719, both worth carrying forward. **One way into the database**:
+  the loader writes a genotype VCF (`FORMAT/GT` plus the caller's rows as `INFO`) and hands it to the
+  ordinary import path, so `ImportCreateVCFModelForGenotypeVCFTask` builds the VCF/Sample/Cohort and
+  `ProcessGenotypeVCFDataTask` COPYs the `CohortGenotype` rows — only the bcftools stages are skipped
+  (`upload/vcf/gene_level_vcf_preprocess.py`), since `norm --check-ref=s` reads a base from the fasta a
+  gene-level record has no coordinate for. A classification naming `BCR::ABL1` resolves to a variant
+  coordinate and goes through the classification upload pipeline the same way. And the **nomenclature is
+  VICC's `GENE1::GENE2`**, never the single-hyphen form, which means a read-through transcript; that
+  string is written into `VariantAnnotation.hgvs_c` and `hgvs_g`, so the grid columns that read those
+  directly show `BCR::ABL1` rather than a blank where g.HGVS is otherwise never blank. Anything parsing
+  the vendor's file says so in its name (`DragenTSO500AllFusions…`), while `GeneFusion`, `FusionGeneId`
+  and `snpdb.gene_level_variants` stay generic — a classification naming a fusion is a second,
+  non-TSO500 source.
+
+  Since a `Sample` belongs to exactly one `VCF`, the file creates its own VCF and Sample rather than
+  joining the RNA arm's `SpliceVariants` sample — Phase 4 ties that sample to the extraction, and Phase
+  7's grouping node shows both arms together once its specimen level lands. A multi-build deployment must declare `genome_build` at upload,
+  as `_DragenExonCNV.vcf` already does.
+
+- **Phase 7 — analysis grouping node, extraction level (private#223)** (PR #1718, branch
+  `private_issue_223_tso500_phase7_analysis_grouping_node`). Everything but the specimen and patient
+  levels, which are below.
+  One entry point gathers every VCF sample belonging to an extraction, so the DNA arm's small-variant,
+  CNV and exon-CNV calls land in one analysis without anyone concatenating files outside VG.
+
+  `SampleNode` gained a `source_level` and extraction/specimen/patient FKs rather than sibling node
+  classes. Sample and Extraction resolve; Specimen and Patient report a configuration error until their
+  resolvers land. Samples resolve **at query time** and each one's filters are ORed as a
+  `pk IN (subquery)` — `MergeNode`'s fallback mechanism, factored out of it into `queryset_to_pk_in_q`
+  alongside `annotate_and_filter_queryset` so there is one implementation. Each subquery carries only its
+  own VCF's genotype join, so `INFO/CN`, `SEGID`, `FORMAT/SM` and Phase 2's preserved FILTER values
+  survive — which is what ruled the pre-built cross-VCF cohort out. A single-sample group short-circuits
+  to the alias path and produces byte-for-byte the query a sample-level node produces today.
+
+  Per-sample thresholds are a `(node, sample)` child table — sapath#301's different `min_ad` per caller —
+  with the node's own fields as the value for any sample without a row, so a sample
+  `reconcile_pending_extractions` attaches later inherits rather than gets nothing. VCF FILTER stays one
+  node-level selection of filter ids resolved into each VCF's own codes at query time, so `CohortMixin`'s
+  single-VCF assumptions moved behind overridable methods. The `arg_q_dict` cache key folds in every
+  sample's genotype collection and cohort version, and deleting a sample bumps nodes grouping on its
+  extraction. Counts are live at group level — there is no single cohort's stats row to read.
+
+  Exclusions are reported rather than silently applied: a sample the group leaves out (archived VCF,
+  another genome build, no permission) surfaces on the node and through
+  `GET /patients/extraction/<pk>/samples?genome_build=`, keyed on the extraction rather than the node so
+  it answers before the node is saved and Phase 3's specimen page can reuse it. Provenance comes off the
+  packed genotype the grid already fetches — a derived Source column of VCF names and a VCF glyph with a
+  ×N badge on the canvas, both from one server-side helper so they cannot disagree. That helper is
+  `cache_memoize`d on `(pk, version)`, so a sample attached by reconcile without the node being saved can
+  leave the badge lagging by up to a day; the node's `arg_q_dict` cache has the same lifetime, so the two
+  stay consistent with each other.
+
+## Where things stand
+
+The five test files from `ed5e15a33` — one de-identified run, one specimen, DNA and RNA arms:
+
+| File | State |
+|---|---|
+| `hard-filtered.vcf` | loads, 93 records |
+| `cnv.vcf` | loads, 16 records — 9 copy-neutral rows skipped and counted; `SM` surfacing is Phase 6 |
+| `SpliceVariants.vcf` | loads, 17 records — VAF derived from `ALTDEDUP`/`REFDEDUP`, `LowUniqueAlignments` preserved |
+| `_DragenExonCNV.vcf` | loads, 2 records, against a `genome_build` declared at upload |
+| `AllFusions.csv` | loads, 33 rows -> 31 fusion variants (2 gene pairs seen more than once); needs `genome_build` declared at upload |
+
+Once Phase 4 has tied their samples to `2600000001C`, the DNA arm's three files reach one analysis
+through a single extraction node, each row carrying its own VCF's values. The RNA arm's two join them
+when Phase 7's specimen level lands.
+
+## Dependency map
+
+```
+  Phase 0  pipeline fixes ✔ ──► Phase 2  loader refinements ✔
+           chase TAU files ─────────────────────────────────────────┐
+                                                                    │
+  Phase 1  #1704 Specimen→Extraction ✔                              │
+             │                                                      │
+      ┌──────┴───────────────────────────┐                          │
+      │                                  │                          │
+  P3  private#2447 tissue status ✔       │                          │
+      #1706 pages, search, preview ✔     │                          │
+      │              │                   │                          │
+  P4  seqauto link ✔ ┤                   │                          │
+      #1707 patient API ✔ ► matching ✔ ► #1559 measures ✔ ◄─────────┘
+      │              │                   │
+      │              │              P7  private#223 extraction level ✔ ─► specimen / patient levels
+      │              │
+      │         P8  sapath#246 ──► #444 multi-variant reporting
+      │
+  P5  #1506 GeneFusion ✔ ──► AllFusions parser ✔
+      │
+  P6  #1558 grid display  (+ #1706's grid half, private#2837 — needs P3's URLs)
+```
+
+Phases are listed in the order to do them, but only the arrows are real constraints. With #1506 and the
+grouping node landed there is no critical path left — everything remaining is ordered by value.
+
+---
+
+## Still open from Phase 0 — chase TAU for the missing files
+
+Long lead time, so worth pushing now:
+
+- `Logs_Intermediates/Gis/<sample>/<sample>.abcn_annotated.vcf` + `<sample>.abcn_genes.tsv` — per-gene
+  absolute and minor copy number, the latter being where gene-level LOH comes from. The only genuinely
+  CVO-only data, and a VCF, so it is in ingestion scope. Illumina names the path but publishes no
+  INFO/FORMAT spec, so it cannot be mocked up.
+- `MetricsOutput.tsv` / the run-level TMB summary — where the numbers Phase 4's `SpecimenMeasure` API
+  takes are transcribed from, so it is now the client's need rather than VG's.
+- A run with a real BRCA1/2 large rearrangement. Both `_DragenExonCNV.vcf` records in the test data are
+  constructed, and no published TSO 500 output has a populated one either. Until one arrives the field
+  spelling in that file stays provisional.
+
+## Still open from Phase 1
+
+The patient CSV columns are all `SPECIMEN_*`, so a CSV can name one extraction per specimen but not the
+DNA and RNA arms of one block. Worth revisiting when a consumer needs it.
+
+## Still open from Phase 2
+
+The manual checklist on #1711 wants running
+against a real GRCh37 deployment: PR #1712 measured the record counts and VAFs through
+`write_cleaned_vcf_header` → `vcf_clean_and_filter` → `bcftools norm`, not through a full import with
+annotation.
+
+The `source` strings a client sends (`DRAGEN TSO500 SmallVariant`, `DRAGEN TSO500 CNV`) are documented
+in [`upload/test_data/tso500/README.md`](../../upload/test_data/tso500/README.md) but nothing is keyed
+on them yet — the SpliceGirl mapping comes off the header and the copy-neutral skip is a general rule.
+They become part of VG's configuration contract the moment a `VCFSourceSettings.source_regex` matches
+one, so they want to stay stable from the first client.
+
+`SEGID=MYCL1` resolving to `MYCL` is unconfirmed against a real database. NCBI carries the alias, and
+`GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` (`genes/gene_matching.py:45`) is the resolver, but
+Phase 6's gene-symbol item rests on that assumption holding. Phase 5's fusion parser goes through the
+same resolver for `SEPT14` → `SEPTIN14`, so one check against a real database covers both — and if the
+alias is missing, a fusion partner still imports, just under a local `GENE:` id rather than its HGNC one.
+
+**Clients send a build's own name (`GRCh37`), not an alias.** `GenomeBuild.get_name_or_alias("hg19")`
+raises `MultipleObjectsReturned` rather than `DoesNotExist`, so a declared build that will not resolve
+is a 400 rather than a guess. `hg19` happens to resolve here because that build is disabled, but
+`GenomeBuild.enabled` is per-deployment DB state, so the check stays. Documented in the API schema,
+`import_vcf --genome-build` and the test-data README; the lab client Phase 4 unblocks should follow it.
+
+## Still open from Phase 3
+
+The grid half of #1706 — top-level specimen and extraction grids under the patients menu, an extraction
+link on the sample grid, and private#2837's IDs in the variant page's sample table — is Phase 6, where
+the column pass already is. Phase 3 gave both models the URL those links need.
+
+A deployment whose patient CSV ever populated the old Germline/Somatic column gets a manual task out of
+`patients/0016` asking a human to decide which of those specimens really were Reference. Nothing
+registers on deployments that never used the column.
+
+## Still open from Phase 4
+
+**The client work is raised but not done** —
+[`SACGF/variantgrid_api#20`](https://github.com/SACGF/variantgrid_api/issues/20) asks for the
+dataclasses and methods behind the patient / specimen / extraction API, the link call, an upload
+metadata kwarg (which also reaches Phase 2's `genome_build` and `source`, unreachable from the client
+today) and the measures. Deliberately deferred to the end and batched with the other client issues still
+to be raised, so it ships as one release rather than several.
+
+The §"Done when" run wants doing once against a real deployment: patient, specimen and both extractions
+(`2600000001C` DNA, `2600000001B` RNA) created over the API, the DNA arm's three VCFs reaching
+`Sample.extraction` through one seqauto link call, a hand-uploaded file reaching it through upload
+metadata alone, a VCF uploaded before its extraction exists parking and then attaching itself, and
+TMB/MSI/GIS showing on the specimen page. PR #1716's evidence is the unit suites, which stop short of a
+full import with annotation — so this joins Phase 2's #1711 checklist as one pass over a real GRCh37
+deployment. Every call is plain JSON over an API token, so the run can be driven by hand rather than
+waiting on the client release.
+
+`URLS_NAME_REGISTER` does not gate router URLs, so Shariant still serves the patient API. The names are
+in `shariantcommon.py` as intended, but only `api_specimen_measure_bulk_create` is registered through
+`perm_path` and therefore actually enforced. Worth a follow-up if Shariant must genuinely not serve
+these.
+
+The sample-name fallback cannot name a parent. `Extraction.reference_id` is unique per specimen rather
+than globally, so a derived reference matching rows under two specimens parks as Needs attention. A TSO
+500 reference embeds its specimen (`2600000001C` starts with `2600000001`), so it does not arise here — a
+deployment whose naming does not carry the specimen would need the regex to yield a parent too.
+
+## Still open from Phase 5
+
+The fusion loader's tests assert the VCF it writes — records, sample column, genotype, merged
+observations — rather than driving the pipeline steps by hand; what happens to that VCF afterwards is
+the ordinary genotype import path the existing VCF suite covers. So a real end-to-end upload of
+`AllFusions.csv` joins Phases 2 and 4 on the manual pass over a real deployment, where the
+`SEPT14` → `SEPTIN14` alias check also lives.
+
+## Still open from Phase 7
+
+**Specimen level, then patient.** The same node with a wider sample query — the only thing a level
+changes is "object → set of samples", which is why it is `SampleNode.source_level` rather than sibling
+node classes. `IMPLEMENTED_SOURCE_LEVELS` (`analysis/models/nodes/sources/sample_node.py:73`) is the
+gate, and both unimplemented levels report a configuration error today rather than resolving. Everything
+else is already level-blind: the per-sample thresholds, the per-VCF locus filters, the exclusion
+reporting and the `GET /patients/extraction/<pk>/samples` preview all key on the resolved sample set or
+on the source object's pk, so Phase 3's specimen page reuses the preview as it stands.
+
+Dropping the cohort dropped its `genome_build` FK with it, so the single-build constraint that
+originally ruled Patient out is gone — an analysis has exactly one build, so restricting to it is a fact
+rather than a policy choice, and the node reports what that excluded the same way it reports an archived
+VCF. That makes Patient one more level a deployment can leave switched off.
+
+Two smaller pieces went with it:
+
+- **Add-node menu entries per level.** The level is switched from the editor dropdown today, because
+  `get_node_types_hash()` (`analysis/models/nodes/node_types.py:19`) is keyed by class, so one class is
+  one menu entry — a user hunting for "Specimen" has to add a Sample node and change a dropdown. Fix it
+  in the menu rather than the models: let a node class declare extra entries carrying initial field
+  values, so `node_create` (`analysis/views/views_json.py:115-127`, currently `NODE_TYPES_HASH[node_type]`
+  → `objects.create(...)`) can split `SampleNode:EXTRACTION` into class plus defaults. Four menu entries,
+  four labels and icons, one table.
+- **`analysis_templates_tag`'s `single_model_args`**
+  (`analysis/templatetags/related_analyses_tags.py:137`), which takes exactly one of
+  sample/cohort/trio/quad/pedigree — extraction and specimen are the natural extension, and that is what
+  launching a template from the extraction page needs. `AnalysisVariable` is keyed `(node, field)` and
+  `hidden_inputs` is already keyed on field name, so a template built around a `SampleNode` exposes
+  `extraction` as its variable and nothing else in the template changes.
+
+One run joins the manual list: an extraction node over the real TSO 500 run returning the DNA arm's
+three callers in one grid, each row carrying its own VCF's `INFO`/`FORMAT`, different `min_ad` per
+caller, ×3 on the canvas. PR #1718's evidence stops at the unit suites over synthetic VCFs.
+
+Deployment-wide threshold defaults per VCF source and per panel are #1717 rather than part of this
+phase — the per-node values built here run either way; #1717 only changes what a new node starts from.
+
+## Phase 6 — showing non-variants on the grids (#1558, and #1706's grid half)
+
+Less outstanding than the issue title suggests. Per its own comment table, SV already works in the grid
+and CNV works as SV — what is missing is surfacing `CohortGenotype.info["CN"]` (and TSO 500's `FORMAT/SM`
+linear copy ratio, which importer v21+ already keeps in the format JSON blob but which is not queryable).
+That part is independent and could be pulled forward any time.
+
+`cnv.vcf`'s `SEGID` gene symbol joins it, down from Phase 2. The value is stored and the JSON is
+queryable, but it is whatever the caller wrote — `MYCL1` where the rest of the pipeline says `MYCL` —
+and JSON cannot be joined to `GeneSymbol`/`GeneSymbolAlias`. So it is the same read-time-versus-column
+decision as `SM` and `CN`, and wants deciding once for all three.
+`GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` (`genes/gene_matching.py:45`) is the resolver
+either way.
+
+Fusions are the genuinely new case, and Phase 5 has now put real ones in the database. **One grid, not
+several** — a fusion is a row like any other, so compound-het detection, gene lists and every downstream
+node keep working over the same result set rather than needing a per-kind union. That is also what Phase
+5's choice of a real `Variant` over a bare `Allele` was for. Phase 5 left them grid-ready rather than
+grid-complete: they carry a gene symbol and `overlapping_symbols` from their own annotation run, so what
+remains here is the kind filter and the columns that only make sense for a fusion (both breakpoints,
+caller, read counts — all in `CohortGenotype.info["observations"]`, one entry per row the caller wrote).
+
+Finding a fusion by a **single** partner — `ROS1` returning every fusion it takes part in — belongs here
+too. Phase 5's search receiver resolves a full pair either way round (`BCR::ABL1`, `CD74-ROS1`, aliases
+applied) and is deliberately lookup-only, minting no `GeneFusion` or `FusionGeneId` on whatever a user
+types; the single-partner query is the same discipline over `GeneFusion`'s anchor and partner FKs.
+
+#1706's grid half joins here because it is the same kind of change and wants the same pass over the
+column definitions: top-level specimen and extraction grids under the patients menu, an extraction link
+on the sample grid, and private#2837's specimen and patient IDs in the variant page's sample table —
+"which of these rows are the same patient" being the question that one is actually asking. Phase 3 gave
+both models the URL all of it links to.
+
+## Phase 8 — reporting (sapath#246, #1419, then #444)
+
+Last, because it consumes everything above. #431 notes #246 is old and may be worth rolling into #444.
+
+Designed in [`somatic_curation_reuse_issue_1419_plan.md`](somatic_curation_reuse_issue_1419_plan.md),
+which is the spec. In short: somatic reporting sees the same variants over and over, so the phase is
+about reusing prior curation. An audit of `EvidenceKey.copy_consensus` first — 142 keys carry it, set
+for germline ACMG work and never reviewed against somatic, and several of them copy one patient's
+tumour measurements or report narrative onto another's. Then a wizard that triages a run's
+`SomaticReportable` tags against what has already been curated for each allele, and walks them one
+variant at a time. Then gene-level reuse (#1419), where the human picks the source record because AMP
+tiering is gene *and* tumour type and the phenotype data cannot make that call.
+
+- **sapath#246** — keep tagging `SomaticReportable` as now, but launch the classification as AMP/somatic
+  from the grid's tags button rather than exporting CSV. Small and independent of the rest; could be
+  pulled forward if it is blocking the diagnostic team.
+- **#1419** — gene-level copy consensus, deliberately as a copy rather than the first-class gene/disease
+  object the issue also proposes. The object needs the disease axis settled first; the copy reuses
+  machinery that already works and owns exactly the key set the object would.
+- **#444** — multi-variant classification and reporting. Grouped by gene, launched from the sample or
+  specimen page, pulling in Phase 4's TMB/MSI measures. `ClassificationReportTemplate` exists; the vue
+  template needs to take an array. Starts from the wizard's triaged list.
+
+---
+
+## Parallelism
+
+With Phases 1-5 and Phase 7's extraction level landed, the model spine is done, the fusion rows Phase 6
+wants to display exist, and one node already groups a DNA arm's callers. What remains splits cleanly:
+one takes Phase 6 (grids), the other Phase 7's specimen and patient levels plus the template-launch
+plumbing (`analysis`, `patients`). Phase 8 consumes everything and comes last either way.
+
+With one person, the order above is the order.
+
+## Decisions worth settling before their phase starts
+
+Phase 5's identity question is settled in code — `FusionGeneId` gives every partner an identity, HGNC
+where there is one and a local id where there is not, so no row is parked. Phase 6's
+single-vs-multiple grid question is settled — one grid, so fusions reach comp-het and every downstream
+node. Phase 7's four are settled in code: per-sample threshold rows in the editor, restrict to the
+analysis build and report the exclusions, `Sample.extraction` left as a single FK, and live counts at
+group level.
+
+## Deferred, deliberately
+
+- **Per-gene LOH as a specimen measure** — #1559 lists it, but it is per-gene rather than per-specimen and
+  the vendor emits it in a VCF, so it belongs with `abcn_annotated.vcf` below rather than in Phase 4.
+- **Fusion equivalence and discordance** — the research-level part of #1506. Somatic classifications get
+  `MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED` today, so nothing regresses by waiting.
+- **Gene/disease curation as a first-class object** — #1419's schema option, and the only thing that can
+  express "reviewed on this date, due for review". Needs the disease axis settled; Phase 8 does the
+  reuse as a copy in the meantime, over exactly the key set such an object would own.
+- **Breakend representation and BND VCF export** — #1506 phases 2 and 3. The breakpoint values themselves
+  arrive in `AllFusions.csv` and Phase 5 stores them, so this is a read-side change when a consumer appears.
+  Whether VEP parses BND ALT syntax at all is unverified — a 20-minute experiment before anyone designs
+  around either answer — but what VEP would give is per-position feature overlap rather than frame or
+  domain analysis, and the caller already reports that as `Gene A/B Location`.
+- **Coordinate-free gene-level CNV** — designed alongside Phase 5 and purely additive to it:
+  `<AMP:HGNC:nnn>` / `<LOSS:HGNC:nnn>` on the same gene-level contig, same anchor, same annotation run —
+  one enum value and one alt prefix. Only for a caller that reports a gene-level event with no
+  coordinates at all (the `CombinedVariantOutput` "JAK2 amplification (5 copies)" style); `cnv.vcf`'s
+  `<DUP>`/`<DEL>` carry real coordinates and stay structural variants. Copy number stays
+  observation-level in `CohortGenotype.info` rather than in the alt, because labs use different
+  amplification thresholds and per-count identity would stop two labs ever agreeing on "JAK2
+  amplification". Build it when a file needs it.
+- **`abcn_annotated.vcf` / gene-level LOH** — cannot start until TAU supplies a file; the format is
+  undocumented and not usefully mockable.
+- **`_DragenExonCNV.vcf` exact field spelling** — provisional until a run with a real large rearrangement
+  arrives. Note the CombinedVariantOutput reports these as `<LOSS>` where the VCF header declares `<DEL>`.
+- **`CombinedVariantOutput.tsv`** — settled as not worth ingesting. It is exactly a filtered subset of the
+  individual files (`PASS` small variants, `PASS` non-reference CNV) and discards 148 of 149 fusion calls
+  and every splice call.
+- **Fold-change → DEL/DUP conversion** (sapath#304's open question) — moot for v2.6.2, which emits
+  `<DUP>`/`<DEL>` directly with `SM` as the linear copy ratio. The `cnv_tsv_to_vcf.py` command in the
+  sapath repo predates that.

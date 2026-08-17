@@ -1,10 +1,9 @@
 import operator
 from functools import reduce
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.conf import settings
-from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import F, IntegerField, OuterRef, QuerySet, Subquery, Value, Func
+from django.db.models import F, Func, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import CharField, TextField
 from django.db.models.query_utils import Q
@@ -13,20 +12,39 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
-from annotation.models import ManualVariantEntryCollection, PATIENT_ONTOLOGY_TERM_PATH
+from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
+from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, ManualVariantEntryCollection
 from library.django_utils import get_url_from_view_path
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import calculate_age, JsonDataType
+from library.utils import JsonDataType, calculate_age
 from ontology.models import OntologyService
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
-from snpdb.models import VCF, Cohort, CohortGenotypeStats, Sample, ImportStatus, \
-    GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, Quad, UserGridConfig, GenomeBuild, ClinGenAllele, \
-    VariantZygosityCountCollection, TagColorsCollection, LiftoverRun, AlleleConversionTool, AlleleLiftover, \
-    ProcessingStatus, Allele
+from snpdb.models import (
+    VCF,
+    Allele,
+    AlleleConversionTool,
+    AlleleLiftover,
+    ClinGenAllele,
+    Cohort,
+    CohortGenotypeStats,
+    CustomColumnsCollection,
+    GenomeBuild,
+    GenomicIntervalsCollection,
+    ImportStatus,
+    LiftoverRun,
+    ProcessingStatus,
+    Quad,
+    Sample,
+    TagColorsCollection,
+    Trio,
+    UserGridConfig,
+    Variant,
+    VariantZygosityCountCollection,
+)
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
-from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
+from snpdb.tasks.soft_delete_tasks import remove_soft_deleted_vcfs_task, soft_delete_vcfs
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_for_js
 
@@ -36,7 +54,7 @@ class VCFListGrid(JqGridUserRowConfig):
     caption = 'VCFs'
     fields = ["id", "name", "vcf_url", "date", "import_status", "data_archived_date", "genome_build__name",
               "user__username", "source",
-              "uploadedvcf__uploaded_file__import_source", "genotype_samples", "project__name", "cohort__import_status",
+              "uploadedvcf__file_upload__import_source", "genotype_samples", "project__name", "cohort__import_status",
               "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
     colmodel_overrides = {
         'id': {"hidden": True},
@@ -99,13 +117,14 @@ class SamplesListGrid(JqGridUserRowConfig):
     caption = 'Samples'
     fields = ["id", "name", "sample_url", "het_hom_count", "vcf__date", "import_status",
               "vcf__genome_build__name", "variants_type", "vcf__user__username", "vcf__source", "vcf__name", "vcf_url",
-              "vcf__project__name", "vcf__uploadedvcf__uploaded_file__import_source",
+              "vcf__project__name", "vcf__uploadedvcf__file_upload__import_source",
               "sample_gene_list_count", "activesamplegenelist__id",
               "mutationalsignature__id", "mutationalsignature__summary",
               "somaliersampleextract__somalierancestry__predicted_ancestry",
               "patient__patient_code", "patient__first_name", "patient__last_name", "patient__sex",
               "patient__date_of_birth", "patient__date_of_death",
-              "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date", "vcf__id"]
+              "extraction__specimen__reference_id", "extraction__specimen__tissue__name",
+              "extraction__specimen__collection_date", "vcf__id"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {"width": 400,
@@ -139,7 +158,7 @@ class SamplesListGrid(JqGridUserRowConfig):
         'patient__date_of_death': {'hidden': True},
         'het_hom_count': {'name': 'het_hom_count', "model_field": False, 'sorttype': 'int',
                           'label': 'Het/Hom Count'},
-        "specimen__reference_id": {'label': 'Specimen'},
+        "extraction__specimen__reference_id": {'label': 'Specimen'},
         # These urls are only there for CSV export
         "sample_url": {'name': 'sample_url', 'label': 'Sample URL', "model_field": False, 'hidden': True},
         "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},
@@ -231,6 +250,51 @@ class SamplesListGrid(JqGridUserRowConfig):
         Sample.objects.filter(pk=sample.pk).update(import_status=ImportStatus.MARKED_FOR_DELETION)
         task = remove_soft_deleted_vcfs_task.si()  # @UndefinedVariable
         task.apply_async()
+
+
+class AbstractSkippedAnnotationGrid(JqGridUserRowConfig):
+    """ Shows Variants that VEP was unable to annotate (variantannotation__vep_skipped_reason set).
+        Subclasses provide a variant source (VCF/Sample - anything with get_variant_qs) via
+        set_skipped_annotation_queryset(). """
+    model = Variant
+    caption = 'Skipped Annotation'
+    fields = ["id", "variantannotation__vep_skipped_reason", "variantannotation__annotation_run_id"]
+
+    colmodel_overrides = {"id": {"hidden": True},
+                          "variantannotation__annotation_run_id": {'formatter': 'formatAnnotationRunLink'}}
+
+    def set_skipped_annotation_queryset(self, variant_source, genome_build):
+        qs = get_queryset_for_latest_annotation_version(self.model, genome_build)
+        qs = variant_source.get_variant_qs(qs).filter(variantannotation__vep_skipped_reason__isnull=False)
+        qs = Variant.annotate_variant_string(qs)
+
+        field_names = list(self.get_field_names())
+        field_names.insert(1, "variant_string")
+
+        self.queryset = qs.values(*field_names)
+        self.extra_config.update({'sortname': 'variant_string',
+                                  'sortorder': 'asc'})
+
+    def get_colmodels(self, remove_server_side_only=False):
+        before_colmodels = [{'index': 'variant_string', 'name': 'variant_string', 'label': 'Variant',
+                             'formatter': 'linkFormatter',
+                             'formatter_kwargs': {"url_name": "view_variant", "url_object_column": "id"}}]
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
+        return before_colmodels + colmodels
+
+
+class SampleSkippedAnnotationGrid(AbstractSkippedAnnotationGrid):
+    def __init__(self, user, sample_id):
+        super().__init__(user)
+        sample = Sample.get_for_user(user, sample_id)
+        self.set_skipped_annotation_queryset(sample, sample.genome_build)
+
+
+class VCFSkippedAnnotationGrid(AbstractSkippedAnnotationGrid):
+    def __init__(self, user, vcf_id):
+        super().__init__(user)
+        vcf = VCF.get_for_user(user, vcf_id)
+        self.set_skipped_annotation_queryset(vcf, vcf.genome_build)
 
 
 class CohortSampleListGrid(JqGridUserRowConfig):
@@ -427,7 +491,6 @@ class AbstractVariantGrid(JqGridUserRowConfig):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._count = None
         self.queryset_is_sorted = False
 
     def _get_standard_overrides(self, af_show_in_percent):
@@ -506,7 +569,8 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         qs = qs.filter(Q(variantallele__isnull=True) | Q(variantallele__genome_build=self.genome_build))
         # Annotate so we can use global_variant_zygosity in grid columns
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
-        qs = self.filter_items(request, qs)  # JQGrid filtering from request
+        # JQGrid request filtering is applied by JqGrid.get_items on our result - doing it here as well
+        # adds a second JOIN per filtered relation, which multiplies rows
         if q := self._get_q():
             qs = qs.filter(q)
 
@@ -535,12 +599,6 @@ class AbstractVariantGrid(JqGridUserRowConfig):
                 field_names.append(f)
 
         return field_names
-
-    def get_count(self, request):
-        if self._count is None:
-            queryset = self._get_queryset(request)
-            self._count = queryset.count()
-        return self._count
 
 
 class TagColorsCollectionColumns(DatatableConfig[TagColorsCollection]):
@@ -584,9 +642,9 @@ class LiftoverRunColumns(DatatableConfig[LiftoverRun]):
             RichColumn(key='source_vcf', orderable=True, css_class="formatted-text"),
             RichColumn(key='source_genome_build', label='Source Build', orderable=True),
             RichColumn(key='genome_build', label='Dest Build', orderable=True),
-            RichColumn(key="uploadedliftover__uploaded_file__uploadpipeline__status",
+            RichColumn(key="uploadedliftover__file_upload__uploadpipeline__status",
                        label='Status', renderer=self.render_import_status, orderable=True),
-            RichColumn(key="uploadedliftover__uploaded_file__uploadpipeline__items_processed",
+            RichColumn(key="uploadedliftover__file_upload__uploadpipeline__items_processed",
                        label='Processed', orderable=True, css_class="num"),
         ]
 
@@ -599,7 +657,7 @@ class LiftoverRunColumns(DatatableConfig[LiftoverRun]):
 
     def render_import_status(self, row: dict[str, Any]) -> JsonDataType:
         label = ""
-        if status := row['uploadedliftover__uploaded_file__uploadpipeline__status']:
+        if status := row['uploadedliftover__file_upload__uploadpipeline__status']:
             processing_status = ProcessingStatus(status)
             label = processing_status.label
         return label
@@ -650,7 +708,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
             allele: Allele
             if allele := Allele.objects.filter(id=allele_id).first():
                 has_37 = bool(allele.variant_for_build_optional(GenomeBuild.grch37()))
-                has_38 = bool(allele.variant_for_build_optional(GenomeBuild.grch37()))
+                has_38 = bool(allele.variant_for_build_optional(GenomeBuild.grch38()))
                 label += f" (Current: {has_build_to_icon[has_37]} GRCh37, {has_build_to_icon[has_38]} GRCh38)"
 
         return label
@@ -765,7 +823,7 @@ class SampleColumns(DatatableConfig[Sample]):
         annotation_kwargs = {}
         for ot in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
             q_ot = Q(**{f"{sample_patient_ontology_path}__ontology_service": ot})
-            annotation_kwargs[ot.label] = StringAgg(ontology_path, '|',
+            annotation_kwargs[ot.label] = StringAgg(ontology_path, Value('|'),
                                                     filter=q_ot, distinct=True,
                                                     output_field=TextField())
         return qs.annotate(**annotation_kwargs)

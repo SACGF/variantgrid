@@ -10,7 +10,7 @@ from django.utils.safestring import SafeText
 
 from library.log_utils import report_message
 from library.utils import html_id_safe
-from uicore.templatetags.ui_utils import parse_tag, TagUtils
+from uicore.templatetags.ui_utils import TagUtils, parse_tag
 
 register = Library()
 

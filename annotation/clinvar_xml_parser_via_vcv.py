@@ -3,11 +3,16 @@ from typing import Optional
 
 from Bio import Entrez
 
-from annotation.clinvar_xml_parser import ClinVarXmlParser, ClinVarXmlParserOutput, CLINVAR_REVIEW_STATUS_TO_STARS, \
-    CLINVAR_TO_VG_CLIN_SIG, SOMATIC_CLIN_SIG_VALUE
+from annotation.clinvar_xml_parser import (
+    CLINVAR_REVIEW_STATUS_TO_STARS,
+    CLINVAR_TO_VG_CLIN_SIG,
+    SOMATIC_CLIN_SIG_VALUE,
+    ClinVarXmlParser,
+    ClinVarXmlParserOutput,
+)
 from annotation.models import ClinVarRecord
 from classification.enums import AlleleOriginBucket
-from library.utils.xml_utils import parser_path, PP
+from library.utils.xml_utils import PP, parser_path
 
 
 class ConditionList:

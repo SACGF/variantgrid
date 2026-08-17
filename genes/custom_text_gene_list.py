@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import GeneListCategory, GeneList, CustomTextGeneList
+from genes.models import CustomTextGeneList, GeneList, GeneListCategory
 from library.utils import sha256sum_str
 from snpdb.models import ImportStatus
 

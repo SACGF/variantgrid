@@ -44,7 +44,7 @@ if SYNC_DETAILS and any(sd["enabled"] for sd in SYNC_DETAILS.values()):
         'schedule': HOUR_SECS,
     }
 
-SAPATH_ENABLED = any((a.startswith("sapath") for a in settings.INSTALLED_APPS))
+SAPATH_ENABLED = any(a.startswith("sapath") for a in settings.INSTALLED_APPS)
 if SAPATH_ENABLED:
     helix_user = getattr(settings, "SAPATH_HELIX_USER", None)
     if helix_user:
@@ -75,12 +75,30 @@ app.conf.beat_schedule['dispatch-annotation-runs'] = {
     'schedule': MINUTE_SECS,
 }
 
+# Extraction references parked by a VCF or link call that arrived before the extraction existed
+app.conf.beat_schedule['reconcile-pending-extractions'] = {
+    'task': 'patients.tasks.extraction_matching_tasks.reconcile_pending_extractions',
+    'schedule': HOUR_SECS,
+}
+
+app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
+    'task': 'analysis.tasks.analysis_grid_export_tasks.clear_old_node_export_cached_generated_files',
+    'schedule': crontab(hour=3, minute=15),
+}
+
 
 # send update emails once a day (if there has been activity)
 if settings.DISCORDANCE_EMAIL:
     app.conf.beat_schedule['discordance-emails-weekly'] = {
         'task': 'classification.views.classification_email_view.send_summary_emails',
         'schedule': crontab(hour=10, minute=0, day_of_week='mon')
+    }
+
+# MME metrics resolve every eligible classification's profile, so precompute and cache them
+if settings.MME_ENABLED:
+    app.conf.beat_schedule['mme-refresh-metrics'] = {
+        'task': 'mme.tasks.refresh_mme_metrics_task',
+        'schedule': crontab(hour=2, minute=30),
     }
 
 # Server monitoring tasks - send RollBar warnings

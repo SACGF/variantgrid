@@ -1,84 +1,84 @@
 from django.test.testcases import TestCase
 
-from genes.hgvs import CHGVS, CHGVSDiff
+from genes.hgvs import HGVSComponents, HGVSDiff, hgvs_nomen_equivalent
 
 
-def diff(c1: str, c2: str) -> CHGVSDiff:
-    return CHGVS(c1).diff(CHGVS(c2))
+def diff(c1: str, c2: str) -> HGVSDiff:
+    return HGVSComponents(c1).diff(HGVSComponents(c2))
 
 
 # noinspection SpellCheckingInspection,SpellCheckingInspection
-class CHGVSDiffTests(TestCase):
+class HGVSDiffTests(TestCase):
 
     def test_c_dot_same(self):
-        self.assertTrue(CHGVS.c_dot_equivalent('c.22G>A', 'c.22G>A'))
-        self.assertTrue(CHGVS.c_dot_equivalent('c.4205_4208del', 'c.4205_4208delTGCC'))
-        self.assertTrue(CHGVS.c_dot_equivalent('c.4205_4208del4', 'c.4205_4208delTGCC'))
-        self.assertFalse(CHGVS.c_dot_equivalent('c.4205_4208del1', 'c.4205_4208del2'))
-        self.assertFalse(CHGVS.c_dot_equivalent('c.4205_4208delAT', 'c.4205_4208delT'))
+        self.assertTrue(hgvs_nomen_equivalent('c.22G>A', 'c.22G>A'))
+        self.assertTrue(hgvs_nomen_equivalent('c.4205_4208del', 'c.4205_4208delTGCC'))
+        self.assertTrue(hgvs_nomen_equivalent('c.4205_4208del4', 'c.4205_4208delTGCC'))
+        self.assertFalse(hgvs_nomen_equivalent('c.4205_4208del1', 'c.4205_4208del2'))
+        self.assertFalse(hgvs_nomen_equivalent('c.4205_4208delAT', 'c.4205_4208delT'))
         # snuck a different nucleotide in the 2nd one below
-        self.assertFalse(CHGVS.c_dot_equivalent('c.2719_2730delAAGAAGGACAGGinsT', 'c.2719_2730delAAGATGGACAGGinsT'))
-        self.assertTrue(CHGVS.c_dot_equivalent('c.2719_2730delAAGAAGGACAGGinsT', 'c.2719_2730delinsT'))
+        self.assertFalse(hgvs_nomen_equivalent('c.2719_2730delAAGAAGGACAGGinsT', 'c.2719_2730delAAGATGGACAGGinsT'))
+        self.assertTrue(hgvs_nomen_equivalent('c.2719_2730delAAGAAGGACAGGinsT', 'c.2719_2730delinsT'))
 
     def test_insert_gene(self):
         cd = diff('NM_000022.3:c.22G>A', 'NM_000022.3(ADA):c.22G>A')
-        self.assertEqual(cd, CHGVSDiff.SAME)
+        self.assertEqual(cd, HGVSDiff.SAME)
 
     def test_same(self):
         cd = diff('NM_000071.2(CBS):c.919G>A', 'NM_000071.2(CBS):c.919G>A')
-        self.assertEqual(cd, CHGVSDiff.SAME)
+        self.assertEqual(cd, HGVSDiff.SAME)
 
     def test_gene_change(self):
         cd = diff('NM_000071.2(CBS):c.919G>A', 'NM_000071.2(BOO):c.919G>A')
-        self.assertEqual(cd, CHGVSDiff.DIFF_GENE)
+        self.assertEqual(cd, HGVSDiff.DIFF_GENE)
 
     def test_gene_case_change(self):
         # only case of gene changes, shouldn't count
         cd = diff('NM_001031726.3(C19ORF12):c.335G>A', 'NM_001031726.3(C19orf12):c.335G>A')
-        self.assertEqual(cd, CHGVSDiff.SAME)
+        self.assertEqual(cd, HGVSDiff.SAME)
 
     def test_transcript_change(self):
         cd = diff('NM_000099.2(CBS):c.919G>A', 'NM_000071.2(CBS):c.919G>A')
-        self.assertEqual(cd, CHGVSDiff.DIFF_TRANSCRIPT_ID)
+        self.assertEqual(cd, HGVSDiff.DIFF_TRANSCRIPT_ID)
 
     def test_transcript_ver_change(self):
         cd = diff('NM_000071.2(CBS):c.919G>A', 'NM_000071.3(CBS):c.919G>A')
-        self.assertEqual(cd, CHGVSDiff.DIFF_TRANSCRIPT_VER)
+        self.assertEqual(cd, HGVSDiff.DIFF_TRANSCRIPT_VER)
 
         # no version compared to a version should not raise a difference
         # otherwise every record from a client (that doesn't provide transcript versions)
         # will generate a warning
         cd = diff('NM_000071(CBS):c.919G>A', 'NM_000071.3(CBS):c.919G>A')
-        self.assertEqual(cd, CHGVSDiff.SAME)
+        self.assertEqual(cd, HGVSDiff.SAME)
 
     def test_expanded(self):
         cd = diff('NM_001083961.1(WDR62):c.4205_4208del', 'NM_001083961.1(WDR62):c.4205_4208delTGCC')
-        self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS_EXPANDED)
+        self.assertEqual(cd, HGVSDiff.DIFF_NOMEN_EXPANDED)
 
         cd = diff('NM_001083961.1(WDR62):c.4205_4208del4', 'NM_001083961.1(WDR62):c.4205_4208delTGCC')
-        self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS_EXPANDED)
+        self.assertEqual(cd, HGVSDiff.DIFF_NOMEN_EXPANDED)
 
         cd = diff('NM_001083961.1(WDR62):c.4205_4208del4', 'NM_001083961.1(WDR62):c.4205_4208del1')
-        self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS)
+        self.assertEqual(cd, HGVSDiff.DIFF_NOMEN)
 
         # size has changed
         cd = diff('NM_001083961.1(WDR62):c.4205_4208del4', 'NM_001083961.1(WDR62):c.4205_4208delT')
-        self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS)
+        self.assertEqual(cd, HGVSDiff.DIFF_NOMEN)
 
         cd = diff('NM_001083961.1(WDR62):c.4205_4208del4', 'NM_001083961.1(WDR62):c.4205_4208del5')
-        self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS)
+        self.assertEqual(cd, HGVSDiff.DIFF_NOMEN)
 
         cd = diff('NM_001083961.1(WDR62):c.4205_4208delTGCC', 'NM_001083961.1(WDR62):c.4205_4208delTGGG')
-        self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS)
+        self.assertEqual(cd, HGVSDiff.DIFF_NOMEN)
 
         cd = diff('NM_001083961.1(WDR62):c.444205_4208del', 'NM_001083961.1(WDR62):c.4205_4208delTGCC')
-        self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS)
+        self.assertEqual(cd, HGVSDiff.DIFF_NOMEN)
 
     def test_multiple(self):
         cd = diff('NM_000081.2(CBS):c.919G>A', 'NM_000071.2(XXX):c.919G>C')
-        self.assertEqual(cd, CHGVSDiff.DIFF_GENE | CHGVSDiff.DIFF_TRANSCRIPT_ID | CHGVSDiff.DIFF_RAW_CGVS)
+        self.assertEqual(cd, HGVSDiff.DIFF_GENE | HGVSDiff.DIFF_TRANSCRIPT_ID | HGVSDiff.DIFF_NOMEN)
 
     def test_multiple_2(self):
         # note we only complain about the gene if the gene was provided
         cd = diff('NM_006086.3:c.1012delC', 'NM_006086.3(TUBB3):c.1012delA')
-        self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS)
+        self.assertEqual(cd, HGVSDiff.DIFF_NOMEN)

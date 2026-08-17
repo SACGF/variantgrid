@@ -50,7 +50,7 @@
                 {% labelled label="Specimen Collected By" %}{{ patient_record.specimen_collected_by }}{% endlabelled %}
                 {% labelled label="Specimen Collected Date" %}{{ patient_record.specimen_collection_date }}{% endlabelled %}
                 {% labelled label="Specimen Received Date" %}{{ patient_record.specimen_received_date }}{% endlabelled %}
-                {% labelled label="Specimen Mutation Type" %}{{ patient_record.get_specimen_mutation_type_display }}{% endlabelled %}
+                {% labelled label="Specimen Tissue Status" %}{{ patient_record.get_specimen_tissue_status_display }}{% endlabelled %}
                 {% labelled label="Specimen Nucleic Acid Source" %}{{ patient_record.get_specimen_nucleic_acid_source_display }}{% endlabelled %}
                 {% labelled label="Specimen Age at collection" %}{{ patient_record.specimen_age_at_collection_date }}{% endlabelled %}
             </div>

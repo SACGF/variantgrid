@@ -22,7 +22,7 @@ class Command(BaseCommand):
             logging.warning("Warning, there are already GeneCoverageCanonicalTranscript objects. You probably don't want to run this... Or maybe you want to run --clear")
 
         qs = GeneCoverageCollection.objects.exclude(genecoveragecanonicaltranscript__isnull=False)
-        field_counts = get_field_counts(qs, "qc__bam_file__unaligned_reads__sequencing_sample__enrichment_kit__name")
+        field_counts = get_field_counts(qs, "qc__bam_file__sequencing_sample__enrichment_kit__name")
         logging.info("Work to do:")
         logging.info(field_counts)
 

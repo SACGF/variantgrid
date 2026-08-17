@@ -4,7 +4,6 @@ import os
 import celery
 
 from analysis.tasks.mutational_signatures_task import calculate_mutational_signature
-from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from annotation.models.models import AnnotationVersion, VCFAnnotationStats
 from annotation.tasks.calculate_sample_stats import calculate_vcf_stats
 from library.log_utils import log_traceback
@@ -12,13 +11,23 @@ from library.utils import full_class_name
 from seqauto.signals.signals_list import backend_vcf_import_success_signal
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
-from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
+from snpdb.models.models_enums import ImportStatus, ProcessingStatus, VariantsType
 from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
 from snpdb.tasks.somalier_tasks import somalier_vcf_id
-from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf, \
-    create_variant_zygosity_counts
-from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, UploadedVCFPendingAnnotation, \
-    UploadPipeline, SimpleVCFImportInfo, SkipUploadStepException, ModifiedImportedVariants
+from snpdb.variant_zygosity_count import (
+    create_variant_zygosity_counts,
+    update_all_variant_zygosity_counts_for_vcf,
+)
+from upload.models import (
+    ModifiedImportedVariants,
+    SimpleVCFImportInfo,
+    SkipUploadStepException,
+    UploadedVCFPendingAnnotation,
+    UploadPipeline,
+    UploadStep,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
 from upload.signals.signals import vcf_import_success_signal
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_upload_pipeline
@@ -29,8 +38,11 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
     """ Create VCF model from header """
 
     def process_items(self, upload_step):
-        from upload.vcf.vcf_import import create_vcf_from_vcf, create_cohort_genotype_collection_from_vcf, \
-            configure_vcf_from_header
+        from upload.vcf.vcf_import import (
+            configure_vcf_from_header,
+            create_cohort_genotype_collection_from_vcf,
+            create_vcf_from_vcf,
+        )
 
         vcf_filename = upload_step.input_filename
         upload_pipeline = upload_step.upload_pipeline
@@ -92,11 +104,12 @@ class VCFCheckAnnotationTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         uploaded_vcf = upload_step.get_uploaded_vcf()
+        # A retry re-runs this step against the UploadedVCF from the earlier run - start pending annotation again
+        UploadedVCFPendingAnnotation.objects.filter(uploaded_vcf=uploaded_vcf).delete()
         pending_annotation = UploadedVCFPendingAnnotation.objects.create(uploaded_vcf=uploaded_vcf)
         annotation_version = AnnotationVersion.latest(upload_step.genome_build)
         variant_annotation_version = annotation_version.variant_annotation_version
-        lowest_unannotated_variant_id = get_lowest_unannotated_variant_id(variant_annotation_version)
-        pending_annotation.attempt_schedule_annotation_stage_steps(lowest_unannotated_variant_id)
+        pending_annotation.attempt_schedule_annotation_stage_steps(variant_annotation_version)
 
 
 class ProcessGenotypeVCFDataTask(ImportVCFStepTask):
@@ -104,7 +117,7 @@ class ProcessGenotypeVCFDataTask(ImportVCFStepTask):
         (ie via ImportGenotypeVCFTask) - this can run in parallel """
 
     def process_items(self, upload_step):
-        from upload.vcf.vcf_import import import_vcf_file, genotype_vcf_processor_factory
+        from upload.vcf.vcf_import import genotype_vcf_processor_factory, import_vcf_file
 
         upload_pipeline = upload_step.upload_pipeline
         uploaded_vcf = upload_pipeline.uploadedvcf

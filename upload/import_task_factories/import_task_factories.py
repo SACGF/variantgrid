@@ -1,30 +1,70 @@
-from typing import Type
 
 import pandas as pd
 from django.conf import settings
 
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.utils import import_class, full_class_name
+from library.utils import full_class_name, import_class
 from patients.models import PatientColumns
-from upload.import_task_factories.abstract_vcf_import_task_factory import AbstractVCFImportTaskFactory
+from upload.import_task_factories.abstract_vcf_import_task_factory import (
+    AbstractVCFImportTaskFactory,
+)
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
-from upload.models import UploadedFileTypes, UploadedBed, \
-    UploadedGeneList, UploadedPatientRecords, UploadedPedFile, UploadedVCF, \
-    UploadedGeneCoverage, UploadStep, UploadStepTaskType, UploadedWikiCollection, VCFPipelineStage
+from upload.models import (
+    UploadedBed,
+    UploadedClassificationImport,
+    UploadedFileTypes,
+    UploadedGeneCoverage,
+    UploadedGeneList,
+    UploadedLiftover,
+    UploadedManualVariantEntryCollection,
+    UploadedPatientRecords,
+    UploadedPedFile,
+    UploadedVariantTags,
+    UploadedVCF,
+    UploadedWikiCollection,
+    UploadStep,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
+from upload.tso500 import dragen_all_fusions_parser
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
+from upload.tasks.import_dragen_tso500_all_fusions_task import (
+    DragenTSO500AllFusionsCreateVCFTask,
+    DragenTSO500AllFusionsInsertTask,
+)
 from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
 from upload.tasks.import_ped_task import ImportPedTask
 from upload.tasks.import_variant_tags_task import VariantTagsCreateVCFTask, VariantTagsInsertTask
-from upload.tasks.import_wiki_task import ImportGeneWikiCollection, VariantWikiCreateVCFTask, VariantWikiInsertTask
-from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, ProcessGenotypeVCFDataTask, \
-    ImportGenotypeVCFSuccessTask, UpdateVariantZygosityCountsTask, SampleLocusCountsTask, \
-    ImportCreateVCFModelForGenotypeVCFTask, SomalierVCFTask
-from upload.tasks.vcf.import_vcf_tasks import ProcessVCFSetMaxVariantTask, \
-    ImportCreateUploadedVCFTask, ProcessVCFLinkAllelesSetMaxVariantTask, LiftoverCompleteTask, LiftoverCreateVCFTask, \
-    PreprocessAndAnnotateVCFTask, ProcessVCFClinGenAlleleTask, ProcessVCFLinkManualVariantEntrySetMaxVariantTask, \
-    LiftoverPreprocessVCFTask
+from upload.tasks.import_wiki_task import (
+    ImportGeneWikiCollection,
+    VariantWikiCreateVCFTask,
+    VariantWikiInsertTask,
+)
+from upload.tasks.vcf.genotype_vcf_tasks import (
+    ImportCreateVCFModelForGenotypeVCFTask,
+    ImportGenotypeVCFSuccessTask,
+    ProcessGenotypeVCFDataTask,
+    SampleLocusCountsTask,
+    SomalierVCFTask,
+    UpdateVariantZygosityCountsTask,
+    VCFCheckAnnotationTask,
+)
+from upload.tasks.vcf.import_vcf_tasks import (
+    GeneLevelPreprocessVCFTask,
+    ImportCreateUploadedVCFTask,
+    LiftoverCompleteTask,
+    LiftoverCreateVCFTask,
+    LiftoverPreprocessVCFTask,
+    PreprocessAndAnnotateVCFTask,
+    ProcessVCFClinGenAlleleTask,
+    ProcessVCFLinkAllelesSetMaxVariantTask,
+    ProcessVCFLinkManualVariantEntrySetMaxVariantTask,
+    ProcessVCFSetMaxVariantTask,
+    UploadPipelineFinishedTask,
+)
+from upload.upload_metadata import VCF_METADATA_KEYS
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -61,6 +101,70 @@ class GeneListImportTaskFactory(ImportTaskFactory):
         return ImportGeneListTask.si(upload_pipeline.pk)
 
 
+class DragenTSO500AllFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
+    """ Illumina DRAGEN TSO 500's AllFusions.csv - one vendor's format, not a standard.
+
+        Its rows become gene-level variants, written as a VCF so they go through the normal insert
+        pipeline. Only the bcftools stages are skipped - they all need a reference base a gene-level
+        locus does not have. @see upload.tasks.import_dragen_tso500_all_fusions_task
+
+        A csv full of gene symbols, so GeneListImportTaskFactory would otherwise claim it on its
+        default ability of 1 """
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS
+
+    def get_possible_extensions(self):
+        return ['csv']
+
+    def get_data_classes(self):
+        return [UploadedVCF]
+
+    def get_metadata_keys(self):
+        # Becomes a VCF with a sample, so it takes the same keys a VCF does - including genome_build,
+        # which the file itself declares nowhere
+        return VCF_METADATA_KEYS
+
+    def get_processing_ability(self, user, filename, file_extension):
+        if dragen_all_fusions_parser.can_process_file(filename):
+            return 1000
+        return 0
+
+    def _get_vcf_filename(self, upload_pipeline) -> str:
+        return get_import_processing_filename(upload_pipeline.pk, "dragen_tso500_all_fusions.vcf")
+
+    def get_pre_vcf_task(self, upload_pipeline):
+        """ Write the fusion variants as a VCF for the pipeline to insert """
+        upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                name="Create DRAGEN TSO500 AllFusions Variant VCF",
+                                                sort_order=self.get_sort_order(),
+                                                task_type=UploadStepTaskType.CELERY,
+                                                pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
+                                                script=full_class_name(DragenTSO500AllFusionsCreateVCFTask),
+                                                input_filename=upload_pipeline.file_upload.get_filename(),
+                                                output_filename=self._get_vcf_filename(upload_pipeline))
+        return DragenTSO500AllFusionsCreateVCFTask.si(upload_step.pk, 0)
+
+    def get_create_data_from_vcf_header_task_class(self):
+        # The VCF we wrote declares its sample and source, so the standard header path makes the
+        # VCF/Sample/Cohort/CohortGenotypeCollection the way it does for a lab's VCF
+        return ImportCreateVCFModelForGenotypeVCFTask
+
+    def _get_preprocess_class(self) -> type:
+        return GeneLevelPreprocessVCFTask
+
+    def get_known_variants_parallel_vcf_processing_task_class(self):
+        # Each row carries a genotype and its caller's data in INFO, so the standard bulk importer
+        # writes the CohortGenotypes by SQL COPY
+        return ProcessGenotypeVCFDataTask
+
+    def get_post_data_insertion_classes(self):
+        return [DragenTSO500AllFusionsInsertTask, VCFCheckAnnotationTask]
+
+    def get_finish_task_classes(self):
+        return [UploadPipelineFinishedTask, ImportGenotypeVCFSuccessTask]
+
+
 class GeneCoverageImportTaskFactory(ImportTaskFactory):
 
     def get_uploaded_file_type(self):
@@ -93,7 +197,10 @@ class PatientRecordsImportTaskFactory(ImportTaskFactory):
         return [UploadedPatientRecords]
 
     def get_processing_ability(self, user, filename, file_extension):
-        df = pd.read_csv(filename, encoding='unicode_escape')
+        try:
+            df = pd.read_csv(filename, encoding='unicode_escape')
+        except Exception:  # Every CSV factory is asked, so a shape we can't read is someone else's file
+            return 0
         if PatientColumns.PATIENT_LAST_NAME in df.columns:
             return 1000
         return 0
@@ -126,10 +233,14 @@ class GenotypeVCFImportFactory(AbstractVCFImportTaskFactory):
     def get_data_classes(self):
         return [UploadedVCF]
 
+    def get_metadata_keys(self):
+        # Consumed in vcf_import.create_vcf_from_vcf / configure_vcf_from_header
+        return VCF_METADATA_KEYS
+
     def get_create_data_from_vcf_header_task_class(self):
         return ImportCreateVCFModelForGenotypeVCFTask
 
-    def _get_preprocess_class(self) -> Type:
+    def _get_preprocess_class(self) -> type:
         return PreprocessAndAnnotateVCFTask
 
     def get_known_variants_parallel_vcf_processing_task_class(self):
@@ -159,7 +270,7 @@ class VCFInsertVariantsOnlyImportFactory(AbstractVCFImportTaskFactory):
         return UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedManualVariantEntryCollection, UploadedClassificationImport, UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
         # Variants Only should only ever be explicitly chosen as a file type
@@ -176,13 +287,28 @@ class VCFInsertVariantsOnlyImportFactory(AbstractVCFImportTaskFactory):
         return [VCFCheckAnnotationTask]
 
 
+class GeneLevelInsertVariantsOnlyImportFactory(VCFInsertVariantsOnlyImportFactory):
+    """ As VCFInsertVariantsOnlyImportFactory, for gene-level variants - a classification naming
+        'BCR::ABL1' comes in this way, so that a fusion enters the database by the same pipeline as
+        every other variant. @see snpdb.gene_level_variants """
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY
+
+    def _get_preprocess_class(self) -> type:
+        return GeneLevelPreprocessVCFTask
+
+    def get_post_data_insertion_classes(self):
+        return [GeneLevelInsertGeneFusionsTask, VCFCheckAnnotationTask]
+
+
 class ManualVariantEntryImportFactory(AbstractVCFImportTaskFactory):
 
     def get_uploaded_file_type(self):
         return UploadedFileTypes.MANUAL_VARIANT_ENTRY
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedManualVariantEntryCollection, UploadedClassificationImport, UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
         # Variants Only should only ever be explicitly chosen as a file type
@@ -207,7 +333,7 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
         return UploadedFileTypes.LIFTOVER
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedLiftover, UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
         # Variants Only should only ever be explicitly chosen as a file type
@@ -216,10 +342,10 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
 
     def get_pre_vcf_task(self, upload_pipeline):
         # If source_vcf/source_genome_build are set, need to convert to produce allele VCF for genome_build
-        liftover = upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover = upload_pipeline.file_upload.uploadedliftover.liftover
         pre_vcf_task = None
         if liftover.source_genome_build:
-            output_filename = upload_pipeline.uploaded_file.get_filename()
+            output_filename = upload_pipeline.file_upload.get_filename()
             unknown_variants_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                               name="Liftover Source VCF",
                                                               sort_order=self.get_sort_order(),
@@ -231,7 +357,7 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
             pre_vcf_task = LiftoverCreateVCFTask.si(unknown_variants_step.pk, 0)
         return pre_vcf_task
 
-    def _get_preprocess_class(self) -> Type:
+    def _get_preprocess_class(self) -> type:
         return LiftoverPreprocessVCFTask
 
     def get_create_data_from_vcf_header_task_class(self):
@@ -259,7 +385,7 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
         return ['csv']
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedVariantTags, UploadedVCF]
 
     @staticmethod
     def _has_all_columns(columns, required_columns):
@@ -283,7 +409,7 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
     def get_pre_vcf_task(self, upload_pipeline):
         """ Need to write a VCF for variants used in tags """
 
-        variant_tags_filename = upload_pipeline.uploaded_file.get_filename()
+        variant_tags_filename = upload_pipeline.file_upload.get_filename()
         vcf_filename = self._get_vcf_filename(upload_pipeline)
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                 name="Create VariantTags Variant VCF",
@@ -340,7 +466,7 @@ class VariantWikiImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
         return ['csv']
 
     def get_data_classes(self):
-        return [UploadedVCF]
+        return [UploadedWikiCollection, UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
         df = pd.read_csv(filename, nrows=1)  # Just need header
@@ -356,7 +482,7 @@ class VariantWikiImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
     def get_pre_vcf_task(self, upload_pipeline):
         """ Need to write a VCF for variants used in tags """
 
-        variant_wiki_filename = upload_pipeline.uploaded_file.get_filename()
+        variant_wiki_filename = upload_pipeline.file_upload.get_filename()
         vcf_filename = self._get_vcf_filename(upload_pipeline)
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                 name="Create VariantWiki Variant VCF",

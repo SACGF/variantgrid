@@ -2,7 +2,7 @@ from collections import Counter, defaultdict
 
 from django.template import Library
 
-from ontology.models import OntologyVersion, ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER
+from ontology.models import ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER, OntologyVersion
 
 register = Library()
 

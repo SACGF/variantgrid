@@ -1,9 +1,17 @@
 from django.core.management.base import BaseCommand
 
-from annotation.models import ClinVar, VariantAnnotation, GeneAnnotation, DBNSFPGeneAnnotation
-from genes.models import Gene, TranscriptVersion, GeneVersion, GeneSymbolWiki, HGNC, UniProt
+from annotation.models import ClinVar, DBNSFPGeneAnnotation, GeneAnnotation, VariantAnnotation
+from genes.models import HGNC, Gene, GeneSymbolWiki, GeneVersion, TranscriptVersion, UniProt
 from library.django_utils import get_model_fields
-from snpdb.models import Variant, Locus, VariantZygosityCount, Contig, ClinGenAllele, VariantWiki, VariantGridColumn
+from snpdb.models import (
+    ClinGenAllele,
+    Contig,
+    Locus,
+    Variant,
+    VariantGridColumn,
+    VariantWiki,
+    VariantZygosityCount,
+)
 
 
 class Command(BaseCommand):

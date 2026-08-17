@@ -8,60 +8,77 @@ from functools import cached_property
 from typing import Optional, Union
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
-from django.db.models import Func, F, Value, CharField
+from django.db.models import CharField, F, Func, Value
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query import QuerySet
-from django.db.models.signals import pre_delete, post_save
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
+from annotation.annotation_versions import get_lowest_unannotated_variant_id
+from annotation.models.models_enums import VariantAnnotationPipelineType
 from eventlog.models import create_event
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.enums.log_level import LogLevel
-from library.log_utils import report_message, report_exc_info
+from library.log_utils import report_exc_info, report_message
 from library.utils import file_sha256sum
 from library.utils.file_utils import mk_path
-from seqauto.models import SingleSampleVCF, JointCalledVCF, get_samples_by_sequencing_sample, VariantCaller
+from seqauto.models import (
+    JointCalledVCF,
+    SingleSampleVCF,
+    VariantCaller,
+    get_samples_by_sequencing_sample,
+)
 from snpdb.import_status import set_vcf_and_samples_import_status
-from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild, VariantCoordinate
-from snpdb.models.models_enums import ImportSource, ProcessingStatus, ImportStatus
+from snpdb.models import VCF, GenomeBuild, SoftwareVersion, Variant, VariantCoordinate
+from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
-from upload.models.models_enums import UploadedFileTypes, VCFPipelineStage, \
-    UploadStepTaskType, TimeFilterMethod, VCFImportInfoSeverity, UploadStepOrigin, ModifiedImportedVariantOperation
+from upload.models.models_enums import (
+    ModifiedImportedVariantOperation,
+    TimeFilterMethod,
+    UploadedFileTypes,
+    UploadStepOrigin,
+    UploadStepTaskType,
+    VCFImportInfoSeverity,
+    VCFPipelineStage,
+)
 from variantgrid.celery import app
 
 
-class UploadedFile(TimeStampedModel):
+class FileUpload(TimeStampedModel):
     # Ownership-based permissions (creator + superuser); not a Guardian object-level perms model.
     path = models.TextField(null=True)
-    uploaded_file = models.FileField(storage=PrivateUploadStorage(),
-                                     max_length=256, null=True)
+    file_field = models.FileField(storage=PrivateUploadStorage(),
+                                  max_length=256, null=True)
     sha256_hash = models.TextField(null=True)
     file_type = models.CharField(max_length=1, choices=UploadedFileTypes.choices, null=True)
-    # import_source is used to decide whether to use 'path' or 'uploaded_file.path'
+    # import_source is used to decide whether to use 'path' or 'file_field.path'
     import_source = models.CharField(max_length=1, choices=ImportSource.choices)
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
+    # Facts about the file the file itself doesn't carry, supplied by whatever submitted it. Keys are
+    # per file_type and validated at upload time - @see upload.upload_metadata
+    metadata = models.JSONField(default=dict, blank=True)
 
     @property
     def exists(self):
-        if self.uploaded_file:
+        if self.file_field:
             return os.path.exists(self.get_filename())
         return False
 
     @property
     def size(self) -> int:
         if self.import_source == ImportSource.WEB_UPLOAD:
-            return self.uploaded_file.size
+            return self.file_field.size
         return os.stat(self.get_filename()).st_size
 
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
@@ -71,7 +88,7 @@ class UploadedFile(TimeStampedModel):
 
     def check_can_view(self, user_or_group: Union[User, Group]):
         if not self.can_view(user_or_group):
-            msg = f"You do not have permission to access UploadedFile pk={self.pk}"
+            msg = f"You do not have permission to access FileUpload pk={self.pk}"
             raise PermissionDenied(msg)
 
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
@@ -82,7 +99,7 @@ class UploadedFile(TimeStampedModel):
     @classmethod
     def allow_group_permission_delete(cls) -> bool:
         # The creator (or a superuser) may delete their upload via the group_permissions delete view.
-        # Defined here directly as UploadedFile is ownership-based rather than a Guardian model.
+        # Defined here directly as FileUpload is ownership-based rather than a Guardian model.
         return True
 
     def get_file(self):
@@ -90,13 +107,13 @@ class UploadedFile(TimeStampedModel):
 
     def get_filename(self):
         if self.import_source == ImportSource.WEB_UPLOAD:
-            filename = self.uploaded_file.path
+            filename = self.file_field.path
             # WEB_UPLOAD files are written by Django via PrivateUploadStorage rooted at UPLOAD_DIR.
             # Resolve symlinks so a poisoned DB row pointing at a symlink can't escape that root.
             upload_root = os.path.realpath(settings.UPLOAD_DIR)
             resolved = os.path.realpath(filename)
             if not (resolved == upload_root or resolved.startswith(upload_root + os.sep)):
-                raise PermissionDenied(f"UploadedFile pk={self.pk} resolves outside UPLOAD_DIR")
+                raise PermissionDenied(f"FileUpload pk={self.pk} resolves outside UPLOAD_DIR")
             filename = resolved
         else:
             filename = self.path
@@ -109,14 +126,42 @@ class UploadedFile(TimeStampedModel):
     def delete(self, using=None, keep_parents=False):
         super().delete(using=using, keep_parents=keep_parents)
         try:
-            if os.path.exists(self.uploaded_file.path):
-                os.unlink(self.uploaded_file.path)
-        except Exception:  # Someone may have deleted MEDIA_ROOT file already - causing uploaded_file to error here
+            if os.path.exists(self.file_field.path):
+                os.unlink(self.file_field.path)
+        except Exception:  # Someone may have deleted MEDIA_ROOT file already - causing file_field to error here
             pass
 
     def __str__(self):
         description = f"{self.name} ({self.created.astimezone(UserSettingsManager.get_user_timezone())})"
         return description
+
+
+class UploadData(models.Model):
+    """ Data created by processing a FileUpload - one per FileUpload/file_type """
+
+    # Retry-import deletes UploadData so the pipeline re-creates it from the file. Set False where the record
+    # links to data created before the pipeline started, as the pipeline can't make it again
+    created_by_pipeline = True
+
+    class Meta:
+        abstract = True
+
+    def get_data(self):
+        raise NotImplementedError()
+
+    @property
+    def genome_build(self) -> Optional[GenomeBuild]:
+        return None
+
+    def get_upload_context(self) -> dict:
+        """ Dict for displaying upload widget """
+        return {}
+
+    def get_data_url(self) -> Optional[str]:
+        if data := self.get_data():
+            if get_absolute_url := getattr(data, "get_absolute_url", None):
+                return get_absolute_url()
+        return None
 
 
 class PipelineFailedJobTerminateEarlyException(Exception):
@@ -130,7 +175,7 @@ class SkipUploadStepException(Exception):
 class UploadPipeline(models.Model):
     INITIAL_PROGRESS_STATUS = "Processing"
     status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     items_processed = models.BigIntegerField(null=True)
     processing_seconds_wall_time = models.IntegerField(null=True)
     processing_seconds_cpu_time = models.IntegerField(null=True)
@@ -140,10 +185,10 @@ class UploadPipeline(models.Model):
 
     @property
     def file_type(self):
-        return self.uploaded_file.file_type
+        return self.file_upload.file_type
 
     def get_file_type_display(self):
-        return self.uploaded_file.get_file_type_display()
+        return self.file_upload.get_file_type_display()
 
     def get_absolute_url(self) -> str:
         return reverse("view_upload_pipeline", kwargs={"upload_pipeline_id": self.pk})
@@ -175,7 +220,7 @@ class UploadPipeline(models.Model):
         self.progress_percent = 0
         self.save()
 
-        user = self.uploaded_file.user
+        user = self.file_upload.user
         create_event(user, f"import_{self.file_type}_start")
 
     def success(self, items_processed=None, processing_seconds_wall_time=None, processing_seconds_cpu_time=None):
@@ -188,7 +233,7 @@ class UploadPipeline(models.Model):
         self.progress_percent = 100.0
         self.save()
 
-        create_event(self.uploaded_file.user, f"import_{self.get_file_type_display()}_success")
+        create_event(self.file_upload.user, f"import_{self.get_file_type_display()}_success")
         if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
             self.remove_processing_files()
 
@@ -203,9 +248,9 @@ class UploadPipeline(models.Model):
 
         self._set_related_data_import_status(ImportStatus.ERROR)
 
-        user = self.uploaded_file.user
+        user = self.file_upload.user
         name = f"import_{self.file_type}_failed"
-        filename = self.uploaded_file.get_filename()
+        filename = self.file_upload.get_filename()
         create_event(user, name, error_message, filename=filename, severity=LogLevel.ERROR)
         message = f"UploadPipeline {self.pk} failed. " \
             f"Filename: {self.get_file_type_display()} Error: {error_message}"
@@ -214,9 +259,9 @@ class UploadPipeline(models.Model):
     def _set_related_data_import_status(self, import_status: ImportStatus):
         if vcf := self.vcf:
             set_vcf_and_samples_import_status(vcf, import_status)
-        elif self.uploaded_file.file_type == UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY:
+        elif self.file_upload.file_type == UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY:
             try:
-                mvec = self.uploaded_file.uploadedmanualvariantentrycollection.collection
+                mvec = self.file_upload.uploadedmanualvariantentrycollection.collection
                 mvec.import_status = import_status
                 mvec.save()
             except ObjectDoesNotExist:
@@ -224,9 +269,9 @@ class UploadPipeline(models.Model):
 
     @property
     def vcf(self):
-        if self.uploaded_file.file_type == UploadedFileTypes.VCF:
+        if self.file_upload.file_type == UploadedFileTypes.VCF:
             try:
-                return self.uploaded_file.uploadedvcf.vcf
+                return self.file_upload.uploadedvcf.vcf
             except (UploadedVCF.DoesNotExist, VCF.DoesNotExist) as _:
                 pass
         return None
@@ -262,38 +307,13 @@ class UploadPipeline(models.Model):
 
     @cached_property
     def genome_build(self) -> Optional[GenomeBuild]:
-        """ returns GenomeBuild based on uploaded file type
-            throws ValueError if it can't retrieve it """
+        """ returns GenomeBuild from the UploadData for this file type (None if it doesn't have one) """
+        # Inline as uploaded_file_type -> import_task_factory -> upload.models is a circular import
+        from upload.uploaded_file_type import get_upload_data_for_uploaded_file
 
-        # TODO: bit of a hack - do this more OO?
-        uploaded_file = self.uploaded_file
-        file_type = uploaded_file.file_type
-
-        genome_build = None
-        if file_type == UploadedFileTypes.VCF:
-            genome_build = uploaded_file.uploadedvcf.vcf.genome_build
-        elif file_type in (UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY, UploadedFileTypes.MANUAL_VARIANT_ENTRY):
-            # This can be either a manually entered variants or from variant classification
-            try:
-                genome_build = uploaded_file.uploadedmanualvariantentrycollection.collection.genome_build
-            except ObjectDoesNotExist:
-                try:
-                    genome_build = uploaded_file.uploadedclassificationimport.classification_import.genome_build
-                except ObjectDoesNotExist:
-                    pass
-        elif file_type == UploadedFileTypes.LIFTOVER:
-            genome_build = uploaded_file.uploadedliftover.liftover.genome_build
-        elif file_type == UploadedFileTypes.CLINVAR:
-            genome_build = uploaded_file.uploadedclinvarversion.clinvar_version.genome_build
-        elif file_type == UploadedFileTypes.VARIANT_TAGS:
-            genome_build = uploaded_file.uploadedvarianttags.variant_tags_import.genome_build
-        elif file_type == UploadedFileTypes.WIKI_VARIANT:
-            genome_build = uploaded_file.uploadedwikicollection.wiki_collection.genome_build
-
-        #  if genome_build is None:
-        #    msg = f"Don't know how to get GenomeBuild for UploadedFile type '{uploaded_file.get_file_type_display()}'"
-        #    raise ValueError(msg)
-        return genome_build
+        if upload_data := get_upload_data_for_uploaded_file(self.file_upload):
+            return upload_data.genome_build
+        return None
 
     def __str__(self):
         return f"UploadPipeline {self.pk} ({self.file_type}: {self.status})"
@@ -338,8 +358,8 @@ class UploadStep(models.Model):
     output_text = models.TextField(null=True)
 
     @property
-    def uploaded_file(self) -> UploadedFile:
-        return self.upload_pipeline.uploaded_file
+    def file_upload(self) -> FileUpload:
+        return self.upload_pipeline.file_upload
 
     @property
     def processing_seconds(self):
@@ -389,7 +409,7 @@ class UploadStep(models.Model):
         qs.update(status=self.status, progress_status=progress_status)
 
     def get_uploaded_vcf(self) -> 'UploadedVCF':
-        return self.uploaded_file.uploadedvcf
+        return self.file_upload.uploadedvcf
 
     def get_multi_input_files_and_records(self):
         input_filenames_and_records = []
@@ -444,17 +464,45 @@ class VCFImporter(models.Model):
         return f"{self.name} (v.{self.version}). Git: {self.code_git_hash}. Uses {self.vcf_parser} (v.{self.vcf_parser_version})"
 
 
-# Note: Probably the best thing to do is to make the below subclasses UploadedFile but migration might be a hassle
-class UploadedVCF(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+# UploadedVCF and the satellites in models_uploaded_files are heading towards being FileUpload
+# subclasses - that needs upload_pipeline/vcf_importer/pipeline_max_variants to move to UploadPipeline first
+class UploadedVCF(UploadData):
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
     vcf = models.OneToOneField(VCF, null=True, on_delete=CASCADE)
     upload_pipeline = models.OneToOneField(UploadPipeline, null=True, on_delete=SET_NULL)
-    # Keep track of highest KNOWN variant, so we can quickly check whether it has been annotated.
-    max_variant = models.ForeignKey(Variant, null=True, on_delete=SET_NULL)
     vcf_importer = models.ForeignKey(VCFImporter, null=True, on_delete=SET_NULL)
 
     def get_data(self) -> VCF:
         return self.vcf
+
+    @property
+    def genome_build(self) -> Optional[GenomeBuild]:
+        # vcf is only set once the VCF model has been created from the header
+        if vcf := self.vcf:
+            return vcf.genome_build
+        return None
+
+    @property
+    def max_variant_id(self) -> Optional[int]:
+        """ Highest known variant across all pipeline types (None if not imported/no variants).
+            Prefer is_fully_annotated() for annotation-completeness - this is for display/progress. """
+        data = self.pipeline_max_variants.aggregate(m=Max("max_variant_id"))
+        return data["m"]
+
+    def is_fully_annotated(self, variant_annotation_version) -> bool:
+        """ True when every pipeline type present in this VCF is fully annotated. A VCF has one
+            UploadedVCFPipelineMaxVariant row per pipeline type its variants are subject to; the
+            absence of a row for a type means "no variants for that pipeline" -> it's ignored.
+            This stops a stuck run of one type (eg a slow SV/AnnotSV run) blocking a VCF whose
+            variants of another type are all annotated (issue #1656). """
+        for row in self.pipeline_max_variants.all():
+            if row.max_variant_id is None:
+                continue
+            lowest_unannotated = get_lowest_unannotated_variant_id(variant_annotation_version,
+                                                                   pipeline_type=row.pipeline_type)
+            if row.max_variant_id >= lowest_unannotated:
+                return False
+        return True
 
     def get_upload_context(self) -> dict:
         """ Dict for displaying upload widget """
@@ -470,7 +518,7 @@ class UploadedVCF(models.Model):
         return context
 
     def __str__(self):
-        description = f"UploadedVCF for {self.uploaded_file}"
+        description = f"UploadedVCF for {self.file_upload}"
         if self.vcf:
             description += f" (proj: {self.vcf})"
         return description
@@ -484,14 +532,30 @@ def pre_delete_uploaded_vcf(sender, instance, *args, **kwargs):
             soft_delete_vcfs(vcf.user, vcf.pk)
 
 
+class UploadedVCFPipelineMaxVariant(models.Model):
+    """ Highest KNOWN variant per annotation pipeline type, so we can quickly check per-type whether a
+        VCF has been annotated. A row's absence for a type means the VCF has no variants subject to
+        that pipeline. Keyed by the same VariantAnnotationPipelineType enum AnnotationRun uses, so
+        adding a future pipeline type needs no schema change (see issue #1656). """
+    uploaded_vcf = models.ForeignKey(UploadedVCF, on_delete=CASCADE, related_name="pipeline_max_variants")
+    pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices)
+    max_variant = models.ForeignKey(Variant, null=True, on_delete=SET_NULL)
+
+    class Meta:
+        unique_together = ("uploaded_vcf", "pipeline_type")
+
+    def __str__(self):
+        return f"{self.uploaded_vcf}: {self.get_pipeline_type_display()} max_variant={self.max_variant_id}"
+
+
 class UploadedVCFPendingAnnotation(models.Model):
     uploaded_vcf = models.OneToOneField(UploadedVCF, on_delete=CASCADE)
     created = models.DateTimeField(auto_now_add=True)
     finished = models.DateTimeField(null=True)
     schedule_pipeline_stage_steps_celery_task = models.CharField(max_length=36, null=True)
 
-    def attempt_schedule_annotation_stage_steps(self, lowest_unannotated_variant_id):
-        if self.uploaded_vcf.max_variant is None or self.uploaded_vcf.max_variant_id < lowest_unannotated_variant_id:
+    def attempt_schedule_annotation_stage_steps(self, variant_annotation_version):
+        if self.uploaded_vcf.is_fully_annotated(variant_annotation_version):
             logging.info("UploadedVCF %s all variants are annotated", self.uploaded_vcf)
             self.finished = timezone.now()
             self.save()
@@ -531,7 +595,7 @@ class BackendVCF(models.Model):
 
     @property
     def user(self):
-        return self.uploaded_vcf.uploaded_file.user
+        return self.uploaded_vcf.file_upload.user
 
     @property
     def vcf(self):
@@ -543,7 +607,7 @@ class BackendVCF(models.Model):
         return record.variant_caller
 
     def get_samples_by_sequencing_sample(self):
-        return get_samples_by_sequencing_sample(self.filesystem_vcf.sample_sheet, self.vcf)
+        return get_samples_by_sequencing_sample(self.filesystem_vcf.get_sequencing_samples(), self.vcf)
 
     def __str__(self):
         backend = self.single_sample_vcf or self.joint_called_vcf or 'None'
@@ -606,7 +670,14 @@ class ModifiedImportedVariants(VCFImportInfo):
 
     @staticmethod
     def get_for_pipeline(upload_pipeline) -> 'ModifiedImportedVariants':
-        upload_step = upload_pipeline.uploadstep_set.get(name=ModifiedImportedVariants.LINKED_SUB_STEP_NAME)
+        """ Modifications hang off the normalize sub-step, since bcftools norm is what makes almost
+            all of them. A pipeline that skips bcftools entirely (gene-level variants have no
+            reference base to normalise against) still records merges, so those fall back to the
+            preprocess step itself. """
+        upload_step = upload_pipeline.uploadstep_set.filter(
+            name=ModifiedImportedVariants.LINKED_SUB_STEP_NAME).first()
+        if upload_step is None:
+            upload_step = upload_pipeline.uploadstep_set.get(name=UploadStep.PREPROCESS_VCF_NAME)
         return ModifiedImportedVariants.objects.get_or_create(upload_step=upload_step)[0]
 
     @property
@@ -636,11 +707,14 @@ class ModifiedImportedVariants(VCFImportInfo):
         if num_rmdup := miv_qs.filter(operation=ModifiedImportedVariantOperation.RMDUP).count():
             messages.append(f"{num_rmdup} duplicates removed")
 
+        if num_shared_locus := miv_qs.filter(operation=ModifiedImportedVariantOperation.SHARED_LOCUS).count():
+            messages.append(f"{num_shared_locus} allele frequencies summed across a shared locus")
+
         return ", ".join(messages)
 
 
 class ModifiedImportedVariant(models.Model):
-    """ Keep track of variants that were modified during import pre-processing by vt,
+    """ Keep track of variants that were modified during import pre-processing by bcftools,
         so people can find out why a variant they expected didn't turn up.  """
     BCFTOOLS_OLD_VARIANT_TAG = "BCFTOOLS_OLD_VARIANT"
     VT_OLD_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+):([^/]+)/([^/]+)$")
@@ -651,11 +725,16 @@ class ModifiedImportedVariant(models.Model):
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     operation = models.CharField(max_length=1, choices=ModifiedImportedVariantOperation.choices,
                                  default=ModifiedImportedVariantOperation.NORMALIZATION)
-    # OLD_MULTIALLELIC from vt: @see https://genome.sph.umich.edu/wiki/Vt#Decompose
+    # Set from bcftools --old-rec-tag when the record was a multi-allelic
+    # Legacy rows hold vt OLD_MULTIALLELIC: @see https://genome.sph.umich.edu/wiki/Vt#Decompose
     old_multiallelic = models.TextField(null=True)
-    # OLD_VARIANT from vt: @see https://genome.sph.umich.edu/wiki/Vt#Normalization
+    # Set from bcftools --old-rec-tag when the record was normalized
+    # Legacy rows hold vt OLD_VARIANT: @see https://genome.sph.umich.edu/wiki/Vt#Normalization
     old_variant = models.TextField(null=True)
     old_variant_formatted = models.TextField(null=True)  # consistently format for retrieval
+    # What the operation did, where the old_* fields (which are bcftools-shaped) can't say it. Used by
+    # SHARED_LOCUS to record the depths that were summed, so the per-record VAF stays reconstructable
+    operation_detail = models.TextField(null=True)
 
     @property
     def tool_name(self) -> Optional[str]:
@@ -677,18 +756,6 @@ class ModifiedImportedVariant(models.Model):
             alt = full_match.group(4)
             return VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
         raise ValueError(f"{old_variant} didn't match regex {ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN}")
-
-    @staticmethod
-    def vt_format_old_variant(old_variant: str, genome_build: GenomeBuild) -> list[str]:
-        """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
-            May return multiple values """
-        formatted_old_variants = []
-        for ov in ModifiedImportedVariant._vt_split_old_variant(old_variant):
-            vc = ModifiedImportedVariant._to_variant_coordinate(ov)
-            contig = genome_build.chrom_contig_mappings[vc.chrom]
-            variant_coordinate = VariantCoordinate(chrom=contig.name, position=vc.position, ref=vc.ref, alt=vc.alt, svlen=vc.svlen)
-            formatted_old_variants.append(ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate))
-        return formatted_old_variants
 
     @staticmethod
     def bcftools_format_old_variant(old_variant: str, svlen: Optional[str], genome_build: GenomeBuild) -> list[str]:

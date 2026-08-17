@@ -14,7 +14,7 @@ from annotation.models.models import VariantAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
 from library.constants import MINUTE_SECS
-from patients.models_enums import SimpleZygosity, GnomADPopulation
+from patients.models_enums import GnomADPopulation, SimpleZygosity
 from snpdb.models import VariantZygosityCountCollection
 
 
@@ -53,7 +53,7 @@ class PopulationNode(AnalysisNode):
     def has_filtering_allele_frequency(self) -> bool:
         try:
             return self.analysis.annotation_version.variant_annotation_version.gnomad_major_version >= 4
-        except AttributeError as e:
+        except AttributeError:
             return False
 
     def modifies_parents(self):

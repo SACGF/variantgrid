@@ -19,11 +19,25 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
-from annotation.models import AnnotationRangeLock, AnnotationRun, AnnotationVersion, VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.annotation_versions import _absorb_range_lock, merge_pending_range_locks
+from annotation.annotsv_annotation import get_annotsv_tsv_filename
+from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    VariantAnnotationVersion,
+)
+from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.sv_conservation import conservation_sidecar_filename
 from annotation.tasks import annotation_scheduler_task
+from annotation.tasks.annotate_variants import (
+    annotate_variants,
+    get_annotated_filename,
+    get_annotsv_dir,
+    get_vep_skipped_variants_filename,
+    import_annotation_run,
+)
 from annotation.tasks.annotation_scheduler_task import (
     _IMPORT_RUNNING_STATUSES,
     _VEP_RUNNING_STATUSES,
@@ -34,7 +48,6 @@ from annotation.tasks.annotation_scheduler_task import (
     dispatch_annotation_runs,
     reclaim_stalled_annotation_runs,
 )
-from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -97,7 +110,8 @@ class AnnotationDispatchTestCase(TestCase):
         with mock.patch.object(annotate_variants, "apply_async") as launch:
             _handle_range_lock(lock)
         runs = AnnotationRun.objects.filter(annotation_range_lock=lock)
-        self.assertEqual(runs.count(), 2)  # one per pipeline type
+        num_pipeline_types = len(VariantAnnotationPipelineType)
+        self.assertEqual(runs.count(), num_pipeline_types)
         for run in runs:
             self.assertEqual(run.status, AnnotationStatus.CREATED)
             self.assertIsNone(run.task_id)
@@ -576,6 +590,104 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertIsNone(run.dump_count)
         self.assertTrue(run.is_dispatchable())
 
+    # ================================================================== #1660: reclaim derives paths
+    def _run_with_dump(self, tmp_dir, lo_idx=0):
+        """ A run leased, expired, and part-way through the pipeline with its dump stem persisted -
+            which is all the row carries until dump_and_annotate_variants' final save. """
+        run = self._make_lock(lo_idx, lo_idx, count=100).annotationrun_set.first()
+        run.dump_start = timezone.now()
+        run.dump_end = timezone.now()
+        run.dump_count = 100
+        run.annotation_start = timezone.now()
+        run.vcf_dump_filename = os.path.join(tmp_dir, f"dump_{run.pk}__task.vcf.gz")
+        run.save()
+        self._lease(run, attempt_count=1, expires_in=-1)
+        return run
+
+    def test_reclaim_resumes_upload_only_when_row_has_no_annotated_filename(self):
+        # #1660: vcf_annotated_filename only reaches the DB at the final save, after VEP *and* AnnotSV.
+        # A run reclaimed mid-AnnotSV has a complete annotated VCF on disk but a NULL field, so reclaim
+        # must derive the path from the dump stem - reading the field would scrub finished VEP work.
+        with tempfile.TemporaryDirectory() as tmp_dir, \
+                override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
+            run = self._run_with_dump(tmp_dir)
+            annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
+            skipped_variants_filename = get_vep_skipped_variants_filename(annotated_filename)
+            open(annotated_filename, "w").close()  # VEP finished; row not saved yet
+            open(skipped_variants_filename, "w").close()  # ... written by Runner::finish()
+            self.assertIsNone(run.vcf_annotated_filename)
+
+            with mock.patch.object(AnnotationRun, "delete_related_objects"):
+                reclaim_stalled_annotation_runs(self.vav)
+
+            run.refresh_from_db()
+            self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
+            self.assertTrue(os.path.exists(annotated_filename))  # VEP output kept
+            # Derived paths recorded, so the upload-only relaunch can find what we kept
+            self.assertEqual(run.vcf_annotated_filename, annotated_filename)
+            self.assertEqual(run.vep_skipped_variants_filename, skipped_variants_filename)
+            self.assertTrue(run.is_upload_resumable())
+
+    def test_reclaim_scrubs_run_killed_mid_vep(self):
+        # #1710: VEP creates the annotated VCF at startup and writes to it progressively, so a run killed
+        # mid-VEP leaves a part-written file. Resuming that upload-only sent a truncated VCF to the import
+        # lane, where the #1701 checks failed it - turning one stalled run into an ERROR. Only the
+        # skipped-variants list (written by Runner::finish, after the output handle is closed) says VEP
+        # got to the end, so without it the run goes back for a full re-dump.
+        with tempfile.TemporaryDirectory() as tmp_dir, \
+                override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
+            run = self._run_with_dump(tmp_dir)
+            annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
+            with open(annotated_filename, "w") as f:
+                f.write("##fileformat=VCFv4.2\n")  # VEP got as far as the header
+            self.assertFalse(os.path.exists(get_vep_skipped_variants_filename(annotated_filename)))
+
+            with mock.patch.object(AnnotationRun, "delete_related_objects"):
+                reclaim_stalled_annotation_runs(self.vav)
+
+            run.refresh_from_db()
+            self.assertEqual(run.status, AnnotationStatus.CREATED)
+            self.assertTrue(run.is_dispatchable())
+            self.assertFalse(run.is_upload_resumable())
+            self.assertIsNone(run.vcf_annotated_filename)
+            self.assertIsNone(run.annotation_end)
+            self.assertIsNone(run.dump_count)  # re-dumped from scratch, so the old count can't stand
+            # The part-written VCF is collected, so the re-dump doesn't land next to it
+            self.assertFalse(os.path.exists(annotated_filename))
+
+    def test_reclaim_full_scrub_removes_derived_files(self):
+        # #1660: the row names only the dump; the annotated VCF, conservation sidecar and AnnotSV TSV are
+        # all derivable from that stem. Reclaim must collect them - a genuinely dead worker never runs
+        # _cleanup_reclaimed_run_files, so reclaim is the only collector for that case.
+        with tempfile.TemporaryDirectory() as tmp_dir, \
+                override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
+            run = self._run_with_dump(tmp_dir)
+            dump_filename = run.vcf_dump_filename
+            annotated_filename = get_annotated_filename(run, dump_filename)
+            annotsv_dir = get_annotsv_dir(run)
+            os.makedirs(annotsv_dir, exist_ok=True)
+            derived = [
+                dump_filename,
+                # Partial VEP output - the heartbeat's kill leaves this behind
+                annotated_filename,
+                conservation_sidecar_filename(annotated_filename),
+                get_annotsv_tsv_filename(dump_filename, annotsv_dir),
+            ]
+            for path in derived:
+                open(path, "w").close()
+            # Reclaim takes the scrub branch only when there's no annotated VCF to resume from
+            os.remove(annotated_filename)
+
+            with mock.patch.object(AnnotationRun, "delete_related_objects"):
+                reclaim_stalled_annotation_runs(self.vav)
+
+            for path in derived:
+                self.assertFalse(os.path.exists(path), f"reclaim left {os.path.basename(path)} behind")
+            run.refresh_from_db()
+            self.assertEqual(run.status, AnnotationStatus.CREATED)
+            self.assertIsNone(run.vcf_dump_filename)
+            self.assertTrue(run.is_dispatchable())
+
     # ================================================================== #1649: VEP / import lane split
     def test_dispatch_routes_by_status(self):
         # CREATED -> annotate_variants (VEP lane); ANNOTATION_COMPLETED-with-file -> import_annotation_run.
@@ -640,7 +752,7 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertEqual(_lane_in_flight_qs(self.vav, now, _IMPORT_RUNNING_STATUSES).count(), 0)
 
     def test_external_imported_run_launches_on_import_lane(self):
-        # #1568/#1649: an external run whose off-VM VEP was imported (external cleared, ANNOTATION_COMPLETED
+        # #1568/#1649: an external run whose external VEP was imported (external cleared, ANNOTATION_COMPLETED
         # with an annotated VCF) rejoins post-VEP and launches on the import lane, never annotate_variants.
         lock = self._make_lock(0, 0, count=100, external=True)
         run = lock.annotationrun_set.first()

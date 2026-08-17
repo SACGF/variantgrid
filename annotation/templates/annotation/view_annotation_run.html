@@ -33,6 +33,12 @@
               <button type='submit' class="btn btn-primary">Subdivide AnnotationRun</button>
           </form>
         {% endif %}
+        {% if can_make_annotation_run_local %}
+          <form id="make-annotation-run-local-form" action={% url 'make_annotation_run_local' annotation_run.pk %} method="post">
+            {% csrf_token %}
+              <button type='submit' class="btn btn-primary">Make Local (annotate locally)</button>
+          </form>
+        {% endif %}
     </div>
 
     <div class="card">
@@ -54,7 +60,7 @@
     <div class="card mt-4">
         <div class="card-header">Annotation Run ({{ annotation_run.pk }})</div>
         <div class="card-body">
-            {% labelled hint="tiny" label="Status" %}{{ annotation_run.get_status_display }}{% endlabelled %}
+            {% labelled hint="tiny" label="Status" %}{{ annotation_run.get_status.label }}{% endlabelled %}
             {% labelled hint="tiny" label="Pipeline Type" %}{{ annotation_run.get_pipeline_type_display }}{% endlabelled %}
 
             <hr/>

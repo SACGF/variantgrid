@@ -1,9 +1,11 @@
-from collections.abc import Callable
-from typing import Iterable, Optional, Any, TypeVar, Generic, Type
 import json
+from collections.abc import Iterable
+from typing import Any, Optional, TypeVar, Generic, Type, Callable
+
 import sqlparse
 from dataclasses_json import DataClassJsonMixin
-from django.db import models, connection, transaction
+from django.db import connection, transaction, models
+
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
 from django.db.models.enums import TextChoices, IntegerChoices

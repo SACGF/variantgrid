@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from analysis.models import Analysis, CohortNode, AnalysisNode, AllVariantsNode
+from analysis.models import AllVariantsNode, Analysis, AnalysisNode, CohortNode
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio

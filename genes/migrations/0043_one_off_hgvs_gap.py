@@ -2,20 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
-
-def _test_has_gene_annotations_without_url(apps):
-    GeneAnnotationImport = apps.get_model("genes", "GeneAnnotationImport")
-    old_imports = GeneAnnotationImport.objects.filter(url__isnull=True)
-    new_imports = GeneAnnotationImport.objects.filter(url__isnull=False)
-    return old_imports.exists() and not new_imports.exists()
-
-
-def _test_has_classifications(apps):
-    Classification = apps.get_model("classification", "Classification")
-    return Classification.objects.exists()
-
 
 class Migration(migrations.Migration):
 
@@ -23,13 +9,9 @@ class Migration(migrations.Migration):
         ('genes', '0042_one_off_refseq_gene_version_zero'),
     ]
 
-    operations = [
-        # Install new annotations
-        ManualOperation.operation_other(args=[
-            "** Before fix_legacy_classification_alignment_gap_hgvs_matching ** - Import gene annotation - see https://github.com/SACGF/variantgrid/issues/494#issuecomment-943977004"],
-            test=_test_has_gene_annotations_without_url),
-        # Once that's done,
-        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_legacy_classification_alignment_gap_hgvs_matching"]),
-                        test=_test_has_classifications),
-
-    ]
+    # Neutralised: this used to register the 'Import gene annotation' reminder plus a manual
+    # 'fix_legacy_classification_alignment_gap_hgvs_matching' task (#494). That command matched against the
+    # pre-cdot transcript JSON schema and rematched via the pre-ImportedAlleleInfo API, so it has been
+    # deleted - classification/0167_one_off_rematch_alignment_gap_allele_infos registers its replacement,
+    # fix_legacy_imported_allele_info_alignment_gap, and clears the orphaned task row.
+    operations = []

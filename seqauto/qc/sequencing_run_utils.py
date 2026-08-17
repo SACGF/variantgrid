@@ -8,7 +8,7 @@ Place to put common data gathering utils for SequencingRunQC and QCExecsummary
 
 from collections import defaultdict
 
-from seqauto.models import SequencingRun, IlluminaFlowcellQC, ReadQ30, QCExecSummary, QCType
+from seqauto.models import IlluminaFlowcellQC, QCExecSummary, QCType, ReadQ30, SequencingRun
 from seqauto.models.models_enums import QCCompareType
 
 ILLUMINA_FLOWCELL_QC_COLUMNS = ["mean_cluster_density", "mean_pf_cluster_density", "total_clusters",
@@ -99,7 +99,7 @@ def get_qc_exec_summary_data(sequencing_run, qc_compare_type, qc_exec_summary, i
     qc_exec_summary_columns = list(exec_summary_qc.qccolumn_set.all().values_list("field", flat=True))
 
     coverage_columns = qc_exec_summary.get_coverage_columns()
-    sequencing_sample = "qc__bam_file__unaligned_reads__sequencing_sample__sample_name"
+    sequencing_sample = "qc__bam_file__sequencing_sample__sample_name"
     sequencing_run_columns = get_sequencing_run_columns(ss_path, ['name', 'gold_standard'])
     values = ["pk", sequencing_sample] + qc_exec_summary_columns + coverage_columns + sequencing_run_columns
     non_null_kwargs = {f"{f}__isnull": False for f in coverage_columns}

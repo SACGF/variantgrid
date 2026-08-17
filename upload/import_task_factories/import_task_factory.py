@@ -1,7 +1,7 @@
 import importlib
 import inspect
 from abc import ABC, abstractmethod
-from typing import Iterable, Type
+from collections.abc import Iterable
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -19,7 +19,7 @@ class ImportTaskFactory(ABC):
         pass
 
     @abstractmethod
-    def get_data_classes(self) -> Iterable[Type[models.Model]]:
+    def get_data_classes(self) -> Iterable[type[models.Model]]:
         """ e.g. return UploadedVCF, UploadedGeneList """
         pass
 
@@ -27,6 +27,11 @@ class ImportTaskFactory(ABC):
     def get_possible_extensions(self) -> Iterable[str]:
         """ e.g. return ['csv', 'xls'] """
         pass
+
+    def get_metadata_keys(self) -> frozenset[str]:
+        """ Upload metadata keys this file type accepts - anything else is rejected at upload time.
+            @see upload.upload_metadata """
+        return frozenset()
 
     def get_processing_ability(self, user: User, filename: str, file_extension: str) -> int:
         """ If you can't process EVERY file of type in extensions, overwrite this and check.

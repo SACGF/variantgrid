@@ -9,5 +9,11 @@ class SeqautoConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
-        from seqauto.signals import experiment_search, sequencing_run_search, enrichment_kit_search
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        from seqauto.signals import (  # noqa: F401
+            enrichment_kit_search,
+            experiment_search,
+            sequencing_run_search,
+        )
         # pylint: enable=import-outside-toplevel,unused-import

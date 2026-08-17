@@ -4,18 +4,21 @@ from collections import defaultdict
 from functools import reduce
 
 from django.conf import settings
-from django.db.models import Q, Model
+from django.db.models import Model, Q
 from django.template import Library
 
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
-from analysis.models import MutationalSignature, Analysis, AnalysisTemplate
+from analysis.models import Analysis, AnalysisTemplate, MutationalSignature
 from analysis.models.models_karyomapping import KaryomappingAnalysis
-from analysis.related_analyses import get_related_analysis_details_for_samples, \
-    get_related_analysis_details_for_cohort, \
-    get_related_analysis_details_for_pedigree, get_related_analysis_details_for_quad, \
-    get_related_analysis_details_for_trio
+from analysis.related_analyses import (
+    get_related_analysis_details_for_cohort,
+    get_related_analysis_details_for_pedigree,
+    get_related_analysis_details_for_quad,
+    get_related_analysis_details_for_samples,
+    get_related_analysis_details_for_trio,
+)
 from pedigree.models import Pedigree
-from snpdb.models import Cohort, Trio, Quad
+from snpdb.models import Cohort, Trio
 
 register = Library()
 
@@ -45,7 +48,7 @@ def get_all_analyses_for_user(user, samples, cohorts=None, trios=None, quads=Non
 
 
 def update_context_with_related_analysis(context, samples, cohorts=None, trios=None, quads=None,
-                                         pedigrees=None, show_sample_info=True):
+                                         pedigrees=None, show_sample_info=True, show_create_analyses=True):
     user = context["user"]
     analysis_details = get_all_analyses_for_user(user, samples, cohorts=cohorts, trios=trios,
                                                  quads=quads, pedigrees=pedigrees)
@@ -58,12 +61,13 @@ def update_context_with_related_analysis(context, samples, cohorts=None, trios=N
                     "karyomapping_analyses": karyomapping_analyses,
                     "show_output_nodes": settings.ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES,
                     "show_sample_info": show_sample_info,
+                    "show_create_analyses": show_create_analyses,
                     "variant_tag_genome_build_names": variant_tag_genome_build_names,
                     "analysis_ids_list": analyses_list})
 
 
 @register.inclusion_tag("analysis/tags/related_analyses_for_samples.html", takes_context=True)
-def related_analyses_for_samples(context, samples, show_sample_info):
+def related_analyses_for_samples(context, samples, show_sample_info, show_create_analyses=True):
     cohorts = Cohort.objects.filter(cohortsample__sample__in=samples).distinct()
     trio_sample_q_list = [Q(**{f"{trio_field}__sample__in": samples}) for trio_field in ["mother", "father", "proband"]]
     trios = Trio.objects.filter(cohort__in=cohorts).filter(reduce(operator.or_, trio_sample_q_list)).distinct()
@@ -71,7 +75,8 @@ def related_analyses_for_samples(context, samples, show_sample_info):
     sample_mutational_signatures = MutationalSignature.objects.filter(sample__in=samples).distinct().select_related("sample")
 
     update_context_with_related_analysis(context, samples, cohorts=cohorts, trios=trios, pedigrees=pedigrees,
-                                         show_sample_info=show_sample_info)
+                                         show_sample_info=show_sample_info,
+                                         show_create_analyses=show_create_analyses)
     context["samples"] = samples
     context["sample_mutational_signatures"] = sample_mutational_signatures
     return context

@@ -26,7 +26,7 @@ class BuiltInFilterNode(AnalysisNode):
         return Q(clinvar__review_status__in=review_statuses)
 
     def _get_node_q(self) -> Optional[Q]:
-        q = get_extra_filters_q(self.analysis.user, self.analysis.genome_build, self.built_in_filter)
+        q = get_extra_filters_q(self.analysis.user, self.analysis.annotation_version, self.built_in_filter)
         if self.built_in_filter == BuiltInFilters.CLINVAR and self.clinvar_stars_min:
             q &= self.get_clinvar_stars_q()
         elif self.built_in_filter == BuiltInFilters.COSMIC and self.cosmic_count_min:

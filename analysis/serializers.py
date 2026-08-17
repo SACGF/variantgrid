@@ -1,21 +1,48 @@
 from rest_framework import serializers
 
-from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, PhenotypeNode, BuiltInFilterNode, \
-    ClassificationsNode, DamageNode, VennNode, ZygosityNode, TrioNode, CohortNode, PedigreeNode, \
-    TissueNode, SelectedInParentNode, SampleNode, PopulationNode, PopulationNodeGnomADPopulation, GeneListNode, \
-    IntersectionNode, GeneListNodeGeneList, Analysis, AlleleFrequencyNode, AllVariantsNode, TagNode, MergeNode, \
-    PhenotypeNodeOntologyTerm, CandidateSearchRun
+from analysis.models import (
+    AlleleFrequencyNode,
+    AllVariantsNode,
+    Analysis,
+    AnalysisVariable,
+    BuiltInFilterNode,
+    CandidateSearchRun,
+    ClassificationsNode,
+    CohortNode,
+    DamageNode,
+    FilterNode,
+    FilterNodeItem,
+    GeneListNode,
+    GeneListNodeGeneList,
+    IntersectionNode,
+    MergeNode,
+    PedigreeNode,
+    PhenotypeNode,
+    PhenotypeNodeOntologyTerm,
+    PopulationNode,
+    PopulationNodeGnomADPopulation,
+    SampleNode,
+    SelectedInParentNode,
+    TagNode,
+    TissueNode,
+    TrioNode,
+    VennNode,
+    ZygosityNode,
+)
 from analysis.models.models_variant_tag import VariantTag
-from analysis.models.nodes.analysis_node import NodeAlleleFrequencyRange, NodeAlleleFrequencyFilter, AnalysisNode, \
-    NodeWiki
+from analysis.models.nodes.analysis_node import (
+    AnalysisNode,
+    NodeAlleleFrequencyFilter,
+    NodeAlleleFrequencyRange,
+    NodeWiki,
+)
 from analysis.models.nodes.filters.conservation_node import ConservationNode
-from genes.models import GeneList
 from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer
 from ontology.models import OntologyTerm
 from ontology.serializers import OntologyTermSerializer
-from snpdb.serializers import UserSerializer, TimestampField
+from snpdb.serializers import TimestampField, UserSerializer
 
 
 class NodeAlleleFrequencyRangeSerializer(serializers.ModelSerializer):

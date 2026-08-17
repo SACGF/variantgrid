@@ -3,12 +3,13 @@ import json
 from dal import forward
 from django import forms
 from django.forms.models import fields_for_model
-from django.forms.widgets import TextInput, HiddenInput
+from django.forms.widgets import HiddenInput, TextInput
 from django.utils.text import slugify
 
 from analysis import models
-from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis, MOINode
-from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
+from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
+from analysis.models.enums import SampleNodeSourceLevel
+from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
@@ -22,24 +23,27 @@ from analysis.models.nodes.filters.tissue_node import TissueNode
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.classifications_node import ClassificationsNode
-from analysis.models.nodes.sources.cohort_node import CohortNode, CohortNodeZygosityFiltersCollection, \
-    CohortNodeZygosityFilter
+from analysis.models.nodes.sources.cohort_node import (
+    CohortNode,
+    CohortNodeZygosityFilter,
+    CohortNodeZygosityFiltersCollection,
+)
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
-from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.quad_node import QuadNode
+from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from annotation.models import VariantAnnotation
 from annotation.pathogenicity_predictions import TOOLS
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.hgvs import get_hgvs_variant_coordinate, get_hgvs_variant, HGVSException
-from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
+from genes.hgvs import HGVSException, get_hgvs_variant, get_hgvs_variant_coordinate
+from genes.models import CustomTextGeneList, GeneList, GeneListCategory, PanelAppPanel
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput, StarsWidget
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
-from snpdb.models import GenomicInterval, Sample, VCFFilter, Tag, Lab
+from snpdb.models import GenomicInterval, Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_genome import Contig
 
 # Can use this for ModelForm.exclude to only use node specific fields
@@ -82,7 +86,9 @@ class VCFLocusFiltersMixin(forms.Form):
         return json.loads(data)
 
     def save_vcf_locus_filters(self, node):
-        if vcf := node._get_vcf():
+        # A node may span VCFs - one selection of filter ids, which NodeVCFFilter translates into
+        # each VCF's own codes at query time
+        if vcfs := node.get_vcf_locus_filter_vcfs():
             vcf_locus_filters = self.cleaned_data["vcf_locus_filters"]
             NodeVCFFilter.objects.filter(node=node).delete()
 
@@ -91,7 +97,9 @@ class VCFLocusFiltersMixin(forms.Form):
                     if filter_id == "PASS":
                         vcf_filter = None
                     else:
-                        vcf_filter = VCFFilter.objects.get(vcf=vcf, filter_id=filter_id)
+                        vcf_filter = VCFFilter.objects.filter(vcf__in=vcfs, filter_id=filter_id).first()
+                        if vcf_filter is None:
+                            continue
                     NodeVCFFilter.objects.create(node=node, vcf_filter=vcf_filter)
 
 
@@ -755,20 +763,57 @@ class PopulationNodeForm(BaseNodeForm):
         return node
 
 
-class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
+class SampleThresholdsMixin(forms.Form):
+    """ Hidden field, automatically populated in base_editor ajaxForm beforeSerialize.
+
+        Per sample threshold overrides - what sapath#301 asked for, different cutoffs per caller. A
+        row is only stored where the user overrode the node's own values, so a sample linked to the
+        extraction later gets the node defaults rather than nothing """
+    sample_thresholds = forms.CharField(widget=HiddenInput(), required=False)
+    THRESHOLD_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl"]
+
+    def clean_sample_thresholds(self):
+        data = self.cleaned_data["sample_thresholds"]
+        if not data:
+            return {}
+        return {int(sample_id): values for sample_id, values in json.loads(data).items()}
+
+    def save_sample_thresholds(self, node):
+        sample_thresholds: dict = self.cleaned_data.get("sample_thresholds") or {}
+        threshold_set = node.samplenodesamplethreshold_set
+        threshold_set.all().delete()
+
+        node_values = {f: getattr(node, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
+        for sample in node.get_source_samples():
+            if (values := sample_thresholds.get(sample.pk)) is None:
+                continue
+            values = {f: values.get(f, node_values[f]) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
+            if values != node_values:  # Only store what's actually an override
+                threshold_set.create(sample=sample, **values)
+
+
+class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin, VCFSourceNodeForm):
     GENOTYPE_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl",
                        "zygosity_ref", "zygosity_het", "zygosity_hom", "zygosity_unk",
                        "allele_frequency"]
-    LOCKED_INPUT_FIELDS = ['sample', 'restrict_to_qc_gene_list']
-    genome_build_fields = ["sample"]
+    LOCKED_INPUT_FIELDS = ['sample', 'extraction', 'restrict_to_qc_gene_list']
+    # Only meaningful over a single sample - hidden at group levels rather than given an invented meaning
+    SAMPLE_LEVEL_FIELDS = ["sample", "sample_gene_list", "restrict_to_qc_gene_list"]
+    SOURCE_LEVEL_FIELDS = {
+        SampleNodeSourceLevel.SAMPLE: "sample",
+        SampleNodeSourceLevel.EXTRACTION: "extraction",
+    }
+    genome_build_fields = ["sample", "extraction"]
     exclude_archived = True
 
     class Meta:
         model = SampleNode
-        exclude = list(ANALYSIS_NODE_FIELDS) + ["has_gene_coverage"]
+        exclude = list(ANALYSIS_NODE_FIELDS) + ["has_gene_coverage", "specimen", "patient"]
         widgets = {
             "sample": ModelSelect2(url='sample_autocomplete',
                                    attrs={'data-placeholder': 'Sample...'}),
+            "extraction": ModelSelect2(url='extraction_autocomplete',
+                                       attrs={'data-placeholder': 'Extraction...'}),
             "min_ad": WIDGET_INTEGER_MIN_0,
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
@@ -781,6 +826,10 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
     def __init__(self, *args, has_genotype=True, lock_input_sources=False, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # The levels that have a resolver - Specimen and Patient join them with a wider sample query
+        self.fields["source_level"].choices = [(level, SampleNodeSourceLevel(level).label)
+                                               for level in SampleNodeForm.SOURCE_LEVEL_FIELDS]
+
         remove_fields = []
         if has_genotype is False:
             remove_fields.extend(SampleNodeForm.GENOTYPE_FIELDS)
@@ -788,15 +837,28 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         if lock_input_sources:
             remove_fields.extend(SampleNodeForm.LOCKED_INPUT_FIELDS)
 
+        for level, field_name in SampleNodeForm.SOURCE_LEVEL_FIELDS.items():
+            if level != self.instance.source_level:
+                remove_fields.append(field_name)
+
+        if self.instance.is_group_level:
+            remove_fields.extend(SampleNodeForm.SAMPLE_LEVEL_FIELDS)
+
         for f in remove_fields:
             if f in self.fields:
                 del self.fields[f]
 
         # Set forward
-        sample_gl = GeneListCategory.get_or_create_category(GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
-        self.fields["sample_gene_list"].widget.forward = [
-            forward.Const(sample_gl.pk, "category")
-        ]
+        if "sample_gene_list" in self.fields:
+            sample_gl = GeneListCategory.get_or_create_category(GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
+            self.fields["sample_gene_list"].widget.forward = [
+                forward.Const(sample_gl.pk, "category")
+            ]
+
+    def save(self, commit=True):
+        node = super().save(commit=commit)
+        self.save_sample_thresholds(node)
+        return node
 
 
 class SelectedInParentNodeForm(BaseNodeForm):

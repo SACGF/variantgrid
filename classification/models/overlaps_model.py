@@ -17,7 +17,7 @@ from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKe
 from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
 from classification.enums.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSComponents, HGVSDisplay
 from library.guardian_utils import admin_bot
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import first, AuditUtils, AuditSingleChange
@@ -291,7 +291,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
                 c_hgvses.add(cg.latest_allele_info.preferred_c_hgvs_obj())
         return list(sorted(c_hgvses))
 
-    def c_hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> CHGVS:
+    def c_hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
         # if no genome_build provided, use the imported value
         # TODO, if there are multiple contributions from the same lab, should we get multiple c.HGVSs?
         lab_classification_grouping = self.contributions.filter(classification_grouping__lab=lab).first()
@@ -299,7 +299,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             # the lab doesn't actually have a horse in this game
             lab_classification_grouping = self.contributions.filter(classification_grouping__isnull=False).first()
         if not lab_classification_grouping:
-            return CHGVS()  # got nothing to work with in this overlap
+            return HGVSDisplay(components=HGVSComponents())  # got nothing to work with in this overlap
         if genome_build:
             return lab_classification_grouping.classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build)
         else:

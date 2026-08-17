@@ -1,9 +1,10 @@
 import json
 import logging
 import uuid
+from collections.abc import Collection, Iterable
 from datetime import timedelta
 from html import escape
-from typing import Union, Optional, Iterable, Any, Collection
+from typing import Any, Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -14,25 +15,37 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
-from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
-from classification.enums import SpecialEKeys, TestingContextBucket, TriageComment
+from classification.criteria_strengths import AcmgPointScore, CriteriaStrength
+from classification.enums import SpecialEKeys, ClassificationResultValue, TestingContextFull, TestingContextBucket, \
+    TriageStatus
 from classification.enums.classification_enums import ShareLevel
-from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
-    EvidenceMixin, Overlap, ClassificationGroupingEntry, \
-    OverlapContribution, ClassificationGrouping, ClassificationResultValue, TestingContextFull, ConditionReference
-from classification.models.classification import ClassificationModification, Classification
-from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
-    ClassificationGroupUtils
+from classification.models import (
+    ClassificationLabSummary,
+    ConditionResolved,
+    ConditionTextMatch,
+    EvidenceMixin,
+    ImportedAlleleInfo, OverlapContribution, ClassificationGroupingEntry, ClassificationGrouping, ConditionReference,
+    Overlap,
+)
+from classification.models.classification import Classification, ClassificationModification
+from classification.models.classification_groups import (
+    ClassificationGroup,
+    ClassificationGroups,
+    ClassificationGroupUtils,
+)
 from classification.models.classification_ref import ClassificationRef
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport
-from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
+from classification.models.discordance_models_utils import (
+    DiscordanceReportRowData,
+    DiscordanceReportTableData,
+)
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
-from classification.enums.overlaps_enums import TriageStatus
+#from classification.models.evidence_mixin_summary_cache import clinical_significance_pills
 from classification.services.overlaps_services import OverlapEntryCompare
 from eventlog.models import ViewEvent
-from genes.hgvs import CHGVS
+from genes.hgvs import HGVSComponents, HGVSDisplay
 from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
 from ontology.models import OntologyTerm
@@ -188,7 +201,7 @@ def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = N
     elif (isinstance(val, list) or isinstance(val, set)) and len(val) == 0:
         if value_if_none is not None:
             return value_if_none
-        return mark_safe(f'<span class="no-value">-</span>')
+        return mark_safe('<span class="no-value">-</span>')
     return pretty_val
 
 
@@ -509,22 +522,25 @@ def classification_table(
     }
 
 
-def _to_c_hgvs(c_hgvs: Any) -> CHGVS:
+def _to_c_hgvs(c_hgvs: Any) -> HGVSDisplay:
     if isinstance(c_hgvs, ClassificationModification):
-        if c_hgvs := c_hgvs.classification.get_c_hgvs(GenomeBuildManager.get_current_genome_build()):
-            c_hgvs = CHGVS(c_hgvs)
-            c_hgvs.genome_build = GenomeBuildManager.get_current_genome_build()
-    elif isinstance(c_hgvs, str):
-        c_hgvs = CHGVS(c_hgvs)
-
-    if c_hgvs is None:  # might have got a none c.hgvs from the ClassificationModification
-        c_hgvs = CHGVS("")
+        genome_build = GenomeBuildManager.get_current_genome_build()
+        if c_hgvs_str := c_hgvs.classification.get_c_hgvs(genome_build):
+            return HGVSDisplay.parse(c_hgvs_str, genome_build=genome_build)
+        # might have got a none c.hgvs from the ClassificationModification
+        return HGVSDisplay.parse("")
+    if isinstance(c_hgvs, str):
+        return HGVSDisplay.parse(c_hgvs)
+    if isinstance(c_hgvs, HGVSComponents):
+        return HGVSDisplay(c_hgvs)
+    if c_hgvs is None:
+        return HGVSDisplay.parse("")
 
     return c_hgvs
 
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[CHGVS, ClassificationModification, str], show_genome_build: Optional[bool] = None, inline: bool = False):
+def c_hgvs(c_hgvs: Union[HGVSDisplay, HGVSComponents, ClassificationModification, str], show_genome_build: Optional[bool] = None, inline: bool = False):
     c_hgvs = _to_c_hgvs(c_hgvs)
 
     if show_genome_build is None:

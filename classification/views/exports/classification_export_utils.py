@@ -1,14 +1,18 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable, Any, Optional
+from typing import Any, Optional
 
 from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import ClassificationModification
 from classification.views.classification_export_utils import TranscriptGroup, VariantWithChgvs
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
-from genes.hgvs import CHGVS
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+)
+from genes.hgvs import HGVSComponents
 from library.log_utils import report_message
 
 
@@ -54,7 +58,7 @@ class CHGVSData:
     def source(self) -> ClassificationFilter:
         return self.allele.source
 
-    chgvs: CHGVS
+    chgvs: HGVSComponents
     different_chgvs: bool = False
     cms: list[ClassificationModification] = field(default_factory=list)
     allele_origin: Optional[AlleleOriginBucket] = None
@@ -104,14 +108,14 @@ class CHGVSData:
 
         genome_build = allele_data.source.genome_build
         for vcm in allele_data.cms:
-            c_parts = CHGVS(vcm.classification.get_c_hgvs(genome_build=genome_build, use_compat=use_compat))
+            c_parts = HGVSComponents(vcm.classification.get_c_hgvs(genome_build=genome_build, use_compat=use_compat))
             if c_parts:
                 transcript_parts = c_parts.transcript_parts
                 if transcript_parts:
                     transcript_no_version = transcript_parts.identifier
                     by_versionless_transcript[transcript_no_version].add(VariantWithChgvs(vcm=vcm, chgvs=c_parts))
                 else:
-                    report_message('MVL export : Could not extract transcript from c.hgvs', extra_data={'chgvs': c_parts.full_c_hgvs})
+                    report_message('MVL export : Could not extract transcript from c.hgvs', extra_data={'chgvs': c_parts.full_hgvs})
             else:
                 report_message('MVL export : Could not liftover', extra_data={'imported_chgvs': vcm.get(SpecialEKeys.C_HGVS), 'id': vcm.classification_id})
 

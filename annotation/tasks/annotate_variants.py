@@ -1,33 +1,82 @@
 import gzip
 import logging
 import os
+import threading
+from datetime import timedelta
 
 import celery
 from celery import chain
 from celery.canvas import Signature
 from django.conf import settings
+from django.db import connection, transaction
 from django.db.models.functions.math import Abs
 from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.annotsv_annotation import run_annotsv, annotsv_check_command_line_version_match
+from annotation.annotsv_annotation import (
+    annotsv_check_command_line_version_match,
+    get_annotsv_tsv_filename,
+    run_annotsv,
+)
+from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
-from annotation.signals.manual_signals import annotation_run_complete_signal
+from annotation.signals.manual_signals import (
+    annotation_run_complete_signal,
+    annotation_run_discarded_signal,
+)
+from annotation.sv_conservation import (
+    conservation_sidecar_filename,
+    get_sv_conservation_tracks,
+    score_sv_vcf,
+    write_conservation_sidecar,
+)
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
-from annotation.vep_annotation import get_vep_command, vep_check_command_line_version_match
+from annotation.vep_annotation import (
+    get_vep_command,
+    get_vep_skipped_variants_filename,
+    vep_check_command_line_version_match,
+)
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
-from library.log_utils import get_traceback, report_message, log_traceback
+from library.log_utils import get_traceback, log_traceback, report_message
 from library.utils import execute_cmd
-from library.utils.file_utils import name_from_filename, mk_path_for_file
-from snpdb.variants_to_vcf import write_contig_sorted_values_to_vcf_file, VARIANT_GRID_INFO_DICT
-
+from library.utils.file_utils import mk_path_for_file, name_from_filename
+from snpdb.variants_to_vcf import VARIANT_GRID_INFO_DICT, write_contig_sorted_values_to_vcf_file
 
 # #2667: kick the single-authority dispatcher by name to avoid importing annotation_scheduler_task
 # (which imports this module). Mirror of analysis _trigger_rescheduling (#346).
 DISPATCH_ANNOTATION_RUNS_TASK = "annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs"
+
+
+def _record_lock_failure(annotation_run_id, task_id: str, msg: str):
+    """ #1658: record a failed task_id lock grab without touching any other column.
+
+        Reaching this means another task holds the lock - we have just proved we do NOT own this run. A
+        full save() of our instance here writes it whole over the winner's row, and the instance was loaded
+        *before* the grab, so its task_id is the None that made us try in the first place: we would blank
+        the winner's execution lock. The run then looks dispatchable (null task_id + dead lease) while the
+        winner is still mid-VEP, so a third attempt can launch, and the winner's own lease heartbeat sees
+        the task_id mismatch and aborts it. Same cascade as a reclaim, but no reclaim needed - a
+        double-dispatch is enough, and the winner may be only seconds in.
+
+        Re-read under a row lock rather than reusing our stale copy, so a set_task_log the winner commits
+        concurrently isn't dropped on the way through this read-modify-write. """
+    with transaction.atomic():
+        annotation_run = AnnotationRun.objects.select_for_update().filter(pk=annotation_run_id).first()
+        if annotation_run is None:
+            return  # deleted under us - nothing to record against
+        celery_task_logs = annotation_run.celery_task_logs or {}
+        celery_task_logs.setdefault(task_id, {})["lock_failed"] = msg
+        AnnotationRun.objects.filter(pk=annotation_run_id).update(celery_task_logs=celery_task_logs)
+
+
+class AnnotationRunReclaimedError(Exception):
+    """ #1658: this attempt lost its run - the lease expired, the dispatcher reclaimed the run and handed
+        it to a fresh attempt, and this one was aborted (or finished) too late to own the result. Celery
+        should still record the attempt as failed, but a distinct type keeps "did VEP break?" separable
+        from "did we lose the race?" in logs and in any future retry logic. """
 
 
 def _trigger_dispatch(variant_annotation_version_id):
@@ -56,6 +105,93 @@ def _dispatch_trigger_sig(variant_annotation_version_id) -> Signature:
     return Signature(DISPATCH_ANNOTATION_RUNS_TASK, args=(variant_annotation_version_id,), immutable=True)
 
 
+class AnnotationRunLeaseHeartbeat:
+    """ Renews an AnnotationRun's dispatcher lease on a background thread while the task actively runs,
+        so a long-but-healthy run (e.g. a multi-hour structural-variant VEP dump, which has no SV-count
+        cap) is never mistaken for a dead worker and reclaimed into a duplicate. Because a live run keeps
+        its own lease fresh, ANNOTATION_RUN_LEASE_SECONDS can stay short - a genuinely dead worker stops
+        heartbeating and is reclaimed within one window.
+
+        The renew is guarded on our own task_id: if the run was reclaimed/reassigned out from under us the
+        update matches no rows, so we never stomp a lease another worker now holds - and we stop. Each
+        successful renew also syncs annotation_run.lease_expires in memory so the pipeline's own full
+        save() calls can't write back the stale load-time value over the fresh lease. """
+
+    def __init__(self, annotation_run: 'AnnotationRun', task_id: str):
+        self.annotation_run = annotation_run
+        self.task_id = task_id
+        self.lease_seconds = settings.ANNOTATION_RUN_LEASE_SECONDS
+        self.interval = settings.ANNOTATION_RUN_LEASE_HEARTBEAT_SECONDS
+        self._stop = threading.Event()
+        self._thread = None
+        # #1658: handle to the currently-running subprocess (VEP), registered by execute_cmd on the task's
+        # main thread and read by this heartbeat thread to abort it if the run is reclaimed under us. Guarded
+        # by a lock because the two threads touch it concurrently.
+        self._process = None
+        self._process_lock = threading.Lock()
+
+    def set_process(self, process):
+        """ execute_cmd process_callback (#1658): register the live subprocess so the heartbeat can kill it
+            if the lease is lost. Pass None once the subprocess has returned to drop the stale handle. """
+        with self._process_lock:
+            self._process = process
+
+    def _abort_process(self):
+        """ #1658: kill the registered subprocess so its blocking communicate() on the main thread returns a
+            non-zero code, tripping the pipeline's `return_code != 0` guard and failing this losing attempt
+            cleanly - without writing results over the new owner's run. Best-effort; already-exited is a no-op. """
+        with self._process_lock:
+            process = self._process
+        if process is None or process.poll() is not None:
+            return
+        logging.warning("Lease heartbeat: killing subprocess for reclaimed AnnotationRun %s (task %s)",
+                        self.annotation_run.pk, self.task_id)
+        try:
+            process.kill()
+        except Exception:
+            log_traceback()
+
+    def _renew(self):
+        now = timezone.now()
+        lease_expires = now + timedelta(seconds=self.lease_seconds)
+        updated = AnnotationRun.objects.filter(
+            pk=self.annotation_run.pk, task_id=self.task_id).update(lease_expires=lease_expires)
+        if updated:
+            # Keep the in-memory instance in step so a full save() in the pipeline doesn't clobber the
+            # renewed lease with the stale value loaded before the heartbeat started.
+            self.annotation_run.lease_expires = lease_expires
+        else:
+            logging.warning("Lease heartbeat: AnnotationRun %s no longer held by task %s - stopping",
+                            self.annotation_run.pk, self.task_id)
+            self._stop.set()
+            # #1658: escalate loss into aborting the run - terminate VEP so it doesn't run to completion and
+            # double-write DB state for a run this worker no longer owns.
+            self._abort_process()
+
+    def _run(self):
+        try:
+            while not self._stop.wait(self.interval):
+                try:
+                    self._renew()
+                except Exception:
+                    # A transient DB blip must not kill the heartbeat (or the run) - log and retry next tick.
+                    log_traceback()
+        finally:
+            connection.close()  # release this thread's own DB connection
+
+    def __enter__(self):
+        self._thread = threading.Thread(target=self._run, daemon=True,
+                                        name=f"lease-heartbeat-{self.annotation_run.pk}")
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=self.interval)
+        return False
+
+
 @celery.shared_task
 def delete_annotation_run(annotation_run_id):
     try:
@@ -82,17 +218,27 @@ def assign_range_lock_to_annotation_run(annotation_run_id, annotation_range_lock
 
 
 @celery.shared_task
+def reset_annotation_run_for_retry(annotation_run_id):
+    """ #1654: clear a run's partially-imported annotation rows and reset it in place to a clean CREATED
+        state (keeping its range lock). Runs on a worker because the row-clear can take a minute or two for
+        a large range; the retry request just queues this ahead of the dispatch trigger. """
+    annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+    annotation_run.reset_for_retry()
+
+
+@celery.shared_task
 def annotate_variants(annotation_run_id):
     """ VEP lane (annotation_workers): dump unannotated variants + run the VEP subprocess, then stop at
         ANNOTATION_COMPLETED and release the lease. The DB upload is deliberately NOT done here - the
         dispatcher re-picks the completed run in its resume lane and runs import_annotation_run on
         db_workers, so a throttled VEP slot is never held through the bulk insert. External runs
-        (#1568) never reach this - they're dumped off-VM and rejoin post-VEP as ANNOTATION_COMPLETED.
+        (#1568) never reach this - they're dumped externally and rejoin post-VEP as ANNOTATION_COMPLETED.
         See #1649. """
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+    my_task_id = annotate_variants.request.id
     logging.info("annotate_variants: %s", annotation_run)
 
-    # External annotation (#1568): VEP for these runs is managed off-VM via the annotation_external
+    # External annotation (#1568): VEP for these runs is managed externally via the annotation_external
     # command. Never auto-run VEP here while waiting for the operator to import an annotated VCF.
     if annotation_run.external and annotation_run.vcf_annotated_filename is None:
         logging.info("Skipping external AnnotationRun %s (awaiting external annotation)", annotation_run.pk)
@@ -100,11 +246,10 @@ def annotate_variants(annotation_run_id):
 
     # task_id used as Celery lock
     num_modified = AnnotationRun.objects.filter(pk=annotation_run.pk,
-                                                task_id__isnull=True).update(task_id=annotate_variants.request.id)
+                                                task_id__isnull=True).update(task_id=my_task_id)
     if num_modified != 1:
         msg = f"Celery couldn't get task_id lock on AnnotationRun: {annotation_run.pk}"
-        annotation_run.celery_task_logs[annotate_variants.request.id] = msg
-        annotation_run.save()
+        _record_lock_failure(annotation_run.pk, my_task_id, msg)
         raise ValueError(msg)
 
     try:
@@ -114,18 +259,42 @@ def annotate_variants(annotation_run_id):
             # We need this so that transcript/versions are in DB so FKs link
             msg = f"{annotation_run.variant_annotation_version} {blocker}"
             raise InvalidAnnotationVersionError(msg)
-        annotation_run.task_id = annotate_variants.request.id
+        annotation_run.task_id = my_task_id
         annotation_run.set_task_log("start", timezone.now())
         annotation_run.save()
 
-        if annotation_run.vcf_annotated_filename is None:
-            dump_and_annotate_variants(annotation_run)
+        # Renew the lease while the (potentially many-hour, e.g. structural-variant) VEP work runs, so a
+        # live worker is never reclaimed under us into a duplicate run.
+        with AnnotationRunLeaseHeartbeat(annotation_run, my_task_id) as lease_heartbeat:
+            if annotation_run.pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
+                # No VCF to dump and no VEP to run - the annotation is computed from the variant's own
+                # gene identity, and there are few enough rows to write here rather than handing the
+                # run to the import lane, so this one goes straight to FINISHED
+                annotate_gene_level_run(annotation_run)
+            elif annotation_run.vcf_annotated_filename is None:
+                dump_and_annotate_variants(annotation_run, lease_heartbeat=lease_heartbeat)
         # DB upload now runs as a separate db_workers task (import_annotation_run), launched by the
         # dispatcher when this run reaches ANNOTATION_COMPLETED. #1649
     except Exception as e:
         tb = get_traceback()
-        error_message = f"{e}: {annotation_run.pipeline_stderr}"
+        annotation_run.error_exception = tb
+        annotation_run.set_task_log("error_exception", tb)
+        # The `finally` below writes the whole instance again, so this save is really here for its return
+        # value - the ownership answer. Deliberately a conditional UPDATE rather than a cheaper .exists()
+        # check: the row count is authoritative at the instant it runs, where a read-then-decide has a
+        # window. The extra UPDATE is not worth optimising away - annotation wall-clock is VEP, not locks.
+        if not annotation_run.save_if_owner(my_task_id):
+            # #1658: we lost the race - the lease expired, the run was reclaimed and a fresh attempt owns
+            # it now (the exception above is typically our own heartbeat killing VEP). Report at warning
+            # level: this is the lease design working as intended under worker churn, not a pipeline
+            # failure, and raising a Rollbar error here describes a VEP break that did not happen - which
+            # both cries wolf and buries the reclaims that genuinely are pathological.
+            msg = f"AnnotationRun {annotation_run.pk} was reclaimed - task {my_task_id} no longer owns it"
+            report_message(message=msg, level='warning', extra_data={'output': str(e), 'error': tb})
+            create_event(None, "AnnotationRun reclaimed", tb, severity=LogLevel.WARNING)
+            raise AnnotationRunReclaimedError(msg) from e
 
+        error_message = f"{e}: {annotation_run.pipeline_stderr}"
         name = 'Annotation pipeline run ' + str(annotation_run.id)
         report_message(message=name,
                        level='error',
@@ -133,72 +302,99 @@ def annotate_variants(annotation_run_id):
                                    'error': tb})
 
         create_event(None, "AnnotationRun failed", tb, severity=LogLevel.ERROR)
-        annotation_run.error_exception = tb
-        annotation_run.set_task_log("error_exception", tb)
-        annotation_run.save()
         raise
     finally:
         annotation_run.set_task_log("end", timezone.now())
         # #2667: release the dispatcher lease so the now-completed run no longer looks in-flight,
         # then kick the dispatcher to refill this freed worker slot (covers success and failure).
+        # #1658: conditional on still holding the run. A stalled attempt whose run was reclaimed mid-VEP
+        # would otherwise blank the *new* owner's task_id/lease - re-opening the run to the dispatcher
+        # while the new owner is still running VEP, and tripping the new owner's own heartbeat into
+        # aborting itself. One reclaim cascades.
         annotation_run.task_id = None
         annotation_run.leased_by = None
         annotation_run.lease_expires = None
-        annotation_run.save()
+        if not annotation_run.save_if_owner(my_task_id):
+            logging.warning("AnnotationRun %s no longer held by task %s - leaving the new owner's lease "
+                            "alone and discarding this attempt's state", annotation_run.pk, my_task_id)
+            _cleanup_reclaimed_run_files(annotation_run)
+        # The dispatcher is single authority and fast-exits when nothing is dispatchable, so kicking it
+        # from a losing attempt too is harmless.
         _trigger_dispatch(annotation_run.annotation_range_lock.version_id)
 
 
 @celery.shared_task
 def import_annotation_run(annotation_run_id):
     """ Import lane (db_workers): bulk-load an already-annotated VCF into the DB. Reached for every run
-        once it is ANNOTATION_COMPLETED with an annotated VCF present - whether VEP just finished in-VM,
+        once it is ANNOTATION_COMPLETED with an annotated VCF present - whether VEP just finished locally,
         an external run (#1568) was imported, or an upload-only retry reset it. Kept off annotation_workers
         so quick DB inserts never consume a throttled VEP slot. See #1649. """
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+    my_task_id = import_annotation_run.request.id
 
     # task_id used as Celery lock (as annotate_variants) so a double-dispatch can't double-import
     num_modified = AnnotationRun.objects.filter(
-        pk=annotation_run.pk, task_id__isnull=True).update(task_id=import_annotation_run.request.id)
+        pk=annotation_run.pk, task_id__isnull=True).update(task_id=my_task_id)
     if num_modified != 1:
         msg = f"Celery couldn't get task_id lock on AnnotationRun: {annotation_run.pk}"
-        annotation_run.celery_task_logs[import_annotation_run.request.id] = msg
-        annotation_run.save()
+        _record_lock_failure(annotation_run.pk, my_task_id, msg)
         raise ValueError(msg)
 
     try:
         # Reload to get updated task_id
         annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
-        annotation_run.task_id = import_annotation_run.request.id
+        annotation_run.task_id = my_task_id
         annotation_run.set_task_log("import_start", timezone.now())
         annotation_run.save()
 
-        import_vcf_annotations(annotation_run)
+        # Renew the lease while the bulk DB insert runs, so a live worker is never reclaimed under us.
+        with AnnotationRunLeaseHeartbeat(annotation_run, my_task_id):
+            import_vcf_annotations(annotation_run)
         # The run is only truly complete once imported (moved here from annotate_variants). #1649
+        # #1670: annotation_run is carried so the cleanup receiver can reclaim this run's output now that
+        # its rows are committed. Existing receivers take **kwargs, so the extra key is transparent.
         annotation_run_complete_signal.send(sender=os.path.basename(__file__),
-                                            variant_annotation_version=annotation_run.annotation_range_lock.version)
-    except Exception:
+                                            variant_annotation_version=annotation_run.annotation_range_lock.version,
+                                            pipeline_type=annotation_run.pipeline_type,
+                                            annotation_run=annotation_run)
+    except Exception as e:
         tb = get_traceback()
-        create_event(None, "AnnotationRun import failed", tb, severity=LogLevel.ERROR)
         annotation_run.error_exception = tb
         annotation_run.set_task_log("error_exception", tb)
-        annotation_run.save()
+        # As annotate_variants: a conditional UPDATE rather than a cheaper ownership read, so the answer
+        # has no window. Cost is irrelevant next to the import it follows.
+        if not annotation_run.save_if_owner(my_task_id):
+            # #1658: reclaimed mid-import - the new attempt owns the run, so this attempt's traceback must
+            # not flip it to ERROR. A lost race is worker churn, not a pipeline failure (see annotate_variants).
+            msg = f"AnnotationRun {annotation_run.pk} was reclaimed - task {my_task_id} no longer owns it"
+            create_event(None, "AnnotationRun import reclaimed", tb, severity=LogLevel.WARNING)
+            raise AnnotationRunReclaimedError(msg) from e
+
+        create_event(None, "AnnotationRun import failed", tb, severity=LogLevel.ERROR)
         raise
     finally:
         annotation_run.set_task_log("import_end", timezone.now())
         # #2667: release the dispatcher lease so the now-completed run no longer looks in-flight, then
         # kick the dispatcher to refill this freed import slot (covers success and failure).
+        # #1658: conditional on still holding the run, so a reclaimed attempt can't blank the new owner's
+        # lease and re-open the run to the dispatcher while that owner is still importing.
         annotation_run.task_id = None
         annotation_run.leased_by = None
         annotation_run.lease_expires = None
-        annotation_run.save()
+        if not annotation_run.save_if_owner(my_task_id):
+            logging.warning("AnnotationRun %s no longer held by task %s - leaving the new owner's lease "
+                            "alone and discarding this attempt's state", annotation_run.pk, my_task_id)
+        # The import lane owns no files of its own - the annotated VCF belongs to the run, and the new
+        # owner is importing from it - so there is nothing to clean up here.
         _trigger_dispatch(annotation_run.annotation_range_lock.version_id)
 
 
-def dump_variants(annotation_run, dump_dir=None) -> int:
+def dump_variants(annotation_run, dump_dir=None, task_token=None) -> int:
     """ Write the unannotated variants in range to the dump VCF and set dump_* fields; returns dump count.
         Factored out of dump_and_annotate_variants so the annotation_external --dump command (#1568) can
-        dump (into --output-dir) and stop before VEP. """
-    vcf_dump_filename = annotation_run.get_dump_filename(dump_dir=dump_dir)
+        dump (into --output-dir) and stop before VEP. task_token (#1658) makes the local pipeline's dump
+        path per-task so a reclaimed run can't collide with its zombie predecessor. """
+    vcf_dump_filename = annotation_run.get_dump_filename(dump_dir=dump_dir, task_token=task_token)
     annotation_run.dump_start = timezone.now()
     annotation_run.vcf_dump_filename = vcf_dump_filename
     annotation_run.save()
@@ -214,7 +410,69 @@ def dump_variants(annotation_run, dump_dir=None) -> int:
     return vcf_dump_count
 
 
-def dump_and_annotate_variants(annotation_run, vep_version_check=True):
+def get_annotated_filename(annotation_run, vcf_dump_filename) -> str:
+    """ Path VEP writes its annotated VCF to for a given dump. Derived from the dump stem, which #1658
+        makes per-task, so each attempt's annotated output is a file of its own. """
+    name = name_from_filename(vcf_dump_filename)
+    vcf_annotated_basename = f"{name}.vep_annotated_{annotation_run.genome_build.name}.vcf.gz"
+    return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_annotated_basename)
+
+
+def get_annotsv_dir(annotation_run) -> str:
+    """ AnnotSV output dir for a run. Deliberately keyed on the run, not the task - shared between
+        attempts, so any party holding the run can name it. See the #720 note: the TSV inside is named
+        from the per-task dump stem, so concurrent attempts write side by side and neither can truncate
+        the other, while a per-task *directory* would be nameable only by the attempt that created it. """
+    return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"annotsv_{annotation_run.pk}")
+
+
+def get_run_output_paths(annotation_run, vcf_dump_filename) -> list[str]:
+    """ Every file the pipeline writes for one attempt, derived from that attempt's dump stem.
+
+        #1660: the single naming authority, shared by the losing attempt's cleanup and the dispatcher's
+        reclaim so the two can't drift. Derivation rather than the persisted filename fields is the whole
+        point - vcf_annotated_filename and annotsv_tsv_filename only reach the DB at the final save in
+        dump_and_annotate_variants, after VEP *and* AnnotSV *and* the conservation sidecar have finished,
+        so a run reclaimed before then has files on disk its row cannot name. The dump stem is persisted
+        before VEP starts (dump_variants), which makes it the one key that always names the rest. """
+    annotated_filename = get_annotated_filename(annotation_run, vcf_dump_filename)
+    return [
+        vcf_dump_filename,
+        annotated_filename,
+        conservation_sidecar_filename(annotated_filename),
+        get_vep_skipped_variants_filename(annotated_filename),
+        get_annotsv_tsv_filename(vcf_dump_filename, get_annotsv_dir(annotation_run)),
+    ]
+
+
+def remove_run_output_files(annotation_run, paths):
+    """ Best-effort removal of an attempt's output. Shared by the losing attempt's cleanup and reclaim. """
+    for path in dict.fromkeys(paths):  # de-dupe, keeping order
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+                logging.info("Removed orphaned file from reclaimed AnnotationRun %s: %s",
+                             annotation_run.pk, path)
+            except OSError:
+                log_traceback()
+
+
+def _cleanup_reclaimed_run_files(annotation_run):
+    """ #1658: discard the on-disk output of an attempt that lost its run.
+
+        Reclaim (_reset_run_for_redispatch) deletes what it can derive from the dump stem and then NULLs
+        the filename fields, so by the time the losing attempt unwinds the DB no longer references its
+        per-task files. There is no sweep of ANNOTATION_VCF_DUMP_DIR, so anything reclaim could not name
+        has to be collected here. Before per-task paths (#1658) the annotated name was a fixed function of
+        the run, so a later attempt overwrote it or a later reclaim deleted it by name; now this attempt
+        is the last party still holding its own paths.
+
+        Passes the in-memory instance deliberately: it still carries the filenames reclaim has since
+        NULLed on the row. #1670: the removal itself lives in annotation.signals.annotation_run_cleanup. """
+    annotation_run_discarded_signal.send(sender=os.path.basename(__file__), annotation_run=annotation_run)
+
+
+def dump_and_annotate_variants(annotation_run, vep_version_check=True, lease_heartbeat=None):
     if vep_version_check:
         # Do a check before we annotate
         vep_check_command_line_version_match(annotation_run.variant_annotation_version)
@@ -223,7 +481,9 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
                 and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
             annotsv_check_command_line_version_match(annotation_run.variant_annotation_version)
 
-    vcf_dump_count = dump_variants(annotation_run)
+    # #1658: tag the local dump (and, via name_from_filename below, the annotated VCF) with the executing
+    # task_id so a reclaimed run's fresh attempt never shares a path with a stalled zombie worker.
+    vcf_dump_count = dump_variants(annotation_run, task_token=annotation_run.task_id)
     vcf_dump_filename = annotation_run.vcf_dump_filename
 
     genome_build = annotation_run.genome_build
@@ -231,9 +491,7 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
 
     logging.info("Annotating %d variants", vcf_dump_count)
     if vcf_dump_count:
-        name = name_from_filename(vcf_dump_filename)
-        vcf_annotated_basename = f"{name}.vep_annotated_{genome_build.name}.vcf.gz"
-        vcf_annotated_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_annotated_basename)
+        vcf_annotated_filename = get_annotated_filename(annotation_run, vcf_dump_filename)
 
         cmd = get_vep_command(vcf_dump_filename, vcf_annotated_filename, genome_build, annotation_consortium,
                               annotation_run.pipeline_type,
@@ -241,7 +499,14 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
         annotation_run.annotation_start = timezone.now()
         annotation_run.pipeline_command = " ".join(cmd)
         annotation_run.save()
-        return_code, std_out, std_err = execute_cmd(cmd)
+        # #1658: register VEP with the lease heartbeat so a reclaim (lost lease) kills it mid-run instead
+        # of letting the losing worker annotate to completion and double-write the reassigned run's state.
+        process_callback = lease_heartbeat.set_process if lease_heartbeat else None
+        try:
+            return_code, std_out, std_err = execute_cmd(cmd, process_callback=process_callback)
+        finally:
+            if lease_heartbeat:
+                lease_heartbeat.set_process(None)  # drop the finished handle so a later tick can't kill anything
         # VEP can produce enormous output (>1GB) for large batches - PostgreSQL has a 1GB field limit
         max_output = 1_000_000
         annotation_run.pipeline_stdout = std_out[:max_output] if std_out else std_out
@@ -249,16 +514,27 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
         logging.info(f"VEP returned code: {return_code}")
 
         if return_code != 0:
-            annotation_run.save()  # save stdout/stderr
+            # #1658: this is the path the heartbeat's abort itself lands on, so it is exactly where we may
+            # no longer own the run - persist the VEP output only while we do, or it goes onto the row the
+            # new attempt now holds. Guarded on our own task_id (None matches an unleased run, which is how
+            # the annotation_external command calls this).
+            if not annotation_run.save_if_owner(annotation_run.task_id):  # save stdout/stderr
+                logging.warning("AnnotationRun %s was reclaimed - discarding VEP output from task %s",
+                                annotation_run.pk, annotation_run.task_id)
             raise RuntimeError(f"VEP returned {return_code}")
 
         annotation_run.vcf_annotated_filename = vcf_annotated_filename
+        # #1701: VEP writes this in Runner::finish(), after the output handle is closed - so it is present
+        # and complete even for the truncated-output failure this check exists to catch. Recorded only when
+        # written, so the import lane falls back to the warnings text for anything that didn't produce one.
+        skipped_variants_filename = get_vep_skipped_variants_filename(vcf_annotated_filename)
+        if os.path.exists(skipped_variants_filename):
+            annotation_run.vep_skipped_variants_filename = skipped_variants_filename
         annotation_run.annotation_end = timezone.now()
 
         if (settings.ANNOTATION_ANNOTSV_ENABLED
                 and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
-            annotsv_dir = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR,
-                                       f"annotsv_{annotation_run.pk}")
+            annotsv_dir = get_annotsv_dir(annotation_run)
             tsv, rc, stdout, stderr = run_annotsv(vcf_dump_filename, annotsv_dir,
                                                   genome_build, annotation_consortium)
             if rc == 0 and os.path.exists(tsv):
@@ -277,6 +553,24 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
                     annotation_run.pk, rc, tsv_missing,
                     (stderr or "")[-4000:], (stdout or "")[-4000:],
                 )
+
+        # Conservation (phastCons/phyloP) _max columns for SVs - computed with pyBigWig instead of the
+        # 4 conservation VEP --custom bigWig overlaps, whose O(SV-span) cost makes large SVs never finish
+        # (#1657). The values are written to a sidecar TSV next to the annotated VCF; the import lane
+        # (BulkVEPVCFAnnotationInserter) merges them into the same _max columns. Best-effort: a scoring
+        # failure logs and leaves the columns null rather than failing the run.
+        if (settings.ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED
+                and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
+            try:
+                tracks = get_sv_conservation_tracks(genome_build)
+                results = score_sv_vcf(vcf_dump_filename, genome_build)
+                sidecar = conservation_sidecar_filename(vcf_annotated_filename)
+                write_conservation_sidecar(sidecar, results, tracks)
+                logging.info("Wrote SV conservation for %d variants to %s", len(results), sidecar)
+            except Exception:
+                log_traceback()
+                logging.warning("SV conservation (pyBigWig) stage failed for AnnotationRun %s",
+                                annotation_run.pk)
     else:
         # Now we have standard/CNV type pipelines, it's possible some can be empty
         annotation_run.annotated_count = 0
@@ -286,32 +580,47 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
 
 
 def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> AnnotationRun:
-    if upload_only and annotation_run.vcf_annotated_filename is None:
-        msg = "Retry annotation run upload only requires annotation VCF to be written"
-        raise ValueError(msg)
+    if upload_only:
+        if annotation_run.vcf_annotated_filename is None:
+            msg = "Retry annotation run upload only requires annotation VCF to be written"
+            raise ValueError(msg)
+        if not os.path.exists(annotation_run.vcf_annotated_filename):
+            # #1670: a run that imported successfully has had its VEP output reclaimed, so the row still
+            # names a file that is gone. Say so here rather than failing deep inside cyvcf2.
+            msg = (f"Annotation VCF '{annotation_run.vcf_annotated_filename}' no longer exists "
+                   f"(removed after successful annotation) - retry the full run instead of upload only")
+            raise ValueError(msg)
 
     annotation_range_lock = annotation_run.annotation_range_lock
     if annotation_range_lock is None:
         msg = "Can't retry annotation run with no annotation lock!"
         raise ValueError(msg)
 
-    annotation_run.error_exception = None  # Clear so status won't be error
-    annotation_run.task_id = None  # Allow celery jobs to get lock on it
-    annotation_run.save()
-
     if upload_only:
+        # A manual retry is a fresh start - reset the lease bookkeeping so the dispatcher's attempt-cap
+        # (reclaim_stalled_annotation_runs) counts from zero again. Otherwise an upload-only retry reuses
+        # the same run, whose attempt_count is already at ANNOTATION_MAX_RUN_ATTEMPTS, so the next stall
+        # fails it immediately with "exceeded max attempts".
+        annotation_run.error_exception = None  # Clear so status won't be error
+        annotation_run.task_id = None  # Allow celery jobs to get lock on it
+        annotation_run.leased_by = None
+        annotation_run.lease_expires = None
+        annotation_run.attempt_count = 0
+        annotation_run.save()
         # Delete uploaded data, then hand back to the dispatcher: the run stays ANNOTATION_COMPLETED with
         # its annotated VCF present -> import lane -> db_workers (import_annotation_run). #1649
         tasks = [
             delete_annotation_run_uploaded_data.si(annotation_run.pk),
         ]
     else:
-        # Delete old AnnotationRun then try again: a fresh CREATED run -> VEP lane (annotate_variants). #1649
-        old_annotation_run = annotation_run
-        annotation_run = AnnotationRun.objects.create(pipeline_type=old_annotation_run.pipeline_type)
+        # #1654: full retry resets the run in place to a clean CREATED state (clearing any partially-
+        # imported annotation rows) rather than delete + recreate. Reusing the same run - keeping its
+        # range lock - means no rangeless AnnotationRun is ever committed, so a mid-retry crash can no
+        # longer strand it invisibly in Created. The row-clear can take a minute or two for a large
+        # range, so it runs on a worker (ahead of the dispatch trigger) instead of blocking this request;
+        # the run stays ERROR (visible, retryable) until the reset flips it to CREATED. #1649
         tasks = [
-            delete_annotation_run.si(old_annotation_run.pk),
-            assign_range_lock_to_annotation_run.si(annotation_run.pk, annotation_range_lock.pk),
+            reset_annotation_run_for_retry.si(annotation_run.pk),
         ]
 
     # #1649: retry no longer launches annotate_variants inline - it hands back to the single-authority
@@ -349,6 +658,9 @@ def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
 def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT, use_accession=False) -> int:
     # We had an issue with writing accessions in VEP, so use chrom names and the default VEP fasta instead
     # @see https://github.com/Ensembl/ensembl-vep/issues/1635
+    # Contigs are shared between builds (eg GRCh37/hg19) so the ordering join needs restricting to this
+    # build, otherwise a variant is written once per build its contig belongs to
+    qs = qs.filter(locus__contig__genomebuildcontig__genome_build=genome_build)
     qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
     if use_accession:
         chrom_key = "locus__contig__refseq_accession"
@@ -362,7 +674,7 @@ def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_
     if vcf_filename.endswith(".gz"):
         f = gzip.open(vcf_filename, "wt", compresslevel=6)
     else:
-        f = open(vcf_filename, "wt")
+        f = open(vcf_filename, "w")
     with f:
         return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=info_dict,
                                                       use_accession=use_accession)

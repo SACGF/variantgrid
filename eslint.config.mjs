@@ -49,6 +49,7 @@ export default [
                 deleteNodesFromDOM: "readonly", // analysis_nodes.js
                 unselectActive: "readonly", // analysis_nodes.js
                 createSampleNode: "readonly", // samplenode.js
+                poll_cached_generated_file: "readonly", // cached_generated_files.js
                 // globals injected by Django templates (inline <script> blocks)
                 ANALYSIS_ID: "readonly", // analysis.html
                 ANALYSIS_SETTINGS: "readonly", // analysis_settings_node_counts_tab.html

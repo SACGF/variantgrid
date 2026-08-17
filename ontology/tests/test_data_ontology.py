@@ -5,7 +5,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from ontology.management.commands import ontology_import
-from ontology.models import OntologyVersion, OntologyImport
+from ontology.models import OntologyImport, OntologyVersion
 
 
 def create_ontology_test_data():

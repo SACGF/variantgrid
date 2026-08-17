@@ -1,8 +1,15 @@
 from django.core.management import BaseCommand
 from django.db.models import Subquery, Exists
 
-from classification.models import Classification, ClassificationModification, ClassificationSummaryCalculator
-from classification.models.classification_grouping import ClassificationGrouping, AlleleOriginGrouping
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    ClassificationSummaryCalculator,
+)
+from classification.models.classification_grouping import (
+    AlleleOriginGrouping,
+    ClassificationGrouping,
+)
 
 
 class Command(BaseCommand):

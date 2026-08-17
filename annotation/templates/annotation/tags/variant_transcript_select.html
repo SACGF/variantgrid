@@ -25,6 +25,8 @@ fieldset.form-fields {
             {% if show_all_transcript_details %}
             <th>Impact
             <th>Protein Length</th>
+            <th title="Codons from the first changed residue to the frameshift's new stop">Stop Distance</th>
+            <th title="PTC-aware Nonsense Mediated Decay prediction">NMD Escape</th>
             {% endif %}
             <th>Properties
         </tr>
@@ -52,6 +54,8 @@ fieldset.form-fields {
             {% if show_all_transcript_details %}
             <td>{{ transcript_data.impact }}
             <td>{{ transcript_data.protein_length }}
+            <td>{{ transcript_data.ptc_distance_codons | dash_if_empty }}
+            <td>{{ transcript_data.nmd_escape_status | dash_if_empty }}
             {% endif %}
             <td><span class="pills">
                 {% if transcript_data.representative %}<span class="pill important" data-toggle="tooltip" title="representative transcript (picked by VEP, changes per variant)">rep.</span>{% endif %}

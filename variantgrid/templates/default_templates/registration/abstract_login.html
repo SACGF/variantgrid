@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load settings_tags %}
 {% block head %}
 <style>
     #oidc-login-box {
@@ -35,7 +36,8 @@
         {% if form.non_field_errors %}
             <td>{{ form.non_field_errors }}</td>
         {% endif %}
-        <td><input id='username' name="username" placeholder="Username" autofocus />
+        {% settings_value 'LOGIN_USERNAME_PLACEHOLDER' as username_placeholder %}
+        <td><input id='username' name="username" placeholder="{{ username_placeholder|default:'Username' }}" autofocus />
         <td><input id='password' type="password" name="password" placeholder="Password" />
         <td><button type="submit" name="go" class="btn">Log in</button>
         </table>

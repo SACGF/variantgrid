@@ -8,12 +8,19 @@ from django.urls import reverse
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.views.classification_export_view import InvalidExportParameter
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column, delimited_row, ExportTweak
-from snpdb.models import Lab, Allele
+from library.utils import ExportRow, ExportTweak, delimited_row, export_column
+from snpdb.models import Allele, Lab
 
 
 class ClassificationLab(ExportRow):
@@ -146,7 +153,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
         super().__init__(classification_filter)
         if not self.classification_filter.include_sources or len(self.classification_filter.include_sources) != 2:
             raise InvalidExportParameter("Lab Compare requires the <b>inclusion</b> of 2 labs.")
-        two_labs = list(sorted(self.classification_filter.include_sources))
+        two_labs = sorted(self.classification_filter.include_sources)
         self.lab_a = two_labs[0]
         self.lab_b = two_labs[1]
         self.e_keys = EvidenceKeyMap.cached()

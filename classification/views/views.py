@@ -3,24 +3,24 @@ import mimetypes
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, Any, Union
+from typing import Any, Optional, Union
 
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons
-from crispy_forms.layout import Layout, Field, Submit
+from crispy_forms.layout import Field, Layout, Submit
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
-from django.http import StreamingHttpResponse
+from django.http import Http404, StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
-from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.views.generic import TemplateView
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
@@ -31,19 +31,41 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
-    create_classification_for_sample_and_variant_objects, generate_auto_populate_data
+from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
+    create_classification_for_sample_and_variant_objects,
+    generate_auto_populate_data,
+)
 from classification.classification_changes import ClassificationChanges
-from classification.classification_stats import get_grouped_classification_counts, \
-    get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason, AlleleOriginBucket, \
-    OverlapStatus
+from classification.classification_stats import (
+    get_classification_counts,
+    get_criteria_counts,
+    get_grouped_classification_counts,
+)
+from classification.enums import (
+    AlleleOriginBucket,
+    LabExternalFilter,
+    ShareLevel,
+    SpecialEKeys,
+    SubmissionSource,
+    WithdrawReason, OverlapStatus,
+)
 from classification.forms import ClassificationAlleleOriginForm
-from classification.models import ClassificationAttachment, Classification, \
-    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleOriginGrouping, \
-    ImportedAlleleInfo, ImportedAlleleInfoStatus, ClassificationImportRun, Overlap, OverlapContributionSkew, \
-    OverlapContribution, ClassificationGroupingEntry
+from classification.models import (
+    AlleleOriginGrouping,
+    Classification,
+    ClassificationAttachment,
+    ClassificationConsensus,
+    ClassificationGrouping,
+    ClassificationImportRun,
+    ClassificationJsonParams,
+    ClassificationRef,
+    ClassificationReportTemplate,
+    ConditionResolvedDict,
+    DiscordanceReport,
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
+    ReportNames, OverlapContribution, OverlapContributionSkew, Overlap,
+)
 from classification.models.classification import ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
@@ -52,25 +74,35 @@ from classification.models.flag_types import classification_flag_types
 from classification.services.public_summary_data import ClassificationPublicSummaryData
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
-from classification.views.exports import ClassificationExportFormatterCSV, ClassificationExportFormatterRedCap
+from classification.views.exports import (
+    ClassificationExportFormatterCSV,
+    ClassificationExportFormatterRedCap,
+)
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
 from genes.hgvs import HGVSMatcher
-from library.django_utils import require_superuser, get_url_from_view_path
-from library.django_utils.file_uploads import filepond_upload_receive, filepond_process_response
+from library.django_utils import get_url_from_view_path, require_superuser
+from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.log_utils import log_traceback
 from library.utils import delimited_row
 from library.utils.django_utils import render_ajax_view
 from library.utils.file_utils import rm_if_exists
-from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm, LabMultiSelectForm, UserLabChoiceForm
+from snpdb.forms import (
+    LabMultiSelectForm,
+    LabSelectForm,
+    SampleChoiceForm,
+    UserLabChoiceForm,
+    UserSelectForm,
+)
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
+from snpdb.models import Allele, Lab, Sample, UserSettings, Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
+from sync.classification_sync_status import classification_sync_status
 from uicore.utils.form_helpers import form_helper_horizontal
 from variantopedia.forms import SearchAndClassifyForm
 
@@ -262,6 +294,8 @@ def classification_groupings(request):
         "labs": Lab.valid_labs_qs(request.user),
         "genome_build": user_settings.default_genome_build,
         "user_settings": user_settings,
+        "lab_external_choices": LabExternalFilter.choices,
+        "lab_external_default": LabExternalFilter.ALL,
     }
     return render(request, 'classification/classification_groupings.html', context)
 
@@ -471,7 +505,7 @@ def view_classification(request: HttpRequest, classification_id: str):
     vc: Classification = ref.record
 
     # see if there are pending values
-    classification_grouping = ClassificationGroupingEntry.grouping_for(vc)
+    # classification_grouping = ClassificationGroupingEntry.grouping_for(vc)
 
     context = {
         'vc': vc,
@@ -483,9 +517,23 @@ def view_classification(request: HttpRequest, classification_id: str):
         'attachments_enabled': settings.CLASSIFICATION_FILE_ATTACHMENTS,
         'delete_enabled': settings.CLASSIFICATION_ALLOW_DELETE,
         'duplicate_records': duplicate_records,
-        'withdraw_reasons': withdraw_reasons
+        'withdraw_reasons': withdraw_reasons,
+        'mme_enabled': settings.MME_ENABLED,   # shows the MatchMaker Exchange card
+        'sync_statuses': classification_sync_status(vc),
     }
     return render(request, 'classification/classification.html', context)
+
+
+def view_classification_lab_record(request: HttpRequest, classification_ref: str):
+    """ Resolve a classification from "lab_group_name/lab_record_id" and redirect to its canonical URL """
+    lab_group_name, _, lab_record_id = classification_ref.rpartition('/')
+    if not lab_group_name or not lab_record_id:
+        raise Http404(f"Expected a classification reference of lab_group_name/lab_record_id, got ({classification_ref})")
+
+    classification = get_object_or_404(Classification, lab__group_name=lab_group_name, lab_record_id=lab_record_id)
+    # same view permission as landing on the record directly - writable, or has a version we can see
+    ClassificationRef.init_from_obj(request.user, classification).check_security()
+    return redirect(classification.get_absolute_url())
 
 
 def view_classification_diff(request):
@@ -666,10 +714,10 @@ def classification_file_upload(request, classification_id):
         classification = get_object_or_404(Classification, pk=classification_id)
         if not classification.can_write(request.user):
             raise PermissionDenied('User can not edit this variant classification')
-        uploaded_file = filepond_upload_receive(request)
+        django_uploaded_file = filepond_upload_receive(request)
 
         vc_attachment = ClassificationAttachment(classification=classification,
-                                                 file=uploaded_file)
+                                                 file=django_uploaded_file)
         vc_attachment.save()
     except Exception:
         log_traceback()
@@ -784,7 +832,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     refseq_transcript_accession = ""
     ensembl_transcript_accession = ""
-    matcher = HGVSMatcher(genome_build)
+    matcher = HGVSMatcher.instance(genome_build)
     hgvs_variant = matcher.create_hgvs_variant(hgvs_string)
     evidence = {}
     if hgvs_variant.transcript:
@@ -869,7 +917,7 @@ def lab_gene_classification_counts(request):
     if settings.CLASSIFICATION_STATS_USE_SHARED:
         visibility = "Shared"
     else:
-        visibility = f"Visible to user"
+        visibility = "Visible to user"
 
     data_columns_whitelist = {
 
@@ -939,10 +987,12 @@ def clin_sig_change_data(request):
                 discordance_dates.append(discordance.created)
 
             if allele := source.allele:
-                cl: Classification
-                for cl in Classification.objects.filter(variant__in=allele.variants):
-                    if cl.lab != source.lab and cl.created < flag.created:
-                        other_labs.add(cl.lab)
+                # Only lab and created are read, so avoid pulling the wide evidence JSONB per classification
+                classification_labs = Classification.objects.filter(variant__in=allele.variants) \
+                    .values_list("lab_id", "created")
+                other_lab_ids = {lab_id for lab_id, created in classification_labs
+                                 if lab_id != source.lab_id and created < flag.created}
+                other_labs = set(Lab.objects.filter(pk__in=other_lab_ids))
 
             for index, flag_comment in enumerate(flag.flagcomment_set.order_by('created')):
                 if text := flag_comment.text:
@@ -968,7 +1018,7 @@ def clin_sig_change_data(request):
     response = StreamingHttpResponse(yield_data(), content_type='text/tsv')
     # modified_str = now().strftime("%a, %d %b %Y %H:%M:%S GMT")  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'
     # response['Last-Modified'] = modified_str
-    response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.tsv"'
+    response['Content-Disposition'] = 'attachment; filename="clin_sig_changes.tsv"'
     return response
 
 

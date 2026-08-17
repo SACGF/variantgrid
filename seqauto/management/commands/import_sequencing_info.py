@@ -2,7 +2,7 @@ import pandas as pd
 from django.core.management.base import BaseCommand
 
 from library.log_utils import console_logger
-from seqauto.models import Sequencer, SequencingInfo, EnrichmentKit
+from seqauto.models import EnrichmentKit, Sequencer, SequencingInfo
 from snpdb.models import Lab, LabProject
 
 LAB_NAME = "lab name"

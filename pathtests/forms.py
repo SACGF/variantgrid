@@ -6,8 +6,7 @@ from django.forms.widgets import TextInput
 from genes.models import GeneList
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.utils import is_not_none
-from pathtests.models import PathologyTest, PathologyTestVersion, Case, \
-    PathologyTestOrder
+from pathtests.models import Case, PathologyTest, PathologyTestOrder, PathologyTestVersion
 from seqauto.models import EnrichmentKit
 
 

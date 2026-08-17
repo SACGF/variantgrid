@@ -179,7 +179,7 @@ class MutationSignatures:
         self.Results = None
 
         NUMPY_DTYPE_TOL = {
-            "float": (np.float, None),
+            "float": (float, None),
             "float64": (np.float64, 1e-15),
             "float128": (np.float128, 1e-30)}
         (self.dtype, self.tolerance) = NUMPY_DTYPE_TOL[precision]
@@ -234,7 +234,7 @@ class MutationSignatures:
     # ---------------------------------------------------------------------------
     # parse the signature data
     def ParseSignatureData(self, sig_data_file):
-        with open(sig_data_file, "r", encoding="utf-8") as fin:
+        with open(sig_data_file, encoding="utf-8") as fin:
             # how many columns are there? how many signatures?
             header = fin.readline()
             for idx, col_name in enumerate(header.strip().split("\t")[3:]):

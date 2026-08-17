@@ -36,7 +36,7 @@ class TestVariantsToVCF(TestCase):
     def _write_and_read(self, sorted_values) -> list:
         header_lines = get_vcf_header_lines(info_dict=VARIANT_GRID_INFO_DICT)
         with tempfile.NamedTemporaryFile(mode="wt", suffix=".vcf", delete=True) as temp_file:
-            with open(temp_file.name, "wt") as f:
+            with open(temp_file.name, "w") as f:
                 count = _write_sorted_values_to_vcf_file(header_lines, sorted_values, f,
                                                          info_dict=VARIANT_GRID_INFO_DICT)
             records = list(cyvcf2.Reader(temp_file.name))

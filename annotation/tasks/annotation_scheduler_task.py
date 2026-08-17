@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import timedelta
+from typing import Optional
 
 import celery
 from django.conf import settings
@@ -9,19 +10,88 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count, \
-    merge_pending_range_locks
+from annotation.annotation_versions import (
+    get_annotation_range_lock_and_unannotated_count,
+    merge_pending_range_locks,
+)
 from annotation.celery_utils import annotation_worker_slots
-from annotation.models import AnnotationRun, AnnotationStatus, VariantAnnotationPipelineType, \
-    VariantAnnotationVersion
-from annotation.models.models import AnnotationVersion, AnnotationRangeLock
-from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
-from library.log_utils import log_traceback
-from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF, Variant, JobsControl
+from annotation.models import (
+    AnnotationRun,
+    AnnotationStatus,
+    VariantAnnotationPipelineType,
+    VariantAnnotationVersion,
+)
+from annotation.models.models import AnnotationRangeLock, AnnotationVersion
+from annotation.signals.manual_signals import annotation_run_discarded_signal
+from annotation.tasks.annotate_variants import (
+    annotate_variants,
+    get_annotated_filename,
+    get_vep_skipped_variants_filename,
+    import_annotation_run,
+)
+from library.constants import HOUR_SECS, MINUTE_SECS
+from library.log_utils import log_traceback, report_message
+from library.utils.file_utils import DiskUsage, get_disk_usage_for_directory
+from snpdb.models import VCF, GenomeBuild, ImportStatus, JobsControl, Sample, Variant
 
 # #1646: max count_annotation_run tasks the dispatcher kicks per cycle, so creating a new annotation
 # version (thousands of runs at once) doesn't burst the count queue - the rest drain over later cycles.
 COUNT_KICK_BATCH = 500
+
+# #1670: the dispatcher runs on every run completion, so an unthrottled low-disk report would bury
+# every other alert. Warn at most once an hour while the pause holds.
+_LOW_DISK_REPORT_CACHE_KEY = "annotation_dispatch_low_disk_reported"
+_LOW_DISK_REPORT_TTL = HOUR_SECS
+# get_disk_usage_for_directory shells out to df, and the dispatcher runs on every run completion - so
+# cache it briefly, as annotation_worker_slots does with its celery inspect() broadcast. Free space over
+# a minute moves by at most a fraction of one run's output, well inside the threshold's headroom.
+_DISK_USAGE_CACHE_KEY = "annotation_dump_dir_disk_usage"
+_DISK_USAGE_CACHE_TTL = MINUTE_SECS
+
+
+def _annotation_dump_disk_usage() -> Optional[DiskUsage]:
+    """ Usage of the ANNOTATION_VCF_DUMP_DIR filesystem, cached ~60s. """
+    disk_usage = cache.get(_DISK_USAGE_CACHE_KEY)
+    if disk_usage is None:
+        disk_usage = get_disk_usage_for_directory(settings.ANNOTATION_VCF_DUMP_DIR)
+        if disk_usage is None:
+            return None
+        cache.set(_DISK_USAGE_CACHE_KEY, disk_usage, _DISK_USAGE_CACHE_TTL)
+    return disk_usage
+
+
+def has_free_disk_for_annotation() -> bool:
+    """ #1670: whether there is room on the ANNOTATION_VCF_DUMP_DIR filesystem to start another VEP run.
+
+        Each run writes a variant dump plus a substantially larger annotated VCF, so dispatching into a
+        nearly-full disk fills it, taking down everything else sharing that mount. Warning after the fact
+        (warn_low_disk_space) does not prevent that, so the dispatcher declines to start new work.
+
+        Only the VEP lane is gated. Runs already past VEP still import - that consumes no new space and
+        releases their dump and annotated VCF on success, so the backlog drains the disk back to healthy
+        rather than deadlocking on it.
+
+        Unknown free space does not block: an unreadable path is a reason to keep annotating and let the
+        existing warning fire, not to silently halt the pipeline. """
+    min_gigs = settings.ANNOTATION_MIN_FREE_DISK_GIGS
+    if not min_gigs:
+        return True
+    dump_dir = settings.ANNOTATION_VCF_DUMP_DIR
+    disk_usage = _annotation_dump_disk_usage()
+    if disk_usage is None:
+        logging.warning("Couldn't determine free disk for '%s' - allowing annotation dispatch", dump_dir)
+        return True
+    if disk_usage.has_capacity(min_gigs):
+        return True
+
+    _, disk_message = disk_usage.as_status_message(min_gigs)
+    msg = (f"Annotation dispatch paused - {dump_dir} is on a mount below "
+           f"ANNOTATION_MIN_FREE_DISK_GIGS. {disk_message}. Runs already past VEP will still be "
+           f"imported (freeing their dumps); no new VEP runs start until there is space.")
+    logging.warning(msg)
+    if cache.add(_LOW_DISK_REPORT_CACHE_KEY, True, _LOW_DISK_REPORT_TTL):
+        report_message(message=msg, level='warning')
+    return False
 
 
 @celery.shared_task(queue='scheduling_single_worker')
@@ -78,7 +148,7 @@ def _handle_range_lock(range_lock, pipeline_type=None):
         annotation_run, _ = AnnotationRun.objects.get_or_create(annotation_range_lock=range_lock,
                                                                 pipeline_type=pipeline_type)
         if annotation_run.external:
-            # External annotation (#1568): VEP is managed off-VM via the annotation_external command.
+            # External annotation (#1568): VEP is managed externally via the annotation_external command.
             # Belt-and-braces guard - the scheduler only operates on ACTIVE versions and external runs
             # live on NEW versions, so this should not normally be reached.
             logging.info("Skipping external AnnotationRun %s (awaiting external annotation)", annotation_run.pk)
@@ -205,7 +275,7 @@ def _dispatchable_variant_annotation_versions() -> list[VariantAnnotationVersion
         onto it), so without a heartbeat here it only ever advances on discrete kicks (VCF import /
         manual / per-completion re-kick) and a stalled dispatch never self-recovers (stale leases go
         unreclaimed, freed capacity unused). Safe to include: the dispatcher already filters external=False
-        and annotate_variants no-ops external runs awaiting an off-VM VCF, and get_annotation_run_blocker()
+        and annotate_variants no-ops external runs awaiting an external VCF, and get_annotation_run_blocker()
         still guards a not-yet-ready version. """
     statuses = [VariantAnnotationVersion.Status.NEW, VariantAnnotationVersion.Status.ACTIVE]
     vavs = []
@@ -257,7 +327,9 @@ def _dispatch_sweep():
     # Import lane first so cheap DB imports (sometimes user-awaited) launch without waiting on the VEP scan.
     if upload_capacity > 0:
         _lease_across_vavs(vavs, AnnotationStatus.ANNOTATION_COMPLETED, upload_capacity, worker_id, now)
-    if vep_capacity > 0:
+    # #1670: checked after the import lane has been dispatched, so a low-disk pause still lets the
+    # already-annotated backlog drain (and free its dumps).
+    if vep_capacity > 0 and has_free_disk_for_annotation():
         _lease_across_vavs(vavs, AnnotationStatus.CREATED, vep_capacity, worker_id, now)
 
 
@@ -312,7 +384,9 @@ def _dispatch_for_vav(vav: VariantAnnotationVersion):
     worker_id = f"dispatch:{dispatch_annotation_runs.request.id or 'sync'}"
     if upload_capacity > 0:
         _lease_across_vavs([vav], AnnotationStatus.ANNOTATION_COMPLETED, upload_capacity, worker_id, now)
-    if vep_capacity > 0:
+    # #1670: as _dispatch_sweep - the import lane is dispatched first so a low-disk pause drains the
+    # already-annotated backlog instead of deadlocking on the full disk.
+    if vep_capacity > 0 and has_free_disk_for_annotation():
         _lease_across_vavs([vav], AnnotationStatus.CREATED, vep_capacity, worker_id, now)
 
 
@@ -398,8 +472,18 @@ def reclaim_stalled_annotation_runs(vav: VariantAnnotationVersion, now=None):
     # on `lease_expires < now` missed orphans left with a task_id / running status but a NULL lease
     # (e.g. a worker SIGKILLed mid-run before the annotate_variants `finally` could clear task_id):
     # a NULL lease is never < now, so those held slots forever and starved the dispatcher of capacity.
-    stalled_qs = _in_flight_runs_qs(vav, now).filter(
-        Q(lease_expires__isnull=True) | Q(lease_expires__lt=now))
+    no_live_lease = Q(lease_expires__isnull=True) | Q(lease_expires__lt=now)
+    orphaned_qs = _in_flight_runs_qs(vav, now).filter(no_live_lease)
+    # _in_flight_runs_qs deliberately treats CREATED as settled (holds no live slot), so it also skips
+    # a run a worker had *leased* but whose lease expired before the worker advanced the status off
+    # CREATED (died at launch, before annotate_variants set task_id/DUMP_STARTED). That run is stalled -
+    # its leased_by/lease are stale locks nothing will ever clear - so reclaim it too, or it would leak
+    # the lease forever and (attempt_count already bumped at lease time) never retry or fail out.
+    leased_stalled_qs = AnnotationRun.objects.filter(
+        annotation_range_lock__version=vav, external=False, leased_by__isnull=False,
+        lease_expires__lt=now,
+    ).exclude(status__in=AnnotationStatus.get_completed_states())
+    stalled_qs = (orphaned_qs | leased_stalled_qs).distinct()
 
     for annotation_run in stalled_qs:
         if annotation_run.attempt_count >= settings.ANNOTATION_MAX_RUN_ATTEMPTS:
@@ -424,27 +508,74 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
     """ Return a stalled run to a dispatchable state so the dispatcher can re-launch it. Always clears
         the lease/task lock. Two flavours of pipeline progress:
 
-        #1646 resume-upload: the run is already past VEP (annotated VCF present on disk) and only the
-        quick DB upload remains. Keep the expensive VEP output - just scrub any partially-imported rows
-        and reset the upload markers, leaving status ANNOTATION_COMPLETED so the dispatcher re-launches
-        it upload-only (annotate_variants skips dump+VEP straight to import_vcf_annotations). This avoids
-        throwing away minutes of VEP per stalled run.
+        #1646 resume-upload: the run is already past VEP and only the quick DB upload remains. Keep the
+        expensive VEP output - just scrub any partially-imported rows and reset the upload markers,
+        leaving status ANNOTATION_COMPLETED so the dispatcher re-launches it upload-only
+        (annotate_variants skips dump+VEP straight to import_vcf_annotations). This avoids throwing away
+        minutes of VEP per stalled run.
 
-        Otherwise (pre-VEP progress): scrub all partial output (on-disk dumps + partial rows) back to a
-        clean CREATED state so a re-dump won't collide. """
-    annotated_filename = annotation_run.vcf_annotated_filename
-    if annotated_filename and os.path.exists(annotated_filename):
+        Otherwise (pre-VEP progress, or VEP part-way): scrub all partial output (on-disk dumps + partial
+        rows) back to a clean CREATED state so a re-dump won't collide.
+
+        #1660: which flavour applies is decided by *deriving* the paths from the dump stem, not by
+        reading vcf_annotated_filename off the row. That field is only persisted at the final save in
+        dump_and_annotate_variants - after VEP, AnnotSV and the conservation sidecar have all finished -
+        so a run reclaimed while AnnotSV is still running has a complete annotated VCF on disk but a NULL
+        field, and reading the field would scrub minutes of finished VEP work the resume path exists to
+        keep. The dump stem is persisted before VEP starts, so it always names the rest.
+
+        Deleting the dump can pull the input out from under a stalled-but-live worker's VEP. That is
+        intentional - it acts as a crude abort of an attempt whose result is going to be discarded anyway.
+        It is safe because the zombie fails loudly rather than silently (VEP returning non-zero raises,
+        and unlink does not truncate, so VEP either holds the fd and reads to completion or fails to open)
+        and because annotate_variants classifies any failure on a run it no longer owns as a reclaim at
+        warning level, not as a pipeline error. """
+    dump_filename = annotation_run.vcf_dump_filename
+    annotated_filename = None
+    skipped_variants_filename = None
+    vep_finished = False
+    if dump_filename:
+        annotated_filename = get_annotated_filename(annotation_run, dump_filename)
+        # #1710: VEP creates the annotated VCF at startup and writes to it progressively, so its presence
+        # says nothing about how far the run got - a run reclaimed mid-VEP used to resume upload-only off
+        # a part-written file, and the #1701 checks in the import lane then failed it. Runner::run closes
+        # the output handle and only then calls finish(), which writes the skipped-variants list (even
+        # when nothing was skipped), so that file appearing is the proof VEP reached the end. It is named
+        # off the per-attempt dump stem, so it can only have come from this attempt.
+        skipped_variants_filename = get_vep_skipped_variants_filename(annotated_filename)
+        vep_finished = os.path.exists(skipped_variants_filename)
+    elif annotation_run.vcf_annotated_filename:
+        # No dump stem to derive from (eg an external run, #1568, imported without a local dump) - no VEP
+        # of ours ran, so the annotated VCF we were handed is all the proof there is.
+        annotated_filename = annotation_run.vcf_annotated_filename
+        vep_finished = True
+
+    if vep_finished and os.path.exists(annotated_filename):
         # Past VEP - resume upload-only. Scrub partially-imported rows; keep dump/VEP/AnnotSV artifacts.
         annotation_run.delete_related_objects()
+        # The row may not name the annotated VCF yet (reclaimed mid-AnnotSV) - record the derived path so
+        # the upload-only relaunch, and any later reclaim, can find the VEP output we are keeping.
+        annotation_run.vcf_annotated_filename = annotated_filename
+        # #1701: same reasoning for VEP's skipped-variants list - record it so the upload-only relaunch
+        # checks records-in vs records-out against VEP's own list rather than the warnings-text fallback.
+        if skipped_variants_filename:
+            annotation_run.vep_skipped_variants_filename = skipped_variants_filename
+        # annotation_end is persisted at that same final save, and get_status() keys ANNOTATION_COMPLETED
+        # off it - so without this the resumed run sits at ANNOTATION_STARTED, which is neither
+        # dispatchable nor upload-resumable, and it would never be picked up again. Stamp the time we
+        # observed VEP had finished.
+        if annotation_run.annotation_end is None:
+            annotation_run.annotation_end = timezone.now()
         annotation_run.upload_start = None
         annotation_run.upload_end = None
         annotation_run.annotsv_imported = False  # re-import re-updates the recreated rows (idempotent)
     elif annotation_run.status != AnnotationStatus.CREATED:
-        # Worker got part-way before dying (pre-VEP) - scrub partial output (a CREATED run has none).
+        # Worker died before VEP finished - scrub partial output (a CREATED run has none).
         annotation_run.delete_related_objects()
-        for filename in (annotation_run.vcf_dump_filename, annotation_run.vcf_annotated_filename):
-            if filename and os.path.exists(filename):
-                os.remove(filename)
+        # #1670: announce the discard - annotation.signals.annotation_run_cleanup owns the removal, and
+        # collects the same derived-plus-persisted set of paths that the losing attempt's cleanup does.
+        # Sent before the filename fields below are NULLed, while they can still name the files.
+        annotation_run_discarded_signal.send(sender=__name__, annotation_run=annotation_run)
         annotation_run.dump_start = None
         annotation_run.dump_end = None
         annotation_run.dump_count = None
@@ -454,6 +585,7 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
         annotation_run.upload_end = None
         annotation_run.vcf_dump_filename = None
         annotation_run.vcf_annotated_filename = None
+        annotation_run.vep_skipped_variants_filename = None
     annotation_run.task_id = None
     annotation_run.leased_by = None
     annotation_run.lease_expires = None

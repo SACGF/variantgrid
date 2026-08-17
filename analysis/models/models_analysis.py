@@ -1,31 +1,37 @@
 from collections import defaultdict
 from functools import cached_property
-from typing import Union, Optional
+from typing import Optional, Union
 
 from auditlog.context import disable_auditlog
 from auditlog.models import LogEntry
 from auditlog.registry import auditlog
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.db import models
-from django.db.models import Model, Q, Count, Max, QuerySet
-from django.db.models.deletion import SET_NULL, CASCADE, SET_DEFAULT, PROTECT, ProtectedError
+from django.db.models import Count, Max, Model, Q, QuerySet
+from django.db.models.deletion import CASCADE, PROTECT, SET_DEFAULT, SET_NULL, ProtectedError
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 
-from analysis.models.enums import AnalysisType, AnalysisTemplateType
+from analysis.models.enums import AnalysisTemplateType, AnalysisType
 from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
 from library.preview_request import PreviewModelMixin
 from seqauto.models import EnrichmentKit
-from snpdb.models import CustomColumnsCollection, CustomColumn, \
-    UserSettings, AbstractNodeCountSettings, Sample, Cohort
+from snpdb.models import (
+    AbstractNodeCountSettings,
+    Cohort,
+    CustomColumn,
+    CustomColumnsCollection,
+    Sample,
+    UserSettings,
+)
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
 
@@ -235,11 +241,11 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         samples = set()
         for node in self.analysisnode_set.filter(analysisnode_parent__isnull=True).select_subclasses():
             samples.update(node.get_samples_from_node_only_not_ancestors())
-        return list(sorted(samples))
+        return sorted(samples)
 
     def clone(self, user: User = None):
         """ user - if provided, assign new ownership """
-        from analysis.models import AnalysisNode, AnalysisEdge
+        from analysis.models import AnalysisEdge, AnalysisNode
         from analysis.models.nodes.node_utils import get_toposorted_nodes
 
         # No point documenting all this copying

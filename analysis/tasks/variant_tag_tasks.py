@@ -1,12 +1,12 @@
 import celery
 from django.db.models import Q
 
-from analysis.models import VariantTag, Analysis, TagNode
+from analysis.models import Analysis, TagNode, VariantTag
 from analysis.models.nodes.node_utils import update_analysis
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import ImportSource, VariantAllele, Tag
+from snpdb.models import ImportSource, Tag, VariantAllele
 
 
 def analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag, visible: bool):

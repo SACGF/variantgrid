@@ -1,20 +1,29 @@
 import itertools
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import cached_property, reduce
-from typing import Optional, Iterator
+from typing import Optional
 
 from django.db.models import Count, QuerySet, Subquery
 
 from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths, CriteriaSummarizer
-from classification.enums import SpecialEKeys, ShareLevel
-from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
-    ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport, Classification
-from classification.models.clinical_context_models import DiscordanceStatus, DiscordanceLevel
+from classification.enums import ShareLevel, SpecialEKeys
+from classification.models import (
+    Classification,
+    ClassificationFlagTypes,
+    ClassificationLabSummary,
+    ClassificationLabSummaryEntry,
+    ClassificationModification,
+    ClinicalContext,
+    DiscordanceReport,
+    classification_flag_types,
+)
+from classification.models.clinical_context_models import DiscordanceLevel, DiscordanceStatus
 from flags.models import Flag, FlagStatus
-from genes.hgvs import CHGVS
-from library.utils import group_by_key, segment, first
+from genes.hgvs import HGVSDisplay
+from library.utils import first, group_by_key, segment
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
 
@@ -252,7 +261,7 @@ class AlleleLegacyOverlap(LegacyOverlapState):
         self._calculator_state = calculator_state
         self.allele = allele
         self.context_map: dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = {}
-        self._c_hgvses: set[CHGVS] = set()
+        self._c_hgvses: set[HGVSDisplay] = set()
 
         # need to keep track of the below for sorting
         self.shared_labs = set()
@@ -290,7 +299,7 @@ class AlleleLegacyOverlap(LegacyOverlapState):
         return sorted(self.context_map.values())
 
     @property
-    def c_hgvses(self) -> list[CHGVS]:
+    def c_hgvses(self) -> list[HGVSDisplay]:
         return sorted(self._c_hgvses)
 
     @property

@@ -65,7 +65,7 @@ There are per-app research documents generated in claude/research
 ### Core genetic apps (dependency order)
 - **`library/`** — Shared utilities (not a Django app). No Django models; provides: permissions (`guardian_utils`), notifications (`log_utils.NotificationBuilder`), preview system, jQGrid/DataTables base classes, caching, and 20+ utility modules in `library/utils/`.
 - **`snpdb/`** — Foundation genetic models: `Variant`, `Allele`, `Locus`, `GenomeBuild`, `VCF`, `Sample`, `Cohort`, `Lab`, `Organization`. Also called "SNPDB" (the original project name). Most other apps depend on this.
-- **`genes/`** — Genes, transcripts, HGVS resolution, canonical transcript management. Contains `hgvs/` subdirectory with biocommons/pyhgvs converters.
+- **`genes/`** — Genes, transcripts, HGVS resolution, canonical transcript management. Contains `hgvs/` subdirectory with the biocommons HGVS converter.
 - **`annotation/`** — VEP annotation integration, ClinVar, variant annotation versions.
 - **`analysis/`** — Interactive DAG-based variant filtering pipeline. Nodes produce Django Q objects composed into querysets. Supports sample/trio/cohort/pedigree analysis modes.
 - **`classification/`** — The largest app. Full ACMG classification workflow: evidence keys, versioned records, discordance detection, ClinVar export, condition text matching, multi-lab sharing.
@@ -142,6 +142,10 @@ When asked to draft a prompt for an agent to implement a plan in another convers
 - The plan reflects the final decision; the agent reading it won't see the alternatives. Mentioning rejected options only confuses or implies the plan is incomplete.
 - Keep prompts short: read-list, "follow plan §X-§Y", any positive overrides, report-back format. No "pre-resolved decisions" section.
 
+## Code comments
+
+Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't write comments about failed paths or reverted decisions, just let the existing code stand. If you are tempted to write a lot of comments, perhaps you could make the code clearer by extracting logic into better named variables
+
 ## GitHub Comments
 
 When writing any comment on a GitHub issue or pull request, always preface it with 🤖 Written by Claude.
@@ -157,6 +161,8 @@ Tests extend `django.test.TestCase`. URL tests use `URLTestCase` from `library/d
 Fake/fixture data helpers are in `annotation/tests/test_data_fake_genes.py`, `snpdb/tests/utils/`, etc.
 
 `UNIT_TEST = sys.argv[1:2] == ['test']` is set in default_settings and used to conditionally skip expensive setup.
+
+It's great to write tests while you are writing code to ensure correctness. At the end, you should audit the tests and decide whether they are worth their costs (code to run and maintain, and possibly hampering refactoring)
 
 ## Database
 

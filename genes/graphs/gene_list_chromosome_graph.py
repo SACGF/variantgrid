@@ -4,7 +4,7 @@ from collections import defaultdict
 from matplotlib.patches import Rectangle
 
 from genes.models import GeneList
-from library.graphs.chromosomes_graph import read_cytoband, centromere_mid
+from library.graphs.chromosomes_graph import centromere_mid, read_cytoband
 from library.utils import sha256sum_str
 from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models.models_enums import AssemblyMoleculeType

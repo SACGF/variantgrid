@@ -7,7 +7,7 @@ from django.db.models import Max
 from library.utils.database_utils import run_sql
 
 
-def _one_off_remove_duplicate_cohort_genotype_collections(apps, _schema_editor):
+def _one_off_remove_duplicate_cohort_genotype_collections(apps, schema_editor):
     CohortGenotypeCollection = apps.get_model("snpdb", "CohortGenotypeCollection")
     newest_qs = CohortGenotypeCollection.objects.values("cohort", "cohort_version").annotate(latest_id=Max('id'))
     for cgc in CohortGenotypeCollection.objects.exclude(pk__in=newest_qs.values_list("latest_id")):
@@ -15,7 +15,20 @@ def _one_off_remove_duplicate_cohort_genotype_collections(apps, _schema_editor):
         try:
             sql = f"DROP TABLE snpdb_cohortgenotype_collection_{cgc.pk}"
             run_sql(sql)
-            cgc.delete()
+            # CohortGenotype is a Postgres inheritance parent with 10,425 children (plain tables,
+            # not partitions, so no pruning). A Django .delete() here cascades into it and emits
+            # a DELETE against the parent WITHOUT "ONLY", which the planner expands over every
+            # child - once per duplicate collection. That is the same fan-out that took the
+            # machine down in snpdb.0045.
+            #
+            # The DROP TABLE above already removed this collection's rows: each child carries
+            # CHECK (collection_id = N) so a collection's genotypes live only in its own child,
+            # and the inheritance parent itself holds no rows. So there is nothing left to
+            # cascade to, and we can just drop the collection row. CohortGenotype is the only
+            # table referencing CohortGenotypeCollection, and its FK is NO ACTION on the (empty)
+            # parent, so Postgres checks it cheaply.
+            with schema_editor.connection.cursor() as cursor:
+                cursor.execute("DELETE FROM snpdb_cohortgenotypecollection WHERE id = %s", [cgc.pk])
         except ProgrammingError as pe:
             logging.warning(pe)
 

@@ -3,12 +3,13 @@ from functools import cached_property, reduce
 
 from auditlog.registry import auditlog
 from django.db import models
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
+from django.utils.timezone import localtime
 
 from analysis.models.enums import TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin, NodeVersion
 from snpdb.models import Tag
 
 
@@ -20,6 +21,17 @@ class TagNode(AnalysisNode):
 
     def modifies_parents(self):
         return True
+
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        if self.mode == TagNodeMode.ALL_TAGS:
+            msg = "Global tags are a snapshot"
+            if node_version := NodeVersion.objects.filter(node=self, version=self.version).first():
+                msg += f" taken {localtime(node_version.created):%d %b %Y %H:%M}"
+            msg += " - tags added or removed in other analyses since then won't be reflected here." \
+                   " Press save to refresh."
+            warnings.append(msg)
+        return warnings
 
     @cached_property
     def tag_ids(self) -> list[str]:

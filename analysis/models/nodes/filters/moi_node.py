@@ -6,12 +6,12 @@ from typing import Optional
 
 from auditlog.registry import auditlog
 from django.db import models
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
-from annotation.models import VariantTranscriptAnnotation, OntologyTerm
+from annotation.models import OntologyTerm, VariantTranscriptAnnotation
 from genes.models import GeneSymbol
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation
 from patients.models_enums import Zygosity

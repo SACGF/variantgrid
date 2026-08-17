@@ -4,11 +4,22 @@ from functools import cached_property
 from typing import Union, Type
 import json
 import django.dispatch
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models import TextField, ForeignKey, JSONField, IntegerField, CASCADE, TextChoices, \
-    PROTECT, DateField, ManyToManyField, QuerySet, BooleanField
+from django.db.models import (
+    CASCADE,
+    PROTECT,
+    BooleanField,
+    DateField,
+    ForeignKey,
+    IntegerField,
+    JSONField,
+    ManyToManyField,
+    QuerySet,
+    TextChoices,
+    TextField,
+)
 from django.urls import reverse
 from model_utils.models import TimeStampedModel
 
@@ -69,7 +80,7 @@ class ValueOther:
         return self.label
 
     @staticmethod
-    def from_str(value: str, text_choices_class: Type) -> 'ValueOther':
+    def from_str(value: str, text_choices_class: type) -> 'ValueOther':
         try:
             choice = text_choices_class(value)
             return ValueOther(key=value, label=choice.label)
@@ -214,12 +225,12 @@ class Review(TimeStampedModel):
             if isinstance(method, str):
                 return [ValueOther.from_str(method, ReviewMedium)]
             else:
-                return list(sorted(ValueOther.from_str(m, ReviewMedium) for m in method))
+                return sorted(ValueOther.from_str(m, ReviewMedium) for m in method)
 
     @property
     def participants(self) -> list[ValueOther]:
         if participants := self.meeting_meta.get("participants", {}).get("review_participants"):
-            return list(sorted(ValueOther.from_str(p, ReviewParticipants) for p in participants))
+            return sorted(ValueOther.from_str(p, ReviewParticipants) for p in participants)
         return []
 
     @property

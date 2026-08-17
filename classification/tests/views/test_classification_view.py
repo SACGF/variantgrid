@@ -2,7 +2,7 @@ import json
 from unittest import skip
 
 from deepdiff import DeepDiff
-from django.test import TestCase, RequestFactory, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 
 from classification.enums import EvidenceKeyValueType, SubmissionSource
 from classification.models import Classification, EvidenceKey

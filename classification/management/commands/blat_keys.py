@@ -44,7 +44,7 @@ class Command(BaseCommand):
             found_deps = False
             for line in lines:
                 if found_deps:
-                    if re.match("^\s+]$", line):
+                    if re.match(r"^\s+]$", line):
                         break
                     dependency_lines.append(line)
                 elif re.match(r"^\s+dependencies = \[", line):

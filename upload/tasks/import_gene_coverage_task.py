@@ -6,10 +6,10 @@ from django.conf import settings
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import GeneCoverageCollection, AnnotationConsortium, TranscriptVersion
+from genes.models import AnnotationConsortium, GeneCoverageCollection, TranscriptVersion
 from library.log_utils import log_traceback
 from library.utils.file_utils import name_from_filename
-from snpdb.models import Sample, GenomeBuild, DataState
+from snpdb.models import DataState, GenomeBuild, Sample
 from upload.models import UploadedGeneCoverage
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app
@@ -49,7 +49,7 @@ class ImportGeneCoverageTask(ImportTask):
             log_traceback()
         return sample
 
-    def process_items(self, uploaded_file):
+    def process_items(self, file_upload):
         # This was originally written for RUNX1
         genome_build = GenomeBuild.legacy_build()
         enrichment_kit = None
@@ -61,24 +61,24 @@ class ImportGeneCoverageTask(ImportTask):
         if settings.SEQAUTO_ENABLED:
             # Only API or seqauto sets path - but seqauto won't call this method it just directly calls
             # GeneCoverageCollection.load_from_file
-            if uploaded_file.path:
+            if file_upload.path:
                 from seqauto.models import QCGeneCoverage
-                if qc_gene_coverage := QCGeneCoverage.objects.filter(path=uploaded_file.path).first():
+                if qc_gene_coverage := QCGeneCoverage.objects.filter(path=file_upload.path).first():
                     logging.info("Found seqauto QCGeneCoverage sharing path: %s", qc_gene_coverage.path)
                     genome_build = qc_gene_coverage.qc.genome_build
                     enrichment_kit = qc_gene_coverage.qc.sequencing_sample.enrichment_kit
 
-        filename = uploaded_file.get_filename()
+        filename = file_upload.get_filename()
 
         try:
-            uploaded_gene_coverage = UploadedGeneCoverage.objects.get(uploaded_file=uploaded_file)
+            uploaded_gene_coverage = UploadedGeneCoverage.objects.get(file_upload=file_upload)
         except UploadedGeneCoverage.DoesNotExist:
-            uploaded_gene_coverage = UploadedGeneCoverage(uploaded_file=uploaded_file)
+            uploaded_gene_coverage = UploadedGeneCoverage(file_upload=file_upload)
 
         # Linking this way was done for RUNX1
         auto_match_samples = False
         if not qc_gene_coverage and auto_match_samples:
-            uploaded_gene_coverage.sample = self.match_sample(uploaded_file.user, filename)
+            uploaded_gene_coverage.sample = self.match_sample(file_upload.user, filename)
             uploaded_gene_coverage.save()
 
         # TODO: This is hardcoded - need to be able to pass this in or select in GUI

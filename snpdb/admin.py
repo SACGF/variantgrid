@@ -11,12 +11,29 @@ from classification.models import Overlap
 from classification.services.overlaps_services import OverlapServices
 from snpdb import models
 from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
-from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_list_column, \
-    admin_action
+from snpdb.admin_utils import (
+    GuardedModelAdminBasics,
+    ModelAdminBasics,
+    admin_action,
+    admin_list_column,
+)
 from snpdb.liftover import liftover_alleles
-from snpdb.models import Allele, VariantAllele, ClinVarKey, ClinVarKeyExcludePattern, UserSettingsOverride, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab, GlobalSettings, Variant, \
-    AlleleLiftover, SiteMessage
+from snpdb.models import (
+    Allele,
+    AlleleLiftover,
+    ClinVarKey,
+    ClinVarKeyExcludePattern,
+    GlobalSettings,
+    Lab,
+    LabUserSettingsOverride,
+    Organization,
+    OrganizationUserSettingsOverride,
+    SiteMessage,
+    UserPageAck,
+    UserSettingsOverride,
+    Variant,
+    VariantAllele,
+)
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -398,7 +415,15 @@ admin.site.register(models.GenomeBuild, ModelAdminBasics)
 admin.site.register(models.LabProject)
 admin.site.register(models.Manufacturer)
 admin.site.register(models.Project, ModelAdminBasics)
-admin.site.register(models.Sample, ModelAdminBasics)
+
+
+@admin.register(models.Sample)
+class SampleAdmin(ModelAdminBasics):
+    """ list_filter on extraction_match_status is the cheapest 'show me everything needing attention' """
+    list_display = ("pk", "name", "vcf", "patient", "extraction", "extraction_match_status")
+    list_filter = ("extraction_match_status",)
+
+
 admin.site.register(models.SampleLabProject)
 admin.site.register(models.SampleTag, ModelAdminBasics)
 admin.site.register(models.SettingsInitialGroupPermission, ModelAdminBasics)

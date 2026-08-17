@@ -1,7 +1,8 @@
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import Iterable, Optional, Any, Mapping, Callable
+from typing import Any, Optional
 
 from django.contrib.auth.models import User
 from django.db.models import Count
@@ -9,8 +10,8 @@ from django.db.models.query import QuerySet
 
 from classification.enums import CriteriaEvaluation
 from classification.models.classification import ClassificationModification
-from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
-from genes.hgvs import CHGVS
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
+from genes.hgvs import HGVSComponents
 from library.cache import clear_cached_property
 
 
@@ -33,7 +34,7 @@ class KeyValueFormatter:
             value = ekey.pretty_value(value)
         else:
             if isinstance(value, list):
-                value = ', '.join((str(item) for item in value))
+                value = ', '.join(str(item) for item in value)
             elif value is True:
                 return 'TRUE'
             elif value is False:
@@ -243,7 +244,7 @@ class VCFEncoding:
 
 class VariantWithChgvs:
 
-    def __init__(self, vcm: ClassificationModification, chgvs: CHGVS):
+    def __init__(self, vcm: ClassificationModification, chgvs: HGVSComponents):
         self.vcm = vcm
         self.chgvs = chgvs
 
@@ -255,7 +256,7 @@ class VariantWithChgvs:
             return 0
 
     @property
-    def c_hgvs_without_transcript_version(self) -> CHGVS:
+    def c_hgvs_without_transcript_version(self) -> HGVSComponents:
         return self.chgvs.without_transcript_version
 
 
@@ -263,7 +264,7 @@ class TranscriptGroup:
 
     def __init__(self):
         self.highest_transcript_version: Optional[int] = None
-        self.highest_transcript_chgvs: Optional[CHGVS] = None
+        self.highest_transcript_chgvs: Optional[HGVSComponents] = None
         self.vcmcs: list[VariantWithChgvs] = []
 
     def add(self, vcmc: VariantWithChgvs):

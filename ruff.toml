@@ -1,0 +1,56 @@
+# Ruff: fast linter + formatter. Owns style / imports / modernization / common
+# refactors. Coexists with a slimmed pylint (config/pylint3.rc), which keeps only
+# the inference-heavy checks + pylint_django that ruff can't replicate, and with
+# mypy (mypy.ini) for type checking. Three complementary layers.
+
+target-version = "py312"
+line-length = 100
+
+extend-exclude = [
+    "**/migrations/**",
+    "variantgrid/static_files",
+    "variantgrid/sitestatic",
+    "**/env/**",
+]
+
+[lint]
+select = [
+    "F",    # pyflakes - undefined names, unused imports/vars
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings (whitespace - replaces the autopep8 pass)
+    "I",    # isort - import ordering
+    "UP",   # pyupgrade - modern py312 syntax
+    "B",    # flake8-bugbear - likely bugs
+    "C4",   # flake8-comprehensions
+    "DJ",   # flake8-django
+    "TC",   # flake8-type-checking - move typing-only imports into TYPE_CHECKING
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",   # line-too-long - matches pylint (too many currently)
+    "E741",   # ambiguous name l/I/O - pylint good-names allows i,j,k
+    "B008",   # function call in arg default - common Django/DRF idiom (Depends-style)
+    "B905",   # zip() without strict= - too noisy for now
+    "RUF012", # mutable class attrs need ClassVar - clashes with Django model idiom
+    "DJ001",  # null=True on string field - existing schema, not actionable in lint
+    # PEP 604 union rewrites are NOT safe to auto-apply here: this codebase has
+    # annotations where a name is shadowed (e.g. a dataclass field named `datetime`)
+    # or is a non-type that Optional[...]/Union[...] silently tolerated. Converting to
+    # `X | None` makes the annotation eager-evaluate and raise TypeError at import.
+    # Re-enable per-file only after adding `from __future__ import annotations`.
+    "UP007",  # Union[X, Y] -> X | Y
+    "UP045",  # Optional[X]  -> X | None
+]
+
+[lint.per-file-ignores]
+# __init__.py: re-exports are intentional (F401), and import order is frequently
+# deliberate to manage circular dependencies, so do not sort imports here (I001).
+"__init__.py" = ["F401", "I001"]
+"**/tests/**" = ["F401", "F841"]    # unused fixtures/locals common in tests
+
+[lint.isort]
+known-first-party = [
+    "analysis", "annotation", "classification", "eventlog", "flags", "genes",
+    "library", "manual", "ontology", "pathtests", "patients", "pedigree",
+    "seqauto", "snpdb", "sync", "uicore", "upload", "variantgrid", "variantopedia",
+]

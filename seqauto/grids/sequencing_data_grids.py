@@ -1,16 +1,23 @@
 from typing import Any
 
 from django.conf import settings
-from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import TextField, QuerySet
+from django.db.models import QuerySet, StringAgg, TextField, Value
 from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
 from django.utils.html import format_html_join, mark_safe
 
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonDataType
-from seqauto.models import SequencingRun, BamFile, UnalignedReads, SingleSampleVCF, QC, Experiment, EnrichmentKit, \
-    EnrichmentKitType
+from seqauto.models import (
+    QC,
+    BamFile,
+    EnrichmentKit,
+    EnrichmentKitType,
+    Experiment,
+    SequencingRun,
+    SingleSampleVCF,
+    UnalignedReads,
+)
 from snpdb.models import UserGridConfig
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -31,7 +38,7 @@ class ExperimentColumns(DatatableConfig[Experiment]):
 
     def get_initial_queryset(self) -> QuerySet[Experiment]:
         queryset = Experiment.objects.all()
-        return queryset.annotate(sequencing_runs=StringAgg("sequencingrun", ',', output_field=TextField()))
+        return queryset.annotate(sequencing_runs=StringAgg("sequencingrun", Value(','), output_field=TextField()))
 
 
 class SequencingRunListGrid(JqGridUserRowConfig):
@@ -68,12 +75,12 @@ class SequencingRunListGrid(JqGridUserRowConfig):
 
         annotate = {
             "sample_count": Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample"),
-            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), ',',
-                                 output_field=TextField(), ordering="vcffromsequencingrun"),
-            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", ',',
-                                            output_field=TextField(), ordering="vcffromsequencingrun"),
-            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", ',',
-                                           ordering="vcffromsequencingrun"),
+            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), Value(','),
+                                 output_field=TextField(), order_by="vcffromsequencingrun"),
+            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", Value(','),
+                                            output_field=TextField(), order_by="vcffromsequencingrun"),
+            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", Value(','),
+                                           order_by="vcffromsequencingrun"),
         }
 
         # Add sample_count to queryset
@@ -140,11 +147,11 @@ class BamFileListGrid(JqGridUserRowConfig):
     model = BamFile
     caption = 'BamFiles'
     fields = [
-        "id", "unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
-        "unaligned_reads__sequencing_sample__sample_id", "path", "aligner__name"]
+        "id", "sequencing_sample__sample_sheet__sequencing_run__name",
+        "sequencing_sample__sample_id", "path", "aligner__name"]
     colmodel_overrides = {
         'id': {'width': 20, 'formatter': 'viewBamFileLink'},
-        'unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'},
+        'sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'},
         'aligner__name': {'label': 'Aligner', "hidden": True}  # Hide as always "Fake Aligner" currently
     }
 
@@ -159,11 +166,11 @@ class BamFileListGrid(JqGridUserRowConfig):
 class SingleSampleVCFListGrid(JqGridUserRowConfig):
     model = SingleSampleVCF
     caption = 'SingleSampleVCFs'
-    fields = ["id", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
-              "bam_file__unaligned_reads__sequencing_sample__sample_id", "path", "variant_caller"]
+    fields = ["id", "bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
+              "bam_file__sequencing_sample__sample_id", "path", "variant_caller"]
     colmodel_overrides = {
         'id': {'width': 20, 'formatter': 'viewVCFFileLink'},
-        'bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}
+        'bam_file__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}
     }
 
     def __init__(self, user, **kwargs):
@@ -177,11 +184,11 @@ class SingleSampleVCFListGrid(JqGridUserRowConfig):
 class QCFileListGrid(JqGridUserRowConfig):
     model = QC
     caption = 'QC'
-    fields = ["id", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
-              "bam_file__unaligned_reads__sequencing_sample__sample_id", "path"]
+    fields = ["id", "bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
+              "bam_file__sequencing_sample__sample_id", "path"]
     colmodel_overrides = {
         'id': {'width': 20, 'formatter': 'viewQCLink'},
-        'bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}
+        'bam_file__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}
     }
 
     def __init__(self, user, **kwargs):

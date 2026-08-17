@@ -4,7 +4,7 @@ from django.test.utils import override_settings
 from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
-from annotation.vep_annotation import get_vep_command
+from annotation.vep_annotation import get_vep_command, get_vep_skipped_variants_filename
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
@@ -22,6 +22,31 @@ class GetVepCommandTests(TestCase):
             VariantAnnotationPipelineType.STANDARD,
             variant_annotation_version=vav,
         )
+
+    def test_skipped_variants_file_named_off_output(self):
+        """ #1701: VEP's own list of what it dropped, per-attempt via the output name """
+        cmd = self._cmd(AnnotationConsortium.ENSEMBL)
+        self.assertIn("--skipped_variants_file", cmd)
+        self.assertEqual(cmd[cmd.index("--skipped_variants_file") + 1],
+                         get_vep_skipped_variants_filename("out.vcf"))
+
+    @override_settings(ANNOTATION_VEP_MEMORY_LIMIT_GB=4)
+    def test_memory_limit_wraps_whole_command(self):
+        """ #1710: prlimit has to be outermost so everything VEP starts inherits the heap ceiling """
+        cmd = self._cmd(AnnotationConsortium.ENSEMBL)
+        self.assertEqual(cmd[:3], ["prlimit", f"--data={4 * 1024 ** 3}", "--"])
+
+    @override_settings(ANNOTATION_VEP_MEMORY_LIMIT_GB=4,
+                       ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT="/path/perlbrew_runner.sh")
+    def test_memory_limit_wraps_perlbrew_runner(self):
+        cmd = self._cmd(AnnotationConsortium.ENSEMBL)
+        self.assertEqual(cmd[:4], ["prlimit", f"--data={4 * 1024 ** 3}", "--", "/path/perlbrew_runner.sh"])
+
+    @override_settings(ANNOTATION_VEP_MEMORY_LIMIT_GB=None, ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT=None)
+    def test_no_memory_limit_leaves_command_unwrapped(self):
+        cmd = self._cmd(AnnotationConsortium.ENSEMBL)
+        self.assertNotIn("prlimit", cmd)
+        self.assertTrue(cmd[0].endswith("vep"))
 
     def test_gencode_primary_ensembl_sets_flag(self):
         vav = VariantAnnotationVersion(
@@ -72,16 +97,8 @@ class GetVepCommandTests(TestCase):
 
 
 def _v5_settings(vep_version: str) -> dict:
-    """ columns_version 5 with the #1638 plugin data files configured on GRCh38. """
+    """ columns_version 5 (the helper pins the #1638 plugin data files) at a given VEP version. """
     d = get_fake_annotation_settings_dict(columns_version=5)
-    grch38_cfg = d["ANNOTATION"]["GRCh38"]["vep_config"]
-    grch38_cfg.update({
-        "protvar": "annotation_data/all_builds/ProtVar_data.db",
-        "open_targets": "annotation_data/GRCh38/open_targets_26.03_vep.tsv.bgz",
-        "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",
-        "popeve": "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz",
-        "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",
-    })
     d["ANNOTATION_VEP_VERSION"] = vep_version
     return d
 

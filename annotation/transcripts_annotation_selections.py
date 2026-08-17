@@ -6,11 +6,17 @@ from django.conf import settings
 from django.forms.models import model_to_dict
 from django.utils.timesince import timesince
 
-from annotation.models import VEPSkippedReason, AnnotationStatus
-from annotation.models.models import VariantAnnotation, AnnotationVersion, \
-    InvalidAnnotationVersionError, VariantTranscriptAnnotation, AnnotationRun
-from genes.hgvs import HGVSMatcher, HGVSException
-from genes.models import TranscriptVersion, GnomADGeneConstraint, Transcript
+from annotation.models import AnnotationStatus, VEPSkippedReason
+from annotation.models.models import (
+    AnnotationRun,
+    AnnotationVersion,
+    InvalidAnnotationVersionError,
+    VariantAnnotation,
+    VariantTranscriptAnnotation,
+)
+from annotation.models.models_enums import NMDEscapeStatus
+from genes.hgvs import HGVSException, HGVSMatcher
+from genes.models import GnomADGeneConstraint, Transcript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -134,6 +140,11 @@ class VariantTranscriptSelections:
             except AttributeError:
                 pass
 
+        # The PTC columns (#579) only say something for frameshifts - every other transcript
+        # is deliberately NOT_APPLICABLE, which would just be noise down the table.
+        if data.get("nmd_escape_status") == NMDEscapeStatus.NOT_APPLICABLE.label:
+            data["nmd_escape_status"] = None
+
         # Split/clean aggregate fields
         VEP_JOINED_FIELDS = ["domains"]
         for field in VEP_JOINED_FIELDS:
@@ -254,7 +265,7 @@ class VariantTranscriptSelections:
             if gene_symbol:
                 gene_symbols.add(gene_symbol)
 
-        hgvs_matcher = HGVSMatcher(self.genome_build)
+        hgvs_matcher = HGVSMatcher.instance(self.genome_build)
         kwargs = {
             "transcript__annotation_consortium": self.other_annotation_consortium,
             "genome_build": self.genome_build,
@@ -264,7 +275,8 @@ class VariantTranscriptSelections:
         # Convert once to explicit, then pass this around
         variant_coordinate = variant.coordinate.as_external_explicit(self.genome_build)
         has_other_annotation_consortium_transcripts = False
-        for transcript_version in TranscriptVersion.objects.filter(**kwargs).order_by("-version"):
+        transcript_version_qs = TranscriptVersion.objects.filter(**kwargs).select_related("gene_version")
+        for transcript_version in transcript_version_qs.order_by("-version"):
             # Don't duplicate ones already available via RefSeq/Ensembl equivalence
             # and only take the highest version we have
             if transcript_version.transcript_id not in existing_other_transcripts:

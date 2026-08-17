@@ -6,7 +6,8 @@
     uses the same canonical_filter_key helper to populate filter-keyed rows. A
     silent mismatch between the two would produce cache misses forever.
 """
-from typing import Iterable, Optional, Union
+from collections.abc import Iterable
+from typing import Optional, Union
 
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -60,6 +61,16 @@ class NoFilterHandler(FilterKeyHandler):
         return [None]
 
 
+class SampleNodeHandler(NoFilterHandler):
+    """ A group level SampleNode spans genotype collections, so there's no single cohort's stats
+        row to read - its counts are live queries. """
+
+    def filter_key_for_node(self, node) -> FilterKey:
+        if node.is_group_level:
+            return UNCACHEABLE
+        return None
+
+
 class TrioInheritanceHandler(FilterKeyHandler):
     # 5 inheritance modes precomputed including compound het.
     CACHED_MODES = {
@@ -95,7 +106,7 @@ def get_handler_for_node(node) -> FilterKeyHandler:
     from analysis.models.nodes.sources.trio_node import TrioNode
 
     handlers = {
-        SampleNode: NoFilterHandler(),
+        SampleNode: SampleNodeHandler(),
         CohortNode: NoFilterHandler(),
         TrioNode: TrioInheritanceHandler(),
         PedigreeNode: NoFilterHandler(),
@@ -152,8 +163,5 @@ def get_cached_label_count_for_cohort(cohort, sample, filter_key: FilterKey,
 
 def _enqueue_lazy_recompute(cohort, annotation_version) -> None:
     """ Fire-and-forget. Idempotent — task no-ops if the row now exists. """
-    from annotation.tasks.calculate_sample_stats import calculate_cohort_stats_task
-    calculate_cohort_stats_task.apply_async(
-        args=[cohort.pk, annotation_version.pk],
-        queue="annotation_workers",
-    )
+    from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
+    enqueue_cohort_stats_recompute(cohort, annotation_version)

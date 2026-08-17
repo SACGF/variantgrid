@@ -1,12 +1,10 @@
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import transaction
-from user_messages.models import Message
 
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
-from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
-from snpdb.models import UserDataPrefix, SettingsInitialGroupPermission, Organization, Lab
+from snpdb.models import Lab, Organization, SettingsInitialGroupPermission, UserDataPrefix
 from snpdb.tasks.vcf_bed_file_task import create_backend_vcf_bed_intersections
 
 
@@ -27,21 +25,13 @@ def user_post_save_handler(sender, instance, **kwargs):
 
         org_labs = getattr(settings, "USER_CREATE_ORG_LABS", None)
         if org_labs:
-            org_message = getattr(settings, "USER_CREATE_ORG_MESSAGE", {})
-
             for org_group_name, lab_pattern in org_labs.items():
                 organization, _ = Organization.objects.get_or_create(group_name=org_group_name)
                 lab_name = lab_pattern % instance.__dict__
                 lab_group_name = f"{organization.group_name}/{lab_name.lower()}"
                 lab, _ = Lab.objects.get_or_create(name=lab_name, organization=organization, group_name=lab_group_name)
-                add_user_to_group(organization.group_name)
+                organization.add_member(instance)
                 add_user_to_group(lab_group_name)
-
-                if message := org_message.get(org_group_name):
-                    Message.objects.create(subject="Your initial lab / organisation",
-                                           body=message,
-                                           sender=admin_bot(),
-                                           recipient=instance)
 
         nb = AdminNotificationBuilder(message="User Created")
         nb.add_markdown("A new user has been created")

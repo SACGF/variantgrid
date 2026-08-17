@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional, Union
+from typing import Optional, Union
 
 from annotation import vep_field_formatters as fmt
 from annotation.models.damage_enums import (
@@ -107,6 +108,7 @@ STRUCTURAL = frozenset({VariantAnnotationPipelineType.STRUCTURAL_VARIANT})
 _ALOFT_DESC = 'Most damaging transcript prediction chosen, and Ensembl transcript stored.'
 _GNOMAD2_AF_DESC = '(exome_AC+genome_AC)/(exome_AN+genome_AN)'
 _INDEL_MAX_DESC = 'max() for indels'
+_PTC_DESC = 'Calculated from HGVSp / Protein_position and transcript exon geometry, not a VEP field.'
 
 # Choice / most-damaging formatters that need a damage enum as argument. The simpler
 # shared factory instances (format_pick_highest_float etc.) live in vep_field_formatters.
@@ -648,6 +650,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         category=ColumnAnnotationCategory.CONSERVATION,
         vep_custom=VEPCustom.PHASTCONS_100_WAY,
         source_field_has_custom_prefix=True,
+        pipeline_types=STANDARD,
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
@@ -671,6 +674,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.PHASTCONS_30_WAY,
         source_field_has_custom_prefix=True,
         genome_builds=GRCH38,
+        pipeline_types=STANDARD,
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
@@ -694,6 +698,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.PHASTCONS_46_WAY,
         source_field_has_custom_prefix=True,
         genome_builds=GRCH37,
+        pipeline_types=STANDARD,
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
@@ -715,6 +720,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         category=ColumnAnnotationCategory.CONSERVATION,
         vep_custom=VEPCustom.PHYLOP_100_WAY,
         source_field_has_custom_prefix=True,
+        pipeline_types=STANDARD,
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
@@ -738,6 +744,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.PHYLOP_30_WAY,
         source_field_has_custom_prefix=True,
         genome_builds=GRCH38,
+        pipeline_types=STANDARD,
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
@@ -761,6 +768,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.PHYLOP_46_WAY,
         source_field_has_custom_prefix=True,
         genome_builds=GRCH37,
+        pipeline_types=STANDARD,
         min_vep_version=112,
         summary_stats='max',
         source_field_processing_description=_INDEL_MAX_DESC,
@@ -826,6 +834,8 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
         formatter=fmt.format_pick_highest_float,
     ),
+    # COSMIC renamed the sample count INFO field from CNT to SAMPLE_COUNT when we moved from
+    # CosmicCodingMuts (v97) to Cosmic_GenomeScreensMutant (v99) in columns version 3
     VEPColumnDef(
         source_field='CNT',
         variant_grid_columns=('cosmic_count',),
@@ -833,6 +843,17 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.COSMIC,
         source_field_has_custom_prefix=True,
         pipeline_types=STANDARD,
+        max_columns_version=2,
+        formatter=fmt.format_pick_highest_int,
+    ),
+    VEPColumnDef(
+        source_field='SAMPLE_COUNT',
+        variant_grid_columns=('cosmic_count',),
+        category=ColumnAnnotationCategory.FREQUENCY_DATA,
+        vep_custom=VEPCustom.COSMIC,
+        source_field_has_custom_prefix=True,
+        pipeline_types=STANDARD,
+        min_columns_version=3,
         formatter=fmt.format_pick_highest_int,
     ),
     VEPColumnDef(
@@ -966,6 +987,36 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_columns_version=2,
         formatter=fmt.format_nmd_escaping_variant,
     ),
+
+    # ---------- PTC / PTC-aware NMD (columns_version >= 5, #579) ------------
+    # No VEP source - calculated at insert time from hgvs_p + protein_position + transcript
+    # geometry. @see BulkVEPVCFAnnotationInserter._add_calculated_ptc. Registered here so
+    # visible_columns_for() shows the variant details rows on the versions that populate them.
+    VEPColumnDef(
+        source_field=None,
+        variant_grid_columns=('ptc_distance_codons',),
+        category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS,
+        pipeline_types=STANDARD,
+        min_columns_version=5,
+        source_field_processing_description=_PTC_DESC,
+    ),
+    VEPColumnDef(
+        source_field=None,
+        variant_grid_columns=('ptc_last_junction_distance',),
+        category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS,
+        pipeline_types=STANDARD,
+        min_columns_version=5,
+        source_field_processing_description=_PTC_DESC,
+    ),
+    VEPColumnDef(
+        source_field=None,
+        variant_grid_columns=('nmd_escape_status',),
+        category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS,
+        pipeline_types=STANDARD,
+        min_columns_version=5,
+        source_field_processing_description=_PTC_DESC,
+    ),
+
     VEPColumnDef(
         source_field='SpliceRegion',
         variant_grid_columns=('splice_region',),
@@ -1172,6 +1223,17 @@ def has_data_files(c: VEPColumnDef, vep_config: VEPConfig) -> bool:
         except KeyError:
             return False
     return True
+
+
+def plugin_applies_to_build(vep_plugin: VEPPlugin, genome_build_name: str) -> bool:
+    """ True iff this plugin has any VEPColumnDef configured for the given build. Plugins whose
+        columns declare `genome_builds` (e.g. GRCh38-only MaveDB/OpenTargets/EVE/PromoterAI) are
+        skipped on builds they don't list, so we never probe for their data. Plugins with no
+        column def at all default to True. """
+    plugin_defs = [c for c in VEP_COLUMNS if c.vep_plugin == vep_plugin]
+    if not plugin_defs:
+        return True
+    return any(c.applies_to(genome_build_name=genome_build_name) for c in plugin_defs)
 
 
 def filter_for(

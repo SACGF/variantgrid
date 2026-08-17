@@ -6,8 +6,9 @@ import logging
 import operator
 import os
 from collections import defaultdict
+from collections.abc import Iterable
 from functools import reduce
-from typing import Iterable, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -15,14 +16,26 @@ from django.db.models.query_utils import Q
 
 from genes.hgvs import HGVSMatcher
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, get_contigs_header_lines
+from library.genomics.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
 from library.guardian_utils import admin_bot
 from snpdb.bcftools_liftover import bcftools_pre_liftover_error_check
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
-from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
+from snpdb.models.models_enums import (
+    AlleleConversionTool,
+    AlleleOrigin,
+    ImportSource,
+    ProcessingStatus,
+)
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
-from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
+from snpdb.models.models_variant import (
+    Allele,
+    AlleleLiftover,
+    LiftoverRun,
+    Variant,
+    VariantAllele,
+    VariantCoordinate,
+)
+from upload.models import FileUpload, UploadedFileTypes, UploadedLiftover, UploadPipeline
 from upload.upload_processing import process_upload_pipeline
 
 # VariantCoordinate can be None, with an error string at the end
@@ -69,6 +82,11 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
             variant_coordinates = []
             for allele, variant_coordinate, error_message in allele_variant_coordinate_error:
                 if variant_coordinate is not None:
+                    if contig_error := _non_standard_contig_error(vcf_genome_build, variant_coordinate):
+                        variant_coordinate = None
+                        error_message = contig_error
+
+                if variant_coordinate is not None:
                     al = AlleleLiftover(allele=allele,
                                         liftover=liftover,
                                         status=ProcessingStatus.CREATED)
@@ -88,23 +106,36 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
 
             if vcf_ids:  # Need to write VCF and run
                 # BCFTools uses chromosomes not contigs
-                used_chroms = set((vc.chrom for vc in variant_coordinates))
+                used_chroms = set(vc.chrom for vc in variant_coordinates)
                 header_lines = get_contigs_header_lines(vcf_genome_build, use_accession=False,
                                                         contig_allow_list=used_chroms)
                 write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates=variant_coordinates,
                                                    vcf_ids=vcf_ids, header_lines=header_lines)
-                uploaded_file = UploadedFile.objects.create(path=liftover_vcf_filename,
-                                                            import_source=import_source,
-                                                            name='Liftover',
-                                                            user=user,
-                                                            file_type=UploadedFileTypes.LIFTOVER)
+                file_upload = FileUpload.objects.create(path=liftover_vcf_filename,
+                                                        import_source=import_source,
+                                                        name='Liftover',
+                                                        user=user,
+                                                        file_type=UploadedFileTypes.LIFTOVER)
 
-                UploadedLiftover.objects.create(uploaded_file=uploaded_file,
+                UploadedLiftover.objects.create(file_upload=file_upload,
                                                 liftover=liftover)
-                upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+                upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
                 process_upload_pipeline(upload_pipeline)
             else:
                 logging.info("LiftoverRun %s doesn't need to be run", liftover)
+
+
+def _non_standard_contig_error(vcf_genome_build: GenomeBuild, variant_coordinate: VariantCoordinate) -> Optional[str]:
+    """ Liftover VCFs are written with standard contigs only (and tools like BCFTools look the chrom up in the
+        reference fasta) so an alt/unlocalized contig would fail the entire run - see issue #1197 """
+    if variant_coordinate.chrom in vcf_genome_build.chrom_standard_contig_mappings:
+        return None
+
+    if contig := vcf_genome_build.chrom_contig_mappings.get(variant_coordinate.chrom):
+        description = f"'{contig}' has role '{contig.get_role_display()}'"
+    else:
+        description = f"'{variant_coordinate.chrom}' is not in {vcf_genome_build}"
+    return f"Liftover VCFs only contain standard contigs - {description}"
 
 
 def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: GenomeBuild,
@@ -115,13 +146,11 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
 
     other_build_contigs_q_list = []
     other_builds = set()
-    hgvs_matchers = {}
     for genome_build in destination_genome_builds:
         if genome_build != inserted_genome_build:
             other_builds.add(genome_build)
             q = Q(variantallele__variant__locus__contig__in=genome_build.contigs)
             other_build_contigs_q_list.append(q)
-        hgvs_matchers[genome_build] = HGVSMatcher(genome_build)
 
     if not other_builds:
         return {}, {}  # Nothing to do
@@ -153,7 +182,7 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
                 build_liftover_existing_allele_and_variants[genome_build][same_contig_tool].append((allele, variant))
                 continue
 
-            hgvs_matcher = hgvs_matchers[genome_build]
+            hgvs_matcher = HGVSMatcher.instance(genome_build)
 
             for tool_coordinate_error in itertools.chain(
                     _liftover_using_dest_variant_coordinate(allele, genome_build,
@@ -234,8 +263,8 @@ def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBui
         Optionally pass in hgvs_matcher to save re-instantiating it all the time """
 
     from annotation.models import VariantAnnotationVersion
-    from snpdb.models.models_dbsnp import DbSNP
     from genes.hgvs import get_hgvs_variant_coordinate
+    from snpdb.models.models_dbsnp import DbSNP
 
     conversion_tool = None
     g_hgvs = None

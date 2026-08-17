@@ -1,4 +1,9 @@
-from email_manager.views.email_manager_views import email_manager_view, EmailColumns, email_detail, email_pure
+from email_manager.views.email_manager_views import (
+    EmailColumns,
+    email_detail,
+    email_manager_view,
+    email_pure,
+)
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 

@@ -1,18 +1,26 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Iterable, Optional
+from typing import Optional
 
 from django.utils import timezone
 from frozendict import frozendict
 from more_itertools import first
 
-from classification.models import DiscordanceReport, DiscordanceReportTriage, DiscordanceReportTriageStatus, \
-    ClassificationModification, ClassificationLabSummary, DiscordanceReportNextStep, DiscordanceReportClassification
-from genes.hgvs import CHGVS
+from classification.models import (
+    ClassificationLabSummary,
+    ClassificationModification,
+    DiscordanceReport,
+    DiscordanceReportClassification,
+    DiscordanceReportNextStep,
+    DiscordanceReportTriage,
+    DiscordanceReportTriageStatus,
+)
+from genes.hgvs import HGVSDisplay
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column, ExportDataType, pretty_label
+from library.utils import ExportDataType, ExportRow, export_column, pretty_label
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 
@@ -187,11 +195,11 @@ class DiscordanceReportRowData(ExportRow):
         return date_str
 
     @property
-    def c_hgvs(self) -> CHGVS:
+    def c_hgvs(self) -> HGVSDisplay:
         return self._cm_candidate.c_hgvs_best(genome_build=self.perspective.genome_build)
 
     @property
-    def c_hgvses(self) -> list[CHGVS]:
+    def c_hgvses(self) -> list[HGVSDisplay]:
         return sorted({candidate.c_hgvs_best(genome_build=self.perspective.genome_build) for candidate in self._cm_candidates})
 
     @property

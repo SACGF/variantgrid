@@ -1,23 +1,38 @@
 import operator
 from functools import cached_property, reduce
-from typing import Dict, List, Optional
+from typing import Optional
 
 from django.conf import settings
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from more_itertools import first
-from classification.enums import AlleleOriginBucket, EvidenceCategory, ShareLevel, TestingContextBucket, TriageStatus, \
-    TriageState
-from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
-    ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
-    Classification, DiscordanceReport, ClassificationResultValue, OverlapContribution
-from genes.hgvs import CHGVS
+
+from classification.enums import (
+    AlleleOriginBucket,
+    EvidenceCategory,
+    LabExternalFilter,
+    ShareLevel,
+    SpecialEKeys, TriageState, TriageStatus, TestingContextBucket, ClassificationResultValue,
+)
+from classification.models import (
+    Classification,
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
+    ClassificationGroupingSearchTerm,
+    ClassificationGroupingSearchTermType,
+    ClassificationModification,
+    DiscordanceReport,
+    DiscordanceReportClassification,
+    EvidenceKeyMap,
+    ImportedAlleleInfo, OverlapContribution,
+)
+from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologySnake
+from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Variant
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder, CellData
+from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
@@ -55,7 +70,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def render_row_header(self, row: CellData) -> JsonDataType:
 
-        matches: Optional[Dict[str, str]] = None
+        matches: Optional[dict[str, str]] = None
         search: Optional[str] = None
 
         if settings.CLASSIFICATION_ID_FILTER:
@@ -144,27 +159,26 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         }
 
     @cached_property
-    def genome_build_prefs(self) -> List[GenomeBuild]:
+    def genome_build_prefs(self) -> list[GenomeBuild]:
         builds = GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
         return [gb for gb in builds if gb in ImportedAlleleInfo.supported_genome_builds()]
 
     def render_c_hgvs(self, row: CellData) -> JsonDataType:
-        def get_preferred_chgvs_json() -> Dict:
+        def get_preferred_chgvs_json() -> dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
-                    c_hgvs = CHGVS(c_hgvs_string)
-                    c_hgvs.genome_build = genome_build
-                    c_hgvs.is_desired_build = index == 0
+                    c_hgvs = HGVSDisplay.parse(c_hgvs_string, genome_build=genome_build,
+                                               is_desired_build=index == 0)
                     return c_hgvs.to_json()
 
             # May still have linked to an allele without having the c_hgvs on either build
             # TODO check imported g_hgvs or other importable columns
             # could be dirty and not have a latest_allele_info
             if raw_genome_build := row["latest_allele_info__imported_genome_build_patch_version__genome_build"]:
-                c_hgvs = CHGVS(row["latest_allele_info__imported_c_hgvs"])
-                c_hgvs.genome_build = GenomeBuild.get_name_or_alias(raw_genome_build)
-                c_hgvs.is_normalised = False
+                c_hgvs = HGVSDisplay.parse(row["latest_allele_info__imported_c_hgvs"],
+                                           genome_build=GenomeBuild.get_name_or_alias(raw_genome_build),
+                                           is_normalised=False)
                 return c_hgvs.to_json()
             else:
                 return {}
@@ -219,7 +233,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         page = self.get_query_param('page_id')
 
-        filters: List[Q] = []
+        filters: list[Q] = []
 
         # run the filters that are perma-applied on certain pages
 
@@ -259,7 +273,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         # run the filters that are optionally applied
 
-        filters: List[Q] = []
+        filters: list[Q] = []
         if lab_id := self.get_query_param('lab'):
             lab_list = lab_id.split(",")
             filters.append(Q(lab_id__in=lab_list))
@@ -267,8 +281,14 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
                 filters.append(Q(allele_origin_grouping__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+
         if testing_context := self.get_query_param("testing_context"):
             filters.append(Q(allele_origin_grouping__testing_context_bucket=testing_context))
+
+        if settings.CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER:
+            if lab_external := self.get_query_param("lab_external"):
+                if q := LabExternalFilter(lab_external).filter_q():
+                    filters.append(q)
 
         # for view gene symbol
         if protein_position := self.get_query_param("protein_position"):
@@ -303,7 +323,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         return None
 
     @cached_property
-    def id_columns(self) -> List[str]:
+    def id_columns(self) -> list[str]:
         keys = EvidenceKeyMap.instance()
         return [e_key.key for e_key in keys.all_keys if '_id' in e_key.key and
                 e_key.evidence_category in (
@@ -325,7 +345,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         )
 
     def id_filter(self, text: str):
-        ids_contain_q_list: List[Q] = []
+        ids_contain_q_list: list[Q] = []
         for id_key in self.id_columns:
             ids_contain_q_list.append(Q(**{f'published_evidence__{id_key}__value__icontains': text}))
         id_filter_q = reduce(operator.or_, ids_contain_q_list)

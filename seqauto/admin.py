@@ -75,3 +75,11 @@ class QCAdmin(ModelAdminBasics):
 @admin.register(models.QCExecSummary)
 class QCExecSummaryAdmin(ModelAdminBasics):
     pass
+
+
+@admin.register(models.SequencingSample)
+class SequencingSampleAdmin(ModelAdminBasics):
+    """ list_filter on extraction_match_status is the cheapest 'show me everything needing attention' """
+    list_display = ("pk", "sample_sheet", "sample_id", "sample_name", "extraction",
+                    "extraction_match_status")
+    list_filter = ("extraction_match_status",)

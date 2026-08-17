@@ -31,6 +31,7 @@
     }
 </style>
 <script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/annotated_file_download.js' %}"></script>
 <script>
 function getBams() {
     const bams = {{ bam_list | jsonify }};
@@ -54,17 +55,35 @@ function setPatientLink() {
     patientSelector.change(mySetPatientLink);
 }
 
+function setExtractionLink() {
+    const extractionSelector = $("#id_extraction");
+    extractionSelector.parent().append("<a class='cross-link' id='extraction-link'>View Extraction</a>");
+    function mySetExtractionLink() {
+        const pk = extractionSelector.find(":selected").val();
+        setCrossLink($("#extraction-link"), Urls.view_extraction, pk);
+    }
+    mySetExtractionLink();
+    extractionSelector.change(mySetExtractionLink);
+}
+
 
 $(document).ready(function() {
     setPatientLink();
+    setExtractionLink();
 
     $("#sample-tabs").tabs();
+
+    // Skipped-annotation warning message (issue #1409) links to its tab
+    $(".activate-tab").click(function() {
+        $("#sample-tabs > ul a[href='" + $(this).attr("href") + "']").trigger("click");
+        return false;
+    });
 
     const sampleForm = $("#sample-form");
     const patientSelect = $("#id_patient", sampleForm);
     patientSelect.change(function() {
-        let specimenSelect = $("#id_specimen", sampleForm);
-        clearAutocompleteChoice(specimenSelect);
+        let extractionSelect = $("#id_extraction", sampleForm);
+        clearAutocompleteChoice(extractionSelect);
     });
     const dialog = setupCreatePatientDialog();
     const sampleName = $("#id_name").val();
@@ -117,6 +136,9 @@ $(document).ready(function() {
             {% if sample.import_status == 'S' or sample.import_status == 'A' %}
             <li><a href="{% url 'sample_graphs_tab' sample.pk %}">Graphs</a></li>
             {% endif %}
+            {% if skipped_annotation_count %}
+            <li><a href="#sample-skipped-annotation">Skipped Annotation ({{ skipped_annotation_count }})</a></li>
+            {% endif %}
             {% if url_name_visible.sample_gene_lists_tab %}
             <li>
                 <a class="sample-gene-list-link" href="{% url 'sample_gene_lists_tab' sample.pk %}">
@@ -141,6 +163,18 @@ $(document).ready(function() {
             <form method="post" id='sample-form'>
                 {% csrf_token %}
                 {% crispy form form_helper.horizontal %}
+                {% if not sample.extraction and sample.extraction_reference %}
+                    {# A claim about which extraction this sample is, that we can't resolve yet (#1707) #}
+                    <div class="form-group-row row" id="parked-extraction-reference">
+                        <label class="col-form-label col-12 col-md-3 text-md-right">Extraction reference</label>
+                        <div class="col-12 col-md-9">
+                            <div>{{ sample.extraction_reference }}</div>
+                            <div class="text-muted">
+                                {{ sample.get_extraction_match_status_display }}: {{ sample.extraction_match_error }}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
                 {% if annotated_download_files and not sample.vcf.data_archived %}
                     <div class="form-group-row row">
                         <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
@@ -315,6 +349,13 @@ $(document).ready(function() {
                 </div>
             {% endwith %}
          {% endwith %}
+    {% endif %}
+    {% if skipped_annotation_count %}
+        <div id="sample-skipped-annotation">
+            <p>Variants that Variant Effect Predictor (VEP) was unable to annotate.</p>
+            {% load jqgrid_tags %}
+            {% jqgrid 'sample_skipped_annotation_grid' name='Skipped Annotation' search=False sample_id=sample.pk %}
+        </div>
     {% endif %}
     </div> <!-- /sample-tabs -->
 

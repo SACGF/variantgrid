@@ -1,10 +1,15 @@
 import vcf
 
-from annotation.tasks.import_clinvar_vcf_task import ImportCreateVersionForClinVarVCFTask, ProcessClinVarVCFDataTask, \
-    ImportClinVarSuccessTask
+from annotation.tasks.import_clinvar_vcf_task import (
+    ImportClinVarSuccessTask,
+    ImportCreateVersionForClinVarVCFTask,
+    ProcessClinVarVCFDataTask,
+)
 from annotation.vcf_files.import_clinvar_vcf import check_can_import_clinvar
-from upload.import_task_factories.abstract_vcf_import_task_factory import AbstractVCFImportTaskFactory
-from upload.models import UploadedFileTypes
+from upload.import_task_factories.abstract_vcf_import_task_factory import (
+    AbstractVCFImportTaskFactory,
+)
+from upload.models import UploadedClinVarVersion, UploadedFileTypes
 
 
 class ImportClinVarTaskFactory(AbstractVCFImportTaskFactory):
@@ -15,7 +20,7 @@ class ImportClinVarTaskFactory(AbstractVCFImportTaskFactory):
         return ['vcf']
 
     def get_data_classes(self):
-        return []  # TODO?
+        return [UploadedClinVarVersion]
 
     def get_processing_ability(self, user, filename, file_extension, **kwargs):
         # Even if it originally was a .gz, will be using decompressed stream here

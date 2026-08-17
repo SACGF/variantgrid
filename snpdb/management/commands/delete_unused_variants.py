@@ -3,13 +3,25 @@ from django.db import transaction
 from django.db.models import Max
 
 from analysis.models import AllVariantsNode, Candidate, IntersectionNode, NodeVariant, VariantTag
-from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap, \
-    ClinVar, CreatedManualVariant, AnnotationRangeLock
+from annotation.models import (
+    AnnotationRangeLock,
+    ClinVar,
+    CreatedManualVariant,
+    VariantAnnotation,
+    VariantGeneOverlap,
+    VariantTranscriptAnnotation,
+)
 from classification.models import Classification, ImportedAlleleInfo, ResolvedVariantInfo
-from snpdb.models import Variant, VariantZygosityCount, VariantCollectionRecord, \
-    CohortGenotype, CommonVariantClassified, VariantAllele, VariantWiki
-from upload.models import ModifiedImportedVariant, UploadedVCF
-
+from snpdb.models import (
+    CohortGenotype,
+    CommonVariantClassified,
+    Variant,
+    VariantAllele,
+    VariantCollectionRecord,
+    VariantWiki,
+    VariantZygosityCount,
+)
+from upload.models import ModifiedImportedVariant, UploadedVCFPipelineMaxVariant
 
 # Every model with a FK to Variant whose presence means the variant is still referenced and must be
 # kept, as (model, fk_column). A variant is "unused" only if no row in any of these (or in
@@ -40,7 +52,7 @@ PRELOAD_VARIANT_RELATIONS = [
     (AnnotationRangeLock, "max_variant_id"),
     (AllVariantsNode, "max_variant_id"),
     (IntersectionNode, "hgvs_variant_id"),
-    (UploadedVCF, "max_variant_id"),
+    (UploadedVCFPipelineMaxVariant, "max_variant_id"),
 ]
 
 

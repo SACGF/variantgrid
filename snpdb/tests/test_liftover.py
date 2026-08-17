@@ -2,9 +2,13 @@ from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.clingen_allele import get_clingen_allele
-from snpdb.liftover import _liftover_using_existing_contig, _liftover_using_dest_variant_coordinate, \
-    _liftover_using_source_variant_coordinate
-from snpdb.models import GenomeBuild, AlleleConversionTool, VariantCoordinate
+from snpdb.liftover import (
+    _liftover_using_dest_variant_coordinate,
+    _liftover_using_existing_contig,
+    _liftover_using_source_variant_coordinate,
+    _non_standard_contig_error,
+)
+from snpdb.models import AlleleConversionTool, GenomeBuild, VariantCoordinate
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
@@ -66,3 +70,14 @@ class TestLiftover(TestCase):
         conversion_tool, variant_coordinate_38, _error_message = result
         self.assertEqual(conversion_tool, AlleleConversionTool.BCFTOOLS_LIFTOVER)
         self.assertEqual(variant_coordinate_38, self.expected_vc_38)
+
+    def test_standard_contig_written_to_vcf(self):
+        self.assertIsNone(_non_standard_contig_error(GenomeBuild.grch37(), self.expected_vc_37))
+
+    def test_unlocalized_scaffold_rejected_before_vcf(self):
+        # issue #1197 - these aren't in the reference fasta, and killed the whole liftover run
+        grch37 = GenomeBuild.grch37()
+        scaffold = grch37.contigs.get(name='HSCHR1_RANDOM_CTG5')
+        scaffold_vc = VariantCoordinate(chrom=scaffold.name, position=1000, ref='A', alt='T')
+        error = _non_standard_contig_error(grch37, scaffold_vc)
+        self.assertIn(scaffold.get_role_display(), error)

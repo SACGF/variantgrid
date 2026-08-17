@@ -2,12 +2,19 @@ from collections import defaultdict
 
 from django.conf import settings
 
-from classification.enums import ShareLevel, EvidenceKeyValueType, SpecialEKeys
-from classification.models import Classification, ClassificationJsonParams, ClassificationModification, EvidenceKeyMap, \
-    ImportedAlleleInfo, ClassificationGroupingEntry, OverlapContribution
-from classification.models.classification_json_definitions import ClassificationJsonAlleleDict, \
-    ClassificationJsonAlleleRevolvedDict
-from genes.hgvs import CHGVS
+from classification.enums import EvidenceKeyValueType, ShareLevel, SpecialEKeys
+from classification.models import (
+    Classification,
+    ClassificationJsonParams,
+    ClassificationModification,
+    EvidenceKeyMap,
+    ImportedAlleleInfo, ClassificationGroupingEntry, OverlapContribution,
+)
+from classification.models.classification_json_definitions import (
+    ClassificationJsonAlleleDict,
+    ClassificationJsonAlleleRevolvedDict,
+)
+from genes.hgvs import HGVSDisplay
 from library.django_utils import get_url_from_view_path
 
 
@@ -25,10 +32,13 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
 
         if (genome_build := classification.get_genome_build_opt()) and \
                 (preferred_build := allele_info[genome_build]) and \
-                (c_hgvs := preferred_build.c_hgvs_obj):
+                (c_hgvs := preferred_build.c_hgvs_display):
             resolved_dict.update(c_hgvs.to_json())
         elif c_hgvs_raw := classification.get(SpecialEKeys.C_HGVS):
-            resolved_dict.update(CHGVS(c_hgvs_raw).to_json())
+            resolved_dict.update(HGVSDisplay.parse(c_hgvs_raw).to_json())
+        elif g_hgvs := allele_info.imported_g_hgvs_obj:
+            # g.HGVS only submission where the variant ran off the transcript, show what was imported
+            resolved_dict.update(HGVSDisplay(g_hgvs).to_json())
 
         include = False
         if latest_validation := allele_info.latest_validation:

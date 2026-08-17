@@ -4,7 +4,7 @@ from functools import reduce
 from typing import Optional
 
 from django.db import models
-from django.db.models import Q, Model
+from django.db.models import Model, Q
 
 
 class AbstractZygosityCountNode(Model):

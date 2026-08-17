@@ -32,11 +32,12 @@ import logging
 import operator
 from copy import deepcopy
 from functools import reduce
+from typing import Optional
 
 from django.core.exceptions import FieldError, ImproperlyConfigured
-from django.core.paginator import Paginator, InvalidPage
+from django.core.paginator import InvalidPage, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import fields, JSONField, F
+from django.db.models import F, JSONField, fields
 from django.db.models.fields.json import KeyTransform
 from django.db.models.query_utils import Q
 from django.utils.encoding import smart_str
@@ -70,6 +71,15 @@ def format_operation(op):
         'le': "less than or equal to",
     }
     return ops[op]
+
+
+class KnownCountPaginator(Paginator):
+    """ For querysets whose row count is already known (a stored node count, a planner estimate) -
+        stops Paginator.count running a COUNT(*) to re-derive it """
+
+    def __init__(self, *args, count: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count  # shadows Paginator.count, a non-data descriptor
 
 
 class JqGrid:
@@ -307,13 +317,23 @@ class JqGrid:
             paginate_by = 10
         return paginate_by
 
+    def get_known_count(self, request, items) -> Optional[int]:
+        """ Row count for this request when it's already known, so the paginator can skip the COUNT(*).
+            None means count the queryset """
+        return None
+
     def paginate_items(self, request, items):
         paginate_by = self.get_paginate_by(request)
         if not paginate_by:
             return None, None, items
 
-        paginator = Paginator(items, paginate_by,
-                              allow_empty_first_page=self.allow_empty)
+        known_count = self.get_known_count(request, items)
+        if known_count is not None:
+            paginator = KnownCountPaginator(items, paginate_by,
+                                            allow_empty_first_page=self.allow_empty, count=known_count)
+        else:
+            paginator = Paginator(items, paginate_by,
+                                  allow_empty_first_page=self.allow_empty)
         page = request.GET.get('page', 1)
 
         try:
@@ -332,12 +352,33 @@ class JqGrid:
         if field_formatters:
 
             def iter_formatted_items(rows):
+                rows = iter(rows)
+                try:
+                    first_row = next(rows)
+                except StopIteration:
+                    return
+
+                # Rows are .values() dicts so they all have the same keys - try each formatter against
+                # the first row to see which ones apply, rather than raising and swallowing a KeyError
+                # per absent field on every row. Bound per call as callers pass different row shapes.
+                formatters = []
+                for f, formatter in field_formatters.items():
+                    try:
+                        first_row[f] = formatter(first_row, f)
+                    except KeyError:
+                        continue  # field may not be in columns returned...
+                    except ValueError:
+                        pass  # formatter applies, it just can't handle this value
+                    formatters.append((f, formatter))
+                yield first_row
+
                 for row in rows:
-                    for f, formatter in field_formatters.items():
+                    for f, formatter in formatters:
                         try:
                             row[f] = formatter(row, f)
-                        except (KeyError, ValueError):
-                            pass  # field may not be in columns returned...
+                        except ValueError:
+                            pass  # formatter can't handle this value
+
                     yield row
 
             items = iter_formatted_items(items)

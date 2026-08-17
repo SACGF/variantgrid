@@ -30,7 +30,9 @@ APPS_WITH_URLS = [
     "classification",
     "variantopedia",
     "manual",
-    "review"
+    "review",
+    "mme",
+    "beacon",
 ]
 
 urlpatterns = [

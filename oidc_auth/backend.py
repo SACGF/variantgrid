@@ -1,15 +1,16 @@
+import re
 from urllib.parse import urlencode
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
+from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.validators import EmailValidator
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from mozilla_django_oidc.utils import import_from_settings
+
 from library.log_utils import report_message
 from snpdb.models import UserSettingsOverride
-from django.core.exceptions import SuspiciousOperation, ValidationError
-import re
-
 
 _email_validator = EmailValidator()
 _CONTROL_CHAR_RE = re.compile(r'[\x00-\x1f\x7f]')

@@ -2,7 +2,7 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Optional
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 from django import template
 from django.http import HttpRequest
@@ -10,7 +10,7 @@ from django.template.base import FilterExpression
 from django.utils.text import slugify
 
 from library.utils.django_utils import is_ajax
-from uicore.templatetags.ui_utils import parse_tag, TagUtils
+from uicore.templatetags.ui_utils import TagUtils, parse_tag
 
 register = template.Library()
 

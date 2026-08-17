@@ -11,7 +11,7 @@ from django.db.models.query_utils import Q
 from library.genomics.vcf_utils import cyvcf2_header_types
 from library.utils.file_utils import mk_path
 from snpdb.models import VCF
-from upload.vcf.vcf_import import create_vcf_info, create_vcf_format
+from upload.vcf.vcf_import import create_vcf_format, create_vcf_info
 
 
 class Command(BaseCommand):
@@ -60,7 +60,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def get_header_types(vcf):
-        filename = vcf.uploadedvcf.uploaded_file.get_filename()
+        filename = vcf.uploadedvcf.file_upload.get_filename()
         if os.path.isfile(filename):
             reader = Reader(filename)
         else:

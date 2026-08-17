@@ -1,6 +1,7 @@
 import csv
 import itertools
 import json
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -12,12 +13,21 @@ import pronto
 from django.core.management import BaseCommand
 from django.utils import timezone
 
+from annotation.models import InvalidAnnotationVersionError
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC, HGNCImport
 from library.utils import file_md5sum
 from ontology.gencc import load_gencc
-from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
-    OntologyTermRelation, OntologyVersion, OntologyTermStatus
+from ontology.models import (
+    OntologyImport,
+    OntologyImportSource,
+    OntologyRelation,
+    OntologyService,
+    OntologyTerm,
+    OntologyTermRelation,
+    OntologyTermStatus,
+    OntologyVersion,
+)
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 """
@@ -93,7 +103,7 @@ def load_mondo(filename: str, force: bool):
     ontology_builder.cache_everything()
 
     data_file: dict
-    with open(filename, 'r') as json_file:
+    with open(filename) as json_file:
         data_file = json.load(json_file)
 
     node_to_hgnc_id: [str, str] = {}
@@ -292,9 +302,9 @@ def load_hpo(filename: str, force: bool):
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
-    print("About to pronto the file")
+    logging.info("About to pronto the file")
     ot = pronto.Ontology(filename)
-    print("Pronto complete")
+    logging.info("Pronto complete")
     scope_lookup = {v.upper(): k for k, v in HPOSynonymScope.choices}
 
     for term in ot.terms():
@@ -329,7 +339,7 @@ def load_hpo(filename: str, force: bool):
             definition=term.definition,
             primary_source=True,
             status=status,
-            aliases=list(sorted(aliases))
+            aliases=sorted(aliases)
         )
 
         children = itertools.islice(term.subclasses(), 1, None)
@@ -344,7 +354,7 @@ def load_hpo(filename: str, force: bool):
                 relation=OntologyRelation.IS_A
             )
     ontology_builder.complete(verbose=True)
-    print("Committing...")
+    logging.info("Committing...")
 
 
 def load_phenotype_to_genes(filename: str, force: bool):
@@ -460,7 +470,7 @@ def load_omim(filename: str, force: bool):
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
 
-    with open(filename, "r") as csv_file:
+    with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter='\t')
         next(csv_reader)  # title row
         next(csv_reader)  # date row (worth reading e.g. "Generated: 20201-02-04")
@@ -636,4 +646,14 @@ class Command(BaseCommand):
         print("*** To make sure no matched terms have become obsolete")
 
         # Create a new OntologyVersion with all the new imports
-        OntologyVersion.latest()
+        try:
+            OntologyVersion.latest()
+        except InvalidAnnotationVersionError as e:
+            # The imports above are all committed by now, so this is a warning not a failure - the new
+            # OntologyVersion exists, it's only the AnnotationVersion bump that needs gene annotation first
+            print("*** Ontology import finished, but the AnnotationVersion was left as-is:")
+            print(f"    {e}")
+            if ontology_version := OntologyVersion.objects.order_by("pk").last():
+                if OntologyVersion.objects.count() > 1:
+                    print(f"*** Add --ontology-version {ontology_version.pk} to build gene annotation "
+                          "against the ontology just imported")

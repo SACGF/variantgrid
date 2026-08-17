@@ -71,7 +71,6 @@ def plot_chromosomes(ax, cytoband_filename, has_chr=False, **kwargs):
         contig_name = format_chrom(contig_name, has_chr)
         coll = ax.broken_barh(xranges, yrange, facecolors=colors)
         coll.set_alpha(chrom_alpha)
-        ax.add_collection(coll)
         center = yrange[0] + yrange[1] / 2.
         yticks.append(center)
         yticklabels.append(contig_name)

@@ -3,9 +3,9 @@ from typing import Any
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from snpdb.models import Variant, Locus, Trio, Quad
+from snpdb.models import Locus, Quad, Trio, Variant
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_genome import GenomeBuild, Contig
+from snpdb.models.models_genome import Contig, GenomeBuild
 from snpdb.models.models_variant import Allele, VariantAllele
 from snpdb.models.models_vcf import Project
 from snpdb.variant_links import variant_link_info
@@ -72,7 +72,7 @@ class AlleleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Allele
-        fields = ('id', 'clingen_allele', "build_names", "__str__")
+        fields = ('id', 'clingen_allele', "build_names", "variant_ids", "__str__")
 
     def get___str__(self, obj) -> str:
         return str(obj)

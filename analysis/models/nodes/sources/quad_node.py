@@ -10,7 +10,7 @@ from django.db.models import Count
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.enums import QuadInheritance, NodeErrorSource, AnalysisTemplateType
+from analysis.models.enums import AnalysisTemplateType, NodeErrorSource, QuadInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.sources.trio_node import (
     AbstractTrioInheritance,
@@ -21,7 +21,7 @@ from analysis.models.nodes.sources.trio_node import (
 from annotation.models.models import VariantTranscriptAnnotation
 from library.constants import DAY_SECS
 from patients.models_enums import Zygosity
-from snpdb.models import Quad, Sample, Contig
+from snpdb.models import Contig, Quad, Sample
 
 
 class AbstractQuadInheritance(ABC):
@@ -183,17 +183,19 @@ class QuadCompHet(AbstractQuadInheritance):
 
         annotation_kwargs = self.node.get_annotation_kwargs()
 
+        # Gene overlaps (not transcript annotation) - a long SV is skipped by VEP so its only
+        # record of the genes it crosses is VariantGeneOverlap @see issue #940
         def get_parent_genes(q):
             qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
-            return qs.values_list("varianttranscriptannotation__gene", flat=True).distinct()
+            return qs.values_list("variantgeneoverlap__gene", flat=True).distinct()
 
         common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
         vav = self.node.analysis.annotation_version.variant_annotation_version
         q_in_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(vav, common_genes)
         parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
-        parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
+        parent_genes_qs = parent_genes_qs.values_list("variantgeneoverlap__gene")
         two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
-        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True).distinct())
+        two_hit_genes = set(two_hits.values_list("variantgeneoverlap__gene", flat=True).distinct())
         return comp_het_q, two_hit_genes
 
     def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
@@ -298,7 +300,7 @@ class QuadNode(AbstractCohortBasedNode):
         errors = super().get_errors(include_parent_errors=include_parent_errors)
         if self.analysis.template_type != AnalysisTemplateType.TEMPLATE:
             if quad_errors := self.get_quad_inheritance_errors(self.quad, self.inheritance):
-                errors.extend(((NodeErrorSource.CONFIGURATION, e) for e in quad_errors))
+                errors.extend((NodeErrorSource.CONFIGURATION, e) for e in quad_errors)
         if flat:
             errors = self.flatten_errors(errors)
         return errors
@@ -466,7 +468,7 @@ class QuadNode(AbstractCohortBasedNode):
         if self.quad:
             cohort = self.quad.cohort
             cohorts = [cohort]
-            visibility = {s: cohort.has_genotype for s in self.quad.get_samples()}
+            visibility = dict.fromkeys(self.quad.get_samples(), cohort.has_genotype)
         return cohorts, visibility
 
     def _get_proband_sample_for_node(self) -> Optional[Sample]:

@@ -1,14 +1,13 @@
 import operator
 import re
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from functools import reduce
 
 from django.conf import settings
-from django.contrib.postgres.aggregates import StringAgg
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Q, StringAgg, Sum, Value
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models import VariantTranscriptAnnotation, AnnotationVersion
+from annotation.models import AnnotationVersion, VariantTranscriptAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models import Classification
 from genes.models import GeneSymbol
@@ -169,10 +168,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
 
     agg_kwargs = {
         "total": Count("id", distinct=True),
-        "REF": Sum("global_variant_zygosity__ref_count"),
-        "HET": Sum("global_variant_zygosity__het_count"),
-        "HOM_ALT": Sum("global_variant_zygosity__hom_count"),
-        "tags": StringAgg("variantallele__allele__varianttag__tag", delimiter='|'),
+        "tags": StringAgg("variantallele__allele__varianttag__tag", delimiter=Value('|')),
     }
 
     clinical_significance_list = [c[0] for c in ClinicalSignificance.SHORT_CHOICES]
@@ -194,7 +190,13 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
                     q_clinical_significance &= classification_q
                 agg_kwargs[f"{classification}_{cs}"] = Count(count_path, filter=q_clinical_significance, distinct=True)
 
-    return qs.aggregate(**agg_kwargs)
+    counts = qs.aggregate(**agg_kwargs)
+    # Zygosity counts are 1 row per variant, so they have to be summed away from the tag/allele/classification
+    # joins above - those multiply the rows a variant contributes (eg a variant in 2 builds, or with 2 tags)
+    counts.update(qs.aggregate(REF=Sum("global_variant_zygosity__ref_count"),
+                               HET=Sum("global_variant_zygosity__het_count"),
+                               HOM_ALT=Sum("global_variant_zygosity__hom_count")))
+    return counts
 
 
 def filter_variant_range(qs, variant: Variant, distance):

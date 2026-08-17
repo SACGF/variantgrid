@@ -1,9 +1,13 @@
 from django.core.management.base import BaseCommand
 from django.db import connection
-from django.db.models import Case, When, Value
+from django.db.models import Case, Value, When
 
 from analysis.models import DamageNode
-from annotation.models import VariantAnnotationVersion, VariantAnnotation, VariantTranscriptAnnotation
+from annotation.models import (
+    VariantAnnotation,
+    VariantAnnotationVersion,
+    VariantTranscriptAnnotation,
+)
 
 
 class Command(BaseCommand):

@@ -4,27 +4,28 @@ import os
 import re
 import shutil
 import types
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import cached_property, total_ordering
-from io import StringIO
-from typing import Optional, Union, Iterable, Any
-from urllib.error import URLError, HTTPError
+from typing import Any, Optional, Union
+from urllib.error import URLError
 
-import requests
-from Bio import Entrez, SeqIO
 from cache_memoize import cache_memoize
-from cdot.pyhgvs.pyhgvs_transcript import PyHGVSTranscriptFactory
 from django.conf import settings
-from django.contrib.auth.models import User, Group
-from django.contrib.postgres.aggregates import StringAgg
+from django.contrib.auth.models import Group, User
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
-from django.db import models, IntegrityError, transaction
-from django.db.models import QuerySet, TextField
-from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
-from django.db.models.functions import Upper, Collate
+from django.core.exceptions import (
+    MultipleObjectsReturned,
+    ObjectDoesNotExist,
+    PermissionDenied,
+    ValidationError,
+)
+from django.db import IntegrityError, models, transaction
+from django.db.models import QuerySet, StringAgg, TextField, Value
+from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
+from django.db.models.functions import Collate, Upper
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
@@ -37,52 +38,44 @@ from guardian.shortcuts import get_objects_for_user
 from requests import RequestException
 
 from genes.gene_coverage import load_gene_coverage_df
-from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus
+from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus, MANEStatus
+
+# Re-exported: callers have long imported these from genes.models
+from genes.transcript_errors import BadTranscript, MissingTranscript, NoTranscript
+from genes.transcript_parts import TranscriptParts, get_transcript_id_and_version
+from genes.transcript_sequence_retrieval import FetchedTranscriptSequence, TranscriptSequenceFetcher
+from genes.transcripts_utils import get_lrg_and_t
 from library.cache import timed_cache
-from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS, DAY_SECS
+from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
+from library.constants import DAY_SECS, HOUR_SECS, WEEK_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
-from snpdb.archive import DataArchivedError
-from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
-    add_public_group_read_permission
+from library.guardian_utils import (
+    DjangoPermission,
+    add_public_group_read_permission,
+    admin_bot,
+    assign_permission_to_user_and_groups,
+)
 from library.log_utils import log_traceback
 from library.preview_request import PreviewData, PreviewModelMixin
-from library.utils import get_single_element, iter_fixed_chunks, FormerTuple
 from library.utils.file_utils import mk_path
-from snpdb.models import Wiki, Company, Sample, DataState
+from snpdb.archive import DataArchivedError
+from snpdb.models import Company, DataState, GenomicCoordinates, Sample, Wiki
 from snpdb.models.models_enums import ImportStatus
-from snpdb.models.models_genome import GenomeBuild, Contig
-from upload.vcf.sql_copy_files import write_sql_copy_csv, gene_coverage_canonical_transcript_sql_copy_csv, \
-    gene_coverage_sql_copy_csv, GENE_COVERAGE_HEADER
+from snpdb.models.models_genome import Contig, GenomeBuild
+from upload.vcf.sql_copy_files import (
+    GENE_COVERAGE_HEADER,
+    gene_coverage_canonical_transcript_sql_copy_csv,
+    gene_coverage_sql_copy_csv,
+    write_sql_copy_csv,
+)
 
 
 class HGNCImport(TimeStampedModel):
     pass
-
-
-class NoTranscript(ValueError):
-    """
-    Extends ValueError for backwards compatibility.
-    Indicates the transcript we are looking for is not in our database
-    """
-
-class NoTranscriptVersion(NoTranscript):
-    pass
-
-
-class MissingTranscript(NoTranscript):
-    """
-    Transcript exists in RefSeq/Ensembl, so c.hgvs (or otherwise) might be okay.
-    """
-
-
-class BadTranscript(NoTranscript):
-    """
-    Transcript not found in Ensembl or RefSeq (User error)
-    """
 
 
 class HGNC(models.Model):
@@ -389,19 +382,19 @@ class GeneSymbolAliasesMeta:
         for alias_summary in self.alias_list:
             if not alias_summary.different_genes:
                 gene_symbol_strs.add(alias_summary.other_symbol)
-        return list(sorted(gene_symbol_strs))
+        return sorted(gene_symbol_strs)
 
     @cached_property
     def alias_symbols_in_db(self) -> list[GeneSymbolAlias]:
-        return list(sorted([alias for alias in self.alias_list if not alias.different_genes and alias.other_symbol_in_database]))
+        return sorted([alias for alias in self.alias_list if not alias.different_genes and alias.other_symbol_in_database])
 
     @cached_property
     def aliases_out(self) -> list[GeneSymbolAliasSummary]:
-        return list(sorted([alias for alias in self.alias_list if not alias.my_symbol_is_main]))
+        return sorted([alias for alias in self.alias_list if not alias.my_symbol_is_main])
 
     @cached_property
     def aliases_in(self) -> list[GeneSymbolAliasSummary]:
-        return list(sorted([alias for alias in self.alias_list if alias.my_symbol_is_main]))
+        return sorted([alias for alias in self.alias_list if alias.my_symbol_is_main])
 
 
 class GeneAnnotationImport(TimeStampedModel):
@@ -622,21 +615,6 @@ class GeneVersion(models.Model):
 
     def __str__(self):
         return f"{self.accession} ({self.gene_symbol}/{self.genome_build})"
-
-
-@dataclass
-class TranscriptParts(FormerTuple):
-    identifier: str
-    version: Optional[int]
-
-    @property
-    def as_tuple(self) -> tuple:
-        return self.identifier, self.version
-
-    def __repr__(self):
-        if self.version:
-            return f"{self.identifier}.{self.version}"
-        return self.identifier
 
 
 class Transcript(models.Model, PreviewModelMixin):
@@ -905,7 +883,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def alignment_gap(self) -> bool:
         if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
             # Sometimes RefSeq transcripts have gaps when aligning to the genome
-            # We've modified PyHGVS to be able to handle this
             for ex in self.genome_build_data["exons"]:
                 if ex[-1] is not None:
                     return True
@@ -916,13 +893,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @staticmethod
     def get_transcript_id_and_version(transcript_accession: str) -> TranscriptParts:
-        parts = transcript_accession.split(".")
-        if len(parts) == 2:
-            identifier = str(parts[0])
-            version = int(parts[1])
-        else:
-            identifier, version = transcript_accession, None
-        return TranscriptParts(identifier, version)
+        return get_transcript_id_and_version(transcript_accession)
 
     @staticmethod
     def transcript_versions_by_id(genome_build: GenomeBuild = None, annotation_consortium=None) -> \
@@ -951,6 +922,15 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         qs = TranscriptVersion.objects.filter(**filter_kwargs)
         tv_values = qs.values_list("pk", "transcript_id", "version")
         return {f"{transcript_id}.{version}": pk for (pk, transcript_id, version) in tv_values}
+
+    @staticmethod
+    def get_for_parts(genome_build: GenomeBuild, transcript_parts: TranscriptParts) -> Optional['TranscriptVersion']:
+        """ Exact lookup for an already split accession - None if the version wasn't given, or we don't have it """
+        if transcript_parts.identifier and transcript_parts.version:
+            return TranscriptVersion.objects.filter(genome_build=genome_build,
+                                                    transcript_id=transcript_parts.identifier,
+                                                    version=transcript_parts.version).first()
+        return None
 
     @staticmethod
     def filter_by_accession(accession, genome_build=None):
@@ -1017,7 +997,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                                 break
                         transcript_version = transcript_versions_qs.filter(version=use_version).last()
                     else:
-                        version_list = ', '.join((str(v) for v in possible_versions))
+                        version_list = ', '.join(str(v) for v in possible_versions)
                         raise MissingTranscript(f"No Transcript for '{transcript_name}' (build: {genome_build}) - but there are entries for versions {version_list}") from exc
         else:
             transcript_version = transcript_versions_qs.last()
@@ -1045,19 +1025,20 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def _sum_intervals(intervals: list[tuple]):
         return sum(b - a for a, b in intervals)
 
+    @classmethod
+    def data_is_current_cdot_format(cls, genome_build: Optional['GenomeBuild'] = None) -> bool:
+        """ Current cdot nests per-build data under a 'genome_builds' key; pre-cdot imports stored a flat
+            structure with no 'genome_builds', which makes genome_build_data (and thus HGVS resolution)
+            raise KeyError on every record. Returns True once any TranscriptVersion is in the current
+            format - ie import_cdot_latest / import_gene_annotation has been run. """
+        qs = cls.objects.all()
+        if genome_build:
+            qs = qs.filter(genome_build=genome_build)
+        return qs.filter(data__has_key="genome_builds").exists()
+
     @cached_property
     def genome_build_data(self) -> dict:
         return self.data["genome_builds"][self.genome_build.name]
-
-    @cached_property
-    def pyhgvs_data(self):
-        transcript_json = self.data.copy()
-        # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
-        # so use DB as source of truth and replace into PyHGVS at last minute
-        if self.gene_symbol:
-            transcript_json["gene_name"] = str(self.gene_symbol)
-        tf = PyHGVSTranscriptFactory(transcripts={self.accession: transcript_json})
-        return tf.get_pyhgvs_data(self.accession, self.genome_build.name, sacgf_pyhgvs_fork=True)
 
     @cached_property
     def length(self) -> Optional[int]:
@@ -1088,6 +1069,17 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     @property
     def protein_length(self) -> int:
         return self.num_codons - 1  # stop codon doesn't count
+
+    def get_coordinates(self) -> Optional[GenomicCoordinates]:
+        """ Where this transcript sits on the genome for its build, or None if the cdot data lacks it
+            (older imports can be sparse - @see genome_build_data). Reuses the start/end/chrom/strand
+            properties so there's one source of truth for reading the cdot coordinates. """
+        build_data = self.data.get("genome_builds", {}).get(self.genome_build.name)
+        if not (build_data and build_data.get("contig") is not None
+                and build_data.get("exons") and build_data.get("strand") is not None):
+            return None
+        return GenomicCoordinates(contig=self.contig, chrom=self.chrom,
+                                  start=self.start, end=self.end, strand=self.strand)
 
     @property
     def chrom(self):
@@ -1174,18 +1166,19 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return cdna_match_errors
 
     def hgvs_data_errors(self) -> dict[str, str]:
+        # Legacy pre-cdot rows have no 'genome_builds' at all - they report as missing every field
+        build_data = self.data.get("genome_builds", {}).get(self.genome_build.name, {})
         data_errors = {}
         for key in ["contig", "strand", "exons"]:
-            try:
-                _ = self.genome_build_data[key]
-            except KeyError:
+            if key not in build_data:
                 data_errors[key] = "Field missing"
 
-        if error := (self.data.get("error") or self.genome_build_data.get("error")):
+        if error := (self.data.get("error") or build_data.get("error")):
             data_errors["error"] = error
 
-        if cdna_errors := self._validate_cdna_match():
-            data_errors["cdna_match"] = ", ".join(cdna_errors)
+        if "exons" not in data_errors:
+            if cdna_errors := self._validate_cdna_match():
+                data_errors["cdna_match"] = ", ".join(cdna_errors)
 
         return data_errors
 
@@ -1356,98 +1349,23 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             return tvi
 
         if retrieve:
-            annotation_consortium = AnnotationConsortium.get_from_transcript_accession(transcript_accession)
-            if annotation_consortium == AnnotationConsortium.REFSEQ:
-                tvi = TranscriptVersionSequenceInfo._get_and_store_from_refseq_api(transcript_accession)
-            else:
-                tvi = TranscriptVersionSequenceInfo._get_and_store_from_ensembl_api(transcript_accession)
+            fetched = TranscriptSequenceFetcher.instance().fetch(transcript_accession)
+            tvi = TranscriptVersionSequenceInfo.store_fetched(fetched)
         return tvi
 
     @staticmethod
-    def _get_kwargs_from_genbank_record(record):
-        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(record.id)
-        sequence = str(record.seq)
-        length = len(sequence)
-        return {"transcript_id": transcript_id,
-                "version": version,
-                "sequence": sequence,
-                "length": length}
-
-    @staticmethod
-    def _get_and_store_from_refseq_api(transcript_accession):
-        try:
-            data = Entrez.efetch(db='nuccore', id=transcript_accession, rettype='gb', retmode='text')
-        except HTTPError as e:
-            if e.code == 400:
-                raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found") from e
-            raise e
-        api_response = data.read()
-        with StringIO(api_response) as f:
-            if api_response.startswith("Error:"):
-                error_message = api_response[6:]
-                if len(error_message) > 2 and error_message[2] == " ":
-                    # error messages seem to have been iterated so that every 2nd characer is a space, fix this
-                    error_message = "".join(char for i, char in enumerate(error_message) if i % 2 == 1)
-                raise ValueError("ClinGen API response: " + error_message)
-
-            records = list(SeqIO.parse(f, "genbank"))
-            record = get_single_element(records)
-            kwargs = TranscriptVersionSequenceInfo._get_kwargs_from_genbank_record(record)
-            transcript_id = kwargs.pop("transcript_id")
-            version = kwargs.pop("version")
-            Transcript.objects.get_or_create(pk=transcript_id,
-                                             annotation_consortium=AnnotationConsortium.REFSEQ)
-            defaults = kwargs
-            defaults["api_response"] = api_response
-            return TranscriptVersionSequenceInfo.objects.get_or_create(transcript_id=transcript_id, version=version,
-                                                                       defaults=defaults)[0]
-
-    @staticmethod
-    def _get_and_store_from_ensembl_api(transcript_accession, genome_build: GenomeBuild = None):
-        if genome_build is None:
-            genome_build = GenomeBuild.grch38()
-        ENSEMBL_REST_BASE_URLS = {
-            "GRCh37": "https://grch37.rest.ensembl.org",
-            "GRCh38": "https://rest.ensembl.org",
-        }
-        base_url = ENSEMBL_REST_BASE_URLS[genome_build.name]
-        transcript_id, requested_version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-        url = f"{base_url}/sequence/id/{transcript_id}?type=cdna"
-        r = requests.get(url, headers={"Content-Type": "application/json"}, timeout=MINUTE_SECS)
-        data = r.json()
-
-        if r.ok:
-            transcript, _ = Transcript.objects.get_or_create(identifier=data["id"],
-                                                             annotation_consortium=AnnotationConsortium.ENSEMBL)
-
-            # Ensembl only returns the latest version via API - so requested/returned version may be different
-            returned_version = data["version"]
-            kwargs = {
-                "transcript": transcript,
-                "version": requested_version,
-                "defaults": {
-                    "api_response": r.text,
-                    "sequence": data["seq"],
-                    "length": len(data["seq"])
-                },
-            }
-            requested_tvsi = TranscriptVersionSequenceInfo.objects.get_or_create(**kwargs)[0]
-            if requested_version != returned_version:
-                # Store what was actually returned
-                kwargs["version"] = returned_version
-                TranscriptVersionSequenceInfo.objects.get_or_create(**kwargs)
-
-            requested_tvsi.raise_any_errors()
-        else:
-            error = data.get("error")
-            if error:
-                if "not found" in error:
-                    if genome_build != GenomeBuild.grch37():
-                        # Try 37 this time
-                        return TranscriptVersionSequenceInfo._get_and_store_from_ensembl_api(transcript_accession,
-                                                                                             GenomeBuild.grch37())
-                    raise BadTranscript(f"Ensembl API reports '{transcript_id}' not found")
-            raise NoTranscript(f"Unable to understand Ensembl API response: {data}")
+    def store_fetched(fetched: FetchedTranscriptSequence) -> 'TranscriptVersionSequenceInfo':
+        Transcript.objects.get_or_create(pk=fetched.transcript_id,
+                                         annotation_consortium=fetched.annotation_consortium)
+        defaults = {"sequence": fetched.sequence, "length": fetched.length, "api_response": fetched.api_response}
+        requested_tvi = None
+        for version in fetched.versions:
+            tvi, _ = TranscriptVersionSequenceInfo.objects.get_or_create(transcript_id=fetched.transcript_id,
+                                                                         version=version, defaults=defaults)
+            if version == fetched.version:
+                requested_tvi = tvi
+        requested_tvi.raise_any_errors()
+        return requested_tvi
 
     @staticmethod
     def get_refseq_transcript_versions(transcript_accessions: Iterable[str], entrez_batch_size: int = 100, fail_on_error=True) -> dict[str, 'TranscriptVersionSequenceInfo']:
@@ -1461,46 +1379,24 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                 tvi_by_id[tvi.accession] = tvi
 
         unknown_accessions = all_transcript_accessions - set(tvi_by_id)
-
-        for id_list in iter_fixed_chunks(unknown_accessions, entrez_batch_size):
-            id_param = ",".join(id_list)
-            try:
-                search_results = Entrez.read(Entrez.epost("nuccore", id=id_param))
-                fetch_handle = Entrez.efetch(
-                    db="nuccore",
-                    rettype="gb",
-                    retmode="text",
-                    webenv=search_results["WebEnv"],
-                    query_key=search_results["QueryKey"],
-                    idtype="acc",
-                )
-                tvi_by_id.update(TranscriptVersionSequenceInfo._insert_from_genbank_handle(fetch_handle))
-            except RuntimeError as e:
-                logging.warning("Entrez failed w/params: %s", id_param)
-                if fail_on_error:
-                    raise e
-
+        if unknown_accessions:
+            fetched_list = TranscriptSequenceFetcher.instance().fetch_refseq_batch(
+                unknown_accessions, entrez_batch_size=entrez_batch_size, fail_on_error=fail_on_error)
+            tvi_by_id.update(TranscriptVersionSequenceInfo.bulk_store_fetched(fetched_list))
         return tvi_by_id
 
     @staticmethod
-    def _insert_from_genbank_handle(handle) -> dict[str, 'TranscriptVersionSequenceInfo']:
-        new_records = []
-        for record in SeqIO.parse(handle, "genbank"):
-            # Store raw data so that we can retrieve more stuff from it later
-            s = StringIO()
-            SeqIO.write(record, s, "genbank")
-            s.seek(0)
-            api_response = s.read()
-            kwargs = TranscriptVersionSequenceInfo._get_kwargs_from_genbank_record(record)
-            tvi = TranscriptVersionSequenceInfo(**kwargs, api_response=api_response)
-            new_records.append(tvi)
-
+    def bulk_store_fetched(fetched_list: list[FetchedTranscriptSequence]) -> dict[str, 'TranscriptVersionSequenceInfo']:
+        new_records = [TranscriptVersionSequenceInfo(transcript_id=f.transcript_id, version=f.version,
+                                                     sequence=f.sequence, length=f.length,
+                                                     api_response=f.api_response)
+                       for f in fetched_list]
         # Write them as we go so any failure only loses some
         tvi_by_id = {}
         if new_records:
             # Create Transcript objects in case they don't exist
-            transcript_records = {Transcript(pk=tvsi.transcript_id, annotation_consortium=AnnotationConsortium.REFSEQ)
-                                  for tvsi in new_records}
+            transcript_records = {Transcript(pk=f.transcript_id, annotation_consortium=f.annotation_consortium)
+                                  for f in fetched_list}
             Transcript.objects.bulk_create(transcript_records, ignore_conflicts=True, batch_size=2000)
             TranscriptVersionSequenceInfo.objects.bulk_create(new_records, ignore_conflicts=True, batch_size=2000)
             for tvi in new_records:
@@ -1527,15 +1423,8 @@ class LRGRefSeqGene(models.Model):
         unique_together = ("lrg", "t")
 
     @staticmethod
-    def get_lrg_and_t(lrg_identifier: str) -> tuple[str, Optional[str]]:
-        if m := re.match(r"(LRG_\d+)(t\d+)?", lrg_identifier, flags=re.IGNORECASE):
-            lrg, t = m.groups()
-            lrg = lrg.upper()
-            if t:
-                t = t.lower()
-        else:
-            lrg = t = None
-        return lrg, t
+    def get_lrg_and_t(lrg_identifier: str) -> tuple[Optional[str], Optional[str]]:
+        return get_lrg_and_t(lrg_identifier)
 
     @staticmethod
     def get_transcript_version(genome_build: GenomeBuild, lrg_identifier: str) -> Optional[TranscriptVersion]:
@@ -1552,8 +1441,8 @@ class LRGRefSeqGene(models.Model):
 
 class GeneAnnotationRelease(models.Model):
     """
-        import_gene_annotation management command now supports --release which is used to link all
-        GeneVersion/TranscriptVersion from a particular GTF file.
+        Links all the GeneVersion/TranscriptVersion from a particular GTF/GFF file, so they match what a
+        VEP build used. Created by the 'import_cdot_gene_annotation_release' management command.
 
         This release can be set on a VariantAnnotationVersion to be able to get genes/transcripts from a VEP build
     """
@@ -1570,11 +1459,12 @@ class GeneAnnotationRelease(models.Model):
                                    geneversion__releasegeneversion__release=self)
 
     @staticmethod
-    def get_for_latest_annotation_versions_for_builds() -> list['GeneAnnotationRelease']:
+    def get_for_latest_annotation_versions_for_builds(status=None) -> list['GeneAnnotationRelease']:
+        """ status: VariantAnnotationVersion.Status - defaults to ACTIVE (see VariantAnnotationVersion.latest) """
         from annotation.models import VariantAnnotationVersion
         gene_annotation_releases = []
         for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
-            if vav := VariantAnnotationVersion.latest(genome_build):
+            if vav := VariantAnnotationVersion.latest(genome_build, status=status):
                 if vav.gene_annotation_release:
                     gene_annotation_releases.append(vav.gene_annotation_release)
         return gene_annotation_releases
@@ -1677,7 +1567,6 @@ class GeneListCategory(models.Model):
     PATHOLOGY_TEST = 'PathologyTest'
     PATHOLOGY_TEST_ORDER = 'PathologyTestOrder'
     PANEL_APP_CACHE = 'PanelAppCache'
-    GENE_INFO = "GeneInfo"
 
     name = models.TextField()
     company = models.OneToOneField(Company, null=True, blank=True, on_delete=CASCADE)
@@ -1882,7 +1771,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         # Sample gene lists for samples we have permission to see
         samples_qs = Sample.filter_for_user(user)
         sample_gene_list_qs = GeneList.objects.filter(category__name=GeneListCategory.SAMPLE_GENE_LIST,
-                                                      customtextgenelist__qcgenelist__qc__bam_file__unaligned_reads__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
+                                                      customtextgenelist__qcgenelist__qc__bam_file__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
 
         qs = user_qs | sample_gene_list_qs
         if success_only:
@@ -1942,7 +1831,7 @@ class GeneListGeneSymbol(models.Model):
     def get_joined_genes_qs_annotation_for_release(release: GeneAnnotationRelease):
         """ Used to annotate GeneListGeneSymbol queryset """
         return StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene",
-                         delimiter=',', distinct=True, output_field=TextField(),
+                         delimiter=Value(','), distinct=True, output_field=TextField(),
                          filter=Q(gene_symbol__releasegenesymbol__release=release))
 
     def __str__(self):
@@ -2118,11 +2007,11 @@ class PanelAppPanelLocalCache(TimeStampedModel):
             gene_list = GeneList.objects.create(**gene_list_kwargs)
             logging.info("Created gene list: %s", gene_list.pk)
             gene_names_list = []
-            for pap_lc_gs in self.panelapppanellocalcachegenesymbol_set.all():
+            for pap_lc_gs in self.panelapppanellocalcachegenesymbol_set.select_related("hgnc"):
                 confidence_level = int(pap_lc_gs.data["confidence_level"])
                 if confidence_level >= min_level:
-                    gene_symbol = pap_lc_gs.data["gene_data"]["gene_symbol"]
-                    gene_names_list.append(gene_symbol)
+                    # Use our current approved symbol - PanelApp's own can be from an older HGNC snapshot
+                    gene_names_list.append(pap_lc_gs.gene_symbol_str)
 
             logging.info("Creating symbols: %s", gene_names_list)
             gene_matcher = GeneSymbolMatcher()
@@ -2141,26 +2030,35 @@ class PanelAppPanelLocalCache(TimeStampedModel):
 
 
 class PanelAppPanelLocalCacheGeneSymbol(models.Model):
+    """ A gene on a cached PanelApp panel.
+
+        PanelApp identifies genes by HGNC ID, and separately reports a gene symbol taken from a dated
+        Ensembl/HGNC snapshot - so their symbol can lag the current approved one (Genomics England is
+        pinned to Ensembl release 90). PanelApp Australia asks integrators to key off HGNC IDs rather
+        than symbols, so 'hgnc' is how we identify the gene and 'gene_symbol_reported' records what
+        they called it.
+
+        hgnc is nullable as PanelApp can reference an HGNC ID we have no record of. """
     panel_app_local_cache = models.ForeignKey(PanelAppPanelLocalCache, on_delete=CASCADE)
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+    # Django names the column 'hgnc_id' - that's HGNC's numeric pk, not the "HGNC:1234" string
+    hgnc = models.ForeignKey(HGNC, null=True, on_delete=SET_NULL)
+    gene_symbol_reported = models.TextField()
     data = models.JSONField(null=False, blank=True, default=dict)  # API response
+
+    @property
+    def gene_symbol_str(self) -> str:
+        """ Our current approved symbol where PanelApp's HGNC ID resolves, else the symbol they reported """
+        if self.hgnc_id is not None:
+            return str(self.hgnc.gene_symbol_id)
+        return self.gene_symbol_reported
+
+    def __str__(self):
+        return self.gene_symbol_str
 
 
 class CachedThirdPartyGeneList(models.Model):
     cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
     company = models.ForeignKey(Company, on_delete=CASCADE)
-
-
-class GeneInfo(models.Model):
-    """ These represent some kind of special tagging on genes """
-    name = models.TextField(primary_key=True)
-    description = models.TextField(blank=True)
-    icon_css_class = models.TextField()
-    gene_list = models.OneToOneField(GeneList, null=True, on_delete=PROTECT)
-
-    @staticmethod
-    def get_for_gene_symbol(gene_symbol):
-        return GeneInfo.objects.filter(gene_list__genelistgenesymbol__gene_symbol=gene_symbol).distinct()
 
 
 class CanonicalTranscriptCollection(TimeStampedModel):
@@ -2405,7 +2303,7 @@ class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):
 
     @staticmethod
     def filter_for_kit_and_gene_symbol(enrichment_kit, genome_build, gene_symbol):
-        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample"
+        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
         kwargs = {sequencing_sample + "__enrichment_kit": enrichment_kit,
                   # Ensure we only get current SampleSheet
                   sequencing_sample + "__sample_sheet__sequencingruncurrentsamplesheet__isnull": False}
@@ -2725,3 +2623,136 @@ class MANE(models.Model):
         elif annotation_consortium == AnnotationConsortium.ENSEMBL:
             transcript_version = self.ensembl_transcript_version
         return transcript_version
+
+
+class FusionGeneId(models.Model):
+    """ A stable number for one side of a gene fusion - the pk is what a fusion Variant carries as its
+        Locus.position and inside its symbolic alt (@see GeneLevelSymbolicAlt), so this table is the
+        identifier space fusion identity is built on. @see snpdb.gene_level_variants for why a fusion
+        is stored as a Variant in the first place.
+
+        pk is the HGNC ID where the gene has one, so the identity of an ordinary fusion is the same
+        number on every deployment. Symbols HGNC doesn't carry - clone-based identifiers like
+        RP11-458D21.5, which turn up as fusion partners routinely - get a pk allocated above
+        CUSTOM_ID_START, so every call the caller made can still become a Variant.
+
+        Custom numbers are local to this deployment, which is why the alt namespaces them as GENE
+        rather than HGNC. Anything leaving the system - display, export, a classification sent to
+        another instance - uses symbol_str rather than the pk, and the receiver resolves it back
+        through its own table. @see GeneLevelSymbolicAlt for where the numbers are used, and
+        GeneFusion.canonical_str for the string form.
+
+        A symbol that later gains an HGNC entry has its hgnc FK filled in, which improves annotation.
+        Existing variants keep the custom pk they were created with - identity, once handed out, is
+        fixed, the same way a Variant's coordinates are. """
+
+    CUSTOM_ID_START = 1_000_000
+    CUSTOM_ID_RETRIES = 5
+
+    # The name to use whenever this leaves the system - the approved symbol where we have one,
+    # otherwise the name exactly as the caller wrote it
+    symbol_str = TextField(unique=True, db_collation='case_insensitive')
+    gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
+    hgnc = models.ForeignKey(HGNC, null=True, on_delete=SET_NULL)
+
+    def __str__(self):
+        return self.symbol_str
+
+    @property
+    def is_custom(self) -> bool:
+        return self.pk >= FusionGeneId.CUSTOM_ID_START
+
+    @property
+    def alt_namespace(self) -> str:
+        return GeneIdNamespace.GENE if self.is_custom else GeneIdNamespace.HGNC
+
+    @staticmethod
+    def get_or_create_for_symbol(symbol_str: str, gene_symbol_id: Optional[str],
+                                 hgnc: Optional[HGNC]) -> 'FusionGeneId':
+        """ symbol_str is what to show and send - callers resolve aliases first, so SEPT14 arrives
+            here as SEPTIN14 and collapses onto the one row """
+
+        if hgnc is not None:
+            defaults = {"symbol_str": symbol_str, "gene_symbol_id": gene_symbol_id, "hgnc": hgnc}
+            fusion_gene_id, _ = FusionGeneId.objects.get_or_create(pk=hgnc.pk, defaults=defaults)
+            return fusion_gene_id
+
+        if fusion_gene_id := FusionGeneId.objects.filter(symbol_str=symbol_str).first():
+            return fusion_gene_id
+
+        # Allocating our own pk, so another worker can take the number between the max() and the insert
+        for _ in range(FusionGeneId.CUSTOM_ID_RETRIES):
+            try:
+                with transaction.atomic():
+                    last = FusionGeneId.objects.filter(pk__gte=FusionGeneId.CUSTOM_ID_START).order_by("-pk").first()
+                    pk = last.pk + 1 if last else FusionGeneId.CUSTOM_ID_START
+                    return FusionGeneId.objects.create(pk=pk, symbol_str=symbol_str,
+                                                        gene_symbol_id=gene_symbol_id)
+            except IntegrityError:
+                pass
+            if fusion_gene_id := FusionGeneId.objects.filter(symbol_str=symbol_str).first():
+                return fusion_gene_id
+        raise IntegrityError(f"Could not allocate a FusionGeneId id for '{symbol_str}'")
+
+    CUSTOM_ID_RETRIES = 5
+
+
+def fusion_canonical_str(anchor: FusionGeneId, partner: Optional[FusionGeneId]) -> str:
+    """ 'BCR::ABL1' - the VICC gene-level form, which HGNC and HGVS both point at for fusions.
+        '::' is the fusion separator; a single hyphen means a read-through transcript, which is a
+        different event, so it is never written here. An unnamed partner shows as '?'. """
+    partner_str = partner.symbol_str if partner else "?"
+    return f"{anchor.symbol_str}::{partner_str}"
+
+
+class GeneFusion(models.Model):
+    """ A gene fusion, one-to-one with the Variant carrying it. The Variant is what makes a fusion
+        reachable from gene lists, comp-het, grids and classifications - @see snpdb.gene_level_variants,
+        which explains why that is how these are stored.
+
+        Identity is the gene pair, not the breakpoints: one caller reports ENTPD3-RPL14 three times
+        with three different 5' breakpoints, so coordinates are per-observation and live in
+        CohortGenotype.info. Reciprocal fusions are separate rows - the 5' promoter drives a
+        different protein, so BCR-ABL1 and ABL1-BCR are not the same event.
+
+        The anchor is the 5' partner when is_ordered, otherwise the lower-id gene of the pair.
+        partner is null only where the caller named one gene and left the other unspecified. """
+
+    variant = models.OneToOneField('snpdb.Variant', on_delete=CASCADE)
+    anchor = models.ForeignKey(FusionGeneId, related_name='fusions_as_anchor', on_delete=PROTECT)
+    partner = models.ForeignKey(FusionGeneId, null=True, related_name='fusions_as_partner', on_delete=PROTECT)
+    is_ordered = models.BooleanField(default=False)
+
+    @property
+    def canonical_str(self) -> str:
+        """ The form to display and to send anywhere off this deployment - @see FusionGeneId """
+        return fusion_canonical_str(self.anchor, self.partner)
+
+    def __str__(self):
+        return self.canonical_str
+
+    def get_absolute_url(self):
+        return self.variant.get_absolute_url()
+
+    @property
+    def fusion_gene_ids(self) -> list[FusionGeneId]:
+        """ Both partners, so gene lists and comp-het find the fusion from either side """
+        genes = [self.anchor]
+        if self.partner:
+            genes.append(self.partner)
+        return genes
+
+    def clean(self):
+        super().clean()
+        parsed = GeneLevelSymbolicAlt.parse(self.variant.alt.seq)
+        if parsed is None:
+            raise ValidationError(f"Variant alt '{self.variant.alt.seq}' is not a gene-level alt")
+
+        kind, _namespace, partner_id = parsed
+        expected_kind = GeneLevelSymbolicAlt.FUSION if self.is_ordered else GeneLevelSymbolicAlt.FUSION_UNORDERED
+        if kind != expected_kind:
+            raise ValidationError(f"Variant alt '{self.variant.alt.seq}' does not match {self.is_ordered=}")
+        if partner_id != self.partner_id:
+            raise ValidationError(f"Variant alt '{self.variant.alt.seq}' does not match {self.partner_id=}")
+        if self.variant.locus.position != self.anchor_id:
+            raise ValidationError(f"Variant position {self.variant.locus.position} is not {self.anchor_id=}")

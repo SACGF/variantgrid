@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from cdot.hgvs import HGVSFixSeverity
 from cdot.hgvs import clean_hgvs as cdot_clean_hgvs, HGVSFixSeverity
 from django import forms
 from django.http import HttpRequest
@@ -8,7 +9,7 @@ from django.shortcuts import render
 
 from classification.models import ImportedAlleleInfo
 from genes.hgvs import HGVSConverterType, HGVSMatcher, VariantResolvingError
-from genes.models import TranscriptVersion, TranscriptParts
+from genes.models import TranscriptParts, TranscriptVersion
 from library.django_utils import require_superuser
 from library.utils import all_equal
 from snpdb.models import GenomeBuild, VariantCoordinate
@@ -131,13 +132,11 @@ def hgvs_resolution_tool(request: HttpRequest):
 
         if data.get("display_clingen_separately"):
             hgvs_matchers = [
-                HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.PYHGVS, clingen_resolution=False),
                 HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS, clingen_resolution=False),
                 HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.CLINGEN_ALLELE_REGISTRY),
             ]
         else:
             hgvs_matchers = [
-                HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.PYHGVS),
                 HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS),
             ]
 

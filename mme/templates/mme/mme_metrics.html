@@ -1,0 +1,42 @@
+{# base_external - served anonymously, so the logged-in page chrome is unavailable #}
+{% extends "uicore/page/base_external.html" %}
+{% block title %}MatchMaker Exchange metrics{% endblock title %}
+{% block content %}
+    <div class="container">
+        <h3>MatchMaker Exchange metrics</h3>
+        <p class="text-muted">
+            Counts describe the consented set we match against: publicly shared classifications
+            of VUS and above, from labs that have opted into MatchMaker Exchange.
+            Generated {{ metrics.dateGenerated }}.
+        </p>
+
+        <table class="table">
+            <tbody>
+                <tr><th>Cases</th><td>{{ metrics.numberOfCases }}</td></tr>
+                <tr><th>Submitters (labs)</th><td>{{ metrics.numberOfSubmitters }}</td></tr>
+                <tr><th>Genes</th><td>{{ metrics.numberOfGenes }}</td></tr>
+                <tr><th>Unique genes</th><td>{{ metrics.numberOfUniqueGenes }}</td></tr>
+                <tr><th>Variants</th><td>{{ metrics.numberOfVariants }}</td></tr>
+                <tr><th>Unique variants</th><td>{{ metrics.numberOfUniqueVariants }}</td></tr>
+                <tr><th>Phenotype features</th><td>{{ metrics.numberOfFeatures }}</td></tr>
+                <tr><th>Unique phenotype features</th><td>{{ metrics.numberOfUniqueFeatures }}</td></tr>
+                <tr><th>Feature sets</th><td>{{ metrics.numberOfFeatureSets }}</td></tr>
+                <tr><th>Unique genes matched</th><td>{{ metrics.numberOfUniqueGenesMatched }}</td></tr>
+                <tr><th>Cases with a diagnosis</th><td>{{ metrics.numberOfCasesWithDiagnosis }}</td></tr>
+                <tr><th>Requests received</th><td>{{ metrics.numberOfRequestsReceived }}</td></tr>
+                <tr><th>Potential matches sent</th><td>{{ metrics.numberOfPotentialMatchesSent }}</td></tr>
+            </tbody>
+        </table>
+
+        {% if disclaimer %}
+            <h4>Disclaimer</h4>
+            <p>{{ disclaimer }}</p>
+        {% endif %}
+        {% if terms %}
+            <h4>Terms</h4>
+            <p>{{ terms }}</p>
+        {% endif %}
+
+        <p><a href="{% url 'mme_public_disclaimers' %}">Disclaimers and terms of connected databases</a></p>
+    </div>
+{% endblock content %}

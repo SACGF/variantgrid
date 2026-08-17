@@ -1,7 +1,6 @@
 from functools import partial
 
-from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import TextField, QuerySet
+from django.db.models import QuerySet, StringAgg, TextField, Value
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
@@ -10,10 +9,10 @@ from django.shortcuts import get_object_or_404
 from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from ontology.grids import AbstractOntologyGenesGrid
-from ontology.models import OntologyTerm, OntologyService
-from patients.models import PatientRecords, Patient, PatientRecord
+from ontology.models import OntologyService, OntologyTerm
+from patients.models import Patient, PatientRecord, PatientRecords
 from patients.models_enums import PatientRecordMatchType
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn
 
 
 class PatientListGrid(JqGridUserRowConfig):
@@ -54,18 +53,18 @@ class PatientListGrid(JqGridUserRowConfig):
         q_mondo = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.MONDO})
         q_hgnc = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HGNC})
         # Add sample_count to queryset
-        annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',',
+        annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", Value(','),
                                                        distinct=True, output_field=TextField()),
-                             "hpo": StringAgg(ontology_path, '|',
+                             "hpo": StringAgg(ontology_path, Value('|'),
                                               filter=q_hpo, distinct=True, output_field=TextField()),
-                             "omim": StringAgg(ontology_path, '|',
+                             "omim": StringAgg(ontology_path, Value('|'),
                                                filter=q_omim, distinct=True, output_field=TextField()),
-                             "mondo": StringAgg(ontology_path, '|',
+                             "mondo": StringAgg(ontology_path, Value('|'),
                                                 filter=q_mondo, distinct=True, output_field=TextField()),
-                             "hgnc": StringAgg(ontology_path, '|',
+                             "hgnc": StringAgg(ontology_path, Value('|'),
                                                filter=q_hgnc, distinct=True, output_field=TextField()),
                              "sample_count": Count("sample", distinct=True),
-                             "samples": StringAgg("sample__name", ", ", distinct=True, output_field=TextField())}
+                             "samples": StringAgg("sample__name", Value(", "), distinct=True, output_field=TextField())}
         queryset = queryset.annotate(**annotation_kwargs)
         field_names = self.get_field_names() + list(annotation_kwargs.keys())
         self.queryset = queryset.values(*field_names)
@@ -96,17 +95,17 @@ class PatientRecordsColumns(DatatableConfig[PatientRecords]):
         self.rich_columns = [
             RichColumn('id', orderable=True, renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
-            RichColumn('uploadedpatientrecords__uploaded_file__created', label="Created",
+            RichColumn('uploadedpatientrecords__file_upload__created', label="Created",
                        client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn('uploadedpatientrecords__uploaded_file__user__username', label="User", orderable=True),
-            RichColumn('uploadedpatientrecords__uploaded_file__name', orderable=True, label="Filename"),
+            RichColumn('uploadedpatientrecords__file_upload__user__username', label="User", orderable=True),
+            RichColumn('uploadedpatientrecords__file_upload__name', orderable=True, label="Filename"),
         ]
 
     def get_initial_queryset(self) -> QuerySet[PatientRecords]:
         # show_group_data = self.get_query_param("patient_records")
         qs = PatientRecords.objects.all()
         if not self.user.is_superuser:
-            qs = qs.filter(uploadedpatientrecords__uploaded_file__user=self.user)
+            qs = qs.filter(uploadedpatientrecords__file_upload__user=self.user)
         return qs
 
 
@@ -152,7 +151,7 @@ class PatientRecordColumns(DatatableConfig[PatientRecord]):
     def get_initial_queryset(self) -> QuerySet[PatientRecord]:
         patient_records_id = self.get_query_param("patient_records")
         patient_records = get_object_or_404(PatientRecords, pk=patient_records_id)
-        patient_records.uploaded_file.check_can_view(self.user)
+        patient_records.check_can_view(self.user)
         return PatientRecord.objects.filter(patient_records=patient_records)
 
 

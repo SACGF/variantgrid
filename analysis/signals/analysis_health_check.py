@@ -1,7 +1,7 @@
 from django.dispatch import receiver
 
 from analysis.models import Analysis
-from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckRecentActivity
+from library.health_check import HealthCheckRecentActivity, HealthCheckRequest, health_check_signal
 from variantgrid.perm_path import get_visible_url_names
 
 

@@ -4,6 +4,9 @@ from typing import Any
 
 from django.db.models import Q
 
+# legacy filter key that tests allele origin rather than an evidence key of its own
+SOMATIC_FILTER_KEY = 'somatic'
+
 
 class QueryJsonFilter:
     """
@@ -42,7 +45,7 @@ class QueryJsonFilter:
 
     def convert_to_q_w_key(self, key: str, value) -> Q:
         # special hardcoded segment, should migrate
-        if key == 'somatic':
+        if key == SOMATIC_FILTER_KEY:
             if value is False:
                 # old code also allowed value to be isnull
                 return ~self.q('allele_origin', ['somatic'], 'in') | self.q('allele_origin', True, 'isnull')

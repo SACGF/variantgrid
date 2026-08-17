@@ -1,6 +1,6 @@
 from django.dispatch.dispatcher import receiver
 
-from annotation.models import clinvar_record_collection_refreshed, ClinVarRecordCollection
+from annotation.models import ClinVarRecordCollection, clinvar_record_collection_refreshed
 from classification.services.overlaps_services import OverlapServices
 
 

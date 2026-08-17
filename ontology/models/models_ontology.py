@@ -4,17 +4,19 @@ A series of models that currently stores the combination of MONDO, OMIM, HPO & H
 """
 import functools
 import logging
+import operator
 import re
 from collections import defaultdict
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Union, Iterable, Any, Iterator
+from typing import Any, Optional, Union
 
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
-from django.db import models, connection
-from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max, TextChoices
+from django.db import connection, models
+from django.db.models import CASCADE, PROTECT, Max, Q, QuerySet, TextChoices
 from django.http import Http404
 from django.urls import reverse
 from model_utils.models import TimeStampedModel, now
@@ -797,6 +799,7 @@ class OntologyVersion(TimeStampedModel):
     ONTOLOGY_IMPORTS = {
         "gencc_import": (OntologyImportSource.GENCC,
                          ['https://search.thegencc.org/download/action/submissions-export-csv',
+                          'submissions-export-csv',  # bare basename some imports stored instead of the full URL
                           'gencc-submissions.csv']),
         "mondo_import": (OntologyImportSource.MONDO, ['mondo.json']),
         "hp_owl_import": (OntologyImportSource.HPO, ['hp.owl']),
@@ -815,14 +818,19 @@ class OntologyVersion(TimeStampedModel):
 
     @staticmethod
     def latest(validate=True) -> Optional['OntologyVersion']:
-        oi_qs = OntologyImport.objects.all()
+        # Fetch candidates for all import fields in one query, then pick the latest per field
+        import_q_list = [Q(import_source=import_source, filename__in=filenames)
+                         for import_source, filenames in OntologyVersion.ONTOLOGY_IMPORTS.values()]
+        candidate_imports = OntologyImport.objects.filter(functools.reduce(operator.or_, import_q_list)).order_by("pk")
+
         kwargs = {}
-        missing_fields = set()
-        for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
-            if ont_import := oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last():
-                kwargs[field] = ont_import
-            elif field not in OntologyVersion.OPTIONAL_IMPORTS:
-                missing_fields.add(field)
+        for ont_import in candidate_imports:  # ordered by pk so the last match per field wins
+            for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
+                if ont_import.import_source == import_source and ont_import.filename in filenames:
+                    kwargs[field] = ont_import
+
+        missing_fields = {field for field in OntologyVersion.ONTOLOGY_IMPORTS
+                          if field not in kwargs and field not in OntologyVersion.OPTIONAL_IMPORTS}
 
         if not missing_fields:
             values = list(kwargs.values())
@@ -841,14 +849,17 @@ class OntologyVersion(TimeStampedModel):
                 ontology_version = None
         return ontology_version
 
-    def get_ontology_imports(self):
-        return [ont_import for ont_import in [
-            self.gencc_import,
-            self.mondo_import,
-            self.hp_owl_import,
-            self.hp_phenotype_to_genes_import,
-            self.omim_import
-        ] if ont_import is not None]
+    def get_ontology_imports(self) -> QuerySet[OntologyImport]:
+        """ Lazy QuerySet - using it in __in filters becomes a subquery (no extra queries,
+            unlike accessing the FK fields which lazy-loads each OntologyImport individually) """
+        import_ids = [import_id for import_id in [
+            self.gencc_import_id,
+            self.mondo_import_id,
+            self.hp_owl_import_id,
+            self.hp_phenotype_to_genes_import_id,
+            self.omim_import_id
+        ] if import_id is not None]
+        return OntologyImport.objects.filter(pk__in=import_ids)
 
     def get_ontology_term_relations(self):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
@@ -874,7 +885,7 @@ class OntologyVersion(TimeStampedModel):
             for source in extra["sources"]:
                 moi.add(source["mode_of_inheritance"])
                 submitters.add(source["submitter"])
-        return list(sorted(moi)), list(sorted(submitters))
+        return sorted(moi), sorted(submitters)
 
     @cache_memoize(DAY_SECS)
     def cached_gene_symbols_for_terms_tuple(self, terms_tuple: tuple[int]) -> QuerySet:
@@ -1111,7 +1122,7 @@ class OntologySnake:
         if otr_qs is None:
             otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
 
-        from ontology.ontology_traversal import bfs_to_ontology, _make_db_step_fn
+        from ontology.ontology_traversal import _make_db_step_fn, bfs_to_ontology
         step_fn = _make_db_step_fn(otr_qs, quality_filter)
         return bfs_to_ontology(term, to_ontology, max_depth, step_fn)
 
@@ -1279,13 +1290,13 @@ class OntologySnakes:
         return self.snakes[item]
 
     def leafs(self) -> list[OntologyTerm]:
-        return list(sorted({snake.leaf_term for snake in self}))
+        return sorted({snake.leaf_term for snake in self})
 
     def leaf_relations(self, ontology_relation: str = None) -> list[OntologyTermRelation]:
         relations = {snake.leaf_relationship for snake in self}
         if ontology_relation:
             relations = {otr for otr in relations if otr.relation == ontology_relation}
-        return list(sorted(relations))
+        return sorted(relations)
 
 
 class SingleTermH:

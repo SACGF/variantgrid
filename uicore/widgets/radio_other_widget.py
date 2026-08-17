@@ -112,7 +112,7 @@ class RadioOtherWidget(ChoiceWidget):
                 else:
                     missing_other = True
 
-            values=list(sorted(values))
+            values=sorted(values)
             if missing_other:
                 values = ValuesMissingOther(values)
             return values

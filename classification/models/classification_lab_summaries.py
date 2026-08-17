@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from classification.enums import SpecialEKeys, AlleleOriginBucket
+from classification.enums import AlleleOriginBucket, SpecialEKeys
 from snpdb.models import Lab
 
 

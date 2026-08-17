@@ -7,32 +7,42 @@ from typing import Optional
 
 from cache_memoize import cache_memoize
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields import DecimalRangeField
 from django.core.cache import cache
 from django.db import models
 from django.db.models import Max
-from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
+from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils.timezone import make_aware
 from django_extensions.db.models import TimeStampedModel
 
-from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
-    Transcript, GeneSymbol, SampleGeneList, TranscriptVersion, GeneCoverageCanonicalTranscript, ActiveSampleGeneList
+from genes.models import (
+    ActiveSampleGeneList,
+    CustomTextGeneList,
+    GeneCoverageCanonicalTranscript,
+    GeneCoverageCollection,
+    GeneList,
+    GeneListCategory,
+    GeneSymbol,
+    SampleGeneList,
+    Transcript,
+    TranscriptVersion,
+)
 from library.constants import DAY_SECS
 from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
 from library.preview_request import PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename
-from patients.models import FakeData, Patient
+from patients.models import ExtractionMatchMixin, FakeData, Patient
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
-from seqauto.models.models_enums import DataGeneration, SequencerRead, PairedEnd
-from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
+from seqauto.models.models_enums import DataGeneration, PairedEnd, SequencerRead
+from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequencer
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
-from snpdb.models import VCF, Sample, GenomeBuild, InheritanceManager, Wiki
+from snpdb.models import VCF, GenomeBuild, InheritanceManager, Sample, Wiki
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -78,15 +88,6 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         except Exception:
             logging.info("Can't find current sample sheet for %s", self.path)
             raise
-
-    @staticmethod
-    def get_name_validation_errors(name: str) -> Optional[str]:
-        """ Returns a string of issues with the name """
-        errors = None
-        if settings.SEQAUTO_SEQUENCING_RUN_VALIDATE_ILLUMINA_FORMULA:
-            if not re.search(SEQUENCING_RUN_REGEX, name):
-                errors = f"Name does not match Illumina regex: '{SEQUENCING_RUN_REGEX}'"
-        return errors
 
     @staticmethod
     def get_original_illumina_sequencing_run(modified_sequencing_run):
@@ -148,7 +149,7 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         except SequencingRunCurrentSampleSheet.DoesNotExist:
             return False
 
-        for joint_called_vcf in current_sample_sheet.jointcalledvcf_set.all():
+        for joint_called_vcf in current_sample_sheet.get_joint_called_vcfs():
             if joint_called_vcf.needs_to_be_linked():
                 return True
 
@@ -158,9 +159,11 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
         old_sample_links = SampleFromSequencingSample.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
         old_unaligned_reads = UnalignedReads.get_for_old_sample_sheets(self)
+        old_bam_files = BamFile.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
         return any([not illuminate_qc.exists() and old_illuminate_qc.exists(),
                     old_joint_called_vcfs.exists(),
                     old_unaligned_reads.exists(),
+                    old_bam_files.exists(),
                     old_sample_links.exists()])
 
     @staticmethod
@@ -226,6 +229,12 @@ class SampleSheet(SeqAutoRecord):
         samples_by_name = self.get_sequencing_samples_by_name()
         return [samples_by_name[name] for name in sorted_nicely(samples_by_name)]
 
+    def get_joint_called_vcfs(self):
+        """ VCFs owned by this sheet, plus cross-run ones drawing members from it """
+        return JointCalledVCF.objects.filter(
+            models.Q(sample_sheet=self) | models.Q(sequencing_samples__sample_sheet=self)
+        ).distinct()
+
     def get_sample_enrichment_kits(self):
         qs = self.sequencingsample_set.filter(enrichment_kit__isnull=False)
         return EnrichmentKit.objects.filter(pk__in=qs.values_list("enrichment_kit", flat=True))
@@ -267,7 +276,7 @@ class SequencingRunCurrentSampleSheet(models.Model):
         return f"{self.sequencing_run}, {self.sample_sheet}"
 
 
-class SequencingSample(models.Model):
+class SequencingSample(ExtractionMatchMixin, models.Model):
     """ Represents a row in a SampleSheet.csv
 
         As it's not a file, not a SeqAutoRecord
@@ -285,6 +294,10 @@ class SequencingSample(models.Model):
     is_control = models.BooleanField(default=False)
     failed = models.BooleanField(default=False)
     automatically_process = models.BooleanField(default=True)
+
+    @property
+    def sequencing_run(self):
+        return self.sample_sheet.sequencing_run
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
@@ -315,26 +328,24 @@ class SequencingSample(models.Model):
         sequencer_model = self.sample_sheet.sequencing_run.sequencer.sequencer_model
         if sequencer_model.data_naming_convention == DataGeneration.HISEQ:
             full_sample_name = f"{self.sample_id}_{self.barcode}"
+            aligned_pattern = settings.SEQAUTO_HISEQ_ALIGNED_PATTERN
         elif sequencer_model.data_naming_convention == DataGeneration.MISEQ:
             full_sample_name = f"{self.sample_name}_S{self.sample_number}"
+            aligned_pattern = settings.SEQAUTO_MISEQ_ALIGNED_PATTERN
         else:
             msg = f"Unknown sequencer_model.data_naming_convention '{sequencer_model.data_naming_convention}'"
             raise ValueError(msg)
         params['full_sample_name'] = full_sample_name
         params['full_sample_name_underscores'] = full_sample_name.replace("-", "_")
+        params['aligned_pattern'] = aligned_pattern % params
         return params
 
     def get_single_bam(self):
         """ relies on there being only one """
         try:
-            unaligned_reads = self.unalignedreads_set.get()
-            try:
-                bam_file = unaligned_reads.bamfile_set.get()
-                return bam_file
-            except Exception:
-                logging.error("Wasn't exactly 1 bam_file for unaligned_reads %s", unaligned_reads)
+            return self.bamfile_set.get()
         except Exception:
-            logging.error("Wasn't exactly 1 unaligned reads for sequencing sample %s", self)
+            logging.error("Wasn't exactly 1 bam_file for sequencing sample %s", self)
         return None
 
     def get_single_qc(self):
@@ -468,25 +479,14 @@ class UnalignedReads(models.Model):
 
     @property
     def sequencing_run(self):
-        return self.sequencing_sample.sample_sheet.sequencing_run
+        return self.sequencing_sample.sequencing_run
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
-        fastq_params = self.sequencing_sample.get_params()
-        data_naming_convention = self.sequencing_run.sequencer.sequencer_model.data_naming_convention
-        if data_naming_convention == DataGeneration.HISEQ:
-            aligned_pattern = settings.SEQAUTO_HISEQ_ALIGNED_PATTERN
-        elif data_naming_convention == DataGeneration.MISEQ:
-            aligned_pattern = settings.SEQAUTO_MISEQ_ALIGNED_PATTERN
-        else:
-            msg = f"Unknown data_naming_convertion: {data_naming_convention}"
-            raise ValueError(msg)
-        params = {"aligned_pattern": aligned_pattern % fastq_params,
-                  "read_1": self.fastq_r1.path}
+        params = self.sequencing_sample.get_params()
+        params["read_1"] = self.fastq_r1.path
         if self.fastq_r2:
             params["read_2"] = self.fastq_r2.path
-
-        params.update(fastq_params)
         return params
 
     @staticmethod
@@ -499,22 +499,22 @@ class UnalignedReads(models.Model):
 
 
 class BamFile(SeqAutoRecord):
+    sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
+    # UnalignedReads is optional metadata - some sequencers produce BAMs with no FastQ stage at all
     unaligned_reads = models.ForeignKey(UnalignedReads, null=True, on_delete=CASCADE)
     name = models.TextField()
     aligner = models.ForeignKey(Aligner, on_delete=CASCADE)
 
     def get_params(self):
-        params = self.unaligned_reads.get_params()
-        params['bam'] = self.get_path_from_unaligned_reads(self.unaligned_reads)
+        params = self.sequencing_sample.get_params()
+        if self.unaligned_reads:
+            params.update(self.unaligned_reads.get_params())
+        params['bam'] = self.get_path_from_sequencing_sample(self.sequencing_sample)
         return params
 
-    @property
-    def sequencing_sample(self):
-        return self.unaligned_reads.sequencing_sample
-
     @staticmethod
-    def get_path_from_unaligned_reads(unaligned_reads):
-        params = unaligned_reads.get_params()
+    def get_path_from_sequencing_sample(sequencing_sample):
+        params = sequencing_sample.get_params()
         pattern = os.path.join(settings.SEQAUTO_BAM_DIR_PATTERN, settings.SEQAUTO_BAM_PATTERN)
         try:
             filename = pattern % params
@@ -522,7 +522,7 @@ class BamFile(SeqAutoRecord):
             if "enrichment_kit" in ke.args:
                 logging.error("'enrichment_kit' not set, this is usually done via signal handlers in a custom app")
             missing = ', '.join(ke.args)
-            logging.error("%s missing: %s. params=%s", unaligned_reads, missing, params)
+            logging.error("%s missing: %s. params=%s", sequencing_sample, missing, params)
             raise
         return os.path.abspath(filename)
 
@@ -533,7 +533,7 @@ class BamFile(SeqAutoRecord):
         return aligner
 
     def __str__(self):
-        return f"BAM: {self.unaligned_reads.sequencing_sample}"
+        return f"BAM: {self.sequencing_sample}"
 
 
 class Flagstats(SeqAutoRecord):
@@ -578,6 +578,18 @@ class SingleSampleVCF(SeqAutoRecord):
     def get_params(self):
         return self.bam_file.get_params()
 
+    def get_sequencing_samples(self):
+        """ The sequencing samples this VCF is allowed to link against """
+        return SequencingSample.objects.filter(pk=self.bam_file.sequencing_sample_id)
+
+    @property
+    def enrichment_kit(self) -> Optional[EnrichmentKit]:
+        return self.bam_file.sequencing_sample.sample_sheet.sequencing_run.enrichment_kit
+
+    @property
+    def has_mixed_enrichment_kits(self) -> bool:
+        return False
+
     @property
     def name(self):
         return name_from_filename(self.path)
@@ -592,7 +604,7 @@ class SingleSampleVCF(SeqAutoRecord):
 
     @property
     def sample_sheet(self) -> SampleSheet:
-        return self.bam_file.unaligned_reads.sequencing_sample.sample_sheet
+        return self.bam_file.sequencing_sample.sample_sheet
 
     def __str__(self):
         return f"VCF {self.name}"
@@ -601,9 +613,42 @@ class SingleSampleVCF(SeqAutoRecord):
 class JointCalledVCF(SeqAutoRecord):
     sample_sheet = models.ForeignKey(SampleSheet, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
+    # Set when the joint call draws samples from runs other than sample_sheet's.
+    # Empty means "every sequencing sample on sample_sheet" (the common single-run case).
+    sequencing_samples = models.ManyToManyField(SequencingSample, blank=True,
+                                                related_name="joint_called_vcfs")
 
     def get_params(self):
         return self.sample_sheet.get_params()
+
+    def get_sequencing_samples(self):
+        """ The sequencing samples this VCF is allowed to link against """
+        explicit = self.sequencing_samples.all()
+        if explicit.exists():
+            return explicit
+        return self.sample_sheet.sequencingsample_set.all()
+
+    @property
+    def sequencing_runs(self) -> list['SequencingRun']:
+        """ Every run contributing samples, owning run first """
+        runs = {self.sample_sheet.sequencing_run: None}
+        for ss in self.get_sequencing_samples():
+            runs[ss.sample_sheet.sequencing_run] = None
+        return list(runs)
+
+    @property
+    def is_cross_run(self) -> bool:
+        return len(self.sequencing_runs) > 1
+
+    @property
+    def enrichment_kit(self) -> Optional[EnrichmentKit]:
+        """ The kit shared by every contributing run, or None when they differ """
+        kits = {r.enrichment_kit for r in self.sequencing_runs}
+        return kits.pop() if len(kits) == 1 else None
+
+    @property
+    def has_mixed_enrichment_kits(self) -> bool:
+        return len({r.enrichment_kit for r in self.sequencing_runs}) > 1
 
     @property
     def name(self):
@@ -621,7 +666,7 @@ class JointCalledVCF(SeqAutoRecord):
     @cached_property
     def vcf(self) -> Optional[VCF]:
         try:
-            return VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)
+            return VCF.objects.get(uploadedvcf__file_upload__path=self.path)
         except VCF.DoesNotExist:
             return None
 
@@ -632,11 +677,18 @@ class JointCalledVCF(SeqAutoRecord):
         return None
 
     @property
+    def sequencing_sample_count(self) -> int:
+        """ How many sequencing samples this VCF could link against """
+        return self.get_sequencing_samples().count()
+
+    @property
     def is_full_sheet(self) -> Optional[bool]:
         count = self.sample_count
         if count is None:
             return None
-        return count == self.sample_sheet.sequencingsample_set.count()
+        if self.is_cross_run:
+            return False
+        return count == self.sequencing_sample_count
 
     def needs_to_be_linked(self):
         try:
@@ -650,8 +702,9 @@ class JointCalledVCF(SeqAutoRecord):
         return False
 
     def __str__(self):
-        num_samples = self.sample_sheet.sequencingsample_set.count()
-        return f"{self.variant_caller} JointCalledVCF ({self.pk}) for {self.sequencing_run} ({num_samples} samples)"
+        num_samples = self.sequencing_sample_count
+        runs = ", ".join(str(sr) for sr in self.sequencing_runs)
+        return f"{self.variant_caller} JointCalledVCF ({self.pk}) for {runs} ({num_samples} samples)"
 
 
 class QC(SeqAutoRecord):
@@ -820,7 +873,7 @@ class QCExecSummary(SeqAutoRecord):
 
     @staticmethod
     def get_sequencing_run_path():
-        return "qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run"
+        return "qc__bam_file__sequencing_sample__sample_sheet__sequencing_run"
 
     def __str__(self):
         return f"QCExecSummary for {self.qc}"
@@ -890,7 +943,7 @@ class GoldGeneCoverageCollection(models.Model):
         If you wish to delete / replace a GeneCoverageCollection here, you must delete the
         old gold first (PROTECT) to stop Stored gold reference and current gold runs
         getting out of sync """
-    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample"
+    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
 
     gold_reference = models.ForeignKey(GoldReference, on_delete=CASCADE)
     gene_coverage_collection = models.ForeignKey(GeneCoverageCollection, on_delete=PROTECT)
@@ -898,7 +951,7 @@ class GoldGeneCoverageCollection(models.Model):
     @property
     def sequencing_sample(self):
         try:
-            ss = self.gene_coverage_collection.qcgenecoverage.qc.bam_file.unaligned_reads.sequencing_sample
+            ss = self.gene_coverage_collection.qcgenecoverage.qc.sequencing_sample
         except Exception:
             ss = None
         return ss
@@ -950,8 +1003,10 @@ class QCColumn(models.Model):
         return self.name
 
 
-def get_samples_by_sequencing_sample(sample_sheet, vcf):
-    sequencing_samples_by_name = sample_sheet.get_sequencing_samples_by_name()
+def get_samples_by_sequencing_sample(sequencing_samples, vcf):
+    """ sequencing_samples is the candidate pool - a sample sheet's rows, or the explicit members
+        of a joint call that spans runs """
+    sequencing_samples_by_name = {ss.sample_name: ss for ss in sequencing_samples}
 
     def clean_sample_name(s):
         return s.upper().replace("-", "_")
@@ -977,7 +1032,7 @@ def get_samples_by_sequencing_sample(sample_sheet, vcf):
 
 def get_20x_gene_coverage(gene_symbol, min_coverage=100):
     gcg_qs = GeneCoverageCollection.objects.filter(
-        qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
+        qcgenecoverage__qc__bam_file__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
 
     existing_count = 0
     existing_max_pk = 0

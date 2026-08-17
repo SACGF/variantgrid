@@ -126,6 +126,7 @@ function showGnomadPopulations() {
             <div id='internal-population-container' class='hidden'>
                 <div><b>Max percent:</b> {{ form.internal_percent }} (Note: results vary over time with # of samples in database) </div>
                 <div><b>Max count:</b> {{ form.max_samples }} ({{ form.zygosity }}) (of the {{ num_samples_for_build }} samples in the database)</div>
+                <div class='text-muted'>"Any zygosity call" means Ref, Het or Hom Alt - samples with no zygosity call ("?") don't count.</div>
             </div>
         </div>
 

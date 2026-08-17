@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from typing import TypedDict, Optional, Self
-
 from dataclasses_json import DataClassJsonMixin
-
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation, TestingContextBucket, ClassificationResultValue
 from library.utils import strip_json
@@ -299,3 +297,40 @@ class ClassificationSummaryCalculator:
                         custom_strength=f"{letter}_{sub_value_label}")
                     )
         return list(str(x) for x in sorted(strengths))
+
+
+#F FIXME underlying code should change due to overlaps
+def clinical_significance_pills(summary: ClassificationSummaryCacheDict, allele_origin_bucket: str) -> list[dict]:
+    from classification.models import EvidenceKeyMap
+    """ Label/CSS class for the c-pill spans - rendered server side by the clinical_significance_values
+        tag, and client side by the variant details samples grid. CSS is .c-pill.cs-* / .c-pill.scs-* """
+    pathogenicity = summary.get("pathogenicity") or {}
+    somatic = summary.get("somatic") or {}
+
+    germline_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+    pending_from = None
+    value = pathogenicity.get("classification")
+    if pending_classification_value := pathogenicity.get("pending"):
+        pending_from = germline_key.pretty_value(value, value) or "No Data"
+        value = pending_classification_value
+
+    pills = [{
+        "title": germline_key.pretty_label,
+        "pending_from": pending_from,
+        "label": germline_key.pretty_value(value, value) or "No Data",
+        "css_class": "cs cs-" + (value.lower() if value else "none"),
+    }]
+
+    always_show_somatic = allele_origin_bucket != AlleleOriginBucket.GERMLINE
+    if always_show_somatic or somatic.get("classification"):
+        somatic_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+        value = somatic.get("clinical_significance")
+        label = somatic_key.pretty_value(value, value) or "No Data"
+        if amp_level := somatic.get("amp_level"):
+            label += amp_level
+        pills.append({
+            "title": somatic_key.pretty_label,
+            "label": label,
+            "css_class": f"scs scs-{value.lower() if value else 'none'}",
+        })
+    return pills

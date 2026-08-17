@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.models import GenomeBuild, Cohort, CohortSample
+from snpdb.models import Cohort, CohortSample, GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 

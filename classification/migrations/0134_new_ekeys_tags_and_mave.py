@@ -20,7 +20,10 @@ def _new_ekey_tags_and_hgvs_g(apps, _schema_editor):
         'value_type': FREE_ENTRY, 'default_crit_evaluation': None, 'allow_custom_values': False, 'hide': True,
         'immutable': False, 'copy_consensus': False, 'variantgrid_column_id': None,
     }
-    EvidenceKey.objects.create(**kwargs)
+    # Skip if the restored DB already carries this key (its snapshot predates this migration's
+    # record), rather than collide on the EvidenceKey PK.
+    if not EvidenceKey.objects.filter(key=kwargs["key"]).exists():
+        EvidenceKey.objects.create(**kwargs)
 
 
 class Migration(migrations.Migration):

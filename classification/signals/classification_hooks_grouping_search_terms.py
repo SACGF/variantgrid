@@ -1,12 +1,19 @@
 from collections import defaultdict
-from typing import Iterable, Optional, Set
+from collections.abc import Iterable
+from typing import Optional
 
 from django.dispatch import receiver
 
 from annotation.models import AnnotationVersion, VariantAnnotation
-from classification.models import ClassificationGroupingSearchTermStub, ClassificationGroupingSearchTermType, \
-    ClassificationGrouping, ImportedAlleleInfo, classification_grouping_search_term_signal, \
-    ClassificationGroupingSearchTermBuilder, ClinVarExport
+from classification.models import (
+    ClassificationGrouping,
+    ClassificationGroupingSearchTermBuilder,
+    ClassificationGroupingSearchTermStub,
+    ClassificationGroupingSearchTermType,
+    ClinVarExport,
+    ImportedAlleleInfo,
+    classification_grouping_search_term_signal,
+)
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneVersion, TranscriptVersion
 from ontology.models import OntologyTerm
 from snpdb.models import GenomeBuild, Variant
@@ -70,7 +77,7 @@ def _gene_symbol_search_for(grouping: ClassificationGrouping, **kwargs) -> Optio
 
 @receiver(classification_grouping_search_term_signal)
 def _condition_terms(grouping: ClassificationGrouping, **kwargs) -> Optional[Iterable[ClassificationGroupingSearchTermStub]]:
-    all_terms: Set[OntologyTerm] = set()
+    all_terms: set[OntologyTerm] = set()
     all_stubs: list[ClassificationGroupingSearchTermStub] = []
 
     # redundantly duplicate a lot for the condition free text

@@ -5,9 +5,12 @@ from django.db.models.query_utils import Q
 from annotation.models import ManualVariantEntryType
 from annotation.models.models import ManualVariantEntry
 from genes.hgvs import HGVSMatcher
-from snpdb.clingen_allele import populate_clingen_alleles_for_variants, get_clingen_alleles_from_external_code
+from snpdb.clingen_allele import (
+    get_clingen_alleles_from_external_code,
+    populate_clingen_alleles_for_variants,
+)
 from snpdb.models import Variant, VariantCoordinate
-from snpdb.models.models_enums import ImportStatus, ClinGenAlleleExternalRecordType
+from snpdb.models.models_enums import ClinGenAlleleExternalRecordType, ImportStatus
 from upload.models import SimpleVCFImportInfo
 from upload.models.models_enums import VCFImportInfoSeverity
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
@@ -22,7 +25,7 @@ def get_manual_variant_coordinates(mve: ManualVariantEntry) -> list[VariantCoord
                                                                      mve.entry_text):
             variant_coordinates.append(clingen_allele.get_variant_coordinate(mve.genome_build))
     elif mve.entry_type == ManualVariantEntryType.HGVS:
-        hgvs_matcher = HGVSMatcher(mve.genome_build)
+        hgvs_matcher = HGVSMatcher.instance(mve.genome_build)
         hgvs_string, search_messages = hgvs_matcher.clean_hgvs(mve.entry_text)
         if search_messages:
             mve.warning_message = "\n".join(search_messages)
@@ -43,7 +46,7 @@ class ManualVariantsPostInsertTask(ImportVCFStepTask):
     """
 
     def process_items(self, upload_step):
-        mvec = upload_step.uploaded_file.uploadedmanualvariantentrycollection.collection
+        mvec = upload_step.file_upload.uploadedmanualvariantentrycollection.collection
         logging.info("ManualVariantsPostInsertTask: mvec_id = %s", mvec)
 
         failed_entries = mvec.manualvariantentry_set.filter(createdmanualvariant__isnull=True)

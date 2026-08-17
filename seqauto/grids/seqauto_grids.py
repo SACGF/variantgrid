@@ -7,8 +7,7 @@ from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.pandas_utils import nan_to_none
-from seqauto.models import SequencingSample, GoldCoverageSummary, \
-    GoldReference, EnrichmentKit
+from seqauto.models import EnrichmentKit, GoldCoverageSummary, GoldReference, SequencingSample
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df, group_enrichment_kits_df
 
 
@@ -86,7 +85,7 @@ class GoldCoverageSummaryGrid(JqGridUserRowConfig):
 
 
 class EnrichmentKitGeneCoverageGrid(JqGridUserRowConfig):
-    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample"
+    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
     SEQUENCING_RUN_PATH = SEQUENCING_SAMPLE_PATH + "__sample_sheet__sequencing_run"
     GOLD_PATH = SEQUENCING_RUN_PATH + "__gold_standard"
     SAMPLE_NAME_PATH = SEQUENCING_SAMPLE_PATH + "__sample_name"

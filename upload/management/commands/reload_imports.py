@@ -24,5 +24,5 @@ class Command(BaseCommand):
             raise CommandError(msg)
 
         logging.info("Reloading UFPPs of type '%s'", uft_description)
-        for upload_pipeline in UploadPipeline.objects.filter(uploaded_file__file_type=uploaded_file_type):
+        for upload_pipeline in UploadPipeline.objects.filter(file_upload__file_type=uploaded_file_type):
             retry_upload_pipeline(upload_pipeline)

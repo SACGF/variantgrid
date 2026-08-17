@@ -5,8 +5,8 @@ from functools import cached_property
 from typing import Optional
 
 from classification.models import Classification, ImportedAlleleInfo
-from flags.models import FlagComment, FlagType, FlagStatus
-from genes.hgvs import CHGVS
+from flags.models import FlagComment, FlagStatus, FlagType
+from genes.hgvs import HGVSComponents
 from library.guardian_utils import admin_bot
 from snpdb.models import Allele, GenomeBuild
 
@@ -26,7 +26,7 @@ class CHGVSIdentifier:
     def effective_transcript(self) -> str:
         if self.transcript:
             return self.transcript
-        return CHGVS(self.imported_c_hgvs).transcript
+        return HGVSComponents(self.imported_c_hgvs).transcript
 
     def fuzzy_matches(self, other: 'CHGVSIdentifier') -> bool:
         if other.genome_build and self.genome_build and other.genome_build != self.genome_build:
@@ -168,7 +168,7 @@ class FlagDatabase:
                     all_open_flags = set()
                     all_open_flags.update(*(match.open_flags for match in matches))
 
-                    all_comments = list(sorted(all_comments, key=lambda c: c.created))
+                    all_comments = sorted(all_comments, key=lambda c: c.created)
                     if not all_comments:
                         continue
 

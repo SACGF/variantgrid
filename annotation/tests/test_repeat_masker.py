@@ -1,8 +1,16 @@
 from django.test import TestCase
 
 from annotation.models.repeat_masker import (
-    RepeatMaskerSummary, classify_repeat,
-    SIMPLE_REPEAT, LOW_COMPLEXITY, SINE, LINE, LTR, DNA, RNA, OTHER,
+    DNA,
+    LINE,
+    LOW_COMPLEXITY,
+    LTR,
+    OTHER,
+    RNA,
+    SIMPLE_REPEAT,
+    SINE,
+    RepeatMaskerSummary,
+    classify_repeat,
 )
 
 # Real value from issue #1580 (NM_182961.4(SYNE1):c.5270_23300del), truncated

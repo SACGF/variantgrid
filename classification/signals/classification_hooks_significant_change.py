@@ -3,15 +3,22 @@ from functools import cached_property
 from typing import Optional
 
 from auditlog.context import set_extra_data
+from django.contrib.auth.models import User
 from django.dispatch import receiver
 from django.urls import reverse
 from django.contrib.auth.models import User
 
-from classification.enums import ShareLevel, SpecialEKeys, ClinicalSignificance
-from classification.models import classification_post_publish_signal, Classification, classification_flag_types, \
-    EvidenceKey, ClassificationFlagTypes, ClassificationModification, EvidenceKeyMap, OverlapContribution, \
-    classification_grouping_summary_signal, ClassificationSummaryCacheObj, ClassificationResultValue, TriageState, \
-    ClassificationGrouping
+from classification.enums import ClinicalSignificance, ShareLevel, SpecialEKeys, ClassificationResultValue, TriageState
+from classification.models import (
+    Classification,
+    ClassificationFlagTypes,
+    ClassificationModification,
+    EvidenceKey,
+    EvidenceKeyMap,
+    classification_flag_types,
+    classification_post_publish_signal, classification_grouping_summary_signal, ClassificationGrouping,
+    ClassificationSummaryCacheObj, OverlapContribution
+)
 from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlaps_services import OverlapServices
 from library.django_utils import get_url_from_view_path

@@ -1,15 +1,21 @@
 import csv
 import json
-from typing import Type, Any, Optional, Iterator
+from collections.abc import Iterator
+from typing import Any, Optional
 
 from django.core.exceptions import PermissionDenied
-from django.http.response import JsonResponse, HttpResponse, StreamingHttpResponse
+from django.http.response import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.urls.base import resolve, reverse
 from django.utils.text import slugify
 from django.views.generic.base import View
 
-from library.utils import nice_class_name, StashFile
+from library.utils import StashFile, nice_class_name
 from library.utils.date_utils import local_date_string
+
+
+# Rows written per yielded chunk - one chunk per row costs far more in WSGI/nginx (and file write)
+# overhead than it saves in memory
+EXPORT_ROWS_PER_CHUNK = 1000
 
 
 class JQGridViewOp:
@@ -26,7 +32,7 @@ class JQGridView(View):
         perm_path('analyses/grid/<slug:op>/', JQGridView.as_view(grid=AnalysesGrid, delete=True), name='analyses_grid'),
     """
 
-    grid: Optional[Type[Any]] = None  # JqGridUserRowConfig (or grid initialised w/user, has delete_row method)
+    grid: Optional[type[Any]] = None  # JqGridUserRowConfig (or grid initialised w/user, has delete_row method)
     delete_row = False
     csv_download = False  # via request - can also do via JSON
 
@@ -53,7 +59,7 @@ class JQGridView(View):
             msg = f"{nice_class_name(self)}.grid not set"
             raise ValueError(msg)
         else:
-            grid_klass: Type[Any] = self.grid
+            grid_klass: type[Any] = self.grid
 
         return self.create_grid_from_request(request, grid_klass, **kwargs)
 
@@ -142,11 +148,14 @@ def grid_export_csv(colmodels, items) -> Iterator[str]:
     writer.writerow(header)
 
     yield pseudo_buffer.value
-    for obj in items:
+    for i, obj in enumerate(items, start=1):
         # labels dict is in same sorted order as header
         row = [obj.get(k) for k in labels]
         writer.writerow(row)
-        yield pseudo_buffer.value
+        if i % EXPORT_ROWS_PER_CHUNK == 0:
+            yield pseudo_buffer.value
+    if remaining := pseudo_buffer.value:
+        yield remaining
 
 
 def colmodel_header_labels(colmodels, label_overrides=None):

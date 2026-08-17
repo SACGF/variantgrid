@@ -13,27 +13,39 @@ class SnpdbConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
-        from snpdb.models import Trio
-        from django.contrib.auth.models import User, Group
+        from django.contrib.auth.models import Group, User
+
         from seqauto.signals.signals_list import backend_vcf_import_success_signal
-        from snpdb.signals.signal_handlers import backend_vcf_import_success_handler, trio_post_save_handler, \
-            user_post_save_handler, group_post_save_handler
-        from snpdb.signals import vcf_health_check
-        from snpdb.signals import disk_usage_health_check
-        from snpdb.signals import lab_search
-        from snpdb.signals import organization_search
-        from snpdb.signals import user_search
-        from snpdb.signals import cohort_search
-        from snpdb.signals import trio_search
-        from snpdb.signals import quad_search
-        from snpdb.signals import sample_search
-        from snpdb.signals import vcf_search
-        from snpdb.signals import variant_search
-        from snpdb.signals import variant_zygosity_preview_extra
-        from snpdb.signals import jobs_autopause  # registers worker_ready crash-safety auto-pause
-        from snpdb.signals import clinvar_export_search
-        from snpdb.signals import scv_search
-        from snpdb.signals import genomics_search
+        from snpdb import checks  # noqa: F401  # registers system checks on import
+        from snpdb.models import Trio
+
+        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
+        # silently unregistering them
+        from snpdb.signals import (  # noqa: F401
+            clinvar_export_search,
+            cohort_search,
+            common_variants_classification_changed,
+            disk_usage_health_check,
+            genomics_search,
+            jobs_autopause,  # registers worker_ready crash-safety auto-pause
+            lab_search,
+            organization_search,
+            quad_search,
+            sample_search,
+            scv_search,
+            trio_search,
+            user_search,
+            variant_search,
+            variant_zygosity_preview_extra,
+            vcf_health_check,
+            vcf_search,
+        )
+        from snpdb.signals.signal_handlers import (
+            backend_vcf_import_success_handler,
+            group_post_save_handler,
+            trio_post_save_handler,
+            user_post_save_handler,
+        )
         # pylint: enable=import-outside-toplevel,unused-import
 
         backend_vcf_import_success_signal.connect(backend_vcf_import_success_handler)

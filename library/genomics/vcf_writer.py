@@ -9,8 +9,10 @@ Shared low-level VCF writing:
 
 Parsing / header-rewriting of existing VCFs lives in ``library.genomics.vcf_utils``.
 """
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional, Union
+from typing import Optional, Union
 
 DEFAULT_FILE_FORMAT = "VCFv4.1"
 
@@ -80,6 +82,25 @@ def symbolic_alt_info(alt: str, *, svlen, end) -> dict:
         "SVLEN": svlen,
         "SVTYPE": alt[1:-1],  # Strip off the < > brackets
     }
+
+
+# The characters VCF 4.x reserves inside an INFO value. Everything else goes through as written, so a
+# value with none of these stays readable in the file
+_INFO_VALUE_ESCAPES = {"%": "%25", ";": "%3B", "=": "%3D", ",": "%2C",
+                       " ": "%20", "\t": "%09", "\r": "%0D", "\n": "%0A"}
+_PERCENT_ESCAPE_PATTERN = re.compile(r"%([0-9A-Fa-f]{2})")
+
+
+def percent_encode_info_value(value) -> str:
+    """ VCF percent-encoding for one INFO value - pass to ``VCFWriter`` as ``encode_info``.
+        Readers get the encoded text (htslib does not decode), so anything storing it keeps it
+        encoded and decodes on the way out - @see ``percent_decode_info_value``. """
+    return "".join(_INFO_VALUE_ESCAPES.get(c, c) for c in str(value))
+
+
+def percent_decode_info_value(value: str) -> str:
+    """ Inverse of ``percent_encode_info_value`` """
+    return _PERCENT_ESCAPE_PATTERN.sub(lambda m: chr(int(m.group(1), 16)), value)
 
 
 class VCFWriter:

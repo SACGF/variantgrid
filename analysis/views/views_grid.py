@@ -2,9 +2,8 @@ import logging
 import time
 from urllib.parse import urlencode
 
-from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.cache import cache
-from django.http.response import StreamingHttpResponse, HttpResponseRedirect
+from django.http.response import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -12,17 +11,21 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
 from analysis import grids
-from analysis.grid_export import node_grid_get_export_iterator
 from analysis.models import AnalysisNode
-from analysis.tasks.analysis_grid_export_tasks import export_cohort_to_downloadable_file, \
-    export_sample_to_downloadable_file, get_grid_downloadable_file_params_hash
+from analysis.tasks.analysis_grid_export_tasks import (
+    NODE_EXPORT_GENERATOR,
+    export_cohort_to_downloadable_file,
+    export_node_to_downloadable_file,
+    export_sample_to_downloadable_file,
+    get_grid_downloadable_file_params_hash,
+    get_node_grid_downloadable_file_params_hash,
+)
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from library.constants import WEEK_SECS
-from library.django_utils.major_operation import major_operation, TooManyMajorOperationsError
+from library.django_utils.major_operation import TooManyMajorOperationsError, major_operation
 from library.utils.hash_utils import sha256sum_str
-from snpdb.models import Sample, Cohort, CachedGeneratedFile
-from snpdb.models.models_variant import Variant
+from snpdb.models import CachedGeneratedFile, Cohort, Sample
 
 _NODE_GRID_ALLOWED_PARAMS = {
     '_filters',
@@ -47,7 +50,7 @@ def _add_allowed_node_grid_params(url: str, params: dict) -> str:
         if key in _NODE_GRID_ALLOWED_PARAMS:
             cleaned_params[key] = value
         else:
-            logging.warning(f"Node redirect had disallowed GET param: %s", key)
+            logging.warning("Node redirect had disallowed GET param: %s", key)
     return f"{url}?" + urlencode(cleaned_params)
 
 
@@ -150,31 +153,29 @@ def sample_grid_export(request, sample_id, export_type):
 
 
 def node_grid_export(request, analysis_id):
+    """ Launches (or joins) a Celery export and redirects to the CachedGeneratedFile poll URL, so a big
+        node isn't bound by the gunicorn request timeout (issue #1257) """
+    EXPORT_TYPES = {"csv", "vcf"}
     export_type = request.GET["export_type"]
-    use_canonical_transcripts = request.GET.get("use_canonical_transcripts")
+    if export_type not in EXPORT_TYPES:
+        raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
 
     node = _node_from_request(request)
-    canonical_transcript_collection = None
-    if use_canonical_transcripts:
+    canonical_transcript_collection_id = None
+    if request.GET.get("use_canonical_transcripts"):
         # Whether to use it or not is set server-side. Just use client to see what they wanted
         if ctc := node.analysis.canonical_transcript_collection:
-            canonical_transcript_collection = ctc
+            canonical_transcript_collection_id = ctc.pk
         else:
             logging.warning("Grid request had 'use_canonical_transcripts' but analysis did not.")
 
-    variant_tags_qs = Variant.objects.filter(varianttag__analysis=node.analysis)
-    variant_tags_qs = variant_tags_qs.annotate(tags=StringAgg("varianttag__tag", delimiter=', ', distinct=True))
-    variant_tags_dict = dict(variant_tags_qs.values_list("id", "tags"))
-
-    filename, file_iterator = node_grid_get_export_iterator(request, node, export_type,
-                                                            canonical_transcript_collection, variant_tags_dict)
-    return _get_streaming_response(filename, file_iterator)
-
-
-def _get_streaming_response(filename, file_iterator):
-    response = StreamingHttpResponse(file_iterator, content_type="text/csv")
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
+    grid_params = {k: v for k, v in request.GET.items() if k in _NODE_GRID_ALLOWED_PARAMS}
+    task_args = (node.pk, node.version, request.user.pk, export_type, canonical_transcript_collection_id, grid_params)
+    params_hash = get_node_grid_downloadable_file_params_hash(*task_args)
+    task = export_node_to_downloadable_file.si(*task_args)
+    cgf = CachedGeneratedFile.get_or_create_and_launch(NODE_EXPORT_GENERATOR, params_hash, task)
+    # A failed export reports its exception through the poll URL, so the client can offer a retry
+    return redirect(cgf)
 
 
 def _node_from_request(request) -> AnalysisNode:

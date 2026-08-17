@@ -1,17 +1,55 @@
-import gzip
 import logging
-import tempfile
 
-import requests
-from cdot.data_release import get_latest_combo_file_urls, get_latest_data_release_tag_name, _get_version_from_tag_name
+from cdot.data_release import (
+    _get_version_from_tag_name,
+    get_latest_combo_file_urls,
+    get_latest_data_release_tag_name,
+)
 from django.core.management import BaseCommand
 
+from genes.cdot_data_release import download_cdot_json
 from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand
 from genes.models import TranscriptVersion
 from genes.models_enums import AnnotationConsortium
-from library.constants import MINUTE_SECS
 from library.utils import get_single_element, invert_dict
 from snpdb.models import GenomeBuild
+
+
+def get_installed_cdot_data_version(genome_builds, annotation_consortia) -> str:
+    """ The cdot version that produced the most recently inserted transcripts """
+    ac_lookup = invert_dict(dict(AnnotationConsortium.choices))
+    ac_codes = [ac_lookup[ac] for ac in annotation_consortia]
+    tv_qs = TranscriptVersion.objects.filter(genome_build__in=genome_builds,
+                                             transcript__annotation_consortium__in=ac_codes)
+    if last_tv := tv_qs.order_by("pk").last():
+        return last_tv.data.get("cdot")
+    return "No cdot data in system"
+
+
+def get_latest_cdot_data_version() -> str:
+    tag_name = get_latest_data_release_tag_name()
+    return _get_version_from_tag_name(tag_name, data_version=True)
+
+
+def cdot_data_needs_update(genome_builds, annotation_consortia) -> tuple[bool, str, str]:
+    """ Returns (needs update, ours, latest on GitHub) """
+    our_latest_cdot = get_installed_cdot_data_version(genome_builds, annotation_consortia)
+    cdot_data_version = get_latest_cdot_data_version()
+    logging.info("Most recent cdot data in our database: %s", our_latest_cdot)
+    logging.info("Latest cdot release on GitHub: %s", cdot_data_version)
+    return cdot_data_version != our_latest_cdot, our_latest_cdot, cdot_data_version
+
+
+def import_latest_combo_file(genome_build: GenomeBuild, annotation_consortium: AnnotationConsortium):
+    """ Import the combo file - the latest copy of every transcript for a build, which is a superset
+        of the per-GFF release files """
+    combo_files = get_latest_combo_file_urls(annotation_consortia={annotation_consortium.label},
+                                             genome_builds=[genome_build.name])
+    combo_file_url = get_single_element(combo_files)
+    logging.info("%s/%s - importing combo file", genome_build, annotation_consortium.label)
+    with download_cdot_json(combo_file_url) as f:
+        cdot_version = GeneAnnotationCommand.read_cdot_version(f)
+        GeneAnnotationCommand.import_cdot_data_file(genome_build, annotation_consortium, f, cdot_version)
 
 
 class Command(BaseCommand):
@@ -45,53 +83,20 @@ class Command(BaseCommand):
             annotation_consortia = self.annotation_consortia
         logging.info("Using genome builds: %s, annotation consortia: %s", genome_builds, annotation_consortia)
 
-        tag_name = get_latest_data_release_tag_name()
-        cdot_data_version = _get_version_from_tag_name(tag_name, data_version=True)
-
-        ac_lookup = invert_dict(dict(AnnotationConsortium.choices))
-        ac_codes = [ac_lookup[ac] for ac in annotation_consortia]
-        tv_qs = TranscriptVersion.objects.filter(genome_build__in=genome_builds,
-                                                 transcript__annotation_consortium__in=ac_codes)
-        if last_tv := tv_qs.order_by("pk").last():
-            our_latest_cdot = last_tv.data.get("cdot")
-        else:
-            our_latest_cdot = "No cdot data in system"
-
-        logging.info("Most recent cdot data in our database: %s", our_latest_cdot)
-        logging.info("Latest cdot release on GitHub: %s", cdot_data_version)
-        needs_update = cdot_data_version != our_latest_cdot
+        needs_update, _ours, _latest = cdot_data_needs_update(genome_builds, annotation_consortia)
         if not needs_update:
             if force:
-               logging.info("Forcing update...")
+                logging.info("Forcing update...")
             else:
-                logging.info("No need to update. Existing. Use --force to bypass this warning")
-                exit(0)
+                logging.info("No need to update. Exiting. Use --force to bypass this warning")
+                return
 
+        ac_lookup = invert_dict(dict(AnnotationConsortium.choices))
         for genome_build_name in genome_builds:
             for annotation_consortium_label in annotation_consortia:
                 print(f"{genome_build_name} / {annotation_consortium_label}")
-                # This is somewhat wasteful as we make an API call each time below, though that's not much compared to
-                # the total download and insertion time
-                combo_files = get_latest_combo_file_urls(annotation_consortia={annotation_consortium_label},
-                                                         genome_builds=[genome_build_name])
-
                 genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
                 annotation_consortium = AnnotationConsortium(ac_lookup[annotation_consortium_label])
-
-                combo_file_url = get_single_element(combo_files)
-                logging.info(f"%s/%s - downloading: %s",
-                             genome_build, annotation_consortium.label, combo_file_url)
-                # Stream the (compressed) file to a seekable temp file on disk rather than loading it
-                # all into RAM - the importer reads it twice (genes then transcripts) so it needs to
-                # be seekable, but it doesn't need to live in memory (avoids OOM on large builds).
-                with requests.get(combo_file_url, stream=True, timeout=2 * MINUTE_SECS) as response:
-                    response.raise_for_status()
-                    with tempfile.NamedTemporaryFile(suffix=".json.gz") as tmp:
-                        for chunk in response.iter_content(chunk_size=1 << 20):
-                            tmp.write(chunk)
-                        tmp.flush()
-                        tmp.seek(0)
-                        with gzip.GzipFile(fileobj=tmp) as fz:
-                            cdot_version = GeneAnnotationCommand.read_cdot_version(fz)
-                            GeneAnnotationCommand.import_cdot_data_file(genome_build, annotation_consortium,
-                                                                       fz, cdot_version)
+                # This is somewhat wasteful as we make an API call each time, though that's not much
+                # compared to the total download and insertion time
+                import_latest_combo_file(genome_build, annotation_consortium)

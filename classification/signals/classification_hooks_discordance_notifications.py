@@ -7,10 +7,18 @@ from django.db.models import QuerySet
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
-from classification.models import DiscordanceReport, discordance_change_signal, \
-    OverlapDiscordanceNotification, Overlap, OverlapContributionStatus, ClassificationImportRun
-from classification.models.clinical_context_models import DiscordanceNotification, ClinicalContextChangeData, \
-    ClinicalContextRecalcTrigger
+from classification.models import (
+    ClassificationLabSummary,
+    DiscordanceReport,
+    EvidenceKeyMap,
+    discordance_change_signal,
+)
+from classification.models.clinical_context_models import (
+    ClinicalContextChangeData,
+    ClinicalContextRecalcTrigger,
+    DiscordanceNotification,
+)
+from classification.models.discordance_models_utils import DiscordanceReportRowData
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from snpdb.models import Lab
@@ -21,6 +29,38 @@ Responsible for emailing/slacking users when a discordance is detected.
 In future we'd like this to occur in bulk (as a single import can create or solve many discordances).
 Discordance is actually detected by classification_hooks_discordance_status.py
 
+            outstanding_lab_discordance_notifications: list[DiscordanceNotification] = list(outstanding_notifications.filter(lab=lab))
+            current_date = timezone.now()
+
+            unique_ids: set[int] = set()
+            for outstanding_notification in outstanding_lab_discordance_notifications:
+                outstanding_notification.notification_sent_date = current_date
+                dr_id = outstanding_notification.discordance_report_id
+                unique_ids.add(dr_id)
+
+            dr_ids: list[int] = sorted(unique_ids)
+            drs: list[DiscordanceReport] = DiscordanceReport.objects.filter(pk__in=dr_ids).order_by('pk')
+
+            dr_count = len(dr_ids)
+            if dr_count > 6:
+                subject = f"Discordance Update for {dr_count} Discordances"
+            else:
+                subject = "Discordance Update for (" + ", ".join([f"DR_{dr_id}" for dr_id in dr_ids]) + ")"
+
+            lab_notification = LabNotificationBuilder(lab=lab, message=subject)
+
+            def report_url_for_id(the_id):
+                return get_url_from_view_path(
+                    reverse('discordance_report', kwargs={'discordance_report_id': the_id}),
+                )
+
+            # Admin Notification
+            admin_notification = NotificationBuilder("Discordance notifications")\
+                .add_markdown(":email: Sending Discordance Notifications")\
+                .add_field("Lab", str(lab))\
+                .add_field("Discordance IDs", ", ".join(f"<{report_url_for_id(dr_id)}|DR_{dr_id}>" for dr_id in dr_ids))
+
+            is_first = True
 Has been deprecated in place of overlaps
 """
 

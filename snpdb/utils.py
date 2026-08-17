@@ -8,7 +8,7 @@ from django.http import Http404
 from email_manager.models import EmailLog
 from library.log_utils import NotificationBuilder, send_notification
 from library.utils import empty_to_none
-from snpdb.models import GenomeBuild, Lab, UserSettings, Tag, TagColorsCollection
+from snpdb.models import GenomeBuild, Lab, Tag, TagColorsCollection, UserSettings
 
 
 def get_genome_build_or_404(build_name) -> GenomeBuild:

@@ -21,11 +21,10 @@ they PASS before and after (no bug, just a correctness invariant).
 
 from django.test import TestCase, override_settings
 
-from analysis.models import Analysis, AllVariantsNode
+from analysis.models import AllVariantsNode, Analysis
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.tests.utils import AnalysisSetupMixin
-
 
 # ---------------------------------------------------------------------------
 # Bug 1 & 2: AbstractZygosityCountNode — max_count=0 falsy check

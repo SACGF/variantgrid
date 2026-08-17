@@ -9,6 +9,7 @@ See https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup
 from variantgrid.settings.components.annotation_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
+from variantgrid.settings.components.https_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 import re
 
@@ -46,6 +47,7 @@ SEND_EMAILS = False
 HEALTH_CHECK_ENABLED = True
 
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
+CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER = False  # Nothing is curated on Shariant, so there's no internal/external split
 CLASSIFICATION_NEW_GROUPING = True
 CLASSIFICATION_ALLOW_DELETE = False
 CLASSIFICATION_ALLOW_UNKNOWN_KEYS = False
@@ -128,6 +130,7 @@ ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", A
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
 ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
 pin_annotation_to_columns_version_3(ANNOTATION)
+use_pre_vep112_fasta(ANNOTATION)
 
 ANNOTATION[BUILD_GRCH37].update({
     "annotation_consortium": "RefSeq",
@@ -146,8 +149,6 @@ STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
 SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
-
-HGVS_DEFAULT_METHOD = "biocommons_hgvs"
 
 # SITE_MESSAGE = "Shariant is currently in pre-BETA. Please excuse bugs and missing features, and the site may be shut down for upgrades"
 
@@ -188,6 +189,19 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "patient_imports": False,
     "patient_term_approvals": False,
     "patients": False,
+    "view_specimen": False,
+    "view_extraction": False,
+
+    # Shariant has no patients menu and should not grow a patient API (#1707)
+    "api_patient-list": False,
+    "api_patient-detail": False,
+    "api_specimen-list": False,
+    "api_specimen-detail": False,
+    "api_extraction-list": False,
+    "api_extraction-detail": False,
+    "api_specimen_measure-list": False,
+    "api_specimen_measure-detail": False,
+    "api_specimen_measure_bulk_create": False,
 
     "gene_lists": False,
     "genes": False,
@@ -252,6 +266,9 @@ VARIANT_MANUAL_CREATE_BY_NON_ADMIN = False
 # Don't show annotation or samples on variant page - don't want to be responsible for it
 VARIANT_DETAILS_SHOW_ANNOTATION = False
 VARIANT_DETAILS_SHOW_SAMPLES = False
+# Keep variant coordinates inside Shariant - viewing a variant page must not egress a query
+# to external Beacons (the panel is otherwise on by default).
+BEACON_OUTBOUND_ENABLED = False
 VARIANT_VCF_DB_PREFIX = "stv"
 VARIANT_SYMBOLIC_ALT_ENABLED = True
 

@@ -1,9 +1,10 @@
 import datetime
 import logging
 from collections import defaultdict
-from functools import cached_property, total_ordering, reduce
+from collections.abc import Iterable
+from functools import cached_property, reduce, total_ordering
 from operator import __and__
-from typing import Optional, Union, Iterable, Any, TypeVar
+from typing import Any, Optional, TypeVar, Union
 
 import django.dispatch
 from django.contrib.auth.models import User
@@ -18,7 +19,7 @@ from flags.models.enums import FlagStatus
 from library.django_utils.django_object_managers import ObjectManagerCachingImmutable
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
-from library.utils import ModelUtilsMixin, ChoicesEnum
+from library.utils import ChoicesEnum, ModelUtilsMixin
 
 flag_collection_extra_info_signal = django.dispatch.Signal()  # args: "flag_infos", "user"
 

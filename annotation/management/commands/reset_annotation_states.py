@@ -4,7 +4,7 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from annotation.models import AnnotationRun, AnnotationRangeLock
+from annotation.models import AnnotationRangeLock, AnnotationRun
 
 
 class Command(BaseCommand):

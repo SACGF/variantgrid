@@ -1,18 +1,26 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional
 
 from auditlog.context import disable_auditlog
 from django.contrib.auth.models import User
 
-from analysis.models import Analysis, AnalysisNode, AnalysisTemplate, AnalysisTemplateRun, \
-    AnalysisTemplateRunArgument, SampleAnalysisTemplateRun, CohortAnalysisTemplateRun, AutoLaunchAnalysisTemplate
+from analysis.models import (
+    Analysis,
+    AnalysisNode,
+    AnalysisTemplate,
+    AnalysisTemplateRun,
+    AnalysisTemplateRunArgument,
+    AutoLaunchAnalysisTemplate,
+    CohortAnalysisTemplateRun,
+    SampleAnalysisTemplateRun,
+)
 from analysis.models.nodes.node_utils import get_toposorted_nodes, reload_analysis_nodes
 from analysis.related_analyses import get_related_analysis_details_for_samples
 from genes.models import ActiveSampleGeneList
 from library.guardian_utils import add_public_group_read_permission
-from snpdb.models import Sample, GenomeBuild, Cohort
+from snpdb.models import Cohort, GenomeBuild, Sample
 
 
 def run_analysis_template(analysis_template: AnalysisTemplate,
@@ -123,7 +131,7 @@ class AutoLaunchAnalysisTemplateMatch:
         return self.enrichment_kit_match and self.sample_regex_match
 
 
-def get_auto_launch_analysis_template_matches(user, sample_enrichment_kit_name, sample_name) -> List[AutoLaunchAnalysisTemplateMatch]:
+def get_auto_launch_analysis_template_matches(user, sample_enrichment_kit_name, sample_name) -> list[AutoLaunchAnalysisTemplateMatch]:
     matches = []
     templates_qs = AnalysisTemplate.filter_for_user(user)
     for auto_launch in AutoLaunchAnalysisTemplate.objects.filter(template__in=templates_qs):

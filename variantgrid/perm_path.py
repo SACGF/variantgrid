@@ -9,7 +9,7 @@ You can't return None to urlpatterns so need to redirect or something...
 """
 import logging
 from collections import defaultdict
-from typing import Mapping
+from collections.abc import Mapping
 
 from django.conf import settings
 from django.urls.conf import path as django_path

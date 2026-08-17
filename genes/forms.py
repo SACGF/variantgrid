@@ -4,8 +4,16 @@ from django.forms.models import ALL_FIELDS
 from django.forms.widgets import HiddenInput, TextInput
 
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.models import PanelAppPanel, GeneListCategory, GeneList, CustomTextGeneList, \
-    GeneSymbol, Gene, Transcript, GeneAnnotationRelease
+from genes.models import (
+    CustomTextGeneList,
+    Gene,
+    GeneAnnotationRelease,
+    GeneList,
+    GeneListCategory,
+    GeneSymbol,
+    PanelAppPanel,
+    Transcript,
+)
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import ROFormMixin
 from snpdb.forms import BaseDeclareForm, GenomeBuildAutocompleteForwardMixin

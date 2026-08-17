@@ -4,7 +4,8 @@ Adversarial unit tests for the patients app.
 Tests that expose confirmed bugs are expected to FAIL until the bug is fixed.
 """
 import os
-from datetime import date, datetime, timezone as dt_timezone
+from datetime import UTC, date, datetime
+from datetime import timezone as dt_timezone
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -12,19 +13,26 @@ from django.test import TestCase
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.import_records import parse_boolean, parse_choice, process_record
 from patients.models import (
-    Clinician, ExternalModelManager, ExternalPK, Patient, PatientColumns,
-    PatientImport, PatientModification, PatientRecords, Specimen,
+    Clinician,
+    ExternalModelManager,
+    ExternalPK,
+    Patient,
+    PatientColumns,
+    PatientImport,
+    PatientModification,
+    PatientRecords,
+    Specimen,
 )
 from patients.models_enums import Sex
 from snpdb.models import ImportSource
-from upload.models import UploadedFile, UploadedFileTypes, UploadedPatientRecords
+from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
 
 _TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "test_data")
 _FAKE_CSV = os.path.join(_TEST_DATA_DIR, "fake_patient_records.csv")
 
 
 def _make_row(**overrides):
-    row = {col: None for col in PatientColumns.COLUMNS}
+    row = dict.fromkeys(PatientColumns.COLUMNS)
     row[PatientColumns.PATIENT_LAST_NAME] = "IMPORTTESTLAST"
     row[PatientColumns.PATIENT_FIRST_NAME] = "IMPORTTESTFIRST"
     row.update(overrides)
@@ -35,14 +43,14 @@ def _make_patient_records(user):
     """Build the full PatientRecords FK chain required by process_record."""
     pi = PatientImport.objects.create(name=f"test_import_{user.pk}")
     pr = PatientRecords.objects.create(patient_import=pi)
-    uf = UploadedFile.objects.create(
+    uf = FileUpload.objects.create(
         user=user,
         name="test_import_file",
         path=_FAKE_CSV,
         file_type=UploadedFileTypes.PATIENT_RECORDS,
         import_source=ImportSource.COMMAND_LINE,
     )
-    UploadedPatientRecords.objects.create(uploaded_file=uf, patient_records=pr)
+    UploadedPatientRecords.objects.create(file_upload=uf, patient_records=pr)
     return pr
 
 
@@ -116,7 +124,7 @@ class TestSpecimenAgeAtCollectionDate(TestCase):
         specimen = Specimen.objects.create(
             reference_id="AGECALC001",
             patient=self.patient,
-            collection_date=datetime(2020, 6, 15, tzinfo=dt_timezone.utc),
+            collection_date=datetime(2020, 6, 15, tzinfo=UTC),
         )
         self.assertEqual(specimen.age_at_collection_date, 40)
 

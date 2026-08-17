@@ -1,19 +1,21 @@
 import logging
 import re
+from collections.abc import Iterable
+from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Iterable, Union, Any
+from typing import Any, Optional, Union
 
 import django
 import pydantic
 from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import models, IntegrityError
-from django.db.models import Value, QuerySet
+from django.db import IntegrityError, models
+from django.db.models import F, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
 from django.db.models.functions.text import Concat
-from django.db.models.query_utils import Q, FilteredRelation
+from django.db.models.query_utils import FilteredRelation, Q
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils.text import slugify
@@ -21,19 +23,25 @@ from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 from pydantic import field_validator
 
-from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
+from flags.models import FlagCollection, FlagInfos, flag_collection_extra_info_signal
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.genomics.vcf_enums import VCFSymbolicAllele, INFO_LIFTOVER_SWAPPED_REF_ALT
+from library.genomics.vcf_enums import (
+    GENE_LEVEL_ALT_PATTERN,
+    INFO_LIFTOVER_SWAPPED_REF_ALT,
+    GeneLevelSymbolicAlt,
+    VCFSymbolicAllele,
+)
 from library.guardian_utils import admin_bot
-from library.preview_request import PreviewModelMixin, PreviewKeyValue
+from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
+from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, SequenceRole
+from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 LOCUS_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
@@ -41,6 +49,9 @@ LOCUS_NO_REF_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)$")
 VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 # This is our internal format for symbolic (ie <DEL>/<DUP> etc)
 VARIANT_SYMBOLIC_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV)>$", re.IGNORECASE)
+# Gene-level - the position is a gene id and the alt carries the partner. @see snpdb.gene_level_variants
+VARIANT_GENE_LEVEL_PATTERN = re.compile(
+    rf"^{GENE_LEVEL_CONTIG_NAME}\s*:\s*(\d+)\s*-\s*\d+\s*({GENE_LEVEL_ALT_PATTERN.pattern})$")
 # matches anything hgvs-like before any fixes
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+", re.IGNORECASE)
 
@@ -184,6 +195,19 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     def build_names(self) -> str:
         return ", ".join(sorted(self.variantallele_set.values_list("genome_build__name", flat=True)))
 
+    @property
+    def variant_ids(self) -> list[int]:
+        """ The same mutation as a variant in each build it's been linked to """
+        return list(self.variantallele_set.order_by("genome_build__name").values_list("variant_id", flat=True))
+
+    @cached_property
+    def all_genome_builds(self) -> set['GenomeBuild']:
+        """ Every build this allele's variants are in. Wider than the builds it's been lifted over to -
+            builds that share a contig (MT, unplaced scaffolds) share the one variant """
+        gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),
+                                                  contig__locus__variant__variantallele__allele=self)
+        return {gbc.genome_build for gbc in gbc_qs}
+
     @staticmethod
     def missing_variants_for_build(genome_build) -> QuerySet['Allele']:
         alleles_with_variants_qs = Allele.objects.filter(variantallele__isnull=False)
@@ -219,6 +243,29 @@ class AlleleMergeLog(TimeStampedModel):
     allele_linking_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     success = models.BooleanField(default=True)
     message = models.TextField(null=True)
+
+
+@dataclass(frozen=True)
+class GenomicCoordinates:
+    """ A location on the genome - a contig and a range on it, optionally stranded.
+        start/end are stored and displayed as-is, in whatever convention the caller uses (the codebase
+        keeps genomic coordinates 1-based). Like VariantCoordinate, the string is the raw coordinates
+        with no 'humanizing' offset, so it round-trips into search. """
+    contig: Contig
+    chrom: str
+    start: int
+    end: int
+    strand: Optional[str] = None
+
+    @property
+    def coordinates(self) -> str:
+        location = f"{self.chrom}:{self.start}-{self.end}"
+        if self.strand:
+            location += f" ({self.strand})"
+        return location
+
+    def __str__(self):
+        return self.coordinates
 
 
 class VariantCoordinate(FormerTuple, pydantic.BaseModel):
@@ -319,13 +366,24 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         return vc.as_internal_canonical_form(genome_build)
 
     @staticmethod
+    def from_gene_level_match(match) -> 'VariantCoordinate':
+        """ No genome build involved - a gene-level coordinate is the same on every build, and there
+            is no reference to read. @see snpdb.gene_level_variants """
+        # Explicit group numbers - the alt sub-pattern brings its own groups along
+        return VariantCoordinate(chrom=GENE_LEVEL_CONTIG_NAME, position=int(match.group(1)),
+                                 ref=GENE_LEVEL_REF, alt=match.group(2), svlen=GENE_LEVEL_SVLEN)
+
+    @staticmethod
     def from_string(variant_string: str, genome_build):
         """ Pass in genome build to be able to set REF from symbolic (will be N otherwise) """
         if full_match := VARIANT_PATTERN.fullmatch(variant_string):
             return VariantCoordinate.from_variant_match(full_match, genome_build)
         elif full_match := VARIANT_SYMBOLIC_PATTERN.fullmatch(variant_string):
             return VariantCoordinate.from_symbolic_match(full_match, genome_build)
-        regex_patterns = ", ".join((str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN)))
+        elif full_match := VARIANT_GENE_LEVEL_PATTERN.fullmatch(variant_string):
+            return VariantCoordinate.from_gene_level_match(full_match)
+        regex_patterns = ", ".join(str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN,
+                                                    VARIANT_GENE_LEVEL_PATTERN))
         raise ValueError(f"{variant_string=} did not match against {regex_patterns=}")
 
     @staticmethod
@@ -343,10 +401,17 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         return Sequence.allele_is_symbolic(self.alt)
 
     @property
+    def is_gene_level(self) -> bool:
+        """ Coordinate-level twin of Variant.is_gene_level - keyed on the alt, since a bare coordinate
+            has no contig role to read. No coordinate means nothing can be read off a reference """
+        return GeneLevelSymbolicAlt.parse(self.alt) is not None
+
+    @property
     def can_be_made_explicit(self) -> bool:
         """ <CNV> (copy-number-variable region) and <INS> have no unambiguous explicit ref/alt
             expansion (cf. Variant.can_make_g_hgvs), so as_external_explicit() will raise for them.
-            Their external VCF representation stays symbolic. """
+            Their external VCF representation stays symbolic. Gene-level alts have no reference
+            sequence at all. """
         if not self.is_symbolic:
             return True
         return self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
@@ -359,6 +424,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def as_external_explicit(self, genome_build) -> 'VariantCoordinate':
         """ explicit ref/alt """
+        if self.is_gene_level:
+            raise ValueError(f"{self} is gene-level - it has no coordinate to read a reference from")
+
         if self.is_symbolic:
             if self.svlen is None:
                 raise ValueError(f"{self} has 'svlen' = None")
@@ -417,7 +485,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                     # Possible dup
                     # TODO: Can probably remove HGVS dependency from here - just look directly at sequence
                     from genes.hgvs import HGVSMatcher
-                    matcher = HGVSMatcher(genome_build)
+                    matcher = HGVSMatcher.instance(genome_build)
                     hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(self)
                     if hgvs_variant.mutation_type == 'dup':
                         ref = self.ref[0]
@@ -539,7 +607,11 @@ class Locus(models.Model):
 class Variant(PreviewModelMixin, models.Model):
     """ Variants represent the different alleles at a locus
         Usually 2+ per line in a VCF file (ref + >= 1 alts pointing to the same locus for the row)
-        There is only 1 Variant for a given locus/alt per database (handled via insertion queues) """
+        There is only 1 Variant for a given locus/alt per database (handled via insertion queues)
+
+        Gene-level events (gene fusions) are also stored as Variants, on a contig that isn't a
+        sequence and with a gene ID in place of a coordinate. That is not what you'd expect here -
+        @see snpdb.gene_level_variants before touching anything guarded by get_gene_level_q() """
 
     REFERENCE_ALT = "="
     _BASES = "GATC"
@@ -564,8 +636,12 @@ class Variant(PreviewModelMixin, models.Model):
 
     @staticmethod
     def get_contigs_q(genome_build: GenomeBuild) -> Q:
-        """ Restrict to contigs in a genome build """
-        return Q(locus__contig__genomebuildcontig__genome_build=genome_build)
+        """ Restrict to contigs in a genome build.
+
+            A build's contigs are a small fixed set, so this is an IN list rather than a join through
+            GenomeBuildContig - the join collapses the planner's row estimate to 1 and it can end up
+            re-scanning the whole variant side once per contig (#1720) """
+        return Q(locus__contig_id__in=genome_build.contig_ids)
 
     @staticmethod
     def get_reference_q() -> Q:
@@ -598,6 +674,18 @@ class Variant(PreviewModelMixin, models.Model):
     @staticmethod
     def get_symbolic_q() -> Q:
         return Q(svlen__isnull=False)
+
+    @staticmethod
+    def get_gene_level_q() -> Q:
+        """ Events with no coordinate (gene fusions) - @see snpdb.gene_level_variants.
+            The single predicate for "keep this away from anything that reads a reference
+            sequence"; is_gene_level is the instance-level twin """
+        return Q(locus__contig__role=SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG)
+
+    @cached_property
+    def is_gene_level(self) -> bool:
+        """ @see snpdb.gene_level_variants, and get_gene_level_q for the queryset form """
+        return self.locus.contig.is_gene_level
 
     @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):
@@ -639,9 +727,16 @@ class Variant(PreviewModelMixin, models.Model):
     @staticmethod
     def qs_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> QuerySet['Variant']:
         variant_coordinate = variant_coordinate.as_internal_symbolic(genome_build)
-        params = ["locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "svlen"]
-        return Variant.objects.filter(locus__contig__genomebuildcontig__genome_build=genome_build,
-                                      **dict(zip(params, variant_coordinate)))
+        # Resolving the contig up front drops the join through GenomeBuildContig (@see #1720) and puts the
+        # filter on the leading edge of the snpdb_locus (contig, position, ref) unique index
+        contig = genome_build.chrom_contig_mappings.get(variant_coordinate.chrom)
+        if contig is None:
+            return Variant.objects.none()
+        return Variant.objects.filter(locus__contig=contig,
+                                      locus__position=variant_coordinate.position,
+                                      locus__ref__seq=variant_coordinate.ref,
+                                      alt__seq=variant_coordinate.alt,
+                                      svlen=variant_coordinate.svlen)
 
     @staticmethod
     def get_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> 'Variant':
@@ -652,6 +747,24 @@ class Variant(PreviewModelMixin, models.Model):
         gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),
                                                   contig__locus__variant=self)
         return {gbc.genome_build for gbc in gbc_qs}
+
+    @cached_property
+    def all_build_variants(self) -> list['Variant']:
+        """ The same mutation in every build it's been linked to, this variant first.
+
+            A Variant is per-build, so the others come via the allele. Builds that share a contig
+            (MT, unplaced scaffolds) share the one variant, so this can be shorter than all_genome_builds """
+        variants = [self]
+        if allele := self.allele:
+            variants += [va.variant for va in allele.variant_alleles() if va.variant_id != self.pk]
+        return variants
+
+    @cached_property
+    def all_genome_builds(self) -> set['GenomeBuild']:
+        """ Every build this mutation is in - genome_builds is only the builds sharing this variant's contig """
+        if allele := self.allele:
+            return allele.all_genome_builds
+        return self.genome_builds
 
     @property
     def any_genome_build(self) -> GenomeBuild:
@@ -726,8 +839,9 @@ class Variant(PreviewModelMixin, models.Model):
 
     def clingen_allele_skip_reason(self) -> Optional[str]:
         """Return why ClinGen should be skipped for this variant, or None if it can be used."""
-        from snpdb.models.models_clingen_allele import ClinGenAllele
-
+        if self.is_gene_level:
+            # ClinGen registers coordinates, and there isn't one - @see snpdb.gene_level_variants
+            return f"Gene-level variant {self.alt} has no coordinate, so cannot be registered"
         if not self.can_make_g_hgvs:
             return f"Symbolic variant {self.alt} cannot form g.HGVS (only DEL/DUP/INV supported)"
         size = self._clingen_allele_size
@@ -794,18 +908,24 @@ class Variant(PreviewModelMixin, models.Model):
     def get_best_variant_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
         from annotation.models import VariantAnnotationVersion
         vav = VariantAnnotationVersion.latest(genome_build)
-        if can := self.varianttranscriptannotation_set.filter(version=vav, canonical=True).first():
-            return can
-        if version := self.varianttranscriptannotation_set.filter(version=vav).first():
+        # canonical is nullable, so nulls_last keeps a canonical=True row ahead of the rest
+        canonical_first = F("canonical").desc(nulls_last=True)
+        if version := self.varianttranscriptannotation_set.filter(version=vav).order_by(canonical_first).first():
             return version
         if any_at_all := self.varianttranscriptannotation_set.first():
             return any_at_all
 
     def get_canonical_c_hgvs(self, genome_build):
-        c_hgvs = None
+        from annotation.models import VariantAnnotationVersion
         if cta := self.get_canonical_transcript_annotation(genome_build):
-            c_hgvs = cta.get_hgvs_c_with_symbol()
-        return c_hgvs
+            return cta.get_hgvs_c_with_symbol()
+        if self.is_gene_level:
+            # Sits on no transcript, so the representative annotation is the only one there is - it
+            # carries the VICC gene-level nomenclature. @see snpdb.gene_level_variants
+            vav = VariantAnnotationVersion.latest(genome_build)
+            if va := self.variantannotation_set.filter(version=vav).first():
+                return va.get_hgvs_c_with_symbol()
+        return None
 
     @property
     def start(self):
@@ -926,9 +1046,6 @@ class AlleleSource(models.Model):
     def get_allele_qs(self):
         return Allele.objects.filter(variantallele__variant__in=self.get_variants_qs())
 
-    def liftover_complete(self, genome_build: GenomeBuild):
-        """ This is called at the end of a liftover pipeline (once per build) """
-
 
 class VariantAlleleSource(AlleleSource):
     variant_allele = models.ForeignKey(VariantAllele, on_delete=CASCADE)
@@ -970,7 +1087,7 @@ class LiftoverRun(TimeStampedModel):
 
         Alleles must have already been created - allele_source used to retrieve them
 
-        The VCF (in genome_build build) is set in UploadedFile for the UploadPipeline """
+        The VCF (in genome_build build) is set in FileUpload for the UploadPipeline """
     user = models.ForeignKey(User, on_delete=CASCADE)
     allele_source = models.ForeignKey(AlleleSource, null=True, on_delete=CASCADE)
     conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)

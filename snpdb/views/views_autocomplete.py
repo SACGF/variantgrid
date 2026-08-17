@@ -3,14 +3,28 @@ from abc import ABC
 from django.contrib.auth.models import User
 from django.db.models.functions import Length
 from django.db.models.query_utils import Q
+from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
-from snpdb.models import VCF, Sample, Cohort, CustomColumnsCollection, CustomColumn, Tag, Trio, Quad, \
-    Lab, GenomicIntervalsCollection, GenomeBuild, ImportStatus, Project
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CustomColumn,
+    CustomColumnsCollection,
+    GenomeBuild,
+    GenomicIntervalsCollection,
+    ImportStatus,
+    Lab,
+    Project,
+    Quad,
+    Sample,
+    Tag,
+    Trio,
+)
 from snpdb.models.models_genome import Contig
 
 
@@ -37,6 +51,20 @@ class UserAutocompleteView(AutocompleteView):
 
     def get_user_queryset(self, user):
         return User.objects.all()
+
+
+class LabAddMemberAutocompleteView(AutocompleteView):
+    """ Who a lab head can add to their lab. Not cached - cache_page is keyed on URL, which would
+        serve one lab's candidates to another """
+    fields = ['last_name', 'first_name', 'username']
+
+    def get_user_queryset(self, user):
+        lab_id = self.forwarded.get('lab_id')
+        if not lab_id:
+            return User.objects.none()
+        lab = get_object_or_404(Lab, pk=lab_id)
+        lab.check_can_manage_members(user)
+        return lab.candidate_members_qs(user)
 
 
 @method_decorator(cache_page(MINUTE_SECS), name='dispatch')
@@ -89,6 +117,9 @@ class SampleAutocompleteView(GenomeBuildAutocompleteView):
     def get_user_queryset(self, user):
         sample_qs = Sample.filter_for_user(user, True).filter(import_status=ImportStatus.SUCCESS)
         sample_qs = self.exclude_archived_if_forwarded(sample_qs, "vcf__data_archived_date")
+        # Completes the Patient -> Specimen -> Extraction -> Sample chain the patients autocompletes start
+        if extraction := self.forwarded.get('extraction'):
+            sample_qs = sample_qs.filter(extraction=extraction)
         return self.filter_to_genome_build(sample_qs, "vcf__genome_build")
 
 
