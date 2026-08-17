@@ -269,6 +269,7 @@ class DiscordanceStatus:
 
 
 class DiscordanceNotification(TimeStampedModel):
+    # DEPRECATED in favour of OverlapDiscordanceNotification
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     discordance_report = models.ForeignKey('DiscordanceReport', on_delete=CASCADE)
     cause = models.TextField(null=True, blank=True)

@@ -119,6 +119,8 @@ class OverlapCalculatorClinSig(OverlapCalculatorBase):
 
         if tiers == {"tier_1", "tier_2"}:
             return OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES
+        elif tiers == {"tier_3", "tier_4"}:
+            return OverlapStatus.MAJOR_DIFFERENCES
         elif len(tiers) == 1 and first(tiers) in {"tier_1", "tier_2"} and has_tier_1_and_2:
             return OverlapStatus.RESOLUTION_DIFFERENCES
         else:

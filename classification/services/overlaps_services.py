@@ -331,6 +331,9 @@ class OverlapServices:
         if overlap.overlap_type == OverlapType.CROSS_CONTEXT:
             return  # don't notify when cross context become discordant
 
+        if not OVERLAP_CLIN_SIG_ENABLED and overlap.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
+            return  # don't notify clin sig discordances
+
         # see if it's worth notifying anyone
         if not (old_state.is_active_discordance ^ new_state.is_active_discordance):
             # only care if we're going from discordant to not discordant or vice versa

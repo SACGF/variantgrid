@@ -508,9 +508,6 @@ class OverlapDiscordanceNotification(TimeStampedModel):
     old_state = models.JSONField(default=OverlapState.default_json)
     new_state = models.JSONField(default=OverlapState.default_json)
 
-    # old_status = IntegerFieldChoices(OverlapStatus)  # type:OverlapStatus
-    # new_status = IntegerFieldChoices(OverlapStatus)  # type:OverlapStatus
-
     notification_sent_date = models.DateTimeField(null=True, blank=True)
 
     @property

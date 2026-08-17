@@ -31,15 +31,6 @@ class ClassificationResultValue(TextChoices):
     ONC_PATH = "O", "Onco-Path"
     SOMATIC_CLINICAL_SIGNIFICANCE = "S", "Clinical significance"
 
-    @staticmethod
-    @property
-    def supported_properties():
-        from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
-        if not OVERLAP_CLIN_SIG_ENABLED:
-            return [ClassificationResultValue.ONC_PATH]
-        else:
-            return [ClassificationResultValue.ONC_PATH, ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE]
-
     @property
     def priority_order(self) -> int:
         match self:
