@@ -274,7 +274,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     if imported_c_hgvs := allele_info.imported_c_hgvs_obj:
         if normalized := allele_info.variant_info_for_imported_genome_build:
             if c_hgvs := normalized.c_hgvs_obj:
-                normalized_diff = imported_c_hgvs.components.diff(c_hgvs)
+                normalized_diff = imported_c_hgvs.diff(c_hgvs)
     if (c37 := allele_info.grch37) and (c38 := allele_info.grch38):
         if (c37c := c37.c_hgvs_obj) and (c38c := c38.c_hgvs_obj):
             liftover_diff = c37c.diff(c38c)
