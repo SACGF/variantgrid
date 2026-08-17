@@ -6,11 +6,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import reduce
-from typing import Any, Optional
-
+from typing import Any
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.forms import model_to_dict
@@ -27,20 +25,14 @@ from annotation.models import (
     AnnotationStatus,
     AnnotationVersion,
     Classification,
-    ClassificationModification,
     ClinVarRecordCollection,
     VariantAnnotation,
     VariantAnnotationVersion,
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
+from classification.enums import OverlapType
 from classification.models import (
-    AlleleOriginGrouping,
-    ClassificationGrouping,
-    ClassificationGroupingEntry,
-    DiscordanceReport,
-    EvidenceKeyMap,
-    OverlapStatus,
+    OverlapStatus, Overlap,
 )
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
