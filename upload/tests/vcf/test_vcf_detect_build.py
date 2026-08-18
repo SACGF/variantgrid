@@ -22,20 +22,14 @@ class TestVCFDetectBuild(TestCase):
     def test_no_contigs(self):
         """ No way to tell what to do """
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "no_contigs.vcf")
-        try:
+        with self.assertRaises(GenomeBuildDetectionException):
             vcf_detect_genome_build(vcf_filename)
-            self.fail("Should have thrown exception for no contigs!")
-        except GenomeBuildDetectionException:
-            pass
 
     def test_bad_contigs(self):
         """ We got a VCF from Centogene that had maxint32 for all contig lengths"""
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "bad_contigs.vcf")
-        try:
+        with self.assertRaises(GenomeBuildDetectionException):
             vcf_detect_genome_build(vcf_filename)
-            self.fail("Should have thrown exception for BAD contigs!")
-        except GenomeBuildDetectionException:
-            pass
 
     @skip  # TODO: Issue #1857 - Proper handling of hg19 vs GRCh37
     def test_detect_hg19(self):

@@ -241,8 +241,8 @@ class ClinVar(models.Model):
                     name = name.replace("MONDO:MONDO:", "MONDO:")
                 elif name.startswith("Orphanet:ORPHA"):
                     name = "ORPHA:" + name[len("Orphanet:ORPHA"):]
-                elif name.startswith("Human_Phenotype_Ontology"):
-                    name = name[25:]
+                elif name.startswith("Human_Phenotype_Ontology:"):
+                    name = name.removeprefix("Human_Phenotype_Ontology:")
                 return name
 
             db_names = sorted(fix_name(db_name) for db_name in re.split("[|,]", db_name_text))
@@ -812,7 +812,9 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
 
     @property
     def gnomad_major_version(self) -> int:
-        return int(self.gnomad.split(".", maxsplit=1)[0])
+        # Pre-migration GRCh37 versions stored the VEP-style "r2.1"
+        major = self.gnomad.split(".", maxsplit=1)[0]
+        return int(major.removeprefix("r"))
 
     @property
     def uses_raw_spliceai(self) -> bool:

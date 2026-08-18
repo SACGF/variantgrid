@@ -32,6 +32,7 @@ from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPi
 from annotation.sv_conservation import conservation_sidecar_filename
 from annotation.tasks import annotation_scheduler_task
 from annotation.tasks.annotate_variants import (
+    _trigger_dispatch,
     annotate_variants,
     get_annotated_filename,
     get_annotsv_dir,
@@ -331,7 +332,6 @@ class AnnotationDispatchTestCase(TestCase):
 
     # ------------------------------------------------------------------ run completion kicks dispatcher
     def test_completion_triggers_dispatch(self):
-        from annotation.tasks.annotate_variants import _trigger_dispatch
         with mock.patch.object(Signature, "apply_async") as m:
             _trigger_dispatch(self.vav.pk)
         # Immediate + 3s delayed kick (covers the commit/read race)

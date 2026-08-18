@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import VariantAnnotationVersion
+from eventlog.models import Event
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.models.models_partition_archive import PartitionArchive
@@ -103,7 +104,6 @@ class PerformPartitionArchiveTaskTests(TestCase):
         self.assertEqual(self.vav.data_archived_by_id, self.user.pk)
         self.assertEqual(self.vav.data_restorable_from, self.archive.dump_path)
 
-        from eventlog.models import Event
         self.assertTrue(Event.objects.filter(name="partition_archive_complete").exists())
 
     def test_pg_dump_failure(self):

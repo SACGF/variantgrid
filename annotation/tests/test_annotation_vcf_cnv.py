@@ -21,7 +21,6 @@ from annotation.vep_annotation import (
     vep_dict_to_variant_annotation_version_kwargs,
 )
 from library.genomics.vcf_enums import VariantClass
-from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 
@@ -52,7 +51,6 @@ class TestAnnotationVCFCNV(TestCase):
             kwargs["genome_build"] = genome_build
             vav, created = VariantAnnotationVersion.objects.get_or_create(**kwargs)
             if not created:
-                print("Truncating!")
                 vav.truncate_related_objects()
             cls.variant_annotation_versions_by_build[genome_build_name] = vav
 
@@ -61,10 +59,6 @@ class TestAnnotationVCFCNV(TestCase):
     def test_import_variant_annotations_grch37(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh37')
         vav = self.variant_annotation_versions_by_build[genome_build.name]
-
-        print("Variants: ", Variant.objects.count())
-        print("VariantAnnotation: ", VariantAnnotation.objects.count())
-        print(f"VariantAnnotationVersion: {vav}")
 
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
@@ -92,10 +86,6 @@ class TestAnnotationVCFCNV(TestCase):
     def test_import_variant_annotations_grch38(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh38')
         vav = self.variant_annotation_versions_by_build[genome_build.name]
-
-        print("Variants: ", Variant.objects.count())
-        print("VariantAnnotation: ", VariantAnnotation.objects.count())
-        print(f"VariantAnnotationVersion: {vav}")
 
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()

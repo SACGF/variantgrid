@@ -71,11 +71,8 @@ class ClassificationTestQuirks(TestCase):
         default_api = BulkClassificationInserter.verify_source({})
         self.assertEqual(default_api, SubmissionSource.API)
 
-        try:
+        with self.assertRaises(ValueError):
             BulkClassificationInserter.verify_source({'source': 'invalid'})
-            raise self.failureException('Source of invalid did not throw exception')
-        except ValueError:
-            pass
 
     def test_immutability(self):
         lab, user = ClassificationTestUtils.lab_and_user()

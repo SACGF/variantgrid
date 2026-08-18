@@ -1,6 +1,6 @@
 """
 Regression tests for confirmed bugs in the annotation app, plus sentinels for
-known fragile code paths that are likely to break when related code changes.
+fragile code paths that are likely to break when related code changes.
 """
 from types import SimpleNamespace
 
@@ -9,7 +9,6 @@ from django.test import TestCase
 from annotation.models.models import ClinVar, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.models_enums import ClinVarReviewStatus
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
-from classification.enums import AlleleOriginBucket
 from library.genomics import Range, overlap_fraction
 
 # ---------------------------------------------------------------------------
@@ -67,9 +66,8 @@ class TestMergeCosmicIds(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Sentinel: gnomad_major_version crashes on old gnomADv2 "r2.1" format
-# int("r2") → ValueError. Any call to gnomad4_or_later/has_hemi/has_mid on a
-# GRCh37 annotation version will crash until this is fixed.
+# gnomad_major_version parses the leading integer out of the VEP pin string,
+# which is what gnomad4_or_later / has_hemi branch on.
 # ---------------------------------------------------------------------------
 
 class TestGnomadMajorVersion(TestCase):
@@ -82,11 +80,10 @@ class TestGnomadMajorVersion(TestCase):
         self.assertEqual(self._call("3.1.2"), 3)
         self.assertEqual(self._call("4.0"), 4)
 
-    def test_v2_old_r_prefix_crashes(self):
-        # Old GRCh37 gnomADv2 VEP output stores "r2.1"; int("r2") → ValueError.
-        # This will start passing once the property handles the "r" prefix.
-        with self.assertRaises(ValueError):
-            self._call("r2.1")
+    def test_v2_old_r_prefix(self):
+        # Old GRCh37 gnomADv2 VEP output stores "r2.1" - migration 0042 rewrote these,
+        # but unmigrated/hand-entered values must not crash the property.
+        self.assertEqual(self._call("r2.1"), 2)
 
 
 # ---------------------------------------------------------------------------
@@ -113,8 +110,8 @@ class TestClinVarReviewStatusStars(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Sentinel: ClinVar._database_terms — hardcoded slice lengths for prefix stripping
-# If the prefix string is ever renamed, the slice index becomes wrong silently.
+# ClinVar._database_terms normalises the assorted prefixes ClinVar ships
+# disease database identifiers under.
 # ---------------------------------------------------------------------------
 
 class TestClinVarDatabaseTerms(TestCase):
@@ -129,28 +126,18 @@ class TestClinVarDatabaseTerms(TestCase):
         self.assertEqual(
             ClinVar._database_terms("Human_Phenotype_Ontology:HP:0001234"), ["HP:0001234"])
 
-    def test_hpo_prefix_slice_length_is_correct(self):
-        # The code does name[25:]. If "Human_Phenotype_Ontology:" is ever renamed
-        # the slice silently strips the wrong number of characters.
-        self.assertEqual(len("Human_Phenotype_Ontology:"), 25)
-
     def test_none_and_empty_return_empty_list(self):
         self.assertEqual(ClinVar._database_terms(None), [])
         self.assertEqual(ClinVar._database_terms(""), [])
 
 
 # ---------------------------------------------------------------------------
-# Sentinel: overlap_fraction int() truncation in SV overlap percentage
-# 99.6% → int() gives 99, not 100. Documents known precision loss.
+# overlap_fraction - fraction of r1 covered by r2, used for SV overlap columns
 # ---------------------------------------------------------------------------
 
-class TestOverlapFractionTruncation(TestCase):
+class TestOverlapFraction(TestCase):
 
-    def test_99_6_percent_truncates_to_99_not_100(self):
+    def test_partial_overlap(self):
         # r1=1000-2000 (len 1000), r2=1000-1996 (overlap 996bp → 99.6%)
         of = overlap_fraction(Range(1000, 2000), Range(1000, 1996))
         self.assertAlmostEqual(of, 0.996)
-        # The annotation code uses int(of * 100) — truncation, not rounding.
-        # A variant with 99.6% gnomAD SV overlap is stored as 99%, which could
-        # cause it to miss a ≥100% filter.
-        self.assertEqual(int(of * 100), 99)

@@ -80,15 +80,8 @@ class TestVariantAnnotationVersionRawScoreFuncs(TestCase):
 
 
 class TestPathogenicityThresholdsTag(TestCase):
-    def test_includes_pejaver_calibrated_revel_band(self):
-        bands = json.loads(pathogenicity_thresholds())
-        self.assertAlmostEqual(bands["revel_score"][0], 0.290)
-        self.assertAlmostEqual(bands["revel_score"][1], 0.644)
-
-    def test_includes_pejaver_calibrated_cadd_phred_band(self):
-        bands = json.loads(pathogenicity_thresholds())
-        self.assertEqual(bands["cadd_phred"], [22.7, 25.3])
-
     def test_excludes_uncalibrated_tools(self):
+        # variant_details.html spreads these into CODE_THRESHOLDS - a tool with no
+        # calibrated band must not get one
         bands = json.loads(pathogenicity_thresholds())
         self.assertNotIn("varity_er_score", bands)

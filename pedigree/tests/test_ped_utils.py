@@ -20,23 +20,14 @@ class TestGetAffection(unittest.TestCase):
 
 
 class TestGetSex(unittest.TestCase):
+    # Asymmetric contract: get_sex silently returns None while get_affection raises
+    # A PED file with an unrecognised sex value is silently treated as unknown sex
 
-    def test_unknown_value_returns_none_not_raises(self):
-        # Asymmetric contract: get_sex silently returns None while get_affection raises
-        # A PED file with an unrecognised sex value is silently treated as unknown sex
-        self.assertIsNone(get_sex('99'))
+    def test_lowercase_m_is_male(self):
+        self.assertEqual(get_sex('m'), Sex.MALE)
 
-    def test_lowercase_m_not_recognised(self):
-        # BUG-4: 'm' is not in SEX_LOOKUP — silently returns None instead of MALE
-        result = get_sex('m')
-        self.assertEqual(result, Sex.MALE,
-                         "Lowercase 'm' should map to MALE — currently returns None (bug)")
-
-    def test_lowercase_f_not_recognised(self):
-        # BUG-4: 'f' is not in SEX_LOOKUP — silently returns None instead of FEMALE
-        result = get_sex('f')
-        self.assertEqual(result, Sex.FEMALE,
-                         "Lowercase 'f' should map to FEMALE — currently returns None (bug)")
+    def test_lowercase_f_is_female(self):
+        self.assertEqual(get_sex('f'), Sex.FEMALE)
 
 
 class TestGetParentId(unittest.TestCase):
@@ -50,7 +41,6 @@ class TestGetParentId(unittest.TestCase):
         self.assertIsNone(get_parent_id('.'))
 
     def test_nan_is_unknown(self):
-        # BUG-6: float('nan') not in UNKNOWN_PARENT_VALUES — passes through as a "valid" ID
-        result = get_parent_id(float('nan'))
-        self.assertIsNone(result,
+        # pandas supplies NaN for a blank cell in an all-numeric parent column
+        self.assertIsNone(get_parent_id(float('nan')),
                           "NaN should be treated as an unknown parent, not a valid ID")

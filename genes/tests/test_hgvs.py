@@ -25,7 +25,9 @@ class TestHGVS(TestCase):
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(grch37)
 
-    def test_clean_hgvs(self):
+    def test_cleaned_hgvs_is_parseable(self):
+        """ Expected clean_hgvs output is asserted in test_clean_hgvs.py - this checks the
+            cleaned form of each malformed input actually parses """
         BAD_HGVS = [
             "NM_205768 c.44A>G",  # Missing colon (no version)
             "NM_005629.3:c1403A>C",  # Missing dot after kind
@@ -58,15 +60,8 @@ class TestHGVS(TestCase):
         hgvs_matcher = HGVSMatcher(genome_build=GenomeBuild.grch38(),
                                    hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
         for bad_hgvs in BAD_HGVS:
-            # try:
-            #     hgvs_matcher.create_hgvs_variant(bad_hgvs)
-            #     self.fail(f"Expected '{bad_hgvs}' to fail!")
-            # except:
-            #     pass  # Expected
-            # We want to test some non Bad HGVS to make sure we don't break already good ones
-
+            # The list also has some already-good HGVS, to make sure we don't break those
             fixed_hgvs = hgvs_matcher.clean_hgvs(bad_hgvs)[0]
-            print(f"\"{bad_hgvs}\" > \"{fixed_hgvs}\"")
             hgvs_matcher.create_hgvs_variant(fixed_hgvs)
 
     def test_clean_hgvs_gene_transcript(self):
@@ -98,9 +93,8 @@ class TestHGVS(TestCase):
             hgvs_actual_no_trim = hgvs_variant.format(max_ref_length=100)
             self.assertEqual(hgvs_actual_no_trim, hgvs_string)  # No change
 
-    @skip
+    @skip("Needs Ensembl contigs")
     def test_c_hgvs_out_of_range(self):
-        """ Disabled as it needs Ensembl contigs """
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         create_fake_transcript_version(genome_build)  # So we can lookup 'ENST00000300305.3'
         matcher = HGVSMatcher(genome_build)

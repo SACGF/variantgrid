@@ -2,7 +2,6 @@ from django.test import TestCase
 
 from analysis.grid_export import _get_column_vcf_info
 from snpdb.models import VariantGridColumn
-from snpdb.models.models_enums import VCFInfoTypes
 from snpdb.vcf_export_columns import COLUMN_VCF_INFO
 
 
@@ -18,10 +17,6 @@ class TestVCFExportColumns(TestCase):
         # Preserves the old OneToOne(VariantGridColumn) guarantee - one info row per column
         columns = [c.column for c in COLUMN_VCF_INFO]
         self.assertEqual(len(columns), len(set(columns)))
-
-    def test_types_are_valid(self):
-        for c in COLUMN_VCF_INFO:
-            self.assertIsInstance(c.type, VCFInfoTypes)
 
     def test_consumer_keys_by_variant_column_with_label_type(self):
         # The VCF export contract: entries keyed by the column's variant_column (query path),

@@ -24,7 +24,6 @@ class TestClinVarXmlParser(TestCase):
         records = self._check_valid(clinvar_variation_id=17662)
         clinvar_record_collection = ClinVarRecordCollection.objects.create(clinvar_variation_id=17662)
         for record in records:
-            print(record)
             record.clinvar_record_collection = clinvar_record_collection
             record.save()
         # TODO validation
@@ -33,7 +32,6 @@ class TestClinVarXmlParser(TestCase):
         records = self._check_valid(clinvar_variation_id=97006)
         clinvar_record_collection = ClinVarRecordCollection.objects.create(clinvar_variation_id=17662)
         for record in records:
-            print(record)
             record.clinvar_record_collection = clinvar_record_collection
             record.save()
 

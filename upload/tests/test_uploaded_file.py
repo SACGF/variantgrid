@@ -21,12 +21,9 @@ class TestUploadedFilePermissions(TestCase):
             import_source=ImportSource.COMMAND_LINE,
         )
 
-    def test_owner_can_view(self):
+    def test_can_view_is_owner_or_superuser(self):
+        """ FileUpload doesn't use Guardian - it's owner-or-superuser only """
         self.assertTrue(self.file_upload.can_view(self.owner))
-
-    def test_non_owner_cannot_view(self):
-        self.assertFalse(self.file_upload.can_view(self.other_user))
-
-    def test_superuser_can_view_any_file(self):
         self.assertTrue(self.file_upload.can_view(self.superuser))
+        self.assertFalse(self.file_upload.can_view(self.other_user))
 

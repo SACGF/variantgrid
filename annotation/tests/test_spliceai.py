@@ -1,5 +1,7 @@
 import os
+import tempfile
 
+from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.models import Analysis
@@ -86,8 +88,6 @@ class TestSpliceAILabel(TestCase):
         self.assertEqual(_spliceai_label(path), "masked")
 
     def test_reads_version_from_vcf_header(self):
-        import tempfile
-
         header = (
             '##fileformat=VCFv4.1\n'
             '##INFO=<ID=SpliceAI,Number=.,Type=String,'
@@ -173,7 +173,6 @@ class TestDamageNodeSpliceAIQ(TestCase):
         super().setUpTestData()
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(cls.grch37)
-        from django.contrib.auth.models import User
         user = User.objects.get_or_create(username="test_TestDamageNodeSpliceAIQ")[0]
         cls.analysis = Analysis(genome_build=cls.grch37)
         cls.analysis.set_defaults_and_save(user)
@@ -208,7 +207,6 @@ class TestDamageNodeSpliceAIQ(TestCase):
         self.assertNotIn("variantannotation__spliceai_max_ds__isnull", q_str)
 
     def test_splice_min_returns_expected_rows(self):
-        from snpdb.models import Variant
         create_fake_variants(self.grch37)
         vav = self.analysis.annotation_version.variant_annotation_version
 

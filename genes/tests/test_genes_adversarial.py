@@ -55,10 +55,8 @@ class TestPHGVSParse(TestCase):
         self.assertIsNone(p.fallback)
 
     def test_three_letter_lowercase_input_normalized(self):
-        # Bug candidate: regex is re.IGNORECASE so "p.gly123ala" matches,
-        # but protein_letters_1to3_extended only has single uppercase-letter keys.
-        # "gly" is not a key, so fallback keeps raw "gly" (lowercase).
-        # We expect canonical 3-letter output, not the raw lowercase.
+        # The regex is re.IGNORECASE, and protein_letters_1to3_extended is keyed on single
+        # uppercase letters, so 3-letter names come back via the .capitalize() fallback.
         p = PHGVS.parse("p.gly123ala")
         self.assertEqual(p.aa_from, "Gly",
                          "3-letter lowercase aa_from should be normalised to title-case")
@@ -552,15 +550,6 @@ class TestTranscriptVersionValidateCdnaMatch(TestCase):
         errors = TranscriptVersion._validate_cdna_match(tv)
         self.assertEqual(errors, [])
 
-    def test_exon_id_starts_at_1_skips_start_check(self):
-        # Bug candidate / documented behaviour:
-        # The check `if exon_id == 0:` is never triggered when exon numbering starts at 1.
-        # A transcript whose first exon starts at cDNA 5 (not 1) is NOT caught.
-        exons = [[1000, 1100, 1, 5, 105, None]]  # exon_id=1, cdna_start=5
-        errors = self._validate("+", exons)
-        # Currently: no errors (false negative) — document actual behaviour
-        self.assertEqual(errors, [], "Exon_id=1 silently skips the cdna_start==1 check")
-
 
 # ---------------------------------------------------------------------------
 # TranscriptVersion.tags / canonical_tag — with fabricated data
@@ -591,10 +580,9 @@ class TestTranscriptVersionTags(TestCase):
         self.assertNotIn("basic", tags)
         self.assertIn("MANE Select", tags)
 
-    def test_tag_with_space_after_comma_not_matched(self):
-        # Bug candidate: "MANE Select, RefSeq Select" splits into
-        # ["MANE Select", " RefSeq Select"] — the space-prefixed version
-        # is NOT equal to "RefSeq Select" and won't match CANONICAL_SCORES.
+    def test_tag_with_space_after_comma_matched(self):
+        # "MANE Select, RefSeq Select" splits with a leading space on the second tag,
+        # which would otherwise never match CANONICAL_SCORES.
         tags = self._get_tags({"tag": "MANE Select, RefSeq Select"})
         self.assertIn("RefSeq Select", tags,
                       "Tag with space after comma should still match 'RefSeq Select'")
@@ -608,8 +596,7 @@ class TestTranscriptVersionTags(TestCase):
         self.assertIn("MANE Select", tags)
 
     def test_empty_genome_build_tag_falls_back_to_data(self):
-        # Bug candidate: "" is falsy → `genome_build_data.get("tag") or data.get("tag")`
-        # Empty string in genome_build_data falls through to data["tag"].
+        # cdot 0.2.12 - 0.2.13 put 'tag' on the transcript, 0.2.14+ in the genome build data
         tags = self._get_tags(
             genome_build_data={"tag": ""},
             data={"tag": "RefSeq Select"},

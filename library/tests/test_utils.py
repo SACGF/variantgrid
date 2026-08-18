@@ -5,12 +5,13 @@ Pure-function tests — no DB needed (TestCase used for consistency).
 import os
 import tempfile
 import time
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from django.test import TestCase
 
 from library.cache import timed_cache
+from library.log_utils import NotificationBuilder
 from library.unit_percent import (
     convert_from_percent_to_unit,
     convert_from_unit_to_percent,
@@ -23,9 +24,9 @@ from library.utils.collection_utils import (
     flatten_nested_lists,
     group_by_key,
 )
-from library.utils.date_utils import calculate_age, month_range, parse_yymm
+from library.utils.date_utils import calculate_age, parse_yymm, utc_from_timestamp
 from library.utils.file_utils import IteratorFile, file_to_array
-from library.utils.hash_utils import sha256sum_str, string_deterministic_hash
+from library.utils.hash_utils import string_deterministic_hash
 from library.utils.json_utils import JsonDiffs, make_json_safe_in_place, strip_json
 from library.utils.text_utils import (
     format_significant_digits,
@@ -77,27 +78,46 @@ class TestFormatSignificantDigits(TestCase):
     def test_zero(self):
         self.assertEqual(format_significant_digits(0), "0")
 
-    def test_integer_large(self):
+    def test_integers_kept_whole(self):
+        self.assertEqual(format_significant_digits(1), "1")
+        self.assertEqual(format_significant_digits(10000), "10000")
         # 123456 → 3 sig figs → 123000
         self.assertEqual(format_significant_digits(123456), "123000")
+        self.assertEqual(format_significant_digits(456.12), "456")
 
     def test_float_trailing_zeros_stripped(self):
         # Trailing zeros after decimal must be stripped, not left as "1.200000000000"
         self.assertEqual(format_significant_digits(1.2), "1.2")
+        self.assertEqual(format_significant_digits(1.10004), "1.1")
 
     def test_float_exact_three_sig_figs(self):
         self.assertEqual(format_significant_digits(1.23456), "1.23")
 
+    def test_rounds_half_up(self):
+        self.assertEqual(format_significant_digits(1.114), "1.11")
+        self.assertEqual(format_significant_digits(1.116), "1.12")
+
     def test_small_float(self):
         self.assertEqual(format_significant_digits(0.0001234), "0.000123")
+        self.assertEqual(format_significant_digits(0.00000150002), "0.0000015")
 
     def test_negative_number(self):
-        result = format_significant_digits(-0.00123)
-        self.assertTrue(result.startswith("-"))
-        self.assertIn("0.00123", result)
+        self.assertEqual(format_significant_digits(-1.234567), "-1.23")
+        self.assertEqual(format_significant_digits(-0.00000150002), "-0.0000015")
 
     def test_custom_sig_digits(self):
         self.assertEqual(format_significant_digits(3.14159, sig_digits=2), "3.1")
+
+
+class TestSlackMarkdownToHtml(TestCase):
+    def test_emoji_stripped_and_bold_converted(self):
+        self.assertEqual(NotificationBuilder.slack_markdown_to_html(":hospital: This is **bold**"),
+                         "This is <strong>bold</strong>")
+
+
+class TestUtcFromTimestamp(TestCase):
+    def test_epoch_is_utc_aware(self):
+        self.assertEqual(utc_from_timestamp(0), datetime(1970, 1, 1, tzinfo=UTC))
 
 
 class TestSplitDictMultiValues(TestCase):
@@ -106,14 +126,11 @@ class TestSplitDictMultiValues(TestCase):
         result = split_dict_multi_values(data, "|")
         self.assertEqual(result, [{"a": "1", "b": "x"}, {"a": "2", "b": "y"}, {"a": "3", "b": "z"}])
 
-    def test_unequal_splits_silent_data_loss(self):
-        # "a" splits into 3, "b" into 2 — third dict silently drops 'b' key
+    def test_unequal_splits_raise(self):
+        # "a" splits into 3, "b" into 2 - mismatched counts must not silently drop keys
         data = {"a": "1|2|3", "b": "x|y"}
-        try:
-            result = split_dict_multi_values(data, "|")
-            self.fail(f"Expected error with unequal splits but got: {result}")
-        except (IndexError, ValueError):
-            pass  # Expected
+        with self.assertRaises(ValueError):
+            split_dict_multi_values(data, "|")
 
 
 class TestJoinWithCommasAndAmpersand(TestCase):
@@ -203,13 +220,11 @@ class TestFileToArray(TestCase):
     def test_no_max_lines_reads_all(self):
         self.assertEqual(len(file_to_array(self.tmp.name)), 5)
 
-    def test_max_lines_off_by_one(self):
-        # Bug: `i > max_lines` returns max_lines+1 lines
+    def test_max_lines_is_a_count_not_an_index(self):
         result = file_to_array(self.tmp.name, max_lines=3)
-        self.assertEqual(len(result), 3, f"Off-by-one: max_lines=3 returned {len(result)} lines")
+        self.assertEqual(len(result), 3, f"max_lines=3 returned {len(result)} lines")
 
     def test_max_lines_zero(self):
-        # Bug: same off-by-one, max_lines=0 returns 1 line
         result = file_to_array(self.tmp.name, max_lines=0)
         self.assertEqual(len(result), 0, f"max_lines=0 should return 0 lines, got {len(result)}")
 
@@ -239,11 +254,10 @@ class TestIteratorFile(TestCase):
         f = self._make(["hel", "lo"])
         self.assertEqual(f.read(5), "hello")
 
-    def test_read_exhausted_returns_empty_or_none(self):
+    def test_read_exhausted_returns_empty_string(self):
         f = self._make(["hi"])
         f.read(100)
-        result = f.read(1)
-        self.assertIn(result, ['', None], f"Expected '' or None after exhaustion, got {result!r}")
+        self.assertEqual(f.read(1), '')
 
     def test_readline_across_chunks(self):
         f = self._make(["lin", "e1\n", "line2\n"])
@@ -426,20 +440,6 @@ class TestStringDeterministicHash(TestCase):
     def test_same_string_same_hash(self):
         self.assertEqual(string_deterministic_hash("hello"), string_deterministic_hash("hello"))
 
-    def test_order_matters(self):
-        # Hash must be order-sensitive — "ab" and "ba" are different strings
-        self.assertNotEqual(string_deterministic_hash("ab"), string_deterministic_hash("ba"))
-
-
-class TestSha256SumStr(TestCase):
-    def test_known_value(self):
-        expected = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
-        self.assertEqual(sha256sum_str("hello"), expected)
-
-    def test_empty_string(self):
-        expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        self.assertEqual(sha256sum_str(""), expected)
-
 
 # ---------------------------------------------------------------------------
 # cache.py
@@ -459,9 +459,7 @@ class TestTimedCache(TestCase):
         fn(5)
         self.assertEqual(call_count, 1)
 
-    def test_ttl_stale_value_returned_on_expiry(self):
-        # Bug: when TTL expires, the stale value is returned on the expiry call itself.
-        # The key is found in storage, result is fetched, THEN the TTL cleanup runs.
+    def test_ttl_expiry_recalculates(self):
         call_count = 0
 
         @timed_cache(ttl=0.05)

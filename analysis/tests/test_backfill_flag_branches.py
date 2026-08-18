@@ -55,9 +55,9 @@ class TestDamageNodeSpliceAIBackfillFlag(_BackfillFlagMixin, TestCase):
         self.assertIn("variantannotation__spliceai_pred_ds_dg__gte", q_str)
         self.assertIn("variantannotation__spliceai_pred_ds_dl__gte", q_str)
 
-    def test_unbackfilled_required_allow_null_includes_per_field_isnull(self):
-        """splice_required + splice_allow_null on pre-backfill VAV emits per-field isnull
-        alternatives so rows with one qualifying DS field still match."""
+    def test_unbackfilled_required_no_allow_null_omits_per_field_isnull(self):
+        """splice_required without splice_allow_null on a pre-backfill VAV keeps the per-field
+        gte clauses but emits no isnull alternatives."""
         self._set_vav_flag(backfilled_spliceai_max_ds=False)
         node = DamageNode(
             analysis=self.analysis,

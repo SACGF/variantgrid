@@ -2,8 +2,12 @@ from unittest import mock
 
 from django.test import TestCase, override_settings
 
-from annotation.models.models_phenotype_match import PatientTextPhenotype
-from annotation.phenotype_matcher import PhenotypeMatcher
+from annotation.models.models_phenotype_match import PatientTextPhenotype, TextPhenotypeMatch
+from annotation.phenotype_matcher import (
+    PhenotypeMatcher,
+    _build_ambiguous_acronym_denylist,
+    get_ambiguous_acronym_denylist,
+)
 from ontology.models import OntologyService
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
@@ -90,8 +94,6 @@ class TestPhenotypeMatching(TestCase):
         - emit a synthetic `ambiguous_alias` + `ambiguous_alias_candidates`
           entry on get_results() so the UI can list the conflicting concepts
         - be excluded from get_ontology_term_ids()."""
-        from annotation.models.models_phenotype_match import TextPhenotypeMatch
-
         denylist = {
             "failure to thrive": (
                 ("HP:0001508", "Failure to thrive"),
@@ -144,10 +146,6 @@ class TestPhenotypeMatching(TestCase):
     def test_hardcoded_override_wins_over_denylist(self):
         """If a key has a hardcoded lookup (e.g. FTT), the public denylist
         accessor must filter it out so the match isn't falsely flagged."""
-        from annotation.phenotype_matcher import (
-            _build_ambiguous_acronym_denylist,
-            get_ambiguous_acronym_denylist,
-        )
         # Raw includes "ftt"; effective denylist should not.
         raw = {
             "ftt": (("HP:0001508", "Failure to thrive"),),

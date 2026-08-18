@@ -10,6 +10,7 @@ from datetime import timedelta
 from unittest import mock
 
 from celery.canvas import Signature, _chain
+from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
@@ -497,7 +498,6 @@ class TestVennCacheScheduling(AnalysisSetupMixin, TestCase):
         venn_cache_count(-1)  # missing VennNodeCache - must return without error
 
     def test_venn_cache_count_routed_to_analysis_workers(self):
-        from django.conf import settings
         route = settings.CELERY_TASK_ROUTES.get(VENN_CACHE_COUNT_TASK)
         self.assertEqual(route, {"queue": "analysis_workers", "routing_key": "analysis_workers"},
                          "venn_cache_count must run on the analysis pool, not default db_workers")

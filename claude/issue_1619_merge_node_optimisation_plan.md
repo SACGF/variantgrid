@@ -261,7 +261,7 @@ double-join shown in SQL inspection) forces it. The default plan is the no-proto
 ## Testing plan
 
 New test module: `analysis/tests/test_merge_node_single_pass.py`. Model the fixtures on
-`test_explicit_pk_substitution_baseline.py` (it already builds a trio cohort with UNCOMMON + COMMON partitions,
+`test_explicit_pk_substitution.py` (it already builds a trio cohort with UNCOMMON + COMMON partitions,
 inserts genotypes with explicit `samples_zygosity` strings, and has `_ready()` / `_child()` helpers). Run every
 equivalence test **twice** — once with `ANALYSIS_MERGE_NODE_SINGLE_PASS=True` (new path) and once `False`
 (legacy materialise path) — and assert identical results, exactly as the existing baseline toggles
@@ -311,7 +311,7 @@ legacy path, (c) the union of each arm's standalone PK set.
 16. **Single same-cohort large arm + unrelated arm** — the lone same-cohort arm is not "combined with itself";
     result correct (concern #5).
 17. **Small arms** — arms ≤ `ANALYSIS_NODE_STORE_ID_SIZE_MAX` still take the upstream literal-PK substitution
-    (covered today by `test_explicit_pk_substitution_baseline.test_merge_node_equivalent_with_gate_on_vs_off`;
+    (covered today by `test_explicit_pk_substitution.test_merge_node_equivalent_with_gate_on_vs_off`;
     add a mixed small+large same-cohort merge).
 
 ### C. "Is actually a single pass" (the "and is faster" requirement)
@@ -334,7 +334,7 @@ Prove the structural win deterministically rather than by wall-clock timing (tim
 ```bash
 python3 manage.py test --keepdb analysis.tests.test_merge_node_single_pass
 # plus the existing baseline must still pass unchanged:
-python3 manage.py test --keepdb analysis.tests.test_explicit_pk_substitution_baseline
+python3 manage.py test --keepdb analysis.tests.test_explicit_pk_substitution
 ```
 
 ## Risks & rollout
@@ -361,6 +361,6 @@ python3 manage.py test --keepdb analysis.tests.test_explicit_pk_substitution_bas
   (`:482`), `zygosity_alias` (`:467`).
 - `snpdb/models/models_cohort.py` — `CohortGenotypeCollection.cohortgenotype_alias` (`:504`),
   `get_annotation_kwargs` (`:521`), `get_zygosity_q` (`:571`).
-- `analysis/tests/test_explicit_pk_substitution_baseline.py` — fixture + equivalence-toggle pattern to reuse.
+- `analysis/tests/test_explicit_pk_substitution.py` — fixture + equivalence-toggle pattern to reuse.
 - Settings: `ANALYSIS_NODE_STORE_ID_SIZE_MAX` (`variantgrid/settings/components/default_settings.py:360`),
   `ANALYSIS_NODE_CACHE_Q` (`:356`).

@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
@@ -62,10 +61,8 @@ class NodeGridAutoLoadSettingTest(TestCase):
         self._set(self.global_settings, 100)
         self.assertEqual(self._resolved(), 100)
 
-    def test_falls_back_to_settings_constant_when_all_null(self):
+    def test_cascade_returns_none_when_all_null(self):
         # Global is seeded with the code default by migration 0191 - clear it to exercise the
         # all-null path that the view's `... or settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS` covers.
         self._set(self.global_settings, None)
         self.assertIsNone(self._resolved())
-        max_variants = self._resolved() or settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS
-        self.assertEqual(max_variants, settings.ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS)

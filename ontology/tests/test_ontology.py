@@ -1,18 +1,9 @@
-import unittest
-
 from django.test import TestCase
 
 from ontology.tests.test_data_ontology import create_ontology_test_data
 
 
 class Test(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
-    def testLoadData(self):
+    def test_ontology_import_loaders_run(self):
+        """ Smoke test - the fixture loaders build the whole test ontology without raising """
         create_ontology_test_data()
-
-
-if __name__ == "__main__":
-    unittest.main()

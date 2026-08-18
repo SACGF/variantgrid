@@ -1,12 +1,11 @@
 """
-Baseline regression test for the issue #546 explicit-PK substitution optimisation.
+Equivalence tests for the issue #546 explicit-PK substitution optimisation.
 
-This locks in the CURRENT AnalysisNode query behaviour (before the small-parent
-pk-substitution change) so that after the optimisation lands we can re-run it and
-confirm node counts, result PK sets, and grid genotype display values are byte-for-byte
-identical.
+ANALYSIS_NODE_STORE_ID_SIZE_MAX gates whether a small parent's results are substituted
+into the child query as explicit PKs, and both settings ship - so node counts, result PK
+sets and grid genotype display values must be identical with the gate on and off.
 
-It deliberately exercises the parts the substitution touches or risks:
+They deliberately exercise the parts the substitution touches or risks:
 
   * CohortGenotype data split across UNCOMMON + COMMON partitions (the rare/common
     split, #1119) so the FilteredRelation join must union both partitions.
@@ -44,7 +43,7 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
-class TestExplicitPkSubstitutionBaseline(TestCase):
+class TestExplicitPkSubstitution(TestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()

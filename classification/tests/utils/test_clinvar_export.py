@@ -206,14 +206,9 @@ class TestClinVarExport(TestCase):
                                   "resolved_terms": [{"name": "ataxia-telangiectasia with generalized skin pigmentation and early death", "term_id": "MONDO:0008841"}]}
         c.save()
 
-        report = ClinvarExportPrepare.update_export_records()
-        print("----")
-        for report_line in report:
-            print(report_line)
-        print("----")
+        ClinvarExportPrepare.update_export_records()
 
         clinvar_export: ClinVarExport = ClinVarExport.objects.first()
-        print(clinvar_export.submission_body_validated)
         self.assertIsNotNone(clinvar_export)
         self.assertEqual(clinvar_export.status, ClinVarExportStatus.NEW_SUBMISSION)
 

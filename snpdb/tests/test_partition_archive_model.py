@@ -12,7 +12,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
-from annotation.models import VariantAnnotationVersion
+from annotation.models import AnnotationVersion, VariantAnnotationVersion
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.models.models_partition_archive import PartitionArchive
@@ -45,7 +45,6 @@ class PartitionArchiveHelperTests(TestCase):
         self.addCleanup(self._tmpdir.cleanup)
 
     def test_resolve_source_returns_live_row_or_none(self):
-        from annotation.models import AnnotationVersion
         vav = self._new_vav()
         with self._archive_dir_override():
             with mock.patch("snpdb.partition_archive._schedule_archive_task"):

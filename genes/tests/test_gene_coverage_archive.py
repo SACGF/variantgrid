@@ -12,7 +12,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from genes.models import GeneCoverageCollection
+from genes.archive import archive_gene_coverage_collection
+from genes.models import GeneCoverageCollection, GeneSymbol
 from snpdb.archive import ArchivePreconditionError, DataArchivedError
 from snpdb.models import DataState, GenomeBuild
 
@@ -31,13 +32,11 @@ class GCCArchiveTests(TestCase):
         )
 
     def test_archive_raises_when_source_missing(self):
-        from genes.archive import archive_gene_coverage_collection
         gcc = self._make_gcc()
         with self.assertRaises(ArchivePreconditionError):
             archive_gene_coverage_collection(gcc, self.user, reason="test")
 
     def test_archive_idempotent(self):
-        from genes.archive import archive_gene_coverage_collection
         with tempfile.NamedTemporaryFile(suffix=".tsv", delete=False) as f:
             f.write(b"placeholder\n")
             tmp_path = f.name
@@ -53,7 +52,6 @@ class GCCArchiveTests(TestCase):
 
     def test_get_uncovered_gene_symbols_raises_when_archived(self):
         """ Read entry point raises DataArchivedError when the GCC is archived. """
-        from genes.models import GeneSymbol
         gcc = self._make_gcc()
         gcc.data_archived_date = timezone.now()
         gcc.save()

@@ -10,7 +10,6 @@ from analysis.models import (
     FilterNodeItem,
     GeneListNode,
     IntersectionNode,
-    MergeNode,
     MOINode,
     NodeAlleleFrequencyFilter,
     NodeVCFFilter,
@@ -83,7 +82,6 @@ class TestCloneAnalysisNodes(TestCase):
         clone_arg_q_dict = str(clone._get_node_arg_q_dict())
         class_name = node.get_class_name()
         msg = f"Clone of {class_name} has same get_q()"
-        print(f"Type '{class_name}' Node: {node_arg_q_dict} <=> {clone_arg_q_dict}")
         self.assertEqual(node_arg_q_dict, clone_arg_q_dict, msg)
 
     @staticmethod
@@ -136,8 +134,9 @@ class TestCloneAnalysisNodes(TestCase):
     def test_clone_gene_list_node(self):
         gene_list_node = GeneListNode.objects.create(analysis=self.analysis)
         gene_list_node.genelistnodegenelist_set.create(gene_list_node=gene_list_node, gene_list=self.gene_list)
-        # TODO: This isn't actually working properly
-        self._test_clone_node(gene_list_node)
+        clone = gene_list_node.save_clone()
+        self.assertEqual([gln_gl.gene_list for gln_gl in clone.genelistnodegenelist_set.all()],
+                         [self.gene_list], "Clone gets its own link to the same GeneList")
 
     def test_clone_intersection_node(self):
         # Doesn't have any related objects, but does need to make its own copy of GenomicInterval so test that
@@ -148,11 +147,6 @@ class TestCloneAnalysisNodes(TestCase):
         clone = intersection_node.save_clone()
         self.assertNotEqual(original_genomic_interval_id, clone.genomic_interval.pk,
                             "Intersection node made copy of genomic interval")
-
-    def test_clone_merge_node(self):
-        _merge_node = MergeNode.objects.create(analysis=self.analysis)
-        # TODO: This doesn't run the test, as it calls _get_node_q which MergeNode doesn't implement
-        # self._test_clone_node(merge_node)
 
     def test_clone_moi_node(self):
         # TODO: Need to also test patient setup w/ontology etc

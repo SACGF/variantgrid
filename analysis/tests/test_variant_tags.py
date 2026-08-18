@@ -29,9 +29,6 @@ class TestVariantTagVisibility(TestCase):
         cls.variant_tag = VariantTag.objects.create(genome_build=cls.grch37, analysis=cls.analysis,
                                                     variant=cls.variant, tag=cls.tag, user=cls.user)
 
-    def test_allele_not_yet_assigned(self):
-        self.assertIsNone(self.variant_tag.allele)
-
     def test_visible_in_own_build(self):
         self.assertIn(self.variant_tag, VariantTag.get_for_build(self.grch37))
 

@@ -1,16 +1,16 @@
 """
-Adversarial unit tests for the patients app.
-
-Tests that expose confirmed bugs are expected to FAIL until the bug is fixed.
+Edge case tests for the patients app - falsy-vs-missing values, import
+reconciliation and the de-identified patient display rules.
 """
 import os
 from datetime import UTC, date, datetime
-from datetime import timezone as dt_timezone
 
 from django.contrib.auth.models import User
+from django.core.exceptions import MultipleObjectsReturned
 from django.test import TestCase
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.forms import PatientForm
 from patients.import_records import parse_boolean, parse_choice, process_record
 from patients.models import (
     Clinician,
@@ -55,15 +55,12 @@ def _make_patient_records(user):
 
 
 # ---------------------------------------------------------------------------
-# parse_boolean — BUG: unrecognised value returned as-is instead of None
+# parse_boolean
 # ---------------------------------------------------------------------------
 
 class TestParseBooleanFunction(TestCase):
     def test_unrecognized_value_returns_none_not_string(self):
-        """
-        An unrecognised value like 'YES' should record an error and return None.
-        BUG: currently returns the original string.
-        """
+        """ Regression: an unrecognised value like 'YES' used to be returned as-is. """
         msgs = []
         result = parse_boolean({"col": "YES"}, "col", msgs)
         self.assertTrue(msgs, "Expected a validation message")
@@ -93,7 +90,7 @@ class TestParseChoiceFunction(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Specimen.age_at_collection_date — BUG: 0 treated as missing
+# Specimen.age_at_collection_date
 # ---------------------------------------------------------------------------
 
 class TestSpecimenAgeAtCollectionDate(TestCase):
@@ -107,9 +104,8 @@ class TestSpecimenAgeAtCollectionDate(TestCase):
 
     def test_zero_stored_age_not_treated_as_missing(self):
         """
-        _age_at_collection_date=0 must be returned as-is.
-        BUG: `if self._age_at_collection_date:` is falsy for 0, so a newborn's
-        explicit age is ignored and a calculated age is returned instead.
+        Regression: a stored age of 0 used to be treated as missing, so a newborn's
+        explicit age was replaced by one calculated from DOB.
         """
         specimen = Specimen.objects.create(
             reference_id="AGENEWBORN001",
@@ -117,7 +113,7 @@ class TestSpecimenAgeAtCollectionDate(TestCase):
             _age_at_collection_date=0,
         )
         self.assertEqual(specimen.age_at_collection_date, 0,
-                         "Age 0 was ignored (falsy); got calculated age instead")
+                         "Stored age of 0 was ignored, got calculated age instead")
 
     def test_age_calculated_from_dob_and_collection_date(self):
         """When no stored age, age should be calculated from DOB + collection_date."""
@@ -130,33 +126,32 @@ class TestSpecimenAgeAtCollectionDate(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Patient.condition_description — BUG: ignores _deceased=True
+# Patient.condition_description
 # ---------------------------------------------------------------------------
 
 class TestPatientConditionDescription(TestCase):
     def test_condition_description_consistent_with_deceased_property(self):
         """
-        If deceased=True, condition_description must not return 'alive'.
-        BUG: condition_description only checks date_of_death; _deceased=True is ignored.
+        Regression: condition_description used to only check date_of_death, so a
+        patient flagged deceased with no date of death still read as 'alive'.
         """
         patient = Patient.objects.create(first_name="DEAD", last_name="NODOD")
         patient._deceased = True
         patient.save()
         self.assertTrue(patient.deceased)
         self.assertNotEqual(patient.condition_description, "alive",
-                            "condition_description returns 'alive' despite deceased=True")
+                            "condition_description must not say 'alive' when deceased=True")
 
 
 # ---------------------------------------------------------------------------
-# Patient.save mutual-exclusion — BUG: _deceased=False not caught
+# Patient.save mutual-exclusion
 # ---------------------------------------------------------------------------
 
 class TestPatientMutuallyExclusiveFieldsOnSave(TestCase):
     def test_deceased_false_and_dod_raises(self):
         """
-        _deceased=False + date_of_death is contradictory and should raise.
-        BUG: ensure_mutally_exclusive_fields_not_set uses truthiness; False is
-        falsy so the check passes silently.
+        Regression: ensure_mutally_exclusive_fields_not_set used truthiness, so the
+        contradictory _deceased=False + date_of_death combination passed silently.
         """
         patient = Patient(
             first_name="BAD", last_name="STATE",
@@ -178,7 +173,7 @@ class TestPatientMatchPrecondition(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Clinician.cleaned_get_or_create — BUG: creates duplicate on ambiguous match
+# Clinician.cleaned_get_or_create
 # ---------------------------------------------------------------------------
 
 class TestClinicianGetOrCreate(TestCase):
@@ -189,14 +184,13 @@ class TestClinicianGetOrCreate(TestCase):
 
     def test_multiple_matching_clinicians_does_not_create_extra(self):
         """
-        When two clinicians share a name, cleaned_get_or_create should raise
-        rather than silently creating a third duplicate.
-        BUG: `except Exception:` catches MultipleObjectsReturned and creates another.
+        Regression: a blanket `except Exception:` swallowed MultipleObjectsReturned,
+        so an ambiguous name silently created a third duplicate.
         """
         Clinician.objects.create(first_name="JOHN", last_name="SMITH")
         Clinician.objects.create(first_name="JOHN", last_name="SMITH")
         count_before = Clinician.objects.count()
-        with self.assertRaises(Exception):
+        with self.assertRaises(MultipleObjectsReturned):
             Clinician.cleaned_get_or_create("John Smith")
         self.assertEqual(Clinician.objects.count(), count_before,
                          "A third Clinician was silently created")
@@ -204,7 +198,6 @@ class TestClinicianGetOrCreate(TestCase):
 
 # ---------------------------------------------------------------------------
 # process_record deceased state machine
-# BUG: elif not patient_deceased catches None
 # ---------------------------------------------------------------------------
 
 class TestProcessRecordDeceasedStateMachine(TestCase):
@@ -222,10 +215,8 @@ class TestProcessRecordDeceasedStateMachine(TestCase):
 
     def test_no_deceased_info_creates_no_modification(self):
         """
-        A row with no deceased flag and no date_of_death should not create any
-        PatientModification.
-        BUG: `elif not patient_deceased:` is True when patient_deceased is None,
-        so a spurious modification is always created.
+        Regression: `elif not patient_deceased:` also matched None, so every row
+        with no deceased info created a spurious PatientModification.
         """
         initial_count = PatientModification.objects.filter(patient=self.patient).count()
         process_record(self.pr, record_id=1, row=_make_row())
@@ -235,7 +226,7 @@ class TestProcessRecordDeceasedStateMachine(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# process_record specimen age — BUG: wrong field name on reimport
+# process_record specimen age
 # ---------------------------------------------------------------------------
 
 class TestProcessRecordSpecimenAge(TestCase):
@@ -253,11 +244,8 @@ class TestProcessRecordSpecimenAge(TestCase):
 
     def test_existing_specimen_age_updated_on_reimport(self):
         """
-        When an existing specimen has age=10 and a reimport provides age=35,
-        the age must be updated.
-        BUG: the if-changed block writes `specimen.age_at_collection = ...`
-        (wrong attribute name; real field is `_age_at_collection_date`),
-        so the update is silently dropped.
+        Regression: the if-changed block assigned to `specimen.age_at_collection`
+        rather than `_age_at_collection_date`, so reimported ages were dropped.
         """
         Specimen.objects.create(
             reference_id="EXISTSPECAGE001",
@@ -270,7 +258,7 @@ class TestProcessRecordSpecimenAge(TestCase):
         }))
         specimen = Specimen.objects.get(reference_id="EXISTSPECAGE001")
         self.assertEqual(specimen._age_at_collection_date, 35,
-                         "Age not updated on reimport (wrong field name in if-changed block)")
+                         "Age not updated on reimport")
 
 
 # ---------------------------------------------------------------------------
@@ -303,7 +291,7 @@ class TestProcessRecordSpecimenPatientMismatch(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# PatientForm audit trail — BUG: falsy old values skipped by `if old_val:`
+# PatientForm audit trail
 # ---------------------------------------------------------------------------
 
 class TestPatientFormAuditTrail(TestCase):
@@ -313,7 +301,6 @@ class TestPatientFormAuditTrail(TestCase):
         cls.user = User.objects.create_user("form_audit_user", password="x")
 
     def _save_form(self, patient, **data_overrides):
-        from patients.forms import PatientForm
         form_data = {
             "first_name": patient.first_name or "",
             "last_name": patient.last_name or "",
@@ -333,9 +320,8 @@ class TestPatientFormAuditTrail(TestCase):
 
     def test_changing_affected_false_to_true_is_audited(self):
         """
-        Changing affected from False → True must create a PatientModification.
-        BUG: `if old_val:` in PatientForm.save() treats False as falsy, so the
-        change is silently dropped.
+        Regression: `if old_val:` in PatientForm.save() treated False as "no old
+        value", so a False → True change was left out of the audit trail.
         """
         patient = Patient.objects.create(
             first_name="AUDIT", last_name="AFFECTED", affected=False)

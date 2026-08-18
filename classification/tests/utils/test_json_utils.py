@@ -26,7 +26,6 @@ class JsonUtilTests(TestCase):
             {"a": 3, "b": {"c": False}, 4: [1, 2]},
             {"a": 4, "b": {"d": True}, 4: [1, 2]}
         ).json_diffs
-        print(diffs)
         self.assertEqual(len(diffs), 3)
         self.assertEqual(diffs[0].json_path_str, '["a"]')
         self.assertEqual(diffs[0].a, 3)
@@ -39,9 +38,3 @@ class JsonUtilTests(TestCase):
         self.assertEqual(diffs[2].json_path_str, '["b"]["d"]')
         self.assertEqual(diffs[2].a, None)
         self.assertEqual(diffs[2].b, True)
-
-        diffs = JsonDiffs.differences(
-            ["A", "b"],
-            ["a", "b", "c"]
-        ).json_diffs
-        print(diffs)

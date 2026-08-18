@@ -20,7 +20,7 @@ from annotation.models.models import (
     VariantAnnotationVersion,
     VariantTranscriptAnnotation,
 )
-from annotation.models.models_enums import NMDEscapeStatus
+from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import (
@@ -31,7 +31,7 @@ from annotation.vep_annotation import (
     vep_parse_version_line,
 )
 from annotation.vep_field_formatters import EMPTY_VALUES, get_clean_and_pick_single_value_func
-from snpdb.models import Variant
+from genes.models_enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 
@@ -61,7 +61,6 @@ class TestAnnotationVCF(TestCase):
             kwargs["genome_build"] = genome_build
             vav, created = VariantAnnotationVersion.objects.get_or_create(**kwargs)
             if not created:
-                print("Truncating!")
                 vav.truncate_related_objects()
             cls.variant_annotation_versions_by_build[genome_build_name] = vav
 
@@ -82,10 +81,6 @@ class TestAnnotationVCF(TestCase):
     def test_import_variant_annotations_grch37(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh37')
         vav = self.variant_annotation_versions_by_build[genome_build.name]
-
-        print("Variants: ", Variant.objects.count())
-        print("VariantAnnotation: ", VariantAnnotation.objects.count())
-        print(f"VariantAnnotationVersion: {vav}")
 
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
@@ -127,10 +122,6 @@ class TestAnnotationVCF(TestCase):
     def test_import_variant_annotations_grch38(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh38')
         vav = self.variant_annotation_versions_by_build[genome_build.name]
-
-        print("Variants: ", Variant.objects.count())
-        print("VariantAnnotation: ", VariantAnnotation.objects.count())
-        print(f"VariantAnnotationVersion: {vav}")
 
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
@@ -461,9 +452,6 @@ class TestDBNSFPPerTranscriptPick(TestCase):
             return None
 
     def _make_inserter(self, resolver):
-        from annotation.models.models_enums import VariantAnnotationPipelineType
-        from genes.models_enums import AnnotationConsortium
-
         inserter = BulkVEPVCFAnnotationInserter.__new__(BulkVEPVCFAnnotationInserter)
         inserter.transcript_resolver = resolver
         inserter.annotation_run = type("AR", (), {
