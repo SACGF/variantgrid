@@ -10,23 +10,10 @@ from annotation.annotsv_annotation import (
     get_annotsv_command_line_version,
     get_annotsv_tsv_filename,
 )
-from annotation.models.models import AnnotationPipelineVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.pipelines.base import AnnotationPipelineRunner
 from annotation.vcf_files.bulk_annotsv_tsv_inserter import import_annotsv_tsv
 from library.utils import execute_cmd
-
-
-def get_current_annotsv_version(genome_build) -> AnnotationPipelineVersion:
-    """ The AnnotSV the deployment is running right now: the binary's own version plus the configured
-        bundle. get_or_create so an upgrade simply starts stamping runs with a new row. """
-    version, _ = AnnotationPipelineVersion.objects.get_or_create(
-        pipeline_type=VariantAnnotationPipelineType.ANNOTSV,
-        genome_build=genome_build,
-        code_version=get_annotsv_command_line_version(),
-        data_version=settings.ANNOTATION_ANNOTSV_BUNDLE_VERSION,
-    )
-    return version
 
 
 class AnnotSVRunner(AnnotationPipelineRunner):
@@ -37,6 +24,13 @@ class AnnotSVRunner(AnnotationPipelineRunner):
 
     pipeline_type = VariantAnnotationPipelineType.ANNOTSV
     selects_unannotated = False  # takes every SV in range; depends_on guarantees VEP wrote their rows
+    versioned = True  # rolling the binary or bundle re-runs the genome, without touching VEP's version
+
+    def get_current_tool_version(self, genome_build) -> dict:
+        return {
+            "code_version": get_annotsv_command_line_version(),
+            "data_version": settings.ANNOTATION_ANNOTSV_BUNDLE_VERSION,
+        }
 
     # Deliberately no ANNOTATION_VEP_SV_MAX_SIZE filter in get_variants_qs. That cap exists because VEP
     # fills the logs with 'too long to annotate' above it; AnnotSV handles large SVs, and ranking them is
@@ -55,7 +49,7 @@ class AnnotSVRunner(AnnotationPipelineRunner):
                                                                          get_annotsv_dir(annotation_run))
 
     def annotate(self, annotation_run, lease_heartbeat=None):
-        annotation_run.pipeline_version = get_current_annotsv_version(annotation_run.genome_build)
+        self.check_tool_version(annotation_run)
 
         # #1658: per-task dump path so a reclaimed run's fresh attempt never shares one with a stalled
         # zombie. The TSV is named off the dump stem, so it is per-attempt too.

@@ -60,10 +60,14 @@ for pipeline_type in VariantAnnotationPipelineType:
         _handle_range_lock(range_lock, pipeline_type)
 ```
 
-Add `ANNOTSV` to the enum and turn it on, and the next scheduler pass creates an `ANNOTSV` run for every
-existing range lock on the ACTIVE version. An AnnotSV run dumps its own VCF from the database, so it does
-not care that the VEP dump is long gone. **Backfill needs no new machinery — it is what the scheduler
-already does.**
+Add `ANNOTSV` to the enum, turn it on and register the installed tool (§3.8), and the next scheduler pass
+creates an `ANNOTSV` run for every existing range lock on the ACTIVE version. An AnnotSV run dumps its own
+VCF from the database, so it does not care that the VEP dump is long gone. **Backfill needs no new
+machinery — it is what the scheduler already does.**
+
+Widening that query from "missing a run of this type" to "missing a run at the
+`AnnotationPipelineVersion` we schedule against" makes the same sentence true of consequence 3: rolling
+the bundle is registering the new version and promoting it, after which every lock is missing a run again.
 
 Operationally that is cheap: most range locks contain no SVs at all, so `count_annotation_run`
 (`annotation_scheduler_task.py:161`) finishes them at `count == 0` on `db_workers` without ever reaching
@@ -411,52 +415,105 @@ the smaller change.
 ### 3.8 Tool version pinning
 
 `VariantAnnotationVersion.annotsv_code` / `annotsv_bundle` are deleted — pinning AnnotSV on the VEP version
-is the thing that makes a bundle bump cost a full re-annotation. Replaced by one small model:
+is the thing that makes a bundle bump cost a full re-annotation. Replaced by a model that carries the
+**same lifecycle as `VariantAnnotationVersion`**, because a supplementary pipeline needs the same three
+things a VEP version needs: a row per tool version, an operator gate before the system starts using a new
+one, and the old rows kept as the record of what produced already-annotated ranges.
 
 ```python
 # annotation/models/models.py
 
 class AnnotationPipelineVersion(TimeStampedModel):
-    """ Version of a non-VEP pipeline's tool + data bundle, recorded on each run that used it. Separate
-        from VariantAnnotationVersion so a tool can roll without forcing a VEP re-annotation - which is
-        the point of #720. VEP pipelines don't use this: their version IS the VariantAnnotationVersion. """
+    """ Version of a non-VEP pipeline's tool + data bundle, and what its AnnotationRuns are scheduled
+        against. Separate from VariantAnnotationVersion so a tool can roll without forcing a VEP
+        re-annotation - which is the point of #720. VEP pipelines don't use this: their version IS the
+        VariantAnnotationVersion. """
+
+    class Status(models.TextChoices):
+        NEW = "NEW", "New"
+        ACTIVE = "ACTIVE", "Active"
+        HISTORICAL = "HISTORICAL", "Historical"
+
     pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     code_version = models.TextField()                       # eg AnnotSV "3.5.8"
     data_version = models.TextField(null=True, blank=True)  # eg AnnotSV bundle version
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.NEW)
 
     class Meta:
         unique_together = ("pipeline_type", "genome_build", "code_version", "data_version")
-
-    def __str__(self):
-        data = f"/{self.data_version}" if self.data_version else ""
-        return f"{self.get_pipeline_type_display()} {self.code_version}{data} ({self.genome_build})"
 ```
 
 ```python
 # AnnotationRun
-    # What ran, for non-VEP pipelines. Null for VEP pipelines (VariantAnnotationVersion covers those).
+    # Which version this run is scheduled against, for non-VEP pipelines. Null for VEP pipelines
+    # (VariantAnnotationVersion covers those).
     pipeline_version = models.ForeignKey(AnnotationPipelineVersion, null=True, blank=True,
                                          on_delete=PROTECT)
 ```
 
-The runner resolves the current version at `annotate()` time (`AnnotSV -version` plus
-`settings.ANNOTATION_ANNOTSV_BUNDLE_VERSION`, `get_or_create`) and records it. This **replaces**
-`annotsv_check_command_line_version_match` rather than reimplementing it: recording what actually ran is
-more useful than refusing to run, because it makes a mid-backfill upgrade visible and re-runnable instead
-of turning every remaining run into an error.
-
-Rolling a version is then: upgrade the binary/bundle, then reset the stale runs.
+**The upgrade path is VEP's, step for step.** `create_new_variant_annotation_version` asks VEP its version
+and creates a `NEW` VAV; the operator promotes it on the annotation runs page; the scheduler only ever
+works `ACTIVE` versions. So:
 
 ```python
-# annotation/management/commands/annotation_pipeline_rerun.py
-#   --pipeline-type A --genome-build GRCh38 [--stale] [--limit N]
+# annotation/management/commands/create_new_annotation_pipeline_version.py
+#   --pipeline-type A [--genome-build GRCh38]
 #
-# --stale selects FINISHED runs whose pipeline_version is not the current one, and calls
-# reset_for_retry() on each (safe - a supplementary run owns no annotation rows, §3.7), then kicks the
-# dispatcher. Also the tool for "AnnotSV was off, now it's on, re-run the ones that already finished
-# empty". Replaces manage.py annotsv_run, which is deleted.
+# Asks the runner for the installed tool's identity (AnnotSVRunner.get_current_tool_version: `AnnotSV
+# -version` plus settings.ANNOTATION_ANNOTSV_BUNDLE_VERSION) and get_or_creates the row. The first
+# version for a build is registered ACTIVE - there is nothing for it to supersede, so no promote step
+# would be protecting anything. Later ones land NEW, awaiting promotion on the annotation runs page.
 ```
+
+Promoting is what re-runs the genome, and it needs no re-run machinery: `_handle_variant_annotation_version`
+already creates a run for every range lock missing one, so making that query *"missing a run **at the
+version we schedule against**"* covers the tool-rolled case with the code that already covers the
+enabled-later case. One mechanism, no `--stale` query to maintain, and the work is dispatched by the same
+capacity-limited lanes as everything else.
+
+That is why `AnnotationRun`'s uniqueness has to admit the version:
+
+```python
+# AnnotationRun.Meta - one run per lock per type, except for versioned pipelines, which get one per
+# version. Two partial constraints rather than one 3-column constraint, because NULLs compare distinct
+# in Postgres, which would drop the VEP guarantee entirely.
+constraints = [
+    models.UniqueConstraint(fields=["annotation_range_lock", "pipeline_type"],
+                            condition=Q(pipeline_version__isnull=True),
+                            name="one_unversioned_run_per_range_lock_and_type"),
+    models.UniqueConstraint(fields=["annotation_range_lock", "pipeline_type", "pipeline_version"],
+                            condition=Q(pipeline_version__isnull=False),
+                            name="one_versioned_run_per_range_lock_type_and_version"),
+]
+```
+
+A new VEP version brings its own range locks, which is why VEP never needed this. A supplementary pipeline
+hangs off the locks the VEP run already has, so a tool upgrade has to be able to produce a second run over
+the same lock.
+
+One consequence in the merge path: `_reset_run_counts_after_extend` reopens empty-finished runs so a
+grown range gets re-counted, and it has to skip runs belonging to a superseded version - reopening one
+would dispatch it against a tool that no longer matches the version it records. Its replacement at the
+ACTIVE version is on the same lock and is reset like any other run.
+
+Growth is bounded by the number of range locks per promotion (hundreds to low thousands) and promotions
+are rare, so the runs table gains a few thousand rows a year — but the annotation runs page scopes its
+per-type counts to the ACTIVE version, since superseded runs are history rather than outstanding work.
+
+**Enforced, not recorded.** `AnnotationPipelineRunner.check_tool_version` refuses to run when the installed
+tool is not the one the run was scheduled against, mirroring `vep_check_command_line_version_match`. This
+is the reverse of what an earlier draft of this section argued, and the lifecycle is why: with a defined
+path for an upgrade — register, promote, let the scheduler create fresh runs — quietly writing 3.5.8
+output into a run the page reports as 3.5.7 is the only way left to lose that history.
+
+**Where the VAV analogy stops.** `HISTORICAL` means less here. A `VariantAnnotationVersion` owns its own
+partition, so a historical one still has its data and old analyses resolve against it. A supplementary
+pipeline writes into columns of the *VEP* partition, one set per `VariantAnnotationVersion`, so a new
+`AnnotationPipelineVersion` overwrites its predecessor's values: `HISTORICAL` is provenance on the runs it
+produced, not data still queryable. Real retention would mean the tool owning its own table keyed by
+`AnnotationPipelineVersion` — a much larger change, and the wrong one while those columns are queried
+alongside VEP's.
 
 Surface `pipeline_version` on the annotation run detail page and the runs grid, so "which AnnotSV produced
 this" is answerable without the shell.
@@ -620,7 +677,7 @@ later, on exactly this machinery.
 - `annotation/signals/annotation_run_cleanup.py` `get_all_run_output_paths` — replace its hardcoded VEP +
   AnnotSV path set with `runner.get_output_paths(...)` plus the persisted `vcf_annotated_filename`, and
   keep the `remove_annotsv_dir` behaviour keyed on the AnnotSV pipeline type.
-- `manage.py annotsv_run` is deleted (§3.8) — the normal run-retry path replaces it.
+- `manage.py annotsv_run` is deleted (§3.8) — the scheduler's missing-run repair replaces it.
 
 ---
 
@@ -644,8 +701,10 @@ operations = [
 ]
 ```
 
-`unique_together ("annotation_range_lock", "pipeline_type")` is unchanged and already correct for the new
-type. No column on `AnnotationRun` changes meaning, so existing rows need nothing.
+A second migration adds `AnnotationPipelineVersion.status` and swaps `AnnotationRun`'s
+`unique_together ("annotation_range_lock", "pipeline_type")` for the two partial unique constraints of
+§3.8. No column on `AnnotationRun` changes meaning, and every existing row has `pipeline_version` NULL, so
+they all fall under the unversioned constraint - which is the old guarantee, unchanged.
 
 ## 5. Settings
 
@@ -662,7 +721,10 @@ ANNOTATION_ANNOTSV_ENABLED = False
 ```
 
 `ANNOTATION_ANNOTSV_CODE_VERSION` is not added — the runner reads the binary's own `-version`.
-`ANNOTATION_ANNOTSV_BUNDLE_VERSION` stays and becomes `AnnotationPipelineVersion.data_version`.
+`ANNOTATION_ANNOTSV_BUNDLE_VERSION` stays and becomes `AnnotationPipelineVersion.data_version`, so a new
+bundle is registered and promoted exactly as a new binary is. Enabling the setting is half of turning
+AnnotSV on; registering the installed tool (§3.8) is the other half, and the annotation runs page says so
+when one is done without the other.
 `ANNOTATION_VEP_BUFFER_SIZE` stays keyed by pipeline type; `ANNOTSV` simply has no entry.
 
 ## 6. Tests
@@ -685,8 +747,15 @@ Worth keeping (each covers logic we wrote, with a branch that is easy to get wro
 - `test_execute_cmd_timeout` — kills, drains, and returns non-zero with partial output.
 - `test_annotsv_run_owns_no_annotation_rows` — §3.7's safety condition: the AnnotSV run owns no
   `VariantAnnotation` rows, so resetting or deleting it cannot take the VEP run's data with it.
-- `test_reuses_row_for_same_code_and_bundle` / `test_upgraded_binary_gets_its_own_version` — §3.8's
-  record-don't-enforce behaviour.
+- `test_reuses_row_for_same_code_and_bundle` / `test_first_registered_version_is_active` /
+  `test_upgraded_binary_registers_as_new` / `test_promoting_retires_the_version_it_replaces` — §3.8's
+  lifecycle, including the first-version-is-ACTIVE shortcut.
+- `test_check_tool_version_rejects_a_drifted_binary` — §3.8's enforcement.
+- `test_promoting_a_new_version_creates_a_second_run_for_each_lock` — the re-run path: promotion, and only
+  promotion, makes the scheduler's missing-run repair cover every lock again, leaving the superseded run
+  FINISHED as the record of what the old tool did.
+- `test_no_runs_created_while_the_installed_tool_is_unregistered` — enabled with nothing ACTIVE schedules
+  nothing, rather than scheduling against no version.
 
 Extend the existing `upload/tests/test_pipeline_max_variant.py` rather than duplicating it — it already
 covers `pipeline_type_variant_q` and the per-type watermark, and only needs the blocking-types distinction
@@ -708,7 +777,8 @@ places the implementation departed from this plan.
    dependency gating in the dispatcher and count lane, `blocking_pipeline_types()` in the upload app,
    `AnnotationPipelineVersion`, migration; strip the AnnotSV stage from `VEPRunner` /
    `import_vcf_annotations`; rescope `import_annotsv_tsv`; delete `manage.py annotsv_run`.
-5. **`annotation_pipeline_rerun` command** + `pipeline_version` on the runs grid and detail page.
+5. **`AnnotationPipelineVersion` lifecycle** — `create_new_annotation_pipeline_version`, the promote
+   control on the annotation runs page, and `pipeline_version` on the runs grid and detail page.
 6. **Tests** per §6.
 
 Step 3 is the one worth pausing on for review — it touches the hot path of every annotation run without
@@ -768,7 +838,7 @@ changing any behaviour, so it should go in on its own and be seen to be a no-op.
 
 ## 9. Where the implementation departed from this plan
 
-Three things only became clear while building it:
+Three things only became clear while building it, and a fourth came out of review:
 
 1. **The count-lane "trap" was not real** (§3.5). `annotated=True` drops the unannotated filter rather
    than inverting it, so a supplementary run's count never depended on the VEP run having imported. The
@@ -786,6 +856,15 @@ Three things only became clear while building it:
    `--skipped_variants_file` exists, per #1710; AnnotSV: the TSV exists) and "what does the run need to
    resume upload-only?" (VEP: annotated VCF + skipped-variants file; AnnotSV: the TSV). Both are per-tool,
    so both became runner methods rather than branches in the scheduler.
+
+4. **Versioning became a lifecycle, in review.** The first cut recorded whatever tool actually ran and
+   left a `annotation_pipeline_rerun --stale` command to find and reset the runs an upgrade had left
+   behind. Review asked why that wasn't handled the way `VariantAnnotationVersion` is — historical
+   versions, a new row when the tools change — and it should be: the scheduler's existing "this lock is
+   missing a run" repair *is* the re-run mechanism once the query is scoped to the version being
+   scheduled against, and `NEW` → promote is the confirmation step that keeps a bundle swapped on disk
+   from silently re-annotating a genome. §3.8 is rewritten around that; the rerun command is gone, and
+   the enforcement question flipped with it.
 
 Also delivered but not in the plan: `pipeline_version` on the annotation-runs grid and the run detail
 page, and the `views.py` VEP-command loop restricted to `vep_pipeline_types()` (it was already wrong for

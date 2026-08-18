@@ -14,7 +14,7 @@ from annotation.models.models import (
     AnnotationRun,
     VariantAnnotationVersion,
 )
-from annotation.pipelines.annotsv import get_current_annotsv_version
+from annotation.pipelines.annotsv import AnnotSVRunner
 from annotation.vcf_files.bulk_annotsv_tsv_inserter import (
     _extract_pathogenic_overlaps,
     _extract_variant_id,
@@ -206,30 +206,66 @@ class TestGetAnnotsvCommand(TestCase):
     ANNOTATION_ANNOTSV_BUNDLE_VERSION="bundle-2024-01",
 )
 class TestCurrentAnnotsvVersion(TestCase):
-    """ #720: what actually ran is recorded on the run, so a tool upgraded mid-backfill is visible and
-        re-runnable rather than turning every remaining run into an error. """
+    """ #720: registering the installed AnnotSV, which is how an upgrade reaches the scheduler. """
+
+    def setUp(self):
+        super().setUp()
+        self.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        self.runner = AnnotSVRunner()
+
+    def _register(self, code_version):
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value=code_version):
+            return self.runner.get_or_create_current_version(self.genome_build)
 
     def test_reuses_row_for_same_code_and_bundle(self):
-        genome_build = GenomeBuild.get_name_or_alias("GRCh37")
-        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
-                        return_value="3.5.8"):
-            first = get_current_annotsv_version(genome_build)
-            second = get_current_annotsv_version(genome_build)
+        first, created = self._register("3.5.8")
+        second, created_again = self._register("3.5.8")
         self.assertEqual(first.pk, second.pk)
+        self.assertTrue(created)
+        self.assertFalse(created_again)
         self.assertEqual(first.code_version, "3.5.8")
         self.assertEqual(first.data_version, "bundle-2024-01")
 
-    def test_upgraded_binary_gets_its_own_version(self):
-        genome_build = GenomeBuild.get_name_or_alias("GRCh37")
-        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
-                        return_value="3.5.8"):
-            old = get_current_annotsv_version(genome_build)
-        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
-                        return_value="3.5.9"):
-            new = get_current_annotsv_version(genome_build)
+    def test_first_registered_version_is_active(self):
+        """ Nothing to supersede, so no promote step - enabling AnnotSV is register-and-go. """
+        first, _ = self._register("3.5.8")
+        self.assertEqual(first.status, AnnotationPipelineVersion.Status.ACTIVE)
+
+    def test_upgraded_binary_registers_as_new(self):
+        """ An upgrade waits to be promoted, so swapping the binary never re-annotates by itself. """
+        old, _ = self._register("3.5.8")
+        new, _ = self._register("3.5.9")
         self.assertNotEqual(old.pk, new.pk)
+        self.assertEqual(new.status, AnnotationPipelineVersion.Status.NEW)
+        old.refresh_from_db()
+        self.assertEqual(old.status, AnnotationPipelineVersion.Status.ACTIVE)
         self.assertEqual(AnnotationPipelineVersion.objects.filter(
             pipeline_type=VariantAnnotationPipelineType.ANNOTSV).count(), 2)
+
+    def test_promoting_retires_the_version_it_replaces(self):
+        old, _ = self._register("3.5.8")
+        new, _ = self._register("3.5.9")
+
+        new.promote_to_active()
+
+        old.refresh_from_db()
+        self.assertEqual(old.status, AnnotationPipelineVersion.Status.HISTORICAL)
+        self.assertEqual(AnnotationPipelineVersion.get_active(
+            VariantAnnotationPipelineType.ANNOTSV, self.genome_build), new)
+
+    def test_check_tool_version_rejects_a_drifted_binary(self):
+        """ A run carries the version it was scheduled against, so writing another tool's output into it
+            would silently lose which AnnotSV produced the data. """
+        pipeline_version, _ = self._register("3.5.8")
+        annotation_run = mock.Mock(pipeline_version=pipeline_version, genome_build=self.genome_build)
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value="3.5.9"):
+            with self.assertRaises(ValueError):
+                self.runner.check_tool_version(annotation_run)
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value="3.5.8"):
+            self.runner.check_tool_version(annotation_run)  # matching binary is fine
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=4))

@@ -41,6 +41,12 @@ def blocking_pipeline_types() -> list[VariantAnnotationPipelineType]:
     return [pt for pt, p in PIPELINES.items() if p.blocks_vcf_import]
 
 
+def versioned_pipeline_types() -> list[VariantAnnotationPipelineType]:
+    """ Types whose runs are scheduled against an AnnotationPipelineVersion (#720) - the ones a tool
+        upgrade re-runs, as opposed to VEP's, which roll with the VariantAnnotationVersion. """
+    return [pt for pt, p in PIPELINES.items() if p.runner.versioned]
+
+
 def vep_pipeline_types() -> list[VariantAnnotationPipelineType]:
     """ Types that actually invoke VEP - the only ones get_vep_command means anything for. """
     return [pt for pt, p in PIPELINES.items() if isinstance(p.runner, VEPRunner)]

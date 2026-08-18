@@ -21,7 +21,7 @@ from annotation.models import (
     VariantAnnotationPipelineType,
     VariantAnnotationVersion,
 )
-from annotation.models.models import AnnotationRangeLock, AnnotationVersion
+from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock, AnnotationVersion
 from annotation.signals.manual_signals import annotation_run_discarded_signal
 from annotation.pipelines import PIPELINES, enabled_pipeline_types, get_runner
 from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
@@ -133,16 +133,33 @@ def annotation_scheduler(status: str = None):
         log_traceback()
 
 
-def _handle_range_lock(range_lock, pipeline_type=None):
-    pipeline_types = []
-    if pipeline_type is not None:
-        pipeline_types.append(pipeline_type)
-    else:
-        pipeline_types = enabled_pipeline_types()
+def _scheduled_pipeline_versions(
+        genome_build) -> dict[VariantAnnotationPipelineType, Optional[AnnotationPipelineVersion]]:
+    """ #720: what each enabled pipeline schedules its runs against - the ACTIVE AnnotationPipelineVersion
+        for a versioned pipeline, None for a VEP one (whose version is the range lock's
+        VariantAnnotationVersion).
 
-    for pipeline_type in pipeline_types:
+        A versioned pipeline with nothing ACTIVE is enabled but unregistered, so it is skipped rather than
+        scheduled against nothing - the annotation runs page says which command registers it. """
+    pipeline_versions = {}
+    for pipeline_type in enabled_pipeline_types():
+        pipeline_version = None
+        if get_runner(pipeline_type).versioned:
+            pipeline_version = AnnotationPipelineVersion.get_active(pipeline_type, genome_build)
+            if pipeline_version is None:
+                logging.warning("%s is enabled for %s but has no ACTIVE AnnotationPipelineVersion - run "
+                                "create_new_annotation_pipeline_version to register the installed tool",
+                                VariantAnnotationPipelineType(pipeline_type).label, genome_build)
+                continue
+        pipeline_versions[pipeline_type] = pipeline_version
+    return pipeline_versions
+
+
+def _handle_range_lock(range_lock, pipeline_versions):
+    for pipeline_type, pipeline_version in pipeline_versions.items():
         annotation_run, _ = AnnotationRun.objects.get_or_create(annotation_range_lock=range_lock,
-                                                                pipeline_type=pipeline_type)
+                                                                pipeline_type=pipeline_type,
+                                                                pipeline_version=pipeline_version)
         if annotation_run.external:
             # External annotation (#1568): VEP is managed externally via the annotation_external command.
             # Belt-and-braces guard - the scheduler only operates on ACTIVE versions and external runs
@@ -209,22 +226,25 @@ def _trigger_counts_for_uncounted_runs(vav: VariantAnnotationVersion):
 def _handle_variant_annotation_version(variant_annotation_version):
     # If we crash in the wrong place, we may end up with unassigned range locks (need 1 of each type)
     arl_qs = AnnotationRangeLock.objects.filter(version=variant_annotation_version)
-    # #720: also how a newly-enabled pipeline backfills. Turning eg ANNOTATION_ANNOTSV_ENABLED on adds it
-    # to enabled_pipeline_types(), so the next pass creates its run for every existing lock. Cheap: most
-    # locks hold no SVs, and the count lane finishes those without ever dispatching them.
-    for pipeline_type in enabled_pipeline_types():
+    pipeline_versions = _scheduled_pipeline_versions(variant_annotation_version.genome_build)
+    # #720: also how a newly-enabled pipeline backfills, and how a versioned one re-runs after its tool is
+    # upgraded - "no run at the version we schedule against" is one query covering both. Turning eg
+    # ANNOTATION_ANNOTSV_ENABLED on, or promoting a new AnnotSV, creates its run for every existing lock.
+    # Cheap: most locks hold no SVs, and the count lane finishes those without ever dispatching them.
+    for pipeline_type, pipeline_version in pipeline_versions.items():
         # Look for missing any AnnotationRun for this lock
-        for range_lock in arl_qs.exclude(annotationrun__pipeline_type=pipeline_type):
+        for range_lock in arl_qs.exclude(annotationrun__pipeline_type=pipeline_type,
+                                         annotationrun__pipeline_version=pipeline_version):
             logging.warning("Assigned orphaned annotation range lock: %s, run type: %s",
                             range_lock, VariantAnnotationPipelineType(pipeline_type).label)
-            _handle_range_lock(range_lock, pipeline_type)
+            _handle_range_lock(range_lock, {pipeline_type: pipeline_version})
 
     range_lock, unannotated_count = get_annotation_range_lock_and_unannotated_count(variant_annotation_version,
                                                                                     settings.ANNOTATION_VEP_BATCH_MIN,
                                                                                     settings.ANNOTATION_VEP_BATCH_MAX)
     if range_lock is not None:
         range_lock.save()
-        _handle_range_lock(range_lock)
+        _handle_range_lock(range_lock, pipeline_versions)
     else:
         if unannotated_count:
             logging.warning("Unannotated variants but couldn't get a lock.")

@@ -360,9 +360,11 @@ ANNOTATION_MIN_FREE_DISK_GIGS = 1
 # scheduler creates no ANNOTSV AnnotationRuns at all. Deployments enable it in their per-host settings
 # file once the binary + bundle are installed.
 #
-# Turning it on backfills. The scheduler creates an ANNOTSV run for every existing range lock on the
-# active version, each dependent on that lock's STRUCTURAL_VARIANT run; the count lane finishes the
-# (majority) SV-free ones on db_workers without ever dispatching them.
+# Turning it on backfills, once the installed AnnotSV is registered with
+# `manage.py create_new_annotation_pipeline_version --pipeline-type=A`. The scheduler creates an ANNOTSV
+# run for every existing range lock on the active version, each dependent on that lock's
+# STRUCTURAL_VARIANT run; the count lane finishes the (majority) SV-free ones on db_workers without ever
+# dispatching them.
 ANNOTATION_ANNOTSV_ENABLED = False
 ANNOTATION_ANNOTSV_BIN = "/data/annotation/AnnotSV/bin/AnnotSV"
 ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/AnnotSV/share/AnnotSV/Annotations_Human"
@@ -372,8 +374,8 @@ ANNOTATION_ANNOTSV_GENOME_BUILD = {
     BUILD_GRCH38: "GRCh38",
 }
 # Annotations bundle has no version stamp file; admin sets this to the bundle release string they
-# installed (eg "3.5.8"). Recorded on each run as AnnotationPipelineVersion.data_version, so changing it
-# starts stamping a new version - `manage.py annotation_pipeline_rerun --stale` re-runs the older ones.
+# installed (eg "3.5.8"). Becomes AnnotationPipelineVersion.data_version, so a new bundle is registered
+# and promoted the same way a new binary is - @see AnnotationPipelineVersion.
 ANNOTATION_ANNOTSV_BUNDLE_VERSION = None
 ANNOTATION_ANNOTSV_EXTRA_ARGS: list[str] = []
 ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60

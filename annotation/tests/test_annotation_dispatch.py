@@ -42,6 +42,7 @@ from annotation.tasks.annotation_scheduler_task import (
     _IMPORT_RUNNING_STATUSES,
     _VEP_RUNNING_STATUSES,
     _handle_range_lock,
+    _scheduled_pipeline_versions,
     _lane_in_flight_qs,
     _trigger_counts_for_uncounted_runs,
     count_annotation_run,
@@ -108,7 +109,7 @@ class AnnotationDispatchTestCase(TestCase):
         lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.variants[0],
                                                   max_variant=self.variants[1], count=100)
         with mock.patch.object(annotate_variants, "apply_async") as launch:
-            _handle_range_lock(lock)
+            _handle_range_lock(lock, _scheduled_pipeline_versions(self.vav.genome_build))
         runs = AnnotationRun.objects.filter(annotation_range_lock=lock)
         # Only the pipelines this deployment has switched on - AnnotSV is opt-in (#720)
         self.assertEqual(runs.count(), len(enabled_pipeline_types()))

@@ -1035,23 +1035,68 @@ class VCFAnnotationStats(models.Model):
 
 
 class AnnotationPipelineVersion(TimeStampedModel):
-    """ #720: version of a non-VEP pipeline's tool + data bundle, recorded on every run that used it.
+    """ #720: version of a non-VEP pipeline's tool + data bundle, and what its AnnotationRuns are
+        scheduled against.
 
         Deliberately separate from VariantAnnotationVersion. Pinning eg AnnotSV on the VEP version is what
         makes rolling its bundle cost a full re-annotation of everything - the thing splitting these
         pipelines out exists to avoid. VEP pipelines don't use this: their version IS the
         VariantAnnotationVersion.
 
-        Recorded rather than enforced. A tool upgraded part-way through a backfill leaves runs against two
-        versions, which is visible and re-runnable (see the annotation_pipeline_rerun command); refusing to
-        run would instead turn every remaining run into an error. """
+        Same lifecycle as VariantAnnotationVersion, for the same reason: upgrading a tool creates a NEW
+        row, and promoting it to ACTIVE is what makes the scheduler create runs against it - so a bundle
+        swapped on disk never silently re-annotates the genome. The scheduler then backfills through the
+        machinery it already has, since "this lock has no run at the ACTIVE version" is the same query as
+        "this lock has no run of this type at all".
+
+        HISTORICAL means less here than it does for a VariantAnnotationVersion, which keeps its own
+        partition and so keeps its data. A supplementary pipeline writes into columns of the VEP
+        partition, one set per VariantAnnotationVersion, so a new version overwrites its predecessor's
+        values: HISTORICAL is provenance on the runs it produced, not data still queryable. """
+
+    class Status(models.TextChoices):
+        NEW = "NEW", "New"
+        ACTIVE = "ACTIVE", "Active"
+        HISTORICAL = "HISTORICAL", "Historical"
+
     pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     code_version = models.TextField()                       # eg AnnotSV "3.5.8", from the binary itself
     data_version = models.TextField(null=True, blank=True)  # eg the AnnotSV bundle release string
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.NEW)
 
     class Meta:
         unique_together = ('pipeline_type', 'genome_build', 'code_version', 'data_version')
+
+    @staticmethod
+    def get_active(pipeline_type, genome_build) -> Optional['AnnotationPipelineVersion']:
+        """ The version the scheduler creates runs against, or None if the tool has never been registered
+            (see the create_new_annotation_pipeline_version command). """
+        return AnnotationPipelineVersion.objects.filter(
+            pipeline_type=pipeline_type, genome_build=genome_build,
+            status=AnnotationPipelineVersion.Status.ACTIVE).first()
+
+    @staticmethod
+    def get_new(pipeline_type, genome_build) -> Optional['AnnotationPipelineVersion']:
+        """ A registered upgrade awaiting promotion. Latest first - re-registering twice before anyone
+            promotes leaves the most recently created one as the candidate. """
+        return AnnotationPipelineVersion.objects.filter(
+            pipeline_type=pipeline_type, genome_build=genome_build,
+            status=AnnotationPipelineVersion.Status.NEW).order_by("-created").first()
+
+    def promote_to_active(self):
+        """ Make this the version the scheduler schedules against, retiring the one it replaces. """
+        with transaction.atomic():
+            AnnotationPipelineVersion.objects.filter(
+                pipeline_type=self.pipeline_type, genome_build=self.genome_build,
+                status=AnnotationPipelineVersion.Status.ACTIVE,
+            ).exclude(pk=self.pk).update(status=AnnotationPipelineVersion.Status.HISTORICAL)
+            self.status = AnnotationPipelineVersion.Status.ACTIVE
+            self.save()
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == AnnotationPipelineVersion.Status.ACTIVE
 
     def __str__(self):
         data = f"/{self.data_version}" if self.data_version else ""
@@ -1142,12 +1187,25 @@ class AnnotationRun(TimeStampedModel):
     annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
 
-    # #720: which version of a non-VEP tool produced this run. NULL for VEP pipelines, whose version is
-    # the VariantAnnotationVersion on the range lock.
+    # #720: which version of a non-VEP tool this run is scheduled against. NULL for VEP pipelines, whose
+    # version is the VariantAnnotationVersion on the range lock.
     pipeline_version = models.ForeignKey(AnnotationPipelineVersion, null=True, blank=True, on_delete=PROTECT)
 
     class Meta:
-        unique_together = ('annotation_range_lock', 'pipeline_type')
+        # #720: one run per lock per pipeline type - except for versioned pipelines, which get one per
+        # version, because that is how they re-run. A new VEP version brings its own range locks, so VEP
+        # never needed this; a supplementary pipeline hangs off the locks the VEP run already has, and a
+        # tool upgrade has to produce a second run over the same lock. Split in two rather than one
+        # 3-column constraint because NULLs compare distinct in Postgres, which would drop the VEP
+        # guarantee entirely.
+        constraints = [
+            models.UniqueConstraint(fields=["annotation_range_lock", "pipeline_type"],
+                                    condition=Q(pipeline_version__isnull=True),
+                                    name="one_unversioned_run_per_range_lock_and_type"),
+            models.UniqueConstraint(fields=["annotation_range_lock", "pipeline_type", "pipeline_version"],
+                                    condition=Q(pipeline_version__isnull=False),
+                                    name="one_versioned_run_per_range_lock_type_and_version"),
+        ]
 
     def get_absolute_url(self):
         return reverse('view_annotation_run', kwargs={'annotation_run_id': self.pk})

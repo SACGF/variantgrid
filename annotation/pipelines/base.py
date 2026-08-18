@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
+from annotation.models.models import AnnotationPipelineVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from library.utils.file_utils import mk_path_for_file
 from snpdb.models import Variant
@@ -29,6 +30,46 @@ class AnnotationPipelineRunner(abc.ABC):
     # means for them. Supplementary pipelines set this False and take every variant of their class in
     # range: they UPDATE rows a VEP pipeline wrote, and depends_on is what guarantees those rows exist.
     selects_unannotated: bool = True
+    # Whether this pipeline's runs are scheduled against an AnnotationPipelineVersion (#720). VEP
+    # pipelines are not: their version is the VariantAnnotationVersion their range lock belongs to.
+    versioned: bool = False
+
+    def get_current_tool_version(self, genome_build) -> dict:
+        """ code_version/data_version of the tool as installed right now - AnnotationPipelineVersion
+            field values, for a versioned pipeline. Usually shells out to the tool, so callers are
+            operator-triggered rather than per-run. """
+        raise NotImplementedError(f"{self.pipeline_type} is not a versioned pipeline")
+
+    def get_or_create_current_version(self, genome_build) -> tuple[AnnotationPipelineVersion, bool]:
+        """ Register the installed tool as an AnnotationPipelineVersion, as
+            get_or_create_variant_annotation_version_from_current_vep does for VEP.
+
+            The first version for a build goes straight to ACTIVE - there is no earlier version for it to
+            supersede, so there is nothing for a promote step to protect. Later ones land as NEW, where
+            promoting them is the decision to re-run every range against the new tool. """
+        kwargs = self.get_current_tool_version(genome_build)
+        already_registered = AnnotationPipelineVersion.objects.filter(
+            pipeline_type=self.pipeline_type, genome_build=genome_build).exists()
+        status = AnnotationPipelineVersion.Status.NEW if already_registered \
+            else AnnotationPipelineVersion.Status.ACTIVE
+        return AnnotationPipelineVersion.objects.get_or_create(
+            pipeline_type=self.pipeline_type, genome_build=genome_build,
+            defaults={"status": status}, **kwargs)
+
+    def check_tool_version(self, annotation_run):
+        """ Refuse to run when the installed tool isn't the version this run was scheduled against, as
+            vep_check_command_line_version_match does for VEP.
+
+            Enforced rather than recorded because there is now a defined path for an upgrade - register
+            it, promote it, let the scheduler create fresh runs - so silently writing 3.5.8 output into a
+            range the runs page reports as 3.5.7 would be the only way to lose that history. """
+        expected = annotation_run.pipeline_version
+        current = self.get_current_tool_version(annotation_run.genome_build)
+        diff = {k: (getattr(expected, k), v) for k, v in current.items() if getattr(expected, k) != v}
+        if diff:
+            raise ValueError(f"{annotation_run} scheduled against {expected}, but the installed tool is "
+                             f"{diff} - register and promote it "
+                             f"(manage.py create_new_annotation_pipeline_version)")
 
     def get_variants_qs(self, annotation_run) -> QuerySet[Variant]:
         """ Variants in this run's range that this pipeline is responsible for. """

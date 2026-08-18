@@ -5,13 +5,18 @@ Covers what the split buys: a supplementary run waits for the VEP run whose rows
 hold up a VCF import, sees SVs too large for VEP, and appears for every existing range lock the moment
 the pipeline is enabled - which is the backfill the issue asked for.
 """
+from unittest import mock
+
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.test.utils import override_settings
+from django.urls import reverse
 from django.utils import timezone
 
+from annotation.annotation_versions import _reset_run_counts_after_extend
 from annotation.fake_annotation import get_fake_vep_version
 from annotation.models import AnnotationVersion, VariantAnnotationVersion
-from annotation.models.models import AnnotationRangeLock, AnnotationRun
+from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock, AnnotationRun
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import blocking_pipeline_types, enabled_pipeline_types, get_runner
 from annotation.tasks.annotation_scheduler_task import (
@@ -47,8 +52,15 @@ class AnnotSVPipelineTestCase(TestCase):
 
     def _make_runs(self, lock):
         sv_run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=STRUCTURAL)
-        annotsv_run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=ANNOTSV)
+        annotsv_run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=ANNOTSV,
+                                                  pipeline_version=self._make_pipeline_version("3.5.8"))
         return sv_run, annotsv_run
+
+    def _make_pipeline_version(self, code_version, status=AnnotationPipelineVersion.Status.ACTIVE):
+        pipeline_version, _ = AnnotationPipelineVersion.objects.get_or_create(
+            pipeline_type=ANNOTSV, genome_build=self.grch37, code_version=code_version,
+            data_version=None, defaults={"status": status})
+        return pipeline_version
 
     def test_annotsv_run_waits_for_sv_vep_run(self):
         lock = self._make_lock()
@@ -82,22 +94,68 @@ class AnnotSVPipelineTestCase(TestCase):
         self.assertIn(STANDARD, blocking_pipeline_types())
         self.assertIn(STRUCTURAL, blocking_pipeline_types())
 
+    def _finish_vep_runs(self, lock):
+        for pipeline_type in (STANDARD, STRUCTURAL, VariantAnnotationPipelineType.GENE_LEVEL):
+            run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=pipeline_type)
+            run.dump_count = 0
+            run.save()
+
     @override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
     def test_enabling_annotsv_creates_runs_for_existing_locks(self):
         """ #720's backfill: enabling the pipeline makes the scheduler's orphaned-lock repair create an
             ANNOTSV run for every lock that already finished VEP. """
         lock = self._make_lock()
-        for pipeline_type in (STANDARD, STRUCTURAL, VariantAnnotationPipelineType.GENE_LEVEL):
-            run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=pipeline_type)
-            run.dump_count = 0
-            run.save()
+        self._finish_vep_runs(lock)
+        active = self._make_pipeline_version("3.5.8")
         self.assertFalse(AnnotationRun.objects.filter(annotation_range_lock=lock,
                                                       pipeline_type=ANNOTSV).exists())
 
         _handle_variant_annotation_version(self.vav)
 
-        self.assertTrue(AnnotationRun.objects.filter(annotation_range_lock=lock,
-                                                     pipeline_type=ANNOTSV).exists())
+        self.assertEqual(AnnotationRun.objects.get(annotation_range_lock=lock,
+                                                   pipeline_type=ANNOTSV).pipeline_version, active)
+
+    @override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
+    def test_promoting_a_new_version_creates_a_second_run_for_each_lock(self):
+        """ The re-run path (#720): upgrading the tool is registering a version and promoting it, after
+            which the scheduler's missing-run repair covers every lock - the same query that backfills a
+            newly-enabled pipeline. The superseded run stays FINISHED, as the record of what 3.5.8 did. """
+        lock = self._make_lock()
+        self._finish_vep_runs(lock)
+        old_version = self._make_pipeline_version("3.5.8")
+        _handle_variant_annotation_version(self.vav)
+        old_run = AnnotationRun.objects.get(annotation_range_lock=lock, pipeline_type=ANNOTSV)
+        old_run.dump_count = 0
+        old_run.save()
+        self.assertEqual(old_run.status, AnnotationStatus.FINISHED)
+
+        new_version = self._make_pipeline_version("3.5.9", status=AnnotationPipelineVersion.Status.NEW)
+        # Registered but not promoted - nothing is scheduled against it yet
+        _handle_variant_annotation_version(self.vav)
+        self.assertEqual(AnnotationRun.objects.filter(annotation_range_lock=lock,
+                                                      pipeline_type=ANNOTSV).count(), 1)
+
+        new_version.promote_to_active()
+        _handle_variant_annotation_version(self.vav)
+
+        runs = AnnotationRun.objects.filter(annotation_range_lock=lock, pipeline_type=ANNOTSV)
+        self.assertEqual({r.pipeline_version for r in runs}, {old_version, new_version})
+        old_run.refresh_from_db()
+        self.assertEqual(old_run.status, AnnotationStatus.FINISHED)
+        old_version.refresh_from_db()
+        self.assertEqual(old_version.status, AnnotationPipelineVersion.Status.HISTORICAL)
+
+    @override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
+    def test_no_runs_created_while_the_installed_tool_is_unregistered(self):
+        """ Enabled with nothing ACTIVE means the operator hasn't run
+            create_new_annotation_pipeline_version yet - schedule nothing rather than against no version. """
+        lock = self._make_lock()
+        self._finish_vep_runs(lock)
+
+        _handle_variant_annotation_version(self.vav)
+
+        self.assertFalse(AnnotationRun.objects.filter(annotation_range_lock=lock,
+                                                      pipeline_type=ANNOTSV).exists())
 
     def test_annotsv_runs_not_created_while_disabled(self):
         self.assertNotIn(ANNOTSV, enabled_pipeline_types())
@@ -115,6 +173,65 @@ class AnnotSVPipelineTestCase(TestCase):
         # VEPRunner adds the abs_svlen annotation solely to apply the cap
         self.assertIn("abs_svlen", get_runner(STRUCTURAL).get_variants_qs(sv_run).query.annotations)
         self.assertNotIn("abs_svlen", get_runner(ANNOTSV).get_variants_qs(annotsv_run).query.annotations)
+
+
+    def test_merge_leaves_a_superseded_run_alone(self):
+        """ A merge reopens empty-finished runs so the larger range gets re-counted, but a run left
+            behind by a promoted version is history - reopening it would dispatch it against a tool that
+            no longer matches the version it records. """
+        lock = self._make_lock()
+        superseded_version = self._make_pipeline_version(
+            "3.5.8", status=AnnotationPipelineVersion.Status.HISTORICAL)
+        superseded_run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=ANNOTSV,
+                                                     pipeline_version=superseded_version)
+        superseded_run.dump_count = 0
+        superseded_run.save()
+        current_run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=ANNOTSV,
+                                                  pipeline_version=self._make_pipeline_version("3.5.9"))
+        current_run.dump_count = 0
+        current_run.save()
+        self.assertTrue(superseded_run.is_empty_finished)
+
+        _reset_run_counts_after_extend(lock)
+
+        superseded_run.refresh_from_db()
+        current_run.refresh_from_db()
+        self.assertEqual(superseded_run.status, AnnotationStatus.FINISHED)
+        self.assertEqual(current_run.status, AnnotationStatus.CREATED)
+
+
+@override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
+class PromotePipelineVersionViewTest(TestCase):
+    """ #720: promoting on the annotation runs page is the whole re-run trigger, so the button the
+        template posts and the handler that reads it have to keep agreeing. """
+
+    def setUp(self):
+        super().setUp()
+        self.user = User.objects.create_superuser("promote_test_admin", "admin@test.com", "password")
+        self.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        self.active = AnnotationPipelineVersion.objects.create(
+            pipeline_type=ANNOTSV, genome_build=self.genome_build, code_version="3.5.8",
+            status=AnnotationPipelineVersion.Status.ACTIVE)
+        self.new = AnnotationPipelineVersion.objects.create(
+            pipeline_type=ANNOTSV, genome_build=self.genome_build, code_version="3.5.9",
+            status=AnnotationPipelineVersion.Status.NEW)
+        self.client.force_login(self.user)
+
+    def test_page_offers_the_promote_button(self):
+        response = self.client.get(reverse("variant_annotation_runs"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"promote-pipeline-version-{self.new.pk}")
+
+    def test_promoting_activates_and_queues_the_scheduler(self):
+        with mock.patch("annotation.views.annotation_scheduler") as scheduler:
+            response = self.client.post(reverse("variant_annotation_runs"),
+                                        {f"promote-pipeline-version-{self.new.pk}": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.new.refresh_from_db()
+        self.active.refresh_from_db()
+        self.assertEqual(self.new.status, AnnotationPipelineVersion.Status.ACTIVE)
+        self.assertEqual(self.active.status, AnnotationPipelineVersion.Status.HISTORICAL)
+        scheduler.si.assert_called_once()
 
 
 class ExecuteCmdTimeoutTest(TestCase):
