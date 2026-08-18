@@ -4,8 +4,6 @@ from pathtests.grids import CasesGrid, PathologyTestOrdersGrid, PathologyTestsGr
 from variantgrid.perm_path import path
 
 urlpatterns = [
-    path('clinician_login', views.clinician_login, name='clinician_login'),
-    path('clinician_cases/<int:clinician_id>', views.clinician_cases, name='clinician_cases'),
     path('my_cases_tab', views.my_cases_tab, name='my_cases_tab'),
     path('my_cases', views.my_cases, name='my_cases'),
     path('scientist_cases/<int:user_id>', views.scientist_cases, name='scientist_cases'),
@@ -14,7 +12,6 @@ urlpatterns = [
     # Pathology Tests
     path('', views.pathology_tests, name='pathology_tests'),
     path('cases', views.cases, name='cases'),
-    path('pathology_test_requests', views.pathology_test_requests, name='pathology_test_requests'),
     path('manage_pathology_tests', views.manage_pathology_tests, name='manage_pathology_tests'),
     path('view_pathology_test_version/<int:pk>', views.view_pathology_test_version, name='view_pathology_test_version'),
     path('view_pathology_test/<name>', views.view_pathology_test, name='view_pathology_test'),

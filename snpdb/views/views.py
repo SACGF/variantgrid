@@ -81,7 +81,7 @@ from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
 from ontology.models import OntologyTerm
 from patients.forms import PatientForm
-from patients.models import Clinician, Patient
+from patients.models import Patient
 from patients.views import get_patient_upload_csv
 from snpdb import forms
 from snpdb.archive import (
@@ -175,9 +175,6 @@ from user_messages.models import Message
 
 @terms_required
 def index(request):
-    if Clinician.user_is_clinician(request.user):
-        return redirect('clinician_login')
-
     return render(request, 'index.html')
 
 

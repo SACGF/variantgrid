@@ -5,7 +5,6 @@ from collections import defaultdict
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
 from django.db.models.query_utils import Q
 from django.http.response import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -35,37 +34,8 @@ from pathtests.models import (
     get_external_order_system_last_checked,
 )
 from patients.forms import external_pk_autocomplete_form_factory
-from patients.models import Clinician, FollowLeadScientist, get_lead_scientist_users_for_user
+from patients.models import FollowLeadScientist, get_lead_scientist_users_for_user
 from snpdb.models.models_enums import ImportStatus
-
-
-def user_is_clinician(user):
-    try:
-        return user.clinician is not None
-    except Clinician.DoesNotExist:
-        return False
-
-
-def clinician_login(request):
-    try:
-        request.user.clinician
-    except Clinician.DoesNotExist as exc:
-        msg = "Only clinicians can view this page!"
-        raise PermissionDenied(msg) from exc
-    return redirect('pathology_test_requests')
-
-
-def clinician_cases(request, clinician_id):
-    clinician = get_object_or_404(Clinician, pk=clinician_id)
-    q_clinician = Q(caseclinician__clinician=clinician)
-    q_requested = Q(pathologytestorder__sapathologyrequestgenelistpathologytestorderlink__sapathology_request_gene_list__sapathology_request__user=clinician.user)
-    cases_qs = get_cases_qs().filter(q_clinician | q_requested).order_by("-created")
-
-    last_checked = get_external_order_system_last_checked()
-    # No current way to find out cases by clinician - waiting on Helix to come back to us...
-    context = {"last_checked": last_checked,
-               "cases_qs": cases_qs}
-    return render(request, 'pathtests/clinician_cases.html', context)
 
 
 def my_cases(request, has_menu=True):
@@ -139,16 +109,6 @@ def cases(request):
 
     context = {"external_case_form": external_case_form}
     return render(request, 'pathtests/cases.html', context)
-
-
-def pathology_test_requests(request):
-    # This redirects to a custom page
-
-    url = settings.PATHOLOGY_TEST_REQUESTS_REDIRECT_URL
-    if not url:
-        msg = "Your system does not have 'PATHOLOGY_TEST_REQUESTS_REDIRECT_URL' setting configured"
-        raise PermissionDenied(msg)
-    return redirect(url)
 
 
 def manage_pathology_tests(request):

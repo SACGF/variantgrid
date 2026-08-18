@@ -16,6 +16,44 @@
     $("#id_exclude").change(function() { mirrorCheckbox(this, $("#mirror-exclude")); });
     $("#mirror-exclude").change(function() { mirrorCheckbox(this, $("#id_exclude")); });
 
+{% if pathology_tests_enabled and pathology_test_category %}
+    const PATHOLOGY_TEST_STALE_WARNING_DAYS = {{ pathology_test_stale_warning_days }};
+    const ptvSelect = $("#id_pathology_test_version");
+
+    function showPathologyTestInfo() {
+        const container = $("#pathology-test-info");
+        container.empty();
+        const ptvId = ptvSelect.val();
+        if (!ptvId) {
+            return;
+        }
+        $.getJSON(Urls.api_view_pathology_test_version(ptvId), function(data) {
+            const testLink = $("<a>", {href: Urls.view_pathology_test_version(ptvId), target: "_blank",
+                                       class: "hover-link", text: data.__str__});
+            const modifiedDate = new Date(data.modified);
+            const ageDays = Math.floor((Date.now() - modifiedDate.getTime()) / (1000 * 60 * 60 * 24));
+            container.append($("<div>").append($("<b>", {text: "Test: "})).append(testLink));
+            container.append($("<div>").append($("<b>", {text: "Last modified: "}))
+                .append(document.createTextNode(modifiedDate.toLocaleDateString() + " (" + ageDays + " days ago)")));
+            if (data.confirmed_date) {
+                container.append($("<div>").append($("<b>", {text: "Confirmed: "}))
+                    .append(document.createTextNode(new Date(data.confirmed_date).toLocaleDateString())));
+            }
+            if (data.pathology_test && data.pathology_test.curator) {
+                container.append($("<div>").append($("<b>", {text: "Curator: "}))
+                    .append(document.createTextNode(data.pathology_test.curator.username)));
+            }
+            if (ageDays > PATHOLOGY_TEST_STALE_WARNING_DAYS) {
+                container.append($("<div>", {class: "warning",
+                    text: "This test was last modified " + ageDays + " days ago and may be out of date - " +
+                          "check the current gene list via the test link above."}));
+            }
+        });
+    }
+    ptvSelect.on("change select2:select select2:clear", showPathologyTestInfo);
+    showPathologyTestInfo();
+{% endif %}
+
 {% endblock docreadyjs %}
 
 {% block content %}
@@ -73,9 +111,10 @@
                 <li id='pathology-test-gene-list'>
                 <h3>{{ pathology_test_category.name }}</h3>
                 <div>
-                    <div>
-                        <div class='gene-list-icon icon48 {{ pathology_test_category.icon_css_class }}'></div> {{ form.pathology_test_version }}<a class="cross-link" id="pathology-test-gene-list-link"></a>
-                        <div class='clear'></div>
+                    <div style="display: flex; align-items: flex-start; gap: 10px;">
+                        <div class='gene-list-icon icon48 {{ pathology_test_category.icon_css_class }}'></div>
+                        <div>{{ form.pathology_test_version }}</div>
+                        <div id="pathology-test-info"></div>
                     </div>
                 </div>
                 </li>

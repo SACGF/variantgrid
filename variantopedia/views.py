@@ -63,7 +63,6 @@ from library.log_utils import (
 )
 from library.utils import flatten_nested_lists
 from pathtests.models import cases_for_user
-from patients.models import Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
@@ -145,9 +144,6 @@ def strip_celery_from_keys(celery_state):
 
 
 def dashboard(request):
-    if Clinician.user_is_clinician(request.user):
-        return redirect('clinician_login')
-
     sample_enrichment_kits_df = None
     latest_sequencing_vcfs = []
     if settings.SEQAUTO_ENABLED:

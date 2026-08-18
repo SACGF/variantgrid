@@ -613,7 +613,8 @@ CLASSIFICATION_ALLOW_UNKNOWN_KEYS = True  # default to true for the sake of envi
 ONTOLOGY_EXTERNAL_LINKS = False  # Generate external or internal links for ontology terms
 
 PATHOLOGY_TESTS_ENABLED = False
-PATHOLOGY_TEST_REQUESTS_REDIRECT_URL = None
+# GeneListNode editor warns if the selected test's last modification is older than this
+PATHOLOGY_TEST_STALE_WARNING_DAYS = 365
 PATHOLOGY_TEST_EXTERNAL_CODE = None
 PATHOLOGY_TEST_SORTED_ENRICHMENT_KITS = []  # Tests get automatically compared to
 PATHOLOGY_TEST_CASE_EXTERNAL_CODE = None

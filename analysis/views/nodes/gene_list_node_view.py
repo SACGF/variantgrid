@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from django.conf import settings
 from django.utils.timesince import timesince
 
 from analysis.forms.forms_nodes import GeneListNodeForm
@@ -53,7 +54,8 @@ class GeneListNodeView(GeneCoverageNodeView):
 
     def _get_pathology_test_context(self):
         pathology_test_category = GeneListCategory.get_pathology_test_gene_category()
-        return {'pathology_test_category': pathology_test_category}
+        return {'pathology_test_category': pathology_test_category,
+                'pathology_test_stale_warning_days': settings.PATHOLOGY_TEST_STALE_WARNING_DAYS}
 
     def _get_panel_app_context(self):
         # TODO: Give a warning if panel app is out of date...
