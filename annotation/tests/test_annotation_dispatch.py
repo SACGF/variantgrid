@@ -20,7 +20,6 @@ from django.test.utils import override_settings
 from django.utils import timezone
 
 from annotation.annotation_versions import _absorb_range_lock, merge_pending_range_locks
-from annotation.annotsv_annotation import get_annotsv_tsv_filename
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import (
     AnnotationRangeLock,
@@ -29,20 +28,21 @@ from annotation.models import (
     VariantAnnotationVersion,
 )
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
-from annotation.sv_conservation import conservation_sidecar_filename
 from annotation.tasks import annotation_scheduler_task
+from annotation.annotation_run_files import get_annotated_filename
+from annotation.vep_annotation import get_vep_skipped_variants_filename
+from annotation.pipelines import enabled_pipeline_types, get_runner
+from annotation.pipelines.vep import VEPRunner
 from annotation.tasks.annotate_variants import (
     _trigger_dispatch,
     annotate_variants,
-    get_annotated_filename,
-    get_annotsv_dir,
-    get_vep_skipped_variants_filename,
     import_annotation_run,
 )
 from annotation.tasks.annotation_scheduler_task import (
     _IMPORT_RUNNING_STATUSES,
     _VEP_RUNNING_STATUSES,
     _handle_range_lock,
+    _scheduled_pipeline_versions,
     _lane_in_flight_qs,
     _trigger_counts_for_uncounted_runs,
     count_annotation_run,
@@ -109,10 +109,10 @@ class AnnotationDispatchTestCase(TestCase):
         lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.variants[0],
                                                   max_variant=self.variants[1], count=100)
         with mock.patch.object(annotate_variants, "apply_async") as launch:
-            _handle_range_lock(lock)
+            _handle_range_lock(lock, _scheduled_pipeline_versions(self.vav.genome_build))
         runs = AnnotationRun.objects.filter(annotation_range_lock=lock)
-        num_pipeline_types = len(VariantAnnotationPipelineType)
-        self.assertEqual(runs.count(), num_pipeline_types)
+        # Only the pipelines this deployment has switched on - AnnotSV is opt-in (#720)
+        self.assertEqual(runs.count(), len(enabled_pipeline_types()))
         for run in runs:
             self.assertEqual(run.status, AnnotationStatus.CREATED)
             self.assertIsNone(run.task_id)
@@ -549,8 +549,8 @@ class AnnotationDispatchTestCase(TestCase):
         # (the dispatcher runs import_annotation_run on db_workers) and does NOT send the complete signal.
         run = self._make_lock(0, 0, count=100).annotationrun_set.first()
         self.assertEqual(run.status, AnnotationStatus.CREATED)
-        with mock.patch("annotation.tasks.annotate_variants.dump_and_annotate_variants") as dump_mock, \
-             mock.patch("annotation.tasks.annotate_variants.import_vcf_annotations") as import_mock, \
+        with mock.patch.object(VEPRunner, "annotate") as dump_mock, \
+             mock.patch.object(VEPRunner, "import_results") as import_mock, \
              mock.patch.object(VariantAnnotationVersion, "get_annotation_run_blocker", return_value=None), \
              mock.patch("annotation.tasks.annotate_variants.annotation_run_complete_signal") as signal, \
              mock.patch("annotation.tasks.annotate_variants._trigger_dispatch"):
@@ -563,7 +563,7 @@ class AnnotationDispatchTestCase(TestCase):
         # #1649: import_annotation_run bulk-loads the annotated VCF and sends the complete signal once.
         run = self._make_past_vep_run()
         self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
-        with mock.patch("annotation.tasks.annotate_variants.import_vcf_annotations") as import_mock, \
+        with mock.patch.object(VEPRunner, "import_results") as import_mock, \
              mock.patch("annotation.tasks.annotate_variants.annotation_run_complete_signal") as signal, \
              mock.patch("annotation.tasks.annotate_variants._trigger_dispatch"):
             import_annotation_run.apply((run.pk,)).get()
@@ -656,23 +656,17 @@ class AnnotationDispatchTestCase(TestCase):
             self.assertFalse(os.path.exists(annotated_filename))
 
     def test_reclaim_full_scrub_removes_derived_files(self):
-        # #1660: the row names only the dump; the annotated VCF, conservation sidecar and AnnotSV TSV are
-        # all derivable from that stem. Reclaim must collect them - a genuinely dead worker never runs
+        # #1660: the row names only the dump; everything else the runner writes is derivable from that
+        # stem. Reclaim must collect them - a genuinely dead worker never runs
         # _cleanup_reclaimed_run_files, so reclaim is the only collector for that case.
         with tempfile.TemporaryDirectory() as tmp_dir, \
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
             run = self._run_with_dump(tmp_dir)
             dump_filename = run.vcf_dump_filename
             annotated_filename = get_annotated_filename(run, dump_filename)
-            annotsv_dir = get_annotsv_dir(run)
-            os.makedirs(annotsv_dir, exist_ok=True)
-            derived = [
-                dump_filename,
-                # Partial VEP output - the heartbeat's kill leaves this behind
-                annotated_filename,
-                conservation_sidecar_filename(annotated_filename),
-                get_annotsv_tsv_filename(dump_filename, annotsv_dir),
-            ]
+            # Partial VEP output - the heartbeat's kill leaves this behind
+            derived = get_runner(run.pipeline_type).get_output_paths(run, dump_filename)
+            self.assertIn(annotated_filename, derived)
             for path in derived:
                 open(path, "w").close()
             # Reclaim takes the scrub branch only when there's no annotated VCF to resume from

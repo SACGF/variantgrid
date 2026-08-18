@@ -27,14 +27,13 @@ from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPi
 from annotation.signals.annotation_run_cleanup import remove_annotation_run_output
 from annotation.signals.manual_signals import annotation_run_complete_signal
 from annotation.tasks import annotation_scheduler_task
+from annotation.annotation_run_files import get_annotsv_dir
+from annotation.pipelines import get_runner
+from annotation.pipelines.vep import VEPRunner
 from annotation.tasks.annotate_variants import (
     _cleanup_reclaimed_run_files,
     annotate_variants,
     annotation_run_retry,
-    conservation_sidecar_filename,
-    get_annotated_filename,
-    get_annotsv_dir,
-    get_annotsv_tsv_filename,
     import_annotation_run,
 )
 from annotation.tasks.annotation_scheduler_task import (
@@ -64,26 +63,26 @@ class AnnotationRunCleanupTestCase(TestCase):
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
         cls.av = AnnotationVersion.objects.create(genome_build=cls.grch37, variant_annotation_version=cls.vav)
 
-    def _run_with_output(self, tmp_dir, **run_kwargs):
-        """ A run whose full set of pipeline artifacts exists on disk. Returns (run, paths, annotsv_dir). """
+    def _run_with_output(self, tmp_dir, pipeline_type=STANDARD, **run_kwargs):
+        """ A run whose full set of pipeline artifacts exists on disk, as its own runner names them.
+            Returns (run, paths, annotsv_dir) - annotsv_dir is None for pipelines that don't use one. """
         lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.variants[0],
                                                   max_variant=self.variants[1], count=100)
-        run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=STANDARD)
+        run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=pipeline_type)
         run.vcf_dump_filename = os.path.join(tmp_dir, f"dump_{run.pk}__task.vcf")
-        annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
-        annotsv_dir = get_annotsv_dir(run)
-        os.makedirs(annotsv_dir, exist_ok=True)
-        paths = [
-            run.vcf_dump_filename,
-            annotated_filename,
-            conservation_sidecar_filename(annotated_filename),
-            get_annotsv_tsv_filename(run.vcf_dump_filename, annotsv_dir),
-        ]
+        runner = get_runner(pipeline_type)
+
+        annotsv_dir = None
+        if pipeline_type == VariantAnnotationPipelineType.ANNOTSV:
+            annotsv_dir = get_annotsv_dir(run)
+            os.makedirs(annotsv_dir, exist_ok=True)
+            # AnnotSV writes more than just the TSV into its directory
+            open(os.path.join(annotsv_dir, "AnnotSV.log"), "w").close()
+
+        paths = runner.get_output_paths(run, run.vcf_dump_filename)
         for path in paths:
             open(path, "w").close()
-        # AnnotSV writes more than just the TSV into its directory
-        open(os.path.join(annotsv_dir, "AnnotSV.log"), "w").close()
-        run.vcf_annotated_filename = annotated_filename
+        runner.record_resume_state(run, run.vcf_dump_filename)
         for k, v in run_kwargs.items():
             setattr(run, k, v)
         run.save()
@@ -92,13 +91,15 @@ class AnnotationRunCleanupTestCase(TestCase):
     def _assert_all_removed(self, paths, annotsv_dir):
         for path in paths:
             self.assertFalse(os.path.exists(path), f"left {os.path.basename(path)} behind")
-        self.assertFalse(os.path.exists(annotsv_dir))
+        if annotsv_dir:
+            self.assertFalse(os.path.exists(annotsv_dir))
 
     def test_success_signal_reclaims_output(self):
         with tempfile.TemporaryDirectory() as tmp_dir, \
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir,
                                   ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS=True):
-            run, paths, annotsv_dir = self._run_with_output(tmp_dir)
+            run, paths, annotsv_dir = self._run_with_output(
+                tmp_dir, pipeline_type=VariantAnnotationPipelineType.ANNOTSV)
 
             annotation_run_complete_signal.send(sender="test", annotation_run=run,
                                                 variant_annotation_version=self.vav,
@@ -110,7 +111,8 @@ class AnnotationRunCleanupTestCase(TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir, \
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir,
                                   ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS=False):
-            run, paths, annotsv_dir = self._run_with_output(tmp_dir)
+            run, paths, annotsv_dir = self._run_with_output(
+                tmp_dir, pipeline_type=VariantAnnotationPipelineType.ANNOTSV)
 
             annotation_run_complete_signal.send(sender="test", annotation_run=run,
                                                 variant_annotation_version=self.vav,
@@ -132,9 +134,9 @@ class AnnotationRunCleanupTestCase(TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir, \
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir,
                                   ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS=True):
-            run, paths, annotsv_dir = self._run_with_output(tmp_dir)
+            run, paths, _ = self._run_with_output(tmp_dir)
 
-            with mock.patch("annotation.tasks.annotate_variants.import_vcf_annotations",
+            with mock.patch.object(VEPRunner, "import_results",
                             side_effect=RuntimeError("import blew up")), \
                     mock.patch("annotation.tasks.annotate_variants._trigger_dispatch"):
                 with self.assertRaises(RuntimeError):
@@ -142,14 +144,14 @@ class AnnotationRunCleanupTestCase(TestCase):
 
             for path in paths:
                 self.assertTrue(os.path.exists(path), f"failure removed {os.path.basename(path)}")
-            self.assertTrue(os.path.isdir(annotsv_dir))
 
     def test_discarded_attempt_keeps_shared_annotsv_dir(self):
         # #1658: the AnnotSV dir is keyed on the run and shared between attempts, so an attempt that lost
         # the run must not take the winner's output with it.
         with tempfile.TemporaryDirectory() as tmp_dir, \
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
-            run, paths, annotsv_dir = self._run_with_output(tmp_dir)
+            run, paths, annotsv_dir = self._run_with_output(
+                tmp_dir, pipeline_type=VariantAnnotationPipelineType.ANNOTSV)
 
             _cleanup_reclaimed_run_files(run)
 
@@ -163,7 +165,8 @@ class AnnotationRunCleanupTestCase(TestCase):
         # subdivide_annotation_range_lock) cannot silently orphan the files.
         with tempfile.TemporaryDirectory() as tmp_dir, \
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
-            run, paths, annotsv_dir = self._run_with_output(tmp_dir)
+            run, paths, annotsv_dir = self._run_with_output(
+                tmp_dir, pipeline_type=VariantAnnotationPipelineType.ANNOTSV)
 
             with mock.patch.object(AnnotationRun, "delete_related_objects"):
                 AnnotationRun.objects.filter(pk=run.pk).delete()

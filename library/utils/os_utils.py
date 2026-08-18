@@ -43,6 +43,10 @@ def execute_cmd(cmd: list, **kwargs) -> CmdOutput:
     # so a caller (e.g. the annotation lease heartbeat on a separate thread) can .kill() the subprocess
     # while communicate() blocks here - the resulting non-zero return_code lets the caller abort cleanly.
     process_callback = kwargs.pop("process_callback", None)
+    # timeout (#720): seconds to wait before killing the subprocess, as subprocess.run's timeout. Callers
+    # get whatever was written before the kill plus a non-zero return_code, so a timeout needs no branch
+    # of its own on top of the return_code handling they already have. Default None = wait forever.
+    timeout = kwargs.pop("timeout", None)
     if kwargs.pop("shell", False):
         command = ' '.join(cmd)
         logging.info('About to call %s', command)
@@ -55,7 +59,16 @@ def execute_cmd(cmd: list, **kwargs) -> CmdOutput:
     if process_callback is not None:
         process_callback(pipes)
 
-    std_out, std_err = pipes.communicate()
+    try:
+        std_out, std_err = pipes.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # Kill then drain - a bare kill() leaves the pipes unread and the child a zombie. The second
+        # communicate() has no timeout on purpose: the process is already killed, so it returns as soon
+        # as the OS closes its end.
+        pipes.kill()
+        std_out, std_err = pipes.communicate()
+        logging.warning("Command timed out after %ss: %s", timeout, cmd)
+
     return CmdOutput(
         return_code=pipes.returncode,
         std_out=std_out.decode() if std_out else None,
