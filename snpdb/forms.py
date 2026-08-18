@@ -351,6 +351,11 @@ class SettingsInitialGroupPermissionForm(forms.Form):
                                                                     group=self.group, defaults=defaults)
 
 
+# Written by extraction matching (see ExtractionMatchMixin.apply_extraction_match) - shown, not edited
+EXTRACTION_MATCH_FIELDS = ('extraction_reference', 'extraction_match_status',
+                           'extraction_match_error', 'extraction_match_date')
+
+
 class SampleForm(forms.ModelForm, ROFormMixin):
     genome_build = forms.CharField()  # From VCF.genome_build
     grid_sample_label = forms.CharField(help_text="Calculated from your current user settings. May be different in analysis due to analysis settings")
@@ -358,9 +363,12 @@ class SampleForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = models.Sample
         exclude = ['vcf', 'has_genotype']
-        read_only = ('genome_build', 'vcf_sample_name', 'import_status', 'grid_sample_label')
+        read_only = ('genome_build', 'vcf_sample_name', 'import_status',
+                     'grid_sample_label') + EXTRACTION_MATCH_FIELDS
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
+                   'extraction_reference': TextInput(),
+                   'extraction_match_error': TextInput(),
                    'patient': ModelSelect2(url='patient_autocomplete',
                                            attrs={'data-placeholder': 'Patient...'}),
                    'extraction': ModelSelect2(url='extraction_autocomplete',
@@ -370,10 +378,15 @@ class SampleForm(forms.ModelForm, ROFormMixin):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
-        fields = ["genome_build"] + [f for f in self.fields if f != 'genome_build']
-        self.order_fields(fields)
+        self.order_fields(self._field_order())
         self.fields['genome_build'].initial = self.instance.vcf.genome_build
         self.fields['grid_sample_label'].initial = self._get_sample_label(user, self.instance)
+
+    def _field_order(self) -> list[str]:
+        """ Extraction matching goes last - it's system bookkeeping below the fields people edit """
+        editable = [f for f in self.fields
+                    if f not in EXTRACTION_MATCH_FIELDS and f != 'genome_build']
+        return ["genome_build"] + editable + list(EXTRACTION_MATCH_FIELDS)
 
     @staticmethod
     def _get_sample_label(user, sample):

@@ -25,7 +25,8 @@ class PatientForm(forms.ModelForm):
 
     class Meta:
         model = Patient
-        fields = ['first_name', 'last_name', 'family_code', 'patient_code',
+        # patient_code first - the de-identified code we want people to enter and that's shown everywhere
+        fields = ['patient_code', 'family_code', 'first_name', 'last_name',
                   'date_of_birth', 'date_of_death', 'sex',
                   'consanguineous', 'affected', 'phenotype']
         widgets = {'first_name': TextInput(attrs={'placeholder': 'First Name'}),

@@ -111,17 +111,17 @@ class ExternallyManagedModel(TimeStampedModel):
 def patient_name(first_name, last_name):
     if not (first_name or last_name):
         return 'Unknown Patient'
-    if first_name:
+    if first_name and last_name:
         return f"{first_name} {last_name}"
-    return last_name
+    return first_name or last_name
 
 
 def patient_name_surname_first(first_name, last_name):
     if not (first_name or last_name):
         return 'Unknown Patient'
-    if first_name:
+    if first_name and last_name:
         return f"{last_name}, {first_name}"
-    return last_name
+    return first_name or last_name
 
 # PATIENT / SAMPLE AGES AND DATES:
 # We recommend using dates rather than storing age/deceased as age will not keep
@@ -140,7 +140,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     family_code = models.TextField(null=True, blank=True)
     patient_code = models.TextField(null=True, blank=True)
     first_name = models.TextField(null=True, blank=True)
-    last_name = models.TextField(null=True)
+    last_name = models.TextField(null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     date_of_death = models.DateField(null=True, blank=True)
     sex = models.CharField(max_length=1, choices=Sex.choices, default=Sex.UNKNOWN)
@@ -288,7 +288,11 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return self.sample_set.all().order_by("vcf__date")
 
     def __str__(self):
-        description = self.name
+        # De-identified patients have no name, so fall back to the code they're known by
+        if self.first_name or self.last_name:
+            description = self.name
+        else:
+            description = str(self.code)
         if self.sex != Sex.UNKNOWN:
             description += f" ({self.sex})"
         return description

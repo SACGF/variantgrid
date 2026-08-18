@@ -376,3 +376,18 @@ class TestPatientCodeProperty(TestCase):
     def test_falls_back_to_pk_when_neither_set(self):
         patient = Patient.objects.create(last_name="SMITH")
         self.assertEqual(patient.code, f"Patient:{patient.pk}")
+
+
+# ---------------------------------------------------------------------------
+# Naming a patient with no last name - issue #1746 de-identified patients
+# ---------------------------------------------------------------------------
+
+class TestDeIdentifiedPatientName(TestCase):
+    def test_str_uses_code_when_no_name(self):
+        patient = Patient.objects.create(patient_code="DEID-101")
+        self.assertEqual(str(patient), "DEID-101")
+
+    def test_name_with_first_name_only(self):
+        patient = Patient.objects.create(first_name="BOB")
+        self.assertEqual(patient.name, "BOB")
+        self.assertEqual(patient.name_last_name_first, "BOB")

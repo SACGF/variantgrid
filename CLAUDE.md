@@ -162,7 +162,16 @@ Fake/fixture data helpers are in `annotation/tests/test_data_fake_genes.py`, `sn
 
 `UNIT_TEST = sys.argv[1:2] == ['test']` is set in default_settings and used to conditionally skip expensive setup.
 
-It's great to write tests while you are writing code to ensure correctness. At the end, you should audit the tests and decide whether they are worth their costs (code to run and maintain, and possibly hampering refactoring)
+Write as many tests as you like while developing - they're a great way to check your work as you go.
+
+When the code is finished, audit them and delete the ones that don't earn their keep. Every test kept is code
+to run, read and maintain, and one more thing to update when refactoring. A test earns its keep when it covers
+logic *we* wrote: a branch, a fallback, a calculation, a rule that's easy to get wrong later.
+
+The most common thing to throw away is a test of framework behaviour rather than ours - that `blank=True` makes
+a field optional, that a `disabled` form field ignores POSTed data, that `order_fields` orders fields. Django is
+already tested. If the test would still pass with our logic deleted, or it only restates a field declaration,
+drop it.
 
 ## Database
 

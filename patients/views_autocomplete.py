@@ -17,7 +17,7 @@ from snpdb.views.views_autocomplete import GenomeBuildAutocompleteView
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
 class PatientAutocompleteView(AutocompleteView):
-    fields = ['last_name', 'first_name']
+    fields = ['patient_code', 'last_name', 'first_name']
 
     def get_user_queryset(self, user):
         return Patient.filter_for_user(user)

@@ -85,9 +85,11 @@ $(document).ready(function() {
         let extractionSelect = $("#id_extraction", sampleForm);
         clearAutocompleteChoice(extractionSelect);
     });
-    const dialog = setupCreatePatientDialog();
+{% if has_write_permission %}
+    const dialog = setupCreatePatientDialog("Click 'save' to link this patient to the sample.");
     const sampleName = $("#id_name").val();
-    addCreatePatientButton(dialog, patientSelect, sampleName, "p");
+    addCreatePatientButton(dialog, patientSelect, sampleName, patientSelect.parent());
+{% endif %}
 
     {% for file_type, cgf in annotated_download_files.items %}
         var pollUrl = Urls.sample_grid_export({{ sample.pk  }}, "{{ file_type }}");
@@ -163,18 +165,6 @@ $(document).ready(function() {
             <form method="post" id='sample-form'>
                 {% csrf_token %}
                 {% crispy form form_helper.horizontal %}
-                {% if not sample.extraction and sample.extraction_reference %}
-                    {# A claim about which extraction this sample is, that we can't resolve yet (#1707) #}
-                    <div class="form-group-row row" id="parked-extraction-reference">
-                        <label class="col-form-label col-12 col-md-3 text-md-right">Extraction reference</label>
-                        <div class="col-12 col-md-9">
-                            <div>{{ sample.extraction_reference }}</div>
-                            <div class="text-muted">
-                                {{ sample.get_extraction_match_status_display }}: {{ sample.extraction_match_error }}
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
                 {% if annotated_download_files and not sample.vcf.data_archived %}
                     <div class="form-group-row row">
                         <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>

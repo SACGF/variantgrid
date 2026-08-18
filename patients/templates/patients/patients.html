@@ -20,9 +20,6 @@
     #patient-header {
         margin-bottom: 10px;
     }
-    #sample-node-container {
-        float: left;
-    }
 
     .matches-graph {
         float: left;
@@ -389,9 +386,11 @@ $(document).ready(function() {
         <form id="patient-form" method="post">
             {% csrf_token %}
 
-            <div id="sample-node-container"></div>
             <fieldset class="form-fields">
                 <legend>Create New Patient</legend>
+                <div class="d-flex justify-content-end">
+                    <div id="sample-node-container"></div>
+                </div>
                 {% crispy form %}
                 <div class="buttons">
                     <button class="btn btn-primary">Create Patient</button>

@@ -5,7 +5,14 @@
 <link href="{% static 'css/nodes.css' %}" rel="stylesheet">
 <style>
 	#sample-node-container {
+		position: relative;
 		width: 60px;
+		height: 60px;
+	}
+
+	/* The analysis canvas positions .window absolutely - in a form it just sits in its container */
+	#sample-node-container .window {
+		position: relative;
 		height: 60px;
 	}
 </style>

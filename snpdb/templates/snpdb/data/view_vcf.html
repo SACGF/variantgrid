@@ -271,13 +271,13 @@ $(document).ready(function() {
 
     addCreateProjectButtonAndForm();
 
-    const dialog = setupCreatePatientDialog();
 {% if has_write_permission %}
+    const dialog = setupCreatePatientDialog("Click 'Update VCF' to link this patient to the sample.");
     $(".sample-patient select", "form#vcf-form").each(function () {
         const parentRow = $(this).parents("tr");
         const sampleNameCell = $(".sample-name", parentRow);
         const sampleName = $("input", sampleNameCell).val();
-        addCreatePatientButton(dialog, $(this), sampleName, ".sample-patient");
+        addCreatePatientButton(dialog, $(this), sampleName, $(this).parents(".sample-patient"));
     });
 {% endif %}
 
