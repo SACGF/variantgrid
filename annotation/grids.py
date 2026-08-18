@@ -26,6 +26,17 @@ class AnnotationRunColumns(DatatableConfig):
         return VariantAnnotationPipelineType(row["pipeline_type"]).label
 
     @staticmethod
+    def pipeline_version(row: dict[str, Any]):
+        """ #720: the tool + bundle a non-VEP run used. Blank for VEP runs, whose version is the
+            VariantAnnotationVersion already shown as 'Version'. """
+        code_version = row["pipeline_version__code_version"]
+        if not code_version:
+            return ""
+        if data_version := row["pipeline_version__data_version"]:
+            return f"{code_version}/{data_version}"
+        return code_version
+
+    @staticmethod
     def format_timedelta(cell: CellData):
         delta: timedelta = cell.value
         if delta is None:
@@ -48,6 +59,9 @@ class AnnotationRunColumns(DatatableConfig):
             RichColumn(key="id", label='ID', order_sequence=[SortOrder.DESC, SortOrder.ASC], client_renderer='idRenderer', default_sort=SortOrder.DESC),
             RichColumn(key="status", orderable=True, renderer=self.status),
             RichColumn(key="pipeline_type", orderable=True, renderer=self.pipeline_type),
+            RichColumn(key="pipeline_version__code_version", label="Tool Version", orderable=True,
+                       renderer=self.pipeline_version,
+                       extra_columns=["pipeline_version__data_version"]),
             RichColumn(key="annotation_range_lock__version__genome_build__name", label='Build', orderable=True, client_renderer='TableFormat.number'),
             RichColumn(key="annotation_range_lock__version__id", label='Version', orderable=True, client_renderer='TableFormat.number'),
             RichColumn(key="count", label='Count', order_sequence=[SortOrder.DESC, SortOrder.ASC], client_renderer='TableFormat.number'),

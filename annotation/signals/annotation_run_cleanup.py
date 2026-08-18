@@ -28,33 +28,29 @@ import shutil
 
 from django.conf import settings
 
-from annotation.tasks.annotate_variants import (
-    conservation_sidecar_filename,
-    get_annotsv_dir,
-    get_run_output_paths,
-    get_vep_skipped_variants_filename,
-)
+from annotation.annotation_run_files import get_annotsv_dir
+from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.pipelines import get_runner
+from annotation.sv_conservation import conservation_sidecar_filename
+from annotation.vep_annotation import get_vep_skipped_variants_filename
 
 
 def get_all_run_output_paths(annotation_run) -> list[str]:
     """ Every path this run may own, from the derived dump stem *and* the persisted filename fields.
 
         The two sources cover each other. Derivation (#1660) names files a run was interrupted before it
-        could record - vcf_annotated_filename and annotsv_tsv_filename only reach the DB at the final save
-        in dump_and_annotate_variants, after VEP *and* AnnotSV *and* the sidecar have finished, while the
-        dump stem is persisted before VEP starts. The persisted fields in turn name files whose path
-        diverges from the derivation: an external run (#1568) imported without a local dump has no dump
-        stem at all, so only the field names its annotated VCF. """
+        could record - vcf_annotated_filename only reaches the DB at the final save in the runner's
+        annotate(), while the dump stem is persisted before the tool starts. The persisted fields in turn
+        name files whose path diverges from the derivation: an external run (#1568) imported without a
+        local dump has no dump stem at all, so only the field names its annotated VCF. """
     paths = []
     if dump_filename := annotation_run.vcf_dump_filename:
-        paths += get_run_output_paths(annotation_run, dump_filename)
+        paths += get_runner(annotation_run.pipeline_type).get_output_paths(annotation_run, dump_filename)
     if annotated_filename := annotation_run.vcf_annotated_filename:
         paths += [annotated_filename, conservation_sidecar_filename(annotated_filename),
                   get_vep_skipped_variants_filename(annotated_filename)]
     if skipped_variants_filename := annotation_run.vep_skipped_variants_filename:
         paths.append(skipped_variants_filename)
-    if annotsv_tsv_filename := annotation_run.annotsv_tsv_filename:
-        paths.append(annotsv_tsv_filename)
     return paths
 
 
@@ -74,7 +70,7 @@ def remove_annotation_run_output(annotation_run, remove_annotsv_dir: bool = True
             except OSError:
                 logging.exception("Failed removing AnnotationRun %s output file: %s",
                                   annotation_run.pk, path)
-    if remove_annotsv_dir:
+    if remove_annotsv_dir and annotation_run.pipeline_type == VariantAnnotationPipelineType.ANNOTSV:
         annotsv_dir = get_annotsv_dir(annotation_run)
         if os.path.isdir(annotsv_dir):
             logging.info("Removing AnnotationRun %s AnnotSV dir: %s", annotation_run.pk, annotsv_dir)

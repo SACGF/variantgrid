@@ -32,6 +32,7 @@ from annotation.models.models import (
 )
 from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.pipelines import vep_pipeline_types
 from annotation.models.models_version_diff import VersionDiff
 from annotation.pathogenicity_predictions import TOOLS
 from annotation.tasks.annotate_variants import annotation_run_retry
@@ -331,7 +332,7 @@ def annotation_versions(request):
             status=VariantAnnotationVersion.Status.ACTIVE,
         ).first()
         vep_commands = {}
-        for pt in VariantAnnotationPipelineType:
+        for pt in vep_pipeline_types():
             vep_command = get_vep_command("in.vcf", "out.vcf", genome_build,
                                           genome_build.annotation_consortium, pt,
                                           variant_annotation_version=latest_vav)

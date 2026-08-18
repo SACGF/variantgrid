@@ -750,13 +750,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     sv_overlap_min_fraction = models.FloatField(null=True, blank=True)  # gnomAD SV overlap_cutoff
     vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
 
-    # AnnotSV version pins. Both default to NULL. Populated only on deployments
-    # that opt-in to AnnotSV via settings + management command. Either value
-    # changing triggers reannotation via the standard VariantAnnotationVersion
-    # path.
-    annotsv_code = models.TextField(null=True, blank=True)     # eg "3.5.8" - from `AnnotSV -version`
-    annotsv_bundle = models.TextField(null=True, blank=True)   # admin-set bundle release string
-
     # Strategy used to map RefSeq <-> Ensembl transcripts when picking dbNSFP
     # per-transcript scores at insert time. Populated on RefSeq pipelines for
     # columns_version >= 4; NULL otherwise (older versions only consumed
@@ -1041,6 +1034,30 @@ class VCFAnnotationStats(models.Model):
         unique_together = ('vcf', 'variant_annotation_version')
 
 
+class AnnotationPipelineVersion(TimeStampedModel):
+    """ #720: version of a non-VEP pipeline's tool + data bundle, recorded on every run that used it.
+
+        Deliberately separate from VariantAnnotationVersion. Pinning eg AnnotSV on the VEP version is what
+        makes rolling its bundle cost a full re-annotation of everything - the thing splitting these
+        pipelines out exists to avoid. VEP pipelines don't use this: their version IS the
+        VariantAnnotationVersion.
+
+        Recorded rather than enforced. A tool upgraded part-way through a backfill leaves runs against two
+        versions, which is visible and re-runnable (see the annotation_pipeline_rerun command); refusing to
+        run would instead turn every remaining run into an error. """
+    pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices)
+    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+    code_version = models.TextField()                       # eg AnnotSV "3.5.8", from the binary itself
+    data_version = models.TextField(null=True, blank=True)  # eg the AnnotSV bundle release string
+
+    class Meta:
+        unique_together = ('pipeline_type', 'genome_build', 'code_version', 'data_version')
+
+    def __str__(self):
+        data = f"/{self.data_version}" if self.data_version else ""
+        return f"{self.get_pipeline_type_display()} {self.code_version}{data} ({self.genome_build})"
+
+
 class AnnotationRangeLock(models.Model):
     MIN_SIZE_FOR_SUBDIVISION = 1000  # Do we need this?
 
@@ -1125,12 +1142,9 @@ class AnnotationRun(TimeStampedModel):
     annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
 
-    # AnnotSV stage (post-VEP, STRUCTURAL_VARIANT pipeline only). Best-effort:
-    # the run is not failed if AnnotSV errors; an error string is recorded and
-    # the VEP-only result is still imported.
-    annotsv_tsv_filename = models.TextField(null=True)
-    annotsv_error = models.TextField(null=True)
-    annotsv_imported = models.BooleanField(default=False)
+    # #720: which version of a non-VEP tool produced this run. NULL for VEP pipelines, whose version is
+    # the VariantAnnotationVersion on the range lock.
+    pipeline_version = models.ForeignKey(AnnotationPipelineVersion, null=True, blank=True, on_delete=PROTECT)
 
     class Meta:
         unique_together = ('annotation_range_lock', 'pipeline_type')
@@ -1332,6 +1346,8 @@ class AnnotationRun(TimeStampedModel):
     PIPELINE_TYPE_DESC = {
         VariantAnnotationPipelineType.STANDARD: "standard",
         VariantAnnotationPipelineType.STRUCTURAL_VARIANT: "structural_variant",
+        VariantAnnotationPipelineType.GENE_LEVEL: "gene_level",
+        VariantAnnotationPipelineType.ANNOTSV: "annotsv",
     }
 
     def _get_dump_path_stem(self, dump_dir=None, task_token=None) -> str:

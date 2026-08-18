@@ -6,7 +6,7 @@ from typing import Optional
 import celery
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import F, Q
+from django.db.models import Exists, F, OuterRef, Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
@@ -23,12 +23,8 @@ from annotation.models import (
 )
 from annotation.models.models import AnnotationRangeLock, AnnotationVersion
 from annotation.signals.manual_signals import annotation_run_discarded_signal
-from annotation.tasks.annotate_variants import (
-    annotate_variants,
-    get_annotated_filename,
-    get_vep_skipped_variants_filename,
-    import_annotation_run,
-)
+from annotation.pipelines import PIPELINES, enabled_pipeline_types, get_runner
+from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
 from library.constants import HOUR_SECS, MINUTE_SECS
 from library.log_utils import log_traceback, report_message
 from library.utils.file_utils import DiskUsage, get_disk_usage_for_directory
@@ -142,7 +138,7 @@ def _handle_range_lock(range_lock, pipeline_type=None):
     if pipeline_type is not None:
         pipeline_types.append(pipeline_type)
     else:
-        pipeline_types = list(VariantAnnotationPipelineType)
+        pipeline_types = enabled_pipeline_types()
 
     for pipeline_type in pipeline_types:
         annotation_run, _ = AnnotationRun.objects.get_or_create(annotation_range_lock=range_lock,
@@ -172,10 +168,9 @@ def count_annotation_run(annotation_run_id):
     if range_lock is None:
         # Something else cleared this - this job is just a way to have a quick exit skipping is fine
         return
-    annotation_version = range_lock.version.get_any_annotation_version()
-    count = get_variants_qs_for_annotation(annotation_version, pipeline_type=annotation_run.pipeline_type,
-                                           min_variant_id=range_lock.min_variant_id,
-                                           max_variant_id=range_lock.max_variant_id).count()
+    # Via the runner so the count is exactly what the dump will be, including the pipeline's own selection
+    # (eg VEP's SV size cap, which a supplementary pipeline over the same variants does not apply).
+    count = get_runner(annotation_run.pipeline_type).get_variants_qs(annotation_run).count()
     update = {"count": count}
     if count == 0:
         # Empty - finish without a dump. dump_count=0 keeps get_status() consistent (-> FINISHED).
@@ -214,7 +209,10 @@ def _trigger_counts_for_uncounted_runs(vav: VariantAnnotationVersion):
 def _handle_variant_annotation_version(variant_annotation_version):
     # If we crash in the wrong place, we may end up with unassigned range locks (need 1 of each type)
     arl_qs = AnnotationRangeLock.objects.filter(version=variant_annotation_version)
-    for pipeline_type in VariantAnnotationPipelineType:
+    # #720: also how a newly-enabled pipeline backfills. Turning eg ANNOTATION_ANNOTSV_ENABLED on adds it
+    # to enabled_pipeline_types(), so the next pass creates its run for every existing lock. Cheap: most
+    # locks hold no SVs, and the count lane finishes those without ever dispatching them.
+    for pipeline_type in enabled_pipeline_types():
         # Look for missing any AnnotationRun for this lock
         for range_lock in arl_qs.exclude(annotationrun__pipeline_type=pipeline_type):
             logging.warning("Assigned orphaned annotation range lock: %s, run type: %s",
@@ -390,17 +388,41 @@ def _dispatch_for_vav(vav: VariantAnnotationVersion):
         _lease_across_vavs([vav], AnnotationStatus.CREATED, vep_capacity, worker_id, now)
 
 
+def dependency_satisfied_q() -> Q:
+    """ #720: a supplementary run may only launch once the run it depends on - over the same range lock -
+        is FINISHED, since it updates the VariantAnnotation rows that run wrote.
+
+        EXISTS subqueries rather than a join to the sibling run: an OR'd multi-valued join would make the
+        independent-pipeline branches inner-join against a sibling they never asked about, silently
+        dropping runs on locks that have none. """
+    independent = [pt for pt, p in PIPELINES.items() if p.depends_on is None]
+    q = Q(pipeline_type__in=independent)
+    for pipeline_type, pipeline_def in PIPELINES.items():
+        if pipeline_def.depends_on is None:
+            continue
+        dep_finished = AnnotationRun.objects.filter(
+            annotation_range_lock_id=OuterRef("annotation_range_lock_id"),
+            pipeline_type=pipeline_def.depends_on,
+            status=AnnotationStatus.FINISHED,
+        )
+        q |= Q(pipeline_type=pipeline_type) & Q(Exists(dep_finished))
+    return q
+
+
 def _dispatchable_runs_qs(vav: VariantAnnotationVersion, now):
-    """ Runs ready to lease + launch, un-leased, no task_id, not external. Two lanes (#1646):
-        pending (CREATED) runs get the full dump+VEP+upload; resume-upload runs (past VEP - annotation
-        complete with an annotated VCF present) get re-launched upload-only. """
+    """ Runs ready to lease + launch, un-leased, no task_id, not external, with any pipeline they depend
+        on already FINISHED. Two lanes (#1646): pending (CREATED) runs get the full dump+tool+upload;
+        resume-upload runs (past the tool - annotation complete with output present) get re-launched
+        upload-only. """
     created = Q(status=AnnotationStatus.CREATED)
     resume = Q(status=AnnotationStatus.ANNOTATION_COMPLETED, vcf_annotated_filename__isnull=False)
     return AnnotationRun.objects.filter(
         annotation_range_lock__version=vav,
         external=False,
         task_id__isnull=True,
-    ).filter(created | resume).filter(Q(lease_expires__isnull=True) | Q(lease_expires__lt=now))
+    ).filter(created | resume).filter(
+        Q(lease_expires__isnull=True) | Q(lease_expires__lt=now)
+    ).filter(dependency_satisfied_q())
 
 
 def _in_flight_runs_qs(vav: VariantAnnotationVersion, now):
@@ -517,58 +539,44 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
         Otherwise (pre-VEP progress, or VEP part-way): scrub all partial output (on-disk dumps + partial
         rows) back to a clean CREATED state so a re-dump won't collide.
 
-        #1660: which flavour applies is decided by *deriving* the paths from the dump stem, not by
-        reading vcf_annotated_filename off the row. That field is only persisted at the final save in
-        dump_and_annotate_variants - after VEP, AnnotSV and the conservation sidecar have all finished -
-        so a run reclaimed while AnnotSV is still running has a complete annotated VCF on disk but a NULL
-        field, and reading the field would scrub minutes of finished VEP work the resume path exists to
-        keep. The dump stem is persisted before VEP starts, so it always names the rest.
+        #1660: which flavour applies is decided by *deriving* the paths from the dump stem (the runner's
+        tool_finished), not by reading vcf_annotated_filename off the row. That field is only persisted at
+        the runner's final save - after every stage has finished - so a run reclaimed while a late stage is
+        still running has complete tool output on disk but a NULL field, and reading the field would scrub
+        minutes of finished work the resume path exists to keep. The dump stem is persisted before the tool
+        starts, so it always names the rest.
 
-        Deleting the dump can pull the input out from under a stalled-but-live worker's VEP. That is
+        Deleting the dump can pull the input out from under a stalled-but-live worker's tool. That is
         intentional - it acts as a crude abort of an attempt whose result is going to be discarded anyway.
-        It is safe because the zombie fails loudly rather than silently (VEP returning non-zero raises,
-        and unlink does not truncate, so VEP either holds the fd and reads to completion or fails to open)
+        It is safe because the zombie fails loudly rather than silently (a non-zero return raises, and
+        unlink does not truncate, so the tool either holds the fd and reads to completion or fails to open)
         and because annotate_variants classifies any failure on a run it no longer owns as a reclaim at
         warning level, not as a pipeline error. """
+    runner = get_runner(annotation_run.pipeline_type)
     dump_filename = annotation_run.vcf_dump_filename
-    annotated_filename = None
-    skipped_variants_filename = None
-    vep_finished = False
+    tool_finished = False
     if dump_filename:
-        annotated_filename = get_annotated_filename(annotation_run, dump_filename)
-        # #1710: VEP creates the annotated VCF at startup and writes to it progressively, so its presence
-        # says nothing about how far the run got - a run reclaimed mid-VEP used to resume upload-only off
-        # a part-written file, and the #1701 checks in the import lane then failed it. Runner::run closes
-        # the output handle and only then calls finish(), which writes the skipped-variants list (even
-        # when nothing was skipped), so that file appearing is the proof VEP reached the end. It is named
-        # off the per-attempt dump stem, so it can only have come from this attempt.
-        skipped_variants_filename = get_vep_skipped_variants_filename(annotated_filename)
-        vep_finished = os.path.exists(skipped_variants_filename)
+        tool_finished = runner.tool_finished(annotation_run, dump_filename)
     elif annotation_run.vcf_annotated_filename:
-        # No dump stem to derive from (eg an external run, #1568, imported without a local dump) - no VEP
-        # of ours ran, so the annotated VCF we were handed is all the proof there is.
-        annotated_filename = annotation_run.vcf_annotated_filename
-        vep_finished = True
+        # No dump stem to derive from (eg an external run, #1568, imported without a local dump) - no tool
+        # run of ours, so the annotated VCF we were handed is all the proof there is.
+        tool_finished = os.path.exists(annotation_run.vcf_annotated_filename)
 
-    if vep_finished and os.path.exists(annotated_filename):
-        # Past VEP - resume upload-only. Scrub partially-imported rows; keep dump/VEP/AnnotSV artifacts.
+    if tool_finished:
+        # Past the tool - resume upload-only. Scrub partially-imported rows; keep the run's output.
         annotation_run.delete_related_objects()
-        # The row may not name the annotated VCF yet (reclaimed mid-AnnotSV) - record the derived path so
-        # the upload-only relaunch, and any later reclaim, can find the VEP output we are keeping.
-        annotation_run.vcf_annotated_filename = annotated_filename
-        # #1701: same reasoning for VEP's skipped-variants list - record it so the upload-only relaunch
-        # checks records-in vs records-out against VEP's own list rather than the warnings-text fallback.
-        if skipped_variants_filename:
-            annotation_run.vep_skipped_variants_filename = skipped_variants_filename
+        if dump_filename:
+            # The row may not name the output yet (reclaimed before the runner's final save) - record the
+            # derived paths so the upload-only relaunch, and any later reclaim, find what we are keeping.
+            runner.record_resume_state(annotation_run, dump_filename)
         # annotation_end is persisted at that same final save, and get_status() keys ANNOTATION_COMPLETED
         # off it - so without this the resumed run sits at ANNOTATION_STARTED, which is neither
         # dispatchable nor upload-resumable, and it would never be picked up again. Stamp the time we
-        # observed VEP had finished.
+        # observed the tool had finished.
         if annotation_run.annotation_end is None:
             annotation_run.annotation_end = timezone.now()
         annotation_run.upload_start = None
         annotation_run.upload_end = None
-        annotation_run.annotsv_imported = False  # re-import re-updates the recreated rows (idempotent)
     elif annotation_run.status != AnnotationStatus.CREATED:
         # Worker died before VEP finished - scrub partial output (a CREATED run has none).
         annotation_run.delete_related_objects()

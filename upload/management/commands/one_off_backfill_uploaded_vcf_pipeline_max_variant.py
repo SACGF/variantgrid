@@ -5,6 +5,7 @@ from django.db.models import Max
 
 from annotation.annotation_version_querysets import pipeline_type_variant_q
 from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.pipelines import blocking_pipeline_types
 from snpdb.archive import DataArchivedError
 from snpdb.models import CohortGenotypeCollection, Variant
 from upload.models import UploadedVCF, UploadedVCFPipelineMaxVariant
@@ -45,7 +46,7 @@ class Command(BaseCommand):
             sv_q = pipeline_type_variant_q(VariantAnnotationPipelineType.STRUCTURAL_VARIANT)
             if variants_qs.filter(sv_q).exists():
                 # Mixed - pay the per-type scan
-                for pipeline_type in VariantAnnotationPipelineType:
+                for pipeline_type in blocking_pipeline_types():
                     q = pipeline_type_variant_q(pipeline_type)
                     max_id = variants_qs.filter(q).aggregate(m=Max("pk"))["m"]
                     if max_id is not None:

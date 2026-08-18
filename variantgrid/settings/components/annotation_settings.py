@@ -356,10 +356,13 @@ ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = True
 # #1670: don't dispatch new VEP runs below this free space on ANNOTATION_VCF_DUMP_DIR (None = no limit)
 ANNOTATION_MIN_FREE_DISK_GIGS = 1
 
-# AnnotSV (post-VEP stage on the STRUCTURAL_VARIANT pipeline). Strictly opt-in:
-# leaving ANNOTATION_ANNOTSV_ENABLED=False means no AnnotSV invocation, no version
-# pin populated on VariantAnnotationVersion, and no reannotation triggered. Deployments
-# enable this in their per-host settings file once the binary + bundle are installed.
+# AnnotSV, its own annotation pipeline type since #720. Strictly opt-in: leaving this False means the
+# scheduler creates no ANNOTSV AnnotationRuns at all. Deployments enable it in their per-host settings
+# file once the binary + bundle are installed.
+#
+# Turning it on backfills. The scheduler creates an ANNOTSV run for every existing range lock on the
+# active version, each dependent on that lock's STRUCTURAL_VARIANT run; the count lane finishes the
+# (majority) SV-free ones on db_workers without ever dispatching them.
 ANNOTATION_ANNOTSV_ENABLED = False
 ANNOTATION_ANNOTSV_BIN = "/data/annotation/AnnotSV/bin/AnnotSV"
 ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/AnnotSV/share/AnnotSV/Annotations_Human"
@@ -368,8 +371,9 @@ ANNOTATION_ANNOTSV_GENOME_BUILD = {
     BUILD_GRCH37: "GRCh37",
     BUILD_GRCH38: "GRCh38",
 }
-# Annotations bundle has no version stamp file; admin sets this to the bundle release
-# string they installed (eg "3.5.8"). Compared against VariantAnnotationVersion.annotsv_bundle.
+# Annotations bundle has no version stamp file; admin sets this to the bundle release string they
+# installed (eg "3.5.8"). Recorded on each run as AnnotationPipelineVersion.data_version, so changing it
+# starts stamping a new version - `manage.py annotation_pipeline_rerun --stale` re-runs the older ones.
 ANNOTATION_ANNOTSV_BUNDLE_VERSION = None
 ANNOTATION_ANNOTSV_EXTRA_ARGS: list[str] = []
 ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60

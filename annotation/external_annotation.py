@@ -19,7 +19,7 @@ from django.utils import timezone
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.models.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
-from annotation.tasks.annotate_variants import dump_variants
+from annotation.pipelines import get_runner
 from annotation.tasks.annotation_scheduler_task import dispatch_annotation_runs
 from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
 from library.utils.file_utils import mk_path_for_file
@@ -186,7 +186,7 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
         if annotation_run.count is not None and annotation_run.count < min_variants:
             _revert_too_small_run(annotation_run, annotation_run.count, min_variants, reverted)
             continue
-        dump_count = dump_variants(annotation_run, dump_dir=output_dir)
+        dump_count = get_runner(pipeline_type).dump(annotation_run, dump_dir=output_dir)
         # Range locks are sized without pipeline_type, so an SV dump leaves most locks with zero SVs; such a
         # run is already FINISHED (get_status: dump_count == 0) with nothing to annotate, so skip its sidecar
         # rather than emit a no-op .meta.json (thousands of them, for a handful of SVs).
@@ -272,7 +272,7 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
         if annotation_run.count is not None and annotation_run.count < min_variants:
             _revert_too_small_run(annotation_run, annotation_run.count, min_variants, reverted)
             continue
-        dump_count = dump_variants(annotation_run, dump_dir=output_dir)
+        dump_count = get_runner(pipeline_type).dump(annotation_run, dump_dir=output_dir)
         # A zero-count run is already FINISHED (get_status: dump_count == 0) with nothing to annotate, so
         # skip its sidecar rather than emit a no-op .meta.json (see dump_external_annotation_runs).
         if dump_count == 0:
