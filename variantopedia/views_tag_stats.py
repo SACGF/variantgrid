@@ -17,8 +17,8 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.db.models import Count, QuerySet
-from django.db.models.functions import TruncMonth, TruncQuarter
+from django.db.models import Count, F, QuerySet
+from django.db.models.functions import TruncDate, TruncMonth, TruncQuarter
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils.timezone import localtime, now
@@ -156,8 +156,9 @@ def tag_stats_for_user(request, genome_build_name, user_id=None):
         tag_counts = qs.values("tag_id").annotate(count=Count("pk")).order_by("-count")
 
         thirty_days_ago = (now() - timedelta(days=30)).date()
-        daily = Counter(created.date() for created in
-                        qs.filter(created__date__gte=thirty_days_ago).values_list("created", flat=True))
+        daily = {row["day"]: row["count"] for row in
+                 qs.filter(created__date__gte=thirty_days_ago).annotate(day=TruncDate("created"))
+                 .values("day").annotate(count=Count("pk"))}
         days = [thirty_days_ago + timedelta(days=i) for i in range(31)]
 
         return {
@@ -247,19 +248,16 @@ def tag_stats_co_occurrence(request, genome_build_name):
 
     def calculate():
         qs = _tags_qs(genome_build).filter(allele__isnull=False)
-        tags_by_allele = defaultdict(set)
-        for allele_id, tag_id in qs.values_list("allele_id", "tag_id").distinct():
-            tags_by_allele[allele_id].add(tag_id)
-
-        pair_counts = Counter()
-        tag_totals = Counter()
-        for tag_ids in tags_by_allele.values():
-            sorted_tags = sorted(tag_ids)
-            for tag_id in sorted_tags:
-                tag_totals[tag_id] += 1
-            for i, tag_a in enumerate(sorted_tags):
-                for tag_b in sorted_tags[i + 1:]:
-                    pair_counts[(tag_a, tag_b)] += 1
+        # Self join on allele - tag_id__gt gives each unordered pair once, and keeps a tag off its own diagonal.
+        # Both conditions are in the one filter() so they apply to the same joined tag
+        pairs_qs = (qs.filter(allele__varianttag__in=qs, allele__varianttag__tag_id__gt=F("tag_id"))
+                    .values("tag_id", pair_tag_id=F("allele__varianttag__tag_id"))
+                    .annotate(alleles=Count("allele_id", distinct=True)))
+        # SQL emits each pair once, but orders the two tags by the DB collation - re-sort so keys match lookups
+        pair_counts = Counter({tuple(sorted((row["tag_id"], row["pair_tag_id"]))): row["alleles"]
+                               for row in pairs_qs})
+        tag_totals = Counter({row["tag_id"]: row["alleles"] for row in
+                              qs.values("tag_id").annotate(alleles=Count("allele_id", distinct=True))})
 
         tags = _top_names(tag_totals, DEFAULT_TOP_TAGS * 2)
         tags.sort()

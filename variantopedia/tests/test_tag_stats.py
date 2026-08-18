@@ -82,6 +82,34 @@ class TagStatsTest(TestCase):
         self.assertEqual(self._get_json("tag_stats_headline")["calculated"], first["calculated"])
 
 
+@override_settings(CACHES=LOCMEM_CACHE)
+class TagStatsCoOccurrenceOrderingTest(TestCase):
+    """ The pair counts are grouped by the DB, which orders text by collation ('artefact' < 'Benign') rather
+        than by codepoint the way Python's sorted() does """
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='tag_stats_ordering_test_user')[0]
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        create_fake_variants(cls.genome_build)
+        variant = Variant.objects.order_by("pk").first()
+        analysis = Analysis.objects.create(genome_build=cls.genome_build, user=cls.user)
+        allele = Allele.objects.create()
+        for tag_name in ["artefact", "Benign"]:
+            VariantTag.objects.create(variant=variant, tag=Tag.objects.create(pk=tag_name), analysis=analysis,
+                                      allele=allele, genome_build=cls.genome_build, user=cls.user)
+
+    def setUp(self):
+        cache.clear()
+        self.client.force_login(self.user)
+
+    def test_matrix_finds_pairs_the_db_ordered_the_other_way(self):
+        url = reverse("tag_stats_co_occurrence", kwargs={"genome_build_name": self.genome_build.name})
+        data = json.loads(self.client.get(url).content)
+        self.assertEqual(data["tags"], ["Benign", "artefact"])
+        self.assertEqual(data["matrix"], [[None, 1], [1, None]])
+
+
 class GroupedSeriesTest(TestCase):
     def test_smaller_names_are_grouped_into_other(self):
         counts = {

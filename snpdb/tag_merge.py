@@ -2,28 +2,24 @@
 Merging tags together, and the case-collision checks that stop them being created in the first place.
 
 Tag.id is the tag name (CharField primary key) so a merge repoints every foreign key at the surviving tag
-then deletes the dying one. Repointing can collide with rows that already use the survivor - those are
-duplicates, so we keep the earliest and drop the rest.
+then deletes the dying one. Most of those tables have no unique constraint involving tag, so they move in a
+single UPDATE - only the two that are unique_together with tag have rows that can't be repointed.
 
 @see https://github.com/SACGF/variantgrid/issues/1751
 """
 import logging
 from collections import defaultdict
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from Levenshtein import distance
 from django.db import transaction
 from django.db.models import Count, Model
-from django.db.models.signals import post_delete
 
 from analysis.models import VariantTag
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
-from analysis.signals.signal_handlers import variant_tag_delete
 from snpdb.models import SampleTag, Tag, TagColor, VCFTag
 
 MERGE_SUGGESTION_MAX_DISTANCE = 1
-BATCH_SIZE = 1000
 
 
 @dataclass(frozen=True)
@@ -70,33 +66,40 @@ class TagMergeResult:
         return f"Merged '{self.dying_tag_id}' into '{self.surviving_tag_id}' ({summary})"
 
 
-# Every FK to Tag, with the other fields that make a row a duplicate once it's been repointed
-_TAG_FOREIGN_KEYS = [
-    ("variant tags", VariantTag, ["variant_id", "analysis_id", "user_id"]),
-    ("analysis tag nodes", TagNodeTag, ["tag_node_id"]),
-    ("tag colour settings", TagColor, ["collection_id"]),
-    ("VCF tags", VCFTag, ["vcf_id"]),
-    ("sample tags", SampleTag, ["sample_id"]),
+@dataclass(frozen=True)
+class TagForeignKey:
+    label: str
+    model: type[Model]
+    # The other half of a unique_together with tag. Set means rows whose partner already uses the surviving
+    # tag can't be repointed, and that the table is small enough to move a row at a time
+    unique_with: str = None
+
+
+# Every FK to Tag
+TAG_FOREIGN_KEYS = [
+    TagForeignKey("variant tags", VariantTag),
+    TagForeignKey("analysis tag nodes", TagNodeTag, unique_with="tag_node_id"),
+    TagForeignKey("tag colour settings", TagColor, unique_with="collection_id"),
+    TagForeignKey("VCF tags", VCFTag),
+    TagForeignKey("sample tags", SampleTag),
 ]
 
 
 def get_tag_usage(tag: Tag) -> TagUsage:
-    entries = [TagUsageEntry(label, model.objects.filter(tag=tag).count())
-               for label, model, _ in _TAG_FOREIGN_KEYS]
+    entries = [TagUsageEntry(fk.label, fk.model.objects.filter(tag=tag).count()) for fk in TAG_FOREIGN_KEYS]
     return TagUsage(tag_id=tag.pk, entries=entries)
 
 
 def get_tag_usage_by_tag_id() -> dict[str, TagUsage]:
     """ Usage for every tag, done as one aggregate per FK table """
     counts_by_model = {}
-    for label, model, _ in _TAG_FOREIGN_KEYS:
-        qs = model.objects.values_list("tag_id").annotate(count=Count("pk"))
-        counts_by_model[label] = dict(qs.values_list("tag_id", "count"))
+    for fk in TAG_FOREIGN_KEYS:
+        qs = fk.model.objects.values_list("tag_id").annotate(count=Count("pk"))
+        counts_by_model[fk.label] = dict(qs.values_list("tag_id", "count"))
 
     usage = {}
     for tag_id in Tag.objects.values_list("pk", flat=True):
-        entries = [TagUsageEntry(label, counts_by_model[label].get(tag_id, 0))
-                   for label, _, _ in _TAG_FOREIGN_KEYS]
+        entries = [TagUsageEntry(fk.label, counts_by_model[fk.label].get(tag_id, 0)) for fk in TAG_FOREIGN_KEYS]
         usage[tag_id] = TagUsage(tag_id=tag_id, entries=entries)
     return usage
 
@@ -130,84 +133,50 @@ def get_merge_suggestions() -> dict[str, list[str]]:
     return {tag_id: sorted(others) for tag_id, others in suggestions.items()}
 
 
-@contextmanager
-def _variant_tag_delete_signal_disconnected():
-    """ Every VariantTag we delete leaves an identical row behind, so the analyses they belong to see no
-        change - skip the per-row 'set tag nodes dirty' + celery task the delete signal would fire.
-        Merges bump the affected nodes once at the end instead """
-    post_delete.disconnect(variant_tag_delete, sender=VariantTag)
-    try:
-        yield
-    finally:
-        post_delete.connect(variant_tag_delete, sender=VariantTag)
+def _repoint_tag(fk: TagForeignKey, dying_tag: Tag, surviving_tag: Tag) -> TagMergeCounts:
+    """ Move fk's rows from dying_tag to surviving_tag """
+    counts = TagMergeCounts(label=fk.label)
+    dying_qs = fk.model.objects.filter(tag=dying_tag)
+    if fk.unique_with is None:
+        counts.moved = dying_qs.update(tag=surviving_tag)
+        return counts
 
-
-def _repoint_tag(model: type[Model], dying_tag: Tag, surviving_tag: Tag,
-                 duplicate_fields: list[str], label: str) -> TagMergeCounts:
-    """ Move model's rows from dying_tag to surviving_tag, deleting any that would duplicate an existing row.
-        Earliest row (lowest pk) wins, so re-tagging history keeps its original event """
-    counts = TagMergeCounts(label=label)
-    existing_keys = set(model.objects.filter(tag=surviving_tag).values_list(*duplicate_fields))
-
-    move_ids = []
-    delete_ids = []
-    for row in model.objects.filter(tag=dying_tag).order_by("pk").values_list("pk", *duplicate_fields):
-        pk, key = row[0], row[1:]
-        if key in existing_keys:
-            delete_ids.append(pk)
+    # Being unique_together with tag makes a row whose partner already uses the surviving tag say the same
+    # thing twice, so it goes. These are small settings tables, so move a row at a time to let the
+    # save()/delete() version bumps that other things cache on happen
+    taken = set(fk.model.objects.filter(tag=surviving_tag).values_list(fk.unique_with, flat=True))
+    for obj in dying_qs:
+        if getattr(obj, fk.unique_with) in taken:
+            obj.delete()
+            counts.deleted += 1
         else:
-            existing_keys.add(key)
-            move_ids.append(pk)
-
-    if delete_ids:
-        model.objects.filter(pk__in=delete_ids).delete()
-        counts.deleted = len(delete_ids)
-    if move_ids:
-        counts.moved = model.objects.filter(pk__in=move_ids).update(tag=surviving_tag)
+            obj.tag = surviving_tag
+            obj.save()
+            counts.moved += 1
     return counts
 
 
-def _set_tag_nodes_dirty(tag_ids: list[str]):
+def _set_tag_nodes_dirty(tag: Tag):
     """ Nodes filtering on either side of a merge return different variants afterwards """
-    nodes_qs = TagNode.objects.filter(tagnodetag__tag__in=tag_ids).distinct()
-    for node in nodes_qs:
+    for node in TagNode.objects.filter(tagnodetag__tag=tag).distinct():
         node.queryset_dirty = True
         node.save()
 
 
 def merge_tag(dying_tag: Tag, surviving_tag: Tag) -> TagMergeResult:
-    """ Repoint everything using dying_tag at surviving_tag, then delete dying_tag. Cannot be undone """
+    """ Repoint everything using dying_tag at surviving_tag, then delete dying_tag. Cannot be undone.
+        Repeated variant tags this leaves behind are indistinguishable from ones that were already there
+        - @see the variant_tags delete-duplicates management command """
     if dying_tag.pk == surviving_tag.pk:
         raise ValueError("Cannot merge a tag into itself")
 
     result = TagMergeResult(dying_tag_id=dying_tag.pk, surviving_tag_id=surviving_tag.pk)
-    with transaction.atomic(), _variant_tag_delete_signal_disconnected():
-        for label, model, duplicate_fields in _TAG_FOREIGN_KEYS:
-            result.counts.append(_repoint_tag(model, dying_tag, surviving_tag, duplicate_fields, label))
-        _set_tag_nodes_dirty([surviving_tag.pk])
+    with transaction.atomic():
+        for fk in TAG_FOREIGN_KEYS:
+            result.counts.append(_repoint_tag(fk, dying_tag, surviving_tag))
+        # Everything now points at the surviving tag, so this catches nodes that used either side
+        _set_tag_nodes_dirty(surviving_tag)
         dying_tag.delete()
 
     logging.info(result.description())
     return result
-
-
-def delete_duplicate_variant_tags(tag: Tag = None) -> int:
-    """ Same user tagging the same variant with the same tag in the same analysis more than once.
-        Different users re-tagging is agreement data, so is kept """
-    qs = VariantTag.objects.all()
-    if tag:
-        qs = qs.filter(tag=tag)
-
-    seen = set()
-    delete_ids = []
-    for pk, key in ((row[0], row[1:]) for row in
-                    qs.order_by("pk").values_list("pk", "variant_id", "tag_id", "analysis_id", "user_id")):
-        if key in seen:
-            delete_ids.append(pk)
-        else:
-            seen.add(key)
-
-    with _variant_tag_delete_signal_disconnected():
-        for i in range(0, len(delete_ids), BATCH_SIZE):
-            VariantTag.objects.filter(pk__in=delete_ids[i:i + BATCH_SIZE]).delete()
-    return len(delete_ids)

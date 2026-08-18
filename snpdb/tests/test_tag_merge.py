@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
@@ -9,7 +10,6 @@ from library.django_utils.unittest_utils import prevent_request_warnings
 from snpdb.forms import CreateTagForm
 from snpdb.models import GenomeBuild, Tag, TagColor, TagColorsCollection, Variant
 from snpdb.tag_merge import (
-    delete_duplicate_variant_tags,
     get_case_collision_groups,
     get_merge_suggestions,
     get_tag_usage,
@@ -17,7 +17,7 @@ from snpdb.tag_merge import (
 )
 
 
-class TagMergeTest(TestCase):
+class VariantTagTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -35,6 +35,8 @@ class TagMergeTest(TestCase):
         return VariantTag.objects.create(variant=variant or self.variant, tag=tag, analysis=self.analysis,
                                          genome_build=self.genome_build, user=user or self.user)
 
+
+class TagMergeTest(VariantTagTestCase):
     def test_merge_moves_variant_tags(self):
         self._create_variant_tag(self.dying_tag)
         self._create_variant_tag(self.dying_tag, variant=self.other_variant)
@@ -44,30 +46,18 @@ class TagMergeTest(TestCase):
         self.assertFalse(Tag.objects.filter(pk="artefact").exists())
         self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
 
-    def test_merge_deletes_rows_that_become_duplicates(self):
-        """ Same variant/analysis/user on both sides of the merge is one tag afterwards, not two """
-        surviving_variant_tag = self._create_variant_tag(self.surviving_tag)
+    def test_merge_keeps_variant_tags_that_repeat(self):
+        """ Variant tags have no unique constraint, so both sides of the merge move - the repeat this leaves
+            is the delete-duplicates command's business """
+        self._create_variant_tag(self.surviving_tag)
         self._create_variant_tag(self.dying_tag)
-        self._create_variant_tag(self.dying_tag, variant=self.other_variant)
 
         result = merge_tag(self.dying_tag, self.surviving_tag)
 
-        variant_tags = VariantTag.objects.filter(tag=self.surviving_tag)
-        self.assertEqual(variant_tags.count(), 2)
-        self.assertTrue(variant_tags.filter(pk=surviving_variant_tag.pk).exists(), "Earliest row was kept")
+        self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
         variant_tag_counts = result.counts[0]
         self.assertEqual(variant_tag_counts.moved, 1)
-        self.assertEqual(variant_tag_counts.deleted, 1)
-
-    def test_merge_keeps_different_users_re_tagging(self):
-        """ A second user tagging the same variant is agreement data, not a duplicate """
-        other_user = User.objects.create(username='tag_merge_test_other_user')
-        self._create_variant_tag(self.surviving_tag)
-        self._create_variant_tag(self.dying_tag, user=other_user)
-
-        merge_tag(self.dying_tag, self.surviving_tag)
-
-        self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
+        self.assertEqual(variant_tag_counts.deleted, 0)
 
     def test_merge_collapses_tag_node_tags(self):
         tag_node = TagNode.objects.create(analysis=self.analysis, version=1)
@@ -116,14 +106,35 @@ class TagMergeTest(TestCase):
         self.assertIn("Aretefact", suggestions["Artefact"])
         self.assertIn("Artefact", suggestions["Aretefact"])
 
-    def test_delete_duplicate_variant_tags(self):
+
+class DeleteDuplicateVariantTagsTest(VariantTagTestCase):
+    def test_keeps_earliest_of_a_repeat(self):
         earliest = self._create_variant_tag(self.surviving_tag)
         self._create_variant_tag(self.surviving_tag)
         self._create_variant_tag(self.surviving_tag, variant=self.other_variant)
 
-        self.assertEqual(delete_duplicate_variant_tags(), 1)
+        call_command("variant_tags", "delete-duplicates")
+
         self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
         self.assertTrue(VariantTag.objects.filter(pk=earliest.pk).exists())
+
+    def test_keeps_different_users_re_tagging(self):
+        """ A second user tagging the same variant is agreement data, not a duplicate """
+        other_user = User.objects.create(username='tag_merge_test_other_user')
+        self._create_variant_tag(self.surviving_tag)
+        self._create_variant_tag(self.surviving_tag, user=other_user)
+
+        call_command("variant_tags", "delete-duplicates")
+
+        self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
+
+    def test_dry_run_deletes_nothing(self):
+        self._create_variant_tag(self.surviving_tag)
+        self._create_variant_tag(self.surviving_tag)
+
+        call_command("variant_tags", "delete-duplicates", "--dry-run")
+
+        self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
 
 
 class CreateTagFormTest(TestCase):
