@@ -30,7 +30,8 @@ def get_annotsv_dir(annotation_run) -> str:
     return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"annotsv_{annotation_run.pk}")
 
 
-def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT, use_accession=False) -> int:
+def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT, use_accession=False,
+                    samples=None) -> int:
     # We had an issue with writing accessions in VEP, so use chrom names and the default VEP fasta instead
     # @see https://github.com/Ensembl/ensembl-vep/issues/1635
     # Contigs are shared between builds (eg GRCh37/hg19) so the ordering join needs restricting to this
@@ -52,4 +53,4 @@ def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_
         f = open(vcf_filename, "w")
     with f:
         return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=info_dict,
-                                                      use_accession=use_accession)
+                                                      use_accession=use_accession, samples=samples)

@@ -1,4 +1,3 @@
-import gzip
 import os
 import re
 import subprocess
@@ -27,30 +26,6 @@ def get_annotsv_command(vcf_filename: str, output_dir: str,
     ]
     cmd.extend(settings.ANNOTATION_ANNOTSV_EXTRA_ARGS)
     return cmd
-
-
-def write_annotsv_input_vcf(vcf_filename: str, output_dir: str) -> str:
-    """ AnnotSV rejects sites-only VCFs (its header check requires a FORMAT column), but our
-        annotation dumps carry no genotypes. Write a copy with a dummy sample into output_dir -
-        the GT value only feeds AnnotSV's Samples_ID reporting. Keeps the dump's basename so
-        AnnotSV names its output TSV to match get_annotsv_tsv_filename. """
-    annotsv_input = os.path.join(output_dir, os.path.basename(vcf_filename))
-    open_func = gzip.open if vcf_filename.endswith(".gz") else open
-    with open_func(vcf_filename, "rt") as fin, open_func(annotsv_input, "wt") as fout:
-        for line in fin:
-            line = line.rstrip("\n")
-            if line.startswith("#CHROM"):
-                if "FORMAT" in line.split("\t"):
-                    fout.close()
-                    os.remove(annotsv_input)
-                    return vcf_filename  # already has genotype columns - use as-is
-                fout.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
-                fout.write(f"{line}\tFORMAT\tvariantgrid\n")
-            elif line.startswith("#"):
-                fout.write(f"{line}\n")
-            else:
-                fout.write(f"{line}\tGT\t0/1\n")
-    return annotsv_input
 
 
 def get_annotsv_tsv_filename(vcf_filename: str, output_dir: str) -> str:

@@ -9,7 +9,6 @@ from annotation.annotsv_annotation import (
     get_annotsv_command,
     get_annotsv_command_line_version,
     get_annotsv_tsv_filename,
-    write_annotsv_input_vcf,
 )
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.pipelines.base import AnnotationPipelineRunner
@@ -26,6 +25,9 @@ class AnnotSVRunner(AnnotationPipelineRunner):
     pipeline_type = VariantAnnotationPipelineType.ANNOTSV
     selects_unannotated = False  # takes every SV in range; depends_on guarantees VEP wrote their rows
     versioned = True  # rolling the binary or bundle re-runs the genome, without touching VEP's version
+    # AnnotSV's header check requires a FORMAT column, so the dump carries a dummy sample. The genotype
+    # only feeds its Samples_ID reporting.
+    dump_samples = ["variantgrid"]
 
     def get_current_tool_version(self, genome_build) -> dict:
         return {
@@ -38,12 +40,7 @@ class AnnotSVRunner(AnnotationPipelineRunner):
     # what it is for. Being fed the VEP dump is the reason it has never seen them.
 
     def get_output_paths(self, annotation_run, dump_filename) -> list[str]:
-        annotsv_dir = get_annotsv_dir(annotation_run)
-        # The genotype-augmented input copy (write_annotsv_input_vcf) shares the dump's basename, so a
-        # discarded attempt reclaims it here - the shared dir it sits in is left alone.
-        return [dump_filename,
-                os.path.join(annotsv_dir, os.path.basename(dump_filename)),
-                get_annotsv_tsv_filename(dump_filename, annotsv_dir)]
+        return [dump_filename, get_annotsv_tsv_filename(dump_filename, get_annotsv_dir(annotation_run))]
 
     def tool_finished(self, annotation_run, dump_filename) -> bool:
         # AnnotSV writes its TSV at the end of the run, so its presence is proof the run completed - no
@@ -69,10 +66,7 @@ class AnnotSVRunner(AnnotationPipelineRunner):
         annotsv_dir = get_annotsv_dir(annotation_run)
         os.makedirs(annotsv_dir, exist_ok=True)
         vcf_dump_filename = annotation_run.vcf_dump_filename
-        # AnnotSV rejects our sites-only dump, so it is fed a genotype-carrying copy. The TSV is still
-        # named off the dump - the copy shares its basename, which is what keeps the derived paths right.
-        annotsv_input = write_annotsv_input_vcf(vcf_dump_filename, annotsv_dir)
-        cmd = get_annotsv_command(annotsv_input, annotsv_dir,
+        cmd = get_annotsv_command(vcf_dump_filename, annotsv_dir,
                                   annotation_run.genome_build, annotation_run.annotation_consortium)
         annotation_run.annotation_start = timezone.now()
         annotation_run.pipeline_command = " ".join(cmd)

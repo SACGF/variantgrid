@@ -6,13 +6,9 @@ from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 
-from annotation.annotation_run_files import get_annotsv_dir
+from annotation.annotation_run_files import get_annotsv_dir, write_qs_to_vcf
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
-from annotation.annotsv_annotation import (
-    get_annotsv_command,
-    get_annotsv_tsv_filename,
-    write_annotsv_input_vcf,
-)
+from annotation.annotsv_annotation import get_annotsv_command, get_annotsv_tsv_filename
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.models import (
@@ -35,6 +31,7 @@ from annotation.vep_annotation import (
     vep_dict_to_variant_annotation_version_kwargs,
 )
 from genes.models_enums import AnnotationConsortium
+from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_loci_and_variants_for_vcf,
@@ -211,14 +208,6 @@ class TestGetAnnotsvCommand(TestCase):
         self.assertEqual(cmd[tx_idx + 1], "ENSEMBL")
 
 
-SITES_ONLY_SV_VCF = "\n".join([
-    "##fileformat=VCFv4.2",
-    '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">',
-    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
-    "1\t1000000\t.\tN\t<DEL>\t.\t.\tSVTYPE=DEL;END=1050000;SVLEN=-50000;variant_id=42",
-]) + "\n"
-
-
 @override_settings(
     ANNOTATION_ANNOTSV_BIN="/fake/AnnotSV",
     ANNOTATION_ANNOTSV_ANNOTATIONS_DIR="/fake/anno",
@@ -228,8 +217,8 @@ SITES_ONLY_SV_VCF = "\n".join([
     ANNOTATION_ANNOTSV_BUNDLE_VERSION="bundle-2024-01",
 )
 class TestRunAnnotsvSubprocessMocked(TestCase):
-    """ What AnnotSVRunner.annotate() hands the tool: the dump is sites-only and AnnotSV rejects those,
-        so it is a genotype-augmented copy that gets run, while the TSV stays named off the dump. """
+    """ What AnnotSVRunner.annotate() hands the tool. AnnotSV's header check rejects a sites-only VCF, so
+        the dump is written with a dummy sample (dump_samples) and fed to AnnotSV as-is. """
 
     @classmethod
     def setUpTestData(cls):
@@ -252,23 +241,14 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
                                             pipeline_type=VariantAnnotationPipelineType.ANNOTSV,
                                             pipeline_version=pipeline_version)
 
-    def test_genotype_augmented_copy_is_what_runs(self):
+    def test_dump_carries_dummy_sample_and_is_what_runs(self):
         annotation_run = self._make_annotsv_run()
         runner = AnnotSVRunner()
-
-        def _dump(run, task_token=None):  # pylint: disable=unused-argument
-            run.vcf_dump_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR,
-                                                 "dump_99_annotsv.vcf")
-            with open(run.vcf_dump_filename, "w") as f:
-                f.write(SITES_ONLY_SV_VCF)
-            run.save()
-            return 1
 
         def _execute_cmd(cmd, **kwargs):  # pylint: disable=unused-argument
             output_dir = cmd[cmd.index("-outputDir") + 1]
             svinput = cmd[cmd.index("-SVinputFile") + 1]
-            tsv = get_annotsv_tsv_filename(svinput, output_dir)
-            with open(tsv, "w") as f:
+            with open(get_annotsv_tsv_filename(svinput, output_dir), "w") as f:
                 f.write("AnnotSV_ID\n")
             return 0, "ok", ""
 
@@ -276,41 +256,50 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
             with override_settings(ANNOTATION_VCF_DUMP_DIR=dump_dir), \
                     mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
                                return_value="3.5.8"), \
-                    mock.patch.object(AnnotSVRunner, "dump", side_effect=_dump), \
+                    mock.patch.object(AnnotSVRunner, "get_variants_qs",
+                                      return_value=Variant.objects.filter(pk__in=[v.pk for v in self.variants])), \
                     mock.patch("annotation.pipelines.annotsv.execute_cmd",
                                side_effect=_execute_cmd) as execute_cmd_mock:
                 runner.annotate(annotation_run)
 
-                annotsv_dir = get_annotsv_dir(annotation_run)
                 dump_filename = annotation_run.vcf_dump_filename
                 self.assertEqual(annotation_run.vcf_annotated_filename,
-                                 get_annotsv_tsv_filename(dump_filename, annotsv_dir))
+                                 get_annotsv_tsv_filename(dump_filename, get_annotsv_dir(annotation_run)))
 
+                # The dump itself is the AnnotSV input - no separate copy
                 cmd_called = execute_cmd_mock.call_args.args[0]
-                annotsv_input = os.path.join(annotsv_dir, os.path.basename(dump_filename))
-                self.assertIn(annotsv_input, cmd_called)
-                self.assertNotIn(dump_filename, cmd_called)
-                with open(annotsv_input) as f:
+                self.assertIn(dump_filename, cmd_called)
+
+                with open(dump_filename) as f:
                     lines = f.read().splitlines()
-                self.assertTrue(lines[-2].endswith("\tFORMAT\tvariantgrid"))
-                self.assertTrue(lines[-1].endswith("\tGT\t0/1"))
+                column_line = [line for line in lines if line.startswith("#CHROM")][0]
+                self.assertTrue(column_line.endswith("\tFORMAT\tvariantgrid"))
+                self.assertIn('##FORMAT=<ID=GT,', "\n".join(lines))
+                records = [line for line in lines if not line.startswith("#")]
+                self.assertTrue(records)
+                for record in records:
+                    self.assertTrue(record.endswith("\tGT\t0/1"), record)
 
-                # A discarded attempt has to be able to reclaim the copy it wrote
-                self.assertIn(annotsv_input, runner.get_output_paths(annotation_run, dump_filename))
 
+class TestDumpSamples(TestCase):
+    """ dump_samples plumbs through write_qs_to_vcf - a pipeline that doesn't set it still dumps
+        sites-only, which is what VEP takes. """
 
-class TestWriteAnnotsvInputVcf(TestCase):
-    def test_vcf_with_genotypes_passed_through(self):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.variant = slowly_create_test_variant("1", 100000, 'A', 'T', cls.genome_build)
+
+    def test_no_samples_writes_sites_only(self):
+        qs = Variant.objects.filter(pk=self.variant.pk)
         with tempfile.TemporaryDirectory() as tmp_dir:
-            vcf_filename = os.path.join(tmp_dir, "with_samples.vcf")
-            with open(vcf_filename, "w") as f:
-                f.write("##fileformat=VCFv4.2\n"
-                        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample1\n"
-                        "1\t1000000\t.\tN\t<DEL>\t.\t.\tSVTYPE=DEL\tGT\t0/1\n")
-            out_dir = os.path.join(tmp_dir, "out_dir")
-            os.makedirs(out_dir)
-            self.assertEqual(write_annotsv_input_vcf(vcf_filename, out_dir), vcf_filename)
-            self.assertEqual(os.listdir(out_dir), [])  # no leftover partial copy
+            vcf_filename = os.path.join(tmp_dir, "sites_only.vcf")
+            write_qs_to_vcf(vcf_filename, self.genome_build, qs)
+            with open(vcf_filename) as f:
+                lines = f.read().splitlines()
+        column_line = [line for line in lines if line.startswith("#CHROM")][0]
+        self.assertNotIn("FORMAT", column_line)
 
 
 @override_settings(
