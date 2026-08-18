@@ -370,7 +370,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     @property
     def overlap_status_label(self):
-        if self.overlap_type == OverlapType.CROSS_CONTEXT:
+        if self.overlap_type == OverlapType.CROSS_CONTEXT or self.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
             match self.overlap_status:
                 case OverlapStatus.MAJOR_DIFFERENCES: return "Difference"
                 case OverlapStatus.MEDICALLY_SIGNIFICANT: return "Medically significant difference"
@@ -439,7 +439,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         relevant_values = set()
         for entry in self.contributions.all():
             if entry.contribution_status == OverlapContributionStatus.CONTRIBUTING:
-                relevant_values.add(entry.value)
+                relevant_values.add(entry.effective_value)
         # for cg in self.classificationgroupingoverlapcontribution_set.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
         #     # FIXME check triages
         #     # FIXME should this entire method
@@ -451,10 +451,19 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         #             relevant_values.add(value)
 
         if self.value_type == ClassificationResultValue.ONC_PATH:
-            return list(EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(relevant_values))[::-1]
+            return list(val.replace('_', '-') for val in EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(relevant_values))
         elif self.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
+            tier_1_or_2 = False
+            if "tier_1_or_2" in relevant_values:
+                relevant_values.remove("tier_1_or_2")
+                tier_1_or_2 = True
             somatic_clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-            return [somatic_clin_sig_e_key.pretty_value(val) for val in somatic_clin_sig_e_key.sort_values(relevant_values)][::-1]
+            sorted_values = somatic_clin_sig_e_key.sort_values(relevant_values)[::-1]
+            if tier_1_or_2:
+                sorted_values.append("tier_1_or_2")
+
+            result = [somatic_clin_sig_e_key.pretty_value(val) for val in sorted_values]
+            return result
         else:
             return []
 

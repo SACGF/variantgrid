@@ -345,7 +345,7 @@
             {% for overlap in cross_overlaps %}
                 <tr class="testing-context-C">
                     <td class="allele-origin-C">{% if forloop.first %}Cross Contexts{% endif %}</td>
-                    <td>Cross Contexts</td>
+                    <td></td>
                     <td>{{ overlap.value_type_label }}</td>
                     <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}{{ value }}{% endfor %}</td>
                     <td class="font-weight-bold"><span class="{% if overlap.overlap_status_obj.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.overlap_status_label }}</td>

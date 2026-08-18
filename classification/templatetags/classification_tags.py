@@ -17,7 +17,7 @@ from django.utils.timezone import localtime
 
 from classification.criteria_strengths import AcmgPointScore, CriteriaStrength
 from classification.enums import SpecialEKeys, ClassificationResultValue, TestingContextFull, TestingContextBucket, \
-    TriageStatus
+    TriageStatus, OverlapStatus
 from classification.enums.classification_enums import ShareLevel
 from classification.models import (
     ClassificationLabSummary,
@@ -884,9 +884,30 @@ def triage(context,
 def overlap_state(overlap: Overlap, show_link=False, show_link_if_discordant=False):
     if not show_link and show_link_if_discordant:
         show_link = overlap.overlap_status.is_discordant and overlap.is_single_context
+
+    show_medical_significant_icon = False
+    if overlap.overlap_status == 90 and overlap.is_single_context and overlap.value_type == ClassificationResultValue.ONC_PATH:
+        show_medical_significant_icon = True
+
+    severity = None
+    warning_message = None
+    if (
+        overlap.overlap_status > OverlapStatus.SINGLE_SUBMITTER and
+        overlap.is_single_context and
+        overlap.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE):
+        severity = "I"
+        warning_message = "Full discordance functionality for Clinical Significance is not yet enabled. Coming in a future release"
+
+        if overlap.testing_context_bucket == TestingContextBucket.SOLID_TUMOR:
+            severity = "W"
+            warning_message = "Solid Tumour will need to be subdivided into tumour types before a clinical significance comparison is meaningful"
+
     return {
         "overlap": overlap,
-        "show_link": show_link
+        "show_link": show_link,
+        "show_medical_significant_icon": show_medical_significant_icon,
+        "severity": severity,
+        "warning_message": warning_message
     }
 
 
