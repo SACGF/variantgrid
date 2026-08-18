@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from analysis.models import Analysis, TagNode, VariantTag
+from analysis.models import Analysis, TagNode, VariantTag, TagNodeInput
 from analysis.models.enums import TagNodeMode
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from snpdb.models import GenomeBuild, Tag, Variant
@@ -63,7 +63,7 @@ class TestTagNodeSnapshotWarning(TestCase):
         cls.analysis.set_defaults_and_save(user)
 
     def _create_tag_node(self, mode) -> TagNode:
-        return TagNode.objects.create(analysis=self.analysis, mode=mode, parent_input=False)
+        return TagNode.objects.create(analysis=self.analysis, mode=mode, node_input=TagNodeInput.TAGGED_VARIANTS)
 
     def test_global_tags_warns_about_snapshot(self):
         node = self._create_tag_node(TagNodeMode.ALL_TAGS)
