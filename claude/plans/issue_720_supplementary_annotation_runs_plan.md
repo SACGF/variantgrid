@@ -383,6 +383,10 @@ run only ever UPDATEs. Three useful consequences:
 - Provenance is the range lock: *"has AnnotSV covered variant X?"* is *"is there a FINISHED `ANNOTSV`
   `AnnotationRun` on the range lock containing X, at which pipeline version?"* No per-variant table.
 
+  This holds because AnnotSV *sweeps* - one run takes every SV in its range. It is not a property of
+  supplementary pipelines in general: a pipeline run on a chosen handful of variants at a time covers a
+  range lock only partially, so it needs per-variant records instead. See #1755.
+
 This does mean `import_annotsv_tsv` must stop scoping by `annotation_run` — it currently does
 `VariantAnnotation.objects.filter(annotation_run=annotation_run)`
 (`annotation/vcf_files/bulk_annotsv_tsv_inserter.py:160`), which will match zero rows once the AnnotSV run
@@ -723,15 +727,22 @@ changing any behaviour, so it should go in on its own and be seen to be a no-op.
 
 **Out of scope, deliberately:**
 
-- **SpliceAI (#720's original ask) — its own issue.** The framework here is what SpliceAI needs, but
-  running it is a separate, mostly operational problem: the benchmarks on the issue are ~10s CPU per
-  variant (6162 CPU-minutes for 38,889 records) and a Quadro P600 was no faster than 8 CPU threads. That
-  rules out sweeping every range lock, so the first question is not "how do we schedule it" but "how small
-  is the gap set?" — SpliceAI's precalculated cache covers SNVs, 1bp insertions and 1-4bp deletions within
-  genes, so the gap is indels of 2-50bp in genes, which may be small enough to be viable or may not. The
-  selection-Q canary the issue identified (`cadd_raw_rankscore IS NULL`, since every dbNSFP record has
-  one) needs measuring against real data before it is worth designing around. None of that should hold up
-  the AnnotSV split, and the split is what makes SpliceAI a ~200-line runner when its time comes.
+- **SpliceAI (#720's original ask) — its own issue, #1755, and a different shape from this.** SpliceAI
+  runs are sparse and manual: a handful of specially chosen variants, with the *same* range lock possibly
+  touched again months later. That breaks the range-lock-as-provenance contract in §3.7 outright — a
+  FINISHED run over a lock would not mean SpliceAI had covered the lock. So SpliceAI needs per-variant
+  coverage records, and a manual run is a poor fit for `AnnotationRun` at all (which is coupled to a range
+  lock through `variant_annotation_version`, `genome_build`, `annotation_consortium` and
+  `_trigger_dispatch`, and which #1654 deliberately keeps from ever being committed rangeless).
+
+  The sharpest consequence: `spliceai_max_ds IS NULL` cannot distinguish "never ran" from "ran, no splice
+  effect", and SpliceAI legitimately returns nothing for variants outside genes or over `2 * -D` long.
+  Without a per-variant record the expensive tool is re-run forever on variants already known to score
+  nothing.
+
+  A batch mode sweeping range locks *would* fit this framework, but only if the gap set is small — the
+  benchmarks on #720 are ~9.5s CPU per variant, and a Quadro P600 was no faster than 8 CPU threads. That
+  needs counting before it is worth designing. Either way none of it should hold up the AnnotSV split.
 
 - **#1675 (backfill a single `VariantAnnotation` column).** Different problem — re-running VEP over
   *already-annotated* variants to fix one column, e.g. the COSMIC field renames in #1673. It shares one
