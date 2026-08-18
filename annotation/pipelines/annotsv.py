@@ -25,6 +25,9 @@ class AnnotSVRunner(AnnotationPipelineRunner):
     pipeline_type = VariantAnnotationPipelineType.ANNOTSV
     selects_unannotated = False  # takes every SV in range; depends_on guarantees VEP wrote their rows
     versioned = True  # rolling the binary or bundle re-runs the genome, without touching VEP's version
+    # AnnotSV's header check requires a FORMAT column, so the dump carries a dummy sample. The genotype
+    # only feeds its Samples_ID reporting.
+    dump_samples = ["variantgrid"]
 
     def get_current_tool_version(self, genome_build) -> dict:
         return {
@@ -61,6 +64,7 @@ class AnnotSVRunner(AnnotationPipelineRunner):
             return
 
         annotsv_dir = get_annotsv_dir(annotation_run)
+        os.makedirs(annotsv_dir, exist_ok=True)
         vcf_dump_filename = annotation_run.vcf_dump_filename
         cmd = get_annotsv_command(vcf_dump_filename, annotsv_dir,
                                   annotation_run.genome_build, annotation_run.annotation_consortium)
@@ -68,7 +72,6 @@ class AnnotSVRunner(AnnotationPipelineRunner):
         annotation_run.pipeline_command = " ".join(cmd)
         annotation_run.save()
 
-        os.makedirs(annotsv_dir, exist_ok=True)
         # #1658: register AnnotSV with the lease heartbeat so a reclaim kills it rather than letting the
         # losing worker run to completion against a range the new attempt now owns.
         process_callback = lease_heartbeat.set_process if lease_heartbeat else None

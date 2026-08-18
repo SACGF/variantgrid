@@ -57,10 +57,19 @@ def write_qs_to_vcf_file_sort_alphabetically(qs, f, info_dict=None) -> int:
     return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict)
 
 
-def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, use_accession=False) -> int:
+def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, use_accession=False,
+                                     samples=None) -> int:
     """
+    :param samples: sample names written into every record as a dummy heterozygous call - for tools that
+                    reject sites-only VCFs. Must match the samples the header_lines were built with
     :return: number of lines written
     """
+    fmt = None
+    sample_calls = None
+    if samples:
+        fmt = "GT"
+        sample_calls = ["0/1"] * len(samples)
+
     if use_accession:
         chrom_key = "locus__contig__refseq_accession"
     else:
@@ -88,15 +97,19 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, 
                     value = func(variant_path, data)
                     info[info_name] = value
 
-        writer.write_record(chrom, pos, ref, alt or ref, info=info or None)
+        writer.write_record(chrom, pos, ref, alt or ref, info=info or None,
+                            fmt=fmt, sample_calls=sample_calls)
         i += 1
 
     return i
 
 
-def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict, use_accession=False) -> int:
-    header_lines = get_vcf_header_from_contigs(genome_build, info_dict=info_dict, use_accession=use_accession)
-    return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict, use_accession=use_accession)
+def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict, use_accession=False,
+                                           samples=None) -> int:
+    header_lines = get_vcf_header_from_contigs(genome_build, info_dict=info_dict, use_accession=use_accession,
+                                               samples=samples)
+    return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict,
+                                            use_accession=use_accession, samples=samples)
 
 
 def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample_name_func=None) -> dict[Sample, Counter]:

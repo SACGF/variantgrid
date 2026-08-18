@@ -33,6 +33,9 @@ class AnnotationPipelineRunner(abc.ABC):
     # Whether this pipeline's runs are scheduled against an AnnotationPipelineVersion (#720). VEP
     # pipelines are not: their version is the VariantAnnotationVersion their range lock belongs to.
     versioned: bool = False
+    # Sample names written into the dump as dummy heterozygous calls. None dumps sites-only, which is
+    # what VEP takes - set by a pipeline whose tool rejects a VCF with no FORMAT column.
+    dump_samples: list[str] = None
 
     def get_current_tool_version(self, genome_build) -> dict:
         """ code_version/data_version of the tool as installed right now - AnnotationPipelineVersion
@@ -97,7 +100,7 @@ class AnnotationPipelineRunner(abc.ABC):
             raise ValueError(f"Don't want to overwrite '{vcf_dump_filename}' which already exists!")
         mk_path_for_file(vcf_dump_filename)
         vcf_dump_count = write_qs_to_vcf(vcf_dump_filename, annotation_run.genome_build,
-                                         self.get_variants_qs(annotation_run))
+                                         self.get_variants_qs(annotation_run), samples=self.dump_samples)
 
         annotation_run.dump_count = vcf_dump_count
         annotation_run.dump_end = timezone.now()

@@ -1,16 +1,19 @@
 import os
+import tempfile
 from unittest import mock
 
 from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 
+from annotation.annotation_run_files import get_annotsv_dir, write_qs_to_vcf
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
-from annotation.annotsv_annotation import get_annotsv_command
-from annotation.fake_annotation import get_fake_annotation_settings_dict
+from annotation.annotsv_annotation import get_annotsv_command, get_annotsv_tsv_filename
+from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.models import (
     AnnotationPipelineVersion,
+    AnnotationRangeLock,
     AnnotationRun,
     VariantAnnotationVersion,
 )
@@ -28,8 +31,12 @@ from annotation.vep_annotation import (
     vep_dict_to_variant_annotation_version_kwargs,
 )
 from genes.models_enums import AnnotationConsortium
+from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
+from snpdb.tests.utils.vcf_testing_utils import (
+    slowly_create_loci_and_variants_for_vcf,
+    slowly_create_test_variant,
+)
 
 TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
 TEST_ANNOTSV_TSV = os.path.join(TEST_DATA_DIR, "annotsv", "test_grch37_sv.annotated.tsv")
@@ -199,6 +206,100 @@ class TestGetAnnotsvCommand(TestCase):
                                   AnnotationConsortium.ENSEMBL)
         tx_idx = cmd.index("-tx")
         self.assertEqual(cmd[tx_idx + 1], "ENSEMBL")
+
+
+@override_settings(
+    ANNOTATION_ANNOTSV_BIN="/fake/AnnotSV",
+    ANNOTATION_ANNOTSV_ANNOTATIONS_DIR="/fake/anno",
+    ANNOTATION_ANNOTSV_GENOME_BUILD={"GRCh37": "GRCh37"},
+    ANNOTATION_ANNOTSV_EXTRA_ARGS=[],
+    ANNOTATION_ANNOTSV_TIMEOUT_SECONDS=60,
+    ANNOTATION_ANNOTSV_BUNDLE_VERSION="bundle-2024-01",
+)
+class TestRunAnnotsvSubprocessMocked(TestCase):
+    """ What AnnotSVRunner.annotate() hands the tool. AnnotSV's header check rejects a sites-only VCF, so
+        the dump is written with a dummy sample (dump_samples) and fed to AnnotSV as-is. """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.variants = [slowly_create_test_variant("1", 100000 + i * 10, 'A', 'T', cls.genome_build)
+                        for i in range(2)]
+        kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.REFSEQ, 4)
+        kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
+        cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
+
+    def _make_annotsv_run(self) -> AnnotationRun:
+        annotation_range_lock = AnnotationRangeLock.objects.create(
+            version=self.vav, min_variant=self.variants[0], max_variant=self.variants[-1], count=1)
+        pipeline_version = AnnotationPipelineVersion.objects.create(
+            pipeline_type=VariantAnnotationPipelineType.ANNOTSV, genome_build=self.genome_build,
+            code_version="3.5.8", data_version="bundle-2024-01",
+            status=AnnotationPipelineVersion.Status.ACTIVE)
+        return AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
+                                            pipeline_type=VariantAnnotationPipelineType.ANNOTSV,
+                                            pipeline_version=pipeline_version)
+
+    def test_dump_carries_dummy_sample_and_is_what_runs(self):
+        annotation_run = self._make_annotsv_run()
+        runner = AnnotSVRunner()
+
+        def _execute_cmd(cmd, **kwargs):  # pylint: disable=unused-argument
+            output_dir = cmd[cmd.index("-outputDir") + 1]
+            svinput = cmd[cmd.index("-SVinputFile") + 1]
+            with open(get_annotsv_tsv_filename(svinput, output_dir), "w") as f:
+                f.write("AnnotSV_ID\n")
+            return 0, "ok", ""
+
+        with tempfile.TemporaryDirectory() as dump_dir:
+            with override_settings(ANNOTATION_VCF_DUMP_DIR=dump_dir), \
+                    mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                               return_value="3.5.8"), \
+                    mock.patch.object(AnnotSVRunner, "get_variants_qs",
+                                      return_value=Variant.objects.filter(pk__in=[v.pk for v in self.variants])), \
+                    mock.patch("annotation.pipelines.annotsv.execute_cmd",
+                               side_effect=_execute_cmd) as execute_cmd_mock:
+                runner.annotate(annotation_run)
+
+                dump_filename = annotation_run.vcf_dump_filename
+                self.assertEqual(annotation_run.vcf_annotated_filename,
+                                 get_annotsv_tsv_filename(dump_filename, get_annotsv_dir(annotation_run)))
+
+                # The dump itself is the AnnotSV input - no separate copy
+                cmd_called = execute_cmd_mock.call_args.args[0]
+                self.assertIn(dump_filename, cmd_called)
+
+                with open(dump_filename) as f:
+                    lines = f.read().splitlines()
+                column_line = [line for line in lines if line.startswith("#CHROM")][0]
+                self.assertTrue(column_line.endswith("\tFORMAT\tvariantgrid"))
+                self.assertIn('##FORMAT=<ID=GT,', "\n".join(lines))
+                records = [line for line in lines if not line.startswith("#")]
+                self.assertTrue(records)
+                for record in records:
+                    self.assertTrue(record.endswith("\tGT\t0/1"), record)
+
+
+class TestDumpSamples(TestCase):
+    """ dump_samples plumbs through write_qs_to_vcf - a pipeline that doesn't set it still dumps
+        sites-only, which is what VEP takes. """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.variant = slowly_create_test_variant("1", 100000, 'A', 'T', cls.genome_build)
+
+    def test_no_samples_writes_sites_only(self):
+        qs = Variant.objects.filter(pk=self.variant.pk)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            vcf_filename = os.path.join(tmp_dir, "sites_only.vcf")
+            write_qs_to_vcf(vcf_filename, self.genome_build, qs)
+            with open(vcf_filename) as f:
+                lines = f.read().splitlines()
+        column_line = [line for line in lines if line.startswith("#CHROM")][0]
+        self.assertNotIn("FORMAT", column_line)
 
 
 @override_settings(

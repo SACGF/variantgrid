@@ -367,7 +367,9 @@ ANNOTATION_MIN_FREE_DISK_GIGS = 1
 # dispatching them.
 ANNOTATION_ANNOTSV_ENABLED = False
 ANNOTATION_ANNOTSV_BIN = "/data/annotation/AnnotSV/bin/AnnotSV"
-ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/AnnotSV/share/AnnotSV/Annotations_Human"
+# Passed as -annotationsDir: the directory *containing* Annotations_Human (and Annotations_Exomiser),
+# ie <install>/share/AnnotSV - not Annotations_Human itself
+ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/AnnotSV/share/AnnotSV"
 # Map our genome build name -> AnnotSV's -genomeBuild value
 ANNOTATION_ANNOTSV_GENOME_BUILD = {
     BUILD_GRCH37: "GRCh37",
