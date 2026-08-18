@@ -7,7 +7,7 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 from django.utils.timezone import localtime
 
-from analysis.models.enums import TagNodeMode
+from analysis.models.enums import TagNodeInput, TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin, NodeVersion
 from snpdb.models import Tag
@@ -15,8 +15,7 @@ from snpdb.models import Tag
 
 class TagNode(AnalysisNode):
     ANALYSIS_TAGS_NAME = "Tagged Variants"
-    parent_input = models.BooleanField(default=True)
-    exclude = models.BooleanField(default=False)
+    node_input = models.CharField(max_length=1, choices=TagNodeInput.choices, default=TagNodeInput.PARENT_TAGGED)
     mode = models.CharField(max_length=1, choices=TagNodeMode.choices, default=TagNodeMode.THIS_ANALYSIS)
 
     def modifies_parents(self):
@@ -61,14 +60,14 @@ class TagNode(AnalysisNode):
             q_list.append(VariantTag.variants_for_build_q(self.analysis.genome_build, tags_qs, self.tag_ids))
 
         q = reduce(operator.or_, q_list)
-        if self.exclude:
+        if self.node_input == TagNodeInput.PARENT_NOT_TAGGED:
             q = ~q
         return q
 
     def get_node_name(self):
         if self.visible:
             description_list = []
-            if self.exclude:
+            if self.node_input == TagNodeInput.PARENT_NOT_TAGGED:
                 description_list.append("Exclude")
 
             if self.mode == TagNodeMode.ALL_TAGS:
@@ -117,9 +116,9 @@ class TagNode(AnalysisNode):
 
     @property
     def max_inputs(self):
-        if self.parent_input:
-            return 1
-        return 0
+        if self.node_input == TagNodeInput.TAGGED_VARIANTS:
+            return 0
+        return 1
 
     @staticmethod
     def get_analysis_tags_node(analysis):
@@ -127,7 +126,7 @@ class TagNode(AnalysisNode):
 
         node, created = TagNode.objects.get_or_create(analysis=analysis,
                                                       name=TagNode.ANALYSIS_TAGS_NAME,
-                                                      parent_input=False,
+                                                      node_input=TagNodeInput.TAGGED_VARIANTS,
                                                       mode=TagNodeMode.THIS_ANALYSIS,
                                                       visible=False)
         if created:

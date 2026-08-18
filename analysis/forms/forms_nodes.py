@@ -880,12 +880,15 @@ class TagNodeForm(BaseNodeForm):
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {
             "mode": forms.RadioSelect(attrs={'class': 'horizontal-radio'}),
+            "node_input": forms.RadioSelect(),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.instance.visible:
-            self.fields["mode"].widget = HiddenInput()  # Hide in special all tags node (tags button)
+            # Hide in special all tags node (tags button) - it's always all of this analysis' tags, no parent
+            for field_name in ("mode", "node_input"):
+                self.fields[field_name].widget = HiddenInput()
 
     def save(self, commit=True):
         node = super().save(commit=False)

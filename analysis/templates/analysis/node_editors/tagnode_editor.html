@@ -10,8 +10,10 @@
 
 {% block content %}
 <style>
-    .tag-top-checkboxes {
-        margin-right: 10px;
+    #tagnode-input ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
     }
 </style>
 <script>
@@ -26,20 +28,6 @@ function classifyAndCloseButton(tagId) {
     $(`#tag-button-${tagId}`).remove();
 }
 
-function enableDisableExclude() {
-    const excludeSection = $("#tagnode-exclude-section");
-    const exclude = $("#id_exclude", excludeSection);
-    if ($("#id_parent_input").is(":checked")) {
-        exclude.prop("disabled", false);
-        excludeSection.css("opacity", "100%");
-    } else {
-        exclude.prop("checked", false);
-        exclude.prop("disabled", true);
-        excludeSection.css("opacity", "50%");
-    }
-}
-
-
 $(document).ready(function() {
     const tagNodeForm = $("form#tag-node-form");
     ajaxForm(tagNodeForm);
@@ -51,9 +39,6 @@ $(document).ready(function() {
 			$(this).addClass("tagged-" + this.value);
 		}
 	});
-
-    enableDisableExclude();
-	$("#id_parent_input", tagNodeForm).change(enableDisableExclude);
 
     {%  if not requires_classification_tags %}
         {% if not node.analysis.analysisclassification_set.exists %}
@@ -73,30 +58,21 @@ $(document).ready(function() {
         {% for hidden in form.hidden_fields %}
             {{ hidden }}
         {% endfor %}
-        {% if node.visible %}
-        <div>
-            <span class="tag-top-checkboxes">
-                <label>{{ form.parent_input.label }}:</label> {{ form.parent_input }}
-            </span>
-        </div>
-        {% endif %}
-        <div>
-    		{% if node.visible %}
-            <div class="display-flex">
-                <label>Tags From:</label>
-                {{ form.mode }}
-            </div>
-    		{% else %}
-    		<b>All tags for analysis</b> 
-    		{% endif %}
-        </div>
 		<div>
     		<b>Tag:</b> {{ form.tags }}
 		</div>
-        <div id="tagnode-exclude-section">
-            <label>{{ form.exclude.label }}:</label> {{ form.exclude }}
-            (Filter OUT variants with selected tags, only works with parent input)
-        </div>
+        {% if node.visible %}
+            <div class="display-flex">
+                <label>Tags from:</label>
+                {{ form.mode }}
+            </div>
+            <div id="tagnode-input">
+                <label>Variants:</label>
+                {{ form.node_input }}
+            </div>
+        {% else %}
+            <div><b>All tags for analysis</b></div>
+        {% endif %}
         {% if has_write_permission %}
             <button id='tag-node-save' class="btn btn-primary">save</button>
         {% endif %}

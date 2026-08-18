@@ -170,8 +170,15 @@ class QuadSample(models.TextChoices):
 
 
 class TagNodeMode(models.TextChoices):
-    THIS_ANALYSIS = 'T', 'This Analysis'
-    ALL_TAGS = 'L', 'All Tags'
+    THIS_ANALYSIS = 'T', 'This analysis'
+    ALL_TAGS = 'L', 'All analyses'
+
+
+class TagNodeInput(models.TextChoices):
+    """ Whether the node is a source (tagged variants) or filters its parent """
+    TAGGED_VARIANTS = 'T', 'Tagged variants (no parent)'
+    PARENT_TAGGED = 'I', 'Parent variants that ARE tagged'
+    PARENT_NOT_TAGGED = 'E', 'Parent variants that are NOT tagged'
 
 
 class TagLocation(models.TextChoices):
