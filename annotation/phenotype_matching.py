@@ -181,12 +181,10 @@ def _replace_comments_with_spaces(text):
 
 
 def create_phenotype_description(text, phenotype_matcher=None, defer_processing=False):
-    """ PhenotypeMatcher takes a while to initialize, so can create once and pass in for
-        faster bulk processing.
+    """ PhenotypeMatcher takes a while to initialize, so is only built if there are sentences we haven't
+        already matched - pass one in to re-use it for bulk processing.
         If defer_processing is True the PhenotypeDescription/TextPhenotype rows are created but NLP matching is
         skipped (used by bulk_patient_phenotype_matching to batch the heavy work for parallel execution). """
-    if not defer_processing and phenotype_matcher is None:
-        phenotype_matcher = PhenotypeMatcher()
     phenotype_tokenizer = PhenotypeTokenizer()
     phenotype_description = PhenotypeDescription.objects.create(original_text=text)
     known_sentences = []
@@ -213,6 +211,8 @@ def create_phenotype_description(text, phenotype_matcher=None, defer_processing=
             known_sentences.append(tps)
 
     if not defer_processing and unknown_sentences:
+        if phenotype_matcher is None:
+            phenotype_matcher = PhenotypeMatcher()
         for sentence in unknown_sentences:
             try:
                 _process_text_phenotype(sentence.text_phenotype, phenotype_tokenizer, phenotype_matcher)

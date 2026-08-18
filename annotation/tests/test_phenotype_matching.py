@@ -75,6 +75,17 @@ class TestPhenotypeMatching(TestCase):
         self.assertFalse(PatientTextPhenotype.objects.filter(patient=patient).exists(),
                          "Exclude marker should prevent persisting matches")
 
+    def test_matcher_only_built_when_there_is_new_text_to_match(self):
+        """ PhenotypeMatcher loads the whole ontology so takes seconds to build - saving a patient
+            shouldn't pay for that unless there are sentences we haven't already matched """
+        already_matched_text = "Failure to thrive"
+        Patient(phenotype=already_matched_text).save(phenotype_matcher=self.phenotype_matcher)
+
+        with mock.patch("annotation.phenotype_matching.PhenotypeMatcher") as mock_matcher:
+            Patient(patient_code="no phenotype").save()
+            Patient(phenotype=already_matched_text).save()
+            mock_matcher.assert_not_called()
+
     def test_commas(self):
         COMMA_OMIM = {
             "PLATELET DISORDER, FAMILIAL, WITH ASSOCIATED MYELOID MALIGNANCY": (OntologyService.OMIM, "OMIM:601399"),
