@@ -1,0 +1,207 @@
+{% extends menu_variants_base %}
+{% load static %}
+{% load genome_build_tags %}
+
+{% block title %}Tag Stats{% endblock title %}
+
+{% block head %}
+{{ block.super }}
+{{ genes_form.media }}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/tag_stats.js' %}"></script>
+<script>
+    const genomeBuildName = "{{ genome_build.name }}";
+
+    function taggedVariantsUrl(tagIds) {
+        const params = tagIds.map((t) => "tag=" + encodeURIComponent(t)).join("&");
+        return "{% url 'genome_build_variant_tags' genome_build.name %}?" + params;
+    }
+
+    function selectedValues(selector) {
+        return $(selector).val() || [];
+    }
+
+    function loadGenesCard() {
+        const params = $.param({
+            gene_symbols: selectedValues("#id_genes-gene_symbols"),
+            tags: selectedValues("#id_genes-tags"),
+        }, true);
+        loadTagStatsCard("tag-stats-genes",
+                         "{% url 'tag_stats_genes' genome_build.name %}?" + params,
+                         renderTagStatsGenes);
+    }
+
+    function loadReTaggedCard() {
+        const tag = $("#id_re-tagged-tag").val() || "";
+        loadTagStatsCard("tag-stats-re-tagged",
+                         "{% url 'tag_stats_re_tagged' genome_build.name %}?tag=" + encodeURIComponent(tag),
+                         (data, $content) => renderTagStatsReTagged(data, $content, Urls.view_allele_from_variant));
+    }
+
+    function loadTagGenesOverTimeCard() {
+        const tag = $("#id_gene-time-tag").val() || "";
+        loadTagStatsCard("tag-stats-tag-genes-over-time",
+                         "{% url 'tag_stats_tag_genes_over_time' genome_build.name %}?tag=" + encodeURIComponent(tag),
+                         renderTagStatsTagGenesOverTime);
+    }
+
+    function showSelectedTagsVariants() {
+        const tagIds = selectedValues("#id_co-occurrence-tags");
+        if (tagIds.length) {
+            window.location = taggedVariantsUrl(tagIds);
+        }
+    }
+
+    $(document).ready(() => {
+        loadTagStatsCard("tag-stats-headline", "{% url 'tag_stats_headline' genome_build.name %}",
+                         renderTagStatsHeadline);
+        loadTagStatsCard("tag-stats-over-time", "{% url 'tag_stats_over_time' genome_build.name %}",
+                         renderTagStatsOverTime);
+        loadTagStatsCard("tag-stats-your-tagging", "{% url 'tag_stats_for_user' genome_build.name %}",
+                         renderTagStatsUser);
+        loadTagStatsCard("tag-stats-by-lab", "{% url 'tag_stats_by_lab' genome_build.name %}",
+                         renderTagStatsByLab);
+        loadTagStatsCard("tag-stats-co-occurrence", "{% url 'tag_stats_co_occurrence' genome_build.name %}",
+                         (data, $content) => renderTagStatsCoOccurrence(data, $content, taggedVariantsUrl));
+        loadGenesCard();
+        loadReTaggedCard();
+        loadTagGenesOverTimeCard();
+
+        $("#genes-recalculate").click(loadGenesCard);
+        $("#re-tagged-recalculate").click(loadReTaggedCard);
+        $("#gene-time-recalculate").click(loadTagGenesOverTimeCard);
+        $("#co-occurrence-show-variants").click(showSelectedTagsVariants);
+    });
+</script>
+<style>
+    .card-spinner {
+        display: none;
+    }
+    ul.columns-2 {
+        column-count: 2;
+    }
+</style>
+{% endblock head %}
+
+{% block submenu_page_content %}
+    {% genome_build_url_arg genome_build 'genome_build_tag_stats' %}
+
+    <h3>Tag Stats</h3>
+
+    <p>
+        <a href="{% url 'genome_build_variant_tags' genome_build.name %}">Back to variant tags</a>
+    </p>
+
+    <div class="card mb-3" id="tag-stats-headline">
+        <div class="card-header">
+            Overview <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small">
+                Tagging repeats - a known artefact gets tagged again in every analysis it turns up in - so every
+                count below says which of these three it is.
+            </p>
+            <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            <div class="card-content"></div>
+        </div>
+    </div>
+
+    <div class="card mb-3" id="tag-stats-over-time">
+        <div class="card-header">
+            Tags over time <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
+        </div>
+        <div class="card-body">
+            <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            <div class="card-content"></div>
+        </div>
+    </div>
+
+    <div class="card mb-3" id="tag-stats-your-tagging">
+        <div class="card-header">
+            Your tagging <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
+        </div>
+        <div class="card-body">
+            <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            <div class="card-content"></div>
+            <p class="text-muted small mt-2">Search for other users to see their stats on their user page.</p>
+        </div>
+    </div>
+
+    <div class="card mb-3" id="tag-stats-by-lab">
+        <div class="card-header">
+            By user and lab <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
+        </div>
+        <div class="card-body">
+            <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            <div class="card-content"></div>
+        </div>
+    </div>
+
+    <div class="card mb-3" id="tag-stats-genes">
+        <div class="card-header">
+            Genes <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
+        </div>
+        <div class="card-body">
+            <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            <div class="card-content"></div>
+            <div class="form-row mt-3">
+                <div class="col">{{ genes_form.gene_symbols }}</div>
+                <div class="col">{{ genes_form.tags }}</div>
+                <div class="col-auto">
+                    <button id="genes-recalculate" class="btn btn-primary" type="button">Recalculate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3" id="tag-stats-co-occurrence">
+        <div class="card-header">
+            Tag co-occurrence <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small">Alleles carrying both tags - conflicting pairs stand out here.</p>
+            <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            <div class="card-content"></div>
+            <div class="form-row mt-3">
+                <div class="col">{{ co_occurrence_form.tags }}</div>
+                <div class="col-auto">
+                    <button id="co-occurrence-show-variants" class="btn btn-primary" type="button">
+                        Show variants with all of these tags
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3" id="tag-stats-re-tagged">
+        <div class="card-header">
+            Most re-tagged variants <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
+        </div>
+        <div class="card-body">
+            <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            <div class="card-content"></div>
+            <div class="form-row mt-3">
+                <div class="col">{{ re_tagged_form.tag }}</div>
+                <div class="col-auto">
+                    <button id="re-tagged-recalculate" class="btn btn-primary" type="button">Recalculate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3" id="tag-stats-tag-genes-over-time">
+        <div class="card-header">
+            A tag's genes over time <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
+        </div>
+        <div class="card-body">
+            <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            <div class="card-content"></div>
+            <div class="form-row mt-3">
+                <div class="col">{{ gene_time_form.tag }}</div>
+                <div class="col-auto">
+                    <button id="gene-time-recalculate" class="btn btn-primary" type="button">Recalculate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock submenu_page_content %}

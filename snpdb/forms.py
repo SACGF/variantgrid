@@ -44,6 +44,7 @@ from snpdb.models import (
 )
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.tag_merge import get_case_collision
 from uicore.utils.form_helpers import FormHelperHelper, form_helper_horizontal
 from variantgrid.perm_path import get_visible_url_names
 
@@ -751,6 +752,20 @@ class CreateTagForm(forms.Form):
             FieldWithButtons('tag', Submit(name="Create", value="create", css_class="btn btn-primary"))
         )
         self.helper = helper
+
+    def clean_tag(self):
+        tag_name = self.cleaned_data['tag']
+        if not tag_name.isalnum():
+            raise ValidationError("Tag names must be alphanumeric (no spaces or special characters)")
+        if Tag.objects.filter(pk=tag_name).exists():
+            raise ValidationError(f"Tag '{tag_name}' already exists")
+        if existing := get_case_collision(tag_name):
+            raise ValidationError(f"Tag '{existing}' already exists, and only differs by case. "
+                                  f"Use it, or ask an admin to merge the tags")
+        return tag_name
+
+    def save(self) -> Tag:
+        return Tag.objects.create(pk=self.cleaned_data['tag'])
 
 
 class UserSettingsGenomeBuildMixin:

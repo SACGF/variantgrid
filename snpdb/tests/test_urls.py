@@ -110,6 +110,7 @@ class Test(URLTestCase):
         ]
 
     def testUrls(self):
+        user_owner_kwargs = {"pk": self.user_owner.pk}
         URL_NAMES_AND_KWARGS = [
             ("data", {}, 200),
             ("vcfs", {}, 200),
@@ -122,6 +123,7 @@ class Test(URLTestCase):
             ("custom_columns", {}, 200),
             ("tag_settings", {}, 200),
             ("view_user_settings", {}, 200),
+            ("view_user", user_owner_kwargs, 200),
             ("labs", {}, 200),
             ("index", {}, 200),
             ("variant_tags", {}, 200),
