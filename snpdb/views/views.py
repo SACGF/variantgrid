@@ -57,6 +57,7 @@ from annotation.serializers import ManualVariantEntryCollectionSerializer
 from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
 from classification.classification_stats import get_grouped_classification_counts
 from classification.enums import AlleleOriginBucket
+from classification.models import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.views.classification_accumulation_graph import (
     AccumulationReportMode,
@@ -163,6 +164,12 @@ from snpdb.models.models_enums import (
     ProcessingStatus,
 )
 from snpdb.sample_file_path import get_example_replacements
+from snpdb.tag_merge import (
+    get_merge_suggestions,
+    get_tag_usage,
+    get_tag_usage_by_tag_id,
+    merge_tag,
+)
 from snpdb.tasks.liftover_tasks import liftover_alleles
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
@@ -1061,6 +1068,8 @@ def view_user(request, pk):
         "other_user": user,
         'user_contact': user_contact,
         'common_groups': common_groups,
+        'genome_build': UserSettings.get_genome_build_or_default(request.user),
+        'classifications_count': Classification.filter_for_user(request.user).filter(user=user).count(),
     }
     return render(request, 'snpdb/settings/view_user.html', context)
 
@@ -1328,17 +1337,24 @@ def view_custom_columns(request, custom_columns_collection_id):
     return render(request, 'snpdb/settings/view_custom_columns.html', context_dict)
 
 
+def _get_tag_summaries() -> list[dict]:
+    """ Per-tag usage counts + possible typo twins, for the tag settings table """
+    usage_by_tag_id = get_tag_usage_by_tag_id()
+    merge_suggestions = get_merge_suggestions()
+    return [{
+        "tag_id": tag_id,
+        "usage": usage,
+        "suggestions": merge_suggestions.get(tag_id, []),
+    } for tag_id, usage in sorted(usage_by_tag_id.items())]
+
+
 def tag_settings(request):
     form = forms.CreateTagForm(request.POST or None)
     if request.method == "POST":
         valid = form.is_valid()
         if valid:
-            tag_name = form.cleaned_data['tag']
-            name = f"Tag {tag_name}"
-            try:
-                Tag.objects.create(pk=tag_name)
-            except:
-                valid = False
+            tag = form.save()
+            name = f"Tag {tag}"
         else:
             name = "Tag"
         add_save_message(request, valid, name, created=True)
@@ -1351,8 +1367,39 @@ def tag_settings(request):
         "user_settings_tag_colors": user_settings_tag_colors,
         'user_tag_styles': user_tag_styles,
         'user_tag_colors': user_tag_colors,
+        'tag_summaries': _get_tag_summaries(),
     }
     return render(request, 'snpdb/settings/tag_settings.html', context_dict)
+
+
+@require_superuser
+def tag_merge(request, tag_id):
+    """ Merges the tag in the URL into another - always stated from the dying tag's side """
+    dying_tag = get_object_or_404(Tag, pk=tag_id)
+    surviving_tag = None
+    if surviving_tag_id := request.GET.get("into") or request.POST.get("surviving_tag"):
+        surviving_tag = Tag.objects.filter(pk=surviving_tag_id).exclude(pk=dying_tag.pk).first()
+
+    if request.method == "POST":
+        confirm = request.POST.get("confirm_tag_name", "")
+        if surviving_tag is None:
+            messages.add_message(request, messages.ERROR, "Choose an existing tag to merge into")
+        elif confirm != dying_tag.pk:
+            messages.add_message(request, messages.ERROR,
+                                 f"Type '{dying_tag}' exactly to confirm the merge")
+        else:
+            result = merge_tag(dying_tag, surviving_tag)
+            messages.add_message(request, messages.INFO, result.description())
+            return redirect('tag_settings')
+
+    context = {
+        "dying_tag": dying_tag,
+        "surviving_tag": surviving_tag,
+        "usage": get_tag_usage(dying_tag),
+        "other_tags": Tag.objects.exclude(pk=dying_tag.pk).order_by("pk"),
+        "suggestions": get_merge_suggestions().get(dying_tag.pk, []),
+    }
+    return render(request, 'snpdb/settings/tag_merge.html', context)
 
 
 def view_tag_colors_collection(request, tag_colors_collection_id):

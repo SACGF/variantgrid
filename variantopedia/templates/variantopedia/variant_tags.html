@@ -4,6 +4,7 @@
 {% load genome_build_tags %}
 {% load jqgrid_tags %}
 {% load user_tag_color_tags %}
+{% load js_tags %}
 
 {% block title %}Variant Tags{% endblock title %}
 
@@ -30,7 +31,8 @@
         });
     }
 
-    gridParams = {};
+    const initialTags = {{ initial_tags|jsonify }};
+    gridParams = initialTags.length ? {"tags": initialTags} : {};
     function getVariantTagsGridExtraFilters() {
         return JSON.stringify(gridParams);
     }
@@ -81,7 +83,16 @@
 
     <h3>Variant Tags</h3>
 
+    <div class="card mb-3">
+        <div class="card-body">
+            <strong>{{ tag_events }}</strong> tag events, <strong>{{ tag_events_last_month }}</strong> in the
+            last 30 days.
+            <a href="{% url 'genome_build_tag_stats' genome_build.name %}">See tag stats</a>
+        </div>
+    </div>
+
     <a class="btn btn-outline-secondary fas fa-tags" href="{% url 'tag_settings' %}">Tag Settings</a>
+    <a class="btn btn-outline-secondary fas fa-chart-bar" href="{% url 'genome_build_tag_stats' genome_build.name %}">Tag Stats</a>
 
     {% tag_counts_filter genome_build=genome_build click_func='tagClick' show_all_func='showAll' any_tag_button=False %}
 

@@ -82,6 +82,7 @@ urlpatterns = [
     path('settings/set_all_variants_filter/<genome_build_name>', views.set_all_variants_filter,
          name='set_all_variants_filter'),
     path('settings/tags', views.tag_settings, name='tag_settings'),
+    path('settings/tags/merge/<tag_id>', views.tag_merge, name='tag_merge'),
     path('settings/tags/collection/datatable', DatabaseTableView.as_view(column_class=TagColorsCollectionColumns),
          name='tag_color_collections_datatable'),
     path('settings/tags/collection/view/<int:tag_colors_collection_id>', views.view_tag_colors_collection,

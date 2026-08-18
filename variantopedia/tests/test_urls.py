@@ -106,6 +106,23 @@ class Test(URLTestCase):
         ]
         self._test_urls(ADMIN_URL_NAMES_AND_KWARGS, self.admin_user)
 
+    def testTagStatsUrls(self):
+        build_name_kwargs = {"genome_build_name": self.grch37.name}
+
+        TAG_STATS_URL_NAMES_AND_KWARGS = [
+            ("genome_build_tag_stats", build_name_kwargs, 200),
+            ("tag_stats_headline", build_name_kwargs, 200),
+            ("tag_stats_over_time", build_name_kwargs, 200),
+            ("tag_stats_for_user", build_name_kwargs, 200),
+            ("tag_stats_for_other_user", {**build_name_kwargs, "user_id": self.user.pk}, 200),
+            ("tag_stats_by_lab", build_name_kwargs, 200),
+            ("tag_stats_genes", build_name_kwargs, 200),
+            ("tag_stats_co_occurrence", build_name_kwargs, 200),
+            ("tag_stats_re_tagged", build_name_kwargs, 200),
+            ("tag_stats_tag_genes_over_time", build_name_kwargs, 200),
+        ]
+        self._test_urls(TAG_STATS_URL_NAMES_AND_KWARGS, self.user)
+
     def testGridUrls(self):
         """ Grids w/o permissions """
         build_name_kwargs = {"genome_build_name": self.grch37.name}

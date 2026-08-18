@@ -1,8 +1,29 @@
 {% extends menu_settings_base %}
 {% load ui_utils %}
 {% load js_tags %}
+{% load static %}
 {% load user_tags %}
 {% block title %}{{ other_user }} user page.{% endblock %}
+
+{% block head %}
+    {{ block.super }}
+    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/tag_stats.js' %}"></script>
+    <script>
+        $(document).ready(() => {
+            if ($("#user-tagging").length) {
+                loadTagStatsCard("user-tagging",
+                                 "{% url 'tag_stats_for_other_user' genome_build.name other_user.pk %}",
+                                 renderTagStatsUser);
+            }
+        });
+    </script>
+    <style>
+        .card-spinner {
+            display: none;
+        }
+    </style>
+{% endblock %}
 
 {% block submenu_page_content %}
     <div class="container">
@@ -21,6 +42,22 @@
                 <a href="{% url 'activity_user' user_id=other_user.pk %}">View classification record edits</a>
             </div>
         </div>
+        {% if url_name_visible.genome_build_tag_stats %}
+        <div class="card mt-4" id="user-tagging">
+            <div class="card-header">
+                Tags &amp; classifications ({{ genome_build }})
+                <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
+            </div>
+            <div class="card-body">
+                {% labelled label="Classifications" %}{{ classifications_count }}{% endlabelled %}
+                <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                <div class="card-content"></div>
+            </div>
+            <div class="card-footer link-toolbar">
+                <a href="{% url 'genome_build_tag_stats' genome_build.name %}">View tag stats</a>
+            </div>
+        </div>
+        {% endif %}
         {% if user != other_user %}
         <div class="card mt-4">
             <div class="card-header">Shared Groups</div>

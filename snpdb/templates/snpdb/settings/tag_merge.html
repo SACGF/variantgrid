@@ -1,0 +1,71 @@
+{% extends menu_settings_base %}
+{% load ui_utils %}
+{% block title %}Merge tag {{ dying_tag }}{% endblock %}
+
+{% block head %}
+    {{ block.super }}
+    <script>
+        $(document).ready(() => {
+            const survivingTagName = $("#surviving-tag-name");
+            const confirmInput = $("#id_confirm_tag_name");
+            const submitButton = $("#merge-button");
+
+            function updateMergeButton() {
+                const survivingTag = $("#id_surviving_tag").val();
+                survivingTagName.text(survivingTag || "...");
+                const confirmed = confirmInput.val() === "{{ dying_tag.pk|escapejs }}";
+                submitButton.prop("disabled", !(survivingTag && confirmed));
+            }
+
+            $("#id_surviving_tag").change(updateMergeButton);
+            confirmInput.on("input", updateMergeButton);
+            updateMergeButton();
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h3>Merge tag "{{ dying_tag }}" into another tag</h3>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                {% labelled label="Currently used by" %}{{ usage.description }}{% endlabelled %}
+                {% if suggestions %}
+                    {% labelled label="Similar tags" %}
+                        {% for suggestion in suggestions %}
+                            <a href="{% url 'tag_merge' dying_tag.pk %}?into={{ suggestion }}">{{ suggestion }}</a>
+                        {% endfor %}
+                    {% endlabelled %}
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    {% labelled label="Merge into" %}
+                        <select class="form-control" id="id_surviving_tag" name="surviving_tag">
+                            <option value="">Select a tag...</option>
+                            {% for tag in other_tags %}
+                                <option value="{{ tag.pk }}" {% if surviving_tag == tag %}selected{% endif %}>{{ tag.pk }}</option>
+                            {% endfor %}
+                        </select>
+                    {% endlabelled %}
+
+                    <div class="alert alert-danger mt-3">
+                        All {{ usage.description }} using <strong>{{ dying_tag }}</strong> will be changed to
+                        <strong><span id="surviving-tag-name">...</span></strong>, and <strong>{{ dying_tag }}</strong>
+                        will be deleted. Rows that would become duplicates are deleted, keeping the earliest.
+                        This cannot be undone.
+                    </div>
+
+                    {% labelled label="Confirm tag name" %}
+                        <input class="form-control" type="text" id="id_confirm_tag_name" name="confirm_tag_name"
+                               autocomplete="off" placeholder="Type {{ dying_tag }} to confirm" />
+                    {% endlabelled %}
+
+                    <button id="merge-button" class="btn btn-danger mt-3" type="submit" disabled>Merge tags</button>
+                    <a class="btn btn-outline-secondary mt-3" href="{% url 'tag_settings' %}">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
