@@ -1,3 +1,4 @@
+import gzip
 import logging
 import os
 import re
@@ -33,6 +34,30 @@ def get_annotsv_command(vcf_filename: str, output_dir: str,
     return cmd
 
 
+def _write_annotsv_input_vcf(vcf_filename: str, output_dir: str) -> str:
+    """ AnnotSV rejects sites-only VCFs (its header check requires a FORMAT column), but our
+        annotation dumps carry no genotypes. Write a copy with a dummy sample into output_dir -
+        the GT value only feeds AnnotSV's Samples_ID reporting. Keeps the dump's basename so
+        AnnotSV names its output TSV to match get_annotsv_tsv_filename. """
+    annotsv_input = os.path.join(output_dir, os.path.basename(vcf_filename))
+    open_func = gzip.open if vcf_filename.endswith(".gz") else open
+    with open_func(vcf_filename, "rt") as fin, open_func(annotsv_input, "wt") as fout:
+        for line in fin:
+            line = line.rstrip("\n")
+            if line.startswith("#CHROM"):
+                if "FORMAT" in line.split("\t"):
+                    fout.close()
+                    os.remove(annotsv_input)
+                    return vcf_filename  # already has genotype columns - use as-is
+                fout.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
+                fout.write(f"{line}\tFORMAT\tvariantgrid\n")
+            elif line.startswith("#"):
+                fout.write(f"{line}\n")
+            else:
+                fout.write(f"{line}\tGT\t0/1\n")
+    return annotsv_input
+
+
 def get_annotsv_tsv_filename(vcf_filename: str, output_dir: str) -> str:
     """ Path AnnotSV writes its TSV to for a given input VCF - <basename>.annotated.tsv inside output_dir.
         A pure function of the input name, so any party holding the dump path can name the TSV without
@@ -49,7 +74,8 @@ def run_annotsv(vcf_filename: str, output_dir: str,
         Best-effort: caller logs failure on AnnotationRun. AnnotSV writes
         <basename>.annotated.tsv inside output_dir. """
     os.makedirs(output_dir, exist_ok=True)
-    cmd = get_annotsv_command(vcf_filename, output_dir, genome_build, annotation_consortium)
+    annotsv_input = _write_annotsv_input_vcf(vcf_filename, output_dir)
+    cmd = get_annotsv_command(annotsv_input, output_dir, genome_build, annotation_consortium)
     try:
         proc = subprocess.run(
             cmd,

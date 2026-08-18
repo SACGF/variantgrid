@@ -1,4 +1,5 @@
 import os
+import tempfile
 from unittest import mock
 
 from django.conf import settings
@@ -8,6 +9,7 @@ from django.test.utils import override_settings
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.annotsv_annotation import (
     AnnotSVVersionMismatchError,
+    _write_annotsv_input_vcf,
     annotsv_check_command_line_version_match,
     get_annotsv_command,
     run_annotsv,
@@ -201,6 +203,14 @@ class TestGetAnnotsvCommand(TestCase):
         self.assertEqual(cmd[tx_idx + 1], "ENSEMBL")
 
 
+SITES_ONLY_SV_VCF = "\n".join([
+    "##fileformat=VCFv4.2",
+    '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">',
+    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+    "1\t1000000\t.\tN\t<DEL>\t.\t.\tSVTYPE=DEL;END=1050000;SVLEN=-50000;variant_id=42",
+]) + "\n"
+
+
 class TestRunAnnotsvSubprocessMocked(TestCase):
     @override_settings(
         ANNOTATION_ANNOTSV_BIN="/fake/AnnotSV",
@@ -211,19 +221,42 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
     )
     def test_subprocess_invocation_and_filename(self):
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
-        with mock.patch("annotation.annotsv_annotation.subprocess.run") as run_mock, \
-                mock.patch("annotation.annotsv_annotation.os.makedirs"), \
-                mock.patch("annotation.annotsv_annotation.os.path.exists", return_value=True):
-            run_mock.return_value = mock.Mock(returncode=0, stdout="ok", stderr="")
-            tsv, rc, _stdout, _stderr = run_annotsv(
-                "/tmp/dump_99_structural_variant.vcf", "/tmp/out_dir",
-                genome_build, AnnotationConsortium.REFSEQ,
-            )
-        self.assertEqual(rc, 0)
-        self.assertEqual(tsv, "/tmp/out_dir/dump_99_structural_variant.annotated.tsv")
-        run_mock.assert_called_once()
-        cmd_called = run_mock.call_args.args[0]
-        self.assertIn("/tmp/dump_99_structural_variant.vcf", cmd_called)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dump_filename = os.path.join(tmp_dir, "dump_99_structural_variant.vcf")
+            with open(dump_filename, "w") as f:
+                f.write(SITES_ONLY_SV_VCF)
+            out_dir = os.path.join(tmp_dir, "out_dir")
+            with mock.patch("annotation.annotsv_annotation.subprocess.run") as run_mock:
+                run_mock.return_value = mock.Mock(returncode=0, stdout="ok", stderr="")
+                tsv, rc, _stdout, _stderr = run_annotsv(
+                    dump_filename, out_dir,
+                    genome_build, AnnotationConsortium.REFSEQ,
+                )
+            self.assertEqual(rc, 0)
+            self.assertEqual(tsv, os.path.join(out_dir, "dump_99_structural_variant.annotated.tsv"))
+            run_mock.assert_called_once()
+            cmd_called = run_mock.call_args.args[0]
+            # AnnotSV rejects sites-only VCFs - a genotype-augmented copy in out_dir is passed instead
+            annotsv_input = os.path.join(out_dir, "dump_99_structural_variant.vcf")
+            self.assertIn(annotsv_input, cmd_called)
+            with open(annotsv_input) as f:
+                lines = f.read().splitlines()
+            self.assertTrue(lines[-2].endswith("\tFORMAT\tvariantgrid"))
+            self.assertTrue(lines[-1].endswith("\tGT\t0/1"))
+
+
+class TestWriteAnnotsvInputVcf(TestCase):
+    def test_vcf_with_genotypes_passed_through(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            vcf_filename = os.path.join(tmp_dir, "with_samples.vcf")
+            with open(vcf_filename, "w") as f:
+                f.write("##fileformat=VCFv4.2\n"
+                        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample1\n"
+                        "1\t1000000\t.\tN\t<DEL>\t.\t.\tSVTYPE=DEL\tGT\t0/1\n")
+            out_dir = os.path.join(tmp_dir, "out_dir")
+            os.makedirs(out_dir)
+            self.assertEqual(_write_annotsv_input_vcf(vcf_filename, out_dir), vcf_filename)
+            self.assertEqual(os.listdir(out_dir), [])  # no leftover partial copy
 
 
 class TestVersionCheck(TestCase):
