@@ -272,7 +272,8 @@ $(document).ready(function() {
     addCreateProjectButtonAndForm();
 
 {% if has_write_permission %}
-    const dialog = setupCreatePatientDialog("Click 'Update VCF' to link this patient to the sample.");
+    setupUnsavedChangesMessage("form#vcf-form", ".sample-select");
+    const dialog = setupCreatePatientDialog();
     $(".sample-patient select", "form#vcf-form").each(function () {
         const parentRow = $(this).parents("tr");
         const sampleNameCell = $(".sample-name", parentRow);
@@ -466,6 +467,7 @@ $(document).ready(function() {
         <p>
         {% if has_write_permission %}
             <button id="vcf-submit-button" type='button' class="btn btn-primary">Update VCF</button>
+            <div class="unsaved-changes-message text-info" style="display: none;">Click 'Update VCF' to save your changes.</div>
             {% if user.is_superuser %}
                 <button id="vcf-populate-clingen-alleles" class="btn btn-secondary"
                         title="Retrieves max {% settings_value 'CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS' %} ClinGen Alleles">

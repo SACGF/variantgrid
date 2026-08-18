@@ -909,6 +909,14 @@ function setAutocompleteValue(selector, value, label) {
     $(selector).append(option).trigger('change');
 }
 
+function setupUnsavedChangesMessage(form, excludeSelector) {
+    /* Reveals the form's .unsaved-changes-message as soon as any field is altered */
+    const fields = excludeSelector ? ":input:not(" + excludeSelector + ")" : ":input";
+    $(form).on("change", fields, function() {
+        $(".unsaved-changes-message", form).show();
+    });
+}
+
 // called by update_django_messages tag
 function update_django_messages(messages) {
     if (messages.length === 0) {

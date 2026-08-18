@@ -86,7 +86,8 @@ $(document).ready(function() {
         clearAutocompleteChoice(extractionSelect);
     });
 {% if has_write_permission %}
-    const dialog = setupCreatePatientDialog("Click 'save' to link this patient to the sample.");
+    setupUnsavedChangesMessage(sampleForm);
+    const dialog = setupCreatePatientDialog();
     const sampleName = $("#id_name").val();
     addCreatePatientButton(dialog, patientSelect, sampleName, patientSelect.parent());
 {% endif %}
@@ -178,6 +179,7 @@ $(document).ready(function() {
 
                 {% if has_write_permission %}
                     <button id='save-sample' class="btn btn-primary">save</button>
+                    <div class="unsaved-changes-message text-info" style="display: none;">Click 'save' to save your changes.</div>
                 {% endif %}
                 {% vcf_import_info sample.vcf 'Please click the VCF icon at the top of the page, then the "View upload processing" link.' %}
 
