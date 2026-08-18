@@ -154,17 +154,23 @@ def _row_to_update(row: dict[str, str]) -> dict[str, Any]:
 def import_annotsv_tsv(annotation_run: AnnotationRun) -> int:
     """ Update existing VariantAnnotation rows for this run from AnnotSV's TSV.
         Returns count of rows updated. """
-    if not annotation_run.annotsv_tsv_filename:
+    if not annotation_run.vcf_annotated_filename:
         return 0
 
-    qs = VariantAnnotation.objects.filter(annotation_run=annotation_run)
+    # Scoped by annotation version + range lock rather than annotation_run: the rows belong to the SV VEP
+    # run that created them, not to this AnnotSV run, which only ever UPDATEs (#720). Filtering on
+    # `version` is what keeps the update off other annotation versions' rows.
+    range_lock = annotation_run.annotation_range_lock
+    qs = VariantAnnotation.objects.filter(version=annotation_run.variant_annotation_version,
+                                          variant_id__gte=range_lock.min_variant_id,
+                                          variant_id__lte=range_lock.max_variant_id)
 
     full_updates_by_variant: dict[int, dict[str, Any]] = {}
     split_count = 0
     full_count = 0
     skipped_no_id = 0
 
-    with open(annotation_run.annotsv_tsv_filename, newline="") as f:
+    with open(annotation_run.vcf_annotated_filename, newline="") as f:
         reader = csv.DictReader(f, delimiter="\t")
         for row in reader:
             mode = (row.get("Annotation_mode") or "").strip().lower()
@@ -204,6 +210,4 @@ def import_annotsv_tsv(annotation_run: AnnotationRun) -> int:
         annotation_run.pk, full_count, split_count, updated, skipped_no_id,
     )
 
-    annotation_run.annotsv_imported = True
-    annotation_run.save()
     return updated

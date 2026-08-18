@@ -8,7 +8,7 @@ from django.conf import settings
 from django.db.models import Max
 
 from annotation.annotation_version_querysets import pipeline_type_variant_q
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.pipelines import blocking_pipeline_types
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from snpdb.models import Variant, VariantCoordinate
@@ -83,7 +83,7 @@ class AbstractBulkVCFProcessor(abc.ABC):
         non_ref_variant_ids = self.variant_pk_lookup.filter_non_reference(variant_hashes, variant_ids)
         if non_ref_variant_ids:
             base_qs = Variant.objects.filter(pk__in=non_ref_variant_ids)
-            for pipeline_type in VariantAnnotationPipelineType:
+            for pipeline_type in blocking_pipeline_types():
                 data = base_qs.filter(pipeline_type_variant_q(pipeline_type)).aggregate(m=Max("pk"))
                 max_returned_variant_id = data["m"]
                 if max_returned_variant_id is not None:

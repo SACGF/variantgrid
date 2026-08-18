@@ -38,7 +38,10 @@ def pipeline_type_variant_q(pipeline_type: VariantAnnotationPipelineType) -> Q:
     q_gene_level = Variant.get_gene_level_q()
     if pipeline_type == VariantAnnotationPipelineType.STANDARD:
         return ~q_sv & ~q_gene_level
-    elif pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
+    elif pipeline_type in (VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
+                           VariantAnnotationPipelineType.ANNOTSV):
+        # AnnotSV annotates the same variants VEP's SV pipeline does - a different tool, not a different
+        # class of variant. The overlap the docstring above allows for.
         return q_sv & ~q_gene_level
     elif pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
         return q_gene_level

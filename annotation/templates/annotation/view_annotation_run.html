@@ -62,6 +62,9 @@
         <div class="card-body">
             {% labelled hint="tiny" label="Status" %}{{ annotation_run.get_status.label }}{% endlabelled %}
             {% labelled hint="tiny" label="Pipeline Type" %}{{ annotation_run.get_pipeline_type_display }}{% endlabelled %}
+            {% if annotation_run.pipeline_version %}
+            {% labelled hint="tiny" label="Pipeline Version" %}{{ annotation_run.pipeline_version }}{% endlabelled %}
+            {% endif %}
 
             <hr/>
             <div class="row">

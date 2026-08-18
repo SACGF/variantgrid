@@ -79,7 +79,7 @@ rich
 rollbar
 scipy
 simplejson
-sqlparse>=0.5.0
+sqlparse>=0.6.0
 toposort
 Unidecode
 # below are only required for environments directly integrating with s3

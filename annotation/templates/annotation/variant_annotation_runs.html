@@ -131,6 +131,45 @@
                 </div>
             </form>
 
+        {% if pipeline_version_panels %}
+            <div id="pipeline-versions" class="mt-4 card">
+                <div class="card-header">Annotation Pipeline Versions</div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% for panel in pipeline_version_panels %}
+                            <h6 class="mt-3">{{ panel.label }} ({{ panel.genome_build }})</h6>
+                            {% if not panel.enabled %}
+                                {% labelled label="Status" %}<span class="text-muted">Disabled in settings</span>{% endlabelled %}
+                            {% elif panel.active %}
+                                {% labelled label="Active" %}{{ panel.active }}{% endlabelled %}
+                            {% else %}
+                                <div class="alert alert-warning" role="alert">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Enabled, but no version registered - no runs are being created. Register the installed tool with:
+                                    <div><code>{{ panel.register_command }}</code></div>
+                                </div>
+                            {% endif %}
+                            {% if panel.new %}
+                                {% labelled label="New" %}{{ panel.new }}{% endlabelled %}
+                                <div class="alert alert-info" role="alert">
+                                    Promoting re-annotates every range with this version. The runs are created by the
+                                    scheduler and dispatched as capacity allows; the versions they replace stay on the
+                                    runs they produced.
+                                </div>
+                                <button name="promote-pipeline-version-{{ panel.new.pk }}" class="btn btn-success">
+                                    Promote to ACTIVE
+                                </button>
+                            {% endif %}
+                            {% if panel.historical_count %}
+                                {% labelled label="Historical" %}{{ panel.historical_count }}{% endlabelled %}
+                            {% endif %}
+                        {% endfor %}
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
         <div class="row equal">
             {% for build_name, vav_field_counts in genome_build_field_counts.items %}
                 <div class="col-xl-6">

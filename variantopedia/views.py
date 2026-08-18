@@ -480,8 +480,13 @@ def variant_tags(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     variant_tags_qs = VariantTag.get_for_build(genome_build)
     tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
+    month_ago = localtime() - timedelta(days=30)
     context = {"genome_build": genome_build,
-               "tag_counts": tag_counts}
+               "tag_counts": tag_counts,
+               "tag_events": sum(count for _, count in tag_counts),
+               "tag_events_last_month": variant_tags_qs.filter(created__gte=month_ago).count(),
+               # Tags to start the grids filtered on - variants must carry all of them
+               "initial_tags": request.GET.getlist("tag")}
     return render(request, 'variantopedia/variant_tags.html', context)
 
 

@@ -25,6 +25,7 @@ from annotation.models import (
     VariantAnnotationVersionDiff,
 )
 from annotation.models.models import (
+    AnnotationPipelineVersion,
     CachedWebResource,
     DBNSFPGeneAnnotationVersion,
     HumanProteinAtlasAnnotation,
@@ -32,6 +33,7 @@ from annotation.models.models import (
 )
 from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.pipelines import get_pipeline, versioned_pipeline_types, vep_pipeline_types
 from annotation.models.models_version_diff import VersionDiff
 from annotation.pathogenicity_predictions import TOOLS
 from annotation.tasks.annotate_variants import annotation_run_retry
@@ -331,7 +333,7 @@ def annotation_versions(request):
             status=VariantAnnotationVersion.Status.ACTIVE,
         ).first()
         vep_commands = {}
-        for pt in VariantAnnotationPipelineType:
+        for pt in vep_pipeline_types():
             vep_command = get_vep_command("in.vcf", "out.vcf", genome_build,
                                           genome_build.annotation_consortium, pt,
                                           variant_annotation_version=latest_vav)
@@ -411,6 +413,18 @@ def variant_annotation_runs(request):
             annotation_scheduler.si(status=VariantAnnotationVersion.Status.NEW).apply_async()
             messages.add_message(request, messages.INFO, "Queued annotation scheduler against NEW")
 
+        # #720: promoting a NEW AnnotationPipelineVersion is what starts a supplementary pipeline's
+        # re-annotation - the scheduler then creates a run per range lock against it, the same query that
+        # backfills a newly-enabled pipeline.
+        for pipeline_version in AnnotationPipelineVersion.objects.filter(
+                status=AnnotationPipelineVersion.Status.NEW):
+            if f"promote-pipeline-version-{pipeline_version.pk}" in request.POST:
+                pipeline_version.promote_to_active()
+                annotation_scheduler.si().apply_async()
+                messages.add_message(request, messages.INFO,
+                                     f"Promoted {pipeline_version} to ACTIVE - queued the scheduler to "
+                                     f"create its annotation runs")
+
         for genome_build in GenomeBuild.builds_with_annotation():
             if f"promote-to-active-{genome_build.name}" in request.POST:
                 new_vav = VariantAnnotationVersion.latest(genome_build,
@@ -454,6 +468,10 @@ def variant_annotation_runs(request):
                     messages.add_message(request, messages.INFO, message)
 
     for genome_build in GenomeBuild.builds_with_annotation():
+        active_pipeline_versions = {
+            pipeline_type: AnnotationPipelineVersion.get_active(pipeline_type, genome_build)
+            for pipeline_type in versioned_pipeline_types()
+        }
         for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date"):
             base_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
             # Split by pipeline type so standard-variant work (the bottleneck) is shown separately from
@@ -462,7 +480,13 @@ def variant_annotation_runs(request):
             field_counts_by_type = {}
             combined_summary = Counter()  # across pipeline types - drives the per-VAV action buttons
             for pipeline_type in VariantAnnotationPipelineType:
-                field_counts = get_field_counts(base_qs.filter(pipeline_type=pipeline_type), "status")
+                type_qs = base_qs.filter(pipeline_type=pipeline_type)
+                # #720: a versioned pipeline keeps the runs of every tool version it has been through, so
+                # scope the outstanding/finished counts to the one being scheduled against now. The
+                # earlier versions' runs are history, not work.
+                if active_version := active_pipeline_versions.get(pipeline_type):
+                    type_qs = type_qs.filter(pipeline_version=active_version)
+                field_counts = get_field_counts(type_qs, "status")
                 if not field_counts:
                     continue
                 summary_data = Counter()
@@ -508,6 +532,24 @@ def variant_annotation_runs(request):
             "historical_count": historical_count,
         }
 
+    # #720: the AnnotationPipelineVersion equivalent of the VAV status panel - what each supplementary
+    # pipeline is annotating against, and whether an upgrade is registered and waiting to be promoted.
+    pipeline_version_panels = []
+    for genome_build in GenomeBuild.builds_with_annotation():
+        for pipeline_type in versioned_pipeline_types():
+            pipeline_version_panels.append({
+                "genome_build": genome_build,
+                "label": VariantAnnotationPipelineType(pipeline_type).label,
+                "enabled": get_pipeline(pipeline_type).enabled,
+                "active": AnnotationPipelineVersion.get_active(pipeline_type, genome_build),
+                "new": AnnotationPipelineVersion.get_new(pipeline_type, genome_build),
+                "historical_count": AnnotationPipelineVersion.objects.filter(
+                    pipeline_type=pipeline_type, genome_build=genome_build,
+                    status=AnnotationPipelineVersion.Status.HISTORICAL).count(),
+                "register_command": f"python3 manage.py create_new_annotation_pipeline_version "
+                                    f"--pipeline-type={pipeline_type} --genome-build={genome_build}",
+            })
+
     any_new_vav = VariantAnnotationVersion.objects.filter(
         status=VariantAnnotationVersion.Status.NEW
     ).exists()
@@ -524,6 +566,7 @@ def variant_annotation_runs(request):
         "new_variant_annotation_versions": new_variant_annotation_versions,
         "historical_variant_annotation_versions": historical_variant_annotation_versions,
         "genome_build_status_panel": genome_build_status_panel,
+        "pipeline_version_panels": pipeline_version_panels,
         "any_new_vav": any_new_vav,
         "jobs_control": jobs_control,
         "jobs_paused": bool(jobs_control and jobs_control.paused),

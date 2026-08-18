@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from django.conf import settings
 from django.db import connection
-from django.db.models import Q, QuerySet
+from django.db.models import Count, OuterRef, Q, QuerySet, Subquery
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -256,6 +256,9 @@ class VariantTagsGrid(JqGridUserRowConfig):
                 tag = Tag.objects.get(pk=tag_id)
                 queryset = queryset.filter(tag=tag)
 
+            if tag_ids := extra_filters.get("tags"):
+                queryset = queryset.filter(tag__in=tag_ids)
+
         user_grid_config = UserGridConfig.get(user, self.caption)
         if user_grid_config.show_group_data:
             queryset = VariantTag.filter_for_user(user, queryset=queryset)
@@ -293,28 +296,50 @@ class TaggedVariantGrid(AbstractVariantGrid):
     """ Shows Variants that have been tagged (Variant-centric) """
     caption = 'Variant with tags'
 
+    TAG_COUNT_OVERRIDE = {
+        'model_field': False, 'queryset_field': False,
+        'name': 'tag_count', 'index': 'tag_count', 'label': 'Tag Events',
+        'width': 60, 'sorttype': 'int',
+    }
+
     def __init__(self, user, genome_build_name, extra_filters=None):
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         self.genome_build = genome_build
         tag_ids = []
+        require_all_tags = False
         if extra_filters:
             if tag_id := extra_filters.get("tag"):
                 tag_ids.append(tag_id)
+            # Variants carrying ALL of these tags - @see tag stats co-occurrence card
+            if all_tag_ids := extra_filters.get("tags"):
+                tag_ids.extend(all_tag_ids)
+                require_all_tags = True
         self.tag_ids = tag_ids
+        self.require_all_tags = require_all_tags
 
         user_settings = UserSettings.get_for_user(user)
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
-        self.fields = fields
+        self.fields = fields + ["tag_count"]
         super().__init__(user)
 
         af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
         update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
         update_dict_of_dict_values(self._overrides, override)
+        update_dict_of_dict_values(self._overrides, {"tag_count": self.TAG_COUNT_OVERRIDE})
         self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "asc",
                                   'shrinkToFit': False})
+
+    def _get_grid_only_annotation_kwargs(self):
+        """ How many times this variant has been tagged - sort on it to find the most re-tagged variants """
+        a_kwargs = super()._get_grid_only_annotation_kwargs()
+        tag_count_qs = VariantTag.filter_for_user(self.user).filter(
+            allele__variantallele__variant_id=OuterRef("id")).values("allele").annotate(
+            tag_count=Count("pk")).values_list("tag_count")
+        a_kwargs["tag_count"] = Subquery(tag_count_qs[:1])
+        return a_kwargs
 
     def _get_base_queryset(self) -> QuerySet:
         genome_build = self.annotation_version.genome_build
@@ -328,6 +353,9 @@ class TaggedVariantGrid(AbstractVariantGrid):
         tags_qs = VariantTag.filter_for_user(self.user)
         if not user_grid_config.show_group_data:
             tags_qs = tags_qs.filter(user=self.user)
+        if self.require_all_tags:
+            q_list = [VariantTag.variants_for_build_q(genome_build, tags_qs, [tag_id]) for tag_id in self.tag_ids]
+            return reduce(operator.and_, q_list)
         return VariantTag.variants_for_build_q(genome_build, tags_qs, self.tag_ids)
 
 

@@ -211,6 +211,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     # Variants
     "variants": False,
     "variant_tags": False,
+    "tag_stats": False,
+    "genome_build_tag_stats": False,
     "manual_variant_entry": False,
     "variantopedia_wiki": False,
 
@@ -221,6 +223,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "change_password": False,
     "custom_columns": False,
     "tag_settings": False,
+    "tag_merge": False,
     "igv_integration": False,
     "sequencing_software_versions": False,
     "classification_dashboard": True,

@@ -75,11 +75,16 @@ class ClinGenClassification(models.TextChoices):
 
 
 class VariantAnnotationPipelineType(models.TextChoices):
-    """ We have standard long and short  """
+    """ An annotation pipeline is a tool applied to a class of variant. Most are VEP over a variant class;
+        GENE_LEVEL and ANNOTSV run other tools. This enum is only the stored key - what each pipeline
+        selects, depends on and runs is declared in annotation.pipelines. """
     STANDARD = "S", "Standard Short Variant"
     STRUCTURAL_VARIANT = "C", "Structural Variant"
     # Never reaches VEP - annotation is computed locally from the gene identity in the alt
     GENE_LEVEL = "G", "Gene Level"
+    # AnnotSV over the same variants as STRUCTURAL_VARIANT, after that run has committed its rows. Its own
+    # pipeline so it can be enabled (and backfilled) and its bundle rolled without re-running VEP (#720)
+    ANNOTSV = "A", "AnnotSV"
 
 
 class NMDEscapeStatus(models.TextChoices):

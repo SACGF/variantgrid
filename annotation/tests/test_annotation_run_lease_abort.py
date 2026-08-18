@@ -30,11 +30,14 @@ from annotation.models import (
     VariantAnnotationVersion,
 )
 from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.pipelines import base as pipelines_base
+from annotation.pipelines import get_runner
+from annotation.pipelines import vep as vep_pipeline
+from annotation.pipelines.vep import VEPRunner
 from annotation.tasks import annotate_variants as annotate_variants_module
 from annotation.tasks.annotate_variants import (
     AnnotationRunLeaseHeartbeat,
     annotate_variants,
-    dump_and_annotate_variants,
     import_annotation_run,
 )
 from genes.models_enums import AnnotationConsortium
@@ -92,8 +95,7 @@ class AnnotationRunUnwindOwnershipTest(AnnotationRunLeaseTestCase):
             `reclaim_side_effect`, which simulates the run being reclaimed mid-VEP and this attempt then
             being killed by its own lease heartbeat. Returns the EagerResult. """
         run = self._make_run()
-        with mock.patch.object(annotate_variants_module, "dump_and_annotate_variants",
-                               side_effect=reclaim_side_effect), \
+        with mock.patch.object(VEPRunner, "annotate", side_effect=reclaim_side_effect), \
                 mock.patch.object(annotate_variants_module, "_trigger_dispatch"), \
                 mock.patch.object(annotate_variants_module, "report_message"), \
                 mock.patch.object(annotate_variants_module, "create_event"), \
@@ -328,7 +330,7 @@ class AnnotationRunDumpPathUniquenessTest(AnnotationRunLeaseTestCase):
         dump_b = run.get_dump_filename(task_token="attempt-b")
         self.assertNotEqual(dump_a, dump_b)
 
-        # The annotated VCF name is derived from the dump name (dump_and_annotate_variants), so the
+        # The annotated VCF name is derived from the dump name (VEPRunner.annotate), so the
         # dump stems must differ, not merely the full paths.
         self.assertNotEqual(name_from_filename(dump_a), name_from_filename(dump_b))
         self.assertEqual(os.path.dirname(dump_a), os.path.dirname(dump_b))
@@ -341,9 +343,9 @@ class AnnotationRunDumpPathUniquenessTest(AnnotationRunLeaseTestCase):
         for task_id in ("attempt-a", "attempt-b"):
             run.task_id = task_id
             run.save()
-            with mock.patch.object(annotate_variants_module, "_unannotated_variants_to_vcf", return_value=0), \
-                    mock.patch.object(annotate_variants_module, "vep_check_command_line_version_match"):
-                dump_and_annotate_variants(run)
+            with mock.patch.object(pipelines_base, "write_qs_to_vcf", return_value=0), \
+                    mock.patch.object(vep_pipeline, "vep_check_command_line_version_match"):
+                get_runner(run.pipeline_type).annotate(run)
             paths.append(run.vcf_dump_filename)
 
         self.assertNotEqual(paths[0], paths[1],

@@ -6,17 +6,22 @@ from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 
+from annotation.annotation_run_files import get_annotsv_dir
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.annotsv_annotation import (
-    AnnotSVVersionMismatchError,
-    _write_annotsv_input_vcf,
-    annotsv_check_command_line_version_match,
     get_annotsv_command,
-    run_annotsv,
+    get_annotsv_tsv_filename,
+    write_annotsv_input_vcf,
 )
-from annotation.fake_annotation import get_fake_annotation_settings_dict
+from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion
+from annotation.models.models import (
+    AnnotationPipelineVersion,
+    AnnotationRangeLock,
+    AnnotationRun,
+    VariantAnnotationVersion,
+)
+from annotation.pipelines.annotsv import AnnotSVRunner
 from annotation.vcf_files.bulk_annotsv_tsv_inserter import (
     _extract_pathogenic_overlaps,
     _extract_variant_id,
@@ -31,7 +36,10 @@ from annotation.vep_annotation import (
 )
 from genes.models_enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
+from snpdb.tests.utils.vcf_testing_utils import (
+    slowly_create_loci_and_variants_for_vcf,
+    slowly_create_test_variant,
+)
 
 TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
 TEST_ANNOTSV_TSV = os.path.join(TEST_DATA_DIR, "annotsv", "test_grch37_sv.annotated.tsv")
@@ -211,38 +219,84 @@ SITES_ONLY_SV_VCF = "\n".join([
 ]) + "\n"
 
 
+@override_settings(
+    ANNOTATION_ANNOTSV_BIN="/fake/AnnotSV",
+    ANNOTATION_ANNOTSV_ANNOTATIONS_DIR="/fake/anno",
+    ANNOTATION_ANNOTSV_GENOME_BUILD={"GRCh37": "GRCh37"},
+    ANNOTATION_ANNOTSV_EXTRA_ARGS=[],
+    ANNOTATION_ANNOTSV_TIMEOUT_SECONDS=60,
+    ANNOTATION_ANNOTSV_BUNDLE_VERSION="bundle-2024-01",
+)
 class TestRunAnnotsvSubprocessMocked(TestCase):
-    @override_settings(
-        ANNOTATION_ANNOTSV_BIN="/fake/AnnotSV",
-        ANNOTATION_ANNOTSV_ANNOTATIONS_DIR="/fake/anno",
-        ANNOTATION_ANNOTSV_GENOME_BUILD={"GRCh37": "GRCh37"},
-        ANNOTATION_ANNOTSV_EXTRA_ARGS=[],
-        ANNOTATION_ANNOTSV_TIMEOUT_SECONDS=60,
-    )
-    def test_subprocess_invocation_and_filename(self):
-        genome_build = GenomeBuild.get_name_or_alias("GRCh37")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            dump_filename = os.path.join(tmp_dir, "dump_99_structural_variant.vcf")
-            with open(dump_filename, "w") as f:
+    """ What AnnotSVRunner.annotate() hands the tool: the dump is sites-only and AnnotSV rejects those,
+        so it is a genotype-augmented copy that gets run, while the TSV stays named off the dump. """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.variants = [slowly_create_test_variant("1", 100000 + i * 10, 'A', 'T', cls.genome_build)
+                        for i in range(2)]
+        kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.REFSEQ, 4)
+        kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
+        cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
+
+    def _make_annotsv_run(self) -> AnnotationRun:
+        annotation_range_lock = AnnotationRangeLock.objects.create(
+            version=self.vav, min_variant=self.variants[0], max_variant=self.variants[-1], count=1)
+        pipeline_version = AnnotationPipelineVersion.objects.create(
+            pipeline_type=VariantAnnotationPipelineType.ANNOTSV, genome_build=self.genome_build,
+            code_version="3.5.8", data_version="bundle-2024-01",
+            status=AnnotationPipelineVersion.Status.ACTIVE)
+        return AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
+                                            pipeline_type=VariantAnnotationPipelineType.ANNOTSV,
+                                            pipeline_version=pipeline_version)
+
+    def test_genotype_augmented_copy_is_what_runs(self):
+        annotation_run = self._make_annotsv_run()
+        runner = AnnotSVRunner()
+
+        def _dump(run, task_token=None):  # pylint: disable=unused-argument
+            run.vcf_dump_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR,
+                                                 "dump_99_annotsv.vcf")
+            with open(run.vcf_dump_filename, "w") as f:
                 f.write(SITES_ONLY_SV_VCF)
-            out_dir = os.path.join(tmp_dir, "out_dir")
-            with mock.patch("annotation.annotsv_annotation.subprocess.run") as run_mock:
-                run_mock.return_value = mock.Mock(returncode=0, stdout="ok", stderr="")
-                tsv, rc, _stdout, _stderr = run_annotsv(
-                    dump_filename, out_dir,
-                    genome_build, AnnotationConsortium.REFSEQ,
-                )
-            self.assertEqual(rc, 0)
-            self.assertEqual(tsv, os.path.join(out_dir, "dump_99_structural_variant.annotated.tsv"))
-            run_mock.assert_called_once()
-            cmd_called = run_mock.call_args.args[0]
-            # AnnotSV rejects sites-only VCFs - a genotype-augmented copy in out_dir is passed instead
-            annotsv_input = os.path.join(out_dir, "dump_99_structural_variant.vcf")
-            self.assertIn(annotsv_input, cmd_called)
-            with open(annotsv_input) as f:
-                lines = f.read().splitlines()
-            self.assertTrue(lines[-2].endswith("\tFORMAT\tvariantgrid"))
-            self.assertTrue(lines[-1].endswith("\tGT\t0/1"))
+            run.save()
+            return 1
+
+        def _execute_cmd(cmd, **kwargs):  # pylint: disable=unused-argument
+            output_dir = cmd[cmd.index("-outputDir") + 1]
+            svinput = cmd[cmd.index("-SVinputFile") + 1]
+            tsv = get_annotsv_tsv_filename(svinput, output_dir)
+            with open(tsv, "w") as f:
+                f.write("AnnotSV_ID\n")
+            return 0, "ok", ""
+
+        with tempfile.TemporaryDirectory() as dump_dir:
+            with override_settings(ANNOTATION_VCF_DUMP_DIR=dump_dir), \
+                    mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                               return_value="3.5.8"), \
+                    mock.patch.object(AnnotSVRunner, "dump", side_effect=_dump), \
+                    mock.patch("annotation.pipelines.annotsv.execute_cmd",
+                               side_effect=_execute_cmd) as execute_cmd_mock:
+                runner.annotate(annotation_run)
+
+                annotsv_dir = get_annotsv_dir(annotation_run)
+                dump_filename = annotation_run.vcf_dump_filename
+                self.assertEqual(annotation_run.vcf_annotated_filename,
+                                 get_annotsv_tsv_filename(dump_filename, annotsv_dir))
+
+                cmd_called = execute_cmd_mock.call_args.args[0]
+                annotsv_input = os.path.join(annotsv_dir, os.path.basename(dump_filename))
+                self.assertIn(annotsv_input, cmd_called)
+                self.assertNotIn(dump_filename, cmd_called)
+                with open(annotsv_input) as f:
+                    lines = f.read().splitlines()
+                self.assertTrue(lines[-2].endswith("\tFORMAT\tvariantgrid"))
+                self.assertTrue(lines[-1].endswith("\tGT\t0/1"))
+
+                # A discarded attempt has to be able to reclaim the copy it wrote
+                self.assertIn(annotsv_input, runner.get_output_paths(annotation_run, dump_filename))
 
 
 class TestWriteAnnotsvInputVcf(TestCase):
@@ -255,36 +309,75 @@ class TestWriteAnnotsvInputVcf(TestCase):
                         "1\t1000000\t.\tN\t<DEL>\t.\t.\tSVTYPE=DEL\tGT\t0/1\n")
             out_dir = os.path.join(tmp_dir, "out_dir")
             os.makedirs(out_dir)
-            self.assertEqual(_write_annotsv_input_vcf(vcf_filename, out_dir), vcf_filename)
+            self.assertEqual(write_annotsv_input_vcf(vcf_filename, out_dir), vcf_filename)
             self.assertEqual(os.listdir(out_dir), [])  # no leftover partial copy
 
 
-class TestVersionCheck(TestCase):
-    @override_settings(ANNOTATION_ANNOTSV_ENABLED=False)
-    def test_skipped_when_disabled(self):
-        # Should be a no-op even with a totally bogus VAV stand-in
-        annotsv_check_command_line_version_match(mock.Mock(annotsv_code="1.0", annotsv_bundle="X"))
+@override_settings(
+    ANNOTATION_ANNOTSV_BIN="/fake/AnnotSV",
+    ANNOTATION_ANNOTSV_BUNDLE_VERSION="bundle-2024-01",
+)
+class TestCurrentAnnotsvVersion(TestCase):
+    """ #720: registering the installed AnnotSV, which is how an upgrade reaches the scheduler. """
 
-    @override_settings(
-        ANNOTATION_ANNOTSV_ENABLED=True,
-        ANNOTATION_ANNOTSV_BUNDLE_VERSION="bundle-2024-01",
-    )
-    def test_raises_on_code_mismatch(self):
-        vav = mock.Mock(annotsv_code="3.5.8", annotsv_bundle=None)
-        with mock.patch("annotation.annotsv_annotation.get_annotsv_command_line_version",
-                        return_value="3.5.7"):
-            with self.assertRaises(AnnotSVVersionMismatchError):
-                annotsv_check_command_line_version_match(vav)
+    def setUp(self):
+        super().setUp()
+        self.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        self.runner = AnnotSVRunner()
 
-    @override_settings(
-        ANNOTATION_ANNOTSV_ENABLED=True,
-        ANNOTATION_ANNOTSV_BUNDLE_VERSION="bundle-old",
-    )
-    def test_raises_on_bundle_mismatch(self):
-        vav = mock.Mock(annotsv_code=None, annotsv_bundle="bundle-new")
-        annotsv_check_command_line_version_match  # alias to avoid lint
-        with self.assertRaises(AnnotSVVersionMismatchError):
-            annotsv_check_command_line_version_match(vav)
+    def _register(self, code_version):
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value=code_version):
+            return self.runner.get_or_create_current_version(self.genome_build)
+
+    def test_reuses_row_for_same_code_and_bundle(self):
+        first, created = self._register("3.5.8")
+        second, created_again = self._register("3.5.8")
+        self.assertEqual(first.pk, second.pk)
+        self.assertTrue(created)
+        self.assertFalse(created_again)
+        self.assertEqual(first.code_version, "3.5.8")
+        self.assertEqual(first.data_version, "bundle-2024-01")
+
+    def test_first_registered_version_is_active(self):
+        """ Nothing to supersede, so no promote step - enabling AnnotSV is register-and-go. """
+        first, _ = self._register("3.5.8")
+        self.assertEqual(first.status, AnnotationPipelineVersion.Status.ACTIVE)
+
+    def test_upgraded_binary_registers_as_new(self):
+        """ An upgrade waits to be promoted, so swapping the binary never re-annotates by itself. """
+        old, _ = self._register("3.5.8")
+        new, _ = self._register("3.5.9")
+        self.assertNotEqual(old.pk, new.pk)
+        self.assertEqual(new.status, AnnotationPipelineVersion.Status.NEW)
+        old.refresh_from_db()
+        self.assertEqual(old.status, AnnotationPipelineVersion.Status.ACTIVE)
+        self.assertEqual(AnnotationPipelineVersion.objects.filter(
+            pipeline_type=VariantAnnotationPipelineType.ANNOTSV).count(), 2)
+
+    def test_promoting_retires_the_version_it_replaces(self):
+        old, _ = self._register("3.5.8")
+        new, _ = self._register("3.5.9")
+
+        new.promote_to_active()
+
+        old.refresh_from_db()
+        self.assertEqual(old.status, AnnotationPipelineVersion.Status.HISTORICAL)
+        self.assertEqual(AnnotationPipelineVersion.get_active(
+            VariantAnnotationPipelineType.ANNOTSV, self.genome_build), new)
+
+    def test_check_tool_version_rejects_a_drifted_binary(self):
+        """ A run carries the version it was scheduled against, so writing another tool's output into it
+            would silently lose which AnnotSV produced the data. """
+        pipeline_version, _ = self._register("3.5.8")
+        annotation_run = mock.Mock(pipeline_version=pipeline_version, genome_build=self.genome_build)
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value="3.5.9"):
+            with self.assertRaises(ValueError):
+                self.runner.check_tool_version(annotation_run)
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value="3.5.8"):
+            self.runner.check_tool_version(annotation_run)  # matching binary is fine
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=4))
@@ -308,24 +401,27 @@ class TestImportAnnotsvTsv(TestCase):
 
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
-        cls.annotation_run = AnnotationRun.objects.create(
+        cls.vep_run = AnnotationRun.objects.create(
             annotation_range_lock=annotation_range_lock,
             pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
             vcf_annotated_filename=TEST_SV_VCF_GRCH37,
         )
-        import_vcf_annotations(cls.annotation_run, delete_temp_files=False, vep_version_check=False)
+        import_vcf_annotations(cls.vep_run, delete_temp_files=False, vep_version_check=False)
+        # #720: AnnotSV is its own run over the same range lock, updating the rows the VEP run wrote
+        cls.annotation_run = AnnotationRun.objects.create(
+            annotation_range_lock=annotation_range_lock,
+            pipeline_type=VariantAnnotationPipelineType.ANNOTSV,
+        )
 
     def test_import_full_lines_updates_variant_annotation(self):
-        self.annotation_run.annotsv_tsv_filename = TEST_ANNOTSV_TSV
+        self.annotation_run.vcf_annotated_filename = TEST_ANNOTSV_TSV
         self.annotation_run.save()
 
         updated = import_annotsv_tsv(self.annotation_run)
         # The fixture references 3 variants (202, 203, 205) all of which have
-        # VariantAnnotation rows from the VEP import above.
+        # VariantAnnotation rows from the VEP import above. The AnnotSV run owns none of them - it finds
+        # them via the version partition and its range lock (#720).
         self.assertEqual(updated, 3)
-
-        self.annotation_run.refresh_from_db()
-        self.assertTrue(self.annotation_run.annotsv_imported)
 
         va_202 = VariantAnnotation.objects.get(variant_id=202)
         self.assertEqual(va_202.annotsv_acmg_class, 2)
@@ -371,10 +467,14 @@ class TestImportAnnotsvTsv(TestCase):
         self.assertIsNone(va_205.annotsv_pathogenic_overlaps)
 
     def test_no_op_when_no_tsv_filename(self):
-        # Ensure unset filename is a no-op (and does not flip annotsv_imported)
-        self.annotation_run.annotsv_tsv_filename = None
-        self.annotation_run.annotsv_imported = False
+        self.annotation_run.vcf_annotated_filename = None
         self.annotation_run.save()
         self.assertEqual(import_annotsv_tsv(self.annotation_run), 0)
-        self.annotation_run.refresh_from_db()
-        self.assertFalse(self.annotation_run.annotsv_imported)
+
+    def test_annotsv_run_owns_no_annotation_rows(self):
+        """ #720: the annotation_run FK stays on the VEP run that created the rows, which is what makes
+            resetting / deleting / re-running an AnnotSV run safe. """
+        self.assertEqual(VariantAnnotation.objects.filter(annotation_run=self.annotation_run).count(), 0)
+        self.assertTrue(VariantAnnotation.objects.filter(annotation_run=self.vep_run).exists())
+        self.annotation_run.delete_related_objects()
+        self.assertTrue(VariantAnnotation.objects.filter(annotation_run=self.vep_run).exists())

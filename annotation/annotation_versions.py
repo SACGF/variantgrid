@@ -159,8 +159,14 @@ def _reset_run_counts_after_extend(range_lock: AnnotationRangeLock):
         to CREATED (the larger range may now hold variants of their pipeline type) and null every run's
         count. The scheduler's next count sweep (_trigger_counts_for_uncounted_runs) re-counts them; an
         un-recounted reopened run is still correct - it just dumps over the new range like any CREATED
-        run. """
+        run.
+
+        #720: a run left behind by a promoted AnnotationPipelineVersion is history and stays untouched -
+        reopening one would dispatch it against a tool that no longer matches the version it records. Its
+        replacement at the ACTIVE version is on the same lock and gets reset like any other run. """
     for run in range_lock.annotationrun_set.all():
+        if run.pipeline_version and not run.pipeline_version.is_active:
+            continue
         if run.is_empty_finished:
             run.reopen_to_created()  # -> CREATED, count=None
         elif run.count is not None:

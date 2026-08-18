@@ -1,4 +1,3 @@
-import gzip
 import logging
 import os
 import threading
@@ -9,41 +8,18 @@ from celery import chain
 from celery.canvas import Signature
 from django.conf import settings
 from django.db import connection, transaction
-from django.db.models.functions.math import Abs
-from django.db.models.query_utils import Q
 from django.utils import timezone
 
-from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.annotsv_annotation import (
-    annotsv_check_command_line_version_match,
-    get_annotsv_tsv_filename,
-    run_annotsv,
-)
-from annotation.gene_level_annotation import annotate_gene_level_run
-from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
+from annotation.models import AnnotationStatus
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
+from annotation.pipelines import get_runner
 from annotation.signals.manual_signals import (
     annotation_run_complete_signal,
     annotation_run_discarded_signal,
 )
-from annotation.sv_conservation import (
-    conservation_sidecar_filename,
-    get_sv_conservation_tracks,
-    score_sv_vcf,
-    write_conservation_sidecar,
-)
-from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
-from annotation.vep_annotation import (
-    get_vep_command,
-    get_vep_skipped_variants_filename,
-    vep_check_command_line_version_match,
-)
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback, report_message
-from library.utils import execute_cmd
-from library.utils.file_utils import mk_path_for_file, name_from_filename
-from snpdb.variants_to_vcf import VARIANT_GRID_INFO_DICT, write_contig_sorted_values_to_vcf_file
 
 # #2667: kick the single-authority dispatcher by name to avoid importing annotation_scheduler_task
 # (which imports this module). Mirror of analysis _trigger_rescheduling (#346).
@@ -266,13 +242,9 @@ def annotate_variants(annotation_run_id):
         # Renew the lease while the (potentially many-hour, e.g. structural-variant) VEP work runs, so a
         # live worker is never reclaimed under us into a duplicate run.
         with AnnotationRunLeaseHeartbeat(annotation_run, my_task_id) as lease_heartbeat:
-            if annotation_run.pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
-                # No VCF to dump and no VEP to run - the annotation is computed from the variant's own
-                # gene identity, and there are few enough rows to write here rather than handing the
-                # run to the import lane, so this one goes straight to FINISHED
-                annotate_gene_level_run(annotation_run)
-            elif annotation_run.vcf_annotated_filename is None:
-                dump_and_annotate_variants(annotation_run, lease_heartbeat=lease_heartbeat)
+            if annotation_run.vcf_annotated_filename is None:
+                get_runner(annotation_run.pipeline_type).annotate(annotation_run,
+                                                                  lease_heartbeat=lease_heartbeat)
         # DB upload now runs as a separate db_workers task (import_annotation_run), launched by the
         # dispatcher when this run reaches ANNOTATION_COMPLETED. #1649
     except Exception as e:
@@ -349,7 +321,7 @@ def import_annotation_run(annotation_run_id):
 
         # Renew the lease while the bulk DB insert runs, so a live worker is never reclaimed under us.
         with AnnotationRunLeaseHeartbeat(annotation_run, my_task_id):
-            import_vcf_annotations(annotation_run)
+            get_runner(annotation_run.pipeline_type).import_results(annotation_run)
         # The run is only truly complete once imported (moved here from annotate_variants). #1649
         # #1670: annotation_run is carried so the cleanup receiver can reclaim this run's output now that
         # its rows are committed. Existing receivers take **kwargs, so the extra key is transparent.
@@ -389,74 +361,6 @@ def import_annotation_run(annotation_run_id):
         _trigger_dispatch(annotation_run.annotation_range_lock.version_id)
 
 
-def dump_variants(annotation_run, dump_dir=None, task_token=None) -> int:
-    """ Write the unannotated variants in range to the dump VCF and set dump_* fields; returns dump count.
-        Factored out of dump_and_annotate_variants so the annotation_external --dump command (#1568) can
-        dump (into --output-dir) and stop before VEP. task_token (#1658) makes the local pipeline's dump
-        path per-task so a reclaimed run can't collide with its zombie predecessor. """
-    vcf_dump_filename = annotation_run.get_dump_filename(dump_dir=dump_dir, task_token=task_token)
-    annotation_run.dump_start = timezone.now()
-    annotation_run.vcf_dump_filename = vcf_dump_filename
-    annotation_run.save()
-
-    genome_build = annotation_run.genome_build
-    vcf_dump_count = _unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
-                                                  annotation_run.annotation_range_lock,
-                                                  annotation_run.pipeline_type)
-
-    annotation_run.dump_count = vcf_dump_count
-    annotation_run.dump_end = timezone.now()
-    annotation_run.save()
-    return vcf_dump_count
-
-
-def get_annotated_filename(annotation_run, vcf_dump_filename) -> str:
-    """ Path VEP writes its annotated VCF to for a given dump. Derived from the dump stem, which #1658
-        makes per-task, so each attempt's annotated output is a file of its own. """
-    name = name_from_filename(vcf_dump_filename)
-    vcf_annotated_basename = f"{name}.vep_annotated_{annotation_run.genome_build.name}.vcf.gz"
-    return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_annotated_basename)
-
-
-def get_annotsv_dir(annotation_run) -> str:
-    """ AnnotSV output dir for a run. Deliberately keyed on the run, not the task - shared between
-        attempts, so any party holding the run can name it. See the #720 note: the TSV inside is named
-        from the per-task dump stem, so concurrent attempts write side by side and neither can truncate
-        the other, while a per-task *directory* would be nameable only by the attempt that created it. """
-    return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"annotsv_{annotation_run.pk}")
-
-
-def get_run_output_paths(annotation_run, vcf_dump_filename) -> list[str]:
-    """ Every file the pipeline writes for one attempt, derived from that attempt's dump stem.
-
-        #1660: the single naming authority, shared by the losing attempt's cleanup and the dispatcher's
-        reclaim so the two can't drift. Derivation rather than the persisted filename fields is the whole
-        point - vcf_annotated_filename and annotsv_tsv_filename only reach the DB at the final save in
-        dump_and_annotate_variants, after VEP *and* AnnotSV *and* the conservation sidecar have finished,
-        so a run reclaimed before then has files on disk its row cannot name. The dump stem is persisted
-        before VEP starts (dump_variants), which makes it the one key that always names the rest. """
-    annotated_filename = get_annotated_filename(annotation_run, vcf_dump_filename)
-    return [
-        vcf_dump_filename,
-        annotated_filename,
-        conservation_sidecar_filename(annotated_filename),
-        get_vep_skipped_variants_filename(annotated_filename),
-        get_annotsv_tsv_filename(vcf_dump_filename, get_annotsv_dir(annotation_run)),
-    ]
-
-
-def remove_run_output_files(annotation_run, paths):
-    """ Best-effort removal of an attempt's output. Shared by the losing attempt's cleanup and reclaim. """
-    for path in dict.fromkeys(paths):  # de-dupe, keeping order
-        if path and os.path.exists(path):
-            try:
-                os.remove(path)
-                logging.info("Removed orphaned file from reclaimed AnnotationRun %s: %s",
-                             annotation_run.pk, path)
-            except OSError:
-                log_traceback()
-
-
 def _cleanup_reclaimed_run_files(annotation_run):
     """ #1658: discard the on-disk output of an attempt that lost its run.
 
@@ -470,113 +374,6 @@ def _cleanup_reclaimed_run_files(annotation_run):
         Passes the in-memory instance deliberately: it still carries the filenames reclaim has since
         NULLed on the row. #1670: the removal itself lives in annotation.signals.annotation_run_cleanup. """
     annotation_run_discarded_signal.send(sender=os.path.basename(__file__), annotation_run=annotation_run)
-
-
-def dump_and_annotate_variants(annotation_run, vep_version_check=True, lease_heartbeat=None):
-    if vep_version_check:
-        # Do a check before we annotate
-        vep_check_command_line_version_match(annotation_run.variant_annotation_version)
-        # Counterpart for AnnotSV - skipped entirely when not enabled
-        if (settings.ANNOTATION_ANNOTSV_ENABLED
-                and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
-            annotsv_check_command_line_version_match(annotation_run.variant_annotation_version)
-
-    # #1658: tag the local dump (and, via name_from_filename below, the annotated VCF) with the executing
-    # task_id so a reclaimed run's fresh attempt never shares a path with a stalled zombie worker.
-    vcf_dump_count = dump_variants(annotation_run, task_token=annotation_run.task_id)
-    vcf_dump_filename = annotation_run.vcf_dump_filename
-
-    genome_build = annotation_run.genome_build
-    annotation_consortium = annotation_run.annotation_consortium
-
-    logging.info("Annotating %d variants", vcf_dump_count)
-    if vcf_dump_count:
-        vcf_annotated_filename = get_annotated_filename(annotation_run, vcf_dump_filename)
-
-        cmd = get_vep_command(vcf_dump_filename, vcf_annotated_filename, genome_build, annotation_consortium,
-                              annotation_run.pipeline_type,
-                              variant_annotation_version=annotation_run.variant_annotation_version)
-        annotation_run.annotation_start = timezone.now()
-        annotation_run.pipeline_command = " ".join(cmd)
-        annotation_run.save()
-        # #1658: register VEP with the lease heartbeat so a reclaim (lost lease) kills it mid-run instead
-        # of letting the losing worker annotate to completion and double-write the reassigned run's state.
-        process_callback = lease_heartbeat.set_process if lease_heartbeat else None
-        try:
-            return_code, std_out, std_err = execute_cmd(cmd, process_callback=process_callback)
-        finally:
-            if lease_heartbeat:
-                lease_heartbeat.set_process(None)  # drop the finished handle so a later tick can't kill anything
-        # VEP can produce enormous output (>1GB) for large batches - PostgreSQL has a 1GB field limit
-        max_output = 1_000_000
-        annotation_run.pipeline_stdout = std_out[:max_output] if std_out else std_out
-        annotation_run.pipeline_stderr = std_err[:max_output] if std_err else std_err
-        logging.info(f"VEP returned code: {return_code}")
-
-        if return_code != 0:
-            # #1658: this is the path the heartbeat's abort itself lands on, so it is exactly where we may
-            # no longer own the run - persist the VEP output only while we do, or it goes onto the row the
-            # new attempt now holds. Guarded on our own task_id (None matches an unleased run, which is how
-            # the annotation_external command calls this).
-            if not annotation_run.save_if_owner(annotation_run.task_id):  # save stdout/stderr
-                logging.warning("AnnotationRun %s was reclaimed - discarding VEP output from task %s",
-                                annotation_run.pk, annotation_run.task_id)
-            raise RuntimeError(f"VEP returned {return_code}")
-
-        annotation_run.vcf_annotated_filename = vcf_annotated_filename
-        # #1701: VEP writes this in Runner::finish(), after the output handle is closed - so it is present
-        # and complete even for the truncated-output failure this check exists to catch. Recorded only when
-        # written, so the import lane falls back to the warnings text for anything that didn't produce one.
-        skipped_variants_filename = get_vep_skipped_variants_filename(vcf_annotated_filename)
-        if os.path.exists(skipped_variants_filename):
-            annotation_run.vep_skipped_variants_filename = skipped_variants_filename
-        annotation_run.annotation_end = timezone.now()
-
-        if (settings.ANNOTATION_ANNOTSV_ENABLED
-                and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
-            annotsv_dir = get_annotsv_dir(annotation_run)
-            tsv, rc, stdout, stderr = run_annotsv(vcf_dump_filename, annotsv_dir,
-                                                  genome_build, annotation_consortium)
-            if rc == 0 and os.path.exists(tsv):
-                annotation_run.annotsv_tsv_filename = tsv
-                annotation_run.annotsv_error = None
-            else:
-                tsv_missing = "" if os.path.exists(tsv) else f" (expected TSV not found: {tsv})"
-                error_blob = (
-                    f"rc={rc}{tsv_missing}\n"
-                    f"--- stderr ---\n{stderr or ''}\n"
-                    f"--- stdout ---\n{stdout or ''}"
-                )
-                annotation_run.annotsv_error = error_blob[:100_000]
-                logging.warning(
-                    "AnnotSV stage failed for AnnotationRun %s: rc=%s%s\nstderr:\n%s\nstdout:\n%s",
-                    annotation_run.pk, rc, tsv_missing,
-                    (stderr or "")[-4000:], (stdout or "")[-4000:],
-                )
-
-        # Conservation (phastCons/phyloP) _max columns for SVs - computed with pyBigWig instead of the
-        # 4 conservation VEP --custom bigWig overlaps, whose O(SV-span) cost makes large SVs never finish
-        # (#1657). The values are written to a sidecar TSV next to the annotated VCF; the import lane
-        # (BulkVEPVCFAnnotationInserter) merges them into the same _max columns. Best-effort: a scoring
-        # failure logs and leaves the columns null rather than failing the run.
-        if (settings.ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED
-                and annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
-            try:
-                tracks = get_sv_conservation_tracks(genome_build)
-                results = score_sv_vcf(vcf_dump_filename, genome_build)
-                sidecar = conservation_sidecar_filename(vcf_annotated_filename)
-                write_conservation_sidecar(sidecar, results, tracks)
-                logging.info("Wrote SV conservation for %d variants to %s", len(results), sidecar)
-            except Exception:
-                log_traceback()
-                logging.warning("SV conservation (pyBigWig) stage failed for AnnotationRun %s",
-                                annotation_run.pk)
-    else:
-        # Now we have standard/CNV type pipelines, it's possible some can be empty
-        annotation_run.annotated_count = 0
-        annotation_run.annotation_end = timezone.now()
-
-    annotation_run.save()
 
 
 def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> AnnotationRun:
@@ -632,49 +429,3 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
     return annotation_run
 
 
-def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
-                                 annotation_range_lock, pipeline_type) -> int:
-    logging.info("unannotated_variants_to_vcf()")
-    if os.path.exists(vcf_filename):
-        raise ValueError(f"Don't want to overwrite '{vcf_filename}' which already exists!")
-    mk_path_for_file(vcf_filename)
-    kwargs = {}
-    if annotation_range_lock:
-        kwargs["min_variant_id"] = annotation_range_lock.min_variant.pk
-        kwargs["max_variant_id"] = annotation_range_lock.max_variant.pk
-
-    annotation_version = annotation_range_lock.version.get_any_annotation_version()
-    qs = get_variants_qs_for_annotation(annotation_version, pipeline_type=pipeline_type, **kwargs)
-
-    if pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
-        if settings.ANNOTATION_VEP_SV_MAX_SIZE:
-            # VEP will skip variants above a certain size and fill up the logs with 'too long to annotate'
-            # So just skip these. I don't think it makes much difference in memory usage
-            q_not_too_long = Q(svlen__isnull=True) | Q(abs_svlen__lte=settings.ANNOTATION_VEP_SV_MAX_SIZE)
-            qs = qs.annotate(abs_svlen=Abs("svlen")).filter(q_not_too_long)
-    return write_qs_to_vcf(vcf_filename, genome_build, qs)
-
-
-def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT, use_accession=False) -> int:
-    # We had an issue with writing accessions in VEP, so use chrom names and the default VEP fasta instead
-    # @see https://github.com/Ensembl/ensembl-vep/issues/1635
-    # Contigs are shared between builds (eg GRCh37/hg19) so the ordering join needs restricting to this
-    # build, otherwise a variant is written once per build its contig belongs to
-    qs = qs.filter(locus__contig__genomebuildcontig__genome_build=genome_build)
-    qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
-    if use_accession:
-        chrom_key = "locus__contig__refseq_accession"
-    else:
-        chrom_key = "locus__contig__name"
-
-    sorted_values = qs.values("id", chrom_key, "locus__position",
-                              "locus__ref__seq", "alt__seq", "end", "svlen")
-
-    # External dumps are written .vcf.gz (see AnnotationRun.get_dump_filename) - gzip on the way out
-    if vcf_filename.endswith(".gz"):
-        f = gzip.open(vcf_filename, "wt", compresslevel=6)
-    else:
-        f = open(vcf_filename, "w")
-    with f:
-        return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=info_dict,
-                                                      use_accession=use_accession)
