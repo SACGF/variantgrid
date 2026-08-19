@@ -80,8 +80,7 @@ class Command(BaseCommand):
             if not dry_run:
                 surviving_tags.append(surviving_tag)
         if surviving_tags:
-            # A node save cascades version bumps through all its descendants, so dirty each affected node
-            # once after every merge is done rather than per merge
+            # One bulk pass over every affected node after all the merges, rather than per merge
             logging.info("Setting analysis nodes that use the merged tags dirty")
             set_tag_nodes_dirty(surviving_tags)
 

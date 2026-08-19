@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from analysis.forms.forms_nodes import TagNodeForm
 from analysis.models import Analysis, VariantTag
+from analysis.models.nodes.analysis_node import AnalysisEdge
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
 from annotation.fake_annotation import create_fake_variants
 from library.django_utils.unittest_utils import prevent_request_warnings
@@ -83,6 +84,28 @@ class TagMergeTest(VariantTagTestCase):
                          ["Artefact"])
         other_node.refresh_from_db()
         self.assertGreater(other_node.version, version_before, "Nodes using the merged tag re-run")
+
+    def test_merge_reruns_tag_node_descendants(self):
+        """ A tag node returning different variants changes everything downstream of it """
+        tag_node = TagNode.objects.create(analysis=self.analysis, version=1)
+        TagNodeTag.objects.create(tag_node=tag_node, tag=self.dying_tag)
+        child = TagNode.objects.create(analysis=self.analysis, version=1)
+        AnalysisEdge.objects.create(parent=tag_node, child=child)
+
+        merge_tag(self.dying_tag, self.surviving_tag, self.user)
+
+        child.refresh_from_db()
+        self.assertGreater(child.version, 1, "Downstream nodes re-run")
+
+    def test_merge_refreshes_auto_node_names(self):
+        """ The merged tag's name appears in auto generated node labels """
+        tag_node = TagNode.objects.create(analysis=self.analysis, version=1)
+        TagNodeTag.objects.create(tag_node=tag_node, tag=self.dying_tag)
+
+        merge_tag(self.dying_tag, self.surviving_tag, self.user)
+
+        tag_node.refresh_from_db()
+        self.assertIn("Artefact", tag_node.name)
 
     def test_merge_keeps_surviving_tag_color(self):
         collection = TagColorsCollection.objects.create(name="test colors", user=self.user)
