@@ -197,6 +197,8 @@ def classifications(request):
         "search_and_classify_form": search_and_classify_form,
         "genome_build": user_settings.default_genome_build,
         "user_settings": user_settings,
+        "lab_external_choices": LabExternalFilter.choices,
+        "lab_external_default": LabExternalFilter.ALL,
     }
     template = 'classification/classifications.html'
 

@@ -123,6 +123,7 @@
         data.allele_origin = blankToNull($("input[name='allele-origin-toggle']:checked").val());
         data.id_filter = blankToNull($('#id_filter').val());
         data.user = blankToNull($('#id_user').val());
+        data.lab_external = blankToNull($("input[name='lab-external-toggle']:checked").val());
         let column = $('#vc-datatable').DataTable().column(3);
         let germline_only = allele_origin_filter_value == "G";
         column.visible(!germline_only);
@@ -159,6 +160,7 @@
     {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
     {% settings_value 'CLASSIFICATION_ID_FILTER' as CLASSIFICATION_ID_FILTER %}
     {% settings_value 'CLASSIFICATION_REDCAP_EXPORT' as CLASSIFICATION_REDCAP_EXPORT %}
+    {% settings_value 'CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER' as CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER %}
     <div id="classifications-page">
         <div class="container">
             {% if labs.count > 0 and can_create_classification %}
@@ -250,6 +252,19 @@
                     Allele Origin<br/>
                     {% allele_origin_toggle show_label=False %}
                 </div>
+
+                {% if CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER %}
+                <div style="width: 220px" class="mx-3">
+                    Labs<br/>
+                    <div id="lab-external-toggle" class="btn-group btn-group-toggle mb-2" data-toggle="buttons">
+                        {% for value, label in lab_external_choices %}
+                        <label class="btn btn-sm btn-outline-secondary {% if value == lab_external_default %}focus active{% endif %}">
+                            <input type="radio" name="lab-external-toggle" value="{{ value }}" {% if value == lab_external_default %}checked="checked"{% endif %} onclick="filterGrid()"> {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
 
                 {% if CLASSIFICATION_ID_FILTER %}
                 <div class="col-md-4 col-lg-2">
