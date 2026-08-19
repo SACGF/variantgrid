@@ -49,11 +49,11 @@ def compose(request, recipient=None):
             messages.info(request, _("Message successfully sent."))
             return HttpResponseRedirect(_safe_next(request))
     else:
-        form = ComposeForm(initial={"subject": request.GET.get("subject", "")})
+        initial = {"subject": request.GET.get("subject", "")}
         if recipient is not None:
-            form.fields['recipient'].initial = list(User.objects.filter(**{
-                f'{User.USERNAME_FIELD}__in': [r.strip() for r in recipient.split('+')]
-            }))
+            recipient_ids = [r for r in recipient.split('+') if r]
+            initial["recipient"] = list(User.objects.filter(pk__in=recipient_ids))
+        form = ComposeForm(initial=initial)
     return render(request, 'user_messages/compose.html', {'form': form})
 
 

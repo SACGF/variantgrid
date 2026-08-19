@@ -71,6 +71,11 @@ class MessageViewTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Message.objects.filter(sender=self.bob, recipient=self.alice, subject="hello").exists())
 
+    def test_compose_to_prefills_recipient(self):
+        response = self.client.get(reverse('messages_compose_to', args=[self.alice.pk]))
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("alice", response.context["form"]["recipient"].value())
+
     def test_delete_marks_recipient_deleted(self):
         msg = self._msg()
         self.client.get(reverse('messages_delete', args=[msg.id]))
