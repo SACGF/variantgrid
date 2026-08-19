@@ -900,7 +900,7 @@ function applyVariantValues() {
                     <div class="card-header">AnnotSV</div>
                     <div class="card-body">
                         {% if variant_annotation.annotsv_acmg_class is not None or variant_annotation.annotsv_acmg_score is not None %}
-                            {% labelled id='annotsv_acmg_class' label='AnnotSV ACMG class' help=annotation_description.annotsv_acmg_class hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_acmg_class|default_if_none:"-" }}{% endlabelled %}
+                            {% labelled id='annotsv_acmg_class' label='AnnotSV ACMG class' help=annotation_description.annotsv_acmg_class hint="tiny" %}{% clinical_significance variant_annotation.annotsv_acmg_clinical_significance %}{% endlabelled %}
                             {% labelled id='annotsv_acmg_score' label='AnnotSV ACMG score' help=annotation_description.annotsv_acmg_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_acmg_score|default_if_none:"-" }}{% endlabelled %}
                             {% if variant_annotation.annotsv_acmg_criteria %}
                                 {% labelled id='annotsv_acmg_criteria' label='AnnotSV ACMG criteria' help=annotation_description.annotsv_acmg_criteria hint="tiny" value_css="text-monospace" %}{{ variant_annotation.annotsv_acmg_criteria }}{% endlabelled %}

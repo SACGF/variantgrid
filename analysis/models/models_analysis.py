@@ -168,9 +168,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
             field_fk = f"{field}_id"  # Avoid fetching related object
             value = getattr(self, field_fk)
             if value is None:
-                msg = f"Analysis setting '{field}' is not set. "
-                msg += "<a href='javascript:analysisSettings()'>Open Analysis Settings</a>"
-                errors.append(msg)
+                errors.append(f"Analysis setting '{field}' is not set")
 
         if not settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
             errors.append("System incorrectly configured - speak to your systems administrator. "
