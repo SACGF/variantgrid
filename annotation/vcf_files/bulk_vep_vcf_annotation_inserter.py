@@ -23,7 +23,11 @@ from annotation.models.models import (
 from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType, VEPCustom
 from annotation.ptc import calculate_ptc_position, parse_ptc_distance_codons, predict_nmd_escape
 from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
-from annotation.sv_conservation import conservation_sidecar_filename, read_conservation_sidecar
+from annotation.sv_conservation import (
+    conservation_sidecar_filename,
+    get_sv_conservation_tracks,
+    read_conservation_sidecar,
+)
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
@@ -406,12 +410,27 @@ class BulkVEPVCFAnnotationInserter:
         }
         self.aloft_columns = self._has_all_aloft_columns(self.all_variant_columns)
 
+    @property
+    def sv_conservation_expected(self) -> bool:
+        """ Whether this run's annotate stage was the one that had to produce a sidecar (#1657).
+
+            External runs (#1568) are annotated somewhere else entirely, and a build with no conservation
+            tracks configured has no columns for the sidecar to carry - neither has one to be missing. """
+        if self.annotation_run.pipeline_type != VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
+            return False
+        if self.annotation_run.external or not settings.ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED:
+            return False
+        return bool(get_sv_conservation_tracks(self.genome_build))
+
     def _load_sv_conservation(self):
-        """ Load the pyBigWig conservation sidecar (#1657) written by the SV annotate stage, if present.
+        """ Load the pyBigWig conservation sidecar (#1657) written by the SV annotate stage.
             For SVs the 4 conservation _max columns are computed with pyBigWig rather than VEP --custom
             bigWig overlaps, so their ColumnVEPField rows are STANDARD-only and _setup_vep_fields_and_db_columns
             drops the columns as out-of-scope/unpopulated. Re-add the columns the sidecar carries so they
-            get written, and hold the {variant_id: {column: value}} map for process_entry to merge in. """
+            get written, and hold the {variant_id: {column: value}} map for process_entry to merge in.
+
+            An SV run with the stage enabled must have one: importing without it writes nulls that read as
+            real "no conservation here" values, and only a re-annotation can correct them. """
         self.sv_conservation: dict[int, dict[str, float]] = {}
         self.sv_conservation_columns: set[str] = set()
         vcf_annotated_filename = self.annotation_run.vcf_annotated_filename
@@ -419,6 +438,9 @@ class BulkVEPVCFAnnotationInserter:
             return
         sidecar = conservation_sidecar_filename(vcf_annotated_filename)
         if not os.path.exists(sidecar):
+            if self.sv_conservation_expected:
+                raise FileNotFoundError(f"{self.annotation_run} conservation sidecar missing: '{sidecar}' - "
+                                        f"retry the run so the pyBigWig stage writes it")
             return
         self.sv_conservation = read_conservation_sidecar(sidecar)
         for values in self.sv_conservation.values():

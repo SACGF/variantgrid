@@ -369,7 +369,10 @@ class TestCurrentAnnotsvVersion(TestCase):
             self.runner.check_tool_version(annotation_run)  # matching binary is fine
 
 
-@override_settings(**get_fake_annotation_settings_dict(columns_version=4))
+# The VEP run here only exists to write the rows AnnotSV updates - its fixture VCF has no #1657
+# conservation sidecar, which an SV import otherwise requires.
+@override_settings(**get_fake_annotation_settings_dict(columns_version=4),
+                   ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED=False)
 class TestImportAnnotsvTsv(TestCase):
     @classmethod
     def setUpTestData(cls):

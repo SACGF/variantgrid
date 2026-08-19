@@ -76,26 +76,30 @@ def span_max_aligned(bw, chrom: str, s: int, e: int) -> Optional[float]:
 def sv_conservation_window(pos: int, end: Optional[int], svlen: Optional[int]) -> tuple[int, int]:
     """ VEP's summary_stats reference footprint for an SV, as 0-based half-open [s, e).
 
-        VEP takes summary over 1-based inclusive [POS, max(END, POS+|SVLEN|)]:
+        A symbolic ALT anchors on the base *before* the event, and VEP's VCF parser advances the start
+        past it, so the footprint is 1-based inclusive [POS+1, max(END, POS+|SVLEN|)]:
         - DEL/DUP/INV: END (== POS+|SVLEN|)
         - INS: END is only POS+1, so the footprint is POS+|SVLEN| """
-    s = pos - 1                                   # 0-based inclusive start
+    s = pos                                       # 0-based inclusive start (1-based POS+1)
     e = max(end or pos, pos + abs(svlen or 0))    # 0-based exclusive end
     return s, e
 
 
-def get_sv_conservation_tracks(genome_build: GenomeBuild) -> list[ConservationTrack]:
+def get_sv_conservation_tracks(genome_build: GenomeBuild, columns_version: Optional[int] = None,
+                               vep_version: Optional[int] = None) -> list[ConservationTrack]:
     """ Conservation bigWig tracks configured for this build, paired with the DB column each populates.
 
         Derived from the ColumnVEPField registry (the summary_stats='max' conservation rows) so the
         track->column mapping stays in one place. Drops any track whose bigWig data file isn't
-        configured for the build. """
+        configured for the build. columns_version/vep_version ask which columns an *existing*
+        VariantAnnotationVersion has, rather than what the current install would annotate. """
     vc = VEPConfig(genome_build)
     tracks: list[ConservationTrack] = []
     for vep_custom in CONSERVATION_VEP_CUSTOMS:
         # pipeline_type is intentionally left unfiltered - the _max rows are STANDARD-only so that
         # get_vep_command drops them on the SV command, but we still want their track->column mapping.
-        cvf_list = [c for c in vep_columns.filter_for(vep_config=vc, vep_custom=vep_custom)
+        cvf_list = [c for c in vep_columns.filter_for(vep_config=vc, vep_custom=vep_custom,
+                                                      columns_version=columns_version, vep_version=vep_version)
                     if c.summary_stats == 'max']
         if not cvf_list:
             continue  # not configured / no data file / wrong build or VEP version
@@ -191,14 +195,20 @@ def read_conservation_sidecar(filename: str) -> dict[int, dict[str, float]]:
 
 def score_sv_vcf(vcf_filename: str, genome_build: GenomeBuild,
                  threads: Optional[int] = None) -> dict[int, dict[str, float]]:
-    """ Compute the 4 conservation _max columns for every SV in `vcf_filename`.
+    """ Compute the 4 conservation _max columns for every SV in `vcf_filename`. """
+    return score_sv_variants(read_sv_vcf_variants(vcf_filename), get_sv_conservation_tracks(genome_build),
+                             threads=threads)
+
+
+def score_sv_variants(variants: list[tuple[int, str, int, Optional[int], Optional[int]]],
+                      tracks: list[ConservationTrack],
+                      threads: Optional[int] = None) -> dict[int, dict[str, float]]:
+    """ Compute the conservation _max columns for (variant_id, chrom, pos, end, svlen) tuples.
 
         Returns {variant_id: {db_column: value}} - keyed by variant, ready to merge onto the import
         path. The bigWig tracks are scored in parallel across a thread pool (one pyBigWig handle per
         worker); the pool size defaults to settings.ANNOTATION_VEP_FORK (the setting that also drives
         VEP --fork). """
-    tracks = get_sv_conservation_tracks(genome_build)
-    variants = read_sv_vcf_variants(vcf_filename)
     results: dict[int, dict[str, float]] = {}
     if not tracks or not variants:
         return results

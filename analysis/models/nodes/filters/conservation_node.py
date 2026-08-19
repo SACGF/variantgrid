@@ -111,6 +111,17 @@ class ConservationNode(AnalysisNode):
             score_dict = self._get_scaled_scores(self.any_scaled_min)
         return score_dict
 
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        if self.modifies_parents() and not self.vav.backfilled_sv_conservation:
+            warnings.append(
+                "Structural variant conservation scores on this VariantAnnotationVersion were taken "
+                "over a window one base too wide, and any run whose scoring stage failed left them "
+                "null - so SVs here may be filtered on the wrong score, or dropped for having none. "
+                "Run `manage.py backfill_sv_conservation` to correct them."
+            )
+        return warnings
+
     def modifies_parents(self):
         if self.use_individual_sliders:
             for field_name, (score, _allow_null) in self._get_individual_scores().items():

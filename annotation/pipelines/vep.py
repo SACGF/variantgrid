@@ -21,7 +21,6 @@ from annotation.vep_annotation import (
     get_vep_skipped_variants_filename,
     vep_check_command_line_version_match,
 )
-from library.log_utils import log_traceback
 from library.utils import execute_cmd
 
 
@@ -35,6 +34,11 @@ class VEPRunner(AnnotationPipelineRunner):
     @property
     def is_structural_variant(self) -> bool:
         return self.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+
+    @property
+    def sv_conservation_enabled(self) -> bool:
+        """ Whether this run must produce a pyBigWig conservation sidecar (#1657). """
+        return self.is_structural_variant and settings.ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED
 
     def get_variants_qs(self, annotation_run):
         qs = super().get_variants_qs(annotation_run)
@@ -64,6 +68,8 @@ class VEPRunner(AnnotationPipelineRunner):
         annotated_filename = get_annotated_filename(annotation_run, dump_filename)
         if not os.path.exists(get_vep_skipped_variants_filename(annotated_filename)):
             return False
+        if self.sv_conservation_enabled and not os.path.exists(conservation_sidecar_filename(annotated_filename)):
+            return False  # #1657: without the sidecar the import lane would write null conservation
         return os.path.exists(annotated_filename)
 
     def record_resume_state(self, annotation_run, dump_filename):
@@ -129,7 +135,7 @@ class VEPRunner(AnnotationPipelineRunner):
                 annotation_run.vep_skipped_variants_filename = skipped_variants_filename
             annotation_run.annotation_end = timezone.now()
 
-            if settings.ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED and self.is_structural_variant:
+            if self.sv_conservation_enabled:
                 self._write_conservation_sidecar(annotation_run, vcf_dump_filename, vcf_annotated_filename)
         else:
             # Now we have standard/CNV type pipelines, it's possible some can be empty
@@ -142,19 +148,21 @@ class VEPRunner(AnnotationPipelineRunner):
         """ Conservation (phastCons/phyloP) _max columns for SVs - computed with pyBigWig instead of the
             4 conservation VEP --custom bigWig overlaps, whose O(SV-span) cost makes large SVs never finish
             (#1657). The values are written to a sidecar TSV next to the annotated VCF; the import lane
-            (BulkVEPVCFAnnotationInserter) merges them into the same _max columns. Best-effort: a scoring
-            failure logs and leaves the columns null rather than failing the run. """
+            (BulkVEPVCFAnnotationInserter) merges them into the same _max columns.
+
+            Required output, not best-effort: the conservation columns have no other source on an SV run,
+            so swallowing a failure here imports nulls that look like real "no conservation here" values
+            and only a re-annotation can correct. Failing the run instead leaves it ERROR (visible and
+            retryable) with the run's files kept on disk for investigation. """
         genome_build = annotation_run.genome_build
-        try:
-            tracks = get_sv_conservation_tracks(genome_build)
-            results = score_sv_vcf(vcf_dump_filename, genome_build)
-            sidecar = conservation_sidecar_filename(vcf_annotated_filename)
-            write_conservation_sidecar(sidecar, results, tracks)
-            logging.info("Wrote SV conservation for %d variants to %s", len(results), sidecar)
-        except Exception:
-            log_traceback()
-            logging.warning("SV conservation (pyBigWig) stage failed for AnnotationRun %s",
-                            annotation_run.pk)
+        tracks = get_sv_conservation_tracks(genome_build)
+        results = score_sv_vcf(vcf_dump_filename, genome_build)
+        sidecar = conservation_sidecar_filename(vcf_annotated_filename)
+        write_conservation_sidecar(sidecar, results, tracks)
+        # Recorded so "did VEP or our code write these columns" survives on the run itself - the caller
+        # saves it with the rest of the run's annotate state
+        annotation_run.sv_conservation_pybigwig = True
+        logging.info("Wrote SV conservation for %d variants to %s", len(results), sidecar)
 
     def import_results(self, annotation_run):
         import_vcf_annotations(annotation_run)

@@ -794,6 +794,12 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_calculated_ptc
     backfilled_ptc = models.BooleanField(default=True)
 
+    # #1657 - the SV conservation _max columns our pyBigWig stage wrote are off by one base at the
+    # start of the span, and a run whose sidecar stage failed left them null. ConservationNode filters
+    # on those columns. Flipped by `manage.py backfill_sv_conservation`. Backfill source:
+    # annotation/sv_conservation.py:sv_conservation_window
+    backfilled_sv_conservation = models.BooleanField(default=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -1161,6 +1167,11 @@ class AnnotationRun(TimeStampedModel):
     # External annotation (#1568): set by the annotation_external --dump command. The normal scheduler /
     # annotate_variants skip these so VEP is never auto-run on a run the operator is managing externally.
     external = models.BooleanField(default=False)
+    # #1657: our pyBigWig stage, not VEP, wrote this run's SV conservation (phastCons/phyloP) _max
+    # columns. Recorded rather than inferred from the conservation --custom args in pipeline_command,
+    # which an external run doesn't have at all - "which code produced these values" is a property of
+    # the run worth keeping once the command that shows it is gone.
+    sv_conservation_pybigwig = models.BooleanField(default=False)
     dump_start = models.DateTimeField(null=True)
     dump_end = models.DateTimeField(null=True)
     annotation_start = models.DateTimeField(null=True)

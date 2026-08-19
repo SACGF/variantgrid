@@ -19,7 +19,9 @@ from annotation.sv_conservation import (
 from snpdb.models import GenomeBuild
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "test_data")
-TOLERANCE = 0.05
+# VEP writes the CSQ values as 3-decimal text, so exact equality can't be asserted against a fixture.
+# Small enough to catch a window off-by-one (the smallest one seen in real data moved a value by 0.003).
+TOLERANCE = 1e-4
 
 # Build -> VEP-annotated SV fixture whose CSQ carries the phastCons*/phyloP* _max ground-truth values.
 BUILD_FIXTURES = {
@@ -51,15 +53,16 @@ def _parse_fixture(filename):
 
 class SVConservationWindowTests(TestCase):
     def test_window_del_dup_uses_svlen(self):
-        # POS-1 (0-based inclusive) .. POS+|SVLEN| (0-based exclusive)
-        self.assertEqual(sv_conservation_window(pos=1000, end=None, svlen=500), (999, 1500))
+        # POS (0-based inclusive - the symbolic ALT's anchor base is not part of the event)
+        # .. POS+|SVLEN| (0-based exclusive)
+        self.assertEqual(sv_conservation_window(pos=1000, end=None, svlen=500), (1000, 1500))
 
     def test_window_negative_svlen_abs(self):
-        self.assertEqual(sv_conservation_window(pos=1000, end=None, svlen=-500), (999, 1500))
+        self.assertEqual(sv_conservation_window(pos=1000, end=None, svlen=-500), (1000, 1500))
 
     def test_window_ins_uses_svlen_over_small_end(self):
         # INS: tiny END (POS+1) but large SVLEN -> footprint is POS+|SVLEN|
-        self.assertEqual(sv_conservation_window(pos=1000, end=1001, svlen=800), (999, 1800))
+        self.assertEqual(sv_conservation_window(pos=1000, end=1001, svlen=800), (1000, 1800))
 
 
 class SVConservationScoringTests(TestCase):

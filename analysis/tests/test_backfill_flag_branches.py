@@ -1,12 +1,14 @@
 """
 Coverage for the per-VAV backfill-completion flags that gate optimised query
 branches in DamageNode. The flags live on VariantAnnotationVersion
-(backfilled_spliceai_max_ds, backfilled_damage_counts, backfilled_ptc) and are
+(backfilled_spliceai_max_ds, backfilled_damage_counts, backfilled_ptc,
+backfilled_sv_conservation) and are
 flipped True by the matching `fix_*` / `backfill_*` management commands once a
 partition's derived columns are populated.
 """
 from django.test import TestCase, override_settings
 
+from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.tests.utils import AnalysisSetupMixin
 
@@ -199,3 +201,27 @@ class TestDamageNodePTCBackfillFlag(_BackfillFlagMixin, TestCase):
         self._set_vav_flag(backfilled_ptc=False)
         node = self._cv5_node()  # no ptc_nmd_escaping
         self.assertEqual([], [w for w in node.get_warnings() if "ptc_nmd_escaping" in w])
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestConservationNodeSVBackfillFlag(_BackfillFlagMixin, TestCase):
+    """ #1657: a node filtering on conservation scores warns while the SV values are known wrong. """
+
+    def test_warns_when_not_backfilled(self):
+        self._set_vav_flag(backfilled_sv_conservation=False)
+        node = ConservationNode(analysis=self.analysis, any_scaled_min=0.5)
+        warnings = node.get_warnings()
+        self.assertTrue(
+            any("backfill_sv_conservation" in w for w in warnings),
+            f"expected backfill_sv_conservation pointer, got: {warnings}",
+        )
+
+    def test_no_warning_when_backfilled(self):
+        self._set_vav_flag(backfilled_sv_conservation=True)
+        node = ConservationNode(analysis=self.analysis, any_scaled_min=0.5)
+        self.assertEqual([], [w for w in node.get_warnings() if "backfill_sv_conservation" in w])
+
+    def test_no_warning_when_not_filtering(self):
+        self._set_vav_flag(backfilled_sv_conservation=False)
+        node = ConservationNode(analysis=self.analysis)  # sliders at default - filters nothing
+        self.assertEqual([], [w for w in node.get_warnings() if "backfill_sv_conservation" in w])
