@@ -300,6 +300,16 @@ class TestNodeExportLaunch(GridExportTestCase):
         self.assertEqual(first.pk, second.pk)
         self.assertEqual(self._num_cached_files(), 1)
 
+    def test_stale_version_id_exports_latest_version(self):
+        """ A node update (eg a tag delete) bumps the version while the grid is open - the export
+            uses the latest version rather than rejecting the client's stale one (#789) """
+        stale_version = self.node.version
+        SampleNode.objects.filter(pk=self.node.pk).update(version=stale_version + 1)
+        stale = self._launch_export(version_id=str(stale_version))
+        self.node.refresh_from_db()
+        current = self._launch_export()
+        self.assertEqual(stale.pk, current.pk)
+
     def test_different_grid_filters_are_separate_downloads(self):
         unfiltered = self._launch_export()
         filters = json.dumps({"groupOp": "AND",
@@ -310,10 +320,13 @@ class TestNodeExportLaunch(GridExportTestCase):
 
     def test_export_task_writes_zipped_csv(self):
         cgf = self._launch_export()
+        # The view strips version_id from the grid params it hands the task (node.version is authoritative)
+        task_grid_params = self._grid_params()
+        task_grid_params.pop("version_id")
         with tempfile.TemporaryDirectory() as generated_dir:
             with override_settings(GENERATED_DIR=generated_dir):
                 export_node_to_downloadable_file.apply(args=(self.node.pk, self.node.version, self.user.pk,
-                                                             "csv", None, self._grid_params()))
+                                                             "csv", None, task_grid_params))
                 cgf.refresh_from_db()
                 self.assertEqual(cgf.task_status, "SUCCESS")
                 self.assertEqual(cgf.progress, 1)

@@ -20,7 +20,11 @@ from analysis.tasks.analysis_grid_export_tasks import (
     get_grid_downloadable_file_params_hash,
     get_node_grid_downloadable_file_params_hash,
 )
-from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
+from analysis.exceptions import NonFatalNodeError
+from analysis.views.analysis_permissions import (
+    get_node_subclass_or_404,
+    get_node_subclass_or_non_fatal_exception,
+)
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from library.constants import WEEK_SECS
 from library.django_utils.major_operation import TooManyMajorOperationsError, major_operation
@@ -63,7 +67,11 @@ class NodeGridHandler(NodeJSONViewMixin):
             which should hopefully hit the cache next time
         """
         LOCK_EXPIRE = 60 * 10  # 10 mins
-        node = self._get_node(request)
+        try:
+            node = self._get_node(request)
+        except NonFatalNodeError:
+            # Let get_response raise it again and format the non-fatal JSON the client expects
+            return self.get_response(request, *args, **kwargs)
         url = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
         url = _add_allowed_node_grid_params(url, request.GET.dict())
         lock_id = sha256sum_str(f"{url}_{request.user}")
@@ -160,7 +168,9 @@ def node_grid_export(request, analysis_id):
     if export_type not in EXPORT_TYPES:
         raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
 
-    node = _node_from_request(request)
+    # Always export the latest version (node.version below) - deliberately don't check the
+    # client's version_id, which goes stale whenever the node is updated, eg a tag delete (#789)
+    node = get_node_subclass_or_404(request.user, request.GET["node_id"])
     canonical_transcript_collection_id = None
     if request.GET.get("use_canonical_transcripts"):
         # Whether to use it or not is set server-side. Just use client to see what they wanted
@@ -170,6 +180,9 @@ def node_grid_export(request, analysis_id):
             logging.warning("Grid request had 'use_canonical_transcripts' but analysis did not.")
 
     grid_params = {k: v for k, v in request.GET.items() if k in _NODE_GRID_ALLOWED_PARAMS}
+    # node.version in task_args is authoritative - the client's (possibly stale) version_id would
+    # otherwise split the params_hash so identical exports wouldn't share a cached file
+    grid_params.pop("version_id", None)
     task_args = (node.pk, node.version, request.user.pk, export_type, canonical_transcript_collection_id, grid_params)
     params_hash = get_node_grid_downloadable_file_params_hash(*task_args)
     task = export_node_to_downloadable_file.si(*task_args)

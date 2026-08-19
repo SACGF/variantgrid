@@ -529,7 +529,11 @@ def get_node_sql(grid):
 @vary_on_cookie
 def node_debug(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
     """ We use analysis version to be able to expire cache if the custom columns etc change """
-    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    try:
+        node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    except NodeOutOfDateException:
+        return HttpResponseRedirect(reverse("node_load",
+                                            kwargs={"analysis_id": analysis_id, "node_id": node_id}))
     model_name = node._meta.label
     node_serializers = AnalysisNodeSerializer.get_node_serializers()
     serializer_klass = node_serializers.get(model_name, AnalysisNodeSerializer)
@@ -553,7 +557,11 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
 # @vary_on_cookie
 def node_audit_log(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
     """ We use analysis version to be able to expire cache if the custom columns etc change """
-    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    try:
+        node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    except NodeOutOfDateException:
+        return HttpResponseRedirect(reverse("node_load",
+                                            kwargs={"analysis_id": analysis_id, "node_id": node_id}))
     context = {
         "node": node
     }
@@ -1146,7 +1154,8 @@ def analysis_input_samples(request, analysis_id):
 
 
 def node_method_description(request, analysis_id, node_id, node_version):
-    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    # Deliberately don't check node_version - always describe the latest version (#789)
+    node = get_node_subclass_or_404(request.user, node_id)
     nodes = AnalysisNode.depth_first(node)
 
     context = {"node": node,
