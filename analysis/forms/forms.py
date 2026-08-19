@@ -249,6 +249,9 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
             genome_build=self.instance.genome_build,
             variant_annotation_version__status=VariantAnnotationVersion.Status.ACTIVE,
         )
+        if annotation_version_id := self.instance.annotation_version_id:
+            # Keep an old (non-active) version selectable, otherwise saving any other setting clears it
+            annotation_version_qs |= AnnotationVersion.objects.filter(pk=annotation_version_id)
         self.fields['annotation_version'].queryset = annotation_version_qs.order_by("-pk")
         self.fields['custom_columns_collection'].queryset = CustomColumnsCollection.filter_for_user(user)
 

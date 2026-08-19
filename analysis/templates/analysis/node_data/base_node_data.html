@@ -5,42 +5,47 @@
 </style>
 
 <script type="text/javascript">
+    function errorListItem(msg) {
+        const $li = $("<li>", { class: "error" });
+
+        if (msg?.startsWith("Analysis:")) {
+            $li.append(document.createTextNode(msg));
+            $li.append(
+                $("<div>").append(
+                    $("<div>", { class: "left", css: { marginRight: 2 }, text: "Fix this in " }),
+                    $("<a>", { href: "javascript:analysisSettings()" }).append(
+                        $("<div>", { class: "left icon16 settings-icon" }),
+                        $("<div>", { class: "left", text: "Analysis settings" })
+                    ),
+                    $("<div>", { class: "clear" })
+                )
+            );
+        } else if (msg && msg.includes(": Traceback (")) {
+            $li.append($("<pre>", { text: msg }));
+        } else {
+            $li.text(msg);      // auto‑escapes < > &
+        }
+        return $li;
+    }
+
+    /* Add to whatever is already showing, so an editor failure doesn't hide the node errors that caused it */
+    function add_errors(errors) {
+        console.log("add_errors:", errors);
+        const $container = $("#error-container");
+        let $list = $("ul.messages", $container);
+        if ($list.length === 0) {
+            $container.append($("<div>", { text: "Node errors:" }));
+            $list = $("<ul>", { class: "messages" }).appendTo($container);
+        }
+        errors.forEach(msg => $list.append(errorListItem(msg)));
+        $container.show();
+    }
+
     function on_error_function(errors) {
-        console.log("on_error_function:", errors);
         hideLoadingOverlay();
-
-        const $list = $("<ul>", { class: "messages" });
-
-        errors.forEach(msg => {
-            const $li = $("<li>", { class: "error" });
-
-            if (msg?.startsWith("Analysis:")) {
-                $li.append(document.createTextNode(msg));
-                $li.append(
-                    $("<div>").append(
-                        $("<div>", { class: "left", css: { marginRight: 2 }, text: "Fix this in " }),
-                        $("<a>", { href: "javascript:analysisSettings()" }).append(
-                            $("<div>", { class: "left icon16 settings-icon" }),
-                            $("<div>", { class: "left", text: "Analysis settings" })
-                        ),
-                        $("<div>", { class: "clear" })
-                    )
-                );
-            } else if (msg && msg.includes(": Traceback (")) {
-                $li.append($("<pre>", { text: msg }));
-            } else {
-                $li.text(msg);      // auto‑escapes < > &
-            }
-
-            $list.append($li);
-        });
-
         $("#node-data-container").empty();
-        $("#error-container")
-            .empty()
-            .append($("<div>", { text: "Node errors:" }))
-            .append($list)
-            .show();
+        $("#error-container").empty();
+        add_errors(errors);
     }
 
 
@@ -61,7 +66,8 @@
                 } else if (xhr.status >= 400) {
                     message += "Error retrieving data - perhaps try reloading node?";
                 }
-                on_error_function([message]);
+                hideLoadingOverlay();
+                add_errors([message]);
             }
         });
 	}

@@ -16,6 +16,14 @@ from snpdb.utils import get_all_tags_and_user_colors
 
 
 class NodeView(UpdateView):
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.get_analysis_errors():
+            # Node forms and grid columns are both built from analysis settings, so we can't build either.
+            # Show the errors instead of failing to load - see the "errors" branch of base_editor.html
+            return self.render_to_response({"errors": self.object.get_errors(flat=True)})
+        return super().get(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         extra_filters = self.kwargs.get("extra_filters")

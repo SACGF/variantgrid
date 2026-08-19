@@ -30,9 +30,10 @@ class TissueNode(AnalysisNode):
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
-        if self.analysis.annotation_version.human_protein_atlas_version is None:
-            msg = "To use the TissueNode you must use an AnnotationVersion with human_protein_atlas_version not equal to None. <a href='javascript:analysisSettings()'>Open Analysis Settings</a>"
-            errors.append(msg)
+        if av := self.analysis.annotation_version:
+            if av.human_protein_atlas_version is None:
+                errors.append("To use the TissueNode, the analysis settings AnnotationVersion needs a "
+                              "human_protein_atlas_version")
         return errors
 
     def modifies_parents(self):
