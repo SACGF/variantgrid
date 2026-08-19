@@ -4,7 +4,7 @@
 {% load classification_tags %}
 <div class="card-header">Triaging</div>
 {% if form %}
-    <form data-toggle="ajax-form" method="POST" action="{% url 'triage_3' triage.pk %}?mode={{ mode }}">
+    <form data-toggle="ajax-form" id="triage-{{ triage.pk }}-form" method="POST" action="{% url 'triage_3' triage.pk %}?mode={{ mode }}">
     <div class="card-body">
         {% labelled label="c.HGVS" %}
             <a href="{{ triage.allele.get_absolute_url }}">
@@ -17,34 +17,29 @@
         {% labelled label="For Lab" %}{% lab triage.lab_like %}{% endlabelled %}
         <div class="triage-form">
             {% crispy form form_helper.horizontal %}
-            <script>
-
-                function triage_status_updated() {
-                    let value = $('input[name="triage_status"]:checked').val();
-                    let willAmend = value == "F";
-                    if (willAmend) {
-                        $('#div_id_new_value').show();
-                    } else {
-                        $('#div_id_new_value').hide();
-                    }
-                }
-                // document.ready() isn't reliable for dialogs, doing it here instead
-                function handleDialogShown(event) {
-                    $('input[name="triage_status"]').change(() => {
-                        triage_status_updated();
-                    });
-                    triage_status_updated();
-                    window.removeEventListener('modalDialogShown', handleDialogShown)
-                }
-                window.addEventListener('modalDialogShown', handleDialogShown);
-
-            </script>
         </div>
     </div>
     <div class="card-footer">
         <input type="submit" class="btn btn-primary" />
     </div>
-</form>
+    </form>
+
+    <script>
+        function triage_status_updated() {
+            let value = $('input[name="triage_status"]:checked').val();
+            let willAmend = value == "F";
+            if (willAmend) {
+                $('#div_id_new_value').show();
+            } else {
+                $('#div_id_new_value').hide();
+            }
+        }
+        $('input[name="triage_status"]').change(() => {
+            triage_status_updated();
+        });
+        triage_status_updated();
+    </script>
+
 {% else %}
     <div class="card-body">
         <div class="container">{% include "uicore/messages/messages.html" %}</div>

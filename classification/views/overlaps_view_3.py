@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import Optional, Any
 from django.contrib import messages
 from django import forms
+from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponseBase
 from django.shortcuts import render, redirect
 from django.urls import reverse
@@ -21,6 +22,21 @@ from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
 class ClassificationGroupingValueTriageForm(forms.Form):
+
+    def __init__(self, triage: OverlapContribution, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.triage = triage
+
+    def clean(self):
+        # Always call the parent class clean() first to get normalized data
+        cleaned_data = super().clean()
+        new_value = cleaned_data.get("new_value")
+        triage_status = cleaned_data.get("triage_status")
+
+        if triage_status == TriageStatus.REVIEWED_WILL_FIX and new_value:
+            if new_value == self.triage.value:
+                raise forms.ValidationError({"new_value": ValidationError(f"{self.fields['new_value'].label} must be different to the existing value")})
+        return cleaned_data
 
     triage_status = forms.ChoiceField(
         label="Triage Status",
@@ -45,6 +61,7 @@ class ClassificationGroupingValueTriageForm(forms.Form):
 
 
 class ClassificationGroupingValueTriageOncPathForm(ClassificationGroupingValueTriageForm):
+
     new_value = forms.ChoiceField(
         label="New Classification",
         widget=forms.Select(),
@@ -55,7 +72,9 @@ class ClassificationGroupingValueTriageOncPathForm(ClassificationGroupingValueTr
     )
 
 
+
 class ClassificationGroupingValueTriageClinSigForm(ClassificationGroupingValueTriageForm):
+
     new_value = forms.ChoiceField(
         label="New Clinical Significance",
         widget=forms.Select(),
@@ -135,13 +154,13 @@ class TriageView3(AjaxFormView[OverlapContribution]):
         }
         if value_type == ClassificationResultValue.ONC_PATH:
             form = ClassificationGroupingValueTriageOncPathForm(
-                # data=request.POST or None,
+                triage=triage,
                 data=request.POST if request.method == "POST" else None,
                 initial=initial_data
             )
         else:
             form = ClassificationGroupingValueTriageClinSigForm(
-                # data=request.POST or None,
+                triage=triage,
                 data=request.POST if request.method == "POST" else None,
                 initial=initial_data
             )
