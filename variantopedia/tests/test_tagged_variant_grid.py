@@ -1,11 +1,23 @@
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
+from django.urls import resolve, reverse
 from guardian.shortcuts import assign_perm
 
 from analysis.models import VariantTag
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
-from snpdb.models import Allele, AlleleOrigin, GenomeBuild, Tag, UserGridConfig, Variant, VariantAllele
-from variantopedia.grids import TaggedVariantGrid, VariantTagsGrid
+from snpdb.models import (
+    Allele,
+    AlleleOrigin,
+    GenomeBuild,
+    Tag,
+    TagColor,
+    TagColorsCollection,
+    UserGridConfig,
+    UserSettingsOverride,
+    Variant,
+    VariantAllele,
+)
+from variantopedia.grids import TaggedVariantGrid, VariantTagCountsColumns, VariantTagsGrid
 
 
 class TaggedVariantGridTest(TestCase):
@@ -70,6 +82,28 @@ class TaggedVariantGridTest(TestCase):
                          {self.other_user_variant.pk})
         self.assertEqual(self._tags_grid_variant_ids({"user": self.other_user.pk}),
                          {self.other_user_variant.pk})
+
+    def _variant_tag_counts_tags(self) -> list[str]:
+        url = reverse('variant_tag_counts_datatable', kwargs={"variant_id": self.both_variant.pk})
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.user
+        config = VariantTagCountsColumns(request)
+        tag_column = config.rich_columns[0]
+        qs = config.get_initial_queryset().order_by(*tag_column.sort_string(False))
+        return list(qs.values_list("tag", flat=True))
+
+    def test_variant_tag_counts_custom_sort_order(self):
+        """ The variant page tag table follows the sort order from the user's tag colours collection """
+        self.assertEqual(self._variant_tag_counts_tags(), ["Artefact", "SomaticReportable"])
+
+        collection = TagColorsCollection.objects.create(name="sort test colors", user=self.user)
+        TagColor.objects.create(collection=collection, tag=self.artefact, rgb="", sort_order=10)
+        user_settings_override, _ = UserSettingsOverride.objects.get_or_create(user=self.user)
+        user_settings_override.tag_colors = collection
+        user_settings_override.save()
+
+        self.assertEqual(self._variant_tag_counts_tags(), ["SomaticReportable", "Artefact"])
 
     def test_user_filter_overrides_show_group_data(self):
         """ An explicit user filter must still show another user's (permission-visible) tags

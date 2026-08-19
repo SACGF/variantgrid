@@ -66,7 +66,7 @@ from pathtests.models import cases_for_user
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
-from snpdb.forms import TagForm, get_settings_form_features
+from snpdb.forms import TagForm, UserSelectForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import (
@@ -499,7 +499,8 @@ def variant_tags(request, genome_build_name=None):
                # Tags to start the grids filtered on - variants must carry all of them
                "initial_tags": request.GET.getlist("tag"),
                # User to start the grids filtered on - @see user page tags card
-               "filter_user": filter_user}
+               "filter_user": filter_user,
+               "user_form": UserSelectForm()}
     return render(request, 'variantopedia/variant_tags.html', context)
 
 

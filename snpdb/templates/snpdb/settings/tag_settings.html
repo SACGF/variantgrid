@@ -93,6 +93,12 @@
             </table>
         </div>
 
+        <h3>Tag colours &amp; sorting</h3>
+
+        <p>Collections below set tag colours and sort order — click one to view or change it</p>
+
+        <table id="tag-color-collections-datatable" data-datatable-url="{% url 'tag_color_collections_datatable' %}" class="sticky-header responsive"></table>
+
         {% if retired_tags %}
             <div>
                 <h3>Retired Tags</h3>
@@ -158,12 +164,6 @@
                 </table>
             </div>
         {% endif %}
-
-        <h3>Tag colour schemes</h3>
-
-        <p>Change colour schemes below</p>
-
-        <table id="tag-color-collections-datatable" data-datatable-url="{% url 'tag_color_collections_datatable' %}" class="sticky-header responsive"></table>
 
     </div>
 

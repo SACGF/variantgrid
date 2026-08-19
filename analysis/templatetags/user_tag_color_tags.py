@@ -10,6 +10,7 @@ from annotation.models import AnnotationVersion
 from library import tag_utils
 from library.django_utils import get_field_counts
 from snpdb.models import GenomeBuild
+from snpdb.models.models_user_settings import UserSettings
 from snpdb.utils import get_tag_sort_order_by_tag, get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 
@@ -105,6 +106,13 @@ def render_tag_styles_and_formatter(context, tag_colors_collection=None):
 
     return {"user_tag_styles": user_tag_styles,
             "url_name_visible": context["url_name_visible"]}
+
+
+@register.inclusion_tag("analysis/tags/tag_colors_collection_link.html", takes_context=True)
+def tag_colors_collection_link(context):
+    """ Explains where tag colours/sort order come from, linking to where they can be changed """
+    user_settings = UserSettings.get_for_user(context["user"])
+    return {"tag_colors_collection": user_settings.tag_colors}
 
 
 @register.inclusion_tag("analysis/tags/tag_counts_filter.html", takes_context=True)

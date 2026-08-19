@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from django.conf import settings
 from django.db import connection
-from django.db.models import Count, OuterRef, Q, QuerySet, Subquery
+from django.db.models import Case, Count, IntegerField, OuterRef, Q, QuerySet, Subquery, Value, When
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -21,6 +21,7 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import GenomeBuild, Tag, Variant, VariantWiki, VariantZygosityCountCollection
 from snpdb.models.models_user_settings import UserGridConfig, UserSettings
+from snpdb.utils import get_tag_sort_order_by_tag
 from snpdb.variant_filters import get_all_variants_filters, get_variant_filter_q, is_selective
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 from variantopedia.interesting_nearby import get_nearby_qs
@@ -376,16 +377,19 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
         super().__init__(request)
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('viewTagDetail', id_field="tag")
         self.tag_stale_date = UserSettings.get_for_user(self.user).variant_tag_stale_date
+        # Custom tag ordering from the tag colors page - tags without an entry sort as 0
+        self.sort_order_by_tag = get_tag_sort_order_by_tag(self.user)
+        tag_sort_keys = ['tag_sort_order', 'tag'] if self.sort_order_by_tag else ['tag']
 
         self.rich_columns = [
-            RichColumn('tag', client_renderer='tagRenderer', orderable=True),
+            RichColumn('tag', client_renderer='tagRenderer', sort_keys=tag_sort_keys,
+                       default_sort=SortOrder.ASC),
             RichColumn('count', orderable=True),
         ]
         if self.tag_stale_date:
             self.rich_columns.append(RichColumn('fresh_count', label='Fresh', orderable=True))
         self.rich_columns += [
-            RichColumn('last_created', client_renderer='TableFormat.timestamp', orderable=True,
-                       default_sort=SortOrder.DESC),
+            RichColumn('last_created', client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn('last_created', name='time_ago', client_renderer='TableFormat.timeAgo'),
         ]
 
@@ -398,6 +402,10 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
         qs = VariantTag.get_variant_tag_counts_qs(variant)
         if self.tag_stale_date:
             qs = qs.annotate(fresh_count=Count("id", filter=Q(created__gte=self.tag_stale_date)))
+        if self.sort_order_by_tag:
+            whens = [When(tag=tag_id, then=Value(sort_order))
+                     for tag_id, sort_order in self.sort_order_by_tag.items()]
+            qs = qs.annotate(tag_sort_order=Case(*whens, default=Value(0), output_field=IntegerField()))
         return qs
 
 

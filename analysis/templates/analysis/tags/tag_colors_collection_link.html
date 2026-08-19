@@ -1,0 +1,7 @@
+<p>
+    Tags below are coloured and sorted using tag colours
+    {% if tag_colors_collection %}
+        <a href="{{ tag_colors_collection.get_absolute_url }}">{{ tag_colors_collection }}</a>
+    {% endif %}
+    set in your <a href="{% url 'view_user_settings' %}">User Settings</a>
+</p>
