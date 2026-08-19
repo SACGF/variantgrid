@@ -179,7 +179,7 @@ class TagAutocompleteView(AutocompleteView):
     fields = ['id']
 
     def get_user_queryset(self, user):
-        return Tag.objects.all().order_by(Length("id").asc())
+        return Tag.live_qs().order_by(Length("id").asc())
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')

@@ -53,8 +53,9 @@
                     <div class="alert alert-danger mt-3">
                         All {{ usage.description }} using <strong>{{ dying_tag }}</strong> will be changed to
                         <strong><span id="surviving-tag-name">...</span></strong>, and <strong>{{ dying_tag }}</strong>
-                        will be deleted. Rows that would become duplicates are deleted, keeping the earliest.
-                        This cannot be undone.
+                        will be retired. Rows that would become duplicates are deleted, keeping the earliest.
+                        Moving the rows cannot be undone - reinstating <strong>{{ dying_tag }}</strong> later
+                        gets the name back, not the tagging.
                     </div>
 
                     {% labelled label="Confirm tag name" %}

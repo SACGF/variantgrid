@@ -417,7 +417,6 @@ class SampleAdmin(ModelAdminBasics):
 
 
 admin.site.register(models.SampleLabProject)
-admin.site.register(models.SampleTag, ModelAdminBasics)
 admin.site.register(models.SettingsInitialGroupPermission, ModelAdminBasics)
 admin.site.register(models.Tag, ModelAdminBasics)
 admin.site.register(models.Trio, ModelAdminBasics)
@@ -428,7 +427,6 @@ class VCFAdmin(GuardedModelAdminBasics):
 
 
 admin.site.register(models.VCFSourceSettings, ModelAdminBasics)
-admin.site.register(models.VCFTag, ModelAdminBasics)
 admin.site.register(models.VariantGridColumn, ModelAdminBasics)
 
 

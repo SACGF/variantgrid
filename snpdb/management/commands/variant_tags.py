@@ -16,8 +16,10 @@ from django.db.models.signals import post_delete
 
 from analysis.models import VariantTag
 from analysis.signals.signal_handlers import variant_tag_delete
+from eventlog.models import create_event
+from library.guardian_utils import admin_bot
 from snpdb.models import Tag
-from snpdb.tag_merge import get_case_collision_groups, get_tag_usage, merge_tag
+from snpdb.tag_operations import get_case_collision_groups, get_tag_usage, merge_tag
 
 MERGE_CASE_COLLISIONS = "merge-case-collisions"
 DELETE_DUPLICATES = "delete-duplicates"
@@ -73,7 +75,7 @@ class Command(BaseCommand):
                     logging.info("Would merge '%s' (%s) into '%s'",
                                  dying_tag, get_tag_usage(dying_tag).description(), surviving_tag)
                 else:
-                    merge_tag(dying_tag, surviving_tag)
+                    merge_tag(dying_tag, surviving_tag, admin_bot())
 
     @staticmethod
     def _delete_duplicates(dry_run: bool):
@@ -83,4 +85,7 @@ class Command(BaseCommand):
         else:
             with _variant_tag_delete_signal_disconnected():
                 num_deleted, _ = qs.delete()
+            # No single tag to hang this off, so it's an event rather than a tag operation
+            create_event(admin_bot(), name="variant_tags_delete_duplicates",
+                         details=f"Deleted {num_deleted} duplicate variant tags")
             logging.info("Deleted %d duplicate variant tags", num_deleted)
