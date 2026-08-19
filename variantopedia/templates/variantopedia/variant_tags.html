@@ -102,12 +102,19 @@
         <div class="card-body">
             <strong>{{ tag_events }}</strong> tag events, <strong>{{ tag_events_last_month }}</strong> in the
             last 30 days.
-            <a href="{% url 'genome_build_tag_stats' genome_build.name %}">See tag stats</a>
+            <a href="{% url 'tag_stats' %}">See tag stats</a>
+            {% if tags_without_build_coordinate %}
+                <p class="text-muted small mb-0 mt-2">
+                    <strong>{{ tags_without_build_coordinate }}</strong> tag events have no
+                    {{ genome_build }} coordinate, so aren't shown in the grids below. See
+                    <a href="{% url 'tag_stats' %}">tag stats</a> for counts across all builds.
+                </p>
+            {% endif %}
         </div>
     </div>
 
     <a class="btn btn-outline-secondary fas fa-tags" href="{% url 'tag_settings' %}">Tag Settings</a>
-    <a class="btn btn-outline-secondary fas fa-chart-bar" href="{% url 'genome_build_tag_stats' genome_build.name %}">Tag Stats</a>
+    <a class="btn btn-outline-secondary fas fa-chart-bar" href="{% url 'tag_stats' %}">Tag Stats</a>
 
     {% tag_counts_filter genome_build=genome_build click_func='tagClick' show_all_func='showAll' any_tag_button=False %}
 

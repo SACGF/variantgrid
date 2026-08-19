@@ -486,10 +486,16 @@ def variant_tags(request, genome_build_name=None):
     if (user_id := request.GET.get("user")) and user_id.isdigit():
         filter_user = User.objects.filter(pk=user_id).first()
 
+    # The grids below show coordinates, so a tag needs a variant in this build to appear in them
+    without_coordinate_qs = VariantTag.objects.exclude(allele__variantallele__genome_build=genome_build)
+    if filter_user:
+        without_coordinate_qs = without_coordinate_qs.filter(user=filter_user)
+
     context = {"genome_build": genome_build,
                "tag_counts": tag_counts,
                "tag_events": sum(count for _, count in tag_counts),
                "tag_events_last_month": variant_tags_qs.filter(created__gte=month_ago).count(),
+               "tags_without_build_coordinate": without_coordinate_qs.count(),
                # Tags to start the grids filtered on - variants must carry all of them
                "initial_tags": request.GET.getlist("tag"),
                # User to start the grids filtered on - @see user page tags card

@@ -13,7 +13,7 @@
         $(document).ready(() => {
             if ($("#user-tagging").length) {
                 loadTagStatsCard("user-tagging",
-                                 "{% url 'tag_stats_for_other_user' genome_build.name other_user.pk %}",
+                                 "{% url 'tag_stats_for_other_user' other_user.pk %}",
                                  renderTagStatsUser);
             }
         });
@@ -52,10 +52,10 @@
                 {% labelled label="Classifications" %}{{ classifications_count }}{% endlabelled %}
             </div>
         </div>
-        {% if url_name_visible.genome_build_tag_stats %}
+        {% if url_name_visible.tag_stats %}
         <div class="card mt-4" id="user-tagging">
             <div class="card-header">
-                Tags ({{ genome_build }})
+                Tags
                 <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
             </div>
             <div class="card-body">
@@ -64,7 +64,7 @@
             </div>
             <div class="card-footer link-toolbar">
                 <a href="{% url 'genome_build_variant_tags' genome_build.name %}?user={{ other_user.pk }}">View tags by this user</a>
-                <a href="{% url 'genome_build_tag_stats' genome_build.name %}">View tag stats</a>
+                <a href="{% url 'tag_stats' %}">View tag stats</a>
             </div>
         </div>
         {% endif %}
