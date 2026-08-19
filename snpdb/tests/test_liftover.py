@@ -1,16 +1,21 @@
-from django.test import TestCase
+from django.db import connection
+from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.liftover import (
+    _batch_alleles,
+    _get_build_liftover_dicts,
     _liftover_using_dest_variant_coordinate,
     _liftover_using_existing_contig,
     _liftover_using_source_variant_coordinate,
     _non_standard_contig_error,
 )
-from snpdb.models import AlleleConversionTool, GenomeBuild, VariantCoordinate
+from snpdb.models import Allele, AlleleConversionTool, GenomeBuild, VariantCoordinate
+from snpdb.tasks.liftover_tasks import _allele_id_batches
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 
 class TestLiftover(TestCase):
@@ -81,3 +86,61 @@ class TestLiftover(TestCase):
         scaffold_vc = VariantCoordinate(chrom=scaffold.name, position=1000, ref='A', alt='T')
         error = _non_standard_contig_error(grch37, scaffold_vc)
         self.assertIn(scaffold.get_role_display(), error)
+
+
+class TestLiftoverBatching(TestCase):
+    NUM_ALLELES = 5
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alleles = [Allele.objects.create() for _ in range(cls.NUM_ALLELES)]
+
+    @override_settings(LIFTOVER_BATCH_SIZE=2)
+    def test_batch_alleles_pages_queryset(self):
+        allele_qs = Allele.objects.filter(pk__in=[a.pk for a in self.alleles])
+        batches = list(_batch_alleles(allele_qs))
+        self.assertEqual([len(b) for b in batches], [2, 2, 1])
+        # Paging by pk needs to cover every allele exactly once
+        batched_pks = [allele.pk for batch in batches for allele in batch]
+        self.assertEqual(sorted(batched_pks), sorted(a.pk for a in self.alleles))
+
+    @override_settings(LIFTOVER_BATCH_SIZE=2)
+    def test_batch_alleles_handles_list(self):
+        batches = list(_batch_alleles(self.alleles))
+        self.assertEqual([len(b) for b in batches], [2, 2, 1])
+
+    @override_settings(LIFTOVER_BATCH_SIZE=2)
+    def test_allele_id_batches(self):
+        allele_qs = Allele.objects.filter(pk__in=[a.pk for a in self.alleles])
+        pks = sorted(a.pk for a in self.alleles)
+        expected = [(pks[0], pks[1]), (pks[2], pks[3]), (pks[4], pks[4])]
+        self.assertEqual(list(_allele_id_batches(allele_qs)), expected)
+
+
+class TestLiftoverQueries(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+            get_fake_annotation_version(genome_build)
+
+    @staticmethod
+    def _create_alleles(num_alleles: int, start_position: int) -> list[Allele]:
+        grch37 = GenomeBuild.grch37()
+        return [create_mock_allele(slowly_create_test_variant("3", start_position + i, 'A', 'T', grch37), grch37)
+                for i in range(num_alleles)]
+
+    @override_settings(LIFTOVER_BCFTOOLS_ENABLED=False)
+    def test_queries_do_not_scale_with_alleles(self):
+        """ The liftover checks used to query per allele (ClinGen failures, VariantAlleles, ...) """
+        grch37 = GenomeBuild.grch37()
+        grch38 = GenomeBuild.grch38()
+
+        def _num_queries(alleles) -> int:
+            with CaptureQueriesContext(connection) as context:
+                _get_build_liftover_dicts(alleles, grch37, [grch38])
+            return len(context.captured_queries)
+
+        _num_queries(self._create_alleles(1, 1000))  # Warm up cached contigs/HGVS matcher
+        one_allele = _num_queries(self._create_alleles(1, 2000))
+        five_alleles = _num_queries(self._create_alleles(5, 3000))
+        self.assertEqual(one_allele, five_alleles)

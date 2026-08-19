@@ -456,6 +456,9 @@ PARTITION_ARCHIVE_DIR = "/data/database/partition_dumps/"
 LIFTOVER_CLASSIFICATIONS = True
 LIFTOVER_TO_CHROMOSOMES_ONLY = True  # False = Liftover to alt/patches
 LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to dbSNP IDs being for loci
+# Alleles per liftover pipeline. Everything for a batch (alleles, variant coordinates, AlleleLiftover
+# records) is held in memory while the VCF is written, so a whole-database liftover needs to be split up
+LIFTOVER_BATCH_SIZE = 10_000
 
 LIFTOVER_BCFTOOLS_ENABLED = True
 # 2025-02-13 - bcftools liftover currently gives a warning about symbolic variants

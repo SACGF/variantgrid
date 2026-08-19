@@ -121,7 +121,8 @@ class LiftoverPreprocessVCFTask(ImportVCFStepTask):
             al.error = {"message": "BCFTools liftover SWAP=1: variant is reference allele in destination build"}
             records.append(al)
         if records:
-            AlleleLiftover.objects.bulk_update(records, fields=["status", "error"])
+            AlleleLiftover.objects.bulk_update(records, fields=["status", "error"],
+                                               batch_size=AlleleLiftover.BULK_UPDATE_BATCH_SIZE)
 
 
 class CheckStartAnnotationTask(ImportVCFStepTask):

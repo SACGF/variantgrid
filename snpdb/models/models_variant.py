@@ -1,5 +1,6 @@
 import logging
 import re
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
@@ -211,7 +212,8 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     @staticmethod
     def missing_variants_for_build(genome_build) -> QuerySet['Allele']:
         alleles_with_variants_qs = Allele.objects.filter(variantallele__isnull=False)
-        return alleles_with_variants_qs.filter(~Q(variantallele__genome_build=genome_build))
+        # distinct as the variantallele join returns an allele once per build it's already in
+        return alleles_with_variants_qs.filter(~Q(variantallele__genome_build=genome_build)).distinct()
 
     def __str__(self):
         name = f"Allele {self.pk}"
@@ -1146,6 +1148,8 @@ class LiftoverRun(TimeStampedModel):
 
 class AlleleLiftover(models.Model):
     ERROR_JSON_MESSAGE_KEY = "message"
+    # bulk_update writes a CASE per record, so keep batches small or Postgres crawls on big liftovers
+    BULK_UPDATE_BATCH_SIZE = 1000
 
     liftover = models.ForeignKey(LiftoverRun, on_delete=CASCADE)
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
@@ -1194,10 +1198,16 @@ class AlleleLiftover(models.Model):
         return s
 
     @staticmethod
-    def has_existing_failure(allele, dest_genome_build, conversion_tool) -> bool:
-        return allele.alleleliftover_set.filter(liftover__genome_build=dest_genome_build,
-                                                liftover__conversion_tool=conversion_tool,
-                                                status=ProcessingStatus.ERROR).exists()
+    def get_failed_conversion_tools(allele_ids: Iterable[int], dest_genome_build) -> dict[int, set[str]]:
+        """ allele_id -> conversion tools that have already failed lifting it over to dest_genome_build
+            Done for a batch of alleles at once, as liftover checks this for every allele/tool """
+        qs = AlleleLiftover.objects.filter(allele__in=allele_ids,
+                                           liftover__genome_build=dest_genome_build,
+                                           status=ProcessingStatus.ERROR)
+        failed_conversion_tools = defaultdict(set)
+        for allele_id, conversion_tool in qs.values_list("allele_id", "liftover__conversion_tool"):
+            failed_conversion_tools[allele_id].add(conversion_tool)
+        return failed_conversion_tools
 
     @staticmethod
     def get_last_failed_liftover_run(allele, genome_build) -> Optional['LiftoverRun']:
