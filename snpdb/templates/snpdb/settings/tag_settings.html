@@ -80,6 +80,11 @@
                         {% if user.is_superuser %}
                             <td>
                                 <a class="btn btn-outline-danger btn-sm" href="{% url 'tag_merge' ts.tag_id %}">Merge away</a>
+                                <form class="d-inline" method="post" action="{% url 'tag_retire' ts.tag_id %}"
+                                      onsubmit="return confirm('Stop offering {{ ts.tag_id }}? Existing tagging is left alone.')">
+                                    {% csrf_token %}
+                                    <button class="btn btn-outline-secondary btn-sm" type="submit">Retire</button>
+                                </form>
                             </td>
                         {% endif %}
                     </tr>
@@ -87,6 +92,72 @@
                 </tbody>
             </table>
         </div>
+
+        {% if retired_tags %}
+            <div>
+                <h3>Retired Tags</h3>
+                <p>These are no longer offered when tagging, but keep their name so old links and history still resolve.</p>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Tag</th>
+                            <th>Merged into</th>
+                            <th>Retired</th>
+                            {% if user.is_superuser %}<th></th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for tag in retired_tags %}
+                        <tr>
+                            <td>{{ tag.pk }}</td>
+                            <td>
+                                {% if tag.merged_into_id %}
+                                    <span class='grid-tag tagged-{{ tag.merged_into_id }}'><span class='user-tag-colored'> {{ tag.merged_into_id }}</span></span>
+                                {% endif %}
+                            </td>
+                            <td>{{ tag.retired }}</td>
+                            {% if user.is_superuser %}
+                                <td>
+                                    <form method="post" action="{% url 'tag_reinstate' tag.pk %}">
+                                        {% csrf_token %}
+                                        <button class="btn btn-outline-secondary btn-sm" type="submit">Reinstate</button>
+                                    </form>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        {% if tag_operations %}
+            <div>
+                <h3>Tag History</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Tag</th>
+                            <th>Operation</th>
+                            <th>Details</th>
+                            <th>By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for op in tag_operations %}
+                        <tr>
+                            <td>{{ op.timestamp }}</td>
+                            <td>{{ op.tag_id }}</td>
+                            <td>{{ op.operation }}</td>
+                            <td>{{ op.detail }}</td>
+                            <td>{{ op.user|default_if_none:"" }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
 
         <h3>Tag colour schemes</h3>
 
