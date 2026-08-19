@@ -29,6 +29,9 @@ class AnnotSVRunner(AnnotationPipelineRunner):
     # only feeds its Samples_ID reporting.
     dump_samples = ["variantgrid"]
 
+    def supports_genome_build(self, genome_build) -> bool:
+        return genome_build.name in settings.ANNOTATION_ANNOTSV_GENOME_BUILD
+
     def get_current_tool_version(self, genome_build) -> dict:
         return {
             "code_version": get_annotsv_command_line_version(),

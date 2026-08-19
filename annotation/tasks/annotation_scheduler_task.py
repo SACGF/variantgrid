@@ -140,11 +140,14 @@ def _scheduled_pipeline_versions(
         VariantAnnotationVersion).
 
         A versioned pipeline with nothing ACTIVE is enabled but unregistered, so it is skipped rather than
-        scheduled against nothing - the annotation runs page says which command registers it. """
+        scheduled against nothing - the annotation runs page offers the button that registers it. """
     pipeline_versions = {}
     for pipeline_type in enabled_pipeline_types():
+        runner = get_runner(pipeline_type)
+        if not runner.supports_genome_build(genome_build):
+            continue  # tool ships no annotations for this build - nothing to schedule against
         pipeline_version = None
-        if get_runner(pipeline_type).versioned:
+        if runner.versioned:
             pipeline_version = AnnotationPipelineVersion.get_active(pipeline_type, genome_build)
             if pipeline_version is None:
                 logging.warning("%s is enabled for %s but has no ACTIVE AnnotationPipelineVersion - run "

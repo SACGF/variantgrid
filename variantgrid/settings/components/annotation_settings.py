@@ -370,10 +370,14 @@ ANNOTATION_ANNOTSV_BIN = "/data/annotation/AnnotSV/bin/AnnotSV"
 # Passed as -annotationsDir: the directory *containing* Annotations_Human (and Annotations_Exomiser),
 # ie <install>/share/AnnotSV - not Annotations_Human itself
 ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/AnnotSV/share/AnnotSV"
-# Map our genome build name -> AnnotSV's -genomeBuild value
+# Map our genome build name -> AnnotSV's -genomeBuild value. A build absent from here is one this
+# AnnotSV cannot annotate, so the runs page offers no registration for it and the scheduler skips it.
+# CHM13 arrived in AnnotSV 3.5 (Annotations_Human 3.5 bundle) - deployments on an older AnnotSV drop
+# that entry in their env settings file.
 ANNOTATION_ANNOTSV_GENOME_BUILD = {
     BUILD_GRCH37: "GRCh37",
     BUILD_GRCH38: "GRCh38",
+    BUILD_T2TV2: "CHM13",
 }
 # Annotations bundle has no version stamp file; admin sets this to the bundle release string they
 # installed (eg "3.5.8"). Becomes AnnotationPipelineVersion.data_version, so a new bundle is registered

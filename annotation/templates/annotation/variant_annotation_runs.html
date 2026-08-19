@@ -141,14 +141,22 @@
                             <h6 class="mt-3">{{ panel.label }} ({{ panel.genome_build }})</h6>
                             {% if not panel.enabled %}
                                 {% labelled label="Status" %}<span class="text-muted">Disabled in settings</span>{% endlabelled %}
-                            {% elif panel.active %}
-                                {% labelled label="Active" %}{{ panel.active }}{% endlabelled %}
+                            {% elif not panel.supported %}
+                                {% labelled label="Status" %}<span class="text-muted">Not supported for this genome build</span>{% endlabelled %}
                             {% else %}
-                                <div class="alert alert-warning" role="alert">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                    Enabled, but no version registered - no runs are being created. Register the installed tool with:
-                                    <div><code>{{ panel.register_command }}</code></div>
-                                </div>
+                                {% if panel.active %}
+                                    {% labelled label="Active" %}{{ panel.active }}{% endlabelled %}
+                                {% else %}
+                                    <div class="alert alert-warning" role="alert">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        Enabled, but no version registered - no runs are being created.
+                                        Register the installed tool below, or with:
+                                        <div><code>{{ panel.register_command }}</code></div>
+                                    </div>
+                                {% endif %}
+                                <button name="{{ panel.register_name }}" class="btn btn-primary">
+                                    Register installed tool
+                                </button>
                             {% endif %}
                             {% if panel.new %}
                                 {% labelled label="New" %}{{ panel.new }}{% endlabelled %}

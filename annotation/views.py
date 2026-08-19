@@ -33,7 +33,7 @@ from annotation.models.models import (
 )
 from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
-from annotation.pipelines import get_pipeline, versioned_pipeline_types, vep_pipeline_types
+from annotation.pipelines import get_pipeline, get_runner, versioned_pipeline_types, vep_pipeline_types
 from annotation.models.models_version_diff import VersionDiff
 from annotation.pathogenicity_predictions import TOOLS
 from annotation.tasks.annotate_variants import annotation_run_retry
@@ -387,6 +387,49 @@ def view_version_diff(request, version_diff_id):
     return render(request, "annotation/view_version_diff.html", context)
 
 
+def _register_pipeline_version_post_name(pipeline_type, genome_build) -> str:
+    return f"register-pipeline-version-{pipeline_type}-{genome_build.name}"
+
+
+def _handle_register_pipeline_version_post(request):
+    """ #720: the runs page equivalent of create_new_annotation_pipeline_version - reads the installed
+        tool's version and registers it, so rolling out an upgrade doesn't need shell access. """
+    for pipeline_type in versioned_pipeline_types():
+        runner = get_runner(pipeline_type)
+        label = VariantAnnotationPipelineType(pipeline_type).label
+        for genome_build in GenomeBuild.builds_with_annotation():
+            if _register_pipeline_version_post_name(pipeline_type, genome_build) not in request.POST:
+                continue
+            if not get_pipeline(pipeline_type).enabled:
+                messages.add_message(request, messages.ERROR, f"{label} is not enabled in settings")
+                continue
+            if not runner.supports_genome_build(genome_build):
+                messages.add_message(request, messages.ERROR,
+                                     f"{label} does not support {genome_build}")
+                continue
+            try:
+                pipeline_version, created = runner.get_or_create_current_version(genome_build)
+            except OSError as e:
+                # Reading the version shells out to the tool, which the web worker may not have installed
+                messages.add_message(request, messages.ERROR,
+                                     f"{label} ({genome_build}) - couldn't read the installed version: {e}")
+                continue
+
+            if not created:
+                messages.add_message(request, messages.INFO,
+                                     f"{label} ({genome_build}) - installed tool is already registered as "
+                                     f"{pipeline_version} [{pipeline_version.get_status_display()}]")
+            elif pipeline_version.is_active:
+                annotation_scheduler.si().apply_async()
+                messages.add_message(request, messages.INFO,
+                                     f"{label} ({genome_build}) - registered {pipeline_version} as ACTIVE "
+                                     f"and queued the scheduler to create its annotation runs")
+            else:
+                messages.add_message(request, messages.INFO,
+                                     f"{label} ({genome_build}) - registered {pipeline_version} as NEW. "
+                                     f"Promote it to re-annotate every range with it.")
+
+
 @require_superuser
 def variant_annotation_runs(request):
     as_display = dict(AnnotationStatus.choices)
@@ -424,6 +467,8 @@ def variant_annotation_runs(request):
                 messages.add_message(request, messages.INFO,
                                      f"Promoted {pipeline_version} to ACTIVE - queued the scheduler to "
                                      f"create its annotation runs")
+
+        _handle_register_pipeline_version_post(request)
 
         for genome_build in GenomeBuild.builds_with_annotation():
             if f"promote-to-active-{genome_build.name}" in request.POST:
@@ -541,11 +586,13 @@ def variant_annotation_runs(request):
                 "genome_build": genome_build,
                 "label": VariantAnnotationPipelineType(pipeline_type).label,
                 "enabled": get_pipeline(pipeline_type).enabled,
+                "supported": get_runner(pipeline_type).supports_genome_build(genome_build),
                 "active": AnnotationPipelineVersion.get_active(pipeline_type, genome_build),
                 "new": AnnotationPipelineVersion.get_new(pipeline_type, genome_build),
                 "historical_count": AnnotationPipelineVersion.objects.filter(
                     pipeline_type=pipeline_type, genome_build=genome_build,
                     status=AnnotationPipelineVersion.Status.HISTORICAL).count(),
+                "register_name": _register_pipeline_version_post_name(pipeline_type, genome_build),
                 "register_command": f"python3 manage.py create_new_annotation_pipeline_version "
                                     f"--pipeline-type={pipeline_type} --genome-build={genome_build}",
             })

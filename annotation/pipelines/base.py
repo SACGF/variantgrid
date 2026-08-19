@@ -37,6 +37,12 @@ class AnnotationPipelineRunner(abc.ABC):
     # what VEP takes - set by a pipeline whose tool rejects a VCF with no FORMAT column.
     dump_samples: list[str] = None
 
+    def supports_genome_build(self, genome_build) -> bool:
+        """ Whether this pipeline's tool can annotate this build at all. A tool only ships annotations for
+            some of the builds we run, so an unsupported build is a permanent property of the install
+            rather than something an admin registers their way out of. """
+        return True
+
     def get_current_tool_version(self, genome_build) -> dict:
         """ code_version/data_version of the tool as installed right now - AnnotationPipelineVersion
             field values, for a versioned pipeline. Usually shells out to the tool, so callers are

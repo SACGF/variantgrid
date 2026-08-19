@@ -234,6 +234,67 @@ class PromotePipelineVersionViewTest(TestCase):
         scheduler.si.assert_called_once()
 
 
+@override_settings(ANNOTATION_ANNOTSV_ENABLED=True,
+                   ANNOTATION_ANNOTSV_GENOME_BUILD={"GRCh37": "GRCh37"},
+                   ANNOTATION_ANNOTSV_BUNDLE_VERSION="3.5")
+class RegisterPipelineVersionViewTest(TestCase):
+    """ #720: registering the installed tool from the runs page rather than the command line - the button
+        the template posts and the handler that reads it have to keep agreeing. """
+
+    def setUp(self):
+        super().setUp()
+        self.user = User.objects.create_superuser("register_test_admin", "register@test.com", "password")
+        self.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        self.client.force_login(self.user)
+        self.post_name = f"register-pipeline-version-{ANNOTSV}-{self.genome_build.name}"
+
+    def test_page_offers_the_register_button(self):
+        response = self.client.get(reverse("variant_annotation_runs"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.post_name)
+
+    def test_registering_creates_active_version_and_queues_the_scheduler(self):
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value="3.5.10"), \
+                mock.patch("annotation.views.annotation_scheduler") as scheduler:
+            response = self.client.post(reverse("variant_annotation_runs"), {self.post_name: "1"})
+        self.assertEqual(response.status_code, 200)
+        pipeline_version = AnnotationPipelineVersion.get_active(ANNOTSV, self.genome_build)
+        self.assertEqual(pipeline_version.code_version, "3.5.10")
+        self.assertEqual(pipeline_version.data_version, "3.5")
+        scheduler.si.assert_called_once()
+
+    def test_registering_an_upgrade_creates_a_new_version_to_promote(self):
+        AnnotationPipelineVersion.objects.create(
+            pipeline_type=ANNOTSV, genome_build=self.genome_build, code_version="3.5.8",
+            data_version="3.5", status=AnnotationPipelineVersion.Status.ACTIVE)
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value="3.5.10"):
+            self.client.post(reverse("variant_annotation_runs"), {self.post_name: "1"})
+        new_version = AnnotationPipelineVersion.get_new(ANNOTSV, self.genome_build)
+        self.assertEqual(new_version.code_version, "3.5.10")
+        self.assertEqual(AnnotationPipelineVersion.get_active(ANNOTSV, self.genome_build).code_version,
+                         "3.5.8")
+
+    def test_missing_binary_reports_an_error_rather_than_500(self):
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        side_effect=FileNotFoundError("/fake/AnnotSV")):
+            response = self.client.post(reverse("variant_annotation_runs"), {self.post_name: "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(AnnotationPipelineVersion.get_active(ANNOTSV, self.genome_build))
+
+    def test_unsupported_build_is_neither_offered_nor_registered(self):
+        t2t = GenomeBuild.t2tv2()
+        post_name = f"register-pipeline-version-{ANNOTSV}-{t2t.name}"
+        response = self.client.get(reverse("variant_annotation_runs"))
+        self.assertNotContains(response, post_name)
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value="3.5.10"):
+            self.client.post(reverse("variant_annotation_runs"), {post_name: "1"})
+        self.assertFalse(AnnotationPipelineVersion.objects.filter(pipeline_type=ANNOTSV,
+                                                                 genome_build=t2t).exists())
+
+
 class ExecuteCmdTimeoutTest(TestCase):
     """ #720: AnnotSV needs a timeout on execute_cmd before it can move off subprocess.run and onto the
         lease heartbeat's process_callback. """
