@@ -35,6 +35,9 @@ class Command(BaseCommand):
 
         runner = get_runner(pipeline_type)
         for genome_build in genome_builds:
+            if not runner.supports_genome_build(genome_build):
+                self.stdout.write(f"{genome_build}: not supported by {pipeline_type.label} - skipping")
+                continue
             pipeline_version, created = runner.get_or_create_current_version(genome_build)
             if created:
                 logging.info("Created: %s", pipeline_version)
